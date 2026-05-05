@@ -1,0 +1,8 @@
+﻿{
+  "name": "@arrange/vite-plugin",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": { ".": { "types": "./src/index.d.ts", "import": "./src/index.mjs" } },
+  "peerDependencies": { "vite": ">=5" },
+  "peerDependenciesMeta": { "vite": { "optional": true } }
+}

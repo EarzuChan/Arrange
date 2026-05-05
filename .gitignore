@@ -1,0 +1,10 @@
+third_party/
+cmake-build-*/
+build/
+.idea/
+tests/smoke/*.output.json
+node_modules/
+.pnpm-store/
+pnpm-debug.log*
+artifacts/
+demo/plugin-src/ui/
