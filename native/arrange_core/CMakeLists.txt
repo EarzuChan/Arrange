@@ -1,13 +1,19 @@
-﻿add_library(arrange_core STATIC
+add_library(arrange_core STATIC
   src/Version.cpp
+  src/EventSlot.cpp
   src/PropValue.cpp
   src/TextLayoutService.cpp
+  src/InputIntent.cpp
+  src/Invalidation.cpp
   src/Bridge.cpp
-  src/RenderTree.cpp
+  src/MutationTransaction.cpp
+  src/NativeScene.cpp
+  src/LayoutTree.cpp
+  src/SceneFramePipeline.cpp
   src/Modifier.cpp
   src/Layout.cpp
   src/HitTest.cpp
-  src/PointerDispatcher.cpp
+  src/PointerInputProcessor.cpp
   src/Scroll.cpp
   src/InputEditing.cpp
   src/Paint.cpp

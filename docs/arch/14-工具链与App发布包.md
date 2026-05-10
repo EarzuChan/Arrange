@@ -53,7 +53,7 @@ Arrange 约定：把 `dist/` 作为一个可加载的 UI 产物包目录。默�
 
 ```txt
 ui/
-  app.mjs
+  app.js
   chunks/...
   assets/...
   其他入口文件（可选）

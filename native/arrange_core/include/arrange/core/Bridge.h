@@ -36,7 +36,7 @@ namespace arrange::core {
         std::string key;
         std::string value;
         std::string text;
-        std::string modifierDebugJson;
+        std::string modifierPayload;
     };
 
     struct BridgeBatch {

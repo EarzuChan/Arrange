@@ -79,7 +79,7 @@ JS requestAnimationFrame(cb)
 -> 执行本帧 RAF callbacks
 -> drain 本帧产生的 microtasks
 -> 读取 incremental Bridge batch
--> C++ RenderTree apply
+-> C++ LayoutTree apply
 -> layout / dirty / repaint
 -> 若仍有 pending RAF，继续下一帧；否则停止或降频
 ```
@@ -90,7 +90,7 @@ JS requestAnimationFrame(cb)
 reactive state
 -> Vue patch
 -> Bridge prop / modifier update
--> RenderTree dirty
+-> LayoutTree dirty
 -> Layout / PaintModel DrawOps
 -> JUCE repaint
 ```
@@ -106,7 +106,7 @@ QuickJS callback 返回时可以 drain 当前必须完成的 microtasks，但不
 `arrange_core` 仍然只维护：
 
 ```txt
-RenderTree / LayoutEngine / PaintModel / HitTester / ScrollDispatcher / InputEditing / TextLayoutService / Invalidation
+LayoutTree / LayoutEngine / PaintModel / HitTester / ScrollDispatcher / InputEditing / TextLayoutService / Invalidation
 ```
 
 它不实现 Vue 动画语义；它只消费每帧 Bridge 更新后的事实树，并产出 layout / DrawOps。
@@ -139,7 +139,7 @@ target reactive state change
 -> host frame tick
 -> animateColorAsState 产生中间色
 -> Vue renderer commit incremental modifier prop
--> native RenderTree apply
+-> native LayoutTree apply
 -> PaintModel DrawOps background color 为中间色
 -> 后续 tick 到最终色
 ```

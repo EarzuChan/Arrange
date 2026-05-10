@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <arrange/core/InputEditing.h>
 #include <arrange/core/Node.h>

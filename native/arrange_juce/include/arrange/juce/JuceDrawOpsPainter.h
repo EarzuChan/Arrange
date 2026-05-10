@@ -25,7 +25,7 @@ namespace arrange::juce {
         PaintResult paint(
             ::juce::Graphics& g,
             const std::vector<arrange::core::DrawOp>& ops,
-            ImageResourceCache& imageResources,
+            const ImageResourceCache& imageResources,
             std::optional<arrange::core::NodeId> focusedInputNode = std::nullopt,
             float focusedInputViewportX = 0.0f) const;
 

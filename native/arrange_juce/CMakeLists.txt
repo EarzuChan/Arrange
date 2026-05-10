@@ -2,7 +2,9 @@ add_library(arrange_juce STATIC
   src/AppResolver.cpp
   src/DevServerClient.cpp
   src/ErrorScreenModel.cpp
+  src/FramePlanner.cpp
   src/HeadlessArrangeEditor.cpp
+  src/ScenePipelineState.cpp
 )
 
 target_include_directories(arrange_juce PUBLIC include)
@@ -11,14 +13,35 @@ target_link_libraries(arrange_juce PUBLIC arrange_core arrange_quickjs)
 if(TARGET juce::juce_audio_processors)
   target_sources(arrange_juce PRIVATE
     src/ArrangeEditor.cpp
+    src/ArrangeRuntime.cpp
+    src/EditorChromeModel.cpp
+    src/CompositionHost.cpp
+    src/DiagnosticsState.cpp
     src/DiagnosticsOverlay.cpp
+    src/DiagnosticsScene.cpp
+    src/EditorDebugActions.cpp
+    src/EditorFrameClock.cpp
+    src/EditorSceneHost.cpp
+    src/EditorTimerDriver.cpp
+    src/FramePumpDriver.cpp
     src/ImageResourceCache.cpp
+    src/InteractionStateOwner.cpp
+    src/TextInputOwner.cpp
+    src/TextInputMutationSink.cpp
     src/InputTextSession.cpp
-    src/InputTextController.cpp
+    src/TextInputLayoutModel.cpp
     src/JuceDrawOpsPainter.cpp
     src/JuceTextServices.cpp
+    src/PackageRuntimeSource.cpp
+    src/PassivePaintRenderer.cpp
+    src/JucePointerInputAdapter.cpp
+    src/PointerInputState.cpp
+    src/JuceRepaintAdapter.cpp
+    src/RuntimePackageBinder.cpp
+    src/RuntimeSessionState.cpp
     src/RuntimePackageLoader.cpp
     src/ScriptEventBridge.cpp
+    src/JuceTextInputAdapter.cpp
   )
   target_compile_definitions(arrange_juce PUBLIC ARRANGE_JUCE_WITH_JUCE=1)
   target_link_libraries(arrange_juce PUBLIC

@@ -1,4 +1,4 @@
-#include <arrange/core/TextLayoutService.h>
+﻿#include <arrange/core/TextLayoutService.h>
 #include <arrange/core/TextMetrics.h>
 
 #include <algorithm>

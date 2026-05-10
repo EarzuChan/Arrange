@@ -1,11 +1,7 @@
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Modifier.h>
-#include <arrange/core/PropValue.h>
 
 #include <algorithm>
-#include <charconv>
-#include <string>
-#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -13,128 +9,76 @@ namespace arrange::core {
     namespace {
         bool contains(const Rect& rect, Point point) noexcept { return point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height; }
 
-        bool modifierHasType(const ArrangeNode& node, const char* type) {
-            const auto elements = parseModifierElements(node);
-            return std::any_of(elements.begin(), elements.end(), [type](const auto& element) { return element.type == type; });
-        }
-
-        float scrollValueFromModifier(const ArrangeNode& node, const char* type) {
-            for (const auto& element : parseModifierElements(node)) { if (element.type == type) return std::max(0.0f, element.number("state.value", element.number("value"))); }
-            return 0.0f;
-        }
-
-        std::uint32_t scrollCallbackFromModifier(const ArrangeNode& node) {
-            for (const auto& element : parseModifierElements(node)) {
-                if (element.type == "verticalScroll" || element.type == "horizontalScroll") {
-                    if (const auto handle = element.handle("state.__arrangeNativeScroll.callbackHandle"); handle != 0) return handle;
-                    if (const auto handle = element.handle("__arrangeNativeScroll.callbackHandle"); handle != 0) return handle;
-                    if (const auto handle = element.handle("callbackHandle"); handle != 0) return handle;
-                }
-            }
-            return 0;
-        }
-
-        void collectScrollTargets(const RenderTree& tree, NodeId id, Point point, const char* type, std::vector<NodeId>& targets, std::unordered_set<NodeId>& visited) {
+        void collectScrollTargets(const LayoutTree& tree, NodeId id, Point point, bool vertical, std::vector<NodeId>& targets, std::unordered_set<NodeId>& visited) {
             if (!tree.contains(id) || !visited.insert(id).second) return;
             const auto& node = tree.node(id);
             if (!contains(node.bounds, point)) return;
-            if (std::string_view(type) == "verticalScroll") {
-                const auto it = node.props.find("__arrangeVerticalScrollEnabled");
-                if (it != node.props.end() ? EncodedProp(it->second).boolValue(false) : modifierHasType(node, type)) targets.push_back(id);
-            }
-            else {
-                const auto it = node.props.find("__arrangeHorizontalScrollEnabled");
-                if (it != node.props.end() ? EncodedProp(it->second).boolValue(false) : modifierHasType(node, type)) targets.push_back(id);
-            }
-            for (auto childId : node.children) collectScrollTargets(tree, childId, point, type, targets, visited);
+            if (vertical ? ScrollDispatcher::hasVerticalScroll(node) : ScrollDispatcher::hasHorizontalScroll(node)) targets.push_back(id);
+            for (auto childId : node.children) collectScrollTargets(tree, childId, point, vertical, targets, visited);
         }
     } // namespace
 
-    ScrollResult ScrollDispatcher::verticalWheel(RenderTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit) const {
+    ScrollResult ScrollDispatcher::verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit) const {
         if (!tree.contains(root) || wheelDeltaY == 0.0f) return {};
         std::vector<NodeId> targets;
         std::unordered_set<NodeId> visited;
-        collectScrollTargets(tree, root, point, "verticalScroll", targets, visited);
+        collectScrollTargets(tree, root, point, true, targets, visited);
         if (targets.empty()) return {};
 
         ScrollResult blocked;
         for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
-            auto& node = tree.node(*it);
+            const auto& node = tree.node(*it);
             const auto contentHeight = verticalContentHeight(tree, node);
             const auto maxValue = std::max(0.0f, contentHeight - node.bounds.height);
             const auto current = verticalScrollValue(node);
             const auto next = std::clamp(current - wheelDeltaY * pixelsPerWheelUnit, 0.0f, maxValue);
-            const auto callbackHandle = nativeScrollCallbackHandle(node, "__arrangeVerticalScrollCallback");
-            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.height, contentHeight, callbackHandle};
+            const auto eventSlot = nativeScrollEventSlot(node, EventSlotKind::VerticalScroll);
+            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.height, contentHeight, eventSlot};
             if (next == current) continue;
-
-            setVerticalScrollValue(node, next);
-            return {true, *it, next, maxValue, node.bounds.height, contentHeight, callbackHandle};
+            return {true, *it, next, maxValue, node.bounds.height, contentHeight, eventSlot};
         }
         return blocked;
     }
 
-    ScrollResult ScrollDispatcher::horizontalWheel(RenderTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit) const {
+    ScrollResult ScrollDispatcher::horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit) const {
         if (!tree.contains(root) || wheelDeltaX == 0.0f) return {};
         std::vector<NodeId> targets;
         std::unordered_set<NodeId> visited;
-        collectScrollTargets(tree, root, point, "horizontalScroll", targets, visited);
+        collectScrollTargets(tree, root, point, false, targets, visited);
         if (targets.empty()) return {};
 
         ScrollResult blocked;
         for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
-            auto& node = tree.node(*it);
+            const auto& node = tree.node(*it);
             const auto contentWidth = horizontalContentWidth(tree, node);
             const auto maxValue = std::max(0.0f, contentWidth - node.bounds.width);
             const auto current = horizontalScrollValue(node);
             const auto next = std::clamp(current - wheelDeltaX * pixelsPerWheelUnit, 0.0f, maxValue);
-            const auto callbackHandle = nativeScrollCallbackHandle(node, "__arrangeHorizontalScrollCallback");
-            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.width, contentWidth, callbackHandle};
+            const auto eventSlot = nativeScrollEventSlot(node, EventSlotKind::HorizontalScroll);
+            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.width, contentWidth, eventSlot};
             if (next == current) continue;
-
-            setHorizontalScrollValue(node, next);
-            return {true, *it, next, maxValue, node.bounds.width, contentWidth, callbackHandle};
+            return {true, *it, next, maxValue, node.bounds.width, contentWidth, eventSlot};
         }
         return blocked;
     }
 
     bool ScrollDispatcher::hasVerticalScroll(const ArrangeNode& node) {
-        if (node.props.contains("__arrangeVerticalScrollEnabled")) return encodedBoolProp(node, "__arrangeVerticalScrollEnabled", false);
-        return modifierHasType(node, "verticalScroll");
+        return node.modifier.scroll.vertical;
     }
 
     bool ScrollDispatcher::hasHorizontalScroll(const ArrangeNode& node) {
-        if (node.props.contains("__arrangeHorizontalScrollEnabled")) return encodedBoolProp(node, "__arrangeHorizontalScrollEnabled", false);
-        return modifierHasType(node, "horizontalScroll");
+        return node.modifier.scroll.horizontal;
     }
 
     float ScrollDispatcher::verticalScrollValue(const ArrangeNode& node) {
-        if (node.props.contains("__arrangeVerticalScrollValue")) return std::max(0.0f, encodedNumberProp(node, "__arrangeVerticalScrollValue", 0.0f));
-        if (!hasVerticalScroll(node)) return 0.0f;
-        return scrollValueFromModifier(node, "verticalScroll");
+        return hasVerticalScroll(node) ? node.modifier.scroll.verticalValue : 0.0f;
     }
 
     float ScrollDispatcher::horizontalScrollValue(const ArrangeNode& node) {
-        if (node.props.contains("__arrangeHorizontalScrollValue")) return std::max(0.0f, encodedNumberProp(node, "__arrangeHorizontalScrollValue", 0.0f));
-        if (!hasHorizontalScroll(node)) return 0.0f;
-        return scrollValueFromModifier(node, "horizontalScroll");
+        return hasHorizontalScroll(node) ? node.modifier.scroll.horizontalValue : 0.0f;
     }
 
-    void ScrollDispatcher::setVerticalScrollValue(ArrangeNode& node, float value) {
-        node.props["__arrangeVerticalScrollValue"] = "f:" + std::to_string(std::max(0.0f, value));
-        markDirty(node, DirtyFlag::Layout);
-        markDirty(node, DirtyFlag::Paint);
-        markDirty(node, DirtyFlag::HitTest);
-    }
-
-    void ScrollDispatcher::setHorizontalScrollValue(ArrangeNode& node, float value) {
-        node.props["__arrangeHorizontalScrollValue"] = "f:" + std::to_string(std::max(0.0f, value));
-        markDirty(node, DirtyFlag::Layout);
-        markDirty(node, DirtyFlag::Paint);
-        markDirty(node, DirtyFlag::HitTest);
-    }
-
-    float ScrollDispatcher::verticalContentHeight(const RenderTree& tree, const ArrangeNode& node) {
+    float ScrollDispatcher::verticalContentHeight(const LayoutTree& tree, const ArrangeNode& node) {
         if (node.children.empty()) return node.bounds.height;
         float top = 0.0f;
         float bottom = 0.0f;
@@ -155,7 +99,7 @@ namespace arrange::core {
         return std::max(0.0f, bottom - top);
     }
 
-    float ScrollDispatcher::horizontalContentWidth(const RenderTree& tree, const ArrangeNode& node) {
+    float ScrollDispatcher::horizontalContentWidth(const LayoutTree& tree, const ArrangeNode& node) {
         if (node.children.empty()) return node.bounds.width;
         float left = 0.0f;
         float right = 0.0f;
@@ -176,12 +120,13 @@ namespace arrange::core {
         return std::max(0.0f, right - left);
     }
 
-    std::uint32_t ScrollDispatcher::nativeScrollCallbackHandle(const ArrangeNode& node, const char* nativeProp) {
-        if (const auto handle = encodedHandleProp(node, nativeProp); handle != 0) return handle;
-        return scrollCallbackFromModifier(node);
+    EventSlotId ScrollDispatcher::nativeScrollEventSlot(const ArrangeNode& node, EventSlotKind kind) {
+        if (kind == EventSlotKind::VerticalScroll) return node.modifier.scroll.verticalEventSlot;
+        if (kind == EventSlotKind::HorizontalScroll) return node.modifier.scroll.horizontalEventSlot;
+        return {};
     }
 
-    NodeId ScrollDispatcher::findVerticalScrollTarget(const RenderTree& tree, NodeId id, Point point, NodeId fallback) {
+    NodeId ScrollDispatcher::findVerticalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
         std::unordered_set<NodeId> visited;
         auto currentFallback = fallback;
         std::vector<NodeId> stack{id};
@@ -197,7 +142,7 @@ namespace arrange::core {
         return currentFallback;
     }
 
-    NodeId ScrollDispatcher::findHorizontalScrollTarget(const RenderTree& tree, NodeId id, Point point, NodeId fallback) {
+    NodeId ScrollDispatcher::findHorizontalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
         std::unordered_set<NodeId> visited;
         auto currentFallback = fallback;
         std::vector<NodeId> stack{id};

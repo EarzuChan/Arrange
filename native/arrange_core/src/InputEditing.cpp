@@ -1,4 +1,4 @@
-#include <arrange/core/InputEditing.h>
+﻿#include <arrange/core/InputEditing.h>
 
 #include <algorithm>
 #include <string>

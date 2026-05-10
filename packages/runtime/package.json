@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": { "types": "./src/index.d.ts", "import": "./src/index.mjs" },
-    "./test": { "types": "./src/test/index.d.ts", "import": "./src/test/index.mjs" }
+    ".": { "import": "./src/index.ts" },
+    "./test": { "import": "./src/test/index.ts" }
   },
   "dependencies": {
     "vue": "^3.5.0"

@@ -1,4 +1,4 @@
-# 主模型
+﻿# 主模型
 
 Arrange 的公开入口是 `ArrangeEditor`。用户在 JUCE 侧直接返回一个 Editor，Arrange 托管整个 Editor UI。
 
@@ -35,7 +35,7 @@ ui-src/
 
 ```txt
 ui/
-  app.mjs
+  app.js
   chunks/...
   assets/...
   其他入口文件（可选）
@@ -117,7 +117,7 @@ Editor 内统一绘制运行状态 badge：
 
 Standalone 额外尝试把标题栏设置为 `Arrange Demo [live]` 或 `Arrange Demo [dist]`。VST3 宿主外层标题栏不作为可靠显示渠道。
 
-badge、标题、toast、错误屏与日志的统一约束见 `docs/arch/25-开发期诊断表层.md`。
+badge、标题、toast、错误屏与日志的统一约束见 [开发期诊断表层](25-开发期诊断表层.md)。
 
 # Window / Editor config
 

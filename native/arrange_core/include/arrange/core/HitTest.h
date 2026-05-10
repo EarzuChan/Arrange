@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "Geometry.h"
-#include "RenderTree.h"
+#include "LayoutTree.h"
 
 namespace arrange::core {
     struct HitTestResult {
@@ -12,8 +12,8 @@ namespace arrange::core {
 
     class HitTester {
     public:
-        HitTestResult hitTest(const RenderTree& tree, NodeId root, Point point) const;
-        HitTestResult hitTestClickable(const RenderTree& tree, NodeId root, Point point) const;
+        HitTestResult hitTest(const LayoutTree& tree, NodeId root, Point point) const;
+        HitTestResult hitTestClickable(const LayoutTree& tree, NodeId root, Point point) const;
 
     private:
         static bool contains(Rect rect, Point point) noexcept;

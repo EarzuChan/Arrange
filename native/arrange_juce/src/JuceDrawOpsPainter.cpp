@@ -156,7 +156,7 @@ namespace arrange::juce {
     JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(
         ::juce::Graphics& g,
         const std::vector<arrange::core::DrawOp>& ops,
-        ImageResourceCache& imageResources,
+        const ImageResourceCache& imageResources,
         std::optional<arrange::core::NodeId> focusedInputNode,
         float focusedInputViewportX) const {
         g.saveState();
@@ -187,12 +187,8 @@ namespace arrange::juce {
                 drawText(g, op, op.inputText && focusedInputNode && op.nodeId == *focusedInputNode ? focusedInputViewportX : 0.0f);
                 break;
             case arrange::core::DrawOpType::DrawImage:
-                if (const auto image = imageResources.load(op.resource); image.isValid()) { drawImageOp(g, image, rect, op); }
+                if (const auto image = imageResources.find(op.resource); image.isValid()) { drawImageOp(g, image, rect, op); }
                 else {
-                    if (imageResources.lastError()) {
-                        restoreGraphicsState();
-                        return {*imageResources.lastError()};
-                    }
                     g.setColour(::juce::Colour(0xff151922));
                     g.fillRect(rect);
                     g.setColour(::juce::Colour(op.color).withAlpha(0.42f));
@@ -211,6 +207,15 @@ namespace arrange::juce {
                 g.fillPath(path);
                 break;
             }
+            case arrange::core::DrawOpType::DrawLine:
+                g.setColour(::juce::Colour(op.color));
+                g.drawLine(
+                    rect.getX(),
+                    rect.getY(),
+                    op.lineEnd.x,
+                    op.lineEnd.y,
+                    std::max(1.0f, op.strokeWidth));
+                break;
             case arrange::core::DrawOpType::PushClip:
                 g.saveState();
                 ++graphicsStateDepth;

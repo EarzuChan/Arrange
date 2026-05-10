@@ -35,11 +35,11 @@ namespace arrange {
             return result;
         }
         if (!std::filesystem::exists(result.entryPath)) {
-            result.error = "Arrange UI package entry app.mjs does not exist: " + result.entryPath.string();
+            result.error = "Arrange UI package entry app.js does not exist: " + result.entryPath.string();
             return result;
         }
         if (!std::filesystem::is_regular_file(result.entryPath)) {
-            result.error = "Arrange UI package entry app.mjs is not a file: " + result.entryPath.string();
+            result.error = "Arrange UI package entry app.js is not a file: " + result.entryPath.string();
             return result;
         }
 

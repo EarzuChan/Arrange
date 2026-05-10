@@ -7,16 +7,20 @@
                        "demo/ui-src"
                    ],
     "scripts":  {
-                    "test":  "node --test tests/**/*.test.mjs",
-                    "test:runtime":  "node --test tests/runtime/*.test.mjs",
-                    "test:bridge":  "node --test tests/bridge/*.test.mjs",
-                    "test:native":  "node scripts/test-native.mjs",
-                    "test:quickjs":  "node scripts/test-quickjs-app.mjs",
-                    "smoke:demo":  "node tests/smoke/basic-editor-smoke.mjs",
-                    "smoke:standalone-hmr":  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\smoke-standalone-hmr.ps1",
-                    "verify:m1-slice":  "node scripts/verify-m1-slice.mjs",
-                    "prepare:deps":  "node scripts/prepare-deps.mjs",
-                    "build:demo-ui":  "node scripts/build-demo-ui.mjs",
-                    "build:demo":  "node scripts/build-demo.mjs"
-                }
+                    "test":  "node --test tests/**/*.test.ts",
+                    "test:runtime":  "node --test tests/runtime/*.test.ts",
+                    "test:bridge":  "node --test tests/bridge/*.test.ts",
+                    "test:native":  "node scripts/test-native.ts",
+                    "test:quickjs":  "node scripts/test-quickjs-app.ts",
+                    "smoke:demo": "node tests/smoke/basic-editor-smoke.ts",
+                    "verify:m1-slice":  "node scripts/verify-m1-slice.ts",
+                    "typecheck":  "tsc -p tsconfig.json --noEmit",
+                    "prepare:deps":  "node scripts/prepare-deps.ts",
+                    "build:demo-ui":  "node scripts/build-demo-ui.ts",
+                    "build:demo":  "node scripts/build-demo.ts"
+                },
+    "devDependencies": {
+        "@types/node": "^20.19.0",
+        "typescript": "^5.9.0"
+    }
 }

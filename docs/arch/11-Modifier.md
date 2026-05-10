@@ -11,15 +11,29 @@ m.padding(dp(8)).background(red)
 
 # 生产事实源
 
-Modifier 生产语义必须来自 ordered typed props / native modifier model：
+Modifier 生产语义必须来自 Bridge `setModifier` typed payload 与 native core 的唯一编译结果：
 
 ```txt
-__arrangeModifierCount
-__arrangeModifier.{index}.type
-__arrangeModifier.{index}.{path}
+JS ModifierDescriptor[]
+-> Bridge setModifier typed payload
+-> native core ModifierCompiler
+-> CompiledModifier cached on LayoutNode
+-> Layout / Paint / HitTest / Input / Invalidation 读取同一份编译结果
 ```
 
-`modifierDebugJson` 只允许用于 diagnostics / devtools / 人工排查，不得在参与布局、绘制、命中、滚动、输入、无障碍或 invalidation 中使用。新增 Modifier 必须同时补 typed 字段、native 解析和 no-debugJson 测试。
+`modifierDebugJson` 只允许用于 diagnostics / devtools / 人工排查 / 测试快照，不得在参与布局、绘制、命中、滚动、输入、无障碍或 invalidation 中使用。
+
+`__arrangeModifier.N.*` 展开字段、`__arrangeClickableEnabled`、`__arrangeVerticalScrollValue`、`__arrangeZIndex`、`__arrangeLayer*` 等 JS 层派生 prop 不得进入生产语义。clickable / scroll / weight / align / zIndex / graphicsLayer 等语义只能由 native core 的 `ModifierCompiler` 编译进 `CompiledModifier`。
+
+`CompiledModifier` 必须保留当前支持 Modifier 的可执行顺序语义。Paint / Layout / HitTest 不能靠字符串补丁反推顺序，例如不能用 `style.type == "padding"` 之类的局部规则决定 background、border、clip 与 padding / size 的相对效果。至少 `padding().background()`、`background().padding()`、`size().background()`、`background().size()` 等顺序差异必须由结构化编译结果和测试保护。
+
+新增 Modifier 必须同时补：
+
+- TS typed descriptor。
+- Bridge typed payload。
+- C++ 集中 decode / compile 到 `CompiledModifier`。
+- dirty schema。
+- no-debugJson / no-expanded-field 测试。
 
 # 便捷组合
 
@@ -41,7 +55,20 @@ Modifier 可作用于：
 - 命中测试。
 - 事件处理。
 
-每个 Modifier 必须声明自己影响哪些阶段。
+每个 Modifier 必须由 native core 的 `ModifierCompiler` 声明自己影响哪些阶段。
+
+阶段声明必须能进入 dirty attribution：
+
+| Modifier 类型 | dirty 影响 |
+| --- | --- |
+| size / padding / weight / text style | Layout + Paint |
+| background / border / alpha / shadow | Paint |
+| clickable / hoverable / focusable / pointerInput | HitTest / Input |
+| zIndex | Paint + HitTest |
+| offset / translation / scale / rotation | Transform + Paint + HitTest |
+| verticalScroll / horizontalScroll | Layout 或 Place + Paint + HitTest |
+
+无法证明局部边界时，必须由 FramePlan 选择显式 full fallback，并记录原因。
 
 # 尺寸与约束
 
@@ -270,5 +297,3 @@ updateTransition(...)
 `m.animateContentSize()` 也使用同一 FrameClock / repaint pump；它不另建计时系统。Canvas `frame` invalidation、未来 meter / waveform 等 UI-thread 高频显示也复用同一底座。
 
 详见 `docs/adr/003-NativeFrameClock与动画刷新链路.md`。
-
-

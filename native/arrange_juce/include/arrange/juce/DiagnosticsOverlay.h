@@ -19,6 +19,12 @@ namespace arrange::juce {
         ::juce::Colour dot = ::juce::Colour(0xffef4444);
     };
 
+    struct DiagnosticsToastModel {
+        LogLevel level = LogLevel::Info;
+        std::string title;
+        std::string message;
+    };
+
     struct DiagnosticsTextContext {
         std::string activeSource;
         bool liveRuntimeEnabled = false;
@@ -36,10 +42,9 @@ namespace arrange::juce {
         bool emit(LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true);
         bool tick(double nowMillis);
         bool hasActiveToasts() const noexcept;
-
-        void paintBadge(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model) const;
-        void paintToasts(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds) const;
-        void paintErrorScreen(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const;
+        [[nodiscard]] std::vector<DiagnosticsToastModel> activeToastModels() const;
+        [[nodiscard]] DiagnosticVisibility badgeVisibility() const noexcept { return config_.badge; }
+        [[nodiscard]] DiagnosticVisibility toastVisibility() const noexcept { return config_.toasts; }
 
         std::string diagnosticsText(const DiagnosticsTextContext& context) const;
 

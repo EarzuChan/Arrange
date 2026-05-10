@@ -38,11 +38,11 @@ const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandl
                      .withHttpRequestCmd("GET");
 auto stream = ::juce::URL(bundleUrl).createInputStream(options);
   if (!stream) {
-    result.serverUnavailable = statusCode == 0;
+    result.serverUnavailable = true;
     result.error = makeErrorScreenModel(
       ErrorSource::AppPackage,
       "Arrange dev server is not reachable: " + bundleUrl,
-      "Debug fallback may load the last built ui/app.mjs, but true hot reload needs pnpm dev.",
+      "Debug fallback may load the last built ui/app.js, but true hot reload needs pnpm dev.",
       bundleUrl);
     setDiagnostic(result, LogLevel::Warn, "Live unavailable", bundleUrl, true);
     return result;
@@ -60,20 +60,21 @@ const auto source = stream->readEntireStreamAsString().toStdString();
   }
 
 auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-const auto modulePath = result.packageDir / "__arrange_dev_app.mjs";
+const auto modulePath = result.packageDir / "__arrange_dev_app.js";
 const auto executed = scriptHost->executeModule(modulePath, source);
   if (!executed.ok) {
     result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, executed.error, {}, bundleUrl);
     setDiagnostic(result, LogLevel::Error, "Live runtime failed", executed.error, true);
     return result;
   }
-  if (!scriptHost->mountedBatch()) {
+  auto initialTransaction = scriptHost->takePendingTransaction();
+  if (!initialTransaction) {
     result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange dev bundle executed but did not mount a UI tree.", {}, bundleUrl);
     setDiagnostic(result, LogLevel::Error, "Live mount missing", bundleUrl, true);
     return result;
   }
 
-result.mountedBatch=*scriptHost->mountedBatch();
+result.initialTransaction=std::move(*initialTransaction);
 result.scriptHost= std::move (scriptHost);
 result.ok=true;
 setDiagnostic(result, LogLevel::Info, "Loaded live app", bundleUrl, true);
@@ -81,10 +82,10 @@ setDiagnostic(result, LogLevel::Info, "Loaded live app", bundleUrl, true);
 #else
 result.error= makeErrorScreenModel(
     ErrorSource::ScriptRuntime,
-    "ArrangeEditor requires QuickJS-NG to execute dev server app.mjs. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
+    "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
     {},
 bundleUrl);
-setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute live app.mjs.", true);
+setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute live app.js.", true);
   return result;
 #endif
 }
@@ -108,13 +109,14 @@ const auto loaded = loader.loadEntry(resolved.entryPath);
     setDiagnostic(result, LogLevel::Error, "Dist runtime failed", loaded.error, true);
     return result;
   }
-  if (!scriptHost->mountedBatch()) {
+  auto initialTransaction = scriptHost->takePendingTransaction();
+  if (!initialTransaction) {
     result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange app executed but did not mount a UI tree.", {}, resolved.entryPath);
     setDiagnostic(result, LogLevel::Error, "Dist mount missing", resolved.entryPath.string(), true);
     return result;
   }
 
-result.mountedBatch=*scriptHost->mountedBatch();
+result.initialTransaction=std::move(*initialTransaction);
 result.scriptHost= std::move (scriptHost);
 result.ok=true;
 setDiagnostic(result, LogLevel::Info, "Loaded dist app", resolved.entryPath.string(), false);
@@ -122,10 +124,10 @@ setDiagnostic(result, LogLevel::Info, "Loaded dist app", resolved.entryPath.stri
 #else
 result.error= makeErrorScreenModel(
     ErrorSource::ScriptRuntime,
-    "ArrangeEditor requires QuickJS-NG to execute ui/app.mjs. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
+    "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
     "The JS-side app.bridge.bin artifact is only a smoke-test fixture and is not a native runtime fallback.",
 resolved.entryPath);
-setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute dist ui/app.mjs.", true);
+setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute dist ui/app.js.", true);
   return result;
 #endif
 }

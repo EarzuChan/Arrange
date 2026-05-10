@@ -27,7 +27,7 @@ namespace arrange {
 
     class AppResolver {
     public:
-        static constexpr const char* DefaultEntry = "app.mjs";
+        static constexpr const char* DefaultEntry = "app.js";
         static constexpr const char* DefaultDevServer = "http://127.0.0.1:9178";
 
         ResolvedApp resolvePackage(const App& app) const;

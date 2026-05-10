@@ -2,19 +2,23 @@
 #include <arrange/core/Layout.h>
 #include <arrange/core/HitTest.h>
 #include <arrange/core/InputEditing.h>
-#include <arrange/core/PointerDispatcher.h>
+#include <arrange/core/PointerInputProcessor.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/PropValue.h>
-#include <arrange/core/RenderTree.h>
+#include <arrange/core/MutationTransaction.h>
+#include <arrange/core/NativeScene.h>
+#include <arrange/core/SceneFramePipeline.h>
+#include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/core/TextLayoutService.h>
 #include <arrange/core/Version.h>
 #include <arrange/juce/AppResolver.h>
 #include <arrange/juce/DevServerClient.h>
 #include <arrange/juce/ErrorScreenModel.h>
+#include <arrange/juce/FramePlanner.h>
 #include <arrange/juce/HeadlessArrangeEditor.h>
+#include <arrange/juce/ScenePipelineState.h>
 #include <arrange/quickjs/AppScriptLoader.h>
-#include <arrange/quickjs/CallbackRegistry.h>
 
 #include <cmath>
 #include <cstddef>
@@ -41,24 +45,21 @@ namespace {
             return {true, {}};
         }
 
-        arrange::quickjs::CallbackInvokeResult invokeCallback(std::uint32_t callbackHandle, const arrange::quickjs::CallbackInvokeOptions& options = {}) override {
-            invokedHandles.push_back(callbackHandle);
-            if (options.hasStringArgument) invokedStringArguments.push_back(options.stringArgument);
-            if (callbackHandle == 999) return {false, "Mock callback failed"};
-            return {true, {}};
-        }
-
         int executeCount = 0;
         std::filesystem::path lastModulePath;
         std::string lastSource;
-        std::vector<std::uint32_t> invokedHandles;
-        std::vector<std::string> invokedStringArguments;
     };
 
     bool near(float actual, float expected, float epsilon = 0.01f) { return std::fabs(actual - expected) <= epsilon; }
     bool hasDirty(const arrange::core::ArrangeNode& node, arrange::core::DirtyFlag flag) { return (node.dirty & arrange::core::dirtyMask(flag)) != 0; }
+    bool phaseRan(const std::vector<arrange::core::PhaseExecution>& phases, arrange::core::FramePhase phase) {
+        for (const auto& execution : phases) {
+            if (execution.phase == phase) return execution.ran;
+        }
+        throw std::runtime_error("missing frame phase execution record");
+    }
 
-    void clearDirty(arrange::core::RenderTree& tree, std::initializer_list<arrange::core::NodeId> ids) { for (auto id : ids) { if (tree.contains(id)) tree.node(id).dirty = 0; } }
+    void clearDirty(arrange::core::LayoutTree& tree, std::initializer_list<arrange::core::NodeId> ids) { for (auto id : ids) { if (tree.contains(id)) tree.node(id).dirty = 0; } }
 
     void setEnvValue(const char* name, const char* value) {
 #if defined(_WIN32)
@@ -80,196 +81,17 @@ namespace {
 
     void addTypedProp(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, std::string key, std::string value) { ops.push_back({arrange::core::BridgeOpcode::SetProp, id, 0, 0, 0, {}, std::move(key), std::move(value)}); }
 
-    float parseTestNumberAfter(const std::string& text, const char* key, float fallback = 0.0f) {
-        const auto pos = text.find(key);
-        if (pos == std::string::npos) return fallback;
-        char* end = nullptr;
-        const auto parsed = std::strtof(text.c_str() + pos + std::string(key).size(), &end);
-        return end == text.c_str() + pos + std::string(key).size() ? fallback : parsed;
+    void applySmokeBatch(arrange::core::LayoutTree& tree, const arrange::core::BridgeBatch& batch);
+
+    void applyTypedProp(arrange::core::LayoutTree& tree, arrange::core::NodeId id, std::string key, std::string value) {
+        arrange::core::BridgeBatch batch;
+        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        addTypedProp(batch.ops, id, std::move(key), std::move(value));
+        applySmokeBatch(tree, batch);
     }
 
-    bool parseTestBoolAfter(const std::string& text, const char* key, bool fallback = false) {
-        const auto pos = text.find(key);
-        if (pos == std::string::npos) return fallback;
-        const auto value = std::string_view(text).substr(pos + std::string(key).size());
-        if (value.starts_with("true") || value.starts_with("1")) return true;
-        if (value.starts_with("false") || value.starts_with("0")) return false;
-        return fallback;
-    }
-
-    std::string parseTestStringAfter(const std::string& text, const char* key) {
-        const auto pos = text.find(key);
-        if (pos == std::string::npos) return {};
-
-        auto start = pos + std::string(key).size();
-        if (start < text.size() && text[start] == '"') ++start;
-
-        std::string result;
-        bool escaping = false;
-        for (auto i = start; i < text.size(); ++i) {
-            const auto ch = text[i];
-
-            if (escaping) {
-                result.push_back(ch);
-                escaping = false;
-                continue;
-            }
-
-            if (ch == '\\') {
-                escaping = true;
-                continue;
-            }
-
-            if (ch == '"') break;
-            result.push_back(ch);
-        }
-        return result;
-    }
-
-    std::uint32_t parseTestHandleAfter(const std::string& text, const char* key) {
-        const auto pos = text.find(key);
-        if (pos == std::string::npos) return 0;
-
-        char* end = nullptr;
-        const auto parsed = std::strtoul(text.c_str() + pos + std::string(key).size(), &end, 10);
-        return end == text.c_str() + pos + std::string(key).size() ? 0 : static_cast<std::uint32_t>(parsed);
-    }
-
-    void addTypedNumber(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, const std::string& prefix, const std::string& key, const std::string& body, const char* jsonKey, float fallback = 0.0f) {
-        if (body.find(jsonKey) == std::string::npos) return;
-        addTypedProp(ops, id, prefix + key, encodedNumber(parseTestNumberAfter(body, jsonKey, fallback)));
-    }
-
-    void addTypedUint(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, const std::string& prefix, const std::string& key, const std::string& body, const char* jsonKey) {
-        const auto pos = body.find(jsonKey);
-        if (pos == std::string::npos) return;
-
-        const auto start = pos + std::string(jsonKey).size();
-        char* end = nullptr;
-        const auto parsed = std::strtoul(body.c_str() + start, &end, 10);
-        if (end == body.c_str() + start) return;
-
-        addTypedProp(ops, id, prefix + key, "f:" + std::to_string(static_cast<std::uint32_t>(parsed)));
-    }
-
-    void addTypedBool(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, const std::string& prefix, const std::string& key, const std::string& body, const char* jsonKey, bool fallback = false) {
-        if (body.find(jsonKey) == std::string::npos) return;
-        addTypedProp(ops, id, prefix + key, parseTestBoolAfter(body, jsonKey, fallback) ? "b:1" : "b:0");
-    }
-
-    void addTypedString(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, const std::string& prefix, const std::string& key, const std::string& body, const char* jsonKey) {
-        if (body.find(jsonKey) == std::string::npos) return;
-        addTypedProp(ops, id, prefix + key, "s:" + parseTestStringAfter(body, jsonKey));
-    }
-
-    void addTypedHandle(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, const std::string& prefix, const std::string& key, const std::string& body, const char* jsonKey) {
-        if (body.find(jsonKey) == std::string::npos) return;
-        addTypedProp(ops, id, prefix + key, "h:" + std::to_string(parseTestHandleAfter(body, jsonKey)));
-    }
-
-    std::vector<std::string> testModifierObjects(std::string_view encodedJson) {
-        auto text = std::string(encodedJson);
-        if (text.rfind("o:", 0) == 0) text = text.substr(2);
-        std::vector<std::string> objects;
-
-        for (std::size_t i = 0; i < text.size(); ++i) {
-            if (text[i] != '{') continue;
-
-            const auto objectStart = i;
-            int depth = 0;
-            bool inString = false;
-            bool escaping = false;
-            for (; i < text.size(); ++i) {
-                const auto ch = text[i];
-                if (escaping) {
-                    escaping = false;
-                    continue;
-                }
-
-                if (ch == '\\') {
-                    escaping = inString;
-                    continue;
-                }
-
-                if (ch == '"') {
-                    inString = !inString;
-                    continue;
-                }
-
-                if (inString) continue;
-
-                if (ch == '{') ++depth;
-
-                if (ch == '}') {
-                    --depth;
-                    if (depth == 0) break;
-                }
-            }
-            if (i < text.size()) objects.push_back(text.substr(objectStart, i - objectStart + 1));
-        }
-        return objects;
-    }
-
-    void appendTypedModifierForSmoke(std::vector<arrange::core::BridgeOp>& ops, arrange::core::NodeId id, std::string_view encodedJson) {
-        const auto objects = testModifierObjects(encodedJson);
-        addTypedProp(ops, id, "__arrangeModifierCount", encodedNumber(static_cast<float>(objects.size())));
-
-        for (std::size_t index = 0; index < objects.size(); ++index) {
-            const auto& body = objects[index];
-            const auto prefix = "__arrangeModifier." + std::to_string(index) + ".";
-            const auto type = parseTestStringAfter(body, "\"type\":");
-            addTypedProp(ops, id, prefix + "type", "s:" + type);
-            addTypedNumber(ops, id, prefix, "value", body, "\"value\":");
-            addTypedNumber(ops, id, prefix, "width", body, "\"width\":");
-            addTypedNumber(ops, id, prefix, "height", body, "\"height\":");
-            addTypedNumber(ops, id, prefix, "fraction", body, "\"fraction\":", 1.0f);
-            addTypedNumber(ops, id, prefix, "min", body, "\"min\":");
-            addTypedNumber(ops, id, prefix, "max", body, "\"max\":");
-            addTypedNumber(ops, id, prefix, "minWidth", body, "\"minWidth\":");
-            addTypedNumber(ops, id, prefix, "maxWidth", body, "\"maxWidth\":");
-            addTypedNumber(ops, id, prefix, "minHeight", body, "\"minHeight\":");
-            addTypedNumber(ops, id, prefix, "maxHeight", body, "\"maxHeight\":");
-            addTypedNumber(ops, id, prefix, "start", body, "\"start\":");
-            addTypedNumber(ops, id, prefix, "top", body, "\"top\":");
-            addTypedNumber(ops, id, prefix, "end", body, "\"end\":");
-            addTypedNumber(ops, id, prefix, "bottom", body, "\"bottom\":");
-            addTypedNumber(ops, id, prefix, "x", body, "\"x\":");
-            addTypedNumber(ops, id, prefix, "y", body, "\"y\":");
-            addTypedNumber(ops, id, prefix, "weight", body, "\"weight\":");
-            addTypedBool(ops, id, prefix, "fill", body, "\"fill\":", true);
-            addTypedString(ops, id, prefix, "alignment", body, "\"alignment\":");
-            addTypedUint(ops, id, prefix, "brush", body, "\"brush\":");
-            addTypedUint(ops, id, prefix, "color", body, "\"color\":");
-            addTypedNumber(ops, id, prefix, "offsetX", body, "\"offsetX\":");
-            addTypedNumber(ops, id, prefix, "offsetY", body, "\"offsetY\":");
-            addTypedNumber(ops, id, prefix, "offset.x", body, "\"offset\":{\"x\":");
-            addTypedNumber(ops, id, prefix, "offset.y", body, "\"y\":");
-            addTypedNumber(ops, id, prefix, "scaleX", body, "\"scaleX\":", 1.0f);
-            addTypedNumber(ops, id, prefix, "scaleY", body, "\"scaleY\":", 1.0f);
-            addTypedNumber(ops, id, prefix, "translationX", body, "\"translationX\":");
-            addTypedNumber(ops, id, prefix, "translationY", body, "\"translationY\":");
-            addTypedNumber(ops, id, prefix, "rotationZ", body, "\"rotationZ\":");
-            addTypedString(ops, id, prefix, "transformOrigin", body, "\"transformOrigin\":");
-            addTypedNumber(ops, id, prefix, "shape.radius", body, "\"radius\":");
-            if (body.find("\"shape\":{\"type\":\"rounded\"") != std::string::npos) addTypedProp(ops, id, prefix + "shape.type", "s:rounded");
-            if (body.find("\"shape\":{\"type\":\"circle\"") != std::string::npos) addTypedProp(ops, id, prefix + "shape.type", "s:circle");
-            addTypedNumber(ops, id, prefix, "state.value", body, "\"state\":{\"value\":");
-            addTypedHandle(ops, id, prefix, "state.__arrangeNativeScroll.callbackHandle", body, "\"__arrangeNativeScroll\":{\"callbackHandle\":");
-            addTypedHandle(ops, id, prefix, "onClick.callbackHandle", body, "\"onClick\":{\"callbackHandle\":");
-            addTypedHandle(ops, id, prefix, "callbackHandle", body, "\"callbackHandle\":");
-        }
-    }
-
-    void applySmokeBatch(arrange::core::RenderTree& tree, const arrange::core::BridgeBatch& batch) {
-        arrange::core::BridgeBatch expanded = batch;
-        const auto originalOps = expanded.ops;
-        expanded.ops.clear();
-
-        for (const auto& op : originalOps) {
-            expanded.ops.push_back(op);
-            if (op.opcode == arrange::core::BridgeOpcode::SetModifier) appendTypedModifierForSmoke(expanded.ops, op.id, op.modifierDebugJson);
-        }
-        tree.apply(expanded);
+    void applySmokeBatch(arrange::core::LayoutTree& tree, const arrange::core::BridgeBatch& batch) {
+        tree.apply(batch);
     }
 
     void pushU32(Bytes& bytes, std::uint32_t value) {
@@ -320,7 +142,7 @@ namespace {
         if (batch.ops.size() < 5) return 2;
         if (batch.ops[0].nodeType != "Column") return 3;
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         if (tree.size() < 2) return 4;
         if (tree.node(1).type != arrange::core::NodeType::Column) return 5;
@@ -337,7 +159,7 @@ namespace {
         if (tree.contains(3) && (!near(tree.node(3).bounds.width, 16.0f) || !near(tree.node(3).bounds.height, 8.0f))) return 13;
         if (tree.node(1).bounds.width < tree.node(2).bounds.width + 16.0f) return 14;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto drawOps = paint.collect(tree, 1);
         bool sawText = false;
         bool sawBoxBackground = false;
@@ -356,24 +178,11 @@ namespace {
         if (!clickable.hit || clickable.node != 3 || !clickable.clickable) return 17;
         const auto noClickable = hitTester.hitTestClickable(tree, 1, {10.0f, 10.0f});
         if (noClickable.hit) return 18;
-        arrange::core::PointerDispatcher dispatcher;
+        arrange::core::PointerInputProcessor dispatcher;
         const auto down = dispatcher.pointerDown(tree, 1, {10.0f, 32.0f}, 1);
-        if (!down.consumed || down.clickTriggered || down.target != 3 || down.callbackHandle != 1) return 19;
+        if (!down.consumed || down.clickTriggered || down.target != 3 || down.eventSlot.toString() != "3:click:click") return 19;
         const auto up = dispatcher.pointerUp(tree, 1, {10.0f, 32.0f}, 1);
-        if (!up.consumed || !up.clickTriggered || up.target != 3 || up.callbackHandle != 1) return 37;
-        arrange::quickjs::CallbackRegistry callbackRegistry;
-        callbackRegistry.add(up.callbackHandle);
-        MockScriptHost clickHost;
-        arrange::quickjs::CallbackDispatcher callbackDispatcher(callbackRegistry, clickHost);
-        const auto callback = callbackDispatcher.dispatch(up.callbackHandle);
-        if (!callback.ok || clickHost.invokedHandles.size() != 1 || clickHost.invokedHandles[0] != 1) return 42;
-        arrange::quickjs::CallbackInvokeOptions textCallbackOptions;
-        textCallbackOptions.hasStringArgument = true;
-        textCallbackOptions.stringArgument = "typed";
-        const auto textCallback = callbackDispatcher.dispatch(up.callbackHandle, textCallbackOptions);
-        if (!textCallback.ok || clickHost.invokedStringArguments.empty() || clickHost.invokedStringArguments.back() != "typed") return 63;
-        const auto unknownCallback = callbackDispatcher.dispatch(777);
-        if (unknownCallback.ok) return 43;
+        if (!up.consumed || !up.clickTriggered || up.target != 3 || up.eventSlot.toString() != "3:click:click") return 37;
         const auto dragDown = dispatcher.pointerDown(tree, 1, {10.0f, 32.0f}, 2);
         if (!dragDown.consumed) return 38;
         const auto dragOut = dispatcher.pointerUp(tree, 1, {10.0f, 10.0f}, 2);
@@ -381,7 +190,7 @@ namespace {
         const auto cancelDown = dispatcher.pointerDown(tree, 1, {10.0f, 32.0f}, 3);
         if (!cancelDown.consumed) return 40;
         const auto cancel = dispatcher.pointerCancel(3);
-        if (!cancel.consumed || cancel.clickTriggered || cancel.target != 3 || cancel.callbackHandle != 1) return 41;
+        if (!cancel.consumed || cancel.clickTriggered || cancel.target != 3 || cancel.eventSlot.toString() != "3:click:click") return 41;
         return 0;
     }
 
@@ -400,7 +209,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree rowTree;
+        arrange::core::LayoutTree rowTree;
         applySmokeBatch(rowTree, rowBatch);
         arrange::core::LayoutEngine layout;
         layout.layout(rowTree, 1, {0.0f, 300.0f, 0.0f, 40.0f});
@@ -422,7 +231,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree columnTree;
+        arrange::core::LayoutTree columnTree;
         applySmokeBatch(columnTree, columnBatch);
         layout.layout(columnTree, 1, {0.0f, 80.0f, 0.0f, 100.0f});
         if (!near(columnTree.node(2).bounds.y, 0.0f) || !near(columnTree.node(2).bounds.height, 20.0f)) return 58;
@@ -431,87 +240,21 @@ namespace {
         return 0;
     }
 
-    int verifyNativeWeightTypedPropsWithoutDebugJson() {
+    int verifyNativeTypedModifierPayloadWithoutExpandedProps() {
         arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 9};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Row"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":300,\"height\":40}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"width\",\"value\":100}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-            {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeWeight", "f:1"},
-            {arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeWeightFill", "b:1"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
-        };
-
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 300.0f, 0.0f, 40.0f});
-        if (!near(tree.node(3).bounds.x, 100.0f) || !near(tree.node(3).bounds.width, 200.0f)) return 202;
-        if (tree.node(3).modifierDebugJson.find("weight") != std::string::npos) return 203;
-
-        tree.node(3).props["__arrangeWeightFill"] = "b:0";
-        layout.layout(tree, 1, {0.0f, 300.0f, 0.0f, 40.0f});
-        if (!near(tree.node(3).bounds.width, 0.0f)) return 204;
-        return 0;
-    }
-
-    int verifyNativeAlignAndOffsetTypedPropsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 8};
+        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 2};
         batch.ops = {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":100}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":10}]"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeAlign", "s:BottomEnd"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeLayoutOffsetX", "f:3"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeLayoutOffsetY", "f:4"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40},{"type":"background","brush":4279312947},{"type":"padding","start":10,"top":6,"end":10,"bottom":6},{"type":"clip","shape":{"type":"rounded","radius":4}}])json"},
         };
 
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 100.0f});
-        if (!near(tree.node(2).bounds.x, 83.0f) || !near(tree.node(2).bounds.y, 94.0f)) return 205;
-        if (tree.node(2).modifierDebugJson.find("align") != std::string::npos) return 206;
-        if (tree.node(2).modifierDebugJson.find("offset") != std::string::npos) return 207;
-        return 0;
-    }
-
-    int verifyNativeTypedModifierElementsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 15};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifierCount", "f:4"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.0.type", "s:size"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.0.width", "f:80"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.0.height", "f:40"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.1.type", "s:background"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.1.brush", "f:4279312947"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.2.type", "s:padding"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.2.start", "f:10"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.2.top", "f:6"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.2.end", "f:10"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.2.bottom", "f:6"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.3.type", "s:clip"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.3.shape.type", "s:rounded"},
-            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeModifier.3.shape.radius", "f:4"},
-        };
-
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 200.0f, 0.0f, 200.0f});
         if (!near(tree.node(1).bounds.width, 80.0f) || !near(tree.node(1).bounds.height, 40.0f)) return 218;
-        if (!tree.node(1).modifierDebugJson.empty()) return 219;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawBackground = false;
         bool sawClip = false;
@@ -536,7 +279,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 400.0f, 0.0f, 400.0f});
@@ -544,7 +287,7 @@ namespace {
         if (!near(tree.node(2).bounds.x, 0.0f) || !near(tree.node(2).bounds.y, 0.0f) || !near(tree.node(2).bounds.width, 100.0f) || !near(tree.node(2).bounds.height, 40.0f)) return 82;
         if (!near(tree.node(3).bounds.x, 0.0f) || !near(tree.node(3).bounds.y, 40.0f) || !near(tree.node(3).bounds.width, 120.0f) || !near(tree.node(3).bounds.height, 60.0f)) return 83;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawSizeThenPaddingInnerBackground = false;
         bool sawPaddingThenSizeInnerBackground = false;
@@ -563,7 +306,7 @@ namespace {
                 "o:[{\"type\":\"size\",\"width\":20,\"height\":10},{\"type\":\"offset\",\"x\":4,\"y\":3},{\"type\":\"background\",\"brush\":4279312947},{\"type\":\"alpha\",\"value\":0.5},{\"type\":\"border\",\"width\":1,\"brush\":4282668390},{\"type\":\"dropShadow\",\"color\":2147483648,\"offsetX\":3,\"offsetY\":2}]"
             },
         };
-        arrange::core::RenderTree alphaTree;
+        arrange::core::LayoutTree alphaTree;
         applySmokeBatch(alphaTree, alphaBatch);
         layout.layout(alphaTree, 1, {0.0f, 100.0f, 0.0f, 100.0f});
         if (!near(alphaTree.node(1).bounds.x, 4.0f) || !near(alphaTree.node(1).bounds.y, 3.0f)) return 94;
@@ -587,7 +330,7 @@ namespace {
                 "o:[{\"type\":\"size\",\"width\":40,\"height\":24},{\"type\":\"dropShadow\",\"color\":1711276032,\"offset\":{\"x\":2,\"y\":3},\"shape\":{\"type\":\"rounded\",\"radius\":6}},{\"type\":\"background\",\"brush\":4280431428,\"shape\":{\"type\":\"rounded\",\"radius\":6}},{\"type\":\"border\",\"width\":2,\"brush\":4284905352,\"shape\":{\"type\":\"rounded\",\"radius\":6}},{\"type\":\"clip\",\"shape\":{\"type\":\"circle\"}}]"
             },
         };
-        arrange::core::RenderTree shapeTree;
+        arrange::core::LayoutTree shapeTree;
         applySmokeBatch(shapeTree, shapeBatch);
         layout.layout(shapeTree, 1, {0.0f, 100.0f, 0.0f, 100.0f});
         const auto shapeOps = paint.collect(shapeTree, 1);
@@ -617,14 +360,14 @@ namespace {
             {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "overflow", "s:ellipsis"},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 400.0f, 0.0f, 400.0f});
         if (!near(tree.node(1).bounds.width, 72.0f) || !near(tree.node(1).bounds.height, 28.0f)) return 97;
         if (!near(tree.node(1).baseline, 11.2f)) return 98;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         if (ops.size() != 1) return 99;
         const auto& op = ops[0];
@@ -656,7 +399,7 @@ namespace {
                 "o:{\"fontSize\":10,\"lineHeight\":12}",
             },
         };
-        arrange::core::RenderTree cjkTree;
+        arrange::core::LayoutTree cjkTree;
         applySmokeBatch(cjkTree, cjkBatch);
         layout.layout(cjkTree, 10, {0.0f, 400.0f, 0.0f, 400.0f});
         if (!near(cjkTree.node(10).bounds.width, 20.0f) ||
@@ -665,7 +408,7 @@ namespace {
         return 0;
     }
 
-    int verifyRenderTreeInsertChildKeepsParentReferenceStable() {
+    int verifyLayoutTreeInsertChildKeepsParentReferenceStable() {
         arrange::core::BridgeBatch batch;
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 60};
         batch.ops.push_back({arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Column"});
@@ -674,14 +417,14 @@ namespace {
             batch.ops.push_back({arrange::core::BridgeOpcode::InsertChild, 0, 1, id, id - 2});
         }
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         if (tree.node(1).children.size() != 20) return 101;
         for (std::size_t index = 0; index < tree.node(1).children.size(); ++index) { if (tree.node(1).children[index] != static_cast<arrange::core::NodeId>(index + 2)) return 102; }
         return 0;
     }
 
-    int verifyRenderTreeRejectsCyclesAndDeduplicatesChildren() {
+    int verifyLayoutTreeRejectsCyclesAndDeduplicatesChildren() {
         arrange::core::BridgeBatch batch;
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 5};
         batch.ops = {
@@ -692,7 +435,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 2, 1, 0},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         bool rejectedCycle = false;
         try { applySmokeBatch(tree, batch); }
         catch (const std::runtime_error&) { rejectedCycle = true; }
@@ -705,7 +448,7 @@ namespace {
         return 0;
     }
 
-    int verifyRenderTreeDirtyPropagationFirstSlice() {
+    int verifyLayoutTreeDirtyPropagationFirstSlice() {
         arrange::core::BridgeBatch batch;
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 5};
         batch.ops = {
@@ -717,7 +460,7 @@ namespace {
             {arrange::core::BridgeOpcode::SetText, 3, 0, 0, 0, {}, {}, {}, "Initial"},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         clearDirty(tree, {1, 2, 3});
 
@@ -732,27 +475,11 @@ namespace {
         clearDirty(tree, {1, 2, 3});
         arrange::core::BridgeBatch modifierChange;
         modifierChange.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
-        modifierChange.ops = {{arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"offset\",\"x\":8,\"y\":4},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":7}}]"}};
+        modifierChange.ops = {{arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"offset\",\"x\":8,\"y\":4},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"3:click:click\"}}]"}};
         applySmokeBatch(tree, modifierChange);
-        if (!hasDirty(tree.node(3), arrange::core::DirtyFlag::Transform) || !hasDirty(tree.node(3), arrange::core::DirtyFlag::HitTest)) return 125;
+        if (!hasDirty(tree.node(3), arrange::core::DirtyFlag::Transform) || !hasDirty(tree.node(3), arrange::core::DirtyFlag::HitTest) || !hasDirty(tree.node(3), arrange::core::DirtyFlag::Paint)) return 125;
         if (!hasDirty(tree.node(2), arrange::core::DirtyFlag::HitTest) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::HitTest)) return 126;
-        if (!hasDirty(tree.node(2), arrange::core::DirtyFlag::Layout) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Layout)) return 127;
-
-        clearDirty(tree, {1, 2, 3});
-        arrange::core::BridgeBatch typedTransformChange;
-        typedTransformChange.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
-        typedTransformChange.ops = {{arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeLayoutOffsetX", "f:4"}};
-        applySmokeBatch(tree, typedTransformChange);
-        if (!hasDirty(tree.node(3), arrange::core::DirtyFlag::Transform) || !hasDirty(tree.node(3), arrange::core::DirtyFlag::HitTest)) return 211;
-        if (!hasDirty(tree.node(2), arrange::core::DirtyFlag::HitTest) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Paint)) return 212;
-
-        clearDirty(tree, {1, 2, 3});
-        arrange::core::BridgeBatch typedLayerChange;
-        typedLayerChange.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
-        typedLayerChange.ops = {{arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeLayerScaleX", "f:2"}};
-        applySmokeBatch(tree, typedLayerChange);
-        if (!hasDirty(tree.node(3), arrange::core::DirtyFlag::Transform) || !hasDirty(tree.node(3), arrange::core::DirtyFlag::HitTest)) return 213;
-        if (!hasDirty(tree.node(2), arrange::core::DirtyFlag::HitTest) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Paint)) return 214;
+        if (hasDirty(tree.node(2), arrange::core::DirtyFlag::Layout) || hasDirty(tree.node(1), arrange::core::DirtyFlag::Layout)) return 127;
 
         clearDirty(tree, {1, 2, 3});
         arrange::core::BridgeBatch resourceChange;
@@ -760,7 +487,7 @@ namespace {
         resourceChange.ops = {{arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "source", "s:logo.png"}};
         applySmokeBatch(tree, resourceChange);
         if (!hasDirty(tree.node(3), arrange::core::DirtyFlag::Resource)) return 128;
-        if (!hasDirty(tree.node(2), arrange::core::DirtyFlag::Layout) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Paint)) return 129;
+        if (hasDirty(tree.node(2), arrange::core::DirtyFlag::Layout) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Paint)) return 129;
 
         clearDirty(tree, {1, 2, 3});
         arrange::core::BridgeBatch deleteSubtree;
@@ -774,7 +501,7 @@ namespace {
         return 0;
     }
 
-    int verifyRenderTreeDirtySnapshotAndClearFirstSlice() {
+    int verifyLayoutTreeDirtySnapshotAndClearFirstSlice() {
         arrange::core::BridgeBatch batch;
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 8};
         batch.ops = {
@@ -788,7 +515,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 60.0f, 0.0f, 20.0f});
@@ -816,11 +543,11 @@ namespace {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
             {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":50}]"},
             {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":10},{\"type\":\"graphicsLayer\",\"translationX\":30,\"translationY\":5},{\"type\":\"background\",\"brush\":4281549909},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":9}}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":10},{\"type\":\"graphicsLayer\",\"translationX\":30,\"translationY\":5},{\"type\":\"background\",\"brush\":4281549909},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"2:click:click\"}}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 50.0f});
@@ -832,7 +559,7 @@ namespace {
         const auto translatedPoint = hitTester.hitTestClickable(tree, 1, {35.0f, 8.0f});
         if (!translatedPoint.hit || translatedPoint.node != 2 || !translatedPoint.clickable) return 139;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawTranslatedPaint = false;
         for (const auto& op : ops) { if (op.type == arrange::core::DrawOpType::FillRect && near(op.rect.x, 30.0f) && near(op.rect.y, 5.0f) && op.color == 0xff334455u) sawTranslatedPaint = true; }
@@ -847,17 +574,17 @@ namespace {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
             {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":80}]"},
             {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"graphicsLayer\",\"scaleX\":2,\"scaleY\":2},{\"type\":\"background\",\"brush\":4279312947},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":12}}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"graphicsLayer\",\"scaleX\":2,\"scaleY\":2},{\"type\":\"background\",\"brush\":4279312947},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"2:click:click\"}}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
             {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
             {
                 arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {},
-                "o:[{\"type\":\"size\",\"width\":20,\"height\":10},{\"type\":\"offset\",\"x\":40,\"y\":20},{\"type\":\"graphicsLayer\",\"rotationZ\":90},{\"type\":\"background\",\"brush\":4280427042},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":13}}]"
+                "o:[{\"type\":\"size\",\"width\":20,\"height\":10},{\"type\":\"offset\",\"x\":40,\"y\":20},{\"type\":\"graphicsLayer\",\"rotationZ\":90},{\"type\":\"background\",\"brush\":4280427042},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"3:click:click\"}}]"
             },
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 80.0f});
@@ -875,7 +602,7 @@ namespace {
         const auto rotatedOutsideVisual = hitTester.hitTestClickable(tree, 1, {58.0f, 34.0f});
         if (rotatedOutsideVisual.hit && rotatedOutsideVisual.node == 3) return 163;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawScaleTransform = false;
         bool sawRotationTransform = false;
@@ -890,49 +617,6 @@ namespace {
         return 0;
     }
 
-    int verifyNativeGraphicsLayerTransformTypedPropsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 10};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":80}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20}]"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeLayerScaleX", "f:2"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeLayerScaleY", "f:2"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeLayerRotationZ", "f:0"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeClickableEnabled", "b:1"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeClickCallback", "h:31"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-        };
-
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 80.0f});
-
-        arrange::core::HitTester hitTester;
-        const auto scaledOutsideOriginal = hitTester.hitTestClickable(tree, 1, {25.0f, 10.0f});
-        if (!scaledOutsideOriginal.hit || scaledOutsideOriginal.node != 2 || !scaledOutsideOriginal.clickable) return 215;
-
-        arrange::core::PaintModel paint;
-        const auto ops = paint.collect(tree, 1);
-        bool sawTypedTransform = false;
-        int transformPops = 0;
-        for (const auto& op : ops) {
-            if (op.type == arrange::core::DrawOpType::PushTransform &&
-                near(op.scaleX, 2.0f) &&
-                near(op.scaleY, 2.0f) &&
-                near(op.rotationZ, 0.0f) &&
-                near(op.transformOriginX, 0.5f) &&
-                near(op.transformOriginY, 0.5f)) { sawTypedTransform = true; }
-            if (op.type == arrange::core::DrawOpType::PopTransform) ++transformPops;
-        }
-        if (!sawTypedTransform || transformPops != 1) return 216;
-        if (tree.node(2).modifierDebugJson.find("graphicsLayer") != std::string::npos) return 217;
-        return 0;
-    }
-
     int verifyNativeNestedTransformClipFirstSlice() {
         arrange::core::BridgeBatch batch;
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 6};
@@ -940,11 +624,11 @@ namespace {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
             {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":60},{\"type\":\"graphicsLayer\",\"scaleX\":2,\"scaleY\":2,\"transformOrigin\":\"TopStart\"},{\"type\":\"clip\",\"shape\":{\"type\":\"rounded\",\"radius\":4}}]"},
             {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"offset\",\"x\":70,\"y\":5},{\"type\":\"background\",\"brush\":4279312947},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":21}}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"offset\",\"x\":70,\"y\":5},{\"type\":\"background\",\"brush\":4279312947},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"2:click:click\"}}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 60.0f});
@@ -953,7 +637,7 @@ namespace {
         const auto hit = hitTester.hitTestClickable(tree, 1, {150.0f, 20.0f});
         if (!hit.hit || hit.node != 2 || !hit.clickable) return 178;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         int pushTransform = -1;
         int pushClip = -1;
@@ -979,19 +663,19 @@ namespace {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
             {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":40,\"height\":40}]"},
             {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"zIndex\",\"value\":10},{\"type\":\"background\",\"brush\":4278190335},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":10}}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"zIndex\",\"value\":10},{\"type\":\"background\",\"brush\":4278190335},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"2:click:click\"}}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
             {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"zIndex\",\"value\":0},{\"type\":\"background\",\"brush\":4294901760},{\"type\":\"clickable\",\"onClick\":{\"callbackHandle\":11}}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"zIndex\",\"value\":0},{\"type\":\"background\",\"brush\":4294901760},{\"type\":\"clickable\",\"onClick\":{\"eventSlot\":\"3:click:click\"}}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 40.0f, 0.0f, 40.0f});
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         std::vector<std::uint32_t> fills;
         for (const auto& op : ops) { if (op.type == arrange::core::DrawOpType::FillRect) fills.push_back(op.color); }
@@ -1000,42 +684,6 @@ namespace {
         arrange::core::HitTester hitTester;
         const auto hit = hitTester.hitTestClickable(tree, 1, {4.0f, 4.0f});
         if (!hit.hit || hit.node != 2 || !hit.clickable) return 142;
-        return 0;
-    }
-
-    int verifyNativeZIndexTypedPropsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 12};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":40,\"height\":40}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"background\",\"brush\":4278190335}]"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeZIndex", "f:10"},
-            {arrange::core::BridgeOpcode::SetProp, 2, 0, 0, 0, {}, "__arrangeClickableEnabled", "b:1"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-            {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":20,\"height\":20},{\"type\":\"background\",\"brush\":4294901760}]"},
-            {arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeZIndex", "f:0"},
-            {arrange::core::BridgeOpcode::SetProp, 3, 0, 0, 0, {}, "__arrangeClickableEnabled", "b:1"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
-        };
-
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 40.0f, 0.0f, 40.0f});
-
-        arrange::core::PaintModel paint;
-        const auto ops = paint.collect(tree, 1);
-        std::vector<std::uint32_t> fills;
-        for (const auto& op : ops) { if (op.type == arrange::core::DrawOpType::FillRect) fills.push_back(op.color); }
-        if (fills.size() != 2 || fills[0] != 0xffff0000u || fills[1] != 0xff0000ffu) return 208;
-
-        arrange::core::HitTester hitTester;
-        const auto hit = hitTester.hitTestClickable(tree, 1, {4.0f, 4.0f});
-        if (!hit.hit || hit.node != 2 || !hit.clickable) return 209;
-        if (tree.node(2).modifierDebugJson.find("zIndex") != std::string::npos) return 210;
         return 0;
     }
 
@@ -1050,13 +698,13 @@ namespace {
             {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"background\",\"brush\":4280427042},{\"type\":\"border\",\"width\":1,\"brush\":4286611584}]"},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, inputBatch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 240.0f, 0.0f, 80.0f});
         if (!near(tree.node(1).bounds.width, 120.0f) || !near(tree.node(1).bounds.height, 28.0f)) return 61;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawInputText = false;
         for (const auto& op : ops) { if (op.type == arrange::core::DrawOpType::DrawText && op.text == "Gain" && op.color == 0xffffffffu && near(op.fontSize, 16.0f) && near(op.rect.x, 8.0f) && near(op.rect.y, 6.0f) && near(op.rect.height, 16.0f)) { sawInputText = true; } }
@@ -1089,7 +737,7 @@ namespace {
                 "o:{\"fontSize\":16,\"color\":4294967295}",
             },
         };
-        arrange::core::RenderTree cjkInputTree;
+        arrange::core::LayoutTree cjkInputTree;
         applySmokeBatch(cjkInputTree, cjkInputBatch);
         layout.layout(cjkInputTree, 20, {0.0f, 240.0f, 0.0f, 80.0f});
         if (!near(cjkInputTree.node(20).bounds.width, 144.0f) ||
@@ -1105,7 +753,7 @@ namespace {
             {arrange::core::BridgeOpcode::SetProp, 10, 0, 0, 0, {}, "minLines", "f:3"},
             {arrange::core::BridgeOpcode::SetProp, 10, 0, 0, 0, {}, "textStyle", "o:{\"fontSize\":16,\"color\":4294967295}"},
         };
-        arrange::core::RenderTree multilineTree;
+        arrange::core::LayoutTree multilineTree;
         applySmokeBatch(multilineTree, multilineBatch);
         layout.layout(multilineTree, 10, {0.0f, 240.0f, 0.0f, 200.0f});
         if (!near(multilineTree.node(10).bounds.width, 120.0f) || !near(multilineTree.node(10).bounds.height, 65.6f)) return 164;
@@ -1251,14 +899,14 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 4, 2},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 120.0f, 0.0f, 40.0f});
         if (!near(tree.node(2).bounds.width, 24.0f) || !near(tree.node(2).bounds.height, 24.0f)) return 64;
         if (!near(tree.node(3).bounds.width, 24.0f) || !near(tree.node(3).bounds.height, 24.0f)) return 65;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawIcon = false;
         bool sawImage = false;
@@ -1277,7 +925,7 @@ namespace {
         batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 8};
         batch.ops = {
             {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Column"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":12,\"__arrangeNativeScroll\":{\"callbackHandle\":77}},\"enabled\":true}]"},
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":12,\"__arrangeNativeScroll\":{\"eventSlot\":\"1:verticalScroll:verticalScroll\"}},\"enabled\":true}]"},
             {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
             {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"height\",\"value\":80},{\"type\":\"fillMaxWidth\",\"fraction\":1},{\"type\":\"background\",\"brush\":4281549909}]"},
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
@@ -1286,7 +934,7 @@ namespace {
             {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
         };
 
-        arrange::core::RenderTree tree;
+        arrange::core::LayoutTree tree;
         applySmokeBatch(tree, batch);
         arrange::core::LayoutEngine layout;
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
@@ -1294,7 +942,7 @@ namespace {
         if (!near(tree.node(2).bounds.y, -12.0f) || !near(tree.node(2).bounds.height, 80.0f)) return 68;
         if (!near(tree.node(3).bounds.y, 68.0f) || !near(tree.node(3).bounds.height, 20.0f)) return 69;
 
-        arrange::core::PaintModel paint;
+        arrange::core::DrawOpsBuilder paint;
         const auto ops = paint.collect(tree, 1);
         bool sawPushClip = false;
         bool sawPopClip = false;
@@ -1306,12 +954,19 @@ namespace {
         }
         if (!sawPushClip || !sawClippedChildPaint || !sawPopClip) return 70;
 
-        tree.node(1).props["__arrangeVerticalScrollValue"] = "f:0";
+        arrange::core::BridgeBatch resetScroll;
+        resetScroll.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        resetScroll.ops = {{arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":0,\"__arrangeNativeScroll\":{\"eventSlot\":\"1:verticalScroll:verticalScroll\"}},\"enabled\":true}]"}};
+        applySmokeBatch(tree, resetScroll);
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
         tree.clearDirty();
         arrange::core::ScrollDispatcher scroll;
         const auto scrolled = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 24.0f);
-        if (!scrolled.consumed || scrolled.target != 1 || !near(scrolled.value, 24.0f) || !near(scrolled.maxValue, 60.0f) || !near(scrolled.viewportSize, 40.0f) || !near(scrolled.contentSize, 100.0f) || scrolled.callbackHandle != 77) return 71;
+        if (!scrolled.consumed || scrolled.target != 1 || !near(scrolled.value, 24.0f) || !near(scrolled.maxValue, 60.0f) || !near(scrolled.viewportSize, 40.0f) || !near(scrolled.contentSize, 100.0f) || scrolled.eventSlot.toString() != "1:verticalScroll:verticalScroll") return 71;
+        arrange::core::BridgeBatch scrolledModifier;
+        scrolledModifier.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        scrolledModifier.ops = {{arrange::core::BridgeOpcode::SetModifier, scrolled.target, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":24,\"__arrangeNativeScroll\":{\"eventSlot\":\"1:verticalScroll:verticalScroll\"}},\"enabled\":true}]"}};
+        applySmokeBatch(tree, scrolledModifier);
         if (!hasDirty(tree.node(1), arrange::core::DirtyFlag::Layout) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::Paint) || !hasDirty(tree.node(1), arrange::core::DirtyFlag::HitTest)) return 153;
         const auto dirty = tree.dirtySnapshot(arrange::core::dirtyMask(arrange::core::DirtyFlag::Layout) | arrange::core::dirtyMask(arrange::core::DirtyFlag::Paint));
         if (dirty.nodeCount != 1 || !dirty.hasRepaintBounds || !near(dirty.repaintBounds.width, 100.0f) || !near(dirty.repaintBounds.height, 40.0f)) return 154;
@@ -1319,149 +974,12 @@ namespace {
         if (!near(tree.node(2).bounds.y, -24.0f) || !near(tree.node(3).bounds.y, 56.0f)) return 72;
         const auto clamped = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -10.0f, 24.0f);
         if (!clamped.consumed || !near(clamped.value, 60.0f) || !near(clamped.maxValue, 60.0f)) return 73;
+        arrange::core::BridgeBatch clampedModifier;
+        clampedModifier.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        clampedModifier.ops = {{arrange::core::BridgeOpcode::SetModifier, clamped.target, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":60,\"__arrangeNativeScroll\":{\"eventSlot\":\"1:verticalScroll:verticalScroll\"}},\"enabled\":true}]"}};
+        applySmokeBatch(tree, clampedModifier);
         layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
         if (!near(tree.node(2).bounds.y, -60.0f) || !near(tree.node(3).bounds.y, 20.0f)) return 74;
-        return 0;
-    }
-
-    int verifyNativeHorizontalScrollFirstSlice() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 8};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Row"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"horizontalScroll\",\"state\":{\"value\":15},\"enabled\":true}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"width\",\"value\":80},{\"type\":\"fillMaxHeight\",\"fraction\":1},{\"type\":\"background\",\"brush\":4281549909}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-            {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"width\",\"value\":40},{\"type\":\"fillMaxHeight\",\"fraction\":1},{\"type\":\"background\",\"brush\":4282668390}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 3, 1},
-        };
-
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
-        if (!near(tree.node(1).bounds.width, 100.0f) || !near(tree.node(1).bounds.height, 40.0f)) return 75;
-        if (!near(tree.node(2).bounds.x, -15.0f) || !near(tree.node(2).bounds.width, 80.0f)) return 76;
-        if (!near(tree.node(3).bounds.x, 65.0f) || !near(tree.node(3).bounds.width, 40.0f)) return 77;
-
-        arrange::core::PaintModel paint;
-        const auto ops = paint.collect(tree, 1);
-        bool sawPushClip = false;
-        bool sawPopClip = false;
-        for (const auto& op : ops) {
-            if (op.type == arrange::core::DrawOpType::PushClip && near(op.rect.width, 100.0f) && near(op.rect.height, 40.0f)) sawPushClip = true;
-            if (op.type == arrange::core::DrawOpType::PopClip) sawPopClip = true;
-        }
-        if (!sawPushClip || !sawPopClip) return 78;
-
-        tree.node(1).props["__arrangeHorizontalScrollValue"] = "f:0";
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
-        arrange::core::ScrollDispatcher scroll;
-        const auto scrolled = scroll.horizontalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 10.0f);
-        if (!scrolled.consumed || scrolled.target != 1 || !near(scrolled.value, 10.0f) || !near(scrolled.maxValue, 20.0f)) return 79;
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 40.0f});
-        if (!near(tree.node(2).bounds.x, -10.0f) || !near(tree.node(3).bounds.x, 70.0f)) return 80;
-        const auto clamped = scroll.horizontalWheel(tree, 1, {8.0f, 8.0f}, -10.0f, 10.0f);
-        if (!clamped.consumed || !near(clamped.value, 20.0f) || !near(clamped.maxValue, 20.0f)) return 81;
-        return 0;
-    }
-
-    int verifyNativeNestedScrollConsumptionFirstSlice() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 14};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Column"},
-            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":60},{\"type\":\"verticalScroll\",\"state\":{\"value\":0,\"__arrangeNativeScroll\":{\"callbackHandle\":10}},\"enabled\":true}]"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Column"},
-            {arrange::core::BridgeOpcode::SetModifier, 2, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"size\",\"width\":100,\"height\":40},{\"type\":\"verticalScroll\",\"state\":{\"value\":0,\"__arrangeNativeScroll\":{\"callbackHandle\":20}},\"enabled\":true}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-            {arrange::core::BridgeOpcode::CreateNode, 3, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 3, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"height\",\"value\":50},{\"type\":\"fillMaxWidth\",\"fraction\":1}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 2, 3, 0},
-            {arrange::core::BridgeOpcode::CreateNode, 4, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 4, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"height\",\"value\":50},{\"type\":\"fillMaxWidth\",\"fraction\":1}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 2, 4, 1},
-            {arrange::core::BridgeOpcode::CreateNode, 5, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::SetModifier, 5, 0, 0, 0, {}, {}, {}, {}, "o:[{\"type\":\"height\",\"value\":80},{\"type\":\"fillMaxWidth\",\"fraction\":1}]"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 5, 1},
-        };
-
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        arrange::core::LayoutEngine layout;
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 60.0f});
-        arrange::core::ScrollDispatcher scroll;
-
-        const auto childFirst = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 10.0f);
-        if (!childFirst.consumed || childFirst.target != 2 || !near(childFirst.value, 10.0f) || !near(childFirst.maxValue, 60.0f) || childFirst.callbackHandle != 20) return 191;
-
-        tree.node(1).props["__arrangeVerticalScrollValue"] = "f:0";
-        tree.node(2).props["__arrangeVerticalScrollValue"] = "f:60";
-        layout.layout(tree, 1, {0.0f, 100.0f, 0.0f, 60.0f});
-        const auto parentFallback = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 10.0f);
-        if (!parentFallback.consumed || parentFallback.target != 1 || !near(parentFallback.value, 10.0f) || !near(parentFallback.maxValue, 60.0f) || parentFallback.callbackHandle != 10) return 192;
-        if (!tree.node(2).props["__arrangeVerticalScrollValue"].starts_with("f:60")) return 193;
-        return 0;
-    }
-
-    int verifyNativeScrollTypedPropsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 3};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Column"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-        };
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        tree.node(1).bounds = {0.0f, 0.0f, 100.0f, 40.0f};
-        tree.node(2).bounds = {0.0f, 0.0f, 100.0f, 100.0f};
-        tree.node(1).props["__arrangeVerticalScrollEnabled"] = "b:1";
-        tree.node(1).props["__arrangeVerticalScrollValue"] = "f:5";
-        tree.node(1).props["__arrangeVerticalScrollCallback"] = "h:123";
-
-        arrange::core::ScrollDispatcher scroll;
-        const auto scrolled = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 10.0f);
-        if (!scrolled.consumed || scrolled.target != 1 || !near(scrolled.value, 15.0f) || !near(scrolled.maxValue, 60.0f) || scrolled.callbackHandle != 123) return 194;
-        if (tree.node(1).modifierDebugJson.find("verticalScroll") != std::string::npos) return 195;
-
-        tree.node(1).props["__arrangeVerticalScrollEnabled"] = "b:0";
-        const auto disabled = scroll.verticalWheel(tree, 1, {8.0f, 8.0f}, -1.0f, 10.0f);
-        if (disabled.target != 0 || disabled.consumed) return 196;
-        return 0;
-    }
-
-    int verifyNativeClickableTypedPropsWithoutDebugJson() {
-        arrange::core::BridgeBatch batch;
-        batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 3};
-        batch.ops = {
-            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Column"},
-            {arrange::core::BridgeOpcode::CreateNode, 2, 0, 0, 0, "Box"},
-            {arrange::core::BridgeOpcode::InsertChild, 0, 1, 2, 0},
-        };
-        arrange::core::RenderTree tree;
-        applySmokeBatch(tree, batch);
-        tree.node(1).bounds = {0.0f, 0.0f, 100.0f, 40.0f};
-        tree.node(2).bounds = {0.0f, 0.0f, 40.0f, 20.0f};
-        tree.node(2).props["__arrangeClickableEnabled"] = "b:1";
-        tree.node(2).props["__arrangeClickCallback"] = "h:321";
-
-        arrange::core::HitTester hitTester;
-        const auto clickable = hitTester.hitTestClickable(tree, 1, {8.0f, 8.0f});
-        if (!clickable.hit || clickable.node != 2 || !clickable.clickable) return 197;
-
-        arrange::core::PointerDispatcher pointer;
-        const auto down = pointer.pointerDown(tree, 1, {8.0f, 8.0f}, 1);
-        if (!down.consumed || down.callbackHandle != 321) return 198;
-        const auto up = pointer.pointerUp(tree, 1, {8.0f, 8.0f}, 1);
-        if (!up.consumed || !up.clickTriggered || up.callbackHandle != 321) return 199;
-        if (tree.node(2).modifierDebugJson.find("clickable") != std::string::npos) return 200;
-
-        tree.node(2).props["__arrangeClickableEnabled"] = "b:0";
-        const auto disabled = hitTester.hitTestClickable(tree, 1, {8.0f, 8.0f});
-        if (disabled.hit) return 201;
         return 0;
     }
 
@@ -1475,7 +993,7 @@ namespace {
         std::filesystem::create_directories(badDir);
         std::filesystem::create_directories(missingDir);
         {
-            std::ofstream app(okDir / "app.mjs", std::ios::binary);
+            std::ofstream app(okDir / "app.js", std::ios::binary);
             app << "export default {};\n";
         }
         {
@@ -1483,7 +1001,7 @@ namespace {
             image << "not a real png but enough for resolver smoke\n";
         }
         {
-            std::ofstream app(badDir / "app.mjs", std::ios::binary);
+            std::ofstream app(badDir / "app.js", std::ios::binary);
             app << "throw new Error('boom');\n";
         }
 
@@ -1501,7 +1019,7 @@ namespace {
         };
         const auto ok = resolver.resolveRelease(appWithDist(okDir));
         if (!ok.ok) return 20;
-        if (ok.entryPath.filename() != "app.mjs") return 21;
+        if (ok.entryPath.filename() != "app.js") return 21;
         const auto okResource = arrange::resolvePackageResource(ok.packageDir, "logo.png");
         if (!okResource.ok || okResource.path.filename() != "logo.png") return 133;
         const auto missingResource = arrange::resolvePackageResource(ok.packageDir, "missing.png");
@@ -1513,9 +1031,9 @@ namespace {
 
         const auto missing = resolver.resolveRelease(appWithDist(missingDir));
         if (missing.ok) return 22;
-        if (missing.error.find("app.mjs") == std::string::npos) return 23;
+        if (missing.error.find("app.js") == std::string::npos) return 23;
         const auto missingModel = arrange::makeErrorScreenModel(arrange::ErrorSource::AppPackage, missing.error, {}, missing.entryPath);
-        if (missingModel.diagnosticText().find("app.mjs") == std::string::npos) return 32;
+        if (missingModel.diagnosticText().find("app.js") == std::string::npos) return 32;
         if (!missingModel.retryAvailable) return 33;
 
         MockScriptHost editorHost;
@@ -1527,9 +1045,9 @@ namespace {
         arrange::HeadlessArrangeEditor missingEditor(appWithDist(missingDir), missingEditorHost);
         if (missingEditor.loadRelease()) return 47;
         if (missingEditor.state() != arrange::HeadlessEditorState::Error) return 48;
-        if (missingEditor.error().diagnosticText().find("app.mjs") == std::string::npos) return 49;
+        if (missingEditor.error().diagnosticText().find("app.js") == std::string::npos) return 49;
         {
-            std::ofstream app(missingDir / "app.mjs", std::ios::binary);
+            std::ofstream app(missingDir / "app.js", std::ios::binary);
             app << "export default {};\n";
         }
         if (!missingEditor.retryRelease()) return 53;
@@ -1579,7 +1097,7 @@ namespace {
     int verifyDevServerClientFirstSlice() {
         const auto endpoint = arrange::parseDevServerUrl("http://127.0.0.1:9178");
         if (!endpoint.ok || endpoint.secure || endpoint.host != "127.0.0.1" || endpoint.port != 9178 || endpoint.websocketPath != "/") return 87;
-        if (arrange::devBundleHttpUrl("http://127.0.0.1:9178") != "http://127.0.0.1:9178/@arrange/app.mjs") return 93;
+        if (arrange::devBundleHttpUrl("http://127.0.0.1:9178") != "http://127.0.0.1:9178/@arrange/app.js") return 93;
 
         const auto baseEndpoint = arrange::parseDevServerUrl("ws://localhost:3000/dev-base/");
         if (!baseEndpoint.ok || baseEndpoint.host != "localhost" || baseEndpoint.port != 3000 || baseEndpoint.websocketPath != "/dev-base/") return 88;
@@ -1655,6 +1173,355 @@ namespace {
 
         const auto wrapped = exactService.layout("abcd", {10.0f, 12.0f}, {0, 15.0f, false});
         if (wrapped.lines.size() != 4 || !near(wrapped.width, 11.0f)) return 242;
+
+        arrange::core::ArrangeNode inputNode;
+        inputNode.id = 42;
+        inputNode.type = arrange::core::NodeType::Input;
+        inputNode.bounds = {10.0f, 20.0f, 120.0f, 30.0f};
+        inputNode.props["textStyle"] = "o:{\"fontSize\":10,\"lineHeight\":12}";
+        arrange::core::TextInputOverlayState overlayState;
+        overlayState.text = "abcd";
+        overlayState.cursorIndex = 2;
+        overlayState.selectionStart = 1;
+        overlayState.selectionEnd = 3;
+        overlayState.temporaryUnderlines.push_back({0, 4});
+        const auto overlayOps = arrange::core::TextInputOverlayBuilder{}.build(inputNode, overlayState, exactService);
+        bool sawFocusRing = false;
+        bool sawSelection = false;
+        bool sawUnderline = false;
+        bool sawCaret = false;
+        bool sawClip = false;
+        for (const auto& op : overlayOps) {
+            if (op.type == arrange::core::DrawOpType::StrokeRect && op.nodeId == 42 && op.color == 0xff7aa2ffu) sawFocusRing = true;
+            if (op.type == arrange::core::DrawOpType::PushClip && near(op.rect.x, 18.0f) && near(op.rect.y, 29.0f)) sawClip = true;
+            if (op.type == arrange::core::DrawOpType::FillRect && op.color == 0x663a7afeu) sawSelection = true;
+            if (op.type == arrange::core::DrawOpType::DrawLine && op.color == 0xff7aa2ffu) sawUnderline = true;
+            if (op.type == arrange::core::DrawOpType::DrawLine && op.color == 0xffe8eaedu && near(op.rect.x, 38.0f)) sawCaret = true;
+        }
+        if (!sawFocusRing || !sawClip || !sawSelection || !sawUnderline || !sawCaret) return 259;
+        return 0;
+    }
+
+    int verifyMutationTransactionQueueAndSceneFramePipelineContract() {
+        arrange::core::BridgeBatch first;
+        first.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        first.ops.push_back({arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"});
+
+        arrange::core::BridgeBatch second;
+        second.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        second.ops = {
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40},{"type":"background","brush":4279312947}])json"},
+        };
+
+        arrange::core::MutationTransactionQueue queue;
+        if (queue.hasPending()) return 243;
+        queue.push(std::move(first));
+        queue.push(std::move(second));
+        if (!queue.hasPending()) return 244;
+
+        auto transaction = queue.take();
+        if (!transaction || !transaction->hasTreeMutations() || transaction->treeMutations.header.opCount != transaction->treeMutations.ops.size() || transaction->treeMutations.ops.size() != 2) return 245;
+        if (queue.hasPending()) return 246;
+
+        arrange::core::NativeScene scene;
+        arrange::core::PublishedFrame publishedFrame;
+        arrange::core::SceneFramePipeline pipeline;
+        const auto result = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &*transaction, true, publishedFrame);
+        if (!result.ran || result.error) return 247;
+        auto& tree = scene.tree();
+        if (!tree.contains(1) || !near(tree.node(1).bounds.width, 80.0f) || !near(tree.node(1).bounds.height, 40.0f)) return 248;
+        if (publishedFrame.content.drawOps.empty() || publishedFrame.content.drawOps.front().type != arrange::core::DrawOpType::FillRect) return 249;
+
+        arrange::core::MutationTransaction invalid;
+        invalid.treeMutations.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        invalid.treeMutations.ops.push_back({arrange::core::BridgeOpcode::SetProp, 99, 0, 0, 0, {}, "missing", "s:value"});
+        const auto failed = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &invalid, true, publishedFrame);
+        if (!failed.ran || !failed.error || !publishedFrame.content.drawOps.empty()) return 250;
+        return 0;
+    }
+
+    int verifySceneFramePipelinePrecisionContract() {
+        arrange::core::NativeScene scene;
+        arrange::core::PublishedFrame publishedFrame;
+        arrange::core::SceneFramePipeline pipeline;
+
+        arrange::core::BridgeBatch create;
+        create.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 2};
+        create.ops = {
+            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40},{"type":"background","brush":4279312947},{"type":"clickable","onClick":{"eventSlot":"1:click:click"}}])json"},
+        };
+        auto createTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(create));
+        auto created = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &createTransaction, true, publishedFrame);
+        if (!created.ran || created.error || !created.plan.measure || !created.plan.layout || !created.plan.buildPaint || !created.plan.passivePaint) return 272;
+        if (!phaseRan(publishedFrame.phases, arrange::core::FramePhase::Measure) ||
+            !phaseRan(publishedFrame.phases, arrange::core::FramePhase::Layout) ||
+            !phaseRan(publishedFrame.phases, arrange::core::FramePhase::BuildPaint) ||
+            !phaseRan(publishedFrame.phases, arrange::core::FramePhase::PassivePaint)) return 273;
+        if (scene.dirtySnapshot().nodeCount != 0 || !scene.invalidationSnapshot().empty()) return 274;
+
+        arrange::core::BridgeBatch paintOnly;
+        paintOnly.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        paintOnly.ops = {
+            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeNativeInputPaintInvalidation", "native paint state changed"},
+        };
+        auto paintTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(paintOnly));
+        auto paintResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &paintTransaction, false, publishedFrame);
+        if (!paintResult.ran || paintResult.error) return 275;
+        if (paintResult.plan.measure || paintResult.plan.layout || !paintResult.plan.buildPaint || paintResult.plan.buildHitTest || !paintResult.plan.publishFrame || !paintResult.plan.passivePaint) return 276;
+        if (phaseRan(publishedFrame.phases, arrange::core::FramePhase::Measure) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::Layout) ||
+            !phaseRan(publishedFrame.phases, arrange::core::FramePhase::BuildPaint) ||
+            !phaseRan(publishedFrame.phases, arrange::core::FramePhase::PassivePaint)) return 277;
+        if (!paintResult.invalidation.affects(arrange::core::DirtyFlag::Paint)) return 278;
+
+        arrange::core::BridgeBatch eventOnly;
+        eventOnly.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        eventOnly.ops = {
+            {arrange::core::BridgeOpcode::SetProp, 1, 0, 0, 0, {}, "__arrangeEventSlot.onClick", "s:1:click:updated"},
+        };
+        auto eventTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(eventOnly));
+        auto eventResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &eventTransaction, false, publishedFrame);
+        if (!eventResult.ran || eventResult.error) return 279;
+        if (eventResult.plan.measure || eventResult.plan.layout || eventResult.plan.buildPaint || eventResult.plan.buildHitTest || eventResult.plan.publishFrame || eventResult.plan.passivePaint) return 280;
+        if (phaseRan(publishedFrame.phases, arrange::core::FramePhase::Measure) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::Layout) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::BuildPaint) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::BuildHitTest) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::PublishFrame) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::PassivePaint)) return 281;
+        if (!eventResult.invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 282;
+        if (scene.dirtySnapshot().nodeCount != 0 || !scene.invalidationSnapshot().empty()) return 283;
+
+        arrange::core::BridgeBatch transformOnly;
+        transformOnly.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        transformOnly.ops = {
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40},{"type":"background","brush":4279312947},{"type":"graphicsLayer","scaleX":2}])json"},
+        };
+        auto transformTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(transformOnly));
+        auto transformResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &transformTransaction, false, publishedFrame);
+        if (!transformResult.ran || transformResult.error) return 284;
+        if (transformResult.plan.measure || transformResult.plan.layout || !transformResult.plan.buildPaint || !transformResult.plan.buildHitTest || !transformResult.plan.publishFrame || !transformResult.plan.passivePaint) return 285;
+
+        arrange::core::BridgeBatch layoutOnly;
+        layoutOnly.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        layoutOnly.ops = {
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":90,"height":50},{"type":"background","brush":4279312947}])json"},
+        };
+        auto layoutTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(layoutOnly));
+        auto layoutResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, &layoutTransaction, false, publishedFrame);
+        if (!layoutResult.ran || layoutResult.error) return 286;
+        if (!layoutResult.plan.measure || !layoutResult.plan.layout || !layoutResult.plan.buildPaint || !layoutResult.plan.buildHitTest || !layoutResult.plan.publishFrame || !layoutResult.plan.passivePaint) return 287;
+        if (!near(scene.node(1).bounds.width, 90.0f) || !near(scene.node(1).bounds.height, 50.0f)) return 288;
+
+        scene.tree().requestFullFallback("precision contract explicit fallback");
+        auto fallbackResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, nullptr, true, publishedFrame);
+        if (!fallbackResult.ran || fallbackResult.error) return 289;
+        if (!fallbackResult.plan.fullFallback || fallbackResult.plan.fallbackReason != "precision contract explicit fallback" || !fallbackResult.plan.buildPaint || !fallbackResult.plan.publishFrame || !fallbackResult.plan.passivePaint) return 290;
+        bool sawFallbackReason = false;
+        for (const auto& reason : fallbackResult.plan.reasons) {
+            if (reason == "precision contract explicit fallback") sawFallbackReason = true;
+        }
+        if (!sawFallbackReason) return 291;
+
+        scene.tree().recordSceneInvalidation(
+            arrange::core::DirtyFlag::Accessibility,
+            arrange::core::InvalidationSource::Diagnostics,
+            "diagnostics",
+            "diagnostics scene changed");
+        auto diagnosticsResult = pipeline.run(scene, 1, {0.0f, 100.0f, 0.0f, 100.0f}, nullptr, false, publishedFrame);
+        if (!diagnosticsResult.ran || diagnosticsResult.error) return 292;
+        if (diagnosticsResult.plan.measure || diagnosticsResult.plan.layout || diagnosticsResult.plan.buildPaint || diagnosticsResult.plan.buildHitTest || !diagnosticsResult.plan.buildDiagnostics || !diagnosticsResult.plan.publishFrame || diagnosticsResult.plan.passivePaint) return 293;
+        if (publishedFrame.content.drawOps.empty()) return 250;
+        if (!phaseRan(publishedFrame.phases, arrange::core::FramePhase::BuildDiagnostics) ||
+            phaseRan(publishedFrame.phases, arrange::core::FramePhase::PassivePaint)) return 294;
+        if (!diagnosticsResult.invalidation.affects(arrange::core::DirtyFlag::Accessibility)) return 295;
+
+        return 0;
+    }
+
+    int verifyMutationTransactionAndNativeSceneContract() {
+        arrange::core::MutationTransactionQueue queue;
+        if (queue.hasPending()) return 251;
+
+        auto& pending = queue.ensurePending();
+        if (!queue.hasPending()) return 252;
+        if (!pending.empty()) return 253;
+
+        const auto clickSlot = arrange::core::makeEventSlotId(1, arrange::core::EventSlotKind::Click);
+        pending.eventSlotUpdates.push_back(clickSlot);
+
+        auto transaction = queue.take();
+        if (!transaction || transaction->empty() || transaction->hasTreeMutations() || !transaction->hasEventSlotChanges()) return 254;
+        if (queue.hasPending()) return 255;
+
+        arrange::core::NativeScene scene;
+        scene.apply(*transaction);
+        if (!scene.hasEventSlot(clickSlot) || scene.eventSlotCount() != 1) return 256;
+
+        arrange::core::MutationTransaction retire;
+        retire.retiredEventSlots.push_back(clickSlot);
+        scene.apply(retire);
+        if (scene.hasEventSlot(clickSlot) || scene.eventSlotCount() != 0) return 257;
+
+        arrange::core::BridgeBatch create;
+        create.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 1};
+        create.ops.push_back({arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"});
+        auto treeTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(create));
+        treeTransaction.eventSlotUpdates.push_back(clickSlot);
+        scene.apply(treeTransaction);
+        if (!scene.contains(1) || !scene.hasEventSlot(clickSlot)) return 258;
+
+        scene.reset();
+        if (scene.contains(1) || scene.hasEventSlot(clickSlot) || scene.eventSlotCount() != 0) return 259;
+        return 0;
+    }
+
+    int verifyInputIntentInvalidationContract() {
+        arrange::core::NativeScene scene;
+        arrange::core::PublishedFrame publishedFrame;
+        arrange::core::SceneFramePipeline pipeline;
+
+        arrange::core::BridgeBatch create;
+        create.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 2};
+        create.ops = {
+            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40},{"type":"background","brush":4279312947}])json"},
+        };
+        auto createTransaction = arrange::core::MutationTransaction::fromBridgeBatch(std::move(create));
+        auto created = pipeline.run(scene, 1, {0.0f, 120.0f, 0.0f, 80.0f}, &createTransaction, true, publishedFrame);
+        if (!created.ran || created.error) return 296;
+
+        scene.tree().recordSceneInvalidation(
+            arrange::core::DirtyFlag::EventSlot,
+            arrange::core::InvalidationSource::InputIntent,
+            "input",
+            "pointer intent");
+        auto pointer = pipeline.run(scene, 1, {0.0f, 120.0f, 0.0f, 80.0f}, nullptr, false, publishedFrame);
+        if (!pointer.ran || pointer.error) return 297;
+        if (!pointer.invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 298;
+        if (pointer.plan.measure || pointer.plan.layout || pointer.plan.buildPaint || pointer.plan.buildHitTest || pointer.plan.buildDiagnostics || pointer.plan.publishFrame || pointer.plan.passivePaint) return 299;
+
+        scene.tree().recordSceneInvalidation(
+            arrange::core::DirtyFlag::Structure,
+            arrange::core::InvalidationSource::InputIntent,
+            "package",
+            "reload intent");
+        auto reload = pipeline.run(scene, 1, {0.0f, 120.0f, 0.0f, 80.0f}, nullptr, false, publishedFrame);
+        if (!reload.ran || reload.error) return 300;
+        if (!reload.invalidation.affects(arrange::core::DirtyFlag::Structure) || !reload.invalidation.affects(arrange::core::DirtyFlag::Layout) || !reload.invalidation.affects(arrange::core::DirtyFlag::HitTest)) return 301;
+        if (!reload.plan.measure || !reload.plan.layout || !reload.plan.buildPaint || !reload.plan.buildHitTest || !reload.plan.publishFrame || !reload.plan.passivePaint) return 302;
+
+        scene.tree().recordSceneInvalidation(
+            arrange::core::DirtyFlag::Resource,
+            arrange::core::InvalidationSource::Resource,
+            "resource",
+            "resource ready");
+        auto resource = pipeline.run(scene, 1, {0.0f, 120.0f, 0.0f, 80.0f}, nullptr, false, publishedFrame);
+        if (!resource.ran || resource.error) return 303;
+        if (!resource.invalidation.affects(arrange::core::DirtyFlag::Resource) || resource.invalidation.affects(arrange::core::DirtyFlag::Layout) || !resource.invalidation.affects(arrange::core::DirtyFlag::Paint)) return 304;
+        if (resource.plan.measure || resource.plan.layout || !resource.plan.buildPaint || resource.plan.buildHitTest || !resource.plan.publishFrame || !resource.plan.passivePaint) return 305;
+
+        arrange::juce::ScenePipelineState pipelineState;
+        arrange::core::BridgeBatch pipelineStateCreate;
+        pipelineStateCreate.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 2};
+        pipelineStateCreate.ops = {
+            {arrange::core::BridgeOpcode::CreateNode, 1, 0, 0, 0, "Box"},
+            {arrange::core::BridgeOpcode::SetModifier, 1, 0, 0, 0, {}, {}, {}, {}, R"json(o:[{"type":"size","width":80,"height":40}])json"},
+        };
+        pipelineState.enqueueIntent(arrange::core::InputIntent::packageLoad(
+            arrange::core::MutationTransaction::fromBridgeBatch(std::move(pipelineStateCreate)),
+            "intent pipeline state package load"));
+        const auto pipelineStateCreated = pipelineState.run(1, {0.0f, 120.0f, 0.0f, 80.0f}, false);
+        if (pipelineStateCreated.error || !pipelineStateCreated.plan.measure || !pipelineStateCreated.invalidation.affects(arrange::core::DirtyFlag::Structure)) return 306;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::key("key input contract", 1));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::textInput("text input contract", 1));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::imeComposition("ime composition contract", 1));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::animationFrame("animation frame contract"));
+        const auto inputOnly = pipelineState.run(1, {0.0f, 120.0f, 0.0f, 80.0f}, false);
+        if (inputOnly.error) return 307;
+        if (!inputOnly.invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 308;
+        if (inputOnly.plan.measure || inputOnly.plan.layout || inputOnly.plan.buildPaint || inputOnly.plan.buildHitTest || inputOnly.plan.buildDiagnostics || inputOnly.plan.publishFrame || inputOnly.plan.passivePaint) return 309;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::reload("reload contract"));
+        const auto reloadIntent = pipelineState.run(1, {0.0f, 120.0f, 0.0f, 80.0f}, false);
+        if (reloadIntent.error || !reloadIntent.plan.fullFallback || reloadIntent.plan.fallbackReason != "reload contract") return 310;
+        if (!reloadIntent.plan.measure || !reloadIntent.plan.layout || !reloadIntent.plan.buildPaint || !reloadIntent.plan.passivePaint) return 311;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::resourceReady("resource ready contract"));
+        const auto resourceIntent = pipelineState.run(1, {0.0f, 120.0f, 0.0f, 80.0f}, false);
+        if (resourceIntent.error || resourceIntent.plan.fullFallback || !resourceIntent.plan.fallbackReason.empty()) return 312;
+        if (!resourceIntent.invalidation.affects(arrange::core::DirtyFlag::Resource) || resourceIntent.plan.measure || resourceIntent.plan.layout || !resourceIntent.plan.buildPaint || resourceIntent.plan.buildHitTest) return 313;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::resourceFailed("resource failed contract"));
+        const auto resourceFailed = pipelineState.run(1, {0.0f, 120.0f, 0.0f, 80.0f}, false);
+        if (resourceFailed.error || resourceFailed.plan.fullFallback || !resourceFailed.plan.fallbackReason.empty()) return 314;
+        if (!resourceFailed.invalidation.affects(arrange::core::DirtyFlag::Resource) || !resourceFailed.invalidation.affects(arrange::core::DirtyFlag::Accessibility)) return 315;
+        if (resourceFailed.plan.measure || resourceFailed.plan.layout || !resourceFailed.plan.buildPaint || resourceFailed.plan.buildHitTest || !resourceFailed.plan.buildDiagnostics || !resourceFailed.plan.publishFrame || !resourceFailed.plan.passivePaint) return 316;
+
+        std::vector<arrange::core::DrawOp> overlayOps;
+        arrange::core::DrawOp overlayCaret;
+        overlayCaret.type = arrange::core::DrawOpType::DrawLine;
+        overlayCaret.nodeId = 1;
+        overlayCaret.rect = {10.0f, 12.0f, 0.0f, 0.0f};
+        overlayCaret.lineEnd = {10.0f, 36.0f};
+        overlayCaret.strokeWidth = 1.0f;
+        overlayOps.push_back(overlayCaret);
+        pipelineState.setOverlayDrawOps(std::move(overlayOps), 1, 6.0f);
+        const auto& overlayFrame = pipelineState.publishedFrame();
+        if (!overlayFrame.changes.overlayDrawOpsChanged || !overlayFrame.changes.hasOverlayRepaintBounds) return 320;
+        if (overlayFrame.content.focusedInputNode != 1 || !near(overlayFrame.content.focusedInputViewportX, 6.0f)) return 321;
+        if (!near(overlayFrame.changes.overlayRepaintBounds.x, 9.0f) || !near(overlayFrame.changes.overlayRepaintBounds.y, 11.0f)) return 322;
+
+        std::vector<arrange::core::DrawOp> diagnosticsOps;
+        arrange::core::DrawOp diagnosticsBadge;
+        diagnosticsBadge.type = arrange::core::DrawOpType::FillRect;
+        diagnosticsBadge.rect = {20.0f, 22.0f, 30.0f, 12.0f};
+        diagnosticsOps.push_back(diagnosticsBadge);
+        pipelineState.setDiagnosticsDrawOps({}, std::move(diagnosticsOps), {});
+        const auto& diagnosticsFrame = pipelineState.publishedFrame();
+        if (!diagnosticsFrame.changes.diagnosticsDrawOpsChanged || !diagnosticsFrame.changes.hasDiagnosticsRepaintBounds) return 323;
+        if (diagnosticsFrame.content.diagnosticsBadgeDrawOps.empty()) return 324;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::resize({0.0f, 240.0f, 0.0f, 160.0f}, "resize contract"));
+        const auto resizeIntent = pipelineState.run(1, {0.0f, 240.0f, 0.0f, 160.0f}, false);
+        if (resizeIntent.error || resizeIntent.plan.fullFallback || !resizeIntent.plan.fallbackReason.empty()) return 317;
+        if (!resizeIntent.invalidation.affects(arrange::core::DirtyFlag::Layout)) return 318;
+        if (!resizeIntent.plan.measure || !resizeIntent.plan.layout || !resizeIntent.plan.buildPaint || !resizeIntent.plan.buildHitTest || !resizeIntent.plan.publishFrame || !resizeIntent.plan.passivePaint) return 319;
+
+        return 0;
+    }
+
+    int verifyFramePlannerTickPlanContract() {
+        arrange::juce::FramePlanner planner;
+
+        const auto idle = planner.planTick({});
+        if (idle.runEvents || idle.runAnimation || idle.runPipeline || idle.hasTickWork) return 260;
+        if (planner.hasPendingFrameWork({})) return 261;
+        if (planner.desiredTimerFrequencyHz({}) != 20) return 262;
+
+        planner.requestFramePipelineRun();
+        const auto explicitPipeline = planner.planTick({});
+        if (explicitPipeline.runEvents || explicitPipeline.runAnimation || !explicitPipeline.runPipeline || !explicitPipeline.hasTickWork) return 263;
+        if (!planner.hasPendingFrameWork({})) return 264;
+        if (planner.desiredTimerFrequencyHz({}) != 60) return 265;
+        if (!planner.framePipelineRunRequested()) return 266;
+        planner.clearFramePipelineRunRequest();
+        if (planner.framePipelineRunRequested()) return 267;
+
+        const arrange::juce::FrameWorkState queuedAnimatedState{true, true, false, false};
+        const auto queuedAnimated = planner.planTick(queuedAnimatedState);
+        if (!queuedAnimated.runEvents || !queuedAnimated.runAnimation || queuedAnimated.runPipeline || !queuedAnimated.hasTickWork) return 268;
+        if (planner.framePipelineRunRequested()) return 269;
+
+        const arrange::juce::FrameWorkState transactionOnlyState{false, false, false, true};
+        const auto transactionOnly = planner.planTick(transactionOnlyState);
+        if (transactionOnly.runEvents || transactionOnly.runAnimation || !transactionOnly.runPipeline || !transactionOnly.hasTickWork) return 270;
+
+        planner.reset();
+        const auto reset = planner.planTick({});
+        if (reset.hasTickWork || planner.framePipelineRunRequested()) return 271;
         return 0;
     }
 }
@@ -1664,29 +1531,25 @@ int main(int argc, char** argv) {
     if (const auto layout = verifyNativeArrangementAndWeightLayout(); layout != 0) return layout;
     if (const auto modifierOrder = verifyNativeModifierOrderFirstSlice(); modifierOrder != 0) return modifierOrder;
     if (const auto text = verifyNativeTextFirstSlice(); text != 0) return text;
-    if (const auto insertChild = verifyRenderTreeInsertChildKeepsParentReferenceStable(); insertChild != 0) return insertChild;
-    if (const auto cycles = verifyRenderTreeRejectsCyclesAndDeduplicatesChildren(); cycles != 0) return cycles;
-    if (const auto dirty = verifyRenderTreeDirtyPropagationFirstSlice(); dirty != 0) return dirty;
-    if (const auto dirtySnapshot = verifyRenderTreeDirtySnapshotAndClearFirstSlice(); dirtySnapshot != 0) return dirtySnapshot;
+    if (const auto insertChild = verifyLayoutTreeInsertChildKeepsParentReferenceStable(); insertChild != 0) return insertChild;
+    if (const auto cycles = verifyLayoutTreeRejectsCyclesAndDeduplicatesChildren(); cycles != 0) return cycles;
+    if (const auto dirty = verifyLayoutTreeDirtyPropagationFirstSlice(); dirty != 0) return dirty;
+    if (const auto dirtySnapshot = verifyLayoutTreeDirtySnapshotAndClearFirstSlice(); dirtySnapshot != 0) return dirtySnapshot;
     if (const auto transformHit = verifyNativeGraphicsLayerTranslationHitTestFirstSlice(); transformHit != 0) return transformHit;
     if (const auto transformScaleRotationHit = verifyNativeGraphicsLayerScaleRotationHitTestFirstSlice(); transformScaleRotationHit != 0) return transformScaleRotationHit;
-    if (const auto typedTransformHit = verifyNativeGraphicsLayerTransformTypedPropsWithoutDebugJson(); typedTransformHit != 0) return typedTransformHit;
     if (const auto nestedTransformClip = verifyNativeNestedTransformClipFirstSlice(); nestedTransformClip != 0) return nestedTransformClip;
     if (const auto zIndex = verifyNativeZIndexPaintAndHitTestFirstSlice(); zIndex != 0) return zIndex;
-    if (const auto typedZIndex = verifyNativeZIndexTypedPropsWithoutDebugJson(); typedZIndex != 0) return typedZIndex;
     if (const auto input = verifyNativeInputFirstSlice(); input != 0) return input;
     if (const auto inputEditing = verifyNativeTextInputEditingFirstSlice(); inputEditing != 0) return inputEditing;
     if (const auto imageIcon = verifyNativeImageIconFirstSlice(); imageIcon != 0) return imageIcon;
-    if (const auto scroll = verifyNativeScrollFirstSlice(); scroll != 0) return scroll;
-    if (const auto horizontalScroll = verifyNativeHorizontalScrollFirstSlice(); horizontalScroll != 0) return horizontalScroll;
-    if (const auto nestedScroll = verifyNativeNestedScrollConsumptionFirstSlice(); nestedScroll != 0) return nestedScroll;
-    if (const auto typedScroll = verifyNativeScrollTypedPropsWithoutDebugJson(); typedScroll != 0) return typedScroll;
-    if (const auto typedClick = verifyNativeClickableTypedPropsWithoutDebugJson(); typedClick != 0) return typedClick;
-    if (const auto typedWeight = verifyNativeWeightTypedPropsWithoutDebugJson(); typedWeight != 0) return typedWeight;
-    if (const auto typedAlignOffset = verifyNativeAlignAndOffsetTypedPropsWithoutDebugJson(); typedAlignOffset != 0) return typedAlignOffset;
-    if (const auto typedModifierElements = verifyNativeTypedModifierElementsWithoutDebugJson(); typedModifierElements != 0) return typedModifierElements;
+    if (const auto typedModifierElements = verifyNativeTypedModifierPayloadWithoutExpandedProps(); typedModifierElements != 0) return typedModifierElements;
     if (const auto propValue = verifyPropValueContract(); propValue != 0) return propValue;
     if (const auto textLayout = verifyTextLayoutServiceContract(); textLayout != 0) return textLayout;
+    if (const auto pipeline = verifyMutationTransactionQueueAndSceneFramePipelineContract(); pipeline != 0) return pipeline;
+    if (const auto precisePipeline = verifySceneFramePipelinePrecisionContract(); precisePipeline != 0) return precisePipeline;
+    if (const auto transaction = verifyMutationTransactionAndNativeSceneContract(); transaction != 0) return transaction;
+    if (const auto intentInvalidation = verifyInputIntentInvalidationContract(); intentInvalidation != 0) return intentInvalidation;
+    if (const auto framePlanner = verifyFramePlannerTickPlanContract(); framePlanner != 0) return framePlanner;
     if (const auto app = verifyAppResolverAndScriptLoader(); app != 0) return app;
     if (const auto devServer = verifyDevServerClientFirstSlice(); devServer != 0) return devServer;
     return 0;

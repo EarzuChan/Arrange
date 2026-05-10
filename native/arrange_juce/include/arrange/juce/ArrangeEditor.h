@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <atomic>
 #include "App.h"
+#include "EditorFrameClock.h"
 
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -57,6 +57,20 @@ namespace arrange::juce {
 
 #if ARRANGE_JUCE_WITH_JUCE
 
+    class ArrangeEditor;
+    class EditorSceneHost;
+
+    class EditorShellDriver final {
+    public:
+        void afterConfigure(ArrangeEditor& editor) const;
+        void afterReload(ArrangeEditor& editor) const;
+        void afterResize(ArrangeEditor& editor) const;
+        void afterPointerDown(ArrangeEditor& editor) const;
+        void afterTimerRelevantChange(ArrangeEditor& editor) const;
+        void afterTitleAndTimerRelevantChange(ArrangeEditor& editor) const;
+        void timerTick(ArrangeEditor& editor, double nowMillis) const;
+    };
+
     class ArrangeEditor final : public ::juce::AudioProcessorEditor, public ::juce::TextInputTarget, private ::juce::Timer {
     public:
         explicit ArrangeEditor(::juce::AudioProcessor& processor);
@@ -88,14 +102,17 @@ namespace arrange::juce {
         ::juce::RectangleList<int> getTextBounds(::juce::Range<int> textRange) const override;
 
     private:
-        class Surface;
+        friend class EditorShellDriver;
+
         void timerCallback() override;
         void updateWindowTitle();
         void updateTimerState();
+        void requestFrameClockResyncAsync();
 
         EditorConfig config_;
-        std::unique_ptr<Surface> surface_;
-        int timerFrequencyHz_ = 0;
+        std::unique_ptr<EditorSceneHost> sceneHost_;
+        EditorFrameClock frameClock_;
+        EditorShellDriver shell_;
     };
 
 #else

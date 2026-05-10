@@ -1,4 +1,4 @@
-#include <arrange/juce/DevServerClient.h>
+﻿#include <arrange/juce/DevServerClient.h>
 
 #include <algorithm>
 #include <charconv>
@@ -258,7 +258,7 @@ namespace arrange {
             url += ":";
             url += std::to_string(endpoint.port);
         }
-        url += ArrangeDevBundlePath;
+        url += "/@arrange/app.js";
         return url;
     }
 

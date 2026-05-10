@@ -16,11 +16,6 @@ namespace arrange::core {
         float clamp(float value, float min, float max) noexcept { return std::max(min, std::min(max, value)); }
         float safeMax(float value, float fallback) noexcept { return value > 0.0f ? value : fallback; }
 
-        bool hasEncodedProp(const ArrangeNode& node, const char* key) {
-            if (node.props.find(key) != node.props.end()) return true;
-            return node.props.find(kebabCase(key)) != node.props.end();
-        }
-
         std::string inputTextProp(const ArrangeNode& node) {
             auto value = propValue(node, "modelValue", "model-value");
             if (value.empty()) { if (const auto it = node.props.find("value"); it != node.props.end()) value = it->second; }
@@ -86,114 +81,102 @@ namespace arrange::core {
             return decodeStringProp(value);
         }
 
-        std::string alignModifier(const ArrangeNode& node) {
-            if (hasEncodedProp(node, "__arrangeAlign")) { return decodeStringProp(propValue(node, "__arrangeAlign", "__arrange-align")); }
-            const auto elements = parseModifierElements(node);
-            for (const auto& element : elements) { if (element.type == "align") return element.string("alignment"); }
-            return {};
-        }
-
-        float paddingValue(const ModifierElement& element, const char* key) { return std::max(0.0f, element.number(key, 0.0f)); }
-
-        float scrollValue(const ArrangeNode& node, const ModifierElement& element, const char* nativeProp) {
-            const auto fallback = element.number("state.value", element.number("value", 0.0f));
-            return std::max(0.0f, encodedNumberProp(node, nativeProp, fallback));
-        }
+        std::string alignModifier(const ArrangeNode& node) { return node.modifier.parentData.align; }
     } // namespace
 
     LayoutEngine::LayoutEngine() : textLayoutService_(&defaultTextLayoutService()) {}
 
     LayoutEngine::LayoutEngine(const TextLayoutService& textLayoutService) : textLayoutService_(&textLayoutService) {}
 
-    void LayoutEngine::layout(RenderTree& tree, NodeId root, Constraints constraints) {
+    void LayoutEngine::layout(LayoutTree& tree, NodeId root, Constraints constraints) {
         measure(tree, root, constraints);
         place(tree, root, 0.0f, 0.0f);
     }
 
-    Size LayoutEngine::measure(RenderTree& tree, NodeId id, Constraints constraints) {
-        const auto elements = parseModifierElements(tree.node(id));
-        return measureWithModifier(tree, id, elements, 0, constraints);
+    Size LayoutEngine::measure(LayoutTree& tree, NodeId id, Constraints constraints) {
+        const auto& modifier = tree.node(id).modifier;
+        return measureWithModifier(tree, id, modifier, 0, constraints);
     }
 
-    Size LayoutEngine::measureWithModifier(RenderTree& tree, NodeId id, const std::vector<ModifierElement>& elements, std::size_t index, Constraints constraints) {
-        if (index >= elements.size()) return measureContent(tree, id, constraints);
+    Size LayoutEngine::measureWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, Constraints constraints) {
+        if (index >= modifier.layout.size()) return measureContent(tree, id, constraints);
 
-        const auto& element = elements[index];
-        if (element.type == "padding") {
-            const auto start = paddingValue(element, "start");
-            const auto top = paddingValue(element, "top");
-            const auto end = paddingValue(element, "end");
-            const auto bottom = paddingValue(element, "bottom");
-            const auto child = measureWithModifier(tree, id, elements, index + 1, shrink(constraints, start + end, top + bottom));
+        const auto& element = modifier.layout[index];
+        if (element.kind == LayoutModifierKind::Padding) {
+            const auto start = element.padding.start;
+            const auto top = element.padding.top;
+            const auto end = element.padding.end;
+            const auto bottom = element.padding.bottom;
+            const auto child = measureWithModifier(tree, id, modifier, index + 1, shrink(constraints, start + end, top + bottom));
             auto& node = tree.node(id);
             node.bounds.width = clamp(child.width + start + end, constraints.minWidth, constraints.maxWidth);
             node.bounds.height = clamp(child.height + top + bottom, constraints.minHeight, constraints.maxHeight);
             return {node.bounds.width, node.bounds.height};
         }
 
-        if (element.type == "width") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, element.number("value"), 0.0f, true, false)); }
-        if (element.type == "height") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, 0.0f, element.number("value"), false, true)); }
-        if (element.type == "size") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, element.number("width"), element.number("height"), true, true)); }
-        if (element.type == "requiredWidth") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, element.number("width"), 0.0f, true, false, true)); }
-        if (element.type == "requiredHeight") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, 0.0f, element.number("height"), false, true, true)); }
-        if (element.type == "requiredSize") { return measureWithModifier(tree, id, elements, index + 1, exact(constraints, element.number("width"), element.number("height"), true, true, true)); }
-        if (element.type == "fillMaxWidth") {
-            const auto fraction = clamp(element.number("fraction", 1.0f), 0.0f, 1.0f);
-            return measureWithModifier(tree, id, elements, index + 1, exact(constraints, constraints.maxWidth * fraction, 0.0f, true, false));
+        if (element.kind == LayoutModifierKind::Width) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.value, 0.0f, true, false)); }
+        if (element.kind == LayoutModifierKind::Height) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, element.value, false, true)); }
+        if (element.kind == LayoutModifierKind::Size) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.width, element.height, true, true)); }
+        if (element.kind == LayoutModifierKind::RequiredWidth) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.value, 0.0f, true, false, true)); }
+        if (element.kind == LayoutModifierKind::RequiredHeight) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, element.value, false, true, true)); }
+        if (element.kind == LayoutModifierKind::RequiredSize) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.width, element.height, true, true, true)); }
+        if (element.kind == LayoutModifierKind::FillMaxWidth) {
+            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
+            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, constraints.maxWidth * fraction, 0.0f, true, false));
         }
-        if (element.type == "fillMaxHeight") {
-            const auto fraction = clamp(element.number("fraction", 1.0f), 0.0f, 1.0f);
-            return measureWithModifier(tree, id, elements, index + 1, exact(constraints, 0.0f, constraints.maxHeight * fraction, false, true));
+        if (element.kind == LayoutModifierKind::FillMaxHeight) {
+            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
+            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, constraints.maxHeight * fraction, false, true));
         }
-        if (element.type == "fillMaxSize") {
-            const auto fraction = clamp(element.number("fraction", 1.0f), 0.0f, 1.0f);
-            return measureWithModifier(tree, id, elements, index + 1, exact(constraints, constraints.maxWidth * fraction, constraints.maxHeight * fraction, true, true));
+        if (element.kind == LayoutModifierKind::FillMaxSize) {
+            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
+            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, constraints.maxWidth * fraction, constraints.maxHeight * fraction, true, true));
         }
-        if (element.type == "widthIn") {
-            if (const auto minWidth = element.number("min", -1.0f); minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
-            if (const auto maxWidth = element.number("max", -1.0f); maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
-            return measureWithModifier(tree, id, elements, index + 1, constraints);
+        if (element.kind == LayoutModifierKind::WidthIn) {
+            if (const auto minWidth = element.minWidth; minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
+            if (const auto maxWidth = element.maxWidth; maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
+            return measureWithModifier(tree, id, modifier, index + 1, constraints);
         }
-        if (element.type == "heightIn") {
-            if (const auto minHeight = element.number("min", -1.0f); minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
-            if (const auto maxHeight = element.number("max", -1.0f); maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
-            return measureWithModifier(tree, id, elements, index + 1, constraints);
+        if (element.kind == LayoutModifierKind::HeightIn) {
+            if (const auto minHeight = element.minHeight; minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
+            if (const auto maxHeight = element.maxHeight; maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
+            return measureWithModifier(tree, id, modifier, index + 1, constraints);
         }
-        if (element.type == "sizeIn") {
-            if (const auto minWidth = element.number("minWidth", -1.0f); minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
-            if (const auto maxWidth = element.number("maxWidth", -1.0f); maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
-            if (const auto minHeight = element.number("minHeight", -1.0f); minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
-            if (const auto maxHeight = element.number("maxHeight", -1.0f); maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
-            return measureWithModifier(tree, id, elements, index + 1, constraints);
+        if (element.kind == LayoutModifierKind::SizeIn) {
+            if (const auto minWidth = element.minWidth; minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
+            if (const auto maxWidth = element.maxWidth; maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
+            if (const auto minHeight = element.minHeight; minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
+            if (const auto maxHeight = element.maxHeight; maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
+            return measureWithModifier(tree, id, modifier, index + 1, constraints);
         }
-        if (element.type == "defaultMinSize") {
-            constraints.minWidth = std::max(constraints.minWidth, element.number("minWidth"));
-            constraints.minHeight = std::max(constraints.minHeight, element.number("minHeight"));
-            return measureWithModifier(tree, id, elements, index + 1, constraints);
+        if (element.kind == LayoutModifierKind::DefaultMinSize) {
+            constraints.minWidth = std::max(constraints.minWidth, element.minWidth);
+            constraints.minHeight = std::max(constraints.minHeight, element.minHeight);
+            return measureWithModifier(tree, id, modifier, index + 1, constraints);
         }
-        if (element.type == "verticalScroll") {
+        if (element.kind == LayoutModifierKind::VerticalScroll) {
             auto unbounded = constraints;
             unbounded.maxHeight = InfiniteConstraint;
-            const auto child = measureWithModifier(tree, id, elements, index + 1, unbounded);
+            const auto child = measureWithModifier(tree, id, modifier, index + 1, unbounded);
             auto& node = tree.node(id);
             node.bounds.width = clamp(child.width, constraints.minWidth, constraints.maxWidth);
             node.bounds.height = clamp(child.height, constraints.minHeight, constraints.maxHeight);
             return {node.bounds.width, node.bounds.height};
         }
-        if (element.type == "horizontalScroll") {
+        if (element.kind == LayoutModifierKind::HorizontalScroll) {
             auto unbounded = constraints;
             unbounded.maxWidth = InfiniteConstraint;
-            const auto child = measureWithModifier(tree, id, elements, index + 1, unbounded);
+            const auto child = measureWithModifier(tree, id, modifier, index + 1, unbounded);
             auto& node = tree.node(id);
             node.bounds.width = clamp(child.width, constraints.minWidth, constraints.maxWidth);
             node.bounds.height = clamp(child.height, constraints.minHeight, constraints.maxHeight);
             return {node.bounds.width, node.bounds.height};
         }
 
-        return measureWithModifier(tree, id, elements, index + 1, constraints);
+        return measureWithModifier(tree, id, modifier, index + 1, constraints);
     }
 
-    Size LayoutEngine::measureContent(RenderTree& tree, NodeId id, Constraints constraints) {
+    Size LayoutEngine::measureContent(LayoutTree& tree, NodeId id, Constraints constraints) {
         auto& node = tree.node(id);
         Size content;
 
@@ -243,7 +226,7 @@ namespace arrange::core {
             };
             std::vector<WeightedChild> weighted;
             for (auto childId : node.children) {
-                const auto childModifier = parseModifier(tree.node(childId));
+                const auto childModifier = modifierMetrics(tree.node(childId));
                 if (childModifier.weight > 0.0f) {
                     totalWeight += childModifier.weight;
                     weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
@@ -278,7 +261,7 @@ namespace arrange::core {
             };
             std::vector<WeightedChild> weighted;
             for (auto childId : node.children) {
-                const auto childModifier = parseModifier(tree.node(childId));
+                const auto childModifier = modifierMetrics(tree.node(childId));
                 if (childModifier.weight > 0.0f) {
                     totalWeight += childModifier.weight;
                     weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
@@ -342,60 +325,44 @@ namespace arrange::core {
         return {node.bounds.width, node.bounds.height};
     }
 
-    void LayoutEngine::place(RenderTree& tree, NodeId id, float x, float y) {
+    void LayoutEngine::place(LayoutTree& tree, NodeId id, float x, float y) {
         auto& node = tree.node(id);
-        const auto elements = parseModifierElements(node);
-        float offsetX = 0.0f;
-        float offsetY = 0.0f;
-        if (hasEncodedProp(node, "__arrangeLayoutOffsetX") || hasEncodedProp(node, "__arrangeLayoutOffsetY")) {
-            offsetX = encodedNumberProp(node, "__arrangeLayoutOffsetX", 0.0f);
-            offsetY = encodedNumberProp(node, "__arrangeLayoutOffsetY", 0.0f);
-        }
-        else {
-            for (const auto& element : elements) {
-                if (element.type == "offset" || element.type == "absoluteOffset") {
-                    offsetX += element.number("x");
-                    offsetY += element.number("y");
-                }
-                else if (element.type == "graphicsLayer") {
-                    offsetX += element.number("translationX");
-                    offsetY += element.number("translationY");
-                }
-            }
-        }
+        const auto& modifier = node.modifier;
+        const auto offsetX = modifier.transform.layoutOffsetX;
+        const auto offsetY = modifier.transform.layoutOffsetY;
         node.bounds.x = x + offsetX;
         node.bounds.y = y + offsetY;
-        placeWithModifier(tree, id, elements, 0, node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
+        placeWithModifier(tree, id, modifier, 0, node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
     }
 
-    void LayoutEngine::placeWithModifier(RenderTree& tree, NodeId id, const std::vector<ModifierElement>& elements, std::size_t index, float x, float y, float width, float height) {
-        if (index >= elements.size()) {
+    void LayoutEngine::placeWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, float x, float y, float width, float height) {
+        if (index >= modifier.layout.size()) {
             placeContent(tree, id, x, y, width, height);
             return;
         }
 
-        const auto& element = elements[index];
-        if (element.type == "padding") {
-            const auto start = paddingValue(element, "start");
-            const auto top = paddingValue(element, "top");
-            const auto end = paddingValue(element, "end");
-            const auto bottom = paddingValue(element, "bottom");
-            placeWithModifier(tree, id, elements, index + 1, x + start, y + top, std::max(0.0f, width - start - end), std::max(0.0f, height - top - bottom));
+        const auto& element = modifier.layout[index];
+        if (element.kind == LayoutModifierKind::Padding) {
+            const auto start = element.padding.start;
+            const auto top = element.padding.top;
+            const auto end = element.padding.end;
+            const auto bottom = element.padding.bottom;
+            placeWithModifier(tree, id, modifier, index + 1, x + start, y + top, std::max(0.0f, width - start - end), std::max(0.0f, height - top - bottom));
             return;
         }
-        if (element.type == "verticalScroll") {
-            placeWithModifier(tree, id, elements, index + 1, x, y - scrollValue(tree.node(id), element, "__arrangeVerticalScrollValue"), width, height);
+        if (element.kind == LayoutModifierKind::VerticalScroll) {
+            placeWithModifier(tree, id, modifier, index + 1, x, y - element.scrollValue, width, height);
             return;
         }
-        if (element.type == "horizontalScroll") {
-            placeWithModifier(tree, id, elements, index + 1, x - scrollValue(tree.node(id), element, "__arrangeHorizontalScrollValue"), y, width, height);
+        if (element.kind == LayoutModifierKind::HorizontalScroll) {
+            placeWithModifier(tree, id, modifier, index + 1, x - element.scrollValue, y, width, height);
             return;
         }
 
-        placeWithModifier(tree, id, elements, index + 1, x, y, width, height);
+        placeWithModifier(tree, id, modifier, index + 1, x, y, width, height);
     }
 
-    void LayoutEngine::placeContent(RenderTree& tree, NodeId id, float x, float y, float width, float height) {
+    void LayoutEngine::placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height) {
         auto& node = tree.node(id);
         if (node.type == NodeType::Row) {
             const auto spacing = rowSpacing(node);
@@ -439,39 +406,31 @@ namespace arrange::core {
         for (auto childId : node.children) place(tree, childId, x, y);
     }
 
-    LayoutEngine::ModifierMetrics LayoutEngine::parseModifier(const ArrangeNode& node) {
+    LayoutEngine::ModifierMetrics LayoutEngine::modifierMetrics(const ArrangeNode& node) {
         ModifierMetrics metrics;
-        const auto elements = parseModifierElements(node);
-        for (const auto& element : elements) {
-            if (element.type == "padding") {
-                metrics.paddingStart += paddingValue(element, "start");
-                metrics.paddingTop += paddingValue(element, "top");
-                metrics.paddingEnd += paddingValue(element, "end");
-                metrics.paddingBottom += paddingValue(element, "bottom");
+        const auto& modifier = node.modifier;
+        metrics.weight = modifier.parentData.weight;
+        metrics.weightFill = modifier.parentData.weightFill;
+        metrics.verticalScroll = modifier.scroll.verticalValue;
+        metrics.horizontalScroll = modifier.scroll.horizontalValue;
+        metrics.hasVerticalScroll = modifier.scroll.vertical;
+        metrics.hasHorizontalScroll = modifier.scroll.horizontal;
+        for (const auto& element : modifier.layout) {
+            if (element.kind == LayoutModifierKind::Padding) {
+                metrics.paddingStart += element.padding.start;
+                metrics.paddingTop += element.padding.top;
+                metrics.paddingEnd += element.padding.end;
+                metrics.paddingBottom += element.padding.bottom;
             }
-            else if (element.type == "size") {
-                metrics.width = element.number("width", metrics.width);
-                metrics.height = element.number("height", metrics.height);
+            else if (element.kind == LayoutModifierKind::Size) {
+                metrics.width = element.width;
+                metrics.height = element.height;
             }
-            else if (element.type == "width") { metrics.width = element.number("value", metrics.width); }
-            else if (element.type == "height") { metrics.height = element.number("value", metrics.height); }
-            else if (element.type == "weight") {
-                metrics.weight = std::max(0.0f, element.number("weight"));
-                metrics.weightFill = element.boolean("fill", true);
-            }
-            else if (element.type == "verticalScroll") {
-                metrics.hasVerticalScroll = true;
-                metrics.verticalScroll = scrollValue(node, element, "__arrangeVerticalScrollValue");
-            }
-            else if (element.type == "horizontalScroll") {
-                metrics.hasHorizontalScroll = true;
-                metrics.horizontalScroll = scrollValue(node, element, "__arrangeHorizontalScrollValue");
-            }
-            else if (element.type == "fillMaxWidth" || element.type == "fillMaxSize") { metrics.fillMaxWidth = true; }
-            else if (element.type == "fillMaxHeight" || element.type == "fillMaxSize") { metrics.fillMaxHeight = true; }
+            else if (element.kind == LayoutModifierKind::Width) metrics.width = element.value;
+            else if (element.kind == LayoutModifierKind::Height) metrics.height = element.value;
+            else if (element.kind == LayoutModifierKind::FillMaxWidth || element.kind == LayoutModifierKind::FillMaxSize) metrics.fillMaxWidth = true;
+            else if (element.kind == LayoutModifierKind::FillMaxHeight || element.kind == LayoutModifierKind::FillMaxSize) metrics.fillMaxHeight = true;
         }
-        metrics.weight = std::max(0.0f, encodedNumberProp(node, "__arrangeWeight", metrics.weight));
-        metrics.weightFill = encodedBoolProp(node, "__arrangeWeightFill", metrics.weightFill);
         return metrics;
     }
 

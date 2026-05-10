@@ -2,7 +2,7 @@
 
 #include "Geometry.h"
 #include "Modifier.h"
-#include "RenderTree.h"
+#include "LayoutTree.h"
 #include <vector>
 
 namespace arrange::core {
@@ -13,7 +13,7 @@ namespace arrange::core {
         LayoutEngine();
         explicit LayoutEngine(const TextLayoutService& textLayoutService);
 
-        void layout(RenderTree& tree, NodeId root, Constraints constraints);
+        void layout(LayoutTree& tree, NodeId root, Constraints constraints);
 
     private:
         struct ModifierMetrics {
@@ -33,13 +33,13 @@ namespace arrange::core {
             bool hasHorizontalScroll = false;
         };
 
-        Size measure(RenderTree& tree, NodeId id, Constraints constraints);
-        Size measureWithModifier(RenderTree& tree, NodeId id, const std::vector<ModifierElement>& elements, std::size_t index, Constraints constraints);
-        Size measureContent(RenderTree& tree, NodeId id, Constraints constraints);
-        void place(RenderTree& tree, NodeId id, float x, float y);
-        void placeWithModifier(RenderTree& tree, NodeId id, const std::vector<ModifierElement>& elements, std::size_t index, float x, float y, float width, float height);
-        void placeContent(RenderTree& tree, NodeId id, float x, float y, float width, float height);
-        static ModifierMetrics parseModifier(const ArrangeNode& node);
+        Size measure(LayoutTree& tree, NodeId id, Constraints constraints);
+        Size measureWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, Constraints constraints);
+        Size measureContent(LayoutTree& tree, NodeId id, Constraints constraints);
+        void place(LayoutTree& tree, NodeId id, float x, float y);
+        void placeWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, float x, float y, float width, float height);
+        void placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height);
+        static ModifierMetrics modifierMetrics(const ArrangeNode& node);
         static float rowSpacing(const ArrangeNode& node);
         static float columnSpacing(const ArrangeNode& node);
 

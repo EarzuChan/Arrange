@@ -111,7 +111,7 @@ namespace arrange::core {
                 break;
             case BridgeOpcode::SetModifier:
                 op.id = atWord(words, cursor);
-                op.modifierDebugJson = atString(strings, atWord(words, cursor));
+                op.modifierPayload = atString(strings, atWord(words, cursor));
                 break;
             case BridgeOpcode::SetText:
                 op.id = atWord(words, cursor);

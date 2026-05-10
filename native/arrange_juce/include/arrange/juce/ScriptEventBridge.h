@@ -1,5 +1,6 @@
-#pragma once
+﻿#pragma once
 
+#include <arrange/core/EventSlot.h>
 #include <arrange/core/Node.h>
 #include <arrange/core/Scroll.h>
 
@@ -21,14 +22,22 @@ namespace arrange::juce {
 
     class ScriptEventBridge final {
     public:
-        static std::uint32_t callbackHandleFromProp(const arrange::core::ArrangeNode& node, const char* key);
-        static std::uint32_t callbackHandleFromAnyProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr);
+        static arrange::core::EventSlotId eventSlotFromProp(const arrange::core::ArrangeNode& node, const char* key);
+        static arrange::core::EventSlotId eventSlotFromAnyProp(
+            const arrange::core::ArrangeNode& node,
+            arrange::core::EventSlotKind kind,
+            const char* camelCase,
+            const char* kebabCase = nullptr);
         static std::string scrollSnapshotJson(const arrange::core::ScrollResult& result);
 
 #if ARRANGE_WITH_QUICKJS_NG
-    ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, std::uint32_t handle, double nowMillis) const;
-    ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, std::uint32_t handle, double nowMillis, const arrange::quickjs::CallbackInvokeOptions& options) const;
-    ScriptEventInvokeResult invokeString(arrange::quickjs::QuickJsScriptHost* host, std::uint32_t handle, double nowMillis, const std::string& value) const;
+        ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis) const;
+        ScriptEventInvokeResult invoke(
+            arrange::quickjs::QuickJsScriptHost* host,
+            const arrange::core::EventSlotId& slot,
+            double nowMillis,
+            const arrange::quickjs::CallbackInvokeOptions& options) const;
+        ScriptEventInvokeResult invokeString(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value) const;
 #endif
     };
 

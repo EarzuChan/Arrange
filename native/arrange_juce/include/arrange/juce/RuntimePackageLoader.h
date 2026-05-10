@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <arrange/core/Bridge.h>
+#include <arrange/core/MutationTransaction.h>
 #include <arrange/juce/ArrangeEditor.h>
 #include <arrange/juce/ErrorScreenModel.h>
 
@@ -34,7 +35,7 @@ namespace arrange::juce {
         std::filesystem::path packageDir;
         std::optional<ErrorScreenModel> error;
         std::optional<RuntimeLoadDiagnostic> diagnostic;
-        std::optional<arrange::core::BridgeBatch> mountedBatch;
+        std::optional<arrange::core::MutationTransaction> initialTransaction;
 #if ARRANGE_WITH_QUICKJS_NG
     std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost;
 #endif

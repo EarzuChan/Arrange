@@ -10,7 +10,7 @@
         :modifier="m.size(dp(20), dp(20)).testTag('play-icon')"
       />
       <Text
-        text="带派"
+        text="恩情"
         :text-style="{ fontSize: sp(50), color: animeColor }"
         :modifier="m.testTag('title')"
       />
@@ -82,8 +82,8 @@
 </template>
 
 <script setup>
-import { animateColorAsState, Arrangement, Color, dp, m, rememberScrollState, sp } from "@arrange/runtime";
-import { onMounted, onUnmounted, ref } from "vue";
+import { animateColorAsState, Arrangement, Color, dp, m, rememberScrollState, sp } from "@arrange/runtime"
+import { onMounted, onUnmounted, ref } from "vue"
 
 const clicks = ref(0);
 const preset = ref("Preset A");

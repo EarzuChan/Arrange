@@ -25,6 +25,5 @@ namespace arrange::quickjs {
     public:
         virtual ~ScriptHost() = default;
         virtual ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) = 0;
-        virtual CallbackInvokeResult invokeCallback(std::uint32_t callbackHandle, const CallbackInvokeOptions& options = {}) = 0;
     };
 } // namespace arrange::quickjs

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
@@ -29,7 +29,7 @@ namespace arrange {
         std::string rawMessage;
     };
 
-    inline constexpr const char* ArrangeDevBundlePath = "/@arrange/app.mjs";
+    inline constexpr const char* ArrangeDevBundlePath = "/@arrange/app.js";
 
     DevServerEndpoint parseDevServerUrl(std::string_view url);
     std::string devBundleHttpUrl(std::string_view devServerUrl);

@@ -1,4 +1,4 @@
-#include <arrange/juce/JuceTextServices.h>
+﻿#include <arrange/juce/JuceTextServices.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 

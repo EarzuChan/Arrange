@@ -16,6 +16,7 @@ extern "C" {
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -86,11 +87,9 @@ namespace arrange::quickjs {
             return length;
         }
 
-        using CallbackRegister = std::uint32_t (*)(JSContext* ctx, JSValueConst callback, void* opaque);
+        std::string serializeJsValue(JSContext* ctx, JSValueConst value);
 
-        std::string serializeJsValue(JSContext* ctx, JSValueConst value, CallbackRegister registerCallback, void* callbackOpaque);
-
-        std::string serializeObject(JSContext* ctx, JSValueConst value, CallbackRegister registerCallback, void* callbackOpaque) {
+        std::string serializeObject(JSContext* ctx, JSValueConst value) {
             JSPropertyEnum* props = nullptr;
             std::uint32_t count = 0;
             if (JS_GetOwnPropertyNames(ctx, &props, &count, value, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) < 0) return "{}";
@@ -105,7 +104,7 @@ namespace arrange::quickjs {
                 first = false;
                 result += jsonEscape(name);
                 result += ":";
-                result += serializeJsValue(ctx, child.get(), registerCallback, callbackOpaque);
+                result += serializeJsValue(ctx, child.get());
                 JS_FreeCString(ctx, name);
             }
             for (std::uint32_t i = 0; i < count; ++i) JS_FreeAtom(ctx, props[i].atom);
@@ -114,21 +113,19 @@ namespace arrange::quickjs {
             return result;
         }
 
-        std::string serializeArray(JSContext* ctx, JSValueConst value, CallbackRegister registerCallback, void* callbackOpaque) {
+        std::string serializeArray(JSContext* ctx, JSValueConst value) {
             std::string result = "[";
             const auto length = arrayLength(ctx, value);
             for (std::uint32_t i = 0; i < length; ++i) {
                 ScopedValue child(ctx, JS_GetPropertyUint32(ctx, value, i));
                 if (i != 0) result += ",";
-                result += serializeJsValue(ctx, child.get(), registerCallback, callbackOpaque);
+                result += serializeJsValue(ctx, child.get());
             }
             result += "]";
             return result;
         }
 
-        std::string serializeCallbackHandle(std::uint32_t handle) { return std::string("{\"callbackHandle\":") + std::to_string(handle) + "}"; }
-
-        std::string serializeJsValue(JSContext* ctx, JSValueConst value, CallbackRegister registerCallback, void* callbackOpaque) {
+        std::string serializeJsValue(JSContext* ctx, JSValueConst value) {
             if (JS_IsUndefined(value)) return "null";
             if (JS_IsNull(value)) return "null";
             if (JS_IsBool(value)) return JS_ToBool(ctx, value) ? "true" : "false";
@@ -138,13 +135,13 @@ namespace arrange::quickjs {
                 return numberToString(number);
             }
             if (JS_IsString(value)) return jsonEscape(toString(ctx, value));
-            if (JS_IsFunction(ctx, value)) return serializeCallbackHandle(registerCallback != nullptr ? registerCallback(ctx, value, callbackOpaque) : 0);
-            if (JS_IsArray(value)) return serializeArray(ctx, value, registerCallback, callbackOpaque);
-            if (JS_IsObject(value)) return serializeObject(ctx, value, registerCallback, callbackOpaque);
+            if (JS_IsFunction(ctx, value)) return "null";
+            if (JS_IsArray(value)) return serializeArray(ctx, value);
+            if (JS_IsObject(value)) return serializeObject(ctx, value);
             return "null";
         }
 
-        std::string encodeBridgeValue(JSContext* ctx, JSValueConst value, CallbackRegister registerCallback = nullptr, void* callbackOpaque = nullptr) {
+        std::string encodeBridgeValue(JSContext* ctx, JSValueConst value) {
             if (JS_IsUndefined(value)) return "u:";
             if (JS_IsNull(value)) return "n:";
             if (JS_IsBool(value)) return JS_ToBool(ctx, value) ? "b:1" : "b:0";
@@ -154,73 +151,51 @@ namespace arrange::quickjs {
                 return std::string("f:") + numberToString(number);
             }
             if (JS_IsString(value)) return std::string("s:") + toString(ctx, value);
-            return std::string("o:") + serializeJsValue(ctx, value, registerCallback, callbackOpaque);
+            return std::string("o:") + serializeJsValue(ctx, value);
         }
 
-        bool isNativeCallbackProp(std::string_view key) {
-            return key == "__arrangeVerticalScrollCallback" ||
-                key == "__arrangeHorizontalScrollCallback" ||
-                key == "__arrangeClickCallback" ||
-                key == "onUpdate:modelValue" ||
+        bool isEventFunctionProp(std::string_view key) {
+            return key == "onUpdate:modelValue" ||
                 key == "onUpdate:model-value" ||
                 key == "onSubmit" ||
                 key == "onChange" ||
                 key == "onBlur";
         }
 
-        std::string encodeBridgePropValue(JSContext* ctx, std::string_view key, JSValueConst value, CallbackRegister registerCallback = nullptr, void* callbackOpaque = nullptr) {
-            if (isNativeCallbackProp(key) && JS_IsFunction(ctx, value)) {
-                const auto handle = registerCallback != nullptr ? registerCallback(ctx, value, callbackOpaque) : 0;
-                return std::string("h:") + std::to_string(handle);
-            }
-            return encodeBridgeValue(ctx, value, registerCallback, callbackOpaque);
+        arrange::core::EventSlotKind propEventSlotKind(std::string_view key) noexcept {
+            if (key == "onUpdate:modelValue" || key == "onUpdate:model-value") return arrange::core::EventSlotKind::InputUpdate;
+            if (key == "onSubmit") return arrange::core::EventSlotKind::InputSubmit;
+            if (key == "onChange") return arrange::core::EventSlotKind::InputChange;
+            if (key == "onBlur") return arrange::core::EventSlotKind::InputBlur;
+            return arrange::core::EventSlotKind::None;
         }
 
-        std::string serializeModifierElement(JSContext* ctx, JSValueConst element, CallbackRegister registerCallback, void* callbackOpaque) {
-            ScopedValue typeValue(ctx, JS_GetPropertyStr(ctx, element, "type"));
-            ScopedValue valueObject(ctx, JS_GetPropertyStr(ctx, element, "value"));
-
-            std::string result = "{";
-            result += "\"type\":";
-            result += jsonEscape(toString(ctx, typeValue.get()));
-
-            if (JS_IsObject(valueObject.get())) {
-                JSPropertyEnum* props = nullptr;
-                std::uint32_t count = 0;
-                if (JS_GetOwnPropertyNames(ctx, &props, &count, valueObject.get(), JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) >= 0) {
-                    for (std::uint32_t i = 0; i < count; ++i) {
-                        const char* name = JS_AtomToCString(ctx, props[i].atom);
-                        if (name == nullptr) continue;
-                        ScopedValue child(ctx, JS_GetProperty(ctx, valueObject.get(), props[i].atom));
-                        result += ",";
-                        result += jsonEscape(name);
-                        result += ":";
-                        result += serializeJsValue(ctx, child.get(), registerCallback, callbackOpaque);
-                        JS_FreeCString(ctx, name);
-                    }
-                    for (std::uint32_t i = 0; i < count; ++i) JS_FreeAtom(ctx, props[i].atom);
-                    js_free(ctx, props);
-                }
-            }
-
-            result += "}";
-            return result;
+        std::string eventSlotPropKey(std::string_view key) {
+            if (key == "onUpdate:modelValue") return "__arrangeEventSlot.onUpdate:modelValue";
+            if (key == "onUpdate:model-value") return "__arrangeEventSlot.onUpdate:model-value";
+            if (key == "onSubmit") return "__arrangeEventSlot.onSubmit";
+            if (key == "onChange") return "__arrangeEventSlot.onChange";
+            if (key == "onBlur") return "__arrangeEventSlot.onBlur";
+            return {};
         }
 
-        std::string serializeModifier(JSContext* ctx, JSValueConst modifier, CallbackRegister registerCallback, void* callbackOpaque) {
-            ScopedValue elements(ctx, JS_GetPropertyStr(ctx, modifier, "elements"));
-            if (!JS_IsArray(elements.get())) return {};
+        std::string encodeBridgePropValue(JSContext* ctx, std::string_view key, JSValueConst value) {
+            if (isEventFunctionProp(key) && JS_IsFunction(ctx, value)) return "s:[Function]";
+            return encodeBridgeValue(ctx, value);
+        }
 
-            std::string result = "o:[";
-            const auto length = arrayLength(ctx, elements.get());
-            if (length == 0) return {};
-            for (std::uint32_t i = 0; i < length; ++i) {
-                ScopedValue element(ctx, JS_GetPropertyUint32(ctx, elements.get(), i));
-                if (i != 0) result += ",";
-                result += serializeModifierElement(ctx, element.get(), registerCallback, callbackOpaque);
-            }
-            result += "]";
-            return result;
+        JSValue eventSlotCallbackValue(JSContext* ctx, JSValueConst value) {
+            if (JS_IsFunction(ctx, value)) return JS_DupValue(ctx, value);
+            if (!JS_IsObject(value)) return JS_UNDEFINED;
+            return JS_GetPropertyStr(ctx, value, "callback");
+        }
+
+        std::string encodeNativeEventSlotPropValue(
+            JSContext* ctx,
+            JSValueConst value,
+            const arrange::core::EventSlotId& slot) {
+            if (!slot.valid() || !JS_IsFunction(ctx, value)) return "n:";
+            return arrange::core::encodeEventSlotProp(slot);
         }
 
         std::string exceptionText(JSContext* ctx) {
@@ -239,11 +214,6 @@ namespace arrange::quickjs {
 
         bool startsWithDotSpecifier(std::string_view specifier) { return specifier == "." || specifier == ".." || specifier.starts_with("./") || specifier.starts_with("../"); }
 
-        struct CallbackRegistrationScope {
-            QuickJsScriptHost* owner = nullptr;
-            std::vector<std::uint32_t>* handles = nullptr;
-        };
-
         struct DrainJobsResult {
             bool ok = true;
             std::string error;
@@ -255,28 +225,38 @@ namespace arrange::quickjs {
         JSContext* context = nullptr;
         arrange::core::NodeId nextNodeId = 1;
         arrange::core::NodeId rootNodeId = 0;
-        std::uint32_t nextCallbackHandle = 1;
         std::uint32_t nextAnimationFrameHandle = 1;
         double frameTimeMillis = 0.0;
-        std::unordered_map<std::uint32_t, JSValue> callbacks;
+        QuickJsScriptHost* owner = nullptr;
+        std::unordered_map<std::string, JSValue> eventSlots;
+        std::unordered_set<std::string> retiredEventSlots;
         std::unordered_map<std::uint32_t, JSValue> animationFrameCallbacks;
-        std::unordered_map<arrange::core::NodeId, std::vector<std::uint32_t>> modifierCallbacksByNode;
-        std::unordered_map<arrange::core::NodeId, std::unordered_map<std::string, std::vector<std::uint32_t>>> propCallbacksByNode;
         std::unordered_map<arrange::core::NodeId, std::vector<arrange::core::NodeId>> childrenByNode;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeId> parentByNode;
         std::filesystem::path moduleRoot;
 
         ~Impl() { reset(); }
 
+        static std::vector<arrange::core::EventSlotId> builtinEventSlotsForNode(arrange::core::NodeId id) {
+            return {
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::VerticalScroll),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::HorizontalScroll),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::InputUpdate),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::InputSubmit),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::InputChange),
+                arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::InputBlur),
+            };
+        }
+
         void reset() {
             if (context != nullptr) {
-                for (auto& [_, callback] : callbacks) JS_FreeValue(context, callback);
+                for (auto& [_, callback] : eventSlots) JS_FreeValue(context, callback);
                 for (auto& [_, callback] : animationFrameCallbacks) JS_FreeValue(context, callback);
             }
-            callbacks.clear();
+            eventSlots.clear();
+            retiredEventSlots.clear();
             animationFrameCallbacks.clear();
-            modifierCallbacksByNode.clear();
-            propCallbacksByNode.clear();
             childrenByNode.clear();
             parentByNode.clear();
             if (context != nullptr) {
@@ -289,14 +269,15 @@ namespace arrange::quickjs {
             }
             nextNodeId = 1;
             rootNodeId = 0;
-            nextCallbackHandle = 1;
             nextAnimationFrameHandle = 1;
             frameTimeMillis = 0.0;
+            owner = nullptr;
             moduleRoot.clear();
         }
 
         void initialise(QuickJsScriptHost* owner, const std::filesystem::path& entryPath) {
             reset();
+            this->owner = owner;
             moduleRoot = std::filesystem::absolute(entryPath).lexically_normal().parent_path();
             runtime = JS_NewRuntime();
             JS_SetModuleLoaderFunc(runtime, &Impl::normalizeModuleName, &Impl::loadModule, owner);
@@ -392,52 +373,46 @@ namespace arrange::quickjs {
             return module;
         }
 
-        static std::uint32_t registerCallback(JSContext* ctx, JSValueConst callback, void* opaque) {
-            auto* scope = static_cast<CallbackRegistrationScope*>(opaque);
-            auto* owner = scope != nullptr ? scope->owner : nullptr;
-            if (owner == nullptr) return 0;
-            const auto handle = owner->impl_->nextCallbackHandle++;
-            owner->impl_->callbacks.emplace(handle, JS_DupValue(ctx, callback));
-            if (scope->handles != nullptr) scope->handles->push_back(handle);
-            return handle;
-        }
-
-        void freeCallback(std::uint32_t handle) {
-            if (context == nullptr) return;
-            const auto it = callbacks.find(handle);
-            if (it == callbacks.end()) return;
-            JS_FreeValue(context, it->second);
-            callbacks.erase(it);
-        }
-
-        void releaseCallbacks(const std::vector<std::uint32_t>& handles) { for (const auto handle : handles) freeCallback(handle); }
-
-        void replaceModifierCallbacks(arrange::core::NodeId id, std::vector<std::uint32_t> handles) {
-            const auto it = modifierCallbacksByNode.find(id);
-            if (it != modifierCallbacksByNode.end()) releaseCallbacks(it->second);
-            if (handles.empty()) {
-                modifierCallbacksByNode.erase(id);
+        void replaceEventSlot(const arrange::core::EventSlotId& slot, JSValueConst callback) {
+            if (context == nullptr || !slot.valid()) return;
+            const auto key = slot.toString();
+            const auto old = eventSlots.find(key);
+            if (old != eventSlots.end()) {
+                JS_FreeValue(context, old->second);
+                eventSlots.erase(old);
+            }
+            if (!JS_IsFunction(context, callback)) {
+                releaseEventSlot(slot);
                 return;
             }
-            modifierCallbacksByNode[id] = std::move(handles);
+            retiredEventSlots.erase(key);
+            eventSlots.emplace(key, JS_DupValue(context, callback));
+            if (auto* transaction = currentTransaction()) transaction->eventSlotUpdates.push_back(slot);
         }
 
-        void replacePropCallbacks(arrange::core::NodeId id, const std::string& key, std::vector<std::uint32_t> handles) {
-            auto nodeIt = propCallbacksByNode.find(id);
-            if (nodeIt != propCallbacksByNode.end()) {
-                const auto propIt = nodeIt->second.find(key);
-                if (propIt != nodeIt->second.end()) releaseCallbacks(propIt->second);
-            }
+        void releaseEventSlot(const arrange::core::EventSlotId& slot) {
+            if (context == nullptr || !slot.valid()) return;
+            if (auto* transaction = currentTransaction()) transaction->retiredEventSlots.push_back(slot);
+            retiredEventSlots.insert(slot.toString());
+        }
 
-            if (handles.empty()) {
-                if (nodeIt != propCallbacksByNode.end()) {
-                    nodeIt->second.erase(key);
-                    if (nodeIt->second.empty()) propCallbacksByNode.erase(nodeIt);
-                }
+        void flushRetiredEventSlots() {
+            if (context == nullptr) {
+                retiredEventSlots.clear();
                 return;
             }
+            for (const auto& slot : retiredEventSlots) {
+                const auto it = eventSlots.find(slot);
+                if (it == eventSlots.end()) continue;
+                JS_FreeValue(context, it->second);
+                eventSlots.erase(it);
+            }
+            retiredEventSlots.clear();
+        }
 
-            propCallbacksByNode[id][key] = std::move(handles);
+        arrange::core::MutationTransaction* currentTransaction() noexcept {
+            if (owner == nullptr) return nullptr;
+            return &owner->pendingTransactions_.ensurePending();
         }
 
         void detachChild(arrange::core::NodeId parent, arrange::core::NodeId child) {
@@ -471,17 +446,7 @@ namespace arrange::quickjs {
                 for (const auto child : children) releaseNodeCallbacksRecursive(child);
             }
 
-            const auto modifierIt = modifierCallbacksByNode.find(id);
-            if (modifierIt != modifierCallbacksByNode.end()) {
-                releaseCallbacks(modifierIt->second);
-                modifierCallbacksByNode.erase(modifierIt);
-            }
-
-            const auto propIt = propCallbacksByNode.find(id);
-            if (propIt != propCallbacksByNode.end()) {
-                for (const auto& [_, handles] : propIt->second) releaseCallbacks(handles);
-                propCallbacksByNode.erase(propIt);
-            }
+            for (const auto& slot : builtinEventSlotsForNode(id)) releaseEventSlot(slot);
 
             const auto parentIt = parentByNode.find(id);
             if (parentIt != parentByNode.end()) detachChild(parentIt->second, id);
@@ -489,11 +454,14 @@ namespace arrange::quickjs {
             parentByNode.erase(id);
         }
 
-        void releaseAllTrackedCallbacks() {
-            if (context != nullptr) { for (auto& [_, callback] : callbacks) JS_FreeValue(context, callback); }
-            callbacks.clear();
-            modifierCallbacksByNode.clear();
-            propCallbacksByNode.clear();
+        void releaseAllEventSlots() {
+            if (auto* transaction = currentTransaction()) {
+                for (const auto& [key, _] : eventSlots) {
+                    const auto slot = arrange::core::parseEventSlotId(key);
+                    if (slot.valid()) transaction->retiredEventSlots.push_back(slot);
+                }
+            }
+            for (const auto& [key, _] : eventSlots) retiredEventSlots.insert(key);
             childrenByNode.clear();
             parentByNode.clear();
             rootNodeId = 0;
@@ -506,7 +474,7 @@ namespace arrange::quickjs {
                 deleteRoot.id = rootNodeId;
                 batch.ops.push_back(std::move(deleteRoot));
             }
-            releaseAllTrackedCallbacks();
+            releaseAllEventSlots();
         }
 
         void appendSetPropOp(arrange::core::BridgeBatch& batch, arrange::core::NodeId id, std::string key, std::string value) {
@@ -516,297 +484,6 @@ namespace arrange::quickjs {
             setProp.key = std::move(key);
             setProp.value = std::move(value);
             batch.ops.push_back(std::move(setProp));
-        }
-
-        std::string encodeTypedModifierValue(JSContext* ctx, JSValueConst value) {
-            if (JS_IsFunction(ctx, value)) return "n:";
-            return encodeBridgeValue(ctx, value);
-        }
-
-        void appendFlattenedModifierValue(
-            JSContext* ctx,
-            arrange::core::NodeId id,
-            std::string_view prefix,
-            std::string path,
-            JSValueConst value,
-            arrange::core::BridgeBatch& batch) {
-            if (JS_IsArray(value)) {
-                const auto length = arrayLength(ctx, value);
-                for (std::uint32_t index = 0; index < length; ++index) {
-                    ScopedValue child(ctx, JS_GetPropertyUint32(ctx, value, index));
-                    appendFlattenedModifierValue(
-                        ctx,
-                        id,
-                        prefix,
-                        path.empty() ? std::to_string(index) : path + "." + std::to_string(index),
-                        child.get(),
-                        batch);
-                }
-                return;
-            }
-
-            if (JS_IsObject(value) && !JS_IsFunction(ctx, value)) {
-                JSPropertyEnum* props = nullptr;
-                std::uint32_t count = 0;
-                if (JS_GetOwnPropertyNames(ctx, &props, &count, value, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) < 0) { return; }
-                for (std::uint32_t propIndex = 0; propIndex < count; ++propIndex) {
-                    const char* name = JS_AtomToCString(ctx, props[propIndex].atom);
-                    if (name == nullptr) continue;
-                    ScopedValue child(ctx, JS_GetProperty(ctx, value, props[propIndex].atom));
-                    const std::string childPath = path.empty() ? std::string(name) : path + "." + name;
-                    appendFlattenedModifierValue(
-                        ctx,
-                        id,
-                        prefix,
-                        childPath,
-                        child.get(),
-                        batch);
-                    JS_FreeCString(ctx, name);
-                }
-                for (std::uint32_t propIndex = 0; propIndex < count; ++propIndex) JS_FreeAtom(ctx, props[propIndex].atom);
-                js_free(ctx, props);
-                return;
-            }
-
-            if (!path.empty()) {
-                appendSetPropOp(
-                    batch,
-                    id,
-                    std::string(prefix) + path,
-                    encodeTypedModifierValue(ctx, value));
-            }
-        }
-
-        void appendTypedModifierElementProps(
-            JSContext* ctx,
-            arrange::core::NodeId id,
-            JSValueConst elements,
-            arrange::core::BridgeBatch& batch) {
-            const auto length = arrayLength(ctx, elements);
-            appendSetPropOp(
-                batch,
-                id,
-                "__arrangeModifierCount",
-                std::string("f:") + numberToString(length));
-            for (std::uint32_t index = 0; index < length; ++index) {
-                ScopedValue element(ctx, JS_GetPropertyUint32(ctx, elements, index));
-                if (!JS_IsObject(element.get())) continue;
-                const auto prefix = "__arrangeModifier." + std::to_string(index) + ".";
-                ScopedValue typeValue(ctx, JS_GetPropertyStr(ctx, element.get(), "type"));
-                appendSetPropOp(batch, id, prefix + "type", encodeBridgeValue(ctx, typeValue.get()));
-                ScopedValue valueObject(ctx, JS_GetPropertyStr(ctx, element.get(), "value"));
-                if (JS_IsObject(valueObject.get())) { appendFlattenedModifierValue(ctx, id, prefix, {}, valueObject.get(), batch); }
-            }
-        }
-
-        void appendNativeScrollProps(QuickJsScriptHost& owner, JSContext* ctx, arrange::core::NodeId id, std::string_view direction, JSValueConst elementValue, arrange::core::BridgeBatch& batch) {
-            ScopedValue state(ctx, JS_GetPropertyStr(ctx, elementValue, "state"));
-            ScopedValue enabledValue(ctx, JS_GetPropertyStr(ctx, elementValue, "enabled"));
-            const auto enabled = JS_IsUndefined(enabledValue.get()) ? true : JS_ToBool(ctx, enabledValue.get()) != 0;
-            const auto directionText = std::string(direction);
-
-            appendSetPropOp(batch, id, "__arrange" + directionText + "ScrollEnabled", enabled ? "b:1" : "b:0");
-
-            double value = 0.0;
-            if (JS_IsObject(state.get())) {
-                ScopedValue scrollValue(ctx, JS_GetPropertyStr(ctx, state.get(), "value"));
-                if (JS_IsNumber(scrollValue.get())) JS_ToFloat64(ctx, &value, scrollValue.get());
-            }
-            appendSetPropOp(batch, id, "__arrange" + directionText + "ScrollValue", std::string("f:") + numberToString(value));
-
-            std::vector<std::uint32_t> propHandles;
-            CallbackRegistrationScope propScope{&owner, &propHandles};
-            const auto callbackKey = "__arrange" + directionText + "ScrollCallback";
-            if (JS_IsObject(state.get())) {
-                ScopedValue callback(ctx, JS_GetPropertyStr(ctx, state.get(), "__arrangeNativeScroll"));
-                appendSetPropOp(batch, id, callbackKey, encodeBridgePropValue(ctx, callbackKey, callback.get(), &Impl::registerCallback, &propScope));
-            }
-            else { appendSetPropOp(batch, id, callbackKey, "n:"); }
-            replacePropCallbacks(id, callbackKey, std::move(propHandles));
-        }
-
-        void appendDisabledNativeScrollProps(arrange::core::NodeId id, std::string_view direction, arrange::core::BridgeBatch& batch) {
-            const auto directionText = std::string(direction);
-            const auto callbackKey = "__arrange" + directionText + "ScrollCallback";
-            appendSetPropOp(batch, id, "__arrange" + directionText + "ScrollEnabled", "b:0");
-            appendSetPropOp(batch, id, "__arrange" + directionText + "ScrollValue", "f:0");
-            appendSetPropOp(batch, id, callbackKey, "n:");
-            replacePropCallbacks(id, callbackKey, {});
-        }
-
-        void appendNativeClickableProps(QuickJsScriptHost& owner, JSContext* ctx, arrange::core::NodeId id, JSValueConst elementValue, arrange::core::BridgeBatch& batch) {
-            ScopedValue enabledValue(ctx, JS_GetPropertyStr(ctx, elementValue, "enabled"));
-            const auto enabled = JS_IsUndefined(enabledValue.get()) ? true : JS_ToBool(ctx, enabledValue.get()) != 0;
-            appendSetPropOp(batch, id, "__arrangeClickableEnabled", enabled ? "b:1" : "b:0");
-
-            std::vector<std::uint32_t> propHandles;
-            CallbackRegistrationScope propScope{&owner, &propHandles};
-            ScopedValue callback(ctx, JS_GetPropertyStr(ctx, elementValue, "onClick"));
-            appendSetPropOp(batch, id, "__arrangeClickCallback", encodeBridgePropValue(ctx, "__arrangeClickCallback", callback.get(), &Impl::registerCallback, &propScope));
-            replacePropCallbacks(id, "__arrangeClickCallback", std::move(propHandles));
-        }
-
-        void appendDisabledNativeClickableProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) {
-            appendSetPropOp(batch, id, "__arrangeClickableEnabled", "b:0");
-            appendSetPropOp(batch, id, "__arrangeClickCallback", "n:");
-            replacePropCallbacks(id, "__arrangeClickCallback", {});
-        }
-
-        void appendNativeWeightProps(JSContext* ctx, arrange::core::NodeId id, JSValueConst elementValue, arrange::core::BridgeBatch& batch) {
-            double weight = 0.0;
-            ScopedValue weightValue(ctx, JS_GetPropertyStr(ctx, elementValue, "weight"));
-            if (JS_IsNumber(weightValue.get())) JS_ToFloat64(ctx, &weight, weightValue.get());
-
-            ScopedValue fillValue(ctx, JS_GetPropertyStr(ctx, elementValue, "fill"));
-            const auto fill = JS_IsUndefined(fillValue.get()) ? true : JS_ToBool(ctx, fillValue.get()) != 0;
-
-            appendSetPropOp(batch, id, "__arrangeWeight", std::string("f:") + numberToString(std::max(0.0, weight)));
-            appendSetPropOp(batch, id, "__arrangeWeightFill", fill ? "b:1" : "b:0");
-        }
-
-        void appendDisabledNativeWeightProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) {
-            appendSetPropOp(batch, id, "__arrangeWeight", "f:0");
-            appendSetPropOp(batch, id, "__arrangeWeightFill", "b:1");
-        }
-
-        double numericProperty(JSContext* ctx, JSValueConst object, const char* key, double fallback = 0.0) {
-            ScopedValue value(ctx, JS_GetPropertyStr(ctx, object, key));
-            double number = fallback;
-            if (JS_IsNumber(value.get())) JS_ToFloat64(ctx, &number, value.get());
-            return number;
-        }
-
-        void appendNativeAlignProps(JSContext* ctx, arrange::core::NodeId id, JSValueConst elementValue, arrange::core::BridgeBatch& batch) {
-            ScopedValue alignment(ctx, JS_GetPropertyStr(ctx, elementValue, "alignment"));
-            appendSetPropOp(batch, id, "__arrangeAlign", std::string("s:") + (JS_IsString(alignment.get()) ? toString(ctx, alignment.get()) : ""));
-        }
-
-        void appendDisabledNativeAlignProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) { appendSetPropOp(batch, id, "__arrangeAlign", "s:"); }
-
-        void appendNativeZIndexProps(JSContext* ctx, arrange::core::NodeId id, JSValueConst elementValue, arrange::core::BridgeBatch& batch) { appendSetPropOp(batch, id, "__arrangeZIndex", std::string("f:") + numberToString(numericProperty(ctx, elementValue, "value"))); }
-
-        void appendDisabledNativeZIndexProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) { appendSetPropOp(batch, id, "__arrangeZIndex", "f:0"); }
-
-        void appendNativeLayoutOffsetProps(arrange::core::NodeId id, double x, double y, arrange::core::BridgeBatch& batch) {
-            appendSetPropOp(batch, id, "__arrangeLayoutOffsetX", std::string("f:") + numberToString(x));
-            appendSetPropOp(batch, id, "__arrangeLayoutOffsetY", std::string("f:") + numberToString(y));
-        }
-
-        void appendDisabledNativeLayoutOffsetProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) { appendNativeLayoutOffsetProps(id, 0.0, 0.0, batch); }
-
-        std::pair<double, double> transformOriginPair(JSContext* ctx, JSValueConst value) {
-            if (JS_IsString(value)) {
-                const auto text = toString(ctx, value);
-                if (text == "TopStart") return {0.0, 0.0};
-                if (text == "TopCenter") return {0.5, 0.0};
-                if (text == "TopEnd") return {1.0, 0.0};
-                if (text == "CenterStart") return {0.0, 0.5};
-                if (text == "CenterEnd") return {1.0, 0.5};
-                if (text == "BottomStart") return {0.0, 1.0};
-                if (text == "BottomCenter") return {0.5, 1.0};
-                if (text == "BottomEnd") return {1.0, 1.0};
-            }
-            if (JS_IsObject(value)) {
-                return {
-                    std::clamp(numericProperty(ctx, value, "x", 0.5), 0.0, 1.0),
-                    std::clamp(numericProperty(ctx, value, "y", 0.5), 0.0, 1.0),
-                };
-            }
-            return {0.5, 0.5};
-        }
-
-        void appendNativeLayerTransformProps(arrange::core::NodeId id, double scaleX, double scaleY, double rotationZ, double originX, double originY, arrange::core::BridgeBatch& batch) {
-            appendSetPropOp(batch, id, "__arrangeLayerScaleX", std::string("f:") + numberToString(scaleX));
-            appendSetPropOp(batch, id, "__arrangeLayerScaleY", std::string("f:") + numberToString(scaleY));
-            appendSetPropOp(batch, id, "__arrangeLayerRotationZ", std::string("f:") + numberToString(rotationZ));
-            appendSetPropOp(batch, id, "__arrangeLayerTransformOriginX", std::string("f:") + numberToString(originX));
-            appendSetPropOp(batch, id, "__arrangeLayerTransformOriginY", std::string("f:") + numberToString(originY));
-        }
-
-        void appendDisabledNativeLayerTransformProps(arrange::core::NodeId id, arrange::core::BridgeBatch& batch) { appendNativeLayerTransformProps(id, 1.0, 1.0, 0.0, 0.5, 0.5, batch); }
-
-        void appendNativeModifierProps(QuickJsScriptHost& owner, JSContext* ctx, arrange::core::NodeId id, JSValueConst modifier, arrange::core::BridgeBatch& batch) {
-            ScopedValue elements(ctx, JS_GetPropertyStr(ctx, modifier, "elements"));
-            if (!JS_IsArray(elements.get())) return;
-            const auto length = arrayLength(ctx, elements.get());
-            appendTypedModifierElementProps(ctx, id, elements.get(), batch);
-            bool hasVerticalScroll = false;
-            bool hasHorizontalScroll = false;
-            bool hasClickable = false;
-            bool hasWeight = false;
-            bool hasAlign = false;
-            bool hasZIndex = false;
-            bool hasLayoutOffset = false;
-            bool hasLayer = false;
-            double layoutOffsetX = 0.0;
-            double layoutOffsetY = 0.0;
-            double layerScaleX = 1.0;
-            double layerScaleY = 1.0;
-            double layerRotationZ = 0.0;
-            double layerOriginX = 0.5;
-            double layerOriginY = 0.5;
-            for (std::uint32_t i = 0; i < length; ++i) {
-                ScopedValue element(ctx, JS_GetPropertyUint32(ctx, elements.get(), i));
-                ScopedValue typeValue(ctx, JS_GetPropertyStr(ctx, element.get(), "type"));
-                const auto type = toString(ctx, typeValue.get());
-                if (type != "verticalScroll" && type != "horizontalScroll" && type != "clickable" && type != "weight" &&
-                    type != "align" && type != "zIndex" && type != "offset" && type != "absoluteOffset" && type != "graphicsLayer")
-                    continue;
-                ScopedValue valueObject(ctx, JS_GetPropertyStr(ctx, element.get(), "value"));
-                if (!JS_IsObject(valueObject.get())) continue;
-                if (type == "verticalScroll") {
-                    hasVerticalScroll = true;
-                    appendNativeScrollProps(owner, ctx, id, "Vertical", valueObject.get(), batch);
-                }
-                else if (type == "horizontalScroll") {
-                    hasHorizontalScroll = true;
-                    appendNativeScrollProps(owner, ctx, id, "Horizontal", valueObject.get(), batch);
-                }
-                else if (type == "clickable") {
-                    hasClickable = true;
-                    appendNativeClickableProps(owner, ctx, id, valueObject.get(), batch);
-                }
-                else if (type == "weight") {
-                    hasWeight = true;
-                    appendNativeWeightProps(ctx, id, valueObject.get(), batch);
-                }
-                else if (type == "align" && !hasAlign) {
-                    hasAlign = true;
-                    appendNativeAlignProps(ctx, id, valueObject.get(), batch);
-                }
-                else if (type == "zIndex") {
-                    hasZIndex = true;
-                    appendNativeZIndexProps(ctx, id, valueObject.get(), batch);
-                }
-                else if (type == "offset" || type == "absoluteOffset") {
-                    hasLayoutOffset = true;
-                    layoutOffsetX += numericProperty(ctx, valueObject.get(), "x");
-                    layoutOffsetY += numericProperty(ctx, valueObject.get(), "y");
-                }
-                else if (type == "graphicsLayer") {
-                    hasLayoutOffset = true;
-                    hasLayer = true;
-                    layoutOffsetX += numericProperty(ctx, valueObject.get(), "translationX");
-                    layoutOffsetY += numericProperty(ctx, valueObject.get(), "translationY");
-                    layerScaleX = numericProperty(ctx, valueObject.get(), "scaleX", 1.0);
-                    layerScaleY = numericProperty(ctx, valueObject.get(), "scaleY", 1.0);
-                    layerRotationZ = numericProperty(ctx, valueObject.get(), "rotationZ");
-                    ScopedValue origin(ctx, JS_GetPropertyStr(ctx, valueObject.get(), "transformOrigin"));
-                    const auto originPair = transformOriginPair(ctx, origin.get());
-                    layerOriginX = originPair.first;
-                    layerOriginY = originPair.second;
-                }
-            }
-            if (!hasVerticalScroll) appendDisabledNativeScrollProps(id, "Vertical", batch);
-            if (!hasHorizontalScroll) appendDisabledNativeScrollProps(id, "Horizontal", batch);
-            if (!hasClickable) appendDisabledNativeClickableProps(id, batch);
-            if (!hasWeight) appendDisabledNativeWeightProps(id, batch);
-            if (!hasAlign) appendDisabledNativeAlignProps(id, batch);
-            if (!hasZIndex) appendDisabledNativeZIndexProps(id, batch);
-            if (hasLayoutOffset) appendNativeLayoutOffsetProps(id, layoutOffsetX, layoutOffsetY, batch);
-            else appendDisabledNativeLayoutOffsetProps(id, batch);
-            if (hasLayer) appendNativeLayerTransformProps(id, layerScaleX, layerScaleY, layerRotationZ, layerOriginX, layerOriginY, batch);
-            else appendDisabledNativeLayerTransformProps(id, batch);
         }
 
         static JSValue nativeCommit(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
@@ -821,92 +498,51 @@ namespace arrange::quickjs {
             auto* owner = static_cast<QuickJsScriptHost*>(JS_GetContextOpaque(ctx));
             if (owner == nullptr) return JS_UNDEFINED;
             owner->reloadRequested_ = true;
-            owner->reloadPayloadJson_ = argc > 0 ? serializeJsValue(ctx, argv[0], nullptr, nullptr) : "{}";
+            owner->reloadPayloadJson_ = argc > 0 ? serializeJsValue(ctx, argv[0]) : "{}";
             return JS_UNDEFINED;
         }
 
-        arrange::core::NodeId emitNode(QuickJsScriptHost& owner, JSContext* ctx, JSValueConst jsNode, arrange::core::NodeId parent, std::uint32_t index, arrange::core::BridgeBatch& batch) {
-            const auto id = nextNodeId++;
-            ScopedValue typeValue(ctx, JS_GetPropertyStr(ctx, jsNode, "type"));
-            const auto type = toString(ctx, typeValue.get());
 
-            arrange::core::BridgeOp create;
-            create.opcode = arrange::core::BridgeOpcode::CreateNode;
-            create.id = id;
-            create.nodeType = type;
-            batch.ops.push_back(std::move(create));
+        void registerStandardModifierEventSlots(QuickJsScriptHost& owner, JSContext* ctx, arrange::core::NodeId id, JSValueConst payload) {
+            if (!JS_IsArray(payload)) {
+                owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click));
+                owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::VerticalScroll));
+                owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::HorizontalScroll));
+                return;
+            }
 
-            ScopedValue props(ctx, JS_GetPropertyStr(ctx, jsNode, "props"));
-            if (JS_IsObject(props.get())) {
-                ScopedValue text(ctx, JS_GetPropertyStr(ctx, props.get(), "text"));
-                if (!JS_IsUndefined(text.get()) && type == "Text") {
-                    arrange::core::BridgeOp setText;
-                    setText.opcode = arrange::core::BridgeOpcode::SetText;
-                    setText.id = id;
-                    setText.text = toString(ctx, text.get());
-                    batch.ops.push_back(std::move(setText));
-                }
-
-                ScopedValue modifier(ctx, JS_GetPropertyStr(ctx, props.get(), "modifier"));
-                std::vector<std::uint32_t> modifierHandles;
-                CallbackRegistrationScope modifierScope{&owner, &modifierHandles};
-                const auto modifierText = serializeModifier(ctx, modifier.get(), &Impl::registerCallback, &modifierScope);
-                if (!modifierText.empty()) {
-                    arrange::core::BridgeOp setModifier;
-                    setModifier.opcode = arrange::core::BridgeOpcode::SetModifier;
-                    setModifier.id = id;
-                    setModifier.modifierDebugJson = modifierText;
-                    batch.ops.push_back(std::move(setModifier));
-                    appendNativeModifierProps(owner, ctx, id, modifier.get(), batch);
-                }
-                replaceModifierCallbacks(id, std::move(modifierHandles));
-
-                JSPropertyEnum* propNames = nullptr;
-                std::uint32_t propCount = 0;
-                if (JS_GetOwnPropertyNames(ctx, &propNames, &propCount, props.get(), JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) >= 0) {
-                    for (std::uint32_t propIndex = 0; propIndex < propCount; ++propIndex) {
-                        const char* name = JS_AtomToCString(ctx, propNames[propIndex].atom);
-                        if (name == nullptr) continue;
-                        const std::string key(name);
-                        JS_FreeCString(ctx, name);
-                        if (key == "modifier" || (key == "text" && type == "Text")) continue;
-
-                        ScopedValue value(ctx, JS_GetProperty(ctx, props.get(), propNames[propIndex].atom));
-                        std::vector<std::uint32_t> propHandles;
-                        CallbackRegistrationScope propScope{&owner, &propHandles};
-                        arrange::core::BridgeOp setProp;
-                        setProp.opcode = arrange::core::BridgeOpcode::SetProp;
-                        setProp.id = id;
-                        setProp.key = key;
-                        setProp.value = encodeBridgePropValue(ctx, key, value.get(), &Impl::registerCallback, &propScope);
-                        batch.ops.push_back(std::move(setProp));
-                        replacePropCallbacks(id, key, std::move(propHandles));
+            bool hasClickCallback = false;
+            bool hasVerticalScrollCallback = false;
+            bool hasHorizontalScrollCallback = false;
+            const auto length = arrayLength(ctx, payload);
+            for (std::uint32_t i = 0; i < length; ++i) {
+                ScopedValue element(ctx, JS_GetPropertyUint32(ctx, payload, i));
+                ScopedValue typeValue(ctx, JS_GetPropertyStr(ctx, element.get(), "type"));
+                const auto type = toString(ctx, typeValue.get());
+                if (type == "clickable") {
+                    ScopedValue binding(ctx, JS_GetPropertyStr(ctx, element.get(), "onClick"));
+                    ScopedValue callback(ctx, JS_GetPropertyStr(ctx, binding.get(), "callback"));
+                    if (JS_IsFunction(ctx, callback.get())) {
+                        owner.impl_->replaceEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click), callback.get());
+                        hasClickCallback = true;
                     }
-                    for (std::uint32_t propIndex = 0; propIndex < propCount; ++propIndex) JS_FreeAtom(ctx, propNames[propIndex].atom);
-                    js_free(ctx, propNames);
+                }
+                else if (type == "verticalScroll" || type == "horizontalScroll") {
+                    ScopedValue state(ctx, JS_GetPropertyStr(ctx, element.get(), "state"));
+                    ScopedValue binding(ctx, JS_GetPropertyStr(ctx, state.get(), "__arrangeNativeScroll"));
+                    ScopedValue callback(ctx, JS_GetPropertyStr(ctx, binding.get(), "callback"));
+                    const auto kind = type == "verticalScroll" ? arrange::core::EventSlotKind::VerticalScroll : arrange::core::EventSlotKind::HorizontalScroll;
+                    if (JS_IsFunction(ctx, callback.get())) {
+                        owner.impl_->replaceEventSlot(arrange::core::makeEventSlotId(id, kind), callback.get());
+                        if (kind == arrange::core::EventSlotKind::VerticalScroll) hasVerticalScrollCallback = true;
+                        else hasHorizontalScrollCallback = true;
+                    }
                 }
             }
 
-            if (parent != 0) {
-                arrange::core::BridgeOp insert;
-                insert.opcode = arrange::core::BridgeOpcode::InsertChild;
-                insert.parent = parent;
-                insert.child = id;
-                insert.index = index;
-                batch.ops.push_back(insert);
-                attachChild(parent, id, index);
-            }
-
-            ScopedValue children(ctx, JS_GetPropertyStr(ctx, jsNode, "children"));
-            if (JS_IsArray(children.get())) {
-                const auto length = arrayLength(ctx, children.get());
-                for (std::uint32_t childIndex = 0; childIndex < length; ++childIndex) {
-                    ScopedValue child(ctx, JS_GetPropertyUint32(ctx, children.get(), childIndex));
-                    if (JS_IsObject(child.get())) emitNode(owner, ctx, child.get(), id, childIndex, batch);
-                }
-            }
-
-            return id;
+            if (!hasClickCallback) owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click));
+            if (!hasVerticalScrollCallback) owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::VerticalScroll));
+            if (!hasHorizontalScrollCallback) owner.impl_->releaseEventSlot(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::HorizontalScroll));
         }
 
         bool appendBridgeOp(QuickJsScriptHost& owner, JSContext* ctx, JSValueConst item, arrange::core::BridgeBatch& batch) {
@@ -922,6 +558,7 @@ namespace arrange::quickjs {
                 bridgeOp.opcode = arrange::core::BridgeOpcode::CreateNode;
                 bridgeOp.id = parsedId;
                 bridgeOp.nodeType = toString(ctx, nodeType.get());
+                if (rootNodeId == 0) rootNodeId = parsedId;
             }
             else if (op == "deleteNode") {
                 ScopedValue id(ctx, JS_GetPropertyStr(ctx, item, "id"));
@@ -968,10 +605,21 @@ namespace arrange::quickjs {
                 bridgeOp.opcode = arrange::core::BridgeOpcode::SetProp;
                 bridgeOp.id = parsedId;
                 bridgeOp.key = toString(ctx, key.get());
-                std::vector<std::uint32_t> propHandles;
-                CallbackRegistrationScope propScope{&owner, &propHandles};
-                bridgeOp.value = encodeBridgePropValue(ctx, bridgeOp.key, value.get(), &Impl::registerCallback, &propScope);
-                replacePropCallbacks(parsedId, bridgeOp.key, std::move(propHandles));
+                const auto slotKind = propEventSlotKind(bridgeOp.key);
+                const auto eventSlot = slotKind == arrange::core::EventSlotKind::None ? arrange::core::EventSlotId{} : arrange::core::makeEventSlotId(parsedId, slotKind);
+                ScopedValue eventCallback(ctx, eventSlot.valid() ? eventSlotCallbackValue(ctx, value.get()) : JS_UNDEFINED);
+                bridgeOp.value = eventSlot.valid() && JS_IsFunction(ctx, eventCallback.get())
+                    ? encodeBridgePropValue(ctx, bridgeOp.key, eventCallback.get())
+                    : encodeBridgePropValue(ctx, bridgeOp.key, value.get());
+                if (eventSlot.valid()) {
+                    arrange::core::BridgeOp slotProp;
+                    slotProp.opcode = arrange::core::BridgeOpcode::SetProp;
+                    slotProp.id = parsedId;
+                    slotProp.key = eventSlotPropKey(bridgeOp.key);
+                    owner.impl_->replaceEventSlot(eventSlot, eventCallback.get());
+                    slotProp.value = encodeNativeEventSlotPropValue(ctx, eventCallback.get(), eventSlot);
+                    batch.ops.push_back(std::move(slotProp));
+                }
             }
             else if (op == "setModifier") {
                 ScopedValue id(ctx, JS_GetPropertyStr(ctx, item, "id"));
@@ -980,10 +628,10 @@ namespace arrange::quickjs {
                 JS_ToUint32(ctx, &parsedId, id.get());
                 bridgeOp.opcode = arrange::core::BridgeOpcode::SetModifier;
                 bridgeOp.id = parsedId;
-                std::vector<std::uint32_t> modifierHandles;
-                CallbackRegistrationScope modifierScope{&owner, &modifierHandles};
-                bridgeOp.modifierDebugJson = serializeModifier(ctx, modifier.get(), &Impl::registerCallback, &modifierScope);
-                replaceModifierCallbacks(parsedId, std::move(modifierHandles));
+                registerStandardModifierEventSlots(owner, ctx, parsedId, modifier.get());
+                bridgeOp.modifierPayload = JS_IsArray(modifier.get())
+                    ? std::string("o:") + serializeJsValue(ctx, modifier.get())
+                    : std::string{};
             }
             else if (op == "setText") {
                 ScopedValue id(ctx, JS_GetPropertyStr(ctx, item, "id"));
@@ -1013,31 +661,14 @@ namespace arrange::quickjs {
                     appendUnmountOp(incrementalBatch);
                     continue;
                 }
-                if (opName != "mount") {
-                    (void)appendBridgeOp(owner, ctx, item.get(), incrementalBatch);
-                    continue;
-                }
-
-                ScopedValue tree(ctx, JS_GetPropertyStr(ctx, item.get(), "tree"));
-                if (!JS_IsObject(tree.get())) continue;
-
-                arrange::core::BridgeBatch batch;
-                batch.header = {arrange::core::BridgeMagic, arrange::core::BridgeVersion, 0, 0};
-                releaseAllTrackedCallbacks();
-                nextNodeId = 1;
-                rootNodeId = emitNode(owner, ctx, tree.get(), 0, 0, batch);
-                batch.header.opCount = static_cast<std::uint32_t>(batch.ops.size());
-                owner.mountedBatch_ = std::move(batch);
-                return;
+                if (opName == "mount") continue;
+                (void)appendBridgeOp(owner, ctx, item.get(), incrementalBatch);
+                continue;
             }
 
             if (!incrementalBatch.ops.empty()) {
-                incrementalBatch.header.opCount = static_cast<std::uint32_t>(incrementalBatch.ops.size());
-                if (owner.mountedBatch_) {
-                    owner.mountedBatch_->ops.insert(owner.mountedBatch_->ops.end(), incrementalBatch.ops.begin(), incrementalBatch.ops.end());
-                    owner.mountedBatch_->header.opCount = static_cast<std::uint32_t>(owner.mountedBatch_->ops.size());
-                }
-                else { owner.mountedBatch_ = std::move(incrementalBatch); }
+                owner.pendingTransactions_.push(
+                    arrange::core::MutationTransaction::fromBridgeBatch(std::move(incrementalBatch)));
             }
         }
     };
@@ -1045,7 +676,18 @@ namespace arrange::quickjs {
     QuickJsScriptHost::QuickJsScriptHost() : impl_(std::make_unique<Impl>()) {}
     QuickJsScriptHost::~QuickJsScriptHost() = default;
 
-    std::size_t QuickJsScriptHost::callbackCount() const noexcept { return impl_ ? impl_->callbacks.size() : 0; }
+        std::size_t QuickJsScriptHost::eventSlotCount() const noexcept { return impl_ ? impl_->eventSlots.size() : 0; }
+    void QuickJsScriptHost::flushRetiredEventSlots() {
+        if (impl_) impl_->flushRetiredEventSlots();
+    }
+
+    std::optional<arrange::core::MutationTransaction> QuickJsScriptHost::takePendingTransaction() noexcept {
+        return pendingTransactions_.take();
+    }
+
+    void QuickJsScriptHost::clearPendingTransactions() noexcept {
+        pendingTransactions_.clear();
+    }
 
     void QuickJsScriptHost::setFrameTimeMillis(double nowMillis) noexcept {
         if (!impl_) return;
@@ -1057,7 +699,7 @@ namespace arrange::quickjs {
     CallbackInvokeResult QuickJsScriptHost::pumpAnimationFrame(double nowMillis) {
         if (impl_->context == nullptr) return {false, "QuickJS runtime is not initialised"};
         setFrameTimeMillis(nowMillis);
-        mountedBatch_.reset();
+        pendingTransactions_.clear();
 
         if (impl_->animationFrameCallbacks.empty()) {
             const auto drained = impl_->drainJobs();
@@ -1087,7 +729,7 @@ namespace arrange::quickjs {
     }
 
     ScriptExecutionResult QuickJsScriptHost::executeModule(const std::filesystem::path& modulePath, std::string_view source) {
-        mountedBatch_.reset();
+        pendingTransactions_.clear();
         reloadRequested_ = false;
         reloadPayloadJson_.clear();
         const auto normalizedModulePath = std::filesystem::absolute(modulePath).lexically_normal();
@@ -1099,16 +741,18 @@ namespace arrange::quickjs {
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
 
-        if (!mountedBatch_) return {false, "Arrange app did not mount. Expected createApp(App).mount() to commit a tree."};
+        const auto& pending = pendingTransactions_.pending();
+        if (!pending || !pending->hasTreeMutations()) return {false, "Arrange app did not mount. Expected createApp(App).mount() to commit bridge mutations."};
         return {true, {}};
     }
 
-    CallbackInvokeResult QuickJsScriptHost::invokeCallback(std::uint32_t callbackHandle, const CallbackInvokeOptions& options) {
+    CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options) {
         if (impl_->context == nullptr) return {false, "QuickJS runtime is not initialised"};
-        const auto it = impl_->callbacks.find(callbackHandle);
-        if (it == impl_->callbacks.end()) return {false, "Arrange callback handle is not registered in QuickJS"};
+        if (!slot.valid()) return {false, "Arrange event slot is invalid"};
+        const auto it = impl_->eventSlots.find(slot.toString());
+        if (it == impl_->eventSlots.end()) return {false, "Arrange event slot is not registered in QuickJS"};
         ScopedValue callback(impl_->context, JS_DupValue(impl_->context, it->second));
-        mountedBatch_.reset();
+        pendingTransactions_.clear();
 
         JSValueConst* argv = nullptr;
         int argc = 0;

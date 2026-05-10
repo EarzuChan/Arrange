@@ -1,4 +1,4 @@
-#include <arrange/juce/InputTextSession.h>
+﻿#include <arrange/juce/InputTextSession.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 

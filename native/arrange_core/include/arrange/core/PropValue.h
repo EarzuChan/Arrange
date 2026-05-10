@@ -1,6 +1,4 @@
-#pragma once
-
-#include "Node.h"
+﻿#pragma once
 
 #include <cstdint>
 #include <string>
@@ -8,6 +6,8 @@
 #include <unordered_map>
 
 namespace arrange::core {
+    struct ArrangeNode;
+
     enum class EncodedPropKind {
         Unknown,
         Undefined,

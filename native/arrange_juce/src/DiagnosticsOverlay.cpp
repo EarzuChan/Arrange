@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -36,20 +35,6 @@ namespace arrange::juce {
 
         bool logLevelEnabled(LogLevel eventLevel, LogLevel configuredLevel) noexcept { return logLevelRank(eventLevel) >= logLevelRank(configuredLevel); }
 
-        ::juce::Colour diagnosticAccentColour(LogLevel level) {
-            switch (level) {
-            case LogLevel::Trace:
-            case LogLevel::Debug:
-                return ::juce::Colour(0xff94a3b8);
-            case LogLevel::Info:
-                return ::juce::Colour(0xff3b82f6);
-            case LogLevel::Warn:
-                return ::juce::Colour(0xfff59e0b);
-            case LogLevel::Error:
-                return ::juce::Colour(0xffef4444);
-            }
-            return ::juce::Colour(0xff3b82f6);
-        }
     } // namespace
 
     void DiagnosticsOverlay::configure(DiagnosticsConfig config) {
@@ -79,96 +64,13 @@ namespace arrange::juce {
 
     bool DiagnosticsOverlay::hasActiveToasts() const noexcept { return !toasts_.empty(); }
 
-    void DiagnosticsOverlay::paintBadge(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model) const {
-        if (!visibilityEnabled(config_.badge)) return;
-        if (model.text.empty()) return;
-
-        g.setFont(::juce::FontOptions(11.0f));
-        const auto textWidth = g.getCurrentFont().getStringWidth(model.text) + 26;
-        const auto anchorX = static_cast<float>(editorBounds.getX());
-        const auto anchorY = static_cast<float>(editorBounds.getY());
-        const auto anchorWidth = static_cast<float>(editorBounds.getWidth());
-        auto rect = ::juce::Rectangle<int>(textWidth, 20).withPosition(
-            static_cast<int>(std::round(std::max(
-                anchorX + 8.0f,
-                anchorX + anchorWidth - 8.0f - static_cast<float>(textWidth)))),
-            static_cast<int>(std::round(anchorY + 20.0f)));
-
-        g.setColour(::juce::Colour(0xcc111827));
-        g.fillRoundedRectangle(rect.toFloat(), 6.0f);
-        g.setColour(::juce::Colour(0x664b5563));
-        g.drawRoundedRectangle(rect.toFloat(), 6.0f, 1.0f);
-        g.setColour(model.dot);
-        g.fillEllipse(::juce::Rectangle<float>(static_cast<float>(rect.getX() + 8), static_cast<float>(rect.getCentreY() - 3), 6.0f, 6.0f));
-        g.setColour(::juce::Colour(0xffe8eaed));
-        g.drawText(::juce::String(model.text), rect.withTrimmedLeft(20).reduced(0, 1), ::juce::Justification::centredLeft, true);
-    }
-
-    void DiagnosticsOverlay::paintToasts(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds) const {
-        if (!visibilityEnabled(config_.toasts)) return;
-        if (toasts_.empty()) return;
-
-        const auto anchorX = static_cast<float>(editorBounds.getX());
-        const auto anchorY = static_cast<float>(editorBounds.getY());
-        const auto anchorWidth = static_cast<float>(editorBounds.getWidth());
-        const auto maxToastWidth = std::min(360, std::max(220, editorBounds.getWidth() - 32));
-        const auto anchorRight = anchorX + anchorWidth;
-        auto y = static_cast<int>(std::round(anchorY + 48.0f));
-        auto drawn = 0;
-        for (auto it = toasts_.rbegin(); it != toasts_.rend() && drawn < 3; ++it, ++drawn) {
-            const auto title = ::juce::String(it->title);
-            const auto message = ::juce::String(it->message);
-            g.setFont(::juce::FontOptions(12.0f, ::juce::Font::bold));
-            const auto titleWidth = g.getCurrentFont().getStringWidth(title);
-            g.setFont(::juce::FontOptions(11.0f));
-            const auto messageWidth = g.getCurrentFont().getStringWidth(message);
-            const auto width = std::min(maxToastWidth, std::max(180, std::max(titleWidth, messageWidth) + 28));
-            const auto height = message.isEmpty() ? 30 : 48;
-            const auto x = static_cast<int>(std::round(std::max(anchorX + 12.0f, anchorRight - static_cast<float>(width) - 12.0f)));
-            const auto rect = ::juce::Rectangle<int>(width, height).withPosition(x, y);
-            const auto accent = diagnosticAccentColour(it->level);
-
-            g.setColour(::juce::Colour(0xe6111827));
-            g.fillRoundedRectangle(rect.toFloat(), 8.0f);
-            g.setColour(accent.withAlpha(0.72f));
-            g.drawRoundedRectangle(rect.toFloat(), 8.0f, 1.0f);
-            g.fillRoundedRectangle(rect.withWidth(4).toFloat(), 4.0f);
-            g.setColour(::juce::Colour(0xfff8fafc));
-            g.setFont(::juce::FontOptions(12.0f, ::juce::Font::bold));
-            g.drawText(title, rect.reduced(12, 6).removeFromTop(15), ::juce::Justification::centredLeft, true);
-            if (!message.isEmpty()) {
-                g.setColour(::juce::Colour(0xffcbd5e1));
-                g.setFont(::juce::FontOptions(11.0f));
-                g.drawText(message, rect.reduced(12, 6).withTrimmedTop(17), ::juce::Justification::centredLeft, true);
-            }
-            y += height + 8;
+    std::vector<DiagnosticsToastModel> DiagnosticsOverlay::activeToastModels() const {
+        std::vector<DiagnosticsToastModel> models;
+        models.reserve(toasts_.size());
+        for (const auto& toast : toasts_) {
+            models.push_back({toast.level, toast.title, toast.message});
         }
-    }
-
-    void DiagnosticsOverlay::paintErrorScreen(::juce::Graphics& g, ::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const {
-        auto area = editorBounds.reduced(20);
-        if (detailed) {
-            g.setColour(::juce::Colour(0xff2a1014));
-            g.fillRoundedRectangle(area.toFloat(), 10.0f);
-            g.setColour(::juce::Colour(0xffff6b6b));
-            g.setFont(::juce::FontOptions(18.0f, ::juce::Font::bold));
-            g.drawText(error.title.empty() ? "Arrange Error" : error.title, area.removeFromTop(34), ::juce::Justification::centredLeft, true);
-            g.setColour(::juce::Colours::white.withAlpha(0.88f));
-            g.setFont(::juce::FontOptions(13.0f));
-            auto body = error.diagnosticText();
-            if (error.retryAvailable) body += "\nClick anywhere to retry.";
-            g.drawFittedText(body, area, ::juce::Justification::topLeft, 8);
-            return;
-        }
-
-        g.setColour(::juce::Colour(0xff111827));
-        g.fillRoundedRectangle(area.toFloat(), 10.0f);
-        g.setColour(::juce::Colour(0xfff59e0b));
-        g.setFont(::juce::FontOptions(17.0f, ::juce::Font::bold));
-        g.drawText("Arrange error screen hidden", area.removeFromTop(32), ::juce::Justification::centredLeft, true);
-        g.setColour(::juce::Colours::white.withAlpha(0.78f));
-        g.setFont(::juce::FontOptions(13.0f));
-        g.drawFittedText(error.summary + "\nError details are still available in logs and Cmd/Ctrl+C diagnostics.", area, ::juce::Justification::topLeft, 4);
+        return models;
     }
 
     std::string DiagnosticsOverlay::diagnosticsText(const DiagnosticsTextContext& context) const {

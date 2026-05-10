@@ -1,4 +1,5 @@
 #include <arrange/core/PropValue.h>
+#include <arrange/core/Node.h>
 
 #include <algorithm>
 #include <charconv>
@@ -129,7 +130,6 @@ namespace arrange::core {
 
     std::uint32_t EncodedProp::handleValue(std::uint32_t fallback) const {
         auto value = body();
-        if (const auto pos = value.find("\"callbackHandle\":"); pos != std::string::npos) value = value.substr(pos + std::string("\"callbackHandle\":").size());
         char* end = nullptr;
         const auto parsed = std::strtoul(value.c_str(), &end, 10);
         return end == value.c_str() ? fallback : static_cast<std::uint32_t>(parsed);

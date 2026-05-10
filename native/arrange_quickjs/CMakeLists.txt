@@ -1,6 +1,5 @@
-add_library(arrange_quickjs STATIC
+﻿add_library(arrange_quickjs STATIC
   src/AppScriptLoader.cpp
-  src/CallbackRegistry.cpp
 )
 
 target_include_directories(arrange_quickjs PUBLIC include)
