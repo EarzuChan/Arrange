@@ -3,7 +3,6 @@
 #include "MutationTransaction.h"
 #include "LayoutTree.h"
 
-#include <string>
 #include <unordered_set>
 
 namespace arrange::core {
@@ -35,6 +34,6 @@ namespace arrange::core {
 
     private:
         LayoutTree tree_;
-        std::unordered_set<std::string> activeEventSlots_;
+        std::unordered_set<EventSlotId, EventSlotIdHash> activeEventSlots_;
     };
 } // namespace arrange::core

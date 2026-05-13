@@ -58,7 +58,7 @@
         :modifier="m.height(dp(14)).testTag('scroll-title')"
       />
       <Text
-        text="Scroll modifier travels through bridge"
+        text="Scroll modifier travels through native state"
         :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
         :modifier="m.height(dp(14)).testTag('scroll-line-1')"
       />

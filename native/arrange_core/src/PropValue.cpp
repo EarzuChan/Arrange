@@ -1,187 +1,99 @@
 #include <arrange/core/PropValue.h>
 #include <arrange/core/Node.h>
 
-#include <algorithm>
-#include <charconv>
 #include <cstdlib>
-#include <cctype>
+#include <utility>
 
 namespace arrange::core {
     namespace {
         std::string toString(std::string_view value) { return {value.data(), value.size()}; }
+    }
 
-        EncodedPropKind kindForRaw(std::string_view raw) noexcept {
-            if (raw.starts_with("u:")) return EncodedPropKind::Undefined;
-            if (raw.starts_with("n:")) return EncodedPropKind::Null;
-            if (raw.starts_with("f:")) return EncodedPropKind::Number;
-            if (raw.starts_with("b:")) return EncodedPropKind::Boolean;
-            if (raw.starts_with("s:")) return EncodedPropKind::String;
-            if (raw.starts_with("o:")) return EncodedPropKind::Object;
-            if (raw.starts_with("h:")) return EncodedPropKind::Handle;
-            return EncodedPropKind::Unknown;
+    PropValue PropValue::nullValue() { return {}; }
+
+    PropValue PropValue::numberValue(double value) {
+        PropValue result;
+        result.kind = PropValueKind::Number;
+        result.number = value;
+        return result;
+    }
+
+    PropValue PropValue::booleanValue(bool value) {
+        PropValue result;
+        result.kind = PropValueKind::Boolean;
+        result.boolean = value;
+        return result;
+    }
+
+    PropValue PropValue::stringValue(std::string value) {
+        PropValue result;
+        result.kind = PropValueKind::String;
+        result.string = std::move(value);
+        return result;
+    }
+
+    PropValue PropValue::objectValue(std::vector<PropObjectField> fields) {
+        PropValue result;
+        result.kind = PropValueKind::Object;
+        result.fields = std::move(fields);
+        return result;
+    }
+
+    const PropValue* PropValue::field(std::string_view key) const noexcept {
+        if (kind != PropValueKind::Object) return nullptr;
+        for (const auto& item : fields) {
+            if (item.key == key) return &item.value;
         }
+        return nullptr;
+    }
 
-        std::string stripNumericPrefix(std::string value) {
-            if (value.starts_with("f:") || value.starts_with("s:") || value.starts_with("h:")) return value.substr(2);
-            return value;
-        }
-
-        void skipWhitespace(std::string_view text, std::size_t& pos) { while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) ++pos; }
-
-        std::string parseJsonString(std::string_view text, std::size_t& pos) {
-            std::string result;
-            if (pos >= text.size() || text[pos] != '"') return result;
-            ++pos;
-            bool escaping = false;
-            for (; pos < text.size(); ++pos) {
-                const auto ch = text[pos];
-                if (escaping) {
-                    result.push_back(ch);
-                    escaping = false;
-                    continue;
-                }
-                if (ch == '\\') {
-                    escaping = true;
-                    continue;
-                }
-                if (ch == '"') {
-                    ++pos;
-                    break;
-                }
-                result.push_back(ch);
-            }
-            return result;
-        }
-
-        std::string encodedJsonPrimitive(std::string_view text, std::size_t& pos) {
-            skipWhitespace(text, pos);
-            if (pos >= text.size()) return {};
-            if (text[pos] == '"') return "s:" + parseJsonString(text, pos);
-            const auto start = pos;
-            while (pos < text.size() && text[pos] != ',' && text[pos] != '}') ++pos;
-            auto value = text.substr(start, pos - start);
-            while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) value.remove_suffix(1);
-            if (value == "true") return "b:1";
-            if (value == "false") return "b:0";
-            if (value == "null") return "n:";
-            return "f:" + toString(value);
-        }
-
-        void parseJsonObjectFields(std::string_view text, std::size_t& pos, std::string prefix, std::unordered_map<std::string, EncodedProp>& fields) {
-            skipWhitespace(text, pos);
-            if (pos >= text.size() || text[pos] != '{') return;
-            ++pos;
-            while (pos < text.size()) {
-                skipWhitespace(text, pos);
-                if (pos < text.size() && text[pos] == '}') {
-                    ++pos;
-                    return;
-                }
-                const auto key = parseJsonString(text, pos);
-                skipWhitespace(text, pos);
-                if (pos >= text.size() || text[pos] != ':') return;
-                ++pos;
-                skipWhitespace(text, pos);
-                const auto path = prefix.empty() ? key : prefix + "." + key;
-                if (pos < text.size() && text[pos] == '{') { parseJsonObjectFields(text, pos, path, fields); }
-                else { fields.emplace(path, EncodedProp(encodedJsonPrimitive(text, pos))); }
-                skipWhitespace(text, pos);
-                if (pos < text.size() && text[pos] == ',') {
-                    ++pos;
-                    continue;
-                }
-            }
-        }
-    } // namespace
-
-    EncodedProp::EncodedProp(std::string raw) : raw_(std::move(raw)), kind_(kindForRaw(raw_)) {}
-
-    std::string EncodedProp::body() const { return raw_.size() >= 2 && raw_[1] == ':' ? raw_.substr(2) : raw_; }
-
-    std::string EncodedProp::stringValue(std::string_view fallback) const {
-        if (kind_ == EncodedPropKind::String || kind_ == EncodedPropKind::Number || kind_ == EncodedPropKind::Handle) return body();
-        if (kind_ == EncodedPropKind::Object && body().starts_with("\"") && body().ends_with("\"")) {
-            const auto value = body();
-            return value.size() > 1 ? value.substr(1, value.size() - 2) : "";
-        }
-        if (kind_ == EncodedPropKind::Unknown) return raw_.empty() ? toString(fallback) : raw_;
+    std::string PropValue::stringOr(std::string_view fallback) const {
+        if (kind == PropValueKind::String) return string;
+        if (kind == PropValueKind::Number) return std::to_string(number);
+        if (kind == PropValueKind::Boolean) return boolean ? "true" : "false";
         return toString(fallback);
     }
 
-    float EncodedProp::floatValue(float fallback) const {
-        auto value = stripNumericPrefix(raw_);
-        if (kind_ == EncodedPropKind::Boolean) value = body() == "1" || body() == "true" ? "1" : "0";
-        char* end = nullptr;
-        const auto parsed = std::strtof(value.c_str(), &end);
-        return end == value.c_str() ? fallback : parsed;
-    }
-
-    int EncodedProp::intValue(int fallback) const { return static_cast<int>(floatValue(static_cast<float>(fallback))); }
-
-    bool EncodedProp::boolValue(bool fallback) const {
-        auto value = body();
-        if (kind_ == EncodedPropKind::Boolean) return value != "0" && value != "false";
-        if (kind_ == EncodedPropKind::Number || kind_ == EncodedPropKind::String || kind_ == EncodedPropKind::Unknown) {
-            if (value == "true" || value == "1") return true;
-            if (value == "false" || value == "0") return false;
+    float PropValue::numberOr(float fallback) const noexcept {
+        if (kind == PropValueKind::Number) return static_cast<float>(number);
+        if (kind == PropValueKind::Boolean) return boolean ? 1.0f : 0.0f;
+        if (kind == PropValueKind::String) {
+            char* end = nullptr;
+            const auto parsed = std::strtof(string.c_str(), &end);
+            return end == string.c_str() ? fallback : parsed;
         }
         return fallback;
     }
 
-    std::uint32_t EncodedProp::handleValue(std::uint32_t fallback) const {
-        auto value = body();
-        char* end = nullptr;
-        const auto parsed = std::strtoul(value.c_str(), &end, 10);
-        return end == value.c_str() ? fallback : static_cast<std::uint32_t>(parsed);
-    }
+    int PropValue::intOr(int fallback) const noexcept { return static_cast<int>(numberOr(static_cast<float>(fallback))); }
 
-    std::uint32_t EncodedProp::uint32Value(std::uint32_t fallback) const {
-        auto value = stripNumericPrefix(raw_);
-        char* end = nullptr;
-        const auto parsed = std::strtoul(value.c_str(), &end, 10);
-        return end == value.c_str() ? fallback : static_cast<std::uint32_t>(parsed);
-    }
-
-    std::string EncodedProp::jsonLiteral() const {
-        switch (kind_) {
-        case EncodedPropKind::Undefined:
-        case EncodedPropKind::Null:
-            return "null";
-        case EncodedPropKind::Number:
-        case EncodedPropKind::Handle:
-            return body();
-        case EncodedPropKind::Boolean:
-            return boolValue(false) ? "true" : "false";
-        case EncodedPropKind::String:
-            return "\"" + jsonEscape(body()) + "\"";
-        case EncodedPropKind::Object:
-            return body().empty() ? "null" : body();
-        case EncodedPropKind::Unknown:
-            return "\"" + jsonEscape(raw_) + "\"";
+    bool PropValue::boolOr(bool fallback) const noexcept {
+        if (kind == PropValueKind::Boolean) return boolean;
+        if (kind == PropValueKind::Number) return number != 0.0;
+        if (kind == PropValueKind::String) {
+            if (string == "true" || string == "1") return true;
+            if (string == "false" || string == "0") return false;
         }
-        return "null";
+        return fallback;
     }
 
-    PropObject::PropObject(std::unordered_map<std::string, EncodedProp> fields) : fields_(std::move(fields)) {}
-
-    bool PropObject::has(std::string_view key) const { return fields_.find(toString(key)) != fields_.end(); }
-
-    EncodedProp PropObject::prop(std::string_view key) const {
-        if (const auto it = fields_.find(toString(key)); it != fields_.end()) return it->second;
-        return {};
+    std::uint32_t PropValue::uint32Or(std::uint32_t fallback) const noexcept {
+        if (kind == PropValueKind::Number) return static_cast<std::uint32_t>(number);
+        if (kind == PropValueKind::String) {
+            char* end = nullptr;
+            const auto parsed = std::strtoul(string.c_str(), &end, 0);
+            return end == string.c_str() ? fallback : static_cast<std::uint32_t>(parsed);
+        }
+        return fallback;
     }
 
-    float PropObject::number(std::string_view key, float fallback) const { return prop(key).floatValue(fallback); }
-
-    int PropObject::integer(std::string_view key, int fallback) const { return prop(key).intValue(fallback); }
-
-    bool PropObject::boolean(std::string_view key, bool fallback) const { return prop(key).boolValue(fallback); }
-
-    std::string PropObject::string(std::string_view key, std::string_view fallback) const { return prop(key).stringValue(fallback); }
-
-    std::uint32_t PropObject::handle(std::string_view key, std::uint32_t fallback) const { return prop(key).handleValue(fallback); }
-
-    std::uint32_t PropObject::color(std::string_view key, std::uint32_t fallback) const { return prop(key).uint32Value(fallback); }
+    bool PropObject::has(std::string_view key) const noexcept { return prop(key) != nullptr; }
+    const PropValue* PropObject::prop(std::string_view key) const noexcept { return value_ == nullptr ? nullptr : value_->field(key); }
+    float PropObject::number(std::string_view key, float fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->numberOr(fallback); }
+    int PropObject::integer(std::string_view key, int fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->intOr(fallback); }
+    bool PropObject::boolean(std::string_view key, bool fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->boolOr(fallback); }
+    std::string PropObject::string(std::string_view key, std::string_view fallback) const { const auto* value = prop(key); return value == nullptr ? toString(fallback) : value->stringOr(fallback); }
+    std::uint32_t PropObject::color(std::string_view key, std::uint32_t fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->uint32Or(fallback); }
 
     std::string kebabCase(std::string_view key) {
         std::string result;
@@ -195,69 +107,50 @@ namespace arrange::core {
         return result;
     }
 
-    std::string propValue(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) {
-        if (const auto it = node.props.find(toString(camelCase)); it != node.props.end()) return it->second;
-        if (!kebab.empty()) { if (const auto it = node.props.find(toString(kebab)); it != node.props.end()) return it->second; }
+    const PropValue* propValue(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) {
+        if (const auto it = node.props.find(toString(camelCase)); it != node.props.end()) return &it->second;
+        if (!kebab.empty()) {
+            if (const auto it = node.props.find(toString(kebab)); it != node.props.end()) return &it->second;
+        }
         if (!camelCase.empty()) {
             const auto generatedKebab = kebabCase(camelCase);
-            if (generatedKebab != camelCase) { if (const auto it = node.props.find(generatedKebab); it != node.props.end()) return it->second; }
-        }
-        return {};
-    }
-
-    bool hasProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) { return !propValue(node, camelCase, kebab).empty(); }
-
-    EncodedProp encodedProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) { return EncodedProp(propValue(node, camelCase, kebab)); }
-
-    PropObject objectFromEncodedProp(const EncodedProp& prop) {
-        std::unordered_map<std::string, EncodedProp> fields;
-        auto body = prop.body();
-        std::size_t pos = 0;
-        parseJsonObjectFields(body, pos, {}, fields);
-        return PropObject(std::move(fields));
-    }
-
-    PropObject objectProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) { return objectFromEncodedProp(encodedProp(node, camelCase, kebab)); }
-
-    std::string decodeStringProp(std::string_view value, std::string_view fallback) {
-        if (value.empty()) return toString(fallback);
-        return EncodedProp(toString(value)).stringValue(fallback);
-    }
-
-    float encodedNumberProp(const ArrangeNode& node, std::string_view key, float fallback) { return encodedProp(node, key).floatValue(fallback); }
-
-    int encodedIntProp(const ArrangeNode& node, std::string_view key, int fallback) { return encodedProp(node, key).intValue(fallback); }
-
-    bool encodedBoolProp(const ArrangeNode& node, std::string_view key, bool fallback) { return encodedProp(node, key).boolValue(fallback); }
-
-    std::uint32_t encodedHandleProp(const ArrangeNode& node, std::string_view key, std::uint32_t fallback) { return encodedProp(node, key).handleValue(fallback); }
-
-    std::uint32_t encodedColorProp(const ArrangeNode& node, std::string_view key, std::uint32_t fallback) { return encodedProp(node, key).uint32Value(fallback); }
-
-    std::string jsonEscape(std::string_view text) {
-        std::string escaped;
-        for (char ch : text) {
-            switch (ch) {
-            case '\\':
-                escaped += "\\\\";
-                break;
-            case '"':
-                escaped += "\\\"";
-                break;
-            case '\n':
-                escaped += "\\n";
-                break;
-            case '\r':
-                escaped += "\\r";
-                break;
-            case '\t':
-                escaped += "\\t";
-                break;
-            default:
-                escaped.push_back(ch);
-                break;
+            if (generatedKebab != camelCase) {
+                if (const auto it = node.props.find(generatedKebab); it != node.props.end()) return &it->second;
             }
         }
-        return escaped;
+        return nullptr;
+    }
+
+    bool hasProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) { return propValue(node, camelCase, kebab) != nullptr; }
+    PropObject objectProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab) { return PropObject(propValue(node, camelCase, kebab)); }
+
+    std::string stringProp(const ArrangeNode& node, std::string_view key, std::string_view fallback) {
+        const auto* value = propValue(node, key);
+        return value == nullptr ? toString(fallback) : value->stringOr(fallback);
+    }
+
+    std::string stringProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebab, std::string_view fallback) {
+        const auto* value = propValue(node, camelCase, kebab);
+        return value == nullptr ? toString(fallback) : value->stringOr(fallback);
+    }
+
+    float numberProp(const ArrangeNode& node, std::string_view key, float fallback) {
+        const auto* value = propValue(node, key);
+        return value == nullptr ? fallback : value->numberOr(fallback);
+    }
+
+    int intProp(const ArrangeNode& node, std::string_view key, int fallback) {
+        const auto* value = propValue(node, key);
+        return value == nullptr ? fallback : value->intOr(fallback);
+    }
+
+    bool boolProp(const ArrangeNode& node, std::string_view key, bool fallback) {
+        const auto* value = propValue(node, key);
+        return value == nullptr ? fallback : value->boolOr(fallback);
+    }
+
+    std::uint32_t colorProp(const ArrangeNode& node, std::string_view key, std::uint32_t fallback) {
+        const auto* value = propValue(node, key);
+        return value == nullptr ? fallback : value->uint32Or(fallback);
     }
 } // namespace arrange::core

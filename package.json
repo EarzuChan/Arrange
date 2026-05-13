@@ -9,18 +9,17 @@
     "scripts":  {
                     "test":  "node --test tests/**/*.test.ts",
                     "test:runtime":  "node --test tests/runtime/*.test.ts",
-                    "test:bridge":  "node --test tests/bridge/*.test.ts",
                     "test:native":  "node scripts/test-native.ts",
                     "test:quickjs":  "node scripts/test-quickjs-app.ts",
-                    "smoke:demo": "node tests/smoke/basic-editor-smoke.ts",
+                    "smoke:demo":  "node tests/smoke/basic-editor-smoke.ts",
                     "verify:m1-slice":  "node scripts/verify-m1-slice.ts",
                     "typecheck":  "tsc -p tsconfig.json --noEmit",
                     "prepare:deps":  "node scripts/prepare-deps.ts",
                     "build:demo-ui":  "node scripts/build-demo-ui.ts",
                     "build:demo":  "node scripts/build-demo.ts"
                 },
-    "devDependencies": {
-        "@types/node": "^20.19.0",
-        "typescript": "^5.9.0"
-    }
+    "devDependencies":  {
+                            "@types/node":  "^20.19.0",
+                            "typescript":  "^5.9.0"
+                        }
 }

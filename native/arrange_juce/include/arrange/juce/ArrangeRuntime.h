@@ -1,6 +1,5 @@
 #pragma once
 
-#include <arrange/core/Bridge.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/Geometry.h>
 #include <arrange/core/InputIntent.h>
@@ -80,8 +79,6 @@ namespace arrange::juce {
         void enqueueNodeStringEvent(
             const arrange::core::ArrangeNode& node,
             arrange::core::EventSlotKind kind,
-            const char* camelCase,
-            const char* kebabCase,
             std::string value);
         [[nodiscard]] bool hasPendingEvents() const noexcept;
 
@@ -136,3 +133,4 @@ namespace arrange::juce {
 
 #endif
 } // namespace arrange::juce
+

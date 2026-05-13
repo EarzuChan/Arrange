@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Bridge.h"
 #include "Geometry.h"
 #include "Invalidation.h"
 #include "Layout.h"
@@ -108,5 +107,6 @@ namespace arrange::core {
         DrawOpsBuilder drawOpsBuilder_;
     };
 } // namespace arrange::core
+
 
 

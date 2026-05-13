@@ -2,16 +2,12 @@ import {createRenderer} from "vue"
 import type {App as VueApp, Component} from "vue"
 import {Text} from "./components.ts"
 import {m, toModifier} from "./modifier.ts"
-import type {Modifier} from "./modifier.ts"
-import {BridgeOpWriter, eventSlotPropForProp, serializeModifier, serializeProp} from "./renderer.ts"
-import {BRIDGE_VERSION} from "./bridge.ts"
-import type {BridgeOp, NativeCommitCommand, NativeCommitTarget, NodeId} from "./bridge.ts"
-import type {ArrangeContainer, ArrangeHostEvent, ArrangeHostEventListener, ArrangeHostNode, ArrangeVNode} from "./types.ts"
-
-type CommitOp = BridgeOp | NativeCommitCommand
+import {ARRANGE_RUNTIME_VERSION} from "./native.ts"
+import type {NativeMutation, NativeTransactionTarget, NodeId} from "./native.ts"
+import type {ArrangeContainer, ArrangeHostEvent, ArrangeHostEventListener, ArrangeHostNode} from "./types.ts"
 
 declare global {
-    var __ARRANGE_NATIVE__: NativeCommitTarget | undefined
+    var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
 }
 
 function makeNode(type: string): ArrangeHostNode {
@@ -51,7 +47,7 @@ function makeNode(type: string): ArrangeHostNode {
             const value = next == null ? "" : String(next)
             this.props.modelValue = value
             this.props.value = value
-            scheduleCommitFrom(this)
+            enqueueNativeMutation(this, (native) => native.setProp?.(this.__arrangeNodeId ?? 0, "modelValue", value))
         },
     })
     return node as ArrangeHostNode
@@ -77,75 +73,82 @@ function currentTree(container: ArrangeContainer | null | undefined): ArrangeHos
     return container?.children?.[0] ?? null
 }
 
-function assignBridgeIds(node: ArrangeHostNode | null | undefined, container: ArrangeContainer): void {
+function assignNodeIds(node: ArrangeHostNode | null | undefined, container: ArrangeContainer): void {
     if (!node) return
-    if (!node.__arrangeBridgeId) node.__arrangeBridgeId = container.__arrangeNextBridgeId++
-    for (const child of node.children ?? []) assignBridgeIds(child, container)
+    if (!node.__arrangeNodeId) node.__arrangeNodeId = container.__arrangeNextNodeId++
+    for (const child of node.children ?? []) assignNodeIds(child, container)
 }
 
-function emitCreateSubtree(node: ArrangeHostNode | null | undefined, parentId: NodeId | null = null, index = 0, ops: BridgeOp[] = []): BridgeOp[] {
-    if (!node) return ops
-    const writer = new BridgeOpWriter()
-    writer.emitHostSubtree(node, parentId, index)
-    ops.push(...writer.ops)
-    return ops
+function emitCreateSubtree(node: ArrangeHostNode | null | undefined, parentId: NodeId | null = null, index = 0, mutations: NativeMutation[] = []): NativeMutation[] {
+    if (!node) return mutations
+    const id = node.__arrangeNodeId
+    if (!id) throw new Error("Arrange host node is missing native node id")
+    mutations.push((native) => native.createNode?.(id, String(node.type)))
+    for (const [key, value] of Object.entries(node.props ?? {})) {
+        if (key === "modifier") continue
+        if (key === "text" && node.type === Text) mutations.push((native) => native.setText?.(id, String(value)))
+        else mutations.push((native) => native.setProp?.(id, key, value))
+    }
+    mutations.push((native) => native.setModifier?.(id, toModifier(node.props?.modifier ?? m)))
+    if (parentId != null) mutations.push((native) => native.insertChild?.(parentId, id, index))
+    node.children?.forEach((child, childIndex) => emitCreateSubtree(child, id, childIndex, mutations))
+    return mutations
 }
 
-function assertNativeProtocol(target: NativeCommitTarget | null | undefined): void {
-    const nativeVersion = target?.protocolVersion ?? target?.bridgeVersion
+function assertNativeRuntime(target: NativeTransactionTarget | null | undefined): void {
+    const nativeVersion = target?.runtimeVersion
     if (nativeVersion == null) return
-    if (nativeVersion !== BRIDGE_VERSION) {
-        throw new Error(`Arrange runtime/native bridge version mismatch: runtime=${BRIDGE_VERSION}, native=${nativeVersion}`)
+    if (nativeVersion !== ARRANGE_RUNTIME_VERSION) {
+        throw new Error(`Arrange runtime/native version mismatch: runtime=${ARRANGE_RUNTIME_VERSION}, native=${nativeVersion}`)
+    }
+}
+
+function commitMutations(target: NativeTransactionTarget, mutations: readonly NativeMutation[]): void {
+    if (mutations.length === 0) return
+    target.beginTransaction?.()
+    try {
+        for (const mutation of mutations) mutation(target)
+    } finally {
+        target.endTransaction?.()
     }
 }
 
 function scheduleCommitFrom(node: ArrangeHostNode | ArrangeContainer | null | undefined): void {
     const container = findContainer(node)
-    if (!container?.__arrangeMounted || typeof container.__arrangeCommit !== "function") return
-    if (container.__arrangeCommitPending) return
-    container.__arrangeCommitPending = true
+    if (!container?.__arrangeMounted || !container.__arrangeNative) return
+    if (container.__arrangeNativeFlushPending) return
+    container.__arrangeNativeFlushPending = true
     queueMicrotask(() => {
-        container.__arrangeCommitPending = false
-        if (!container.__arrangeMounted) return
-        const ops = container.__arrangePendingOps.splice(0)
-        if (ops.length > 0) container.__arrangeCommit?.(ops)
+        container.__arrangeNativeFlushPending = false
+        if (!container.__arrangeMounted || !container.__arrangeNative) return
+        const mutations = container.__arrangePendingMutations.splice(0)
+        commitMutations(container.__arrangeNative, mutations)
     })
 }
 
-function enqueueBridgeOps(node: ArrangeHostNode | ArrangeContainer, ops: BridgeOp | BridgeOp[]): boolean {
+function enqueueNativeMutation(node: ArrangeHostNode | ArrangeContainer, mutation: NativeMutation | NativeMutation[]): boolean {
     const container = findContainer(node)
-    if (!container?.__arrangeMounted || typeof container.__arrangeCommit !== "function") return false
-    container.__arrangePendingOps.push(...(Array.isArray(ops) ? ops : [ops]))
+    if (!container?.__arrangeMounted || !container.__arrangeNative) return false
+    container.__arrangePendingMutations.push(...(Array.isArray(mutation) ? mutation : [mutation]))
     scheduleCommitFrom(node)
     return true
 }
 
-function emitModifierOps(id: NodeId, modifier: Modifier | null | undefined, _includeDisabled: boolean, ops: BridgeOp[]): void {
-    ops.push({op: "setModifier", id, modifier: serializeModifier(modifier ?? m, id)})
-}
-
-function clearBridgeIds(node: ArrangeHostNode | null | undefined): void {
+function clearNodeIds(node: ArrangeHostNode | null | undefined): void {
     if (!node) return
-    delete node.__arrangeBridgeId
-    for (const child of node.children ?? []) clearBridgeIds(child)
+    delete node.__arrangeNodeId
+    for (const child of node.children ?? []) clearNodeIds(child)
 }
 
 const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
     patchProp(el, key, _previous, next) {
         if (key === "class" || key === "style") return
         el.props[key] = key === "modifier" ? toModifier(next ?? m) : next
-        const id = el.__arrangeBridgeId
+        const id = el.__arrangeNodeId
         if (!id) return
-        if (key === "modifier") {
-            const modifier = el.props.modifier ?? m
-            const ops: BridgeOp[] = []
-            emitModifierOps(id, modifier, true, ops)
-            enqueueBridgeOps(el, ops)
-        } else if (key === "text" && el.type === Text) enqueueBridgeOps(el, {op: "setText", id, text: String(next)})
-        else {
-            const slotProp = eventSlotPropForProp(id, key, el.props[key])
-            enqueueBridgeOps(el, {op: "setProp", id, key, value: slotProp ?? serializeProp(el.props[key])})
-        }
+        if (key === "modifier") enqueueNativeMutation(el, (native) => native.setModifier?.(id, toModifier(el.props.modifier ?? m)))
+        else if (key === "text" && el.type === Text) enqueueNativeMutation(el, (native) => native.setText?.(id, String(next)))
+        else enqueueNativeMutation(el, (native) => native.setProp?.(id, key, el.props[key]))
     },
     insert(child, rawParent, anchor = null) {
         const parent = rawParent as ArrangeHostNode | ArrangeContainer
@@ -159,30 +162,30 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
             parent.children.splice(index < 0 ? parent.children.length : index, 0, child)
         }
         const container = findContainer(parent)
-        const parentId = isHostNode(parent) ? parent.__arrangeBridgeId : undefined
+        const parentId = isHostNode(parent) ? parent.__arrangeNodeId : undefined
         if (container?.__arrangeMounted && parentId) {
-            const existingId = child.__arrangeBridgeId
-            if (!existingId) assignBridgeIds(child, container)
+            const existingId = child.__arrangeNodeId
+            if (!existingId) assignNodeIds(child, container)
             const index = parent.children.indexOf(child)
-            enqueueBridgeOps(parent, existingId
-                ? {op: "insertChild", parent: parentId, child: existingId, index}
+            enqueueNativeMutation(parent, existingId
+                ? (native) => native.insertChild?.(parentId, existingId, index)
                 : emitCreateSubtree(child, parentId, index, []))
         }
     },
     remove(child) {
         const parent = child.__arrangeParent
         if (!parent?.children) return
-        const parentId = isHostNode(parent) ? parent.__arrangeBridgeId : undefined
-        const childId = child.__arrangeBridgeId
+        const parentId = isHostNode(parent) ? parent.__arrangeNodeId : undefined
+        const childId = child.__arrangeNodeId
         const index = parent.children.indexOf(child)
         if (index >= 0) parent.children.splice(index, 1)
         child.__arrangeParent = null
         if (parentId && childId) {
-            enqueueBridgeOps(parent, [
-                {op: "removeChild", parent: parentId, child: childId},
-                {op: "deleteNode", id: childId},
+            enqueueNativeMutation(parent, [
+                (native) => native.removeChild?.(parentId, childId),
+                (native) => native.deleteNode?.(childId),
             ])
-            clearBridgeIds(child)
+            clearNodeIds(child)
         }
     },
     createElement(type) {
@@ -198,7 +201,7 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
     },
     setText(node, text) {
         node.props.text = String(text)
-        if (node.__arrangeBridgeId) enqueueBridgeOps(node, {op: "setText", id: node.__arrangeBridgeId, text: String(text)})
+        if (node.__arrangeNodeId) enqueueNativeMutation(node, (native) => native.setText?.(node.__arrangeNodeId ?? 0, String(text)))
     },
     setElementText(node, text) {
         node.children = []
@@ -208,9 +211,9 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
             child.__arrangeParent = node
             node.children.push(child)
         }
-        if (node.__arrangeBridgeId) {
-            if (node.type === Text) enqueueBridgeOps(node, {op: "setText", id: node.__arrangeBridgeId, text: String(text)})
-            else enqueueBridgeOps(node, {op: "setProp", id: node.__arrangeBridgeId, key: "__arrangeSubtreeReplaced", value: true})
+        if (node.__arrangeNodeId) {
+            if (node.type === Text) enqueueNativeMutation(node, (native) => native.setText?.(node.__arrangeNodeId ?? 0, String(text)))
+            else enqueueNativeMutation(node, (native) => native.invalidate?.(node.__arrangeNodeId ?? 0, "structure", "subtree text replaced"))
         }
     },
     parentNode(node) {
@@ -225,7 +228,7 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
 })
 
 export type ArrangeMountHandle = {tree: ArrangeHostNode | null; unmount: () => void}
-export type ArrangeApp = Omit<VueApp, "mount"> & {mount: (target?: NativeCommitTarget) => unknown}
+export type ArrangeApp = Omit<VueApp, "mount"> & {mount: (target?: NativeTransactionTarget) => unknown}
 type ArrangeVueAppBoundary = ArrangeApp & {unmount: () => void}
 
 function createArrangeVueApp(rootComponent: Component, rootProps: Record<string, unknown> | null): {app: ArrangeVueAppBoundary; vueApp: VueApp} {
@@ -242,30 +245,35 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
     const originalMount = vueApp.mount.bind(vueApp)
     const originalUnmount = app.unmount.bind(app)
     let container: ArrangeContainer | null = null
-    let nativeTarget: NativeCommitTarget | null = null
+    let nativeTarget: NativeTransactionTarget | null = null
 
     app.unmount = () => {
         if (!container) return originalUnmount()
         const target = nativeTarget
         originalUnmount()
         container.__arrangeMounted = false
-        container.__arrangeCommitPending = false
-        if (target && typeof target.commit === "function") target.commit([{op: "unmount"}])
+        container.__arrangeNativeFlushPending = false
+        target?.beginTransaction?.()
+        try {
+            target?.unmount?.()
+        } finally {
+            target?.endTransaction?.()
+        }
         container = null
         nativeTarget = null
     }
 
-    app.mount = (target: NativeCommitTarget = globalThis.__ARRANGE_NATIVE__ ?? {}) => {
-        assertNativeProtocol(target)
+    app.mount = (target: NativeTransactionTarget = globalThis.__ARRANGE_NATIVE__ ?? {}) => {
+        assertNativeRuntime(target)
         nativeTarget = target
         container = {
             $$arrangeContainer: true,
             children: [],
-            __arrangeCommit: target?.commit?.bind(target),
-            __arrangeCommitPending: false,
+            __arrangeNative: target,
+            __arrangeNativeFlushPending: false,
             __arrangeMounted: false,
-            __arrangeNextBridgeId: 1,
-            __arrangePendingOps: [],
+            __arrangeNextNodeId: 1,
+            __arrangePendingMutations: [],
         }
         if (typeof globalThis.Document !== "function") {
             Object.defineProperty(globalThis, "Document", {configurable: true, writable: true, value: function ArrangeDocument() {}})
@@ -274,9 +282,9 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
             Object.defineProperty(globalThis, "ShadowRoot", {configurable: true, writable: true, value: function ArrangeShadowRoot() {}})
         }
         const result = originalMount(containerAsMountHost(container))
-        assignBridgeIds(currentTree(container), container)
+        assignNodeIds(currentTree(container), container)
         container.__arrangeMounted = true
-        if (target && typeof target.commit === "function") target.commit(emitCreateSubtree(currentTree(container), null, 0, []))
+        commitMutations(target, emitCreateSubtree(currentTree(container), null, 0, []))
 
         if (result && (typeof result === "object" || typeof result === "function")) {
             try {
@@ -285,7 +293,7 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
                 return result
             } catch {
                 // Vue component public instances are proxies; if a host rejects augmentation,
-                // fall through to the minimal Arrange mount handle used by tests/smoke.
+                // fall through to the Arrange mount handle used by tests/smoke.
             }
         }
         return {tree: currentTree(container), unmount: () => app.unmount()} satisfies ArrangeMountHandle

@@ -11,12 +11,12 @@ m.padding(dp(8)).background(red)
 
 # 生产事实源
 
-Modifier 生产语义必须来自 Bridge `setModifier` typed payload 与 native core 的唯一编译结果：
+Modifier 生产语义必须来自 QuickJS 直接读取的稳定 TS Modifier object shape 与 native core 的唯一编译结果：
 
 ```txt
 JS ModifierDescriptor[]
--> Bridge setModifier typed payload
--> native core ModifierCompiler
+-> QuickJS ModifierReader 直接读取 JSValue
+-> native ModifierSpec / ModifierCompiler
 -> CompiledModifier cached on LayoutNode
 -> Layout / Paint / HitTest / Input / Invalidation 读取同一份编译结果
 ```
@@ -27,11 +27,15 @@ JS ModifierDescriptor[]
 
 `CompiledModifier` 必须保留当前支持 Modifier 的可执行顺序语义。Paint / Layout / HitTest 不能靠字符串补丁反推顺序，例如不能用 `style.type == "padding"` 之类的局部规则决定 background、border、clip 与 padding / size 的相对效果。至少 `padding().background()`、`background().padding()`、`size().background()`、`background().size()` 等顺序差异必须由结构化编译结果和测试保护。
 
-新增 Modifier 必须同时补：
+绘制语义收敛为 typed paint op。`ModifierCompiler` 负责把 `background`、`border`、`alpha`、`dropShadow`、`innerShadow`、`clip`、`padding` 等字符串 payload 编译成明确的 paint chain op；Paint 阶段不可靠自由字符串 `style.type == ...` 作为分派依据。
 
-- TS typed descriptor。
-- Bridge typed payload。
-- C++ 集中 decode / compile 到 `CompiledModifier`。
+`CompiledModifierDiff` 结构化地表达其变化来源。layout、paint、transform、parent data、zIndex、input、focus、scroll value、click event slot、scroll event slot 等变化应分别进入对应 dirty attribution。纯 event callback / event slot 替换不得触发无理由 measure / layout / paint。
+
+新增 Modifier 同时补：
+
+- TS typed descriptor / stable object shape。
+- QuickJS ModifierReader。
+- C++ 集中读取 / compile 到 `CompiledModifier`。
 - dirty schema。
 - no-debugJson / no-expanded-field 测试。
 
@@ -292,7 +296,7 @@ updateTransition(...)
 
 基础动画属于核心设计；更复杂的动画编排后续细化。
 
-动画语义在 JS runtime，帧时钟在 native host。`animate*AsState` 不得用 Promise / microtask 伪造逐帧刷新，必须通过 host `requestAnimationFrame` 进入 native frame pump。每个动画 tick 都应能产生 Bridge 增量、native dirty 与 repaint。
+动画语义在 JS runtime，帧时钟在 native host。`animate*AsState` 不得用 Promise / microtask 伪造逐帧刷新，必须通过 host `requestAnimationFrame` 进入 native frame pump。每个动画 tick 都应能产生 native typed mutation、native dirty 与 repaint。
 
 `m.animateContentSize()` 也使用同一 FrameClock / repaint pump；它不另建计时系统。Canvas `frame` invalidation、未来 meter / waveform 等 UI-thread 高频显示也复用同一底座。
 

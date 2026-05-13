@@ -21,7 +21,7 @@ export type ScrollState = {
     canScrollForward: boolean
     scrollTo: (value: number) => void
     animateScrollTo: (value: number) => void
-    __arrangeNativeScroll: (payload: string | ScrollSnapshot) => void
+    __arrangeNativeScroll: (payload: ScrollSnapshot) => void
 }
 
 let currentFocusManager: FocusManager | null = null
@@ -79,8 +79,8 @@ export function rememberScrollState(args: {initial?: number} = {}): ScrollState 
         animateScrollTo(value: number) {
             this.scrollTo(value)
         },
-        __arrangeNativeScroll(payload: string | ScrollSnapshot) {
-            applyScrollSnapshot(state, typeof payload === "string" ? JSON.parse(payload) as ScrollSnapshot : payload)
+        __arrangeNativeScroll(payload: ScrollSnapshot) {
+            applyScrollSnapshot(state, payload)
         },
     })
     applyScrollSnapshot(state, state)
@@ -159,3 +159,4 @@ export function useParameter(id: string) {
 
 export function useHost(): Record<string, never> { return {} }
 export function useTransport(): {playing: boolean; bpm: number | null; positionPpq: number | null} { return {playing: false, bpm: null, positionPpq: null} }
+

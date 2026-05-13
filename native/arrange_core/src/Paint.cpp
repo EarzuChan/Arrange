@@ -12,29 +12,26 @@
 namespace arrange::core {
     namespace {
         std::string inputValue(const ArrangeNode& node) {
-            auto value = propValue(node, "modelValue", "model-value");
-            if (value.empty()) { if (const auto it = node.props.find("value"); it != node.props.end()) value = it->second; }
-            return decodeStringProp(value);
+            if (const auto* value = propValue(node, "modelValue", "model-value")) return value->stringOr();
+            if (const auto* value = propValue(node, "value")) return value->stringOr();
+            return {};
         }
 
         std::string inputPlaceholder(const ArrangeNode& node) {
-            if (const auto it = node.props.find("placeholder"); it != node.props.end()) return decodeStringProp(it->second);
+            if (const auto* value = propValue(node, "placeholder")) return value->stringOr();
             return {};
         }
 
         std::string resourceProp(const ArrangeNode& node) {
-            if (const auto it = node.props.find("source"); it != node.props.end()) return decodeStringProp(it->second);
+            if (const auto* value = propValue(node, "source")) return value->stringOr();
             return {};
         }
 
-        float encodedFloatProp(const ArrangeNode& node, const char* key, float fallback) { return encodedNumberProp(node, key, fallback); }
+        float numericProp(const ArrangeNode& node, const char* key, float fallback) { return numberProp(node, key, fallback); }
 
-        std::string encodedStringProp(const ArrangeNode& node, const char* key, const char* fallback = "") { return encodedProp(node, key).stringValue(fallback); }
+        std::string textProp(const ArrangeNode& node, const char* key, const char* fallback = "") { return stringProp(node, key, fallback); }
 
-        std::string encodedStringProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
-            const auto value = propValue(node, camelCase, kebabCase);
-            return value.empty() ? std::string(fallback) : EncodedProp(value).stringValue(fallback);
-        }
+        std::string textProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) { return stringProp(node, camelCase, kebabCase, fallback); }
 
         bool hasProp(const ArrangeNode& node, const char* key) { return node.props.find(key) != node.props.end(); }
 
@@ -129,10 +126,10 @@ namespace arrange::core {
                     ops.push_back(clip);
                     popStack.push_back(DrawOpType::PopClip);
                 }
-                else if (style.type == "alpha") {
+                else if (style.kind == PaintStyleKind::Alpha) {
                     alpha *= style.alpha;
                 }
-                else if (style.type == "dropShadow" && color != 0) {
+                else if (style.kind == PaintStyleKind::DropShadow && color != 0) {
                     auto rect = contentRect;
                     rect.x += style.shadowOffset.x;
                     rect.y += style.shadowOffset.y;
@@ -144,7 +141,7 @@ namespace arrange::core {
                     op.cornerRadius = style.cornerRadius;
                     ops.push_back(std::move(op));
                 }
-                else if (style.type == "innerShadow" && color != 0) {
+                else if (style.kind == PaintStyleKind::InnerShadow && color != 0) {
                     DrawOp op;
                     op.type = DrawOpType::StrokeRect;
                     op.rect = contentRect;
@@ -154,7 +151,7 @@ namespace arrange::core {
                     op.cornerRadius = style.cornerRadius;
                     ops.push_back(std::move(op));
                 }
-                else if (style.type == "background" && color != 0) {
+                else if (style.kind == PaintStyleKind::Background && color != 0) {
                     DrawOp op;
                     op.type = DrawOpType::FillRect;
                     op.rect = contentRect;
@@ -163,7 +160,7 @@ namespace arrange::core {
                     op.cornerRadius = style.cornerRadius;
                     ops.push_back(std::move(op));
                 }
-                else if (style.type == "border" && color != 0) {
+                else if (style.kind == PaintStyleKind::Border && color != 0) {
                     DrawOp op;
                     op.type = DrawOpType::StrokeRect;
                     op.rect = contentRect;
@@ -179,7 +176,7 @@ namespace arrange::core {
         if (node.type == NodeType::Text && !node.text.empty()) {
             std::uint32_t textColor = 0xff000000u;
             float fontSize = 14.0f;
-            const auto style = objectFromEncodedProp(EncodedProp(textStyleProp(node)));
+            const auto style = objectProp(node, "textStyle", "text-style");
             textColor = style.color("color", textColor);
             fontSize = style.number("fontSize", fontSize);
             const auto lineHeight = std::max(fontSize, style.number("lineHeight", fontSize * 1.2f));
@@ -190,17 +187,17 @@ namespace arrange::core {
             op.color = withAlpha(textColor, alpha);
             op.fontSize = fontSize;
             op.lineHeight = lineHeight;
-            op.maxLines = std::max(0, encodedIntProp(node, "maxLines", 0));
+            op.maxLines = std::max(0, intProp(node, "maxLines", 0));
             op.text = node.text;
-            op.textAlign = encodedStringProp(node, "textAlign", "start");
-            op.overflow = encodedStringProp(node, "overflow", "clip");
+            op.textAlign = textProp(node, "textAlign", "start");
+            op.overflow = textProp(node, "overflow", "clip");
             ops.push_back(std::move(op));
         }
 
         if (node.type == NodeType::Input) {
             std::uint32_t textColor = 0xffe8eaedu;
             float fontSize = 14.0f;
-            const auto style = objectFromEncodedProp(EncodedProp(textStyleProp(node)));
+            const auto style = objectProp(node, "textStyle", "text-style");
             textColor = style.color("color", textColor);
             fontSize = style.number("fontSize", fontSize);
             const auto lineHeight = style.number("lineHeight", fontSize);
@@ -221,7 +218,7 @@ namespace arrange::core {
                 op.fontSize = fontSize;
                 op.lineHeight = std::max(fontSize, lineHeight);
                 op.text = text;
-                op.maxLines = singleLine ? 1 : std::max(1, encodedIntProp(node, "maxLines", lineCount(text)));
+                op.maxLines = singleLine ? 1 : std::max(1, intProp(node, "maxLines", lineCount(text)));
                 ops.push_back(std::move(op));
             }
         }
@@ -231,10 +228,10 @@ namespace arrange::core {
             op.type = DrawOpType::DrawImage;
             op.rect = contentRect;
             op.hasTint = hasProp(node, "tint");
-            op.color = withAlpha(encodedColorProp(node, "tint", 0xffffffffu), alpha * encodedFloatProp(node, "alpha", 1.0f));
+            op.color = withAlpha(colorProp(node, "tint", 0xffffffffu), alpha * numericProp(node, "alpha", 1.0f));
             op.resource = resourceProp(node);
-            op.contentScale = encodedStringProp(node, "contentScale", "content-scale", "Fit");
-            op.alignment = encodedStringProp(node, "alignment", "Center");
+            op.contentScale = textProp(node, "contentScale", "content-scale", "Fit");
+            op.alignment = textProp(node, "alignment", "Center");
             ops.push_back(std::move(op));
         }
 
@@ -242,7 +239,7 @@ namespace arrange::core {
             DrawOp op;
             op.type = DrawOpType::DrawIcon;
             op.rect = contentRect;
-            op.color = withAlpha(encodedColorProp(node, "tint", 0xff000000u), alpha);
+            op.color = withAlpha(colorProp(node, "tint", 0xff000000u), alpha);
             op.resource = resourceProp(node);
             ops.push_back(std::move(op));
         }
@@ -256,23 +253,19 @@ namespace arrange::core {
         }
     }
 
-    std::string DrawOpsBuilder::textStyleProp(const ArrangeNode& node) {
-        if (const auto it = node.props.find("textStyle"); it != node.props.end()) return it->second;
-        if (const auto it = node.props.find("text-style"); it != node.props.end()) return it->second;
-        return {};
-    }
+    std::string DrawOpsBuilder::textStyleProp(const ArrangeNode& node) { return stringProp(node, "textStyle", "text-style", ""); }
 
     bool TextInputOverlayBuilder::allowsLineBreak(const ArrangeNode& node) {
-        if (!encodedProp(node, "singleLine", "single-line").boolValue(true)) return true;
-        if (encodedProp(node, "minLines", "min-lines").floatValue(1.0f) > 1.0f) return true;
-        if (encodedProp(node, "maxLines", "max-lines").floatValue(1.0f) > 1.0f) return true;
+        if (!boolProp(node, "singleLine", true)) return true;
+        if (numberProp(node, "minLines", 1.0f) > 1.0f) return true;
+        if (numberProp(node, "maxLines", 1.0f) > 1.0f) return true;
         return false;
     }
 
     TextInputOverlayBuilder::Metrics TextInputOverlayBuilder::metrics(const ArrangeNode& node, float viewportX) {
         Metrics result;
         result.rect = node.bounds;
-        const auto style = objectFromEncodedProp(EncodedProp(DrawOpsBuilder::textStyleProp(node)));
+        const auto style = objectProp(node, "textStyle", "text-style");
         result.fontSize = style.number("fontSize", 14.0f);
         result.singleLine = !allowsLineBreak(node);
         result.textLeft = result.rect.x + 8.0f;
@@ -421,3 +414,5 @@ namespace arrange::core {
         return ops;
     }
 } // namespace arrange::core
+
+

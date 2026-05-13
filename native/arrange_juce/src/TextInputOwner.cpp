@@ -9,23 +9,25 @@
 
 namespace arrange::juce {
     namespace {
-        std::string nodeProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr) {
-            if (const auto it = node.props.find(camelCase); it != node.props.end()) return it->second;
-            if (kebabCase != nullptr) {
-                if (const auto it = node.props.find(kebabCase); it != node.props.end()) return it->second;
-            }
-            return {};
+        const arrange::core::PropValue* nodeProp(
+            const arrange::core::ArrangeNode& node,
+            const char* camelCase,
+            const char* kebabCase = nullptr) {
+            return arrange::core::propValue(
+                node,
+                camelCase,
+                kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase});
         }
 
         std::string inputModelValue(const arrange::core::ArrangeNode& node) {
-            auto value = nodeProp(node, "modelValue", "model-value");
-            if (value.empty()) value = nodeProp(node, "value");
-            return arrange::core::decodeStringProp(value);
+            if (const auto* value = nodeProp(node, "modelValue", "model-value")) return value->stringOr();
+            if (const auto* value = nodeProp(node, "value")) return value->stringOr();
+            return {};
         }
 
         bool boolProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr, bool fallback = false) {
-            const auto value = nodeProp(node, camelCase, kebabCase);
-            return value.empty() ? fallback : arrange::core::EncodedProp(value).boolValue(fallback);
+            const auto* value = nodeProp(node, camelCase, kebabCase);
+            return value == nullptr ? fallback : value->boolOr(fallback);
         }
     } // namespace
 
@@ -315,13 +317,13 @@ namespace arrange::juce {
         auto* node = activeInputNode(tree, true);
         if (node != nullptr) {
             if (submit && callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputSubmit, "onSubmit", nullptr, session_.state().text());
+                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputSubmit, session_.state().text());
             }
             if (session_.state().changedSinceBegin() && callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputChange, "onChange", nullptr, session_.state().text());
+                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputChange, session_.state().text());
             }
             if (callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputBlur, "onBlur", nullptr, session_.state().text());
+                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputBlur, session_.state().text());
             }
             if (callbacks.invalidateNativeState) {
                 callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input focus cleared");
@@ -395,7 +397,7 @@ namespace arrange::juce {
 
         if (edit.submitRequested) {
             if (callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(node, arrange::core::EventSlotKind::InputSubmit, "onSubmit", nullptr, session_.state().text());
+                callbacks.invokeStringEvent(node, arrange::core::EventSlotKind::InputSubmit, session_.state().text());
             }
             return true;
         }
@@ -406,8 +408,6 @@ namespace arrange::juce {
                 callbacks.invokeStringEvent(
                     node,
                     arrange::core::EventSlotKind::InputUpdate,
-                    "onUpdate:modelValue",
-                    "onUpdate:model-value",
                     session_.state().text());
             }
         }

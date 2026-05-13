@@ -1,4 +1,4 @@
-﻿#include <arrange/juce/CompositionHost.h>
+#include <arrange/juce/CompositionHost.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 
@@ -60,7 +60,7 @@ namespace arrange::juce {
 
     CompositionInvokeResult CompositionHost::invoke(const arrange::core::EventSlotId& slot, double nowMillis) {
 #if ARRANGE_WITH_QUICKJS_NG
-        return fromScriptEventResult(eventBridge_.invoke(scriptHost_.get(), slot, nowMillis));
+        return fromScriptEventResult(eventDispatcher_.invoke(scriptHost_.get(), slot, nowMillis));
 #else
         (void)slot;
         (void)nowMillis;
@@ -73,7 +73,7 @@ namespace arrange::juce {
         double nowMillis,
         const std::string& value) {
 #if ARRANGE_WITH_QUICKJS_NG
-        return fromScriptEventResult(eventBridge_.invokeString(scriptHost_.get(), slot, nowMillis, value));
+        return fromScriptEventResult(eventDispatcher_.invokeString(scriptHost_.get(), slot, nowMillis, value));
 #else
         (void)slot;
         (void)nowMillis;
@@ -85,11 +85,9 @@ namespace arrange::juce {
     CompositionInvokeResult CompositionHost::invokeNodeStringEvent(
         const arrange::core::ArrangeNode& node,
         arrange::core::EventSlotKind kind,
-        const char* camelCase,
-        const char* kebabCase,
         double nowMillis,
         const std::string& value) {
-        const auto slot = ScriptEventBridge::eventSlotFromAnyProp(node, kind, camelCase, kebabCase);
+        const auto slot = ScriptEventDispatcher::eventSlot(node, kind);
         return invokeString(slot, nowMillis, value);
     }
 
@@ -97,7 +95,7 @@ namespace arrange::juce {
         const arrange::core::EventSlotId& slot,
         double nowMillis,
         const arrange::core::ScrollResult& result) {
-        return invokeString(slot, nowMillis, ScriptEventBridge::scrollSnapshotJson(result));
+        return fromScriptEventResult(eventDispatcher_.invokeScroll(scriptHost_.get(), slot, nowMillis, result));
     }
 
     void CompositionHost::flushRetiredEventSlots() {
@@ -108,3 +106,4 @@ namespace arrange::juce {
 } // namespace arrange::juce
 
 #endif
+

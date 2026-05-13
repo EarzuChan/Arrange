@@ -9,7 +9,7 @@ namespace arrange {
         AppPackage,
         ScriptLoad,
         ScriptRuntime,
-        BridgeProtocol,
+        NativeTransaction,
         Hmr,
         Resource,
     };

@@ -10,7 +10,7 @@
 namespace arrange::core {
     enum class InvalidationSource {
         Unknown,
-        BridgeMutation,
+        NativeMutation,
         NativeState,
         InputIntent,
         Resize,
@@ -81,3 +81,4 @@ namespace arrange::core {
         InvalidationSnapshot snapshot_;
     };
 } // namespace arrange::core
+

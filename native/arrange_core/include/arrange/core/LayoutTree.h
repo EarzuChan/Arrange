@@ -3,8 +3,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include "Bridge.h"
 #include "Invalidation.h"
+#include "Mutation.h"
 #include "Node.h"
 
 namespace arrange::core {
@@ -17,7 +17,7 @@ namespace arrange::core {
 
     class LayoutTree {
     public:
-        void apply(const BridgeBatch& batch);
+        void apply(const std::vector<TreeMutation>& mutations);
         bool contains(NodeId id) const noexcept { return nodes_.find(id) != nodes_.end(); }
         const ArrangeNode& node(NodeId id) const;
         ArrangeNode& node(NodeId id);
@@ -34,6 +34,7 @@ namespace arrange::core {
         void clearDirty() noexcept;
 
     private:
+        void applyMutation(const TreeMutation& mutation);
         void markDirtyWithPropagation(NodeId id, DirtyFlag flag);
         void markAncestorsDirty(NodeId id, DirtyFlag flag);
         void markDirtyAttributed(

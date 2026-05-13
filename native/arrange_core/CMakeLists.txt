@@ -5,7 +5,7 @@ add_library(arrange_core STATIC
   src/TextLayoutService.cpp
   src/InputIntent.cpp
   src/Invalidation.cpp
-  src/Bridge.cpp
+  src/Mutation.cpp
   src/MutationTransaction.cpp
   src/NativeScene.cpp
   src/LayoutTree.cpp
@@ -19,3 +19,5 @@ add_library(arrange_core STATIC
   src/Paint.cpp
 )
 target_include_directories(arrange_core PUBLIC include)
+
+

@@ -1,6 +1,5 @@
-﻿#pragma once
+#pragma once
 
-#include <arrange/core/Bridge.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/juce/ArrangeEditor.h>
 #include <arrange/juce/ErrorScreenModel.h>
@@ -49,3 +48,4 @@ namespace arrange::juce {
 
 #endif
 } // namespace arrange::juce
+

@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <functional>
 
 namespace arrange::core {
     using NodeId = std::uint32_t;
@@ -25,12 +26,22 @@ namespace arrange::core {
         std::string path;
 
         [[nodiscard]] bool valid() const noexcept { return node != 0 && kind != EventSlotKind::None; }
-        [[nodiscard]] std::string toString() const;
+        [[nodiscard]] bool operator==(const EventSlotId& other) const noexcept {
+            return node == other.node && kind == other.kind && path == other.path;
+        }
+    };
+
+    struct EventSlotIdHash {
+        [[nodiscard]] std::size_t operator()(const EventSlotId& slot) const noexcept {
+            auto result = std::hash<NodeId>{}(slot.node);
+            result ^= std::hash<std::uint32_t>{}(static_cast<std::uint32_t>(slot.kind)) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
+            result ^= std::hash<std::string>{}(slot.path) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
+            return result;
+        }
     };
 
     [[nodiscard]] std::string eventSlotKindName(EventSlotKind kind);
     [[nodiscard]] EventSlotKind eventSlotKindFromName(std::string_view name) noexcept;
     [[nodiscard]] EventSlotId makeEventSlotId(NodeId node, EventSlotKind kind, std::string path = {});
-    [[nodiscard]] EventSlotId parseEventSlotId(std::string_view text);
-    [[nodiscard]] std::string encodeEventSlotProp(const EventSlotId& slot);
 } // namespace arrange::core
+

@@ -9,7 +9,7 @@ namespace arrange {
         case ErrorSource::AppPackage: return "AppPackage";
         case ErrorSource::ScriptLoad: return "ScriptLoad";
         case ErrorSource::ScriptRuntime: return "ScriptRuntime";
-        case ErrorSource::BridgeProtocol: return "BridgeProtocol";
+        case ErrorSource::NativeTransaction: return "NativeTransaction";
         case ErrorSource::Hmr: return "HMR";
         case ErrorSource::Resource: return "Resource";
         case ErrorSource::Unknown: return "Unknown";

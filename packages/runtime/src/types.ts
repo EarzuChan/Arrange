@@ -1,5 +1,5 @@
-import type {BridgeEncodedValue, BridgeOp, EventSlotId, NativeCommitTarget, NodeId} from "./bridge.ts"
 import type {Modifier} from "./modifier.ts"
+import type {NativeMutation, NativeTransactionTarget, NodeId} from "./native.ts"
 
 export type ArrangeVNode = ArrangeElementVNode | string | number
 export type ArrangeChild = ArrangeVNode | null | undefined
@@ -27,7 +27,7 @@ export type ArrangeHostNode = Omit<ArrangeElementVNode, "children"> & {
     tagName: string
     children: ArrangeHostNode[]
     __arrangeParent?: ArrangeHostNode | ArrangeContainer | null
-    __arrangeBridgeId?: NodeId
+    __arrangeNodeId?: NodeId
     __arrangeListeners: Map<string, ArrangeHostEventListener[]>
     addEventListener: (name: string, listener: ArrangeHostEventListener) => void
     removeEventListener: (name: string, listener: ArrangeHostEventListener) => void
@@ -39,11 +39,11 @@ export type ArrangeHostNode = Omit<ArrangeElementVNode, "children"> & {
 export type ArrangeContainer = {
     $$arrangeContainer: true
     children: ArrangeHostNode[]
-    __arrangeCommit?: NativeCommitTarget["commit"]
-    __arrangeCommitPending: boolean
+    __arrangeNative?: NativeTransactionTarget
+    __arrangeNativeFlushPending: boolean
     __arrangeMounted: boolean
-    __arrangeNextBridgeId: NodeId
-    __arrangePendingOps: BridgeOp[]
+    __arrangeNextNodeId: NodeId
+    __arrangePendingMutations: NativeMutation[]
 }
 
 export type ArrangeHostEvent = {
@@ -62,14 +62,7 @@ export type ModifierElement = {
     value: Record<string, unknown>
 }
 
-export type NativeModifierProp = {
-    key: string
-    value: BridgeEncodedValue | EventSlotId
-}
-
 export type ArrangeRenderInput =
     | ArrangeVNode
     | (() => ArrangeVNode)
     | {render: () => ArrangeVNode}
-
-export type NativeModifierPropEntry = NativeModifierProp

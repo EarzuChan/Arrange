@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/Node.h>
@@ -20,15 +20,11 @@ namespace arrange::juce {
         std::string error;
     };
 
-    class ScriptEventBridge final {
+    class ScriptEventDispatcher final {
     public:
-        static arrange::core::EventSlotId eventSlotFromProp(const arrange::core::ArrangeNode& node, const char* key);
-        static arrange::core::EventSlotId eventSlotFromAnyProp(
+        static arrange::core::EventSlotId eventSlot(
             const arrange::core::ArrangeNode& node,
-            arrange::core::EventSlotKind kind,
-            const char* camelCase,
-            const char* kebabCase = nullptr);
-        static std::string scrollSnapshotJson(const arrange::core::ScrollResult& result);
+            arrange::core::EventSlotKind kind);
 
 #if ARRANGE_WITH_QUICKJS_NG
         ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis) const;
@@ -38,8 +34,10 @@ namespace arrange::juce {
             double nowMillis,
             const arrange::quickjs::CallbackInvokeOptions& options) const;
         ScriptEventInvokeResult invokeString(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value) const;
+        ScriptEventInvokeResult invokeScroll(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result) const;
 #endif
     };
 
 #endif
 } // namespace arrange::juce
+

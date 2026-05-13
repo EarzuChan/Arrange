@@ -1,6 +1,5 @@
 #pragma once
 
-#include <arrange/core/Bridge.h>
 #include <arrange/core/Geometry.h>
 #include <arrange/core/InputIntent.h>
 #include <arrange/core/MutationTransaction.h>
@@ -48,3 +47,4 @@ namespace arrange::juce {
         arrange::core::PublishedFrame publishedFrame_;
     };
 } // namespace arrange::juce
+

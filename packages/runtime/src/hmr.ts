@@ -1,13 +1,9 @@
-import type {NativeCommitTarget} from "./bridge.ts"
+import type {NativeReloadPayload, NativeTransactionTarget} from "./native.ts"
 
 export const ARRANGE_HMR_RELOAD_EVENT = "arrange:reload"
 
-export type ArrangeHmrReloadPayload = {
-    path?: string
-    timestamp?: number
-}
-
-type NativeReloadTarget = NativeCommitTarget & {
+export type ArrangeHmrReloadPayload = NativeReloadPayload
+type NativeReloadTarget = NativeTransactionTarget & {
     reload?: (payload: ArrangeHmrReloadPayload) => void
 }
 
@@ -30,3 +26,4 @@ export function installArrangeHmrClient(hot: HotLike | null | undefined, target?
 
     return true
 }
+

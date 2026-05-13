@@ -34,7 +34,7 @@ createApp(App).mount()
 Vue SFC / Vue render function
 -> Vue custom renderer
 -> Arrange host nodes
--> Bridge
+-> QuickJS native transaction
 ```
 
 `@arrange/runtime` 不公开自研 `h` 作为主 API。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
@@ -399,16 +399,16 @@ useTransport(): TransportState
 
 互操作语义见 [互操作](16-互操作.md)。
 
-# Bridge Header
+# Runtime Hello
 
-若 runtime 与 native 之间需要版本检查，应在 bridge 初始化时传递最小头信息：
+若 runtime 与 native 之间需要版本检查，应在 QuickJS native runtime 初始化时传递最小握手信息：
 
 ```ts
-interface BridgeHello {
+interface RuntimeHello {
     protocolVersion: number
     runtimeVersion: string
     appId?: string
 }
 ```
 
-生产协议细节见 [渲染树与Bridge协议](15-渲染树与Bridge协议.md)。
+生产 native transaction 细节见 [LayoutTree与NativeTransaction](15-LayoutTree与NativeTransaction.md)。

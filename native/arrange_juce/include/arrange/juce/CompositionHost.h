@@ -4,7 +4,7 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Node.h>
 #include <arrange/core/Scroll.h>
-#include <arrange/juce/ScriptEventBridge.h>
+#include <arrange/juce/ScriptEventDispatcher.h>
 
 #if ARRANGE_WITH_QUICKJS_NG
 #include <arrange/quickjs/QuickJsScriptHost.h>
@@ -44,8 +44,6 @@ namespace arrange::juce {
         [[nodiscard]] CompositionInvokeResult invokeNodeStringEvent(
             const arrange::core::ArrangeNode& node,
             arrange::core::EventSlotKind kind,
-            const char* camelCase,
-            const char* kebabCase,
             double nowMillis,
             const std::string& value);
         [[nodiscard]] CompositionInvokeResult invokeScrollSnapshot(
@@ -56,7 +54,7 @@ namespace arrange::juce {
         void flushRetiredEventSlots();
 
     private:
-        ScriptEventBridge eventBridge_;
+        ScriptEventDispatcher eventDispatcher_;
 #if ARRANGE_WITH_QUICKJS_NG
         std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost_;
 #endif

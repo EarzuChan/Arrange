@@ -15,7 +15,7 @@ namespace arrange::juce {
     namespace {
         [[nodiscard]] ErrorSource frameErrorSource(RuntimeFrameErrorPhase phase) noexcept {
             return phase == RuntimeFrameErrorPhase::Pipeline
-                       ? ErrorSource::BridgeProtocol
+                       ? ErrorSource::NativeTransaction
                        : ErrorSource::ScriptRuntime;
         }
 
@@ -77,7 +77,7 @@ namespace arrange::juce {
         DiagnosticsState& diagnostics,
         ArrangeRuntime& runtime) {
         diagnostics.setError(makeErrorScreenModel(
-            ErrorSource::BridgeProtocol,
+            ErrorSource::NativeTransaction,
             "Arrange layout tree is empty after loading UI package."));
         loaded_ = false;
         emitDiagnostic(

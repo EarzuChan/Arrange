@@ -1,4 +1,4 @@
-﻿#include <arrange/core/NativeScene.h>
+#include <arrange/core/NativeScene.h>
 
 namespace arrange::core {
     void NativeScene::reset() {
@@ -15,14 +15,15 @@ namespace arrange::core {
 
     void NativeScene::applyEventSlotChanges(const MutationTransaction& transaction) {
         for (const auto& slot : transaction.retiredEventSlots) {
-            if (slot.valid()) activeEventSlots_.erase(slot.toString());
+            if (slot.valid()) activeEventSlots_.erase(slot);
         }
         for (const auto& slot : transaction.eventSlotUpdates) {
-            if (slot.valid()) activeEventSlots_.insert(slot.toString());
+            if (slot.valid()) activeEventSlots_.insert(slot);
         }
     }
 
     bool NativeScene::hasEventSlot(const EventSlotId& slot) const {
-        return slot.valid() && activeEventSlots_.contains(slot.toString());
+        return slot.valid() && activeEventSlots_.contains(slot);
     }
 } // namespace arrange::core
+

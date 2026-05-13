@@ -88,18 +88,12 @@ export class Modifier {
     animateContentSize(): Modifier { return this.#add("animateContentSize", {}) }
     testTag(name: string): Modifier { return this.#add("testTag", {name}) }
 
-    toJSON(): Array<Record<string, unknown>> {
-        return this.elements.map((element) => ({type: element.type, ...serializable(element.value) as Record<string, unknown>}))
-    }
 
     #add(type: string, value: Record<string, unknown>): Modifier {
         return new Modifier([...this.elements, Object.freeze({type, value: Object.freeze(value)})])
     }
 }
 
-function serializable(value: unknown): unknown {
-    return JSON.parse(JSON.stringify(value, (_key, val: unknown) => typeof val === "function" ? "[Function]" : val))
-}
 
 function checkedFraction(fraction: number): Readonly<{fraction: number}> {
     if (typeof fraction !== "number" || fraction < 0 || fraction > 1) throw new RangeError("fillMax* fraction must be in 0..1")
@@ -123,3 +117,4 @@ function scrollStateSnapshot(state: ScrollStateLike): ScrollStateLike {
         __arrangeNativeScroll: state.__arrangeNativeScroll,
     }
 }
+

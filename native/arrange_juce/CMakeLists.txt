@@ -40,7 +40,7 @@ if(TARGET juce::juce_audio_processors)
     src/RuntimePackageBinder.cpp
     src/RuntimeSessionState.cpp
     src/RuntimePackageLoader.cpp
-    src/ScriptEventBridge.cpp
+    src/ScriptEventDispatcher.cpp
     src/JuceTextInputAdapter.cpp
   )
   target_compile_definitions(arrange_juce PUBLIC ARRANGE_JUCE_WITH_JUCE=1)

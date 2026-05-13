@@ -11,37 +11,25 @@
 
 namespace arrange::juce {
     namespace {
-        std::string nodeProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr) {
-            if (const auto it = node.props.find(camelCase); it != node.props.end()) return it->second;
-            if (kebabCase != nullptr) { if (const auto it = node.props.find(kebabCase); it != node.props.end()) return it->second; }
-            return {};
-        }
+        bool nodeBoolProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase, bool fallback) { const auto* value = arrange::core::propValue(node, camelCase, kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase}); return value == nullptr ? fallback : value->boolOr(fallback); }
 
-        bool boolProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr, bool fallback = false) {
-            auto value = nodeProp(node, camelCase, kebabCase);
-            return value.empty() ? fallback : arrange::core::EncodedProp(value).boolValue(fallback);
-        }
-
-        float numberProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr, float fallback = 0.0f) {
-            auto value = nodeProp(node, camelCase, kebabCase);
-            return value.empty() ? fallback : arrange::core::EncodedProp(value).floatValue(fallback);
-        }
+        float nodeNumberProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase, float fallback) { const auto* value = arrange::core::propValue(node, camelCase, kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase}); return value == nullptr ? fallback : value->numberOr(fallback); }
     } // namespace
 
     TextInputLayoutModel::TextInputLayoutModel(arrange::core::TextLayoutService& textLayoutService) noexcept
         : textLayoutService_(textLayoutService) {}
 
     bool TextInputLayoutModel::allowsLineBreak(const arrange::core::ArrangeNode& node) {
-        if (!boolProp(node, "singleLine", "single-line", true)) return true;
-        if (numberProp(node, "minLines", "min-lines", 1.0f) > 1.0f) return true;
-        if (numberProp(node, "maxLines", "max-lines", 1.0f) > 1.0f) return true;
+        if (!nodeBoolProp(node, "singleLine", "single-line", true)) return true;
+        if (nodeNumberProp(node, "minLines", "min-lines", 1.0f) > 1.0f) return true;
+        if (nodeNumberProp(node, "maxLines", "max-lines", 1.0f) > 1.0f) return true;
         return false;
     }
 
     TextInputLayoutModel::Metrics TextInputLayoutModel::metrics(const arrange::core::ArrangeNode& node, float viewportX) const {
         Metrics metrics;
         metrics.rect = ::juce::Rectangle<float>(node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
-        const auto style = arrange::core::objectFromEncodedProp(arrange::core::EncodedProp(nodeProp(node, "textStyle", "text-style")));
+        const auto style = arrange::core::objectProp(node, "textStyle", "text-style");
         metrics.fontSize = style.number("fontSize", 14.0f);
         metrics.singleLine = !allowsLineBreak(node);
         metrics.textLeft = metrics.rect.getX() + 8.0f;
@@ -146,3 +134,4 @@ namespace arrange::juce {
 } // namespace arrange::juce
 
 #endif
+

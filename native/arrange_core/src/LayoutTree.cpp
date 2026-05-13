@@ -1,7 +1,6 @@
 #include <arrange/core/LayoutTree.h>
 
 #include <algorithm>
-#include <arrange/core/Modifier.h>
 #include <stdexcept>
 #include <string_view>
 #include <optional>
@@ -15,18 +14,11 @@ namespace arrange::core {
         bool isAccessibilityProp(std::string_view key) { return key == "contentDescription" || key == "content-description" || key == "label" || key == "description" || key == "role" || key == "enabled"; }
 
         bool isEventProp(std::string_view key) {
-            return key.rfind("on", 0) == 0 ||
-                key.rfind("__arrangeEventSlot.", 0) == 0 ||
-                key.find("EventSlot") != std::string_view::npos;
-        }
-
-
-
-
-
-        bool isNativeInputInvalidationProp(std::string_view key) {
-            return key == "__arrangeNativeInputPaintInvalidation" ||
-                key == "__arrangeNativeInputStateInvalidation";
+            return key == "onSubmit" ||
+                key == "onChange" ||
+                key == "onBlur" ||
+                key == "onUpdate:modelValue" ||
+                key == "onUpdate:model-value";
         }
 
         bool hasArea(Rect rect) { return rect.width > 0.0f && rect.height > 0.0f; }
@@ -38,105 +30,127 @@ namespace arrange::core {
             const auto y2 = std::max(left.y + left.height, right.y + right.height);
             return {x1, y1, x2 - x1, y2 - y1};
         }
+
+        template <typename T>
+        const T* getIf(const TreeMutation& mutation) noexcept {
+            return std::get_if<T>(&mutation);
+        }
     } // namespace
 
-    void LayoutTree::apply(const BridgeBatch& batch) {
-        for (const auto& op : batch.ops) {
-            switch (op.opcode) {
-            case BridgeOpcode::CreateNode: {
-                ArrangeNode node;
-                node.id = op.id;
-                node.type = nodeTypeFromBridgeName(op.nodeType);
-                markDirty(node, DirtyFlag::Structure);
-                recordDirtyAttribution(op.id, DirtyFlag::Structure, InvalidationSource::BridgeMutation, "node", "create node");
-                nodes_[op.id] = std::move(node);
-                clearParent(op.id);
-                break;
+    void LayoutTree::apply(const std::vector<TreeMutation>& mutations) {
+        for (const auto& mutation : mutations) applyMutation(mutation);
+    }
+
+    void LayoutTree::applyMutation(const TreeMutation& mutation) {
+        if (const auto* op = getIf<CreateNodeMutation>(mutation)) {
+            ArrangeNode node;
+            node.id = op->id;
+            node.type = op->type;
+            markDirty(node, DirtyFlag::Structure);
+            recordDirtyAttribution(op->id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "node", "create node");
+            nodes_[op->id] = std::move(node);
+            clearParent(op->id);
+            return;
+        }
+
+        if (const auto* op = getIf<DeleteNodeMutation>(mutation)) {
+            if (!contains(op->id)) return;
+            detachFromParents(op->id);
+            eraseSubtree(op->id);
+            return;
+        }
+
+        if (const auto* op = getIf<InsertChildMutation>(mutation)) {
+            require(op->child);
+            if (op->parent == op->child) throw std::runtime_error("Arrange layout tree cannot insert a node into itself");
+            std::unordered_set<NodeId> visited;
+            if (isDescendant(op->child, op->parent, visited)) { throw std::runtime_error("Arrange layout tree cannot insert an ancestor as a child"); }
+            auto& parent = require(op->parent);
+            if (const auto oldParent = parentOf(op->child)) {
+                auto& oldParentNode = require(*oldParent);
+                oldParentNode.children.erase(std::remove(oldParentNode.children.begin(), oldParentNode.children.end(), op->child), oldParentNode.children.end());
+                markDirtyWithPropagation(*oldParent, DirtyFlag::Structure);
             }
-            case BridgeOpcode::DeleteNode: {
-                if (!contains(op.id)) break;
-                detachFromParents(op.id);
-                eraseSubtree(op.id);
-                break;
+            parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
+            const auto insertAt = std::min<std::size_t>(op->index, parent.children.size());
+            parent.children.insert(parent.children.begin() + static_cast<std::ptrdiff_t>(insertAt), op->child);
+            setParent(op->child, op->parent);
+            markDirtyWithPropagation(op->parent, DirtyFlag::Structure);
+            return;
+        }
+
+        if (const auto* op = getIf<RemoveChildMutation>(mutation)) {
+            auto& parent = require(op->parent);
+            const auto oldSize = parent.children.size();
+            parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
+            if (parent.children.size() != oldSize) {
+                clearParent(op->child);
+                markDirtyWithPropagation(op->parent, DirtyFlag::Structure);
             }
-            case BridgeOpcode::InsertChild: {
-                require(op.child);
-                if (op.parent == op.child) throw std::runtime_error("Arrange layout tree cannot insert a node into itself");
-                std::unordered_set<NodeId> visited;
-                if (isDescendant(op.child, op.parent, visited)) { throw std::runtime_error("Arrange layout tree cannot insert an ancestor as a child"); }
-                auto& parent = require(op.parent);
-                if (const auto oldParent = parentOf(op.child)) {
-                    auto& oldParentNode = require(*oldParent);
-                    oldParentNode.children.erase(std::remove(oldParentNode.children.begin(), oldParentNode.children.end(), op.child), oldParentNode.children.end());
-                    markDirtyWithPropagation(*oldParent, DirtyFlag::Structure);
-                }
-                parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op.child), parent.children.end());
-                const auto insertAt = std::min<std::size_t>(op.index, parent.children.size());
-                parent.children.insert(parent.children.begin() + static_cast<std::ptrdiff_t>(insertAt), op.child);
-                setParent(op.child, op.parent);
-                markDirtyWithPropagation(op.parent, DirtyFlag::Structure);
-                break;
+            return;
+        }
+
+        if (const auto* op = getIf<SetPropMutation>(mutation)) {
+            auto& node = require(op->id);
+            node.props[op->key] = op->value;
+            if (isEventProp(op->key)) {
+                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, op->key, "event callback changed");
+                return;
             }
-            case BridgeOpcode::RemoveChild: {
-                auto& parent = require(op.parent);
-                const auto oldSize = parent.children.size();
-                parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op.child), parent.children.end());
-                if (parent.children.size() != oldSize) {
-                    clearParent(op.child);
-                    markDirtyWithPropagation(op.parent, DirtyFlag::Structure);
-                }
-                break;
+            if (isResourceProp(op->key)) {
+                markDirtyAttributed(op->id, DirtyFlag::Resource, InvalidationSource::NativeMutation, op->key, "resource prop changed");
+                return;
             }
-            case BridgeOpcode::SetProp: {
-                auto& node = require(op.id);
-                if (isNativeInputInvalidationProp(op.key)) {
-                    const auto flag = op.key == "__arrangeNativeInputPaintInvalidation" ? DirtyFlag::Paint : DirtyFlag::EventSlot;
-                    markDirtyAttributed(op.id, flag, InvalidationSource::NativeState, op.key, op.value);
-                    break;
-                }
-                node.props[op.key] = op.value;
-                if (isEventProp(op.key)) {
-                    markDirtyAttributed(op.id, DirtyFlag::EventSlot, InvalidationSource::BridgeMutation, op.key, "event slot update");
-                    break;
-                }
-                if (isResourceProp(op.key)) {
-                    markDirtyAttributed(op.id, DirtyFlag::Resource, InvalidationSource::BridgeMutation, op.key, "resource prop changed");
-                    break;
-                }
-                if (isAccessibilityProp(op.key)) {
-                    markDirtyAttributed(op.id, DirtyFlag::Accessibility, InvalidationSource::BridgeMutation, op.key, "accessibility prop changed");
-                    break;
-                }
-                markDirtyAttributed(op.id, DirtyFlag::Layout, InvalidationSource::BridgeMutation, op.key, "layout prop changed");
-                markDirtyAttributed(op.id, DirtyFlag::Paint, InvalidationSource::BridgeMutation, op.key, "paint prop changed");
-                break;
+            if (isAccessibilityProp(op->key)) {
+                markDirtyAttributed(op->id, DirtyFlag::Accessibility, InvalidationSource::NativeMutation, op->key, "accessibility prop changed");
+                return;
             }
-            case BridgeOpcode::SetModifier: {
-                auto& node = require(op.id);
-                const auto oldModifier = node.modifier;
-                auto newModifier = ModifierCompiler{}.compile(op.modifierPayload);
-                const auto diff = diffCompiledModifier(oldModifier, newModifier);
-                node.modifierPayload = op.modifierPayload;
-                node.modifier = std::move(newModifier);
-                if (diff.dirtyMask == 0) {
-                    markDirtyAttributed(op.id, DirtyFlag::EventSlot, InvalidationSource::BridgeMutation, "modifier", "modifier metadata changed");
-                    break;
-                }
-                if ((diff.dirtyMask & dirtyMask(DirtyFlag::Layout)) != 0) markDirtyAttributed(op.id, DirtyFlag::Layout, InvalidationSource::BridgeMutation, "modifier", "compiled layout modifier changed");
-                if ((diff.dirtyMask & dirtyMask(DirtyFlag::Paint)) != 0) markDirtyAttributed(op.id, DirtyFlag::Paint, InvalidationSource::BridgeMutation, "modifier", "compiled paint modifier changed");
-                if ((diff.dirtyMask & dirtyMask(DirtyFlag::Transform)) != 0) markDirtyAttributed(op.id, DirtyFlag::Transform, InvalidationSource::BridgeMutation, "modifier", "compiled transform modifier changed");
-                if ((diff.dirtyMask & dirtyMask(DirtyFlag::HitTest)) != 0) markDirtyAttributed(op.id, DirtyFlag::HitTest, InvalidationSource::BridgeMutation, "modifier", "compiled input/hit-test modifier changed");
-                if ((diff.dirtyMask & dirtyMask(DirtyFlag::Focus)) != 0) markDirtyAttributed(op.id, DirtyFlag::Focus, InvalidationSource::BridgeMutation, "modifier", "compiled focus modifier changed");
-                break;
+            markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, op->key, "layout prop changed");
+            markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, op->key, "paint prop changed");
+            return;
+        }
+
+        if (const auto* op = getIf<SetEventSlotMutation>(mutation)) {
+            auto& node = require(op->id);
+            if (op->kind != EventSlotKind::None && op->slot.valid()) {
+                node.eventSlots[op->kind] = op->slot;
+                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, eventSlotKindName(op->kind), "event callback changed");
             }
-            case BridgeOpcode::SetText: {
-                auto& node = require(op.id);
-                node.text = op.text;
-                markDirtyAttributed(op.id, DirtyFlag::Layout, InvalidationSource::BridgeMutation, "text", "text changed");
-                markDirtyAttributed(op.id, DirtyFlag::Paint, InvalidationSource::BridgeMutation, "text", "text changed");
-                break;
+            return;
+        }
+
+        if (const auto* op = getIf<ClearEventSlotMutation>(mutation)) {
+            auto& node = require(op->id);
+            if (op->kind != EventSlotKind::None && node.eventSlots.erase(op->kind) > 0) {
+                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, eventSlotKindName(op->kind), "event callback removed");
             }
-            }
+            return;
+        }
+
+        if (const auto* op = getIf<SetModifierMutation>(mutation)) {
+            auto& node = require(op->id);
+            const auto oldModifier = node.modifier;
+            const auto diff = diffCompiledModifier(oldModifier, op->modifier);
+            node.modifier = op->modifier;
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Layout)) != 0) markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, "modifier", "compiled layout modifier changed");
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Paint)) != 0) markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, "modifier", "compiled paint modifier changed");
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Transform)) != 0) markDirtyAttributed(op->id, DirtyFlag::Transform, InvalidationSource::NativeMutation, "modifier", "compiled transform modifier changed");
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::HitTest)) != 0) markDirtyAttributed(op->id, DirtyFlag::HitTest, InvalidationSource::NativeMutation, "modifier", "compiled input/hit-test modifier changed");
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Focus)) != 0) markDirtyAttributed(op->id, DirtyFlag::Focus, InvalidationSource::NativeMutation, "modifier", "compiled focus modifier changed");
+            if ((diff.dirtyMask & dirtyMask(DirtyFlag::EventSlot)) != 0) markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, "modifier", "compiled event modifier changed");
+            return;
+        }
+
+        if (const auto* op = getIf<SetTextMutation>(mutation)) {
+            auto& node = require(op->id);
+            node.text = op->text;
+            markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, "text", "text changed");
+            markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, "text", "text changed");
+            return;
+        }
+
+        if (const auto* op = getIf<NativeInvalidationMutation>(mutation)) {
+            markDirtyAttributed(op->id, op->flag, InvalidationSource::NativeState, op->field, op->reason);
         }
     }
 
@@ -285,7 +299,7 @@ namespace arrange::core {
                 markAncestorsDirty(node.id, DirtyFlag::Structure);
                 markAncestorsDirty(node.id, DirtyFlag::Layout);
                 markAncestorsDirty(node.id, DirtyFlag::HitTest);
-                recordDirtyAttribution(node.id, DirtyFlag::Structure, InvalidationSource::BridgeMutation, "children", "detach child");
+                recordDirtyAttribution(node.id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "detach child");
             }
         }
         clearParent(id);
@@ -300,13 +314,8 @@ namespace arrange::core {
         nodes_.erase(id);
     }
 
-    void LayoutTree::setParent(NodeId child, NodeId parent) {
-        parentByNode_[child] = parent;
-    }
-
-    void LayoutTree::clearParent(NodeId child) {
-        parentByNode_.erase(child);
-    }
+    void LayoutTree::setParent(NodeId child, NodeId parent) { parentByNode_[child] = parent; }
+    void LayoutTree::clearParent(NodeId child) { parentByNode_.erase(child); }
 
     std::optional<NodeId> LayoutTree::parentOf(NodeId id) const noexcept {
         const auto it = parentByNode_.find(id);

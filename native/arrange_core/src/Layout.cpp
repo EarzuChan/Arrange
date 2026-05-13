@@ -17,14 +17,14 @@ namespace arrange::core {
         float safeMax(float value, float fallback) noexcept { return value > 0.0f ? value : fallback; }
 
         std::string inputTextProp(const ArrangeNode& node) {
-            auto value = propValue(node, "modelValue", "model-value");
-            if (value.empty()) { if (const auto it = node.props.find("value"); it != node.props.end()) value = it->second; }
-            if (value.empty()) { if (const auto it = node.props.find("placeholder"); it != node.props.end()) value = it->second; }
-            return decodeStringProp(value);
+            if (const auto* value = propValue(node, "modelValue", "model-value")) return value->stringOr();
+            if (const auto* value = propValue(node, "value")) return value->stringOr();
+            if (const auto* value = propValue(node, "placeholder")) return value->stringOr();
+            return {};
         }
 
-        float spacedByValue(const std::string& value) {
-            const auto object = objectFromEncodedProp(EncodedProp(value));
+        float spacedByValue(const PropValue* value) {
+            const auto object = PropObject(value);
             if (object.string("kind") != "spacedBy") return 0.0f;
             return std::max(0.0f, object.number("space"));
         }
@@ -32,12 +32,12 @@ namespace arrange::core {
         PropObject textStyleProp(const ArrangeNode& node) { return objectProp(node, "textStyle", "text-style"); }
 
         int textMaxLines(const ArrangeNode& node) {
-            const auto value = static_cast<int>(encodedNumberProp(node, "maxLines", 0.0f));
+            const auto value = intProp(node, "maxLines", 0);
             return value > 0 ? value : 0;
         }
 
         int textMinLines(const ArrangeNode& node) {
-            const auto value = static_cast<int>(encodedNumberProp(node, "minLines", 1.0f));
+            const auto value = intProp(node, "minLines", 1);
             return value > 0 ? value : 1;
         }
 
@@ -76,9 +76,7 @@ namespace arrange::core {
         }
 
         std::string nodeAlignmentProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
-            auto value = propValue(node, camelCase, kebabCase);
-            if (value.empty()) return fallback;
-            return decodeStringProp(value);
+            return stringProp(node, camelCase, kebabCase, fallback);
         }
 
         std::string alignModifier(const ArrangeNode& node) { return node.modifier.parentData.align; }
@@ -200,7 +198,7 @@ namespace arrange::core {
             if (!(fontSize > 0.0f)) fontSize = 14.0f;
             const auto lineHeight = std::max(fontSize, textStyle.number("lineHeight", fontSize * 1.2f));
             const auto text = inputTextProp(node);
-            const auto singleLine = encodedBoolProp(node, "singleLine", true);
+            const auto singleLine = boolProp(node, "singleLine", true);
             const auto minLines = singleLine ? 1 : textMinLines(node);
             const auto maxLines = singleLine ? 1 : textMaxLines(node);
             const auto textMaxWidth = !singleLine && constraints.maxWidth < InfiniteConstraint ? std::max(0.0f, constraints.maxWidth - 16.0f) : 0.0f;
@@ -300,7 +298,7 @@ namespace arrange::core {
             content.height = 24.0f;
             break;
         case NodeType::Icon: {
-            auto iconSize = encodedProp(node, "size").floatValue(-1.0f);
+            auto iconSize = numberProp(node, "size", -1.0f);
             if (!(iconSize > 0.0f)) iconSize = 24.0f;
             content.width = iconSize;
             content.height = iconSize;
@@ -439,3 +437,4 @@ namespace arrange::core {
 
     float LayoutEngine::columnSpacing(const ArrangeNode& node) { return spacedByValue(propValue(node, "verticalArrangement", "vertical-arrangement")); }
 } // namespace arrange::core
+

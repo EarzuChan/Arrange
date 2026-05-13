@@ -2,7 +2,7 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-#include <arrange/juce/ScriptEventBridge.h>
+#include <arrange/juce/ScriptEventDispatcher.h>
 
 #include <utility>
 
@@ -83,10 +83,8 @@ namespace arrange::juce {
     void ArrangeRuntime::enqueueNodeStringEvent(
         const arrange::core::ArrangeNode& node,
         arrange::core::EventSlotKind kind,
-        const char* camelCase,
-        const char* kebabCase,
         std::string value) {
-        const auto slot = ScriptEventBridge::eventSlotFromAnyProp(node, kind, camelCase, kebabCase);
+        const auto slot = ScriptEventDispatcher::eventSlot(node, kind);
         enqueueStringEvent(slot, std::move(value));
     }
 

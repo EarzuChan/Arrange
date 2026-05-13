@@ -23,8 +23,6 @@ namespace arrange::juce {
         std::function<void(
             const arrange::core::ArrangeNode&,
             arrange::core::EventSlotKind,
-            const char*,
-            const char*,
             const std::string&)> invokeStringEvent;
         std::function<void(arrange::core::NodeId, arrange::core::DirtyFlag, std::string)> invalidateNativeState;
         std::function<void(arrange::core::NodeId, std::string)> enqueueKeyIntent;

@@ -1,12 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "EventSlot.h"
 #include "Geometry.h"
-#include "PropValue.h"
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include <optional>
 
@@ -26,19 +24,6 @@ namespace arrange::core {
     inline constexpr std::uint32_t dirtyMask(DirtyFlag flag) noexcept { return static_cast<std::uint32_t>(flag); }
 
     struct ArrangeNode;
-
-    struct ModifierElement {
-        std::string type;
-        std::unordered_map<std::string, EncodedProp> props;
-
-        bool has(std::string_view key) const;
-        EncodedProp prop(std::string_view key) const;
-        float number(std::string_view key, float fallback = 0.0f) const;
-        bool boolean(std::string_view key, bool fallback = false) const;
-        std::string string(std::string_view key, std::string_view fallback = {}) const;
-        std::uint32_t handle(std::string_view key, std::uint32_t fallback = 0) const;
-        std::uint32_t color(std::string_view key, std::uint32_t fallback = 0) const;
-    };
 
 
     struct ModifierPadding {
@@ -87,8 +72,16 @@ namespace arrange::core {
         std::string align;
     };
 
+    enum class PaintStyleKind {
+        Background,
+        Border,
+        Alpha,
+        DropShadow,
+        InnerShadow,
+    };
+
     struct PaintStyleSemantics {
-        std::string type;
+        PaintStyleKind kind = PaintStyleKind::Background;
         Rect inset;
         std::uint32_t color = 0;
         std::uint32_t brush = 0;
@@ -156,20 +149,15 @@ namespace arrange::core {
         TransformModifierSemantics transform;
         ScrollModifierSemantics scroll;
         float zIndex = 0.0f;
-        std::uint32_t affectedDirtyMask = 0;
     };
 
     struct CompiledModifierDiff {
         std::uint32_t dirtyMask = 0;
     };
 
-    class ModifierCompiler final {
-    public:
-        [[nodiscard]] CompiledModifier compile(std::string_view encodedPayload) const;
-        [[nodiscard]] CompiledModifier compile(const ArrangeNode& node) const;
-    };
 
     [[nodiscard]] CompiledModifierDiff diffCompiledModifier(const CompiledModifier& before, const CompiledModifier& after);
 
-    std::vector<ModifierElement> parseModifierPayload(std::string_view encodedPayload);
 } // namespace arrange::core
+
+

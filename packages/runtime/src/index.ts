@@ -1,6 +1,6 @@
 export * from "./animation.ts"
 export * from "./app.ts"
-export * from "./bridge.ts"
+export * from "./native.ts"
 export * from "./components.ts"
 export * from "./hmr.ts"
 export * from "./modifier.ts"

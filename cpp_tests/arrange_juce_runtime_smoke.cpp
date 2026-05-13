@@ -8,7 +8,7 @@
 #include <arrange/juce/ImageResourceCache.h>
 #include <arrange/juce/JuceDrawOpsPainter.h>
 #include <arrange/juce/JuceTextServices.h>
-#include <arrange/juce/ScriptEventBridge.h>
+#include <arrange/juce/ScriptEventDispatcher.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
@@ -46,16 +46,13 @@ namespace {
         return false;
     }
 
-    std::optional<arrange::core::NodeId> firstNodeWithProp(
+    std::optional<arrange::core::NodeId> firstInputNodeWithEventSlot(
         const arrange::core::LayoutTree& tree,
-        std::initializer_list<const char*> keys) {
+        arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
             if (tree.node(id).type != arrange::core::NodeType::Input) continue;
-            const auto& props = tree.node(id).props;
-            for (const auto* key : keys) {
-                if (props.find(key) != props.end()) return id;
-            }
+            if (tree.node(id).eventSlots.contains(kind)) return id;
         }
         return std::nullopt;
     }
@@ -69,34 +66,22 @@ namespace {
         return op;
     }
 
-    bool verifyScriptEventBridgeRequiresRealPropContract() {
+    bool verifyScriptEventDispatcherRequiresTypedSlotContract() {
         arrange::core::ArrangeNode inputNode;
         inputNode.id = 42;
         inputNode.type = arrange::core::NodeType::Input;
 
-        const auto missingSubmit = arrange::juce::ScriptEventBridge::eventSlotFromAnyProp(
-            inputNode,
-            arrange::core::EventSlotKind::InputSubmit,
-            "onSubmit",
-            nullptr);
+        const auto missingSubmit = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputSubmit);
         if (missingSubmit.valid()) return false;
 
-        inputNode.props["__arrangeEventSlot.onSubmit"] = "s:42:inputSubmit:inputSubmit";
-        const auto generatedSubmit = arrange::juce::ScriptEventBridge::eventSlotFromAnyProp(
-            inputNode,
-            arrange::core::EventSlotKind::InputSubmit,
-            "onSubmit",
-            nullptr);
+        inputNode.eventSlots[arrange::core::EventSlotKind::InputSubmit] = arrange::core::makeEventSlotId(42, arrange::core::EventSlotKind::InputSubmit);
+        const auto generatedSubmit = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputSubmit);
         if (!generatedSubmit.valid() || generatedSubmit.node != 42 || generatedSubmit.kind != arrange::core::EventSlotKind::InputSubmit) return false;
 
-        inputNode.props.erase("__arrangeEventSlot.onSubmit");
-        inputNode.props["onUpdate:model-value"] = "s:42:inputUpdate:inputUpdate";
-        const auto kebabUpdate = arrange::juce::ScriptEventBridge::eventSlotFromAnyProp(
-            inputNode,
-            arrange::core::EventSlotKind::InputUpdate,
-            "onUpdate:modelValue",
-            "onUpdate:model-value");
-        return kebabUpdate.valid() && kebabUpdate.node == 42 && kebabUpdate.kind == arrange::core::EventSlotKind::InputUpdate;
+        inputNode.eventSlots.erase(arrange::core::EventSlotKind::InputSubmit);
+        inputNode.eventSlots[arrange::core::EventSlotKind::InputUpdate] = arrange::core::makeEventSlotId(42, arrange::core::EventSlotKind::InputUpdate);
+        const auto update = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputUpdate);
+        return update.valid() && update.node == 42 && update.kind == arrange::core::EventSlotKind::InputUpdate;
     }
 } // namespace
 
@@ -109,8 +94,8 @@ int main(int argc, char** argv) {
 #else
     ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
-    if (!verifyScriptEventBridgeRequiresRealPropContract()) {
-        std::cerr << "script event bridge generated a fake slot or failed to read a real prop slot\n";
+    if (!verifyScriptEventDispatcherRequiresTypedSlotContract()) {
+        std::cerr << "script event dispatcher generated a fake slot or failed to read a typed slot\n";
         return 18;
     }
 
@@ -183,16 +168,14 @@ int main(int argc, char** argv) {
         return 11;
     }
 
-    const auto inputNode = firstNodeWithProp(runtime.scene().tree(), {"__arrangeEventSlot.onSubmit", "onSubmit"});
+    const auto inputNode = firstInputNodeWithEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::InputSubmit);
     if (!inputNode) {
         std::cerr << "input submit node not found\n";
         return 12;
     }
-    const auto inputSubmitSlot = arrange::juce::ScriptEventBridge::eventSlotFromAnyProp(
+    const auto inputSubmitSlot = arrange::juce::ScriptEventDispatcher::eventSlot(
         runtime.scene().tree().node(*inputNode),
-        arrange::core::EventSlotKind::InputSubmit,
-        "onSubmit",
-        nullptr);
+        arrange::core::EventSlotKind::InputSubmit);
     if (!inputSubmitSlot.valid()) {
         std::cerr << "input submit slot not found on node\n";
         return 13;

@@ -1,16 +1,21 @@
-﻿#pragma once
+#pragma once
 
 #include <memory>
 #include <optional>
 #include <cstddef>
 #include <string>
-#include <arrange/core/Bridge.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/MutationTransaction.h>
+#include <arrange/core/Scroll.h>
 #include "ScriptHost.h"
 
 namespace arrange::quickjs {
 #if ARRANGE_WITH_QUICKJS_NG
+
+    struct ReloadRequest {
+        std::string path;
+        double timestamp = 0.0;
+    };
 
     class QuickJsScriptHost final : public ScriptHost {
     public:
@@ -19,6 +24,7 @@ namespace arrange::quickjs {
 
         ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override;
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});
+        CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll);
 
         bool hasPendingTransactions() const noexcept { return pendingTransactions_.hasPending(); }
         const std::optional<arrange::core::MutationTransaction>& pendingTransactions() const noexcept { return pendingTransactions_.pending(); }
@@ -28,7 +34,7 @@ namespace arrange::quickjs {
         bool hasPendingAnimationFrame() const noexcept;
         CallbackInvokeResult pumpAnimationFrame(double nowMillis);
         bool reloadRequested() const noexcept { return reloadRequested_; }
-        const std::string& reloadPayloadJson() const noexcept { return reloadPayloadJson_; }
+        const ReloadRequest& reloadRequest() const noexcept { return reloadRequest_; }
         std::size_t eventSlotCount() const noexcept;
         void flushRetiredEventSlots();
 
@@ -37,8 +43,9 @@ namespace arrange::quickjs {
         std::unique_ptr<Impl> impl_;
         arrange::core::MutationTransactionQueue pendingTransactions_;
         bool reloadRequested_ = false;
-        std::string reloadPayloadJson_;
+        ReloadRequest reloadRequest_;
     };
 
 #endif
 } // namespace arrange::quickjs
+
