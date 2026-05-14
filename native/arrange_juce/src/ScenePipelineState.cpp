@@ -93,17 +93,47 @@ namespace arrange::juce {
                     "diagnostics",
                     intent.reason.empty() ? "diagnostics event" : intent.reason);
             }
-            else if (intent.kind == arrange::core::InputIntentKind::AnimationFrame ||
-                     intent.kind == arrange::core::InputIntentKind::Pointer ||
-                     intent.kind == arrange::core::InputIntentKind::Wheel ||
-                     intent.kind == arrange::core::InputIntentKind::Key ||
-                     intent.kind == arrange::core::InputIntentKind::TextInput ||
-                     intent.kind == arrange::core::InputIntentKind::ImeComposition) {
+            else if (intent.kind == arrange::core::InputIntentKind::AnimationFrame) {
                 scene_.tree().recordSceneInvalidation(
                     arrange::core::DirtyFlag::EventSlot,
                     arrange::core::InvalidationSource::InputIntent,
-                    "input",
-                    intent.reason.empty() ? "input intent" : intent.reason);
+                    "animationFrame",
+                    intent.reason.empty() ? "animation frame callback" : intent.reason);
+            }
+            else if (intent.kind == arrange::core::InputIntentKind::Pointer) {
+                scene_.tree().recordSceneInvalidation(
+                    arrange::core::DirtyFlag::HitTest,
+                    arrange::core::InvalidationSource::InputIntent,
+                    intent.target ? "pointer:target" : "pointer",
+                    intent.reason.empty() ? "pointer input" : intent.reason);
+            }
+            else if (intent.kind == arrange::core::InputIntentKind::Wheel) {
+                scene_.tree().recordSceneInvalidation(
+                    arrange::core::DirtyFlag::Layout,
+                    arrange::core::InvalidationSource::InputIntent,
+                    intent.eventSlot ? "wheel:eventSlot" : "wheel",
+                    intent.reason.empty() ? "wheel scroll input" : intent.reason);
+            }
+            else if (intent.kind == arrange::core::InputIntentKind::Key) {
+                scene_.tree().recordSceneInvalidation(
+                    arrange::core::DirtyFlag::Focus,
+                    arrange::core::InvalidationSource::InputIntent,
+                    intent.target ? "key:target" : "key",
+                    intent.reason.empty() ? "key input" : intent.reason);
+            }
+            else if (intent.kind == arrange::core::InputIntentKind::TextInput) {
+                scene_.tree().recordSceneInvalidation(
+                    arrange::core::DirtyFlag::Paint,
+                    arrange::core::InvalidationSource::InputIntent,
+                    intent.target ? "textInput:target" : "textInput",
+                    intent.reason.empty() ? "text input" : intent.reason);
+            }
+            else if (intent.kind == arrange::core::InputIntentKind::ImeComposition) {
+                scene_.tree().recordSceneInvalidation(
+                    arrange::core::DirtyFlag::Paint,
+                    arrange::core::InvalidationSource::InputIntent,
+                    intent.target ? "ime:target" : "ime",
+                    intent.reason.empty() ? "ime composition" : intent.reason);
             }
             else if (intent.kind == arrange::core::InputIntentKind::PackageLoad ||
                      intent.kind == arrange::core::InputIntentKind::Reload ||

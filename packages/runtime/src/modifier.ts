@@ -46,10 +46,6 @@ export class Modifier {
     fillMaxWidth(fraction = 1): Modifier { return this.#add("fillMaxWidth", checkedFraction(fraction)) }
     fillMaxHeight(fraction = 1): Modifier { return this.#add("fillMaxHeight", checkedFraction(fraction)) }
     fillMaxSize(fraction = 1): Modifier { return this.#add("fillMaxSize", checkedFraction(fraction)) }
-    wrapContentWidth(align: string, unbounded = false): Modifier { return this.#add("wrapContentWidth", {align, unbounded}) }
-    wrapContentHeight(align: string, unbounded = false): Modifier { return this.#add("wrapContentHeight", {align, unbounded}) }
-    wrapContentSize(align: string, unbounded = false): Modifier { return this.#add("wrapContentSize", {align, unbounded}) }
-    aspectRatio(ratio: number, matchHeightConstraintsFirst = false): Modifier { return this.#add("aspectRatio", {ratio, matchHeightConstraintsFirst}) }
     padding(value: PaddingValue): Modifier { return this.#add("padding", PaddingValues(value)) }
     offset(args: {x?: number; y?: number}): Modifier { return this.#add("offset", {x: args.x ?? 0, y: args.y ?? 0}) }
     absoluteOffset(args: {x?: number; y?: number}): Modifier { return this.#add("absoluteOffset", {x: args.x ?? 0, y: args.y ?? 0}) }
@@ -58,7 +54,6 @@ export class Modifier {
         if (!(weight > 0)) throw new RangeError("m.weight(...) requires weight > 0")
         return this.#add("weight", {weight, fill: args.fill ?? true})
     }
-    matchParentSize(): Modifier { return this.#add("matchParentSize", {}) }
     zIndex(value: number): Modifier { return this.#add("zIndex", {value}) }
     background(brush: Brush | number, shape?: Shape): Modifier { return this.#add("background", {brush, shape}) }
     border(widthOrArgs: number | Record<string, unknown>, brush?: Brush | number, shape?: Shape): Modifier {
@@ -69,24 +64,14 @@ export class Modifier {
     innerShadow(args: Record<string, unknown>): Modifier { return this.#add("innerShadow", {...args}) }
     alpha(value: number): Modifier { return this.#add("alpha", {value}) }
     graphicsLayer(args: Record<string, unknown> = {}): Modifier { return this.#add("graphicsLayer", {...args}) }
-    drawBehind(draw: unknown): Modifier { return this.#add("drawBehind", {draw}) }
-    drawWithContent(draw: unknown): Modifier { return this.#add("drawWithContent", {draw}) }
-    drawWithCache(build: unknown): Modifier { return this.#add("drawWithCache", {build}) }
     clickable(arg: (() => void) | Record<string, unknown>): Modifier {
         return this.#add("clickable", typeof arg === "function" ? {onClick: arg, enabled: true, focusable: true} : {enabled: true, focusable: true, ...arg})
     }
     hoverable(args: Record<string, unknown> = {}): Modifier { return this.#add("hoverable", {enabled: true, ...args}) }
     focusable(arg: boolean | Record<string, unknown> = true): Modifier { return this.#add("focusable", typeof arg === "boolean" ? {enabled: arg} : {enabled: true, ...arg}) }
-    focusRequester(requester: unknown): Modifier { return this.#add("focusRequester", {requester}) }
-    onFocusChanged(callback: unknown): Modifier { return this.#add("onFocusChanged", {callback}) }
-    focusProperties(args: Record<string, unknown>): Modifier { return this.#add("focusProperties", {...args}) }
-    focusGroup(): Modifier { return this.#add("focusGroup", {}) }
     pointerInput(handler: unknown): Modifier { return this.#add("pointerInput", {handler}) }
     verticalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("verticalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
     horizontalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("horizontalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
-    scrollable(state: ScrollStateLike, orientation: string, args: Record<string, unknown> = {}): Modifier { return this.#add("scrollable", {state, orientation, enabled: true, ...args}) }
-    animateContentSize(): Modifier { return this.#add("animateContentSize", {}) }
-    testTag(name: string): Modifier { return this.#add("testTag", {name}) }
 
 
     #add(type: string, value: Record<string, unknown>): Modifier {

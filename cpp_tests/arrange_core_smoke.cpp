@@ -201,6 +201,23 @@ namespace {
         return 0;
     }
 
+    int verifyEventPropIsNotCoreEventSlot() {
+        arrange::core::LayoutTree tree;
+        tree.apply(std::vector<arrange::core::TreeMutation>{
+            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Input},
+        });
+        tree.clearDirty();
+        (void)tree.takeInvalidation();
+
+        tree.apply(std::vector<arrange::core::TreeMutation>{
+            arrange::core::SetPropMutation{1, "onSubmit", arrange::core::PropValue::stringValue("not an event slot")},
+        });
+        const auto snapshot = tree.invalidationSnapshot();
+        if (snapshot.affects(arrange::core::DirtyFlag::EventSlot)) return 18;
+        if (!tree.node(1).eventSlots.empty()) return 19;
+        return 0;
+    }
+
     int verifyNativeSceneAndFramePipeline() {
         arrange::core::NativeScene scene;
         arrange::core::PublishedFrame published;
@@ -390,12 +407,18 @@ namespace {
         pipelineState.enqueueIntent(arrange::core::InputIntent::textInput("native input paint", 6));
         result = pipelineState.run(1, {0.0f, 320.0f, 0.0f, 240.0f}, false);
         if (result.error) return 92;
-        if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 93;
+        if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::Paint)) return 93;
+        if (pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 96;
 
         pipelineState.enqueueIntent(arrange::core::InputIntent::resize({0.0f, 640.0f, 0.0f, 480.0f}));
         result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
         if (result.error) return 94;
         if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::Layout)) return 95;
+
+        pipelineState.enqueueIntent(arrange::core::InputIntent::pointer("pointer hit test", 3));
+        result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
+        if (result.error) return 97;
+        if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::HitTest)) return 98;
         return 0;
     }
 }
@@ -403,6 +426,7 @@ namespace {
 int main() {
     if (const auto result = verifyTypedLayoutTreePipeline(); result != 0) return result;
     if (const auto result = verifyTypedDirtyPrecision(); result != 0) return result;
+    if (const auto result = verifyEventPropIsNotCoreEventSlot(); result != 0) return result;
     if (const auto result = verifyNativeSceneAndFramePipeline(); result != 0) return result;
     if (const auto result = verifyPointerScrollAndHitTest(); result != 0) return result;
     if (const auto result = verifyPropValueAndTextInput(); result != 0) return result;

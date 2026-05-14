@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
+#include <string_view>
 #include <string>
 #include <variant>
 #include <vector>
@@ -80,6 +81,16 @@ namespace {
         }
         return false;
     }
+
+    std::string strictModifierSmokeSource(std::string_view modifierExpression) {
+        return std::string("const native = globalThis.__ARRANGE_NATIVE__;\n") +
+            "native.createNode(1, 'Box');\n" +
+            "if (!native.setModifier) throw new Error('native.setModifier missing');\n" +
+            "native.setModifier(1, " + std::string(modifierExpression) + ");\n" +
+            "native.createNode(2, 'Box');\n" +
+            "native.setModifier(2, { elements: [] });\n" +
+            "native.insertChild(1, 2, 0);\n";
+    }
 }
 
 int main(int argc, char** argv) {
@@ -95,6 +106,38 @@ int main(int argc, char** argv) {
     }
 
     arrange::quickjs::QuickJsScriptHost host;
+    if (argc >= 4 && std::string(argv[2]) == "--expect-strict-modifier-ok") {
+        const auto source = strictModifierSmokeSource(argv[3]);
+        const auto result = host.executeModule("strict-modifier-smoke.js", source);
+        if (!result.ok) {
+            std::cerr << result.error << "\n";
+            return 38;
+        }
+        const auto transaction = host.takePendingTransaction();
+        if (!transaction) return 39;
+        std::uint32_t modifiers = 0;
+        for (const auto& mutation : transaction->treeMutations) {
+            if (std::holds_alternative<arrange::core::SetModifierMutation>(mutation)) ++modifiers;
+        }
+        if (modifiers != 2) return 40;
+        std::cout << "QuickJS strict modifier smoke accepted valid direct object path\n";
+        return 0;
+    }
+    if (argc >= 4 && std::string(argv[2]) == "--expect-strict-modifier-error") {
+        const auto result = host.executeModule("strict-modifier-smoke.js", strictModifierSmokeSource(argv[3]));
+        if (result.ok) {
+            std::cerr << "expected strict modifier rejection for expression: " << argv[3] << "\n";
+            return 41;
+        }
+        if (result.error.find("Arrange native setModifier") == std::string::npos &&
+            result.error.find("Arrange modifier") == std::string::npos) {
+            std::cerr << result.error << "\n";
+            return 42;
+        }
+        std::cout << "QuickJS strict modifier rejected: " << result.error.substr(0, result.error.find('\n')) << "\n";
+        return 0;
+    }
+
     arrange::quickjs::AppScriptLoader loader(host);
     const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
     if (!loaded.ok) {

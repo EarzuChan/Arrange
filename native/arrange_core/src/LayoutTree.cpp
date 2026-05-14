@@ -13,14 +13,6 @@ namespace arrange::core {
 
         bool isAccessibilityProp(std::string_view key) { return key == "contentDescription" || key == "content-description" || key == "label" || key == "description" || key == "role" || key == "enabled"; }
 
-        bool isEventProp(std::string_view key) {
-            return key == "onSubmit" ||
-                key == "onChange" ||
-                key == "onBlur" ||
-                key == "onUpdate:modelValue" ||
-                key == "onUpdate:model-value";
-        }
-
         bool hasArea(Rect rect) { return rect.width > 0.0f && rect.height > 0.0f; }
 
         Rect unionRect(Rect left, Rect right) {
@@ -93,10 +85,6 @@ namespace arrange::core {
         if (const auto* op = getIf<SetPropMutation>(mutation)) {
             auto& node = require(op->id);
             node.props[op->key] = op->value;
-            if (isEventProp(op->key)) {
-                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, op->key, "event callback changed");
-                return;
-            }
             if (isResourceProp(op->key)) {
                 markDirtyAttributed(op->id, DirtyFlag::Resource, InvalidationSource::NativeMutation, op->key, "resource prop changed");
                 return;

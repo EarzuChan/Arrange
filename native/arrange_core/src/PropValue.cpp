@@ -1,7 +1,6 @@
 #include <arrange/core/PropValue.h>
 #include <arrange/core/Node.h>
 
-#include <cstdlib>
 #include <utility>
 
 namespace arrange::core {
@@ -48,20 +47,11 @@ namespace arrange::core {
     }
 
     std::string PropValue::stringOr(std::string_view fallback) const {
-        if (kind == PropValueKind::String) return string;
-        if (kind == PropValueKind::Number) return std::to_string(number);
-        if (kind == PropValueKind::Boolean) return boolean ? "true" : "false";
-        return toString(fallback);
+        return kind == PropValueKind::String ? string : toString(fallback);
     }
 
     float PropValue::numberOr(float fallback) const noexcept {
         if (kind == PropValueKind::Number) return static_cast<float>(number);
-        if (kind == PropValueKind::Boolean) return boolean ? 1.0f : 0.0f;
-        if (kind == PropValueKind::String) {
-            char* end = nullptr;
-            const auto parsed = std::strtof(string.c_str(), &end);
-            return end == string.c_str() ? fallback : parsed;
-        }
         return fallback;
     }
 
@@ -69,21 +59,11 @@ namespace arrange::core {
 
     bool PropValue::boolOr(bool fallback) const noexcept {
         if (kind == PropValueKind::Boolean) return boolean;
-        if (kind == PropValueKind::Number) return number != 0.0;
-        if (kind == PropValueKind::String) {
-            if (string == "true" || string == "1") return true;
-            if (string == "false" || string == "0") return false;
-        }
         return fallback;
     }
 
     std::uint32_t PropValue::uint32Or(std::uint32_t fallback) const noexcept {
         if (kind == PropValueKind::Number) return static_cast<std::uint32_t>(number);
-        if (kind == PropValueKind::String) {
-            char* end = nullptr;
-            const auto parsed = std::strtoul(string.c_str(), &end, 0);
-            return end == string.c_str() ? fallback : static_cast<std::uint32_t>(parsed);
-        }
         return fallback;
     }
 

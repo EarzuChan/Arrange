@@ -1,37 +1,37 @@
 ﻿<template>
   <Column
-    :modifier="m.fillMaxSize().padding(dp(12)).background(Color(0xFF000000)).testTag('demo-root')"
+    :modifier="m.fillMaxSize().padding(dp(12)).background(Color(0xFF000000))"
     :vertical-arrangement="Arrangement.spacedBy(dp(8))"
   >
     <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
       <Icon
         source="play"
         :tint="Color(0xFFE8EAED)"
-        :modifier="m.size(dp(20), dp(20)).testTag('play-icon')"
+        :modifier="m.size(dp(20), dp(20))"
       />
       <Text
         text="恩情"
         :text-style="{ fontSize: sp(50), color: animeColor }"
-        :modifier="m.testTag('title')"
+        :modifier="m"
       />
       <Image
         source="logo.png"
-        :modifier="m.size(dp(96), dp(40)).testTag('demo-logo')"
+        :modifier="m.size(dp(96), dp(40))"
       />
     </Row>
     <Row
       :horizontal-arrangement="Arrangement.spacedBy(dp(8))"
-      :modifier="m.fillMaxWidth().height(dp(44)).testTag('meter-row')"
+      :modifier="m.fillMaxWidth().height(dp(44))"
     >
-      <Box :modifier="m.size(dp(180), dp(38)).background(Color(0xFF3A7AFE)).testTag('meter-left')" />
+      <Box :modifier="m.size(dp(180), dp(38)).background(Color(0xFF3A7AFE))" />
       <Spacer :modifier="m.width(dp(8))" />
-      <Box :modifier="m.size(dp(180), dp(38)).background(Color(0xFFFFB020)).testTag('meter-right')" />
+      <Box :modifier="m.size(dp(180), dp(38)).background(Color(0xFFFFB020))" />
     </Row>
     <Spacer :modifier="m.height(dp(4))" />
     <Text
       :text="`Clicks: ${clicks}`"
       :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }"
-      :modifier="m.size(dp(160), dp(28)).background(counterColor).clickable(handleTap).testTag('click-counter')"
+      :modifier="m.size(dp(160), dp(28)).background(counterColor).clickable(handleTap)"
     />
     <Input
       v-model="preset"
@@ -41,42 +41,42 @@
       :onChange="handleChange"
       :onBlur="handleBlur"
       :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }"
-      :modifier="m.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563)).testTag('preset-input')"
+      :modifier="m.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"
     />
     <Text
       :text="inputStatus"
       :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
-      :modifier="m.height(dp(16)).testTag('input-status')"
+      :modifier="m.height(dp(16))"
     />
     <Column
-      :modifier="m.size(dp(260), dp(58)).verticalScroll(scrollState).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563)).testTag('scroll-preview')"
+      :modifier="m.size(dp(260), dp(58)).verticalScroll(scrollState).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"
       :vertical-arrangement="Arrangement.spacedBy(dp(4))"
     >
       <Text
         text="Scroll viewport"
         :text-style="{ fontSize: sp(12), color: Color(0xFFE8EAED) }"
-        :modifier="m.height(dp(14)).testTag('scroll-title')"
+        :modifier="m.height(dp(14))"
       />
       <Text
         text="Scroll modifier travels through native state"
         :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
-        :modifier="m.height(dp(14)).testTag('scroll-line-1')"
+        :modifier="m.height(dp(14))"
       />
       <Text
         text="Wheel/state sync comes next"
         :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
-        :modifier="m.height(dp(14)).testTag('scroll-line-2')"
+        :modifier="m.height(dp(14))"
       />
       <Text
         text="Hidden row appears after wheel"
         :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
-        :modifier="m.height(dp(14)).testTag('scroll-line-3')"
+        :modifier="m.height(dp(14))"
       />
     </Column>
     <Text
       text="Vue SFC authoring, Compose-like layout, JUCE-native target。度尽劫波兄弟在，相逢一笑泯恩仇"
       :text-style="{ fontSize: sp(13), color: Color(0xFFB8BDC7) }"
-      :modifier="m.border(dp(1), Color(0xFF4B5563)).testTag('subtitle')"
+      :modifier="m.border(dp(1), Color(0xFF4B5563))"
     />
   </Column>
 </template>
