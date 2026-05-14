@@ -150,6 +150,19 @@ m.clip(rounded(dp(8)))
 
 `background` 与 `border` 绘制在当前 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中测试默认仍按布局 bounds，精确形状命中后续另行设计。
 
+普通容器默认不裁剪子内容。子节点、阴影、显式绘制、图层变换等可以在视觉上超出父容器 bounds；最终仍受祖先显式 clip、滚动 viewport clip 与宿主窗口根裁剪影响。
+
+`clip` 是显式视觉裁剪，语义接近 Compose 的 `clip` / `clipToBounds` / `graphicsLayer(clip = true)`：只有用户声明裁剪、滚动容器建立 viewport 或根宿主裁剪时，才应裁掉视觉超出。不得把所有父容器都实现成默认 clip。
+
+`clip` 必须保留 Modifier 顺序语义：
+
+```ts
+m.background(red).clip(rounded(dp(8))).background(blue)
+m.clip(rounded(dp(8))).background(red)
+```
+
+以上链条的绘制顺序和裁剪作用范围不同，不能被折叠成同一种效果。
+
 # 阴影
 
 主推设计工具式阴影：
@@ -270,8 +283,16 @@ m.scrollable(state, Orientation.Vertical)
 
 - 自己成为 viewport。
 - 按滚动轴给子节点无界主轴约束。
-- 裁剪并平移子内容。
+- 裁剪并平移子内容：scroll viewport 必须天然包含 viewport clip，不能只平移不裁剪。
 - 更新 `ScrollState.value/maxValue/viewportSize/contentSize`。
+
+scroll viewport clip 与普通 `m.clip(shape)` 同属于视觉裁剪，但来源不同：
+
+- `m.clip(shape)` 由用户显式声明，形状来自 Modifier。
+- `verticalScroll` / `horizontalScroll` 由滚动语义建立，默认裁剪到 viewport rect。
+- Lazy 组件自身是滚动 viewport，也必须裁剪到 viewport rect。
+
+滚动 viewport clip 不改变测量尺寸，不把内容从 layout tree 删除；它只限制绘制与命中范围。命中测试应优先按 viewport 裁掉不可见滚动内容，再进行子节点命中与事件派发。
 
 `scrollable` 是手势型滚动：只接收滚动 delta，不自动移动内容；适合自定义控件、Canvas、旋钮轨道等。
 
