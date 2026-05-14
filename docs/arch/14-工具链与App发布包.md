@@ -80,4 +80,30 @@ Vite 插件应在开发期诊断：
 
 # 资源处理
 
-Vite 侧资源引用走 ESM import 或 `new URL(..., import.meta.url)`；`public/` 里的文件原样复制到输出包根。C++ 只负责入口包加载，不单独解析资源图。
+Vite 侧资源引用走 ESM import 或 `new URL(..., import.meta.url)`；`public/` 里的文件原样复制到输出包根。C++ 只负责按已解析资源引用读取 UI package 内文件，不单独维护第二套资源图。
+
+资源引用形态：
+
+```ts
+import logo from "./assets/logo.png"
+const play = new URL("./assets/play.svg", import.meta.url)
+```
+
+Arrange runtime 可接收：
+
+- Vite 产出的资源字符串。
+- Arrange Vite 插件规范化出的 `ResourceRef` 对象。
+- 指向 UI package 内资源的字符串路径。
+
+字符串路径规则：
+
+- `"/logo.png"` 表示 UI package root 下的 `logo.png`。
+- `"assets/logo.png"` 表示 UI package root 下的相对路径。
+- 禁止绝对文件系统路径。
+- 禁止 `../` 逃逸 UI package。
+- 禁止隐式相对当前工作目录查找。
+- 默认不加载远程网络资源；未来若支持 remote resource，必须单独设计缓存、错误、权限和诊断。
+
+`Image` 主要加载位图资源，具体解码格式由平台图片解码能力决定。`Icon` 初期加载 SVG 子集，具体规则见 [内建组件](12-内建组件.md)。
+
+资源缺失、格式不支持、解码失败必须产生 `resource` 类别的 `DiagnosticEvent`，并进入日志、recent event ring 与必要错误屏。不得用硬编码占位图标或静默空绘制冒充加载成功。

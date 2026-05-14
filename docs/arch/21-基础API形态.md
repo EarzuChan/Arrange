@@ -115,6 +115,18 @@ rememberLazyGridState
 useParameter
 useHost
 useTransport
+
+logger
+diagnostics
+
+LocalContentColor
+LocalTextStyle
+LocalDensity
+LocalLayoutDirection
+provideArrangeLocal
+useArrangeLocal
+provideContentColor
+useContentColor
 ```
 
 # 基础类型 API
@@ -126,6 +138,7 @@ px(value: number): Px
 
 Color(value: number): ArrangeColor
 Color(args: { red: number; green: number; blue: number; alpha?: number }): ArrangeColor
+Color.Unspecified: ArrangeColor
 
 solidColor(color: ArrangeColor): Brush
 linearGradient(args: LinearGradientArgs): Brush
@@ -283,6 +296,8 @@ interface IconProps {
 }
 ```
 
+`ImageResource` / `IconResource` 可由 Vite import、`new URL(..., import.meta.url)` 或 Arrange Vite 插件规范化产生。字符串资源路径按 UI package root 解析。Icon 初期只承诺 SVG 子集，且核心不内建官方图标包。行为见 [内建组件](12-内建组件.md) 与 [工具链与App发布包](14-工具链与App发布包.md)。
+
 ## Canvas
 
 ```ts
@@ -398,6 +413,54 @@ useTransport(): TransportState
 ```
 
 互操作语义见 [互操作](16-互操作.md)。
+
+# Diagnostics API
+
+```ts
+type DiagnosticLevel = "trace" | "debug" | "info" | "warn" | "error"
+type DiagnosticCategory =
+    | "app"
+    | "live"
+    | "hmr"
+    | "dist"
+    | "transaction"
+    | "script"
+    | "layout"
+    | "paint"
+    | "input"
+    | "scroll"
+    | "resource"
+    | "host"
+
+logger.trace(category: DiagnosticCategory, message: string, detail?: unknown): void
+logger.debug(category: DiagnosticCategory, message: string, detail?: unknown): void
+logger.info(category: DiagnosticCategory, message: string, detail?: unknown): void
+logger.warn(category: DiagnosticCategory, message: string, detail?: unknown): void
+logger.error(category: DiagnosticCategory, message: string, detail?: unknown): void
+
+diagnostics.toast(message: string, args?: DiagnosticToastArgs): void
+diagnostics.warn(message: string, detail?: unknown): void
+diagnostics.error(message: string, detail?: unknown): void
+```
+
+`logger` 与 `diagnostics.toast` 都进入 `DiagnosticEvent` 系统。行为见 [开发期诊断表层](25-开发期诊断表层.md)。
+
+# Arrange Local API
+
+```ts
+interface ArrangeLocalKey<T> {
+    readonly name: string
+    readonly defaultValue: T
+}
+
+provideArrangeLocal<T>(key: ArrangeLocalKey<T>, value: T): void
+useArrangeLocal<T>(key: ArrangeLocalKey<T>): T
+
+provideContentColor(color: ArrangeColor): void
+useContentColor(): ArrangeColor
+```
+
+内置 Local 与读取优先级见 [主题与扩展包](20-主题与扩展包.md)。
 
 # Runtime Hello
 
