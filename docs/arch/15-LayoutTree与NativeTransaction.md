@@ -160,7 +160,7 @@ Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、
 
 - QuickJS host 按 prop schema 直接读取 JSValue。
 - core 接收 typed prop value。
-- unknown prop 必须明确拒绝、忽略并诊断，或进入受控 extension bucket。
+- unknown prop 默认拒绝并诊断；若未来需要 extension / custom bucket，必须先为该 bucket 设计独立 schema、命名空间、dirty 影响与测试，不能把它变成任意对象后门。
 - event prop 必须基于明确 schema，不得靠任意 `on*` 或包含 `EventSlot` 的字符串猜测。
 - camelCase / kebab-case 若都公开支持，必须写入 API 契约并通过统一入口读取。
 
