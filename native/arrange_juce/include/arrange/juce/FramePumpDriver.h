@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arrange/core/Node.h>
-#include <arrange/juce/DiagnosticsOverlay.h>
+#include <arrange/juce/DiagnosticEvent.h>
 
 #include <filesystem>
 

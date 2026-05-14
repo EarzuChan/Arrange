@@ -17,6 +17,10 @@ namespace arrange::core {
             return node.modifier.input.clickable;
         }
 
+        bool clipsChildren(const ArrangeNode& node) {
+            return !node.modifier.paint.clips.empty() || node.modifier.scroll.vertical || node.modifier.scroll.horizontal;
+        }
+
         float zIndexOf(const ArrangeNode& node) {
             return node.modifier.zIndex;
         }
@@ -63,7 +67,8 @@ namespace arrange::core {
             if (!tree.contains(root) || !visiting.insert(root).second) return {};
             const auto& node = tree.node(root);
             const auto nodePoint = inverseGraphicsLayerPoint(node, point);
-            if (!containsRect(node.bounds, nodePoint)) return {};
+            const auto insideNode = containsRect(node.bounds, nodePoint);
+            if (!insideNode && clipsChildren(node)) return {};
 
             const auto children = childrenInPaintOrder(tree, node);
             for (auto it = children.rbegin(); it != children.rend(); ++it) {
@@ -72,10 +77,10 @@ namespace arrange::core {
             }
 
             if (clickableOnly) {
-                if (nodeWantsClick(node)) return {true, root, true};
+                if (insideNode && nodeWantsClick(node)) return {true, root, true};
                 return {};
             }
-            return {true, root, nodeWantsClick(node)};
+            return insideNode ? HitTestResult{true, root, nodeWantsClick(node)} : HitTestResult{};
         }
     } // namespace
 

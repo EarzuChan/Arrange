@@ -11,3 +11,5 @@ await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-strict-modif
 await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-strict-modifier-error "{ elements: 'not-array' }"`)
 await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-strict-modifier-error "{ elements: [{ type: 'unknownModifier', value: {} }] }"`)
 await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-strict-modifier-error "{ elements: [{ type: 'width', value: {} }] }"`)
+await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-script-diagnostics`)
+await runInVsDev(`${smokeExe} demo\\plugin-src\\ui\\app.js --expect-script-diagnostics-rejection`)

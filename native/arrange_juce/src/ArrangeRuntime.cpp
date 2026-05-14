@@ -244,6 +244,16 @@ namespace arrange::juce {
         pipelineState_.setDiagnosticsDrawOps(std::move(errorOps), std::move(badgeOps), std::move(toastOps));
     }
 
+#if ARRANGE_WITH_QUICKJS_NG
+    std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> ArrangeRuntime::takeDiagnosticEvents() {
+        return composition_.takeDiagnosticEvents();
+    }
+
+    std::vector<arrange::quickjs::QuickJsDiagnosticAction> ArrangeRuntime::takeDiagnosticActions() {
+        return composition_.takeDiagnosticActions();
+    }
+#endif
+
 } // namespace arrange::juce
 
 #endif

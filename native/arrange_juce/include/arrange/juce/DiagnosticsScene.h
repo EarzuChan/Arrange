@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arrange/core/Paint.h>
-#include <arrange/juce/DiagnosticsOverlay.h>
+#include <arrange/juce/DiagnosticEvent.h>
 #include <arrange/juce/ErrorScreenModel.h>
 
 #if ARRANGE_JUCE_WITH_JUCE

@@ -3,7 +3,9 @@
 #include <memory>
 #include <optional>
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
@@ -11,6 +13,64 @@
 
 namespace arrange::quickjs {
 #if ARRANGE_WITH_QUICKJS_NG
+
+    enum class QuickJsDiagnosticLevel {
+        Trace,
+        Debug,
+        Info,
+        Warn,
+        Error,
+    };
+
+    enum class QuickJsDiagnosticCategory {
+        App,
+        HostLive,
+        HostDist,
+        HostHmr,
+        RuntimeScript,
+        RuntimeTransaction,
+        PipelineFrame,
+        PipelineLayout,
+        PipelinePaint,
+        InputPointer,
+        InputKey,
+        InputIme,
+        InputScroll,
+        ResourcePackage,
+        ResourceImage,
+        ResourceIcon,
+        Diagnostics,
+    };
+
+    struct QuickJsDiagnosticEventInput {
+        QuickJsDiagnosticLevel level = QuickJsDiagnosticLevel::Info;
+        QuickJsDiagnosticCategory category = QuickJsDiagnosticCategory::RuntimeScript;
+        std::string code;
+        std::string message;
+        std::string detail;
+        std::string source;
+        std::string pathOrUrl;
+        bool toast = false;
+        bool coalesceToast = true;
+    };
+
+    enum class QuickJsDiagnosticActionKind {
+        RequestReload,
+        TriggerFakeError,
+        SetLogLevel,
+        SetCategoryEnabled,
+        SetToastsEnabled,
+    };
+
+    struct QuickJsDiagnosticAction {
+        QuickJsDiagnosticActionKind kind = QuickJsDiagnosticActionKind::RequestReload;
+        QuickJsDiagnosticLevel level = QuickJsDiagnosticLevel::Info;
+        QuickJsDiagnosticCategory category = QuickJsDiagnosticCategory::Diagnostics;
+        std::string message;
+        std::string path;
+        double timestamp = 0.0;
+        bool enabled = false;
+    };
 
     struct ReloadRequest {
         std::string path;
@@ -35,6 +95,8 @@ namespace arrange::quickjs {
         CallbackInvokeResult pumpAnimationFrame(double nowMillis);
         bool reloadRequested() const noexcept { return reloadRequested_; }
         const ReloadRequest& reloadRequest() const noexcept { return reloadRequest_; }
+        std::vector<QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        std::vector<QuickJsDiagnosticAction> takeDiagnosticActions();
         std::size_t eventSlotCount() const noexcept;
         void flushRetiredEventSlots();
 

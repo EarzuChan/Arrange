@@ -114,7 +114,6 @@ namespace arrange::core {
         bool clickable = false;
         bool hoverable = false;
         bool focusable = false;
-        bool pointerInput = false;
         EventSlotId clickEventSlot;
     };
 

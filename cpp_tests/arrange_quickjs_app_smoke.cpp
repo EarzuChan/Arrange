@@ -91,6 +91,83 @@ namespace {
             "native.setModifier(2, { elements: [] });\n" +
             "native.insertChild(1, 2, 0);\n";
     }
+
+    bool expectScriptDiagnostics(arrange::quickjs::QuickJsScriptHost& host) {
+        const auto source =
+            "const native = globalThis.__ARRANGE_NATIVE__;\n"
+            "console.warn('from console');\n"
+            "native.diagnosticsLog('debug', { category: 'app', code: 'app.debug', message: 'debug log', detail: 'detail' });\n"
+            "native.diagnosticsToast({ category: 'diagnostics', code: 'toast', message: 'toast log' });\n"
+            "native.diagnosticsSetLogLevel('error');\n"
+            "native.diagnosticsSetCategoryEnabled('runtime.script', false);\n"
+            "native.diagnosticsSetToastsEnabled(false);\n"
+            "native.diagnosticsRequestReload({ path: 'src/App.vue', timestamp: 12 });\n"
+            "native.createNode(1, 'Box');\n"
+            "native.createNode(2, 'Box');\n"
+            "native.setModifier(2, { elements: [] });\n"
+            "native.insertChild(1, 2, 0);\n";
+        const auto result = host.executeModule("diagnostics-smoke.js", source);
+        if (!result.ok) {
+            std::cerr << result.error << "\n";
+            return false;
+        }
+        auto events = host.takeDiagnosticEvents();
+        auto actions = host.takeDiagnosticActions();
+        if (events.size() != 3) return false;
+        if (events[0].level != arrange::quickjs::QuickJsDiagnosticLevel::Warn ||
+            events[0].category != arrange::quickjs::QuickJsDiagnosticCategory::RuntimeScript ||
+            events[0].code != "console.warn" ||
+            events[0].message.find("from console") == std::string::npos) return false;
+        if (events[1].level != arrange::quickjs::QuickJsDiagnosticLevel::Debug ||
+            events[1].category != arrange::quickjs::QuickJsDiagnosticCategory::App ||
+            events[1].code != "app.debug" ||
+            events[1].detail != "detail") return false;
+        if (events[2].level != arrange::quickjs::QuickJsDiagnosticLevel::Info ||
+            events[2].category != arrange::quickjs::QuickJsDiagnosticCategory::Diagnostics ||
+            !events[2].toast ||
+            events[2].code != "toast") return false;
+        if (actions.size() != 4) return false;
+        if (actions[0].kind != arrange::quickjs::QuickJsDiagnosticActionKind::SetLogLevel ||
+            actions[0].level != arrange::quickjs::QuickJsDiagnosticLevel::Error) return false;
+        if (actions[1].kind != arrange::quickjs::QuickJsDiagnosticActionKind::SetCategoryEnabled ||
+            actions[1].category != arrange::quickjs::QuickJsDiagnosticCategory::RuntimeScript ||
+            actions[1].enabled) return false;
+        if (actions[2].kind != arrange::quickjs::QuickJsDiagnosticActionKind::SetToastsEnabled ||
+            actions[2].enabled) return false;
+        if (actions[3].kind != arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload ||
+            actions[3].path != "src/App.vue" ||
+            actions[3].timestamp != 12.0) return false;
+        if (!host.reloadRequested() || host.reloadRequest().path != "src/App.vue") return false;
+        return true;
+    }
+
+    bool expectScriptDiagnosticsRejection(arrange::quickjs::QuickJsScriptHost& host) {
+        {
+            const auto result = host.executeModule(
+                "diagnostics-invalid-level-smoke.js",
+                "const native = globalThis.__ARRANGE_NATIVE__;\n"
+                "native.createNode(1, 'Box');\n"
+                "native.setModifier(1, { elements: [] });\n"
+                "native.diagnosticsLog('verbose', { category: 'app', message: 'bad' });\n");
+            if (result.ok || result.error.find("log level") == std::string::npos || !host.takeDiagnosticEvents().empty()) {
+                std::cerr << "invalid level result ok=" << (result.ok ? "true" : "false") << " error=[" << result.error << "]\n";
+                return false;
+            }
+        }
+        {
+            const auto result = host.executeModule(
+                "diagnostics-invalid-category-smoke.js",
+                "const native = globalThis.__ARRANGE_NATIVE__;\n"
+                "native.createNode(1, 'Box');\n"
+                "native.setModifier(1, { elements: [] });\n"
+                "native.diagnosticsSetCategoryEnabled('runtime.fake', true);\n");
+            if (result.ok || result.error.find("category") == std::string::npos || !host.takeDiagnosticActions().empty()) {
+                std::cerr << "invalid category result ok=" << (result.ok ? "true" : "false") << " error=[" << result.error << "]\n";
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 int main(int argc, char** argv) {
@@ -106,6 +183,16 @@ int main(int argc, char** argv) {
     }
 
     arrange::quickjs::QuickJsScriptHost host;
+    if (argc >= 3 && std::string(argv[2]) == "--expect-script-diagnostics") {
+        if (!expectScriptDiagnostics(host)) return 43;
+        std::cout << "QuickJS diagnostics smoke produced structured events and actions\n";
+        return 0;
+    }
+    if (argc >= 3 && std::string(argv[2]) == "--expect-script-diagnostics-rejection") {
+        if (!expectScriptDiagnosticsRejection(host)) return 44;
+        std::cout << "QuickJS diagnostics smoke rejected invalid level and category\n";
+        return 0;
+    }
     if (argc >= 4 && std::string(argv[2]) == "--expect-strict-modifier-ok") {
         const auto source = strictModifierSmokeSource(argv[3]);
         const auto result = host.executeModule("strict-modifier-smoke.js", source);
@@ -290,3 +377,4 @@ int main(int argc, char** argv) {
     return 0;
 #endif
 }
+

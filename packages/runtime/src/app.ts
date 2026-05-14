@@ -3,11 +3,24 @@ import type {App as VueApp, Component} from "vue"
 import {Text} from "./components.ts"
 import {m, toModifier} from "./modifier.ts"
 import {ARRANGE_RUNTIME_VERSION} from "./native.ts"
-import type {NativeMutation, NativeTransactionTarget, NodeId} from "./native.ts"
+import type {NativeMutation, NativePropValue, NativeTransactionTarget, NodeId} from "./native.ts"
 import type {ArrangeContainer, ArrangeHostEvent, ArrangeHostEventListener, ArrangeHostNode} from "./types.ts"
 
 declare global {
     var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
+}
+
+const eventPropNames = new Set(["onUpdate:modelValue", "onUpdate:model-value", "onSubmit", "onChange", "onBlur"])
+
+function isNativePropValue(value: unknown): value is NativePropValue {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true
+    return Boolean(value && typeof value === "object" && !Array.isArray(value))
+}
+
+function toNativePropValue(key: string, value: unknown): NativePropValue {
+    if (eventPropNames.has(key) && typeof value === "function") return value as NativePropValue
+    if (isNativePropValue(value)) return value
+    throw new TypeError(`Arrange prop '${key}' cannot be sent to native: unsupported value type`)
 }
 
 function makeNode(type: string): ArrangeHostNode {
@@ -87,7 +100,7 @@ function emitCreateSubtree(node: ArrangeHostNode | null | undefined, parentId: N
     for (const [key, value] of Object.entries(node.props ?? {})) {
         if (key === "modifier") continue
         if (key === "text" && node.type === Text) mutations.push((native) => native.setText?.(id, String(value)))
-        else mutations.push((native) => native.setProp?.(id, key, value))
+        else mutations.push((native) => native.setProp?.(id, key, toNativePropValue(key, value)))
     }
     mutations.push((native) => native.setModifier?.(id, toModifier(node.props?.modifier ?? m)))
     if (parentId != null) mutations.push((native) => native.insertChild?.(parentId, id, index))
@@ -148,7 +161,7 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
         if (!id) return
         if (key === "modifier") enqueueNativeMutation(el, (native) => native.setModifier?.(id, toModifier(el.props.modifier ?? m)))
         else if (key === "text" && el.type === Text) enqueueNativeMutation(el, (native) => native.setText?.(id, String(next)))
-        else enqueueNativeMutation(el, (native) => native.setProp?.(id, key, el.props[key]))
+        else enqueueNativeMutation(el, (native) => native.setProp?.(id, key, toNativePropValue(key, el.props[key])))
     },
     insert(child, rawParent, anchor = null) {
         const parent = rawParent as ArrangeHostNode | ArrangeContainer

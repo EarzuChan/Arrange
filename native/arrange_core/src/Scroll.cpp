@@ -12,7 +12,7 @@ namespace arrange::core {
         void collectScrollTargets(const LayoutTree& tree, NodeId id, Point point, bool vertical, std::vector<NodeId>& targets, std::unordered_set<NodeId>& visited) {
             if (!tree.contains(id) || !visited.insert(id).second) return;
             const auto& node = tree.node(id);
-            if (!contains(node.bounds, point)) return;
+            if ((vertical ? ScrollDispatcher::hasVerticalScroll(node) : ScrollDispatcher::hasHorizontalScroll(node)) && !contains(node.bounds, point)) return;
             if (vertical ? ScrollDispatcher::hasVerticalScroll(node) : ScrollDispatcher::hasHorizontalScroll(node)) targets.push_back(id);
             for (auto childId : node.children) collectScrollTargets(tree, childId, point, vertical, targets, visited);
         }
@@ -135,7 +135,7 @@ namespace arrange::core {
             stack.pop_back();
             if (!tree.contains(current) || !visited.insert(current).second) continue;
             const auto& node = tree.node(current);
-            if (!contains(node.bounds, point)) continue;
+            if (hasVerticalScroll(node) && !contains(node.bounds, point)) continue;
             if (hasVerticalScroll(node)) currentFallback = current;
             for (auto childId : node.children) stack.push_back(childId);
         }
@@ -151,7 +151,7 @@ namespace arrange::core {
             stack.pop_back();
             if (!tree.contains(current) || !visited.insert(current).second) continue;
             const auto& node = tree.node(current);
-            if (!contains(node.bounds, point)) continue;
+            if (hasHorizontalScroll(node) && !contains(node.bounds, point)) continue;
             if (hasHorizontalScroll(node)) currentFallback = current;
             for (auto childId : node.children) stack.push_back(childId);
         }

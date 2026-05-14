@@ -23,7 +23,17 @@ namespace arrange::core {
         }
 
         std::string resourceProp(const ArrangeNode& node) {
-            if (const auto* value = propValue(node, "source")) return value->stringOr();
+            const auto resourceFrom = [](const PropValue* value) -> std::string {
+                if (value == nullptr) return {};
+                if (value->isString()) return value->string;
+                if (value->isObject()) {
+                    if (const auto* path = value->field("path"); path != nullptr && path->isString()) return path->string;
+                    if (const auto* url = value->field("url"); url != nullptr && url->isString()) return url->string;
+                }
+                return {};
+            };
+            if (auto resource = resourceFrom(propValue(node, "source")); !resource.empty()) return resource;
+            if (auto resource = resourceFrom(propValue(node, "src")); !resource.empty()) return resource;
             return {};
         }
 
@@ -34,6 +44,11 @@ namespace arrange::core {
         std::string textProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) { return stringProp(node, camelCase, kebabCase, fallback); }
 
         bool hasProp(const ArrangeNode& node, const char* key) { return node.props.find(key) != node.props.end(); }
+
+        bool hasColorUnspecified(const ArrangeNode& node, const char* key) {
+            const auto* value = propValue(node, key);
+            return value != nullptr && value->isString() && value->string == "Color.Unspecified";
+        }
 
         int lineCount(std::string_view text) {
             if (text.empty()) return 1;
@@ -191,7 +206,21 @@ namespace arrange::core {
             op.text = node.text;
             op.textAlign = textProp(node, "textAlign", "start");
             op.overflow = textProp(node, "overflow", "clip");
-            ops.push_back(std::move(op));
+            if (op.overflow == "clip" || op.overflow == "ellipsis") {
+                DrawOp pushClip;
+                pushClip.type = DrawOpType::PushClip;
+                pushClip.nodeId = id;
+                pushClip.rect = contentRect;
+                ops.push_back(std::move(pushClip));
+                ops.push_back(std::move(op));
+                DrawOp popClip;
+                popClip.type = DrawOpType::PopClip;
+                popClip.nodeId = id;
+                ops.push_back(std::move(popClip));
+            }
+            else {
+                ops.push_back(std::move(op));
+            }
         }
 
         if (node.type == NodeType::Input) {
@@ -227,8 +256,7 @@ namespace arrange::core {
             DrawOp op;
             op.type = DrawOpType::DrawImage;
             op.rect = contentRect;
-            op.hasTint = hasProp(node, "tint");
-            op.color = withAlpha(colorProp(node, "tint", 0xffffffffu), alpha * numericProp(node, "alpha", 1.0f));
+            op.color = withAlpha(0xffffffffu, alpha * numericProp(node, "alpha", 1.0f));
             op.resource = resourceProp(node);
             op.contentScale = textProp(node, "contentScale", "content-scale", "Fit");
             op.alignment = textProp(node, "alignment", "Center");
@@ -239,8 +267,10 @@ namespace arrange::core {
             DrawOp op;
             op.type = DrawOpType::DrawIcon;
             op.rect = contentRect;
+            op.hasTint = !hasColorUnspecified(node, "tint");
             op.color = withAlpha(colorProp(node, "tint", 0xff000000u), alpha);
             op.resource = resourceProp(node);
+            op.resourceIsIcon = true;
             ops.push_back(std::move(op));
         }
 

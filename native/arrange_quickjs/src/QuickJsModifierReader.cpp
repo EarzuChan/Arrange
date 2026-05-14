@@ -296,9 +296,6 @@ namespace arrange::quickjs {
             else if (type == "focusable") {
                 result.input.focusable = reader_.boolField(payload, "enabled", true);
             }
-            else if (type == "pointerInput") {
-                result.input.pointerInput = true;
-            }
             else if (type == "wrapContentWidth" ||
                      type == "wrapContentHeight" ||
                      type == "wrapContentSize" ||
@@ -313,6 +310,8 @@ namespace arrange::quickjs {
                      type == "focusGroup" ||
                      type == "scrollable" ||
                      type == "animateContentSize" ||
+                     type == "pointerInput" ||
+                     type == "semantics" ||
                      type == "testTag") {
                 (void)throwUnknownModifier(type);
                 return {};

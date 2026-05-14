@@ -16,8 +16,9 @@ if(TARGET juce::juce_audio_processors)
     src/ArrangeRuntime.cpp
     src/EditorChromeModel.cpp
     src/CompositionHost.cpp
+    src/DiagnosticEvent.cpp
     src/DiagnosticsState.cpp
-    src/DiagnosticsOverlay.cpp
+    src/DiagnosticsModel.cpp
     src/DiagnosticsScene.cpp
     src/EditorDebugActions.cpp
     src/EditorFrameClock.cpp

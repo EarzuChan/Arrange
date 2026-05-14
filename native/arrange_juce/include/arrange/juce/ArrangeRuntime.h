@@ -102,6 +102,10 @@ namespace arrange::juce {
             std::vector<arrange::core::DrawOp> errorOps,
             std::vector<arrange::core::DrawOp> badgeOps,
             std::vector<arrange::core::DrawOp> toastOps);
+#if ARRANGE_WITH_QUICKJS_NG
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
+#endif
 
     private:
         enum class QueuedEventKind {

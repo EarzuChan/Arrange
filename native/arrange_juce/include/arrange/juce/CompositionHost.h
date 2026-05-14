@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
@@ -52,6 +53,10 @@ namespace arrange::juce {
             const arrange::core::ScrollResult& result);
 
         void flushRetiredEventSlots();
+#if ARRANGE_WITH_QUICKJS_NG
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
+#endif
 
     private:
         ScriptEventDispatcher eventDispatcher_;

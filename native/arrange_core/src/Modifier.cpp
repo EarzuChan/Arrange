@@ -87,7 +87,6 @@ namespace arrange::core {
         }
         if (before.input.clickable != after.input.clickable ||
             before.input.hoverable != after.input.hoverable ||
-            before.input.pointerInput != after.input.pointerInput ||
             !sameSlot(before.input.clickEventSlot, after.input.clickEventSlot) ||
             !sameSlot(before.scroll.verticalEventSlot, after.scroll.verticalEventSlot) ||
             !sameSlot(before.scroll.horizontalEventSlot, after.scroll.horizontalEventSlot)) {

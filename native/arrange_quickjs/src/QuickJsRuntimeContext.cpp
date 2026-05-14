@@ -36,6 +36,24 @@ namespace arrange::quickjs {
         childrenByNode.erase(id);
         parentByNode.erase(id);
     }
+
+    void QuickJsRuntimeContext::releaseNodeTypesRecursive(arrange::core::NodeId id) {
+        const auto children = childrenByNode.find(id) == childrenByNode.end()
+                                  ? std::vector<arrange::core::NodeId>{}
+                                  : childrenByNode.at(id);
+        for (auto child : children) releaseNodeTypesRecursive(child);
+        nodeTypes.erase(id);
+    }
+
+    void QuickJsRuntimeContext::recordDiagnostic(QuickJsDiagnosticEventInput event) {
+        diagnosticEvents.push_back(std::move(event));
+        while (diagnosticEvents.size() > 64) diagnosticEvents.erase(diagnosticEvents.begin());
+    }
+
+    void QuickJsRuntimeContext::recordDiagnosticAction(QuickJsDiagnosticAction action) {
+        diagnosticActions.push_back(std::move(action));
+        while (diagnosticActions.size() > 64) diagnosticActions.erase(diagnosticActions.begin());
+    }
 }
 
 #endif

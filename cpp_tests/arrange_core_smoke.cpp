@@ -9,6 +9,7 @@
 #include <arrange/core/NativeScene.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/PointerInputProcessor.h>
+#include <arrange/core/PropSchema.h>
 #include <arrange/core/PropValue.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/core/Scroll.h>
@@ -209,12 +210,30 @@ namespace {
         tree.clearDirty();
         (void)tree.takeInvalidation();
 
-        tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::SetPropMutation{1, "onSubmit", arrange::core::PropValue::stringValue("not an event slot")},
-        });
+        try {
+            tree.apply(std::vector<arrange::core::TreeMutation>{
+                arrange::core::SetPropMutation{1, "onSubmit", arrange::core::PropValue::stringValue("not an event slot")},
+            });
+            return 20;
+        } catch (const std::runtime_error&) {
+        }
         const auto snapshot = tree.invalidationSnapshot();
         if (snapshot.affects(arrange::core::DirtyFlag::EventSlot)) return 18;
         if (!tree.node(1).eventSlots.empty()) return 19;
+        return 0;
+    }
+
+    int verifyPropSchema() {
+        using namespace arrange::core;
+        std::string error;
+        if (!validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontSize", PropValue::numberValue(12.0)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
+        if (validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontSize", PropValue::stringValue("12"))}), error)) return 102;
+        if (validateSetPropMutation(NodeType::Column, "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy"))}), error)) return 103;
+        if (validateSetPropMutation(NodeType::Text, "unknownProp", PropValue::stringValue("bad"), error)) return 104;
+        if (validateSetPropMutation(NodeType::Image, "tint", PropValue::numberValue(0xff000000u), error)) return 105;
+        if (validateSetPropMutation(NodeType::Text, "testTag", PropValue::stringValue("tag"), error)) return 106;
+        if (!validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg"))}), error)) return 107;
+        if (validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg")), field("url", PropValue::stringValue("https://example.invalid/play.svg"))}), error)) return 108;
         return 0;
     }
 
@@ -329,6 +348,73 @@ namespace {
         return 0;
     }
 
+    int verifyClippingAndOverflowOps() {
+        using namespace arrange::core;
+        LayoutTree tree;
+        tree.apply(std::vector<TreeMutation>{
+            CreateNodeMutation{1, NodeType::Box},
+            SetModifierMutation{1, size(80.0f, 40.0f)},
+            CreateNodeMutation{2, NodeType::Box},
+            SetModifierMutation{2, background(120.0f, 20.0f, 0xffabcdefu)},
+            InsertChildMutation{1, 2, 0},
+        });
+        LayoutEngine{}.layout(tree, 1, {0.0f, 80.0f, 0.0f, 40.0f});
+        const auto unclipped = DrawOpsBuilder{}.collect(tree, 1);
+        for (const auto& op : unclipped) {
+            if (op.type == DrawOpType::PushClip) return 111;
+        }
+
+        tree.apply(std::vector<TreeMutation>{
+            SetModifierMutation{1, verticalScroll(80.0f, 40.0f, 0.0f, makeEventSlotId(1, EventSlotKind::VerticalScroll))},
+        });
+        LayoutEngine{}.layout(tree, 1, {0.0f, 80.0f, 0.0f, 40.0f});
+        const auto scrollOps = DrawOpsBuilder{}.collect(tree, 1);
+        bool sawClip = false;
+        for (const auto& op : scrollOps) {
+            if (op.type == DrawOpType::PushClip && near(op.rect.width, 80.0f) && near(op.rect.height, 40.0f)) sawClip = true;
+        }
+        if (!sawClip) return 112;
+
+        tree = {};
+        tree.apply(std::vector<TreeMutation>{
+            CreateNodeMutation{1, NodeType::Text},
+            SetTextMutation{1, "overflow text"},
+            SetPropMutation{1, "overflow", PropValue::stringValue("visible")},
+            SetModifierMutation{1, size(40.0f, 12.0f)},
+        });
+        LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
+        const auto visibleOps = DrawOpsBuilder{}.collect(tree, 1);
+        for (const auto& op : visibleOps) {
+            if (op.type == DrawOpType::PushClip) return 113;
+        }
+        tree.apply(std::vector<TreeMutation>{
+            SetPropMutation{1, "overflow", PropValue::stringValue("clip")},
+        });
+        LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
+        const auto clipOps = DrawOpsBuilder{}.collect(tree, 1);
+        sawClip = false;
+        for (const auto& op : clipOps) {
+            if (op.type == DrawOpType::PushClip) sawClip = true;
+        }
+        if (!sawClip) return 114;
+
+        tree = {};
+        tree.apply(std::vector<TreeMutation>{
+            CreateNodeMutation{1, NodeType::Icon},
+            SetPropMutation{1, "source", object({field("path", PropValue::stringValue("icons/play.svg"))})},
+            SetPropMutation{1, "tint", PropValue::numberValue(0xff000000u)},
+            SetModifierMutation{1, size(24.0f, 24.0f)},
+        });
+        LayoutEngine{}.layout(tree, 1, {0.0f, 24.0f, 0.0f, 24.0f});
+        const auto iconOps = DrawOpsBuilder{}.collect(tree, 1);
+        bool sawResourceObjectIcon = false;
+        for (const auto& op : iconOps) {
+            if (op.type == DrawOpType::DrawIcon && op.resource == "icons/play.svg") sawResourceObjectIcon = true;
+        }
+        if (!sawResourceObjectIcon) return 115;
+        return 0;
+    }
+
     class MockScriptHost final : public arrange::quickjs::ScriptHost {
     public:
         arrange::quickjs::ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override {
@@ -424,16 +510,20 @@ namespace {
 }
 
 int main() {
-    if (const auto result = verifyTypedLayoutTreePipeline(); result != 0) return result;
-    if (const auto result = verifyTypedDirtyPrecision(); result != 0) return result;
-    if (const auto result = verifyEventPropIsNotCoreEventSlot(); result != 0) return result;
-    if (const auto result = verifyNativeSceneAndFramePipeline(); result != 0) return result;
-    if (const auto result = verifyPointerScrollAndHitTest(); result != 0) return result;
-    if (const auto result = verifyPropValueAndTextInput(); result != 0) return result;
-    if (const auto result = verifyTextLayoutAndOverlay(); result != 0) return result;
-    if (const auto result = verifyAppResolverAndHeadlessLoader(); result != 0) return result;
-    if (const auto result = verifyDevServerAndFramePlanner(); result != 0) return result;
-    if (const auto result = verifyScenePipelineStateIntentContract(); result != 0) return result;
+#define RUN_SMOKE(name) do { if (const auto result = name(); result != 0) return result; } while (false)
+    RUN_SMOKE(verifyTypedLayoutTreePipeline);
+    RUN_SMOKE(verifyTypedDirtyPrecision);
+    RUN_SMOKE(verifyEventPropIsNotCoreEventSlot);
+    RUN_SMOKE(verifyPropSchema);
+    RUN_SMOKE(verifyNativeSceneAndFramePipeline);
+    RUN_SMOKE(verifyPointerScrollAndHitTest);
+    RUN_SMOKE(verifyPropValueAndTextInput);
+    RUN_SMOKE(verifyTextLayoutAndOverlay);
+    RUN_SMOKE(verifyClippingAndOverflowOps);
+    RUN_SMOKE(verifyAppResolverAndHeadlessLoader);
+    RUN_SMOKE(verifyDevServerAndFramePlanner);
+    RUN_SMOKE(verifyScenePipelineStateIntentContract);
+#undef RUN_SMOKE
     if (arrange::core::RuntimeVersion == 0) return 99;
     return 0;
 }

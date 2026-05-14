@@ -28,7 +28,7 @@ namespace arrange::juce {
     } // namespace
 
     void DiagnosticsState::configure(DiagnosticsConfig config) {
-        overlay_.configure(std::move(config));
+        model_.configure(std::move(config));
         error_.reset();
         invalidatePreparedFrame();
     }
@@ -55,28 +55,59 @@ namespace arrange::juce {
         invalidatePreparedFrame();
     }
 
+    bool DiagnosticsState::emit(DiagnosticEventInput input) {
+        const auto changed = model_.emit(std::move(input));
+        invalidatePreparedFrame();
+        return changed;
+    }
+
     bool DiagnosticsState::emit(LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast) {
-        return overlay_.emit(level, std::move(title), std::move(message), toast, coalesceToast);
+        const auto changed = model_.emit(level, std::move(title), std::move(message), toast, coalesceToast);
+        invalidatePreparedFrame();
+        return changed;
     }
 
     bool DiagnosticsState::tick(double nowMillis) {
-        return overlay_.tick(nowMillis);
+        const auto changed = model_.tick(nowMillis);
+        if (changed) invalidatePreparedFrame();
+        return changed;
     }
 
     bool DiagnosticsState::hasActiveToasts() const noexcept {
-        return overlay_.hasActiveToasts();
+        return model_.hasActiveToasts();
     }
 
     std::vector<DiagnosticsToastModel> DiagnosticsState::activeToastModels() const {
-        return overlay_.activeToastModels();
+        return model_.activeToastModels();
     }
 
     DiagnosticVisibility DiagnosticsState::badgeVisibility() const noexcept {
-        return overlay_.badgeVisibility();
+        return model_.badgeVisibility();
     }
 
     DiagnosticVisibility DiagnosticsState::toastVisibility() const noexcept {
-        return overlay_.toastVisibility();
+        return model_.toastVisibility();
+    }
+
+    void DiagnosticsState::setLogLevel(LogLevel level) noexcept {
+        model_.setLogLevel(level);
+    }
+
+    void DiagnosticsState::setCategoryEnabled(DiagnosticCategory category, bool enabled) {
+        model_.setCategoryEnabled(category, enabled);
+    }
+
+    void DiagnosticsState::setToastsEnabled(bool enabled) noexcept {
+        model_.setToastsEnabled(enabled);
+        invalidatePreparedFrame();
+    }
+
+    bool DiagnosticsState::categoryEnabled(DiagnosticCategory category) const {
+        return model_.categoryEnabled(category);
+    }
+
+    const std::vector<DiagnosticEvent>& DiagnosticsState::recentEvents() const noexcept {
+        return model_.recentEvents();
     }
 
     void DiagnosticsState::invalidatePreparedFrame() noexcept {
@@ -117,11 +148,11 @@ namespace arrange::juce {
         if (context.error == nullptr && error_) {
             context.error = &*error_;
         }
-        return overlay_.diagnosticsText(context);
+        return model_.diagnosticsText(context);
     }
 
     std::string DiagnosticsState::currentLocalTimeLabel() {
-        return DiagnosticsOverlay::currentLocalTimeLabel();
+        return DiagnosticsModel::currentLocalTimeLabel();
     }
 } // namespace arrange::juce
 

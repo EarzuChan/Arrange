@@ -54,7 +54,7 @@ namespace arrange::juce {
         const DiagnosticsBadgeModel& model,
         DiagnosticVisibility visibility) const {
         std::vector<arrange::core::DrawOp> ops;
-        if (!DiagnosticsOverlay::visibilityEnabled(visibility) || model.text.empty()) return ops;
+        if (!diagnosticVisibilityEnabled(visibility) || model.text.empty()) return ops;
 
         const auto textWidth = static_cast<int>(model.text.size()) * 7 + 26;
         const auto x = static_cast<int>(std::round(std::max(
@@ -74,7 +74,7 @@ namespace arrange::juce {
         const std::vector<DiagnosticsToastModel>& toasts,
         DiagnosticVisibility visibility) const {
         std::vector<arrange::core::DrawOp> ops;
-        if (!DiagnosticsOverlay::visibilityEnabled(visibility) || toasts.empty()) return ops;
+        if (!diagnosticVisibilityEnabled(visibility) || toasts.empty()) return ops;
 
         const auto maxToastWidth = std::min(360, std::max(220, editorBounds.getWidth() - 32));
         auto y = editorBounds.getY() + 48;

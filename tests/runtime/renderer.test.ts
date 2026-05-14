@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import {createRequire} from "node:module"
 import {pathToFileURL} from "node:url"
-import {Column, Text, createApp, m, rememberScrollState} from "../../packages/runtime/src/index.ts"
+import {Column, Icon, Text, createApp, diagnostics, logger, m, provideContentColor, rememberScrollState} from "../../packages/runtime/src/index.ts"
 import type {NativeTransactionTarget} from "../../packages/runtime/src/index.ts"
 
 const requireFromRuntime = createRequire(new URL("../../packages/runtime/package.json", import.meta.url))
@@ -28,6 +28,15 @@ function recordingNative(): RecordingNative {
         setModifier: (id, modifier) => calls.push(["setModifier", id, modifier]),
         invalidate: (id, flag, reason) => calls.push(["invalidate", id, flag, reason]),
         unmount: () => calls.push(["unmount"]),
+        diagnosticsLog: (level, payload) => calls.push(["diagnosticsLog", level, payload]),
+        diagnosticsToast: (payload) => calls.push(["diagnosticsToast", payload]),
+        diagnosticsRequestReload: (payload) => calls.push(["diagnosticsRequestReload", payload]),
+        diagnosticsTriggerFakeError: (payload) => calls.push(["diagnosticsTriggerFakeError", payload]),
+        diagnosticsCopyDiagnostics: () => "copied",
+        diagnosticsCopyRecentEvents: () => "recent",
+        diagnosticsSetLogLevel: (level) => calls.push(["diagnosticsSetLogLevel", level]),
+        diagnosticsSetCategoryEnabled: (category, enabled) => calls.push(["diagnosticsSetCategoryEnabled", category, enabled]),
+        diagnosticsSetToastsEnabled: (enabled) => calls.push(["diagnosticsSetToastsEnabled", enabled]),
     }
 }
 
@@ -84,4 +93,51 @@ test("ScrollState native object snapshots trigger modifier updates without JSON"
 test("Vue renderer rejects incompatible native runtime version", () => {
     const app = createApp({setup: () => () => vueH(Text, {text: "versioned"})})
     assert.throws(() => app.mount({runtimeVersion: 999}), /runtime\/native version mismatch/)
+})
+
+test("diagnostics TS API forwards to native diagnostics functions", () => {
+    const native = recordingNative()
+    globalThis.__ARRANGE_NATIVE__ = native
+    try {
+        logger.warn({category: "app", message: "warned", detail: "detail"})
+        diagnostics.toast("toast")
+        diagnostics.setLogLevel("error")
+        diagnostics.setCategoryEnabled("runtime.script", false)
+        diagnostics.setToastsEnabled(false)
+        diagnostics.requestReload("src/App.vue")
+        assert.equal(diagnostics.copyDiagnostics(), "copied")
+        assert.equal(diagnostics.copyRecentEvents(), "recent")
+    } finally {
+        delete globalThis.__ARRANGE_NATIVE__
+    }
+    assert.ok(native.calls.some((call) => call[0] === "diagnosticsLog" && call[1] === "warn"))
+    assert.ok(native.calls.some((call) => call[0] === "diagnosticsToast"))
+    assert.ok(native.calls.some((call) => call[0] === "diagnosticsSetCategoryEnabled" && call[1] === "runtime.script" && call[2] === false))
+    assert.ok(native.calls.some((call) => call[0] === "diagnosticsRequestReload"))
+})
+
+test("diagnostics TS API rejects unsupported levels and categories before native", () => {
+    const native = recordingNative()
+    globalThis.__ARRANGE_NATIVE__ = native
+    try {
+        assert.throws(() => diagnostics.setLogLevel("verbose" as never), /log level/)
+        assert.throws(() => diagnostics.setCategoryEnabled("runtime.fake" as never, true), /category/)
+        assert.throws(() => logger.info({category: "runtime.fake" as never, message: "bad"}), /category/)
+    } finally {
+        delete globalThis.__ARRANGE_NATIVE__
+    }
+    assert.deepEqual(native.calls, [])
+})
+
+test("Icon without explicit tint reads LocalContentColor before native commit", () => {
+    const native = recordingNative()
+    createApp({
+        setup() {
+            provideContentColor(0xffe8eaed)
+            return () => vueH(Column, null, [vueH(Icon, {source: "icons/play.svg"})])
+        },
+    }).mount(native)
+
+    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "source" && call[3] === "icons/play.svg"))
+    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "tint" && call[3] === 0xffe8eaed))
 })

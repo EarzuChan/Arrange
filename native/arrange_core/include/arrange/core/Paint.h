@@ -43,6 +43,7 @@ namespace arrange::core {
         std::string textAlign;
         std::string overflow;
         std::string resource;
+        bool resourceIsIcon = false;
         std::string contentScale;
         std::string alignment;
         bool hasTint = false;

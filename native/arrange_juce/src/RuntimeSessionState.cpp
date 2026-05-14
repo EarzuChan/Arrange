@@ -41,7 +41,15 @@ namespace arrange::juce {
             std::string message = {},
             bool toast = false,
             bool coalesceToast = true) {
-            if (diagnostics.emit(level, std::move(title), std::move(message), toast, coalesceToast)) {
+            DiagnosticEventInput event;
+            event.level = level;
+            event.category = DiagnosticCategory::RuntimeTransaction;
+            event.code = "runtime.session";
+            event.message = std::move(title);
+            event.detail = std::move(message);
+            event.toast = toast;
+            event.coalesceToast = coalesceToast;
+            if (diagnostics.emit(std::move(event))) {
                 runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("runtime diagnostic event"));
             }
         }

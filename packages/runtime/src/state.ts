@@ -1,7 +1,5 @@
 import {reactive} from "vue"
 
-type FocusManager = {clearFocus: () => boolean}
-export type FocusRequester = {requested: boolean; requestFocus: () => boolean; __arrangeBind?: (callback: () => boolean) => void}
 export type InteractionState = {hovered: boolean; pressed: boolean; focused: boolean; enabled: boolean}
 type ScrollSnapshot = Partial<Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "isScrollInProgress">>
 export type LazyVisibleItemInfo = {
@@ -24,44 +22,11 @@ export type ScrollState = {
     __arrangeNativeScroll: (payload: ScrollSnapshot) => void
 }
 
-let currentFocusManager: FocusManager | null = null
-
 export function rememberInteractionState(): InteractionState {
     return reactive({hovered: false, pressed: false, focused: false, enabled: true})
 }
 
-export function rememberFocusRequester(): FocusRequester {
-    let requestFocusImpl: (() => boolean) | null = null
-    const requester: FocusRequester = {
-        requested: false,
-        requestFocus() {
-            this.requested = true
-            if (typeof requestFocusImpl !== "function") return false
-            this.requested = false
-            return requestFocusImpl()
-        },
-    }
-    Object.defineProperty(requester, "__arrangeBind", {
-        enumerable: false,
-        value(callback: () => boolean) {
-            requestFocusImpl = callback
-            if (requester.requested) requester.requestFocus()
-        },
-    })
-    return requester
-}
-
-export function useFocusManager(): FocusManager {
-    return {
-        clearFocus() {
-            return currentFocusManager?.clearFocus() ?? false
-        }
-    }
-}
-
-export function __arrangeSetFocusManager(manager: FocusManager | null | undefined): void {
-    currentFocusManager = manager ?? null
-}
+// FocusRequester / useFocusManager 将来会在 JS 请求 focus、native focus session、IME/caret、pipeline 与测试闭环齐全后再正规添加回来；当前故意不公开孤儿 API。
 
 export function rememberScrollState(args: {initial?: number} = {}): ScrollState {
     let state: ScrollState

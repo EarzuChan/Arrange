@@ -1,5 +1,7 @@
 #include <arrange/core/LayoutTree.h>
 
+#include <arrange/core/PropSchema.h>
+
 #include <algorithm>
 #include <stdexcept>
 #include <string_view>
@@ -84,6 +86,10 @@ namespace arrange::core {
 
         if (const auto* op = getIf<SetPropMutation>(mutation)) {
             auto& node = require(op->id);
+            std::string propError;
+            if (!validateSetPropMutation(node.type, op->key, op->value, propError)) {
+                throw std::runtime_error(propError);
+            }
             node.props[op->key] = op->value;
             if (isResourceProp(op->key)) {
                 markDirtyAttributed(op->id, DirtyFlag::Resource, InvalidationSource::NativeMutation, op->key, "resource prop changed");

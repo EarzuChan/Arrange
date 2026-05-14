@@ -103,6 +103,16 @@ namespace arrange::juce {
         if (scriptHost_) scriptHost_->flushRetiredEventSlots();
 #endif
     }
+
+#if ARRANGE_WITH_QUICKJS_NG
+    std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> CompositionHost::takeDiagnosticEvents() {
+        return scriptHost_ ? scriptHost_->takeDiagnosticEvents() : std::vector<arrange::quickjs::QuickJsDiagnosticEventInput>{};
+    }
+
+    std::vector<arrange::quickjs::QuickJsDiagnosticAction> CompositionHost::takeDiagnosticActions() {
+        return scriptHost_ ? scriptHost_->takeDiagnosticActions() : std::vector<arrange::quickjs::QuickJsDiagnosticAction>{};
+    }
+#endif
 } // namespace arrange::juce
 
 #endif

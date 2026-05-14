@@ -69,7 +69,7 @@ export class Modifier {
     }
     hoverable(args: Record<string, unknown> = {}): Modifier { return this.#add("hoverable", {enabled: true, ...args}) }
     focusable(arg: boolean | Record<string, unknown> = true): Modifier { return this.#add("focusable", typeof arg === "boolean" ? {enabled: arg} : {enabled: true, ...arg}) }
-    pointerInput(handler: unknown): Modifier { return this.#add("pointerInput", {handler}) }
+    // pointerInput 将来会在 native typed pointer event slot、派发、释放与测试齐全后再正规添加回来；当前故意不公开半支持 API。
     verticalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("verticalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
     horizontalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("horizontalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
 

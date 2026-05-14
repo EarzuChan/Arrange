@@ -42,12 +42,15 @@ namespace arrange::quickjs {
             runtime.nextAnimationFrameHandle = 1;
             runtime.frameTimeMillis = 0.0;
             runtime.pendingTransactions = nullptr;
+            runtime.nodeTypes.clear();
             runtime.childrenByNode.clear();
             runtime.parentByNode.clear();
             runtime.moduleLoader.clear();
             runtime.reloadRequested = false;
             runtime.reloadRequest = {};
             runtime.nativeError.clear();
+            runtime.diagnosticEvents.clear();
+            runtime.diagnosticActions.clear();
         }
 
         void initialise(QuickJsScriptHost* owner, const std::filesystem::path& entryPath) {
@@ -80,6 +83,20 @@ namespace arrange::quickjs {
 
     void QuickJsScriptHost::flushRetiredEventSlots() {
         if (impl_) impl_->runtime.events.flushRetired();
+    }
+
+    std::vector<QuickJsDiagnosticEventInput> QuickJsScriptHost::takeDiagnosticEvents() {
+        if (!impl_) return {};
+        auto events = std::move(impl_->runtime.diagnosticEvents);
+        impl_->runtime.diagnosticEvents.clear();
+        return events;
+    }
+
+    std::vector<QuickJsDiagnosticAction> QuickJsScriptHost::takeDiagnosticActions() {
+        if (!impl_) return {};
+        auto actions = std::move(impl_->runtime.diagnosticActions);
+        impl_->runtime.diagnosticActions.clear();
+        return actions;
     }
 
     std::optional<arrange::core::MutationTransaction> QuickJsScriptHost::takePendingTransaction() noexcept {

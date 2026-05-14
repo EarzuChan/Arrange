@@ -91,7 +91,15 @@ namespace arrange::juce {
         std::string message,
         bool toast,
         bool coalesceToast) {
-        if (diagnostics.emit(level, std::move(title), std::move(message), toast, coalesceToast)) {
+        DiagnosticEventInput event;
+        event.level = level;
+        event.category = DiagnosticCategory::Diagnostics;
+        event.code = "editor.debug";
+        event.message = std::move(title);
+        event.detail = std::move(message);
+        event.toast = toast;
+        event.coalesceToast = coalesceToast;
+        if (diagnostics.emit(std::move(event))) {
             runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("editor diagnostic event"));
         }
     }

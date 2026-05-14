@@ -89,12 +89,19 @@ namespace arrange::juce {
         DiagnosticsState& diagnostics,
         ArrangeRuntime& runtime,
         RuntimeLoadDiagnostic diagnostic) {
-        if (diagnostics.emit(
-                diagnostic.level,
-                std::move(diagnostic.title),
-                std::move(diagnostic.message),
-                diagnostic.toast,
-                diagnostic.coalesceToast)) {
+        DiagnosticEventInput event;
+        event.level = diagnostic.level;
+        event.category = diagnostic.title.find("Live") != std::string::npos
+                             ? DiagnosticCategory::HostLive
+                             : diagnostic.title.find("Dist") != std::string::npos
+                                   ? DiagnosticCategory::HostDist
+                                   : DiagnosticCategory::ResourcePackage;
+        event.code = "package.load";
+        event.message = std::move(diagnostic.title);
+        event.detail = std::move(diagnostic.message);
+        event.toast = diagnostic.toast;
+        event.coalesceToast = diagnostic.coalesceToast;
+        if (diagnostics.emit(std::move(event))) {
             runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package diagnostic event"));
         }
     }

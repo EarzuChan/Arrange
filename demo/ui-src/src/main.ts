@@ -1,4 +1,4 @@
-import { createApp } from "@arrange/runtime";
-import App from "./App.vue";
+import { createApp } from "@arrange/runtime"
+import App from "./App.vue"
 
-createApp(App).mount();
+createApp(App).mount()

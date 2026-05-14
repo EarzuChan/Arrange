@@ -9,7 +9,6 @@ const arrangeTags = new Set([
   "Text",
   "Input",
   "Image",
-  "Icon",
   "Canvas",
   "FlowRow",
   "FlowColumn",

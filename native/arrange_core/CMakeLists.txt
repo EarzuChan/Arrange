@@ -2,6 +2,7 @@ add_library(arrange_core STATIC
   src/Version.cpp
   src/EventSlot.cpp
   src/PropValue.cpp
+  src/PropSchema.cpp
   src/TextLayoutService.cpp
   src/InputIntent.cpp
   src/Invalidation.cpp

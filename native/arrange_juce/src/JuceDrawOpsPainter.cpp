@@ -89,7 +89,9 @@ namespace arrange::juce {
                 if (area.isEmpty() || op.text.empty()) return;
 
                 g.saveState();
-                g.reduceClipRegion((op.inputText ? area : area.expanded(2.0f, 2.0f)).toNearestInt());
+                if (op.inputText) {
+                    g.reduceClipRegion(area.toNearestInt());
+                }
                 const auto font = ::juce::Font(::juce::FontOptions(op.fontSize));
                 const auto colour = ::juce::Colour(op.color);
                 const auto lineHeight = op.lineHeight > 0.0f ? op.lineHeight : font.getHeight();
@@ -197,14 +199,24 @@ namespace arrange::juce {
                 }
                 break;
             case arrange::core::DrawOpType::DrawIcon: {
-                g.setColour(::juce::Colour(op.color));
-                const auto r = rect.reduced(rect.getWidth() * 0.18f, rect.getHeight() * 0.18f);
-                ::juce::Path path;
-                path.startNewSubPath(r.getX(), r.getY());
-                path.lineTo(r.getRight(), r.getCentreY());
-                path.lineTo(r.getX(), r.getBottom());
-                path.closeSubPath();
-                g.fillPath(path);
+                const auto drawable = imageResources.findIcon(op.resource);
+                if (drawable && *drawable != nullptr) {
+                    auto icon = (*drawable)->createCopy();
+                    if (op.hasTint) {
+                        icon->replaceColour(::juce::Colours::black, ::juce::Colour(op.color));
+                        icon->replaceColour(::juce::Colours::white, ::juce::Colour(op.color));
+                        icon->replaceColour(::juce::Colour(0xff000000), ::juce::Colour(op.color));
+                        icon->replaceColour(::juce::Colour(0xffffffff), ::juce::Colour(op.color));
+                    }
+                    icon->drawWithin(g, rect, ::juce::RectanglePlacement::stretchToFit, 1.0f);
+                }
+                else {
+                    g.setColour(::juce::Colour(0xff151922));
+                    g.fillRect(rect);
+                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f));
+                    g.drawRect(rect, 1.0f);
+                    g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 1.0f);
+                }
                 break;
             }
             case arrange::core::DrawOpType::DrawLine:

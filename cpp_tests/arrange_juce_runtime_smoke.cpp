@@ -13,6 +13,7 @@
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -63,6 +64,17 @@ namespace {
         op.resource = std::move(resource);
         op.rect = {0.0f, 0.0f, 8.0f, 8.0f};
         op.color = 0xffffffff;
+        return op;
+    }
+
+    arrange::core::DrawOp iconOp(std::string resource) {
+        arrange::core::DrawOp op;
+        op.type = arrange::core::DrawOpType::DrawIcon;
+        op.resource = std::move(resource);
+        op.resourceIsIcon = true;
+        op.hasTint = true;
+        op.color = 0xffe8eaed;
+        op.rect = {0.0f, 0.0f, 8.0f, 8.0f};
         return op;
     }
 
@@ -218,7 +230,27 @@ int main(int argc, char** argv) {
     arrange::juce::DiagnosticsConfig diagnosticsConfig;
     diagnosticsConfig.badge = arrange::juce::DiagnosticVisibility::Always;
     diagnosticsConfig.toasts = arrange::juce::DiagnosticVisibility::Always;
+    diagnosticsConfig.logLevel = arrange::juce::LogLevel::Warn;
     DiagnosticsState.configure(std::move(diagnosticsConfig));
+    arrange::juce::DiagnosticEventInput debugEvent;
+    debugEvent.level = arrange::juce::LogLevel::Debug;
+    debugEvent.category = arrange::juce::DiagnosticCategory::RuntimeScript;
+    debugEvent.code = "debug.filtered";
+    debugEvent.message = "debug event still enters recent ring";
+    if (DiagnosticsState.emit(std::move(debugEvent))) return 33;
+    if (DiagnosticsState.recentEvents().empty() || DiagnosticsState.recentEvents().back().code != "debug.filtered") return 34;
+    DiagnosticsState.setCategoryEnabled(arrange::juce::DiagnosticCategory::RuntimeScript, false);
+    if (DiagnosticsState.categoryEnabled(arrange::juce::DiagnosticCategory::RuntimeScript)) return 35;
+    DiagnosticsState.setToastsEnabled(false);
+    arrange::juce::DiagnosticEventInput toastDisabledEvent;
+    toastDisabledEvent.level = arrange::juce::LogLevel::Error;
+    toastDisabledEvent.category = arrange::juce::DiagnosticCategory::Diagnostics;
+    toastDisabledEvent.code = "toast.disabled";
+    toastDisabledEvent.message = "toast disabled still logged";
+    toastDisabledEvent.toast = true;
+    if (DiagnosticsState.emit(std::move(toastDisabledEvent))) return 36;
+    if (DiagnosticsState.recentEvents().back().code != "toast.disabled") return 37;
+    if (DiagnosticsState.hasActiveToasts()) return 38;
     DiagnosticsState.setError(arrange::makeErrorScreenModel(
         arrange::ErrorSource::ScriptRuntime,
         "prepared diagnostics frame smoke",
@@ -260,6 +292,17 @@ int main(int argc, char** argv) {
     if (prepared.error || !prepared.changed || !imageCache.find("valid.png").isValid()) return 24;
     const auto paintAfterPrepare = painter.paint(graphics, validOps, imageCache);
     if (paintAfterPrepare.error) return 25;
+
+    const auto validSvg = resourceDir / "play.svg";
+    {
+        std::ofstream svg(validSvg);
+        svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
+    }
+    const std::vector iconOps{iconOp("play.svg")};
+    const auto iconPrepared = imageCache.prepare(iconOps);
+    if (iconPrepared.error || !iconPrepared.changed || !imageCache.findIcon("play.svg")) return 31;
+    const auto iconPaint = painter.paint(graphics, iconOps, imageCache);
+    if (iconPaint.error) return 32;
 
     std::cout << "ArrangeRuntime queued counter/scroll/input smoke passed\n";
     return 0;

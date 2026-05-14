@@ -26,6 +26,15 @@ namespace arrange::juce {
         const auto result = imageResources_.prepare(runtime.publishedFrame().content.drawOps);
         if (result.error) {
             diagnostics.setError(*result.error);
+            DiagnosticEventInput event;
+            event.level = LogLevel::Error;
+            event.category = result.error->relatedPath.extension() == ".svg" ? DiagnosticCategory::ResourceIcon : DiagnosticCategory::ResourceImage;
+            event.code = "resource.prepare.failed";
+            event.message = "Resource prepare failed";
+            event.detail = result.error->summary;
+            event.pathOrUrl = result.error->relatedPath.string();
+            event.toast = true;
+            (void)diagnostics.emit(std::move(event));
             runtime.enqueueIntent(arrange::core::InputIntent::resourceFailed("resource prepare failed"));
             return true;
         }
