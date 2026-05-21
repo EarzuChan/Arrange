@@ -6,6 +6,7 @@
     ".": { "import": "./src/index.ts" }
   },
   "dependencies": {
-    "vue": "^3.5.0"
+    "@arrange/vue-reactivity": "workspace:*",
+    "@arrange/vue-runtime-core": "workspace:*"
   }
 }

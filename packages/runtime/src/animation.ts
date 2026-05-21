@@ -1,5 +1,6 @@
-import {isRef, ref, watch} from "vue"
-import type {Ref, WatchStopHandle} from "vue"
+import {isRef, ref} from "@arrange/vue-reactivity"
+import {watch} from "@arrange/vue-runtime-core"
+import type {Ref, WatchStopHandle} from "@arrange/vue-runtime-core"
 
 type AnimationFrameHandle = ReturnType<typeof requestAnimationFrame> | ReturnType<typeof setTimeout> | number
 

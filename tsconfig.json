@@ -1,9 +1,25 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "types": ["node"],
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "vue": ["packages/arrange-vue-runtime-core/src/index.ts"],
+      "vue/compiler-sfc": ["packages/arrange-vue-compiler-sfc/src/index.ts"],
+      "@vue/shared": ["packages/arrange-vue-shared/src/index.ts"],
+      "@vue/reactivity": ["packages/arrange-vue-reactivity/src/index.ts"],
+      "@vue/runtime-core": ["packages/arrange-vue-runtime-core/src/index.ts"],
+      "@vue/compiler-core": ["packages/arrange-vue-compiler-core/src/index.ts"],
+      "@vue/compiler-dom": ["packages/arrange-vue-compiler-arrange/src/index.ts"],
+      "@arrange/vue-shared": ["packages/arrange-vue-shared/src/index.ts"],
+      "@arrange/vue-reactivity": ["packages/arrange-vue-reactivity/src/index.ts"],
+      "@arrange/vue-runtime-core": ["packages/arrange-vue-runtime-core/src/index.ts"],
+      "@arrange/vue-compiler-core": ["packages/arrange-vue-compiler-core/src/index.ts"],
+      "@arrange/vue-compiler-sfc": ["packages/arrange-vue-compiler-sfc/src/index.ts"],
+      "@arrange/vue-compiler-arrange": ["packages/arrange-vue-compiler-arrange/src/index.ts"]
+    }
   },
   "include": [
     "packages/runtime/src/**/*.ts",

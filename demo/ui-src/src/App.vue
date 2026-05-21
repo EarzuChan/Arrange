@@ -82,8 +82,7 @@
 </template>
 
 <script setup>
-import {animateColorAsState, Arrangement, Color, dp, Icon, logger, m, rememberScrollState, sp} from "@arrange/runtime"
-import {onMounted, onUnmounted, ref} from "vue"
+import {animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/runtime"
 
 const clicks = ref(0)
 const preset = ref("Preset A")

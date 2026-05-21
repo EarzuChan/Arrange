@@ -1,4 +1,4 @@
-import {reactive} from "vue"
+import {reactive} from "@arrange/vue-reactivity"
 
 export type InteractionState = {hovered: boolean; pressed: boolean; focused: boolean; enabled: boolean}
 type ScrollSnapshot = Partial<Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "isScrollInProgress">>

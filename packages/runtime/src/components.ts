@@ -1,4 +1,4 @@
-import {defineComponent, h} from "vue"
+import {defineComponent, h} from "@arrange/vue-runtime-core"
 import {useContentColor} from "./local.ts"
 
 export const Box = "Box"

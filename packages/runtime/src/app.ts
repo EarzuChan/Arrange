@@ -1,5 +1,5 @@
-import {createRenderer} from "vue"
-import type {App as VueApp, Component} from "vue"
+import {createRenderer} from "@arrange/vue-runtime-core"
+import type {App as VueApp, Component} from "@arrange/vue-runtime-core"
 import {Text} from "./components.ts"
 import {m, toModifier} from "./modifier.ts"
 import {ARRANGE_RUNTIME_VERSION} from "./native.ts"

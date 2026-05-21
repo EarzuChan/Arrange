@@ -1,4 +1,4 @@
-import {inject, provide} from "vue"
+import {inject, provide} from "@arrange/vue-runtime-core"
 import type {ColorValue} from "./primitives.ts"
 
 export type ArrangeLocalKey<T> = Readonly<{
