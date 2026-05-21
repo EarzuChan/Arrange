@@ -6,12 +6,12 @@
         <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
             <Icon
                 source="icons/play.svg"
-                :tint="Color(0xFFFF0000)"
+                :tint="Color(0xFF00FF00)"
                 :modifier="m.size(dp(20), dp(20))"
             />
             <Text
-                text="恩情"
-                :text-style="{ fontSize: sp(50), color: animeColor }"
+                :text="preset"
+                :text-style="{ fontSize: sp(50),  color: Color(0xFFFFFFFF) }"
                 :modifier="m"
             />
             <Image
@@ -91,7 +91,7 @@ const inputStatus = ref("Input: focus, type, Enter to submit")
 const scrollState = rememberScrollState()
 const counterColor = animateColorAsState(
     () => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE),
-    {durationMillis: 120},
+    { durationMillis: 240 },
 )
 const rainbowColors = [
     Color(0xFFFF1744),

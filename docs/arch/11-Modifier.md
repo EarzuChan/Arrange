@@ -1,4 +1,4 @@
-# 模型
+﻿# 模型
 
 Modifier 是顺序敏感的洋葱模型。链条左侧先包裹右侧：
 
@@ -25,7 +25,7 @@ JS ModifierDescriptor[]
 
 `__arrangeModifier.N.*` 展开字段、`__arrangeClickableEnabled`、`__arrangeVerticalScrollValue`、`__arrangeZIndex`、`__arrangeLayer*` 等 JS 层派生 prop 不得进入生产语义。clickable / scroll / weight / align / zIndex / graphicsLayer 等语义只能由 native core 的 `ModifierCompiler` 编译进 `CompiledModifier`。
 
-`CompiledModifier` 必须保留当前支持 Modifier 的可执行顺序语义。Paint / Layout / HitTest 不能靠字符串补丁反推顺序，例如不能用 `style.type == "padding"` 之类的局部规则决定 background、border、clip 与 padding / size 的相对效果。至少 `padding().background()`、`background().padding()`、`size().background()`、`background().size()` 等顺序差异必须由结构化编译结果和测试保护。
+`CompiledModifier` 必须保留 Modifier 的可执行顺序语义。Paint / Layout / HitTest 不能靠字符串补丁反推顺序，例如不能用 `style.type == "padding"` 之类的局部规则决定 background、border、clip 与 padding / size 的相对效果。至少 `padding().background()`、`background().padding()`、`size().background()`、`background().size()` 等顺序差异必须由结构化编译结果和测试保护。
 
 绘制语义收敛为 typed paint op。`ModifierCompiler` 负责把 `background`、`border`、`alpha`、`dropShadow`、`innerShadow`、`clip`、`padding` 等字符串 payload 编译成明确的 paint chain op；Paint 阶段不可靠自由字符串 `style.type == ...` 作为分派依据。
 
@@ -148,7 +148,7 @@ m.border(dp(1), Color(0xFF606060), rounded(dp(8)))
 m.clip(rounded(dp(8)))
 ```
 
-`background` 与 `border` 绘制在当前 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中测试默认仍按布局 bounds，精确形状命中后续另行设计。
+`background` 与 `border` 绘制在对应 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中测试默认仍按布局 bounds，精确形状命中后续另行设计。
 
 普通容器默认不裁剪子内容。子节点、阴影、显式绘制、图层变换等可以在视觉上超出父容器 bounds；最终仍受祖先显式 clip、滚动 viewport clip 与宿主窗口根裁剪影响。
 
@@ -185,7 +185,7 @@ m.innerShadow({
 })
 ```
 
-注意：我们不采用 `m.shadow(elevation)`，这和设计工具不接轨，太和 Material 捆绑，暂且淘汰。
+注意：我们不采用 `m.shadow(elevation)`，这和设计工具不接轨，太和 Material 捆绑，不进入核心 API。
 
 # 绘制
 
@@ -221,7 +221,7 @@ m.graphicsLayer({
 
 # 输入与交互
 
-通用交互走 Modifier；样式不走 CSS 伪类，而是由响应式交互状态驱动。
+通用交互走 Modifier；交互视觉由响应式交互状态驱动。
 
 ```ts
 const interaction = rememberInteractionState()
@@ -306,19 +306,20 @@ scroll viewport clip 与普通 `m.clip(shape)` 同属于视觉裁剪，但来源
 m.animateContentSize()
 ```
 
-值动画通过运行时 API 提供：
+值动画通过 Arrange runtime API 提供：
 
 ```ts
-animateFloatAsState(...)
-animateDpAsState(...)
-animateColorAsState(...)
-updateTransition(...)
+animatedNumberAsRef(...)
+animatedDpAsRef(...)
+animatedColorAsRef(...)
+transition(...)
 ```
 
-基础动画属于核心设计；更复杂的动画编排后续细化。
+动画语义由 JS Value Phase 推进，生产视觉帧源由 VBlankSource 提供。动画过程值变化进入 Reactive Slot Runtime，并产生 typed slot dirty；它不得默认触发 component render、VNode diff 或 generic prop patch。
 
-动画语义在 JS runtime，帧时钟在 native host。`animate*AsState` 不得用 Promise / microtask 伪造逐帧刷新，必须通过 host `requestAnimationFrame` 进入 native frame pump。每个动画 tick 都应能产生 native typed mutation、native dirty 与 repaint。
+`m.animateContentSize()` 复用同一 VBlankSource、JS Value Phase、SlotUpdateBatch 与 FramePlan。Canvas `frame` invalidation、meter / waveform 等 UI-thread 高频显示也复用同一底座。
 
-`m.animateContentSize()` 也使用同一 FrameClock / repaint pump；它不另建计时系统。Canvas `frame` invalidation、未来 meter / waveform 等 UI-thread 高频显示也复用同一底座。
+详见 [动画与Transition](28-动画与Transition.md)、[运行时](04-运行时.md) 与 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 
-详见 `docs/adr/003-NativeFrameClock与动画刷新链路.md`。
+
+

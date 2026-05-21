@@ -1,45 +1,47 @@
-# 基本分工
+﻿# 基本分工
 
-在 `Arrange UI Pipeline` 中，Vue 负责声明式 diff，QuickJS host 负责把 Vue renderer 的 host 操作接入 native transaction，C++ core 负责 scene state、LayoutTree、布局、绘制准备、命中测试与 dirty 归因。
+在 `Arrange UI Pipeline` 中，Arrange Vue 负责 authoring、composition、phase-aware reactivity、host target lowering 与 typed UI slot scheduling；QuickJS host 负责把 Arrange Vue 产生的 typed mutation、event slot update 与 slot update 直接接入 native boundary；C++ core 负责 scene state、LayoutTree、布局、绘制准备、命中测试与 dirty 归因。
 
-Arrange 的 QuickJS 与 C++ 是同进程关系，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON bridge、二进制 bridge、字符串 value 编码或 command buffer 协议。QuickJS host 必须直接读取 `JSValue`、primitive 与 callback function，并构造 native typed `MutationTransaction`。
+Arrange 的 QuickJS 与 C++ 是同进程关系，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON、二进制 buffer、字符串 value 编码或 command buffer 协议。QuickJS host 必须直接读取 `JSValue`、primitive、callback function 与稳定 runtime object shape，并构造 native typed `MutationTransaction` 与 `SlotUpdateBatch`。
 
 # 性能原则
 
 - JS 到 C++ 只提交变化，不传整棵树快照。
-- 一次 Vue flush 后可以统一提交一个 native transaction batch。
-- 批处理是 transaction 优化，不是序列化协议。
-- Canvas、动画、高频绘制不通过普通树 patch 传大对象。
+- Composition Phase 的离散界面变化进入 `MutationTransaction`。
+- JS Value Phase 的 UI value 变化进入 `SlotUpdateBatch`。
+- 批处理是 transaction / slot update 优化，不是序列化协议。
+- Canvas、动画、高频绘制不通过普通 component render / VNode diff / generic prop patch 传大对象。
 - QuickJS host 不做泛用 serializer；只按稳定 TS object shape / native API 参数读取字段。
-- core 不解析 JSON、不解析 encoded string、不知道 QuickJS 类型。
+- core 不解析 JSON、不解析 encoded string、不知道 QuickJS 业务对象。
 
-# Vue 自定义渲染器
+# Arrange Vue lowering
 
-Vue renderer 调用：
-
-```txt
-createElement
-patchProp
-insert
-remove
-setElementText
-```
-
-这些 host 操作必须进入 QuickJS native transaction API，而不是先生成可传输 BridgeOp。
-
-目标形态：
+Arrange Vue compiler / runtime 产生两类生产更新：
 
 ```txt
-Vue renderer host op
--> QuickJS native transaction API
--> QuickJS JSValue reader
--> native typed MutationTransaction
--> MutationTransaction queue
+Composition mutations:
+  create / delete / insert / remove node
+  set text
+  set typed prop
+  set modifier
+  update / retire event slot
+  explicit native invalidation
+
+Reactive slot updates:
+  layout slot
+  draw / paint slot
+  transform slot
+  hit-test slot
+  event slot
+  resource slot
+  accessibility slot
 ```
+
+host target lowering 必须基于 Arrange host component schema、Modifier schema、prop schema 与 slot schema。运行时不得把任意 JS object 当作可生产提交的 UI payload。
 
 # Native transaction API
 
-QuickJS host 暴露给 TS runtime 的生产入口应表达 native transaction，而不是 bridge protocol：
+QuickJS host 暴露给 TS runtime 的生产入口应表达 native typed mutation，而不是 serialization protocol：
 
 ```ts
 native.beginTransaction()
@@ -50,6 +52,7 @@ native.removeChild(parent, child)
 native.setText(id, text)
 native.setProp(id, propNameOrId, value)
 native.setModifier(id, modifierObject)
+native.updateEventSlot(id, slot, callback)
 native.invalidate(intent)
 native.endTransaction()
 ```
@@ -64,7 +67,34 @@ native.endTransaction()
 - QuickJS host 构造 core typed mutation。
 - core 只消费 typed mutation。
 
-`endTransaction()` 只表示 JS Composition Phase 提交界面变更意图。它不得在调用栈内直接执行 tree apply、measure、layout 或 repaint。提交后的 transaction 进入 `MutationTransaction` queue，由 [调度线程与帧阶段](26-调度线程与帧阶段.md) 定义的 SceneFramePipeline 按 FramePlan 统一消费。
+`endTransaction()` 只表示 Composition Phase 提交界面变更意图。它不得在调用栈内直接执行 tree apply、measure、layout 或 repaint。提交后的 transaction 进入 `MutationTransaction` queue，由 [调度线程与帧阶段](26-调度线程与帧阶段.md) 定义的 SceneFramePipeline 按 FramePlan 统一消费。
+
+# Slot update API
+
+QuickJS host 必须为 Reactive Slot Runtime 提供 typed slot update 入口。slot update 表达 UI value 对指定节点字段或 scene 字段的阶段化影响。
+
+概念形态：
+
+```ts
+native.beginSlotBatch()
+native.updateSlot(nodeId, slotKind, fieldPath, value, dirtyRole)
+native.retireSlotBinding(nodeId, slotKind, fieldPath)
+native.endSlotBatch()
+```
+
+slot update 必须携带足够的 typed 信息：
+
+```txt
+scene / node id
+slot kind
+field path
+value kind
+current typed value
+dirty role
+source / reason
+```
+
+slot update 不表达结构增删。结构变化必须使用 `MutationTransaction`。
 
 # QuickJS native boundary
 
@@ -74,20 +104,22 @@ QuickJS native boundary 的职责：
 - 按明确 prop schema 读取 prop value。
 - 按明确 Modifier object shape 读取 Modifier descriptor。
 - 读取真实 JS callback function，并注册到 native event registry。
+- 按明确 slot schema 读取 UI slot value。
 - 构造 native typed `MutationTransaction`。
+- 构造 native typed `SlotUpdateBatch`。
 - 为 C++ -> JS callback 构造 JS primitive 或 JS object 参数。
 
 QuickJS native boundary 禁止：
 
 - 泛用 JS object -> JSON/string serializer。
-- `BridgeEncodedValue` 一类任意值编码。
+- `EncodedAnyValue` 一类任意值编码。
 - `modifierPayload` 字符串。
 - command buffer / binary buffer 作为生产提交路径。
 - 为兼容旧测试保留第二套 production semantics。
 
 # MutationTransaction
 
-`MutationTransaction` 是 JS Composition Phase 与 SceneFramePipeline 的 typed 边界：
+`MutationTransaction` 是 Composition Phase 与 SceneFramePipeline 的 typed 边界：
 
 ```cpp
 struct CreateNodeMutation;
@@ -119,6 +151,46 @@ struct MutationTransaction {
 
 C++ SceneFramePipeline 原子消费 transaction，更新 `NativeScene` 或等价 scene state 后再执行 dirty resolution、measure / layout / place / DrawOps preparation。event slot update 与 tree mutation 必须处于同一 apply 边界，避免 native tree 命中旧 callback。
 
+# SlotUpdateBatch
+
+`SlotUpdateBatch` 是 JS Value Phase 与 SceneFramePipeline 的 typed 边界：
+
+```cpp
+enum class SlotKind {
+    Layout,
+    Draw,
+    Transform,
+    HitTest,
+    Event,
+    Resource,
+    Accessibility,
+};
+
+struct SlotUpdate {
+    NodeId nodeId;
+    SlotKind slotKind;
+    FieldPath fieldPath;
+    TypedSlotValue value;
+    DirtyRole dirtyRole;
+    DirtyReason reason;
+};
+
+struct SlotUpdateBatch {
+    std::vector<SlotUpdate> updates;
+    std::vector<SlotBindingId> retiredBindings;
+};
+```
+
+C++ SceneFramePipeline 消费 slot update，更新 LayoutNode、scene state 或对应 runtime state，并产生明确 dirty attribution。
+
+规则：
+
+- `Draw` / `Paint` slot 不得触发 measure / layout。
+- `Layout` slot 必须进入必要 layout dirty。
+- `Event` slot 不得触发无理由 measure / layout / paint。
+- `Resource` slot 影响 resource state 与相关 draw / layout dirty。
+- retired binding 必须在节点删除、组件卸载、reload、HMR reload、错误恢复和 source 切换时同步清理。
+
 # JSON 与诊断
 
 JSON 只允许用于旁路诊断和人类可读输出：
@@ -128,8 +200,7 @@ JSON 只允许用于旁路诊断和人类可读输出：
 - 错误屏诊断。
 - 人类可读日志。
 
-JSON 不允许作为 JS 到 C++ 的生产提交事实源，也不允许作为 Modifier、Prop、Event、Reload 或 Scroll 的生产编码。测试快照可以是 JSON 文件格式，但快照内容必须来自真实 native pipeline 的结果，不能反过来定义生产语义。
-
+JSON 不允许作为 JS 到 C++ 的生产提交事实源，也不允许作为 Modifier、Prop、Event、Slot、Reload 或 Scroll 的生产编码。测试快照可以是 JSON 文件格式，但快照内容必须来自真实 native pipeline 的结果，不能反过来定义生产语义。
 # C++ scene state 与 LayoutTree
 
 长期概念上，C++ 侧生产状态分为：
@@ -154,11 +225,12 @@ struct LayoutNode {
 
 # Prop 表达
 
-Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、每个 prop 的 native 类型、unknown prop 的处理口径都必须明确。
+Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、每个 prop 的 native 类型、slot lowering、dirty role 与 unknown prop 的处理口径都必须明确。
 
 要求：
 
 - QuickJS host 按 prop schema 直接读取 JSValue。
+- Arrange Vue compiler / runtime 按 prop schema 建立 typed prop op 或 reactive slot binding。
 - core 接收 typed prop value。
 - unknown prop 默认拒绝并诊断；若未来需要 extension / custom bucket，必须先为该 bucket 设计独立 schema、命名空间、dirty 影响与测试，不能把它变成任意对象后门。
 - event prop 必须基于明确 schema，不得靠任意 `on*` 或包含 `EventSlot` 的字符串猜测。
@@ -237,7 +309,7 @@ native state changed
 
 # Dirty 分类
 
-typed mutation 或 native-first state change 后必须产出 dirty attribution。dirty 不只是 bit flag，还必须能记录或推导：
+typed mutation、slot update 或 native-first state change 后必须产出 dirty attribution。dirty 不只是 bit flag，还必须能记录或推导：
 
 ```txt
 source input / intent
@@ -297,14 +369,14 @@ insert / remove / delete subtree 时必须同步维护 parent index 与 order in
 - Canvas 与最终绘制在 JUCE。
 - 性能与线程边界更清晰。
 
-生产事实源在 `arrange_core`。TS runtime 负责 Vue/SFC authoring、响应式状态与 native transaction 提交，不形成第二套生产布局、绘制、命中或文本测量事实源。
+生产事实源在 `arrange_core` 与 Arrange Vue runtime 的明确边界内。Arrange Vue 负责 authoring、composition、phase-aware reactivity 与 typed slot scheduling；C++ core 负责生产布局、绘制、命中与文本测量事实源。
 
 # 生命周期
 
 每个 `ArrangeEditor` 拥有：
 
 - 一个 QuickJS runtime/context。
-- 一个 Vue App instance。
+- 一个 Arrange Vue App instance。
 - 一个 `NativeScene` 或等价 scene state，其中包含 LayoutTree、event slots、dirty state 与渲染状态。
 - 一个 scene host。
 
@@ -313,3 +385,7 @@ insert / remove / delete subtree 时必须同步维护 parent index 与 order in
 # Transform 与命中
 
 `graphicsLayer`、平移、缩放、旋转等 transform 会影响默认命中测试；非平移变换的精确命中可后续再细化，但不能完全无视。
+
+
+
+

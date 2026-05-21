@@ -1,6 +1,6 @@
-# 基础 API 形态
+﻿# 基础 API 形态
 
-本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，组件行为见 [内建组件](12-内建组件.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)。
+本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，组件行为见 [内建组件](12-内建组件.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)，动画与 transition 见 [动画与Transition](28-动画与Transition.md)。
 
 # TypeScript 包
 
@@ -31,13 +31,14 @@ createApp(App).mount()
 正式 authoring 路径：
 
 ```txt
-Vue SFC / Vue render function
--> Vue custom renderer
--> Arrange host nodes
--> QuickJS native transaction
+Vue SFC / template / render function
+-> Arrange Vue compiler / runtime
+-> Composition mutations + Reactive slot updates
+-> QuickJS native boundary
+-> MutationTransaction / SlotUpdateBatch
 ```
 
-`@arrange/runtime` 不公开自研 `h` 作为主 API。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
+`@arrange/runtime` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
 
 # C++ App source
 
@@ -65,6 +66,15 @@ config.app.useLive("http://host:port");
 
 ```ts
 createApp
+
+ref
+reactive
+computed
+watch
+watchEffect
+onMounted
+onUnmounted
+nextTick
 
 Box
 Row
@@ -105,6 +115,16 @@ GridItemSpan
 
 rememberInputState
 rememberCanvasController
+
+animatedNumberAsRef
+animatedDpAsRef
+animatedColorAsRef
+animatedOffsetAsRef
+animatedSizeAsRef
+animatedRectAsRef
+animatedNumberArrayAsRef
+transition
+
 rememberInteractionState
 rememberFocusRequester
 useFocusManager
@@ -309,6 +329,8 @@ interface CanvasProps {
 }
 ```
 
+Canvas 行为见 [文本输入与绘制](18-文本输入与绘制.md) 与 [内建组件](12-内建组件.md)。
+
 ## Flow
 
 ```ts
@@ -390,6 +412,22 @@ interface LazyHorizontalGridProps<T> {
 ```
 
 Lazy 行为见 [内建组件](12-内建组件.md)。
+
+# 动画 API
+
+```ts
+animatedNumberAsRef(...): Ref<number>
+animatedDpAsRef(...): Ref<Dp>
+animatedColorAsRef(...): Ref<ArrangeColor>
+animatedOffsetAsRef(...): Ref<Offset>
+animatedSizeAsRef(...): Ref<Size>
+animatedRectAsRef(...): Ref<Rect>
+animatedNumberArrayAsRef(...): Ref<number[]>
+
+transition(...): Transition
+```
+
+动画与 transition 行为见 [动画与Transition](28-动画与Transition.md)。调度语义见 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 
 # 状态 helper
 
@@ -475,3 +513,7 @@ interface RuntimeHello {
 ```
 
 生产 native transaction 细节见 [LayoutTree与NativeTransaction](15-LayoutTree与NativeTransaction.md)。
+
+
+
+

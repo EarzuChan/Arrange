@@ -70,7 +70,7 @@ import App from "./App.vue"
 createApp(App).mount()
 ```
 
-正式 authoring 路径为 Vue SFC 或 Vue render function，经 Vue custom renderer 进入 Arrange host nodes。`@arrange/runtime` 不公开自研 `h` 作为主 authoring API。
+正式 authoring 路径为 SFC / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/runtime` 是 authoring API 主入口。
 
 # 路径约定
 
@@ -138,6 +138,9 @@ Standalone 应尽量完整尊重这些配置；插件宿主中按宿主允许范
 # 原则
 
 - Authoring 上是 App。
-- 实现上可分 Runtime、Surface、Renderer。
+- 实现上可分 Runtime、SceneHost、VBlankSource adapter、SceneFramePipeline 与 passive paint adapter。
 - 加载 source 必须显式、可诊断、可重试。
 - 必要信息写在代码里；CMake、宏、打包工具只作为可选增强。
+
+
+
