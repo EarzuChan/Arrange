@@ -1,4 +1,4 @@
-import { isArray } from '@vue/shared'
+﻿import { isArray } from '@arrange/vue-shared'
 import type { ComponentInternalInstance } from '../component'
 import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling'
 import { DeprecationTypes, assertCompatEnabled } from './compatConfig'
@@ -107,3 +107,4 @@ export function emit(
   }
   return instance.proxy
 }
+

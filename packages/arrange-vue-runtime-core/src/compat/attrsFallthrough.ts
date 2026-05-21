@@ -1,4 +1,4 @@
-import { isOn } from '@vue/shared'
+﻿import { isOn } from '@arrange/vue-shared'
 import type { ComponentInternalInstance } from '../component'
 import { DeprecationTypes, isCompatEnabled } from './compatConfig'
 
@@ -27,3 +27,4 @@ export function shouldSkipAttr(
   }
   return false
 }
+

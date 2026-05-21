@@ -1,4 +1,4 @@
-import type { CompilerOptions } from './options'
+﻿import type { CompilerOptions } from './options'
 import { baseParse } from './parser'
 import {
   type DirectiveTransform,
@@ -7,7 +7,7 @@ import {
 } from './transform'
 import { type CodegenResult, generate } from './codegen'
 import type { RootNode } from './ast'
-import { extend, isString } from '@vue/shared'
+import { extend, isString } from '@arrange/vue-shared'
 import { transformIf } from './transforms/vIf'
 import { transformFor } from './transforms/vFor'
 import { transformExpression } from './transforms/transformExpression'
@@ -63,7 +63,7 @@ export function getBaseTransformPreset(
 }
 
 // we name it `baseCompile` so that higher order compilers like
-// @vue/compiler-dom can export `compile` while re-exporting everything else.
+// @arrange/vue-compiler-arrange can export `compile` while re-exporting everything else.
 export function baseCompile(
   source: string | RootNode,
   options: CompilerOptions = {},
@@ -120,3 +120,4 @@ export function baseCompile(
 
   return generate(ast, resolvedOptions)
 }
+

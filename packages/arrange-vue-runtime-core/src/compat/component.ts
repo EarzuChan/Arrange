@@ -1,4 +1,4 @@
-import { isFunction, isObject } from '@vue/shared'
+﻿import { isFunction, isObject } from '@arrange/vue-shared'
 import type { Component, ComponentInternalInstance } from '../component'
 import {
   DeprecationTypes,
@@ -55,3 +55,4 @@ export function convertLegacyComponent(
 
   return comp
 }
+

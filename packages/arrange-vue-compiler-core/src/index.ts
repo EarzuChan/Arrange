@@ -1,4 +1,4 @@
-export { baseCompile } from './compile'
+﻿export { baseCompile } from './compile'
 
 // Also expose lower level APIs & types
 export {
@@ -69,7 +69,7 @@ export {
 export { transformVBindShorthand } from './transforms/transformVBindShorthand'
 export { processSlotOutlet } from './transforms/transformSlotOutlet'
 export { getConstantType } from './transforms/cacheStatic'
-export { generateCodeFrame } from '@vue/shared'
+export { generateCodeFrame } from '@arrange/vue-shared'
 
 // v2 compat only
 export {
@@ -77,3 +77,4 @@ export {
   warnDeprecation,
   CompilerDeprecationTypes,
 } from './compat/compatConfig'
+

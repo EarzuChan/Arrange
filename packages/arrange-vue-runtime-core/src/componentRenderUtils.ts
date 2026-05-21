@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ComponentInternalInstance,
   type Data,
   type FunctionalComponent,
@@ -22,7 +22,7 @@ import {
   isObject,
   isOn,
   looseEqual,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from './warning'
 import { isHmrUpdating } from './hmr'
 import type { NormalizedProps } from './componentProps'
@@ -33,7 +33,7 @@ import {
   isCompatEnabled,
   warnDeprecation,
 } from './compat/compatConfig'
-import { shallowReadonly } from '@vue/reactivity'
+import { shallowReadonly } from '@arrange/vue-reactivity'
 import { setTransitionHooks } from './components/BaseTransition'
 
 /**
@@ -494,3 +494,4 @@ export function updateHOCHostEl(
     suspense.vnode.el = el
   }
 }
+

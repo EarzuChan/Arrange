@@ -1,4 +1,4 @@
-import {
+﻿import {
   EMPTY_OBJ,
   NOOP,
   hasChanged,
@@ -9,7 +9,7 @@ import {
   isPlainObject,
   isSet,
   remove,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from './warning'
 import type { ComputedRef } from './computed'
 import { ReactiveFlags } from './constants'
@@ -26,7 +26,7 @@ import { type Ref, isRef } from './ref'
 import { getCurrentScope } from './effectScope'
 
 // These errors were transferred from `packages/runtime-core/src/errorHandling.ts`
-// to @vue/reactivity to allow co-location with the moved base watch logic, hence
+// to @arrange/vue-reactivity to allow co-location with the moved base watch logic, hence
 // it is essential to keep these values unchanged.
 export enum WatchErrorCodes {
   WATCH_GETTER = 2,
@@ -365,3 +365,4 @@ export function traverse(
   }
   return value
 }
+

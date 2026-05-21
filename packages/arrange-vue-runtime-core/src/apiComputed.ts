@@ -1,4 +1,4 @@
-import { type ComputedRefImpl, computed as _computed } from '@vue/reactivity'
+﻿import { type ComputedRefImpl, computed as _computed } from '@arrange/vue-reactivity'
 import { getCurrentInstance, isInSSRComponentSetup } from './component'
 
 export const computed: typeof _computed = (
@@ -15,3 +15,4 @@ export const computed: typeof _computed = (
   }
   return c as any
 }
+

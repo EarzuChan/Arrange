@@ -1,7 +1,7 @@
-import { type ShallowRef, readonly, shallowRef } from '@vue/reactivity'
+﻿import { type ShallowRef, readonly, shallowRef } from '@arrange/vue-reactivity'
 import { type Data, getCurrentInstance } from '../component'
 import { warn } from '../warning'
-import { EMPTY_OBJ } from '@vue/shared'
+import { EMPTY_OBJ } from '@arrange/vue-shared'
 
 export const knownTemplateRefs: WeakSet<ShallowRef> = new WeakSet()
 
@@ -42,3 +42,4 @@ export function isTemplateRefKey(refs: Data, key: string): boolean {
     (desc = Object.getOwnPropertyDescriptor(refs, key)) && !desc.configurable
   )
 }
+

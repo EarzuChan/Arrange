@@ -1,4 +1,4 @@
-import {
+﻿import {
   type WatchOptions as BaseWatchOptions,
   type DebuggerOptions,
   type ReactiveMarker,
@@ -7,9 +7,9 @@ import {
   type WatchHandle,
   type WatchSource,
   watch as baseWatch,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import { type SchedulerJob, SchedulerJobFlags, queueJob } from './scheduler'
-import { EMPTY_OBJ, NOOP, extend, isFunction, isString } from '@vue/shared'
+import { EMPTY_OBJ, NOOP, extend, isFunction, isString } from '@arrange/vue-shared'
 import {
   type ComponentInternalInstance,
   currentInstance,
@@ -30,7 +30,7 @@ export type {
   WatchSource,
   WatchCallback,
   OnCleanup,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 
 type MaybeUndefined<T, I> = I extends true ? T | undefined : T
 
@@ -280,3 +280,4 @@ export function createPathGetter(
     return cur
   }
 }
+

@@ -1,4 +1,4 @@
-import { isObject, toHandlerKey } from '@vue/shared'
+﻿import { isObject, toHandlerKey } from '@arrange/vue-shared'
 import { warn } from '../warning'
 
 /**
@@ -23,3 +23,4 @@ export function toHandlers(
   }
   return ret
 }
+

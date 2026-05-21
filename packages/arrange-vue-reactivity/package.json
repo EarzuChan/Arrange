@@ -1,56 +1,49 @@
-﻿{
-    "name":  "@arrange/vue-reactivity",
-    "version":  "0.0.0",
-    "description":  "Arrange-specialized Vue reactivity",
-    "main":  "index.js",
-    "module":  "dist/reactivity.esm-bundler.js",
-    "types":  "dist/reactivity.d.ts",
-    "unpkg":  "dist/reactivity.global.js",
-    "jsdelivr":  "dist/reactivity.global.js",
-    "files":  [
-                  "index.js",
-                  "dist"
-              ],
-    "exports":  {
-                    ".":  {
-                              "types":  "./dist/reactivity.d.ts",
-                              "node":  {
-                                           "production":  "./dist/reactivity.cjs.prod.js",
-                                           "development":  "./dist/reactivity.cjs.js",
-                                           "default":  "./index.js"
-                                       },
-                              "module":  "./dist/reactivity.esm-bundler.js",
-                              "import":  "./dist/reactivity.esm-bundler.js",
-                              "require":  "./index.js"
-                          },
-                    "./*":  "./*"
-                },
-    "sideEffects":  false,
-    "repository":  {
-                       "type":  "git",
-                       "url":  "git+https://github.com/vuejs/core.git",
-                       "directory":  "packages/reactivity"
-                   },
-    "buildOptions":  {
-                         "name":  "VueReactivity",
-                         "formats":  [
-                                         "esm-bundler",
-                                         "esm-browser",
-                                         "cjs",
-                                         "global"
-                                     ]
-                     },
-    "keywords":  [
-                     "vue"
-                 ],
-    "author":  "Evan You",
-    "license":  "MIT",
-    "bugs":  {
-                 "url":  "https://github.com/vuejs/core/issues"
-             },
-    "homepage":  "https://github.com/vuejs/core/tree/main/packages/reactivity#readme",
-    "dependencies":  {
-                         "@arrange/vue-shared":  "workspace:*"
-                     },
-    "private":  true
+{
+  "name": "@arrange/vue-reactivity",
+  "version": "0.0.0",
+  "description": "Arrange-specialized Vue reactivity",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "unpkg": "dist/reactivity.global.js",
+  "jsdelivr": "dist/reactivity.global.js",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vuejs/core.git",
+    "directory": "packages/reactivity"
+  },
+  "buildOptions": {
+    "name": "VueReactivity",
+    "formats": [
+      "esm-bundler",
+      "esm-browser",
+      "cjs",
+      "global"
+    ]
+  },
+  "keywords": [
+    "vue"
+  ],
+  "author": "Evan You",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/vuejs/core/issues"
+  },
+  "homepage": "https://github.com/vuejs/core/tree/main/packages/reactivity#readme",
+  "dependencies": {
+    "@arrange/vue-shared": "workspace:*"
+  },
+  "private": true,
+  "type": "module"
 }

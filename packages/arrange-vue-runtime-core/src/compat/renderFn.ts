@@ -1,4 +1,4 @@
-import {
+﻿import {
   ShapeFlags,
   extend,
   hyphenate,
@@ -9,7 +9,7 @@ import {
   normalizeClass,
   normalizeStyle,
   toHandlerKey,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import type {
   Component,
   ComponentInternalInstance,
@@ -348,3 +348,4 @@ export function defineLegacyVNodeProperties(vnode: VNode): void {
   }
   /* v8 ignore stop */
 }
+

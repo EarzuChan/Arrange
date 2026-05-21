@@ -1,5 +1,5 @@
-import type { Node } from '@babel/types'
-import { unwrapTSNode } from '@vue/compiler-dom'
+﻿import type { Node } from '@babel/types'
+import { unwrapTSNode } from '@arrange/vue-compiler-arrange'
 import type { ScriptCompileContext } from './context'
 import { isCallOf } from './utils'
 import { DEFINE_PROPS } from './defineProps'
@@ -85,3 +85,4 @@ export function processDefineOptions(
 
   return true
 }
+

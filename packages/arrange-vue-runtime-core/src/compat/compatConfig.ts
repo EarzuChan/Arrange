@@ -1,4 +1,4 @@
-import { extend, hasOwn, isArray, isFunction } from '@vue/shared'
+﻿import { extend, hasOwn, isArray, isFunction } from '@arrange/vue-shared'
 import {
   type Component,
   type ComponentInternalInstance,
@@ -156,7 +156,7 @@ export const deprecationData: Record<DeprecationTypes, DeprecationData> = {
     message: () => {
       let msg = `config.ignoredElements has been removed.`
       if (isRuntimeOnly()) {
-        msg += ` Pass the "isCustomElement" option to @vue/compiler-dom instead.`
+        msg += ` Pass the "isCustomElement" option to @arrange/vue-compiler-arrange instead.`
       } else {
         msg += ` Use config.isCustomElement instead.`
       }
@@ -640,3 +640,4 @@ if (__TEST__) {
     MODE: 3,
   })
 }
+

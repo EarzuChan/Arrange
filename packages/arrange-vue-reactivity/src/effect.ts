@@ -1,4 +1,4 @@
-import { extend, hasChanged } from '@vue/shared'
+﻿import { extend, hasChanged } from '@arrange/vue-shared'
 import type { ComputedRefImpl } from './computed'
 import type { TrackOpTypes, TriggerOpTypes } from './constants'
 import { type Link, globalVersion } from './dep'
@@ -580,3 +580,4 @@ function cleanupEffect(e: ReactiveEffect) {
     }
   }
 }
+

@@ -1,11 +1,11 @@
-import {
+﻿import {
   TrackOpTypes,
   TriggerOpTypes,
   isReactive,
   reactive,
   track,
   trigger,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import {
   NOOP,
   extend,
@@ -14,7 +14,7 @@ import {
   isFunction,
   isObject,
   isString,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from '../warning'
 import { cloneVNode, createVNode } from '../vnode'
 import type { ElementNamespace, RootRenderFunction } from '../renderer'
@@ -663,3 +663,4 @@ function defineReactiveSimple(obj: any, key: string, val: any) {
     },
   })
 }
+

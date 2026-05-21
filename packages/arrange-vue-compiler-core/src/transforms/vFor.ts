@@ -1,4 +1,4 @@
-import {
+﻿import {
   type NodeTransform,
   type TransformContext,
   createStructuralDirectiveTransform,
@@ -47,7 +47,7 @@ import {
 } from '../runtimeHelpers'
 import { processExpression } from './transformExpression'
 import { validateBrowserExpression } from '../validateExpression'
-import { PatchFlags } from '@vue/shared'
+import { PatchFlags } from '@arrange/vue-shared'
 
 export const transformFor: NodeTransform = createStructuralDirectiveTransform(
   'for',
@@ -394,3 +394,4 @@ function createParamsList(
     .slice(0, i + 1)
     .map((arg, i) => arg || createSimpleExpression(`_`.repeat(i + 1), false))
 }
+

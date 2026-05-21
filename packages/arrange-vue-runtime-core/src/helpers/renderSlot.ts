@@ -1,4 +1,4 @@
-import type { Data } from '../component'
+﻿import type { Data } from '../component'
 import type { RawSlots, Slots } from '../componentSlots'
 import {
   type ContextualRenderFn,
@@ -14,7 +14,7 @@ import {
   isVNode,
   openBlock,
 } from '../vnode'
-import { PatchFlags, SlotFlags, isSymbol } from '@vue/shared'
+import { PatchFlags, SlotFlags, isSymbol } from '@arrange/vue-shared'
 import { warn } from '../warning'
 import { isAsyncWrapper } from '../apiAsyncComponent'
 
@@ -116,3 +116,4 @@ export function ensureValidVNode(
     ? vnodes
     : null
 }
+

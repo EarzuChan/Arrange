@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "types": ["node"],
+    "types": ["node", "./types/arrange-vue-globals.d.ts"],
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {

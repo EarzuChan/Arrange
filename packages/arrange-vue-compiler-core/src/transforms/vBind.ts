@@ -1,4 +1,4 @@
-import type { DirectiveTransform } from '../transform'
+﻿import type { DirectiveTransform } from '../transform'
 import {
   type ExpressionNode,
   NodeTypes,
@@ -6,7 +6,7 @@ import {
   createSimpleExpression,
 } from '../ast'
 import { ErrorCodes, createCompilerError } from '../errors'
-import { camelize } from '@vue/shared'
+import { camelize } from '@arrange/vue-shared'
 import { CAMELIZE } from '../runtimeHelpers'
 
 // v-bind without arg is handled directly in ./transformElement.ts due to its affecting
@@ -84,3 +84,4 @@ const injectPrefix = (arg: ExpressionNode, prefix: string) => {
     arg.children.push(`)`)
   }
 }
+

@@ -1,4 +1,4 @@
-import { ElementTypes, type NodeTransform, NodeTypes } from '@vue/compiler-core'
+﻿import { ElementTypes, type NodeTransform, NodeTypes } from '@arrange/vue-compiler-core'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 
 export const ignoreSideEffectTags: NodeTransform = (node, context) => {
@@ -17,3 +17,4 @@ export const ignoreSideEffectTags: NodeTransform = (node, context) => {
     context.removeNode()
   }
 }
+

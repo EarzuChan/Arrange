@@ -1,6 +1,7 @@
 third_party/
 cmake-build-*/
 build/
+dist/
 .idea/
 tests/smoke/*.output.json
 node_modules/

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Comment,
   Fragment,
   Static,
@@ -38,7 +38,7 @@ import {
   invokeArrayFns,
   isArray,
   isReservedProp,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   type SchedulerJob,
   SchedulerJobFlags,
@@ -53,7 +53,7 @@ import {
   ReactiveEffect,
   pauseTracking,
   resetTracking,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import { updateProps } from './componentProps'
 import { updateSlots } from './componentSlots'
 import { popWarningContext, pushWarningContext, warn } from './warning'
@@ -2616,3 +2616,4 @@ function resolveAsyncComponentPlaceholder(anchorVnode: VNode) {
 
   return null
 }
+

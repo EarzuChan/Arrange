@@ -1,4 +1,4 @@
-import { isArray } from '@vue/shared'
+﻿import { isArray } from '@arrange/vue-shared'
 import { inject } from '../apiInject'
 import type { ComponentInternalInstance, Data } from '../component'
 import {
@@ -41,3 +41,4 @@ export function createPropsDefaultThis(
     },
   )
 }
+

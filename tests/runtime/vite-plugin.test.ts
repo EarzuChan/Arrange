@@ -40,9 +40,9 @@ test("vite plugin can build the native dev app.js bundle on demand", {timeout: 1
     assert.match(code, /createApp/)
 })
 
-test("vite plugin injects Arrange HMR client into the configured entry", () => {
+test("vite plugin injects Arrange HMR client into the configured entry", async () => {
     const plugin = arrange()
-    const transformed = plugin.transform.call({
+    const transformed = await plugin.transform.call({
         warn() {
         }
     }, 'import { createApp } from "@arrange/runtime";\n', "C:/demo/ui-src/src/main.ts")

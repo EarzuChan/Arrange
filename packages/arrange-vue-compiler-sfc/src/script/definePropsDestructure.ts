@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BlockStatement,
   Expression,
   Identifier,
@@ -18,8 +18,8 @@ import {
   isStaticProperty,
   unwrapTSNode,
   walkFunctionParams,
-} from '@vue/compiler-dom'
-import { genPropsAccessExp } from '@vue/shared'
+} from '@arrange/vue-compiler-arrange'
+import { genPropsAccessExp } from '@arrange/vue-shared'
 import { isCallOf, resolveObjectKey } from './utils'
 import type { ScriptCompileContext } from './context'
 import { DEFINE_PROPS } from './defineProps'
@@ -314,3 +314,4 @@ export function transformDestructuredProps(
     },
   })
 }
+

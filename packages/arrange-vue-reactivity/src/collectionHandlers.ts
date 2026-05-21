@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Target,
   isReadonly,
   isShallow,
@@ -15,7 +15,7 @@ import {
   hasOwn,
   isMap,
   toRawType,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from './warning'
 
 type CollectionTypes = IterableCollections | WeakCollections
@@ -327,3 +327,4 @@ function checkIdentityKeys(
     )
   }
 }
+

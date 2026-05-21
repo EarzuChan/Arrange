@@ -1,7 +1,7 @@
-import merge from 'merge-source-map'
-import type { RawSourceMap } from '@vue/compiler-core'
+﻿import merge from 'merge-source-map'
+import type { RawSourceMap } from '@arrange/vue-compiler-core'
 import type { SFCStyleCompileOptions } from '../compileStyle'
-import { isFunction } from '@vue/shared'
+import { isFunction } from '@arrange/vue-shared'
 
 export type StylePreprocessor = (
   source: string,
@@ -159,3 +159,4 @@ export const processors: Record<PreprocessLang, StylePreprocessor> = {
   styl,
   stylus: styl,
 }
+

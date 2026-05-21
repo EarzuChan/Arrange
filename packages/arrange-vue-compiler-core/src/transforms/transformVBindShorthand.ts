@@ -1,4 +1,4 @@
-import { camelize } from '@vue/shared'
+﻿import { camelize } from '@arrange/vue-shared'
 import {
   NodeTypes,
   type SimpleExpressionNode,
@@ -46,3 +46,4 @@ export const transformVBindShorthand: NodeTransform = (node, context) => {
     }
   }
 }
+

@@ -1,4 +1,4 @@
-import type { SFCDescriptor } from '../parse'
+﻿import type { SFCDescriptor } from '../parse'
 import {
   type ExpressionNode,
   NodeTypes,
@@ -7,9 +7,9 @@ import {
   isSimpleIdentifier,
   parserOptions,
   walkIdentifiers,
-} from '@vue/compiler-dom'
+} from '@arrange/vue-compiler-arrange'
 import { createCache } from '../cache'
-import { camelize, capitalize, isBuiltInDirective } from '@vue/shared'
+import { camelize, capitalize, isBuiltInDirective } from '@arrange/vue-shared'
 
 /**
  * Check if an import is used in the SFC's template. This is used to determine
@@ -141,3 +141,4 @@ function extractIdentifiers(ids: Set<string>, node: ExpressionNode) {
     ids.add((node as SimpleExpressionNode).content)
   }
 }
+

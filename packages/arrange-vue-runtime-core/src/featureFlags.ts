@@ -1,4 +1,4 @@
-import { getGlobalThis } from '@vue/shared'
+﻿import { getGlobalThis } from '@arrange/vue-shared'
 
 /**
  * This is only called in esm-bundler builds.
@@ -36,3 +36,4 @@ export function initFeatureFlags(): void {
     )
   }
 }
+

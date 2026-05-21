@@ -1,8 +1,8 @@
-import type { LVal, Node, TSType } from '@babel/types'
+﻿import type { LVal, Node, TSType } from '@babel/types'
 import type { ScriptCompileContext } from './context'
 import { inferRuntimeType } from './resolveType'
 import { UNKNOWN_TYPE, isCallOf, toRuntimeTypeString } from './utils'
-import { BindingTypes, unwrapTSNode } from '@vue/compiler-dom'
+import { BindingTypes, unwrapTSNode } from '@arrange/vue-compiler-arrange'
 
 export const DEFINE_MODEL = 'defineModel'
 
@@ -178,3 +178,4 @@ export function genModelProps(ctx: ScriptCompileContext): string | undefined {
   }
   return `{${modelPropsDecl}\n  }`
 }
+

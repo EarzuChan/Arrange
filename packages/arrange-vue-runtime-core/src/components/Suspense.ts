@@ -1,4 +1,4 @@
-import {
+﻿import {
   Comment,
   type VNode,
   type VNodeProps,
@@ -10,7 +10,7 @@ import {
   normalizeVNode,
   openBlock,
 } from '../vnode'
-import { ShapeFlags, isArray, isFunction, toNumber } from '@vue/shared'
+import { ShapeFlags, isArray, isFunction, toNumber } from '@arrange/vue-shared'
 import {
   type ComponentInternalInstance,
   handleSetupResult,
@@ -938,3 +938,4 @@ function isVNodeSuspensible(vnode: VNode) {
   const suspensible = vnode.props && vnode.props.suspensible
   return suspensible != null && suspensible !== false
 }
+

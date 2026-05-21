@@ -1,5 +1,5 @@
-// enums are compiled away via custom transform so no real dependency here
-import { ReactiveFlags } from '@vue/reactivity'
+﻿// enums are compiled away via custom transform so no real dependency here
+import { ReactiveFlags } from '@arrange/vue-reactivity'
 import {
   isArray,
   isFunction,
@@ -12,7 +12,7 @@ import {
   objectToString,
 } from './general'
 
-// can't use isRef here since @vue/shared has no deps
+// can't use isRef here since @arrange/vue-shared has no deps
 const isRef = (val: any): val is { value: unknown } => {
   return !!(val && val[ReactiveFlags.IS_REF] === true)
 }
@@ -65,3 +65,4 @@ const stringifySymbol = (v: unknown, i: number | string = ''): any =>
   // Symbol.description in es2019+ so we need to cast here to pass
   // the lib: es2016 check
   isSymbol(v) ? `Symbol(${(v as any).description ?? i})` : v
+

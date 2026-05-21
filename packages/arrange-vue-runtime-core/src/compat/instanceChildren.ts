@@ -1,4 +1,4 @@
-import { ShapeFlags } from '@vue/shared'
+﻿import { ShapeFlags } from '@arrange/vue-shared'
 import type { ComponentInternalInstance } from '../component'
 import type { ComponentPublicInstance } from '../componentPublicInstance'
 import type { VNode } from '../vnode'
@@ -26,3 +26,4 @@ function walk(vnode: VNode, children: ComponentPublicInstance[]) {
     }
   }
 }
+

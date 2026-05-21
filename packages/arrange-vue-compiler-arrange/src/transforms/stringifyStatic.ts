@@ -1,4 +1,4 @@
-/**
+﻿/**
  * This module is Node-only.
  */
 import {
@@ -19,7 +19,7 @@ import {
   createCallExpression,
   findDir,
   isStaticArgOf,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import {
   escapeHtml,
   isArray,
@@ -35,7 +35,7 @@ import {
   normalizeStyle,
   stringifyStyle,
   toDisplayString,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 
 export enum StringifyThresholds {
   ELEMENT_WITH_BINDING_COUNT = 5,
@@ -421,3 +421,4 @@ function evaluateConstant(exp: ExpressionNode): string {
     return res
   }
 }
+

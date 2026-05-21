@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Target,
   isReadonly,
   isShallow,
@@ -21,7 +21,7 @@ import {
   isObject,
   isSymbol,
   makeMap,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { isRef } from './ref'
 import { warn } from './warning'
 
@@ -262,3 +262,4 @@ export const shallowReactiveHandlers: MutableReactiveHandler =
 // retain the reactivity of the normal readonly object.
 export const shallowReadonlyHandlers: ReadonlyReactiveHandler =
   /*@__PURE__*/ new ReadonlyReactiveHandler(true)
+

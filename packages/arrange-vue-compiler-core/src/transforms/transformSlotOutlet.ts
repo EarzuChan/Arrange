@@ -1,4 +1,4 @@
-import type { NodeTransform, TransformContext } from '../transform'
+﻿import type { NodeTransform, TransformContext } from '../transform'
 import {
   type CallExpression,
   type ExpressionNode,
@@ -12,7 +12,7 @@ import { isSlotOutlet, isStaticArgOf, isStaticExp } from '../utils'
 import { type PropsExpression, buildProps } from './transformElement'
 import { ErrorCodes, createCompilerError } from '../errors'
 import { RENDER_SLOT } from '../runtimeHelpers'
-import { camelize } from '@vue/shared'
+import { camelize } from '@arrange/vue-shared'
 import { processExpression } from './transformExpression'
 
 export const transformSlotOutlet: NodeTransform = (node, context) => {
@@ -121,3 +121,4 @@ export function processSlotOutlet(
     slotProps,
   }
 }
+

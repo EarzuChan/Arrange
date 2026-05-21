@@ -1,11 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {createRequire} from "node:module"
-import {pathToFileURL} from "node:url"
-import {animateColorAsState, animateDpAsState, animateFloatAsState, createManualAnimationClock, updateTransition} from "../../packages/runtime/src/index.ts"
-
-const requireFromRuntime = createRequire(new URL("../../packages/runtime/package.json", import.meta.url))
-const {ref} = await import(pathToFileURL(requireFromRuntime.resolve("vue")).href)
+import {animateColorAsState, animateDpAsState, animateFloatAsState, createManualAnimationClock, ref, updateTransition} from "../../packages/runtime/src/index.ts"
 
 test("animateFloatAsState follows target changes with a deterministic clock", () => {
     const clock = createManualAnimationClock()

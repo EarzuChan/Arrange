@@ -1,5 +1,5 @@
-import { type UrlWithStringQuery, parse as uriParse } from 'url'
-import { isString } from '@vue/shared'
+﻿import { type UrlWithStringQuery, parse as uriParse } from 'url'
+import { isString } from '@arrange/vue-shared'
 
 export function isRelativeUrl(url: string): boolean {
   const firstChar = url.charAt(0)
@@ -50,3 +50,4 @@ function parseUriParts(urlString: string): UrlWithStringQuery {
   // @see https://nodejs.org/api/url.html#url_url_parse_urlstring_parsequerystring_slashesdenotehost
   return uriParse(isString(urlString) ? urlString : '', false, true)
 }
+

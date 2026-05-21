@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CallExpression,
   type ConditionalExpression,
   type DirectiveNode,
@@ -34,7 +34,7 @@ import {
 } from '../utils'
 import { CREATE_SLOTS, RENDER_LIST, WITH_CTX } from '../runtimeHelpers'
 import { createForLoopParams, finalizeForParseResult } from './vFor'
-import { SlotFlags, slotFlagsText } from '@vue/shared'
+import { SlotFlags, slotFlagsText } from '@arrange/vue-shared'
 
 const defaultFallback = createSimpleExpression(`undefined`, false)
 
@@ -421,3 +421,4 @@ function hasForwardedSlots(children: TemplateChildNode[]): boolean {
   }
   return false
 }
+

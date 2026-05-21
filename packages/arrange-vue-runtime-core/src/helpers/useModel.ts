@@ -1,5 +1,5 @@
-import { type Ref, customRef, ref } from '@vue/reactivity'
-import { EMPTY_OBJ, camelize, hasChanged, hyphenate } from '@vue/shared'
+﻿import { type Ref, customRef, ref } from '@arrange/vue-reactivity'
+import { EMPTY_OBJ, camelize, hasChanged, hyphenate } from '@arrange/vue-shared'
 import type { DefineModelOptions, ModelRef } from '../apiSetupHelpers'
 import { getCurrentInstance } from '../component'
 import { warn } from '../warning'
@@ -127,3 +127,4 @@ export const getModelModifiers = (
         props[`${camelize(modelName)}Modifiers`] ||
         props[`${hyphenate(modelName)}Modifiers`]
 }
+

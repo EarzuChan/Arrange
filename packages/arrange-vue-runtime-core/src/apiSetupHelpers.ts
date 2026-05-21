@@ -1,4 +1,4 @@
-import {
+﻿import {
   type IfAny,
   type LooseRequired,
   type Prettify,
@@ -7,7 +7,7 @@ import {
   isArray,
   isFunction,
   isPromise,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   type SetupContext,
   createSetupContext,
@@ -32,7 +32,7 @@ import type {
 } from './componentProps'
 import { warn } from './warning'
 import type { SlotsType, StrictUnwrapSlotsType } from './componentSlots'
-import type { Ref } from '@vue/reactivity'
+import type { Ref } from '@arrange/vue-reactivity'
 
 // dev only
 const warnRuntimeUsage = (method: string) =>
@@ -574,3 +574,4 @@ export function withAsyncContext(getAwaitable: () => any): [any, () => void] {
     },
   ]
 }
+

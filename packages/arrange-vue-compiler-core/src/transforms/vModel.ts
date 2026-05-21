@@ -1,4 +1,4 @@
-import type { DirectiveTransform } from '../transform'
+﻿import type { DirectiveTransform } from '../transform'
 import {
   ConstantTypes,
   ElementTypes,
@@ -18,7 +18,7 @@ import {
 } from '../utils'
 import { IS_REF } from '../runtimeHelpers'
 import { BindingTypes } from '../options'
-import { camelize } from '@vue/shared'
+import { camelize } from '@arrange/vue-shared'
 
 export const transformModel: DirectiveTransform = (dir, node, context) => {
   const { exp, arg } = dir
@@ -167,3 +167,4 @@ export const transformModel: DirectiveTransform = (dir, node, context) => {
 function createTransformProps(props: Property[] = []) {
   return { props }
 }
+

@@ -1,8 +1,29 @@
-﻿{
+{
   "name": "@arrange/vite-plugin",
   "version": "0.0.0",
   "type": "module",
-  "exports": { ".": { "import": "./src/index.ts" } },
-  "peerDependencies": { "vite": ">=5" },
-  "peerDependenciesMeta": { "vite": { "optional": true } }
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "peerDependencies": {
+    "vite": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@arrange/vue-compiler-sfc": "workspace:*"
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
 }

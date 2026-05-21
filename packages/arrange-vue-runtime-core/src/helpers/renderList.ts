@@ -1,4 +1,4 @@
-import type { VNode, VNodeChild } from '../vnode'
+﻿import type { VNode, VNodeChild } from '../vnode'
 import {
   isReactive,
   isReadonly,
@@ -6,8 +6,8 @@ import {
   shallowReadArray,
   toReactive,
   toReadonly,
-} from '@vue/reactivity'
-import { isArray, isObject, isString } from '@vue/shared'
+} from '@arrange/vue-reactivity'
+import { isArray, isObject, isString } from '@arrange/vue-shared'
 import { warn } from '../warning'
 
 /**
@@ -124,3 +124,4 @@ export function renderList(
   }
   return ret
 }
+

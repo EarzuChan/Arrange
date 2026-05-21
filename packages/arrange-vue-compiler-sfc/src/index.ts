@@ -1,4 +1,4 @@
-export const version: string = __VERSION__
+﻿export const version: string = __VERSION__
 
 // API
 export { parse } from './parse'
@@ -16,7 +16,7 @@ export const parseCache = _parseCache as Map<string, SFCParseResult>
 import {
   DOMErrorMessages,
   errorMessages as coreErrorMessages,
-} from '@vue/compiler-dom'
+} from '@arrange/vue-compiler-arrange'
 
 export const errorMessages: Record<number, string> = {
   ...coreErrorMessages,
@@ -37,7 +37,7 @@ export {
   extractIdentifiers,
   isInDestructureAssignment,
   isStaticProperty,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 
 // Internals for type resolution
 export { invalidateTypeCache, registerTS } from './script/resolveType'
@@ -79,7 +79,7 @@ export type {
   CompilerOptions,
   CompilerError,
   BindingMetadata,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 
 /**
  * @deprecated this is preserved to avoid breaking vite-plugin-vue < 5.0
@@ -87,3 +87,4 @@ export type {
  * ignoring the option instead of breaking.
  */
 export const shouldTransformRef = () => false
+

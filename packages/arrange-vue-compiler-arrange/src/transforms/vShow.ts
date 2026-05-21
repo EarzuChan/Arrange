@@ -1,4 +1,4 @@
-import type { DirectiveTransform } from '@vue/compiler-core'
+﻿import type { DirectiveTransform } from '@arrange/vue-compiler-core'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 import { V_SHOW } from '../runtimeHelpers'
 
@@ -15,3 +15,4 @@ export const transformShow: DirectiveTransform = (dir, node, context) => {
     needRuntime: context.helper(V_SHOW),
   }
 }
+

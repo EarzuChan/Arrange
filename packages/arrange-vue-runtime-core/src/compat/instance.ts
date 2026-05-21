@@ -1,11 +1,11 @@
-import {
+﻿import {
   NOOP,
   extend,
   looseEqual,
   looseIndexOf,
   looseToNumber,
   toDisplayString,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import type {
   ComponentPublicInstance,
   PublicPropertiesMap,
@@ -19,7 +19,7 @@ import {
 } from './compatConfig'
 import { off, on, once } from './instanceEventEmitter'
 import { getCompatListeners } from './instanceListeners'
-import { shallowReadonly } from '@vue/reactivity'
+import { shallowReadonly } from '@arrange/vue-reactivity'
 import { legacySlotProxyHandlers } from './componentFunctional'
 import { compatH } from './renderFn'
 import { createCommentVNode, createTextVNode } from '../vnode'
@@ -197,3 +197,4 @@ export function installCompatInstanceProperties(
     }
   }
 }
+

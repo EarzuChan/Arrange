@@ -1,9 +1,9 @@
-import {
+﻿import {
   type CompilerError,
   ElementTypes,
   type NodeTransform,
   NodeTypes,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { isValidHTMLNesting } from '../htmlNesting'
 
 export const validateHtmlNesting: NodeTransform = (node, context) => {
@@ -25,3 +25,4 @@ export const validateHtmlNesting: NodeTransform = (node, context) => {
     context.onWarn(error)
   }
 }
+

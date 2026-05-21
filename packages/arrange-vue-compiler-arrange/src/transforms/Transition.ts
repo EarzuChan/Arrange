@@ -1,11 +1,11 @@
-import {
+﻿import {
   type ComponentNode,
   ElementTypes,
   type IfBranchNode,
   type NodeTransform,
   NodeTypes,
   isCommentOrWhitespace,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { TRANSITION } from '../runtimeHelpers'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 
@@ -68,3 +68,4 @@ function hasMultipleChildren(node: ComponentNode | IfBranchNode): boolean {
     (child.type === NodeTypes.IF && child.branches.some(hasMultipleChildren))
   )
 }
+

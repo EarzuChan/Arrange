@@ -1,4 +1,4 @@
-import { def, hasOwn, isObject, toRawType } from '@vue/shared'
+﻿import { def, hasOwn, isObject, toRawType } from '@arrange/vue-shared'
 import {
   mutableHandlers,
   readonlyHandlers,
@@ -446,3 +446,4 @@ export const toReactive = <T extends unknown>(value: T): T =>
  */
 export const toReadonly = <T extends unknown>(value: T): DeepReadonly<T> =>
   isObject(value) ? readonly(value) : (value as DeepReadonly<T>)
+

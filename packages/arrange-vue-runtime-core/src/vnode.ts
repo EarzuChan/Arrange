@@ -1,4 +1,4 @@
-import {
+﻿import {
   EMPTY_ARR,
   PatchFlags,
   ShapeFlags,
@@ -12,7 +12,7 @@ import {
   isString,
   normalizeClass,
   normalizeStyle,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   type ClassComponent,
   type Component,
@@ -28,7 +28,7 @@ import {
   isProxy,
   isRef,
   toRaw,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import type { AppContext } from './apiCreateApp'
 import {
   type Suspense,
@@ -920,3 +920,4 @@ export function invokeVNodeHook(
     prevVNode,
   ])
 }
+

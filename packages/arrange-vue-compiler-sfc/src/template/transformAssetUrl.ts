@@ -1,4 +1,4 @@
-import path from 'path'
+﻿import path from 'path'
 import {
   ConstantTypes,
   type ExpressionNode,
@@ -8,7 +8,7 @@ import {
   type SourceLocation,
   type TransformContext,
   createSimpleExpression,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import {
   isDataUrl,
   isExternalUrl,
@@ -16,7 +16,7 @@ import {
   normalizeDecodedImportPath,
   parseUrl,
 } from './templateUtils'
-import { isArray } from '@vue/shared'
+import { isArray } from '@arrange/vue-shared'
 
 export interface AssetURLTagConfig {
   [name: string]: string[]
@@ -83,7 +83,7 @@ function canTransformHashImport(tag: string, attrName: string): boolean {
 }
 
 /**
- * A `@vue/compiler-core` plugin that transforms relative asset urls into
+ * A `@arrange/vue-compiler-core` plugin that transforms relative asset urls into
  * either imports or absolute urls.
  *
  * ``` js
@@ -279,3 +279,4 @@ function getImportsExpressionExp(
   // Hoist the expression and return the hoisted expression
   return context.hoist(finalExp)
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CodegenResult,
   type CompilerError,
   type CompilerOptions,
@@ -9,7 +9,7 @@ import {
   type RawSourceMap,
   type RootNode,
   createRoot,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { SourceMapConsumer, SourceMapGenerator } from 'source-map-js'
 import {
   type AssetURLOptions,
@@ -22,10 +22,8 @@ import {
   createSrcsetTransformWithOptions,
   transformSrcset,
 } from './template/transformSrcset'
-import { generateCodeFrame, isObject } from '@vue/shared'
-import * as CompilerDOM from '@vue/compiler-dom'
-import * as CompilerSSR from '@vue/compiler-ssr'
-import consolidate from '@vue/consolidate'
+import { generateCodeFrame, isObject } from '@arrange/vue-shared'
+import * as CompilerDOM from '@arrange/vue-compiler-arrange'
 import { warnOnce } from './warn'
 import { genCssVarsFromList } from './style/cssVars'
 
@@ -124,9 +122,7 @@ export function compileTemplate(
   const preprocessor = preprocessLang
     ? preprocessCustomRequire
       ? preprocessCustomRequire(preprocessLang)
-      : __ESM_BROWSER__
-        ? undefined
-        : consolidate[preprocessLang as keyof typeof consolidate]
+      : undefined
     : false
   if (preprocessor) {
     try {
@@ -202,7 +198,13 @@ function doCompileTemplate({
   const shortId = id.replace(/^data-v-/, '')
   const longId = `data-v-${shortId}`
 
-  const defaultCompiler = ssr ? (CompilerSSR as TemplateCompiler) : CompilerDOM
+  if (ssr) {
+    throw new Error(
+      `Arrange Vue compiler does not support SSR template compilation.`,
+    )
+  }
+
+  const defaultCompiler = CompilerDOM
   compiler = compiler || defaultCompiler
 
   if (compiler !== defaultCompiler) {
@@ -215,7 +217,7 @@ function doCompileTemplate({
     // If input AST has already been transformed, then it cannot be reused.
     // We need to parse a fresh one. Can't just use `source` here since we need
     // the AST location info to be relative to the entire SFC.
-    const newAST = (ssr ? CompilerDOM : compiler).parse(inAST.source, {
+    const newAST = compiler.parse(inAST.source, {
       prefixIdentifiers: true,
       ...compilerOptions,
       parseMode: 'sfc',
@@ -346,3 +348,4 @@ function patchErrors(
     }
   })
 }
+

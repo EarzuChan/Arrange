@@ -1,10 +1,10 @@
-import { pauseTracking, resetTracking } from '@vue/reactivity'
+﻿import { pauseTracking, resetTracking } from '@arrange/vue-reactivity'
 import type { VNode } from './vnode'
 import type { ComponentInternalInstance } from './component'
 import { popWarningContext, pushWarningContext, warn } from './warning'
-import { EMPTY_OBJ, isArray, isFunction, isPromise } from '@vue/shared'
+import { EMPTY_OBJ, isArray, isFunction, isPromise } from '@arrange/vue-shared'
 import { LifecycleHooks } from './enums'
-import { WatchErrorCodes } from '@vue/reactivity'
+import { WatchErrorCodes } from '@arrange/vue-reactivity'
 
 // contexts where user provided function may be executed, in addition to
 // lifecycle hooks.
@@ -183,3 +183,4 @@ function logError(
     console.error(err)
   }
 }
+

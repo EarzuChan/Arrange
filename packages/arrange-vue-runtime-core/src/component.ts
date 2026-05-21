@@ -1,4 +1,4 @@
-import { type VNode, type VNodeChild, isVNode } from './vnode'
+﻿import { type VNode, type VNodeChild, isVNode } from './vnode'
 import {
   EffectScope,
   type ReactiveEffect,
@@ -10,7 +10,7 @@ import {
   resetTracking,
   shallowReadonly,
   track,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import {
   type ComponentPublicInstance,
   type ComponentPublicInstanceConstructor,
@@ -71,9 +71,9 @@ import {
   isObject,
   isPromise,
   makeMap,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import type { SuspenseBoundary } from './components/Suspense'
-import type { CompilerOptions } from '@vue/compiler-core'
+import type { CompilerOptions } from '@arrange/vue-compiler-core'
 import { markAttrsAccessed } from './componentRenderUtils'
 import { currentRenderingInstance } from './componentRenderContext'
 import { endMeasure, startMeasure } from './profiling'
@@ -154,7 +154,7 @@ export interface ComponentCustomProps {}
  * ```ts
  * import VTooltip from 'v-tooltip'
  *
- * declare module '@vue/runtime-core' {
+ * declare module '@arrange/vue-runtime-core' {
  *   interface GlobalDirectives {
  *     VTooltip
  *   }
@@ -171,7 +171,7 @@ export interface GlobalDirectives {}
  * ```ts
  * import { RouterView } from 'vue-router'
  *
- * declare module '@vue/runtime-core' {
+ * declare module '@arrange/vue-runtime-core' {
  *   interface GlobalComponents {
  *     RouterView
  *   }
@@ -1302,3 +1302,4 @@ export interface ComponentCustomElementInterface {
    */
   _hasShadowRoot(): boolean
 }
+

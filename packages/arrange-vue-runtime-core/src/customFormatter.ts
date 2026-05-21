@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Ref,
   isReactive,
   isReadonly,
@@ -7,8 +7,8 @@ import {
   pauseTracking,
   resetTracking,
   toRaw,
-} from '@vue/reactivity'
-import { EMPTY_OBJ, extend, isArray, isFunction, isObject } from '@vue/shared'
+} from '@arrange/vue-reactivity'
+import { EMPTY_OBJ, extend, isArray, isFunction, isObject } from '@arrange/vue-shared'
 import type { ComponentInternalInstance, ComponentOptions } from './component'
 import type { ComponentPublicInstance } from './componentPublicInstance'
 
@@ -210,3 +210,4 @@ export function initCustomFormatter(): void {
     ;(window as any).devtoolsFormatters = [formatter]
   }
 }
+

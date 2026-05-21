@@ -1,4 +1,4 @@
-import { isFunction } from '@vue/shared'
+﻿import { isFunction } from '@arrange/vue-shared'
 import {
   type DebuggerEvent,
   type DebuggerOptions,
@@ -41,7 +41,7 @@ export interface WritableComputedOptions<T, S = T> {
 }
 
 /**
- * @private exported by @vue/reactivity for Vue core use, but not exported from
+ * @private exported by @arrange/vue-reactivity for Vue core use, but not exported from
  * the main vue package
  */
 export class ComputedRefImpl<T = any> implements Subscriber {
@@ -219,3 +219,4 @@ export function computed<T>(
 
   return cRef as any
 }
+

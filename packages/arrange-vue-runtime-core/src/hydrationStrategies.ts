@@ -1,4 +1,4 @@
-import { getGlobalThis, isString } from '@vue/shared'
+﻿import { getGlobalThis, isString } from '@arrange/vue-shared'
 import { DOMNodeTypes, isComment } from './hydration'
 
 // Polyfills for Safari support
@@ -137,3 +137,4 @@ export function forEachElement(
     cb(node as Element)
   }
 }
+

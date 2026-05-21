@@ -1,4 +1,4 @@
-import { registerRuntimeHelpers } from '@vue/compiler-core'
+﻿import { registerRuntimeHelpers } from '@arrange/vue-compiler-core'
 
 export const V_MODEL_RADIO: unique symbol = Symbol(__DEV__ ? `vModelRadio` : ``)
 export const V_MODEL_CHECKBOX: unique symbol = Symbol(
@@ -38,3 +38,4 @@ registerRuntimeHelpers({
   [TRANSITION]: `Transition`,
   [TRANSITION_GROUP]: `TransitionGroup`,
 })
+

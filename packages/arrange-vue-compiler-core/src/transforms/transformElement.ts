@@ -1,4 +1,4 @@
-import type { NodeTransform, TransformContext } from '../transform'
+﻿import type { NodeTransform, TransformContext } from '../transform'
 import {
   type ArrayExpression,
   type CallExpression,
@@ -31,7 +31,7 @@ import {
   isOn,
   isReservedProp,
   isSymbol,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { ErrorCodes, createCompilerError } from '../errors'
 import {
   GUARD_REACTIVE_PROPS,
@@ -935,3 +935,4 @@ function stringifyDynamicPropNames(props: string[]): string {
 function isComponentTag(tag: string) {
   return tag === 'component' || tag === 'Component'
 }
+

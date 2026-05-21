@@ -1,4 +1,4 @@
-import { isArray } from '@vue/shared'
+﻿import { isArray } from '@arrange/vue-shared'
 import type { ComponentInternalInstance } from '../component'
 import type { DirectiveHook, ObjectDirective } from '../directives'
 import { DeprecationTypes, softAssertCompatEnabled } from './compatConfig'
@@ -58,3 +58,4 @@ export function mapCompatDirectiveHook(
     }
   }
 }
+

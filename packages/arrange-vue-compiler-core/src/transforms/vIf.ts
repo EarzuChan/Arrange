@@ -1,4 +1,4 @@
-import {
+﻿import {
   type NodeTransform,
   type TransformContext,
   createStructuralDirectiveTransform,
@@ -39,7 +39,7 @@ import {
   injectProp,
   isCommentOrWhitespace,
 } from '../utils'
-import { PatchFlags } from '@vue/shared'
+import { PatchFlags } from '@arrange/vue-shared'
 
 export const transformIf: NodeTransform = createStructuralDirectiveTransform(
   /^(?:if|else|else-if)$/,
@@ -347,3 +347,4 @@ function getParentCondition(
     }
   }
 }
+

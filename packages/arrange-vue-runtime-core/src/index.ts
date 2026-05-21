@@ -1,4 +1,4 @@
-// Core API ------------------------------------------------------------------
+﻿// Core API ------------------------------------------------------------------
 
 export const version: string = __VERSION__
 export {
@@ -36,7 +36,7 @@ export {
   EffectScope,
   getCurrentScope,
   onScopeDispose,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 export { computed } from './apiComputed'
 export {
   watch,
@@ -184,7 +184,7 @@ import type { VNode } from './vnode'
 import type { ComponentInternalInstance } from './component'
 
 // Augment Ref unwrap bail types.
-declare module '@vue/reactivity' {
+declare module '@arrange/vue-reactivity' {
   export interface RefUnwrapBailTypes {
     runtimeCoreBailTypes:
       | VNode
@@ -196,7 +196,7 @@ declare module '@vue/reactivity' {
   }
 }
 
-export { TrackOpTypes, TriggerOpTypes } from '@vue/reactivity'
+export { TrackOpTypes, TriggerOpTypes } from '@arrange/vue-reactivity'
 export type {
   Ref,
   MaybeRef,
@@ -224,7 +224,7 @@ export type {
   DebuggerEventExtraInfo,
   Raw,
   Reactive,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 export type {
   MultiWatchSources,
   WatchEffect,
@@ -353,7 +353,7 @@ export type { HMRRuntime } from './hmr'
 // user code should avoid relying on them.
 
 // For compiler generated code
-// should sync with '@vue/compiler-core/src/runtimeHelpers.ts'
+// should sync with '@arrange/vue-compiler-core/src/runtimeHelpers.ts'
 export {
   withCtx,
   pushScopeId,
@@ -384,7 +384,7 @@ export {
   normalizeProps,
   normalizeClass,
   normalizeStyle,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 
 // For test-utils
 export { transformVNodeArgs } from './vnode'
@@ -449,7 +449,7 @@ import {
   softAssertCompatEnabled,
 } from './compat/compatConfig'
 import { resolveFilter as _resolveFilter } from './helpers/resolveAssets'
-import { NOOP } from '@vue/shared'
+import { NOOP } from '@arrange/vue-shared'
 
 /**
  * @internal only exposed in compat builds
@@ -482,3 +482,4 @@ export const compatUtils = (
 export const DeprecationTypes = (
   __COMPAT__ ? _DeprecationTypes : null
 ) as typeof _DeprecationTypes
+

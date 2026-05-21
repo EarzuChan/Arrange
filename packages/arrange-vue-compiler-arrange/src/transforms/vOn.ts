@@ -1,4 +1,4 @@
-import {
+﻿import {
   CompilerDeprecationTypes,
   type DirectiveTransform,
   type ExpressionNode,
@@ -13,9 +13,9 @@ import {
   createObjectProperty,
   createSimpleExpression,
   isStaticExp,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { V_ON_WITH_KEYS, V_ON_WITH_MODIFIERS } from '../runtimeHelpers'
-import { capitalize, makeMap } from '@vue/shared'
+import { capitalize, makeMap } from '@arrange/vue-shared'
 
 const isEventOptionModifier = /*@__PURE__*/ makeMap(`passive,once,capture`)
 const isNonKeyModifier = /*@__PURE__*/ makeMap(
@@ -152,3 +152,4 @@ export const transformOn: DirectiveTransform = (dir, node, context) => {
     }
   })
 }
+

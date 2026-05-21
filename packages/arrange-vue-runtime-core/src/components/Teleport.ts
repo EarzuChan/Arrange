@@ -1,4 +1,4 @@
-import type { ComponentInternalInstance } from '../component'
+﻿import type { ComponentInternalInstance } from '../component'
 import type { SuspenseBoundary } from './Suspense'
 import {
   type ElementNamespace,
@@ -11,7 +11,7 @@ import {
   traverseStaticChildren,
 } from '../renderer'
 import type { VNode, VNodeArrayChildren, VNodeProps } from '../vnode'
-import { ShapeFlags, isString } from '@vue/shared'
+import { ShapeFlags, isString } from '@arrange/vue-shared'
 import { warn } from '../warning'
 import { isHmrUpdating } from '../hmr'
 import { type SchedulerJob, SchedulerJobFlags } from '../scheduler'
@@ -584,3 +584,4 @@ function prepareAnchor(
 
   return targetAnchor
 }
+

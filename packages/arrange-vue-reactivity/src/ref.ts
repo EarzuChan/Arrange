@@ -1,4 +1,4 @@
-import {
+﻿import {
   type IfAny,
   hasChanged,
   isArray,
@@ -6,7 +6,7 @@ import {
   isIntegerKey,
   isObject,
   isSymbol,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { Dep, getDepFromReactive } from './dep'
 import {
   type Builtin,
@@ -530,7 +530,7 @@ function propertyToRef(
  * \@vue/runtime-dom can declare it like so in its d.ts:
  *
  * ``` ts
- * declare module '@vue/reactivity' {
+ * declare module '@arrange/vue-reactivity' {
  *   export interface RefUnwrapBailTypes {
  *     runtimeDOMBailTypes: Node | Window
  *   }
@@ -579,3 +579,4 @@ export type UnwrapRefSimple<T> = T extends
                     [P in keyof T]: P extends symbol ? T[P] : UnwrapRef<T[P]>
                   }
                 : T
+

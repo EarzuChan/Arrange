@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ComponentInjectOptions,
   ComponentOptions,
   ComponentOptionsBase,
@@ -27,7 +27,7 @@ import type {
   EmitsToProps,
   TypeEmitsToOptions,
 } from './componentEmits'
-import { type IsKeyValues, extend, isFunction } from '@vue/shared'
+import { type IsKeyValues, extend, isFunction } from '@arrange/vue-shared'
 import type { VNodeProps } from './vnode'
 import type {
   ComponentPublicInstanceConstructor,
@@ -313,3 +313,4 @@ export function defineComponent(
         extend({ name: options.name }, extraOptions, { setup: options }))()
     : options
 }
+

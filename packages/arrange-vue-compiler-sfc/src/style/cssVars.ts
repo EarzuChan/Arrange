@@ -1,4 +1,4 @@
-import {
+﻿import {
   type BindingMetadata,
   NodeTypes,
   type SimpleExpressionNode,
@@ -6,11 +6,11 @@ import {
   createSimpleExpression,
   createTransformContext,
   processExpression,
-} from '@vue/compiler-dom'
+} from '@arrange/vue-compiler-arrange'
 import type { SFCDescriptor } from '../parse'
 import type { PluginCreator } from 'postcss'
 import hash from 'hash-sum'
-import { getEscapedCssVarName } from '@vue/shared'
+import { getEscapedCssVarName } from '@arrange/vue-shared'
 
 export const CSS_VARS_HELPER = `useCssVars`
 
@@ -214,3 +214,4 @@ export function genNormalScriptCssVarsCode(
     `  : __injectCSSVars__\n`
   )
 }
+

@@ -1,4 +1,4 @@
-import type { NodeTransform } from '../transform'
+﻿import type { NodeTransform } from '../transform'
 import {
   type CallExpression,
   type CompoundExpressionNode,
@@ -10,7 +10,7 @@ import {
 } from '../ast'
 import { isText } from '../utils'
 import { CREATE_TEXT } from '../runtimeHelpers'
-import { PatchFlagNames, PatchFlags } from '@vue/shared'
+import { PatchFlagNames, PatchFlags } from '@arrange/vue-shared'
 import { getConstantType } from './cacheStatic'
 
 // Merge adjacent text nodes and expressions into a single expression
@@ -117,3 +117,4 @@ export const transformText: NodeTransform = (node, context) => {
     }
   }
 }
+

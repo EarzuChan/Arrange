@@ -1,4 +1,4 @@
-import type { CodegenOptions } from './options'
+﻿import type { CodegenOptions } from './options'
 import {
   type ArrayExpression,
   type AssignmentExpression,
@@ -41,7 +41,7 @@ import {
   isArray,
   isString,
   isSymbol,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   CREATE_COMMENT,
   CREATE_ELEMENT_VNODE,
@@ -1116,3 +1116,4 @@ function genReturnStatement(
     genNode(returns, context)
   }
 }
+

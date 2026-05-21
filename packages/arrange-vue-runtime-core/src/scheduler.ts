@@ -1,5 +1,5 @@
-import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling'
-import { NOOP, isArray } from '@vue/shared'
+﻿import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling'
+import { NOOP, isArray } from '@arrange/vue-shared'
 import { type ComponentInternalInstance, getComponentName } from './component'
 
 export enum SchedulerJobFlags {
@@ -288,3 +288,4 @@ function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {
   seen.set(fn, count + 1)
   return false
 }
+

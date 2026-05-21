@@ -1,11 +1,11 @@
-import type { CallExpression, Node, ObjectPattern, Program } from '@babel/types'
+﻿import type { CallExpression, Node, ObjectPattern, Program } from '@babel/types'
 import type { SFCDescriptor } from '../parse'
-import { generateCodeFrame, isArray } from '@vue/shared'
+import { generateCodeFrame, isArray } from '@arrange/vue-shared'
 import { type ParserPlugin, parse as babelParse } from '@babel/parser'
 import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript'
 import type { PropsDestructureBindings } from './defineProps'
 import type { ModelDecl } from './defineModel'
-import type { BindingMetadata } from '../../../compiler-core/src'
+import type { BindingMetadata } from '@arrange/vue-compiler-core'
 import MagicString from 'magic-string'
 import type { TypeScope } from './resolveType'
 import { warn } from '../warn'
@@ -19,12 +19,11 @@ export class ScriptCompileContext {
   scriptAst: Program | null
   scriptSetupAst: Program | null
 
-  source: string = this.descriptor.source
-  filename: string = this.descriptor.filename
-  s: MagicString = new MagicString(this.source)
-  startOffset: number | undefined =
-    this.descriptor.scriptSetup?.loc.start.offset
-  endOffset: number | undefined = this.descriptor.scriptSetup?.loc.end.offset
+  source: string
+  filename: string
+  s: MagicString
+  startOffset: number | undefined
+  endOffset: number | undefined
 
   // import / type analysis
   scope?: TypeScope
@@ -84,6 +83,12 @@ export class ScriptCompileContext {
     public descriptor: SFCDescriptor,
     public options: Partial<SFCScriptCompileOptions>,
   ) {
+    this.source = descriptor.source
+    this.filename = descriptor.filename
+    this.s = new MagicString(this.source)
+    this.startOffset = descriptor.scriptSetup?.loc.start.offset
+    this.endOffset = descriptor.scriptSetup?.loc.end.offset
+
     const { script, scriptSetup } = descriptor
     const scriptLang = script && script.lang
     const scriptSetupLang = scriptSetup && scriptSetup.lang
@@ -205,3 +210,4 @@ export function resolveParserPlugins(
   }
   return plugins
 }
+

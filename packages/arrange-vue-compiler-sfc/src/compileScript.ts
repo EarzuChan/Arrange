@@ -1,17 +1,17 @@
-import {
+﻿import {
   BindingTypes,
   UNREF,
   isFunctionType,
   unwrapTSNode,
   walkIdentifiers,
-} from '@vue/compiler-dom'
+} from '@arrange/vue-compiler-arrange'
 import {
   DEFAULT_FILENAME,
   type SFCDescriptor,
   type SFCScriptBlock,
 } from './parse'
 import type { ParserPlugin } from '@babel/parser'
-import { generateCodeFrame } from '@vue/shared'
+import { generateCodeFrame } from '@arrange/vue-shared'
 import type {
   ArrayPattern,
   CallExpression,
@@ -1408,3 +1408,4 @@ export function mergeSourceMaps(
   ;(generator as any)._file = scriptMap.file
   return (generator as any).toJSON()
 }
+

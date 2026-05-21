@@ -1,4 +1,4 @@
-import { hasChanged } from '@vue/shared'
+﻿import { hasChanged } from '@arrange/vue-shared'
 import { type VNode, currentBlock, isBlockTreeEnabled } from '../vnode'
 
 export function withMemo(
@@ -38,3 +38,4 @@ export function isMemoSame(cached: VNode, memo: any[]): boolean {
   }
   return true
 }
+

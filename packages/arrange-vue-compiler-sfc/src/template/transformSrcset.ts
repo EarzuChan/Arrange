@@ -1,4 +1,4 @@
-import path from 'path'
+﻿import path from 'path'
 import {
   ConstantTypes,
   type ExpressionNode,
@@ -7,7 +7,7 @@ import {
   type SimpleExpressionNode,
   createCompoundExpression,
   createSimpleExpression,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import {
   isDataUrl,
   isExternalUrl,
@@ -182,3 +182,4 @@ export const transformSrcset: NodeTransform = (
     }
   }
 }
+

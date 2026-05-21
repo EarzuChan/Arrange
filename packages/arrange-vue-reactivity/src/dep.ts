@@ -1,4 +1,4 @@
-import { extend, isArray, isIntegerKey, isMap, isSymbol } from '@vue/shared'
+﻿import { extend, isArray, isIntegerKey, isMap, isSymbol } from '@arrange/vue-shared'
 import type { ComputedRefImpl } from './computed'
 import { type TrackOpTypes, TriggerOpTypes } from './constants'
 import {
@@ -395,3 +395,4 @@ export function getDepFromReactive(
   const depMap = targetMap.get(object)
   return depMap && depMap.get(key)
 }
+

@@ -1,12 +1,12 @@
-import type { VNode } from './vnode'
+﻿import type { VNode } from './vnode'
 import {
   type ComponentInternalInstance,
   type ConcreteComponent,
   type Data,
   formatComponentName,
 } from './component'
-import { isFunction, isString } from '@vue/shared'
-import { isRef, pauseTracking, resetTracking, toRaw } from '@vue/reactivity'
+import { isFunction, isString } from '@arrange/vue-shared'
+import { isRef, pauseTracking, resetTracking, toRaw } from '@arrange/vue-reactivity'
 import { ErrorCodes, callWithErrorHandling } from './errorHandling'
 
 type ComponentVNode = VNode & {
@@ -180,3 +180,4 @@ export function assertNumber(val: unknown, type: string): void {
   }
 }
 /* v8 ignore stop */
+

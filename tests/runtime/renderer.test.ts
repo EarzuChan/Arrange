@@ -1,12 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {createRequire} from "node:module"
-import {pathToFileURL} from "node:url"
-import {Column, Icon, Text, createApp, diagnostics, logger, m, provideContentColor, rememberScrollState} from "../../packages/runtime/src/index.ts"
+import {Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, rememberScrollState} from "../../packages/runtime/src/index.ts"
 import type {NativeTransactionTarget} from "../../packages/runtime/src/index.ts"
-
-const requireFromRuntime = createRequire(new URL("../../packages/runtime/package.json", import.meta.url))
-const {h: vueH, nextTick, ref} = await import(pathToFileURL(requireFromRuntime.resolve("vue")).href)
 
 type NativeCall = readonly [string, ...unknown[]]
 

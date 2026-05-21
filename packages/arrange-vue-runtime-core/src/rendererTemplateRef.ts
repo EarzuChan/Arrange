@@ -1,4 +1,4 @@
-import type { SuspenseBoundary } from './components/Suspense'
+﻿import type { SuspenseBoundary } from './components/Suspense'
 import type {
   VNode,
   VNodeNormalizedRef,
@@ -14,10 +14,10 @@ import {
   isFunction,
   isString,
   remove,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { isAsyncWrapper } from './apiAsyncComponent'
 import { warn } from './warning'
-import { isRef, toRaw } from '@vue/reactivity'
+import { isRef, toRaw } from '@arrange/vue-reactivity'
 import { ErrorCodes, callWithErrorHandling } from './errorHandling'
 import { type SchedulerJob, SchedulerJobFlags } from './scheduler'
 import { queuePostRenderEffect } from './renderer'
@@ -213,3 +213,4 @@ function invalidatePendingSetRef(rawRef: VNodeNormalizedRef) {
     pendingSetRefMap.delete(rawRef)
   }
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   camelize,
   extend,
   hyphenate,
@@ -6,7 +6,7 @@ import {
   isObject,
   isReservedProp,
   normalizeClass,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import type { ComponentInternalInstance, Data } from '../component'
 import type { Slot } from '../componentSlots'
 import { createSlots } from '../helpers/createSlots'
@@ -180,3 +180,4 @@ export function legacyBindDynamicKeys(props: any, values: any[]): any {
 export function legacyPrependModifier(value: any, symbol: string): any {
   return typeof value === 'string' ? symbol + value : value
 }
+

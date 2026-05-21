@@ -1,4 +1,4 @@
-// - Parse expressions in templates into compound expressions so that each
+﻿// - Parse expressions in templates into compound expressions so that each
 //   identifier gets more accurate source-map locations.
 //
 // - Prefix identifiers with `_ctx.` or `$xxx` (for known binding types) so that
@@ -31,7 +31,7 @@ import {
   isGloballyAllowed,
   isString,
   makeMap,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { ErrorCodes, createCompilerError } from '../errors'
 import type {
   AssignmentExpression,
@@ -418,3 +418,4 @@ function isConst(type: unknown) {
     type === BindingTypes.SETUP_CONST || type === BindingTypes.LITERAL_CONST
   )
 }
+

@@ -1,4 +1,4 @@
-import { ShapeFlags, extend } from '@vue/shared'
+﻿import { ShapeFlags, extend } from '@arrange/vue-shared'
 import type { ComponentInternalInstance, ComponentOptions } from '../component'
 import { createAppContext } from '../apiCreateApp'
 import { ErrorCodes, callWithErrorHandling } from '../errorHandling'
@@ -91,3 +91,4 @@ export function compatModelEmit(
     )
   }
 }
+

@@ -1,4 +1,4 @@
-import { type PatchFlags, isString } from '@vue/shared'
+﻿import { type PatchFlags, isString } from '@arrange/vue-shared'
 import {
   CREATE_BLOCK,
   CREATE_ELEMENT_BLOCK,
@@ -879,3 +879,4 @@ export function convertToBlock(
     helper(getVNodeBlockHelper(inSSR, node.isComponent))
   }
 }
+

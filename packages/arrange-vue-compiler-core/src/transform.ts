@@ -1,4 +1,4 @@
-import type { TransformOptions } from './options'
+﻿import type { TransformOptions } from './options'
 import {
   type ArrayExpression,
   type CacheExpression,
@@ -28,7 +28,7 @@ import {
   capitalize,
   isArray,
   isString,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { defaultOnError, defaultOnWarn } from './errors'
 import {
   CREATE_COMMENT,
@@ -516,3 +516,4 @@ export function createStructuralDirectiveTransform(
     }
   }
 }
+

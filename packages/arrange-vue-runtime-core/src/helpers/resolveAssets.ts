@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ComponentOptions,
   type ConcreteComponent,
   currentInstance,
@@ -6,7 +6,7 @@ import {
 } from '../component'
 import { currentRenderingInstance } from '../componentRenderContext'
 import type { Directive } from '../directives'
-import { camelize, capitalize, isString } from '@vue/shared'
+import { camelize, capitalize, isString } from '@arrange/vue-shared'
 import { warn } from '../warning'
 import type { VNodeTypes } from '../vnode'
 
@@ -138,3 +138,4 @@ function resolve(registry: Record<string, any> | undefined, name: string) {
       registry[capitalize(camelize(name))])
   )
 }
+

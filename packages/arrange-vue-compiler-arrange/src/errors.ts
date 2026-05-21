@@ -1,9 +1,9 @@
-import {
+﻿import {
   type CompilerError,
   ErrorCodes,
   type SourceLocation,
   createCompilerError,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 
 export interface DOMCompilerError extends CompilerError {
   code: DOMErrorCodes
@@ -61,3 +61,4 @@ export const DOMErrorMessages: { [code: number]: string } = {
   [DOMErrorCodes.X_TRANSITION_INVALID_CHILDREN]: `<Transition> expects exactly one child element or component.`,
   [DOMErrorCodes.X_IGNORED_SIDE_EFFECT_TAG]: `Tags with side effect (<script> and <style>) are ignored in client component templates.`,
 }
+

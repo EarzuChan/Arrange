@@ -1,4 +1,4 @@
-import {
+﻿import {
   type BlockCodegenNode,
   type CacheExpression,
   type CallExpression,
@@ -37,7 +37,7 @@ import {
   TO_HANDLERS,
   WITH_MEMO,
 } from './runtimeHelpers'
-import { NOOP, isObject, isString } from '@vue/shared'
+import { NOOP, isObject, isString } from '@arrange/vue-shared'
 import type { PropsExpression } from './transforms/transformElement'
 import { parseExpression } from '@babel/parser'
 import type { Expression, Node } from '@babel/types'
@@ -589,3 +589,4 @@ export function isWhitespaceText(node: TemplateChildNode): boolean {
 export function isCommentOrWhitespace(node: TemplateChildNode): boolean {
   return node.type === NodeTypes.COMMENT || isWhitespaceText(node)
 }
+

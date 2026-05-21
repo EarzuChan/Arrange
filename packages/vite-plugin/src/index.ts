@@ -1,10 +1,11 @@
 import {createRequire} from "node:module"
 import {resolve} from "node:path"
 import {pathToFileURL} from "node:url"
+import {transformWithEsbuild} from "vite"
+import {compileScript, compileTemplate, parse} from "@arrange/vue-compiler-sfc"
 
 const DOM_TAG_PATTERN = /<\s*(div|span|input|canvas|button|section|article|main|header|footer)(\s|>|\/)/
 const CLASS_STYLE_PATTERN = /\s(class|style)\s*=/i
-const SFC_STYLE_PATTERN = /<\s*style(\s|>)/i
 const HMR_CLIENT_MARKER = "__ARRANGE_HMR_CLIENT__"
 const HOT_EXTENSIONS = new Set([".vue", ".ts", ".tsx", ".js", ".jsx"])
 const DEV_BUNDLE_PATH = "/@arrange/app.js"
@@ -23,15 +24,17 @@ type ViteModule = {
     mergeConfig: (base: Record<string, unknown>, patch: Record<string, unknown>) => Record<string, unknown>
 }
 
-type ViteOutputItem = {
-    type?: string
-    fileName?: string
+type ViteBuildChunk = {
+    type: "chunk"
+    fileName: string
+    code: string
     isEntry?: boolean
-    code?: string
-    output?: ViteOutputItem[]
 }
 
-type ViteBuildResult = ViteOutputItem | {output?: ViteOutputItem[]} | Array<{output?: ViteOutputItem[]}>
+type ViteBuildResult = {
+    output?: Array<{type?: string; fileName?: string; code?: string; isEntry?: boolean}>
+}
+
 type MiddlewareHandler = (req: unknown, res: {statusCode: number; setHeader: (name: string, value: string) => void; end: (body?: string) => void}) => void | Promise<void>
 type ArrangeDevServer = {
     config?: {
@@ -104,16 +107,98 @@ if (import.meta.hot) ${HMR_CLIENT_MARKER}(import.meta.hot)
 `
 }
 
+function hashId(filename: string, source: string): string {
+    let hash = 0x811c9dc5
+    const input = `${filename}\0${source}`
+    for (let index = 0; index < input.length; index++) {
+        hash ^= input.charCodeAt(index)
+        hash = Math.imul(hash, 0x01000193)
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0")
+}
+
+function supportsTs(lang: string | undefined): boolean {
+    return typeof lang === "string" && /tsx?|mts|cts/i.test(lang)
+}
+
+function replaceExportRender(code: string): string {
+    return code.replace(/^export\s+function\s+render/m, "function render")
+}
+
+function compileArrangeSfc(code: string, id: string): {code: string; warnings: string[]} {
+    const filename = normalizePath(id)
+    const descriptorResult = parse(code, {filename})
+    if (descriptorResult.errors.length) {
+        throw new Error(
+            descriptorResult.errors
+                .map((error) => error instanceof Error ? error.message : String(error))
+                .join("\n"),
+        )
+    }
+
+    const descriptor = descriptorResult.descriptor
+    const warnings: string[] = []
+    if (DOM_TAG_PATTERN.test(code)) warnings.push("Arrange does not render DOM/HTML tags; use Box/Row/Column/Text/Input/Canvas etc.")
+    if (CLASS_STYLE_PATTERN.test(code)) warnings.push("Arrange ignores class/style attributes; use modifier instead.")
+    if (descriptor.styles.length > 0) warnings.push("Arrange ignores SFC <style> blocks; use Modifier and theme tokens instead.")
+
+    const shortId = hashId(filename, code)
+    const compilerOptions = {runtimeModuleName: "@arrange/runtime"}
+
+    if (descriptor.scriptSetup || descriptor.script) {
+        const script = compileScript(descriptor, {
+            id: shortId,
+            genDefaultAs: "_sfc_main",
+            inlineTemplate: Boolean(descriptor.template),
+            templateOptions: {compilerOptions},
+            isProd: true,
+        })
+
+        let output = script.content
+        if (!descriptor.template) {
+            output += "\nexport default _sfc_main"
+        } else if (!script.content.includes("export default")) {
+            output += "\nexport default _sfc_main"
+        }
+        return {
+            code: output,
+            warnings,
+        }
+    }
+
+    if (!descriptor.template) {
+        throw new Error(`Arrange SFC ${filename} contains no <script> or <template> block.`)
+    }
+
+    const template = compileTemplate({
+        source: descriptor.template.content,
+        filename,
+        id: shortId,
+        isProd: true,
+        compilerOptions,
+    })
+    if (template.errors.length) {
+        throw new Error(
+            template.errors
+                .map((error) => error instanceof Error ? error.message : String(error))
+                .join("\n"),
+        )
+    }
+
+    const codeBlock = replaceExportRender(template.code)
+    const output = `const _sfc_main = {}\n${codeBlock}\n_sfc_main.render = render\nexport default _sfc_main`
+    return {code: output, warnings}
+}
+
 async function importViteApiFromServerRoot(root: string): Promise<ViteModule> {
     const require = createRequire(resolve(root, "package.json"))
     const viteEntry = require.resolve("vite")
     return import(pathToFileURL(viteEntry).href) as Promise<ViteModule>
 }
 
-function outputOfBuildResult(result: ViteBuildResult): ViteOutputItem[] {
-    if (Array.isArray(result)) return result.flatMap((item) => item.output ?? [])
-    if ("output" in result && Array.isArray(result.output)) return result.output
-    return []
+function outputOfBuildResult(result: ViteBuildResult | ViteBuildResult[]): ViteBuildChunk[] {
+    const items = Array.isArray(result) ? result : [result]
+    return items.flatMap((item) => item.output ?? []).filter((item): item is ViteBuildChunk => item.type === "chunk")
 }
 
 export async function buildDevBundle(server: ArrangeDevServer, entry: string): Promise<string> {
@@ -130,6 +215,9 @@ export async function buildDevBundle(server: ArrangeDevServer, entry: string): P
         root: config.root,
         mode: config.mode,
         logLevel: "silent",
+        define: {
+            "process.env.NODE_ENV": JSON.stringify(config.mode === "production" ? "production" : "development"),
+        },
         build: {
             write: false,
             target: "es2022",
@@ -159,7 +247,7 @@ export type ArrangeVitePlugin = {
     config: () => ArrangeViteConfig
     configureServer: (server: ArrangeDevServer) => void
     handleHotUpdate: (ctx: HotUpdateContext) => HotUpdateModule[]
-    transform: (this: TransformThis, code: string, id: string) => string | null
+    transform: (this: TransformThis, code: string, id: string) => string | Promise<string | null> | null
 }
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
@@ -213,17 +301,23 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
             })
             return []
         },
-        transform(this: TransformThis, code: string, id: string): string | null {
+        transform(this: TransformThis, code: string, id: string): string | Promise<string | null> | null {
             if (isEntryModule(id, entry)) return injectHmrClient(code)
             if (!id.endsWith(".vue")) return null
             if (id.includes("?")) return null
-            if (id.endsWith(".vue") && !code.includes("<template")) return null
-            const warnings: string[] = []
-            if (DOM_TAG_PATTERN.test(code)) warnings.push("Arrange does not render DOM/HTML tags; use Box/Row/Column/Text/Input/Canvas etc.")
-            if (CLASS_STYLE_PATTERN.test(code)) warnings.push("Arrange ignores class/style attributes; use modifier instead.")
-            if (SFC_STYLE_PATTERN.test(code)) warnings.push("Arrange ignores SFC <style>; use Modifier and theme tokens instead.")
+
+            const {code: transformed, warnings} = compileArrangeSfc(code, id)
             for (const message of warnings) this.warn({id, message})
-            return null
+
+            const descriptor = parse(code, {filename: normalizePath(id)}).descriptor
+            const needsEsbuild = supportsTs(descriptor.script?.lang) || supportsTs(descriptor.scriptSetup?.lang)
+            if (!needsEsbuild) return transformed
+
+            return transformWithEsbuild(transformed, id, {
+                loader: "ts",
+                target: "es2022",
+                sourcemap: false,
+            }).then((result) => result.code)
         },
     }
 }

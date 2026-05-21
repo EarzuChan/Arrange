@@ -1,4 +1,4 @@
-/**
+﻿/**
 Runtime helper for applying directives to a vnode. Example usage:
 
 const comp = resolveComponent('comp')
@@ -12,7 +12,7 @@ return withDirectives(h(comp), [
 */
 
 import type { VNode } from './vnode'
-import { EMPTY_OBJ, isBuiltInDirective, isFunction } from '@vue/shared'
+import { EMPTY_OBJ, isBuiltInDirective, isFunction } from '@arrange/vue-shared'
 import { warn } from './warning'
 import {
   type ComponentInternalInstance,
@@ -23,7 +23,7 @@ import { currentRenderingInstance } from './componentRenderContext'
 import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
 import type { ComponentPublicInstance } from './componentPublicInstance'
 import { mapCompatDirectiveHook } from './compat/customDirective'
-import { pauseTracking, resetTracking, traverse } from '@vue/reactivity'
+import { pauseTracking, resetTracking, traverse } from '@arrange/vue-reactivity'
 
 export interface DirectiveBinding<
   Value = any,
@@ -198,3 +198,4 @@ export function invokeDirectiveHook(
     }
   }
 }
+

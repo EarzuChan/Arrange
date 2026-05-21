@@ -1,4 +1,4 @@
-import { isPlainObject } from '@vue/shared'
+﻿import { isPlainObject } from '@arrange/vue-shared'
 import { DeprecationTypes, warnDeprecation } from './compatConfig'
 
 export function deepMergeData(to: any, from: any): any {
@@ -14,3 +14,4 @@ export function deepMergeData(to: any, from: any): any {
   }
   return to
 }
+

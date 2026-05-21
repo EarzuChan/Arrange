@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Component,
   type ComponentInternalInstance,
   type ComponentOptions,
@@ -7,12 +7,12 @@ import {
   getComponentName,
   isInSSRComponentSetup,
 } from './component'
-import { isFunction, isObject } from '@vue/shared'
+import { isFunction, isObject } from '@arrange/vue-shared'
 import type { ComponentPublicInstance } from './componentPublicInstance'
 import { type VNode, createVNode } from './vnode'
 import { defineComponent } from './apiDefineComponent'
 import { warn } from './warning'
-import { ref } from '@vue/reactivity'
+import { ref } from '@arrange/vue-reactivity'
 import { ErrorCodes, handleError } from './errorHandling'
 import { isKeepAlive } from './components/KeepAlive'
 import { markAsyncBoundary } from './helpers/useId'
@@ -266,3 +266,4 @@ function createInnerComp(
 
   return vnode
 }
+

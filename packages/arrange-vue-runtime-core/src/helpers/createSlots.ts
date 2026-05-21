@@ -1,4 +1,4 @@
-import { isArray } from '@vue/shared'
+﻿import { isArray } from '@arrange/vue-shared'
 import type { VNode } from '../vnode'
 
 // #6651 res can be undefined in SSR in string push mode
@@ -44,3 +44,4 @@ export function createSlots(
   }
   return slots
 }
+

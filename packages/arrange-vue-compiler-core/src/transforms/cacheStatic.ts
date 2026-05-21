@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CacheExpression,
   type CallExpression,
   type ComponentNode,
@@ -27,7 +27,7 @@ import {
   isArray,
   isString,
   isSymbol,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { findDir, isSlotOutlet } from '../utils'
 import {
   GUARD_REACTIVE_PROPS,
@@ -463,3 +463,4 @@ function getNodeProps(node: PlainElementNode) {
     return codegenNode.props
   }
 }
+

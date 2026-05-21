@@ -1,12 +1,12 @@
-import {
+﻿import {
   ConstantTypes,
   type NodeTransform,
   NodeTypes,
   type SimpleExpressionNode,
   type SourceLocation,
   createSimpleExpression,
-} from '@vue/compiler-core'
-import { parseStringStyle } from '@vue/shared'
+} from '@arrange/vue-compiler-core'
+import { parseStringStyle } from '@arrange/vue-shared'
 
 // Parse inline CSS strings for static style attributes into an object.
 // This is a NodeTransform since it works on the static `style` attribute and
@@ -44,3 +44,4 @@ const parseInlineCSS = (
     ConstantTypes.CAN_STRINGIFY,
   )
 }
+

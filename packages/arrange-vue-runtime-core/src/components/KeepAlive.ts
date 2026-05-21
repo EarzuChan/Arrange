@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ComponentInternalInstance,
   type ComponentOptions,
   type ConcreteComponent,
@@ -31,7 +31,7 @@ import {
   isRegExp,
   isString,
   remove,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { watch } from '../apiWatch'
 import {
   type ElementNamespace,
@@ -480,3 +480,4 @@ function resetShapeFlag(vnode: VNode) {
 function getInnerChild(vnode: VNode) {
   return vnode.shapeFlag & ShapeFlags.SUSPENSE ? vnode.ssContent! : vnode
 }
+

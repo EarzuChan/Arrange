@@ -1,4 +1,4 @@
-import { TrackOpTypes } from './constants'
+﻿import { TrackOpTypes } from './constants'
 import { endBatch, pauseTracking, resetTracking, startBatch } from './effect'
 import {
   isProxy,
@@ -10,7 +10,7 @@ import {
   toReadonly,
 } from './reactive'
 import { ARRAY_ITERATE_KEY, track } from './dep'
-import { isArray } from '@vue/shared'
+import { isArray } from '@arrange/vue-shared'
 
 /**
  * Track array iteration and return:
@@ -370,3 +370,4 @@ function noTracking(
   resetTracking()
   return res
 }
+

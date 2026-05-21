@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Comment,
   type Fragment,
   type Text,
@@ -11,7 +11,7 @@ import {
 } from './vnode'
 import type { Teleport, TeleportProps } from './components/Teleport'
 import type { Suspense, SuspenseProps } from './components/Suspense'
-import { type IfAny, isArray, isObject } from '@vue/shared'
+import { type IfAny, isArray, isObject } from '@arrange/vue-shared'
 import type { RawSlots } from './componentSlots'
 import type {
   Component,
@@ -230,3 +230,4 @@ export function h(type: any, propsOrChildren?: any, children?: any): VNode {
     setBlockTracking(1)
   }
 }
+

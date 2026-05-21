@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Expression,
   LVal,
   Node,
@@ -6,7 +6,7 @@ import type {
   ObjectMethod,
   ObjectProperty,
 } from '@babel/types'
-import { BindingTypes, isFunctionType, unwrapTSNode } from '@vue/compiler-dom'
+import { BindingTypes, isFunctionType, unwrapTSNode } from '@arrange/vue-compiler-arrange'
 import type { ScriptCompileContext } from './context'
 import {
   type TypeResolveContext,
@@ -395,3 +395,4 @@ function inferValueType(node: Node): string | undefined {
       return 'Function'
   }
 }
+

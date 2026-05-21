@@ -1,4 +1,4 @@
-import postcss, {
+﻿import postcss, {
   type LazyResult,
   type Message,
   type ProcessOptions,
@@ -13,7 +13,7 @@ import {
   type StylePreprocessorResults,
   processors,
 } from './style/preprocessors'
-import type { RawSourceMap } from '@vue/compiler-core'
+import type { RawSourceMap } from '@arrange/vue-compiler-core'
 import { cssVarsPlugin } from './style/cssVars'
 import postcssModules from 'postcss-modules'
 
@@ -241,3 +241,4 @@ function preprocess(
     options.preprocessCustomRequire,
   )
 }
+

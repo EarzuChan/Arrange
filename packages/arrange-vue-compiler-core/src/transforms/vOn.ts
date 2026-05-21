@@ -1,4 +1,4 @@
-import type { DirectiveTransform, DirectiveTransformResult } from '../transform'
+﻿import type { DirectiveTransform, DirectiveTransformResult } from '../transform'
 import {
   type DirectiveNode,
   ElementTypes,
@@ -9,7 +9,7 @@ import {
   createObjectProperty,
   createSimpleExpression,
 } from '../ast'
-import { camelize, toHandlerKey } from '@vue/shared'
+import { camelize, toHandlerKey } from '@arrange/vue-shared'
 import { ErrorCodes, createCompilerError } from '../errors'
 import { processExpression } from './transformExpression'
 import { validateBrowserExpression } from '../validateExpression'
@@ -178,3 +178,4 @@ export const transformOn: DirectiveTransform = (
   ret.props.forEach(p => (p.key.isHandlerKey = true))
   return ret
 }
+

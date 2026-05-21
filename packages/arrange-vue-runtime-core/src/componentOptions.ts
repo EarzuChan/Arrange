@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Component,
   type ComponentInternalInstance,
   type ComponentInternalOptions,
@@ -18,8 +18,8 @@ import {
   isObject,
   isPromise,
   isString,
-} from '@vue/shared'
-import { type Ref, getCurrentScope, isRef, traverse } from '@vue/reactivity'
+} from '@arrange/vue-shared'
+import { type Ref, getCurrentScope, isRef, traverse } from '@arrange/vue-reactivity'
 import { computed } from './apiComputed'
 import {
   type WatchCallback,
@@ -48,7 +48,7 @@ import {
   type ComputedGetter,
   type WritableComputedOptions,
   reactive,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import type {
   ComponentObjectPropsOptions,
   ComponentPropsOptions,
@@ -1325,3 +1325,4 @@ export type ComponentOptionsWithObjectProps<
       Directives
     >
   >
+

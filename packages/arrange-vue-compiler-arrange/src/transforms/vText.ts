@@ -1,11 +1,11 @@
-import {
+﻿import {
   type DirectiveTransform,
   TO_DISPLAY_STRING,
   createCallExpression,
   createObjectProperty,
   createSimpleExpression,
   getConstantType,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 
 export const transformVText: DirectiveTransform = (dir, node, context) => {
@@ -38,3 +38,4 @@ export const transformVText: DirectiveTransform = (dir, node, context) => {
     ],
   }
 }
+

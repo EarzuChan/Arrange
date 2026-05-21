@@ -1,4 +1,4 @@
-import {
+﻿import {
   Fragment,
   Static,
   Text,
@@ -31,7 +31,7 @@ import {
   normalizeCssVarValue,
   normalizeStyle,
   stringifyStyle,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { type RendererInternals, needTransition } from './renderer'
 import { setRef } from './rendererTemplateRef'
 import {
@@ -41,7 +41,7 @@ import {
 } from './components/Suspense'
 import type { TeleportImpl, TeleportVNode } from './components/Teleport'
 import { isAsyncWrapper } from './apiAsyncComponent'
-import { isReactive } from '@vue/reactivity'
+import { isReactive } from '@arrange/vue-reactivity'
 import { updateHOCHostEl } from './componentRenderUtils'
 
 export type RootHydrateFunction = (
@@ -1003,3 +1003,4 @@ function isMismatchAllowed(
     return list.includes(MismatchTypeString[allowedType])
   }
 }
+

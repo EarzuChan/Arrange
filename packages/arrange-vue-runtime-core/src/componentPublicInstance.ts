@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Attrs,
   type Component,
   type ComponentInternalInstance,
@@ -24,7 +24,7 @@ import {
   isFunction,
   isGloballyAllowed,
   isString,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   ReactiveFlags,
   type ShallowUnwrapRef,
@@ -33,7 +33,7 @@ import {
   shallowReadonly,
   toRaw,
   track,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import {
   type ComponentInjectOptions,
   type ComponentOptionsBase,
@@ -714,3 +714,4 @@ export function exposeSetupStateOnRenderContext(
     }
   })
 }
+

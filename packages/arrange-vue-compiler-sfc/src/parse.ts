@@ -1,4 +1,4 @@
-import {
+﻿import {
   type BindingMetadata,
   type CodegenSourceMapGenerator,
   type CompilerError,
@@ -9,8 +9,8 @@ import {
   type RootNode,
   type SourceLocation,
   createRoot,
-} from '@vue/compiler-core'
-import * as CompilerDOM from '@vue/compiler-dom'
+} from '@arrange/vue-compiler-core'
+import * as CompilerDOM from '@arrange/vue-compiler-arrange'
 import { SourceMapGenerator } from 'source-map-js'
 import type { TemplateCompiler } from './compileTemplate'
 import { parseCssVars } from './style/cssVars'
@@ -18,7 +18,7 @@ import { createCache } from './cache'
 import type { ImportBinding } from './compileScript'
 import { isImportUsed } from './script/importUsageCheck'
 import type { LRUCache } from 'lru-cache'
-import { genCacheKey } from '@vue/shared'
+import { genCacheKey } from '@arrange/vue-shared'
 
 export const DEFAULT_FILENAME = 'anonymous.vue'
 
@@ -483,3 +483,4 @@ function dedent(s: string): [string, number] {
     minIndent,
   ]
 }
+

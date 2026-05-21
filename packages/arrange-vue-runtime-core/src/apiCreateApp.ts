@@ -1,4 +1,4 @@
-import {
+﻿import {
   type Component,
   type ComponentInternalInstance,
   type ConcreteComponent,
@@ -22,7 +22,7 @@ import { warn } from './warning'
 import { type VNode, cloneVNode, createVNode } from './vnode'
 import type { RootHydrateFunction } from './hydration'
 import { devtoolsInitApp, devtoolsUnmountApp } from './devtools'
-import { NO, extend, hasOwn, isFunction, isObject } from '@vue/shared'
+import { NO, extend, hasOwn, isFunction, isObject } from '@arrange/vue-shared'
 import { version } from '.'
 import { installAppCompatProperties } from './compat/global'
 import type { NormalizedPropsOptions } from './componentProps'
@@ -139,7 +139,7 @@ export interface AppConfig {
   ) => void
 
   /**
-   * Options to pass to `@vue/compiler-dom`.
+   * Options to pass to `@arrange/vue-compiler-arrange`.
    * Only supported in runtime compiler build.
    */
   compilerOptions: RuntimeCompilerOptions
@@ -491,3 +491,4 @@ export function createAppAPI<HostElement>(
  * `app.runWithContext()`.
  */
 export let currentApp: App<unknown> | null = null
+

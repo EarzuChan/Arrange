@@ -1,4 +1,4 @@
-import { isFunction } from '@vue/shared'
+﻿import { isFunction } from '@arrange/vue-shared'
 import { currentInstance, getCurrentInstance } from './component'
 import { currentApp } from './apiCreateApp'
 import { warn } from './warning'
@@ -92,3 +92,4 @@ export function inject(
 export function hasInjectionContext(): boolean {
   return !!(getCurrentInstance() || currentApp)
 }
+

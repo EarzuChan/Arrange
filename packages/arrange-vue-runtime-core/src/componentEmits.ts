@@ -1,4 +1,4 @@
-import {
+﻿import {
   EMPTY_OBJ,
   type OverloadParameters,
   type UnionToIntersection,
@@ -13,7 +13,7 @@ import {
   isString,
   looseToNumber,
   toHandlerKey,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import {
   type ComponentInternalInstance,
   type ComponentOptions,
@@ -310,3 +310,4 @@ export function isEmitListener(
     hasOwn(options, key)
   )
 }
+

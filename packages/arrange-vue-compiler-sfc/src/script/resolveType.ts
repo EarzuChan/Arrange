@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Expression,
   Identifier,
   Node,
@@ -35,7 +35,7 @@ import {
 } from './utils'
 import { type ScriptCompileContext, resolveParserPlugins } from './context'
 import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript'
-import { capitalize, hasOwn } from '@vue/shared'
+import { capitalize, hasOwn } from '@arrange/vue-shared'
 import { parse as babelParse } from '@babel/parser'
 import { parse } from '../parse'
 import { createCache } from '../cache'
@@ -2244,3 +2244,4 @@ export function resolveUnionType(
 
   return types
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   type AttributeNode,
   ConstantTypes,
   type DirectiveNode,
@@ -31,7 +31,7 @@ import {
   isCompatEnabled,
   warnDeprecation,
 } from './compat/compatConfig'
-import { NO, extend } from '@vue/shared'
+import { NO, extend } from '@arrange/vue-shared'
 import {
   ErrorCodes,
   createCompilerError,
@@ -1043,12 +1043,12 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
   if (__DEV__) {
     if (!__BROWSER__ && currentOptions.decodeEntities) {
       console.warn(
-        `[@vue/compiler-core] decodeEntities option is passed but will be ` +
+        `[@arrange/vue-compiler-core] decodeEntities option is passed but will be ` +
           `ignored in non-browser builds.`,
       )
     } else if (__BROWSER__ && !__TEST__ && !currentOptions.decodeEntities) {
       throw new Error(
-        `[@vue/compiler-core] decodeEntities option is required in browser builds.`,
+        `[@arrange/vue-compiler-core] decodeEntities option is required in browser builds.`,
       )
     }
   }
@@ -1077,3 +1077,4 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
   currentRoot = null
   return root
 }
+

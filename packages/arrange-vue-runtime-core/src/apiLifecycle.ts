@@ -1,4 +1,4 @@
-import {
+﻿import {
   type ComponentInternalInstance,
   currentInstance,
   isInSSRComponentSetup,
@@ -7,12 +7,12 @@ import {
 import type { ComponentPublicInstance } from './componentPublicInstance'
 import { ErrorTypeStrings, callWithAsyncErrorHandling } from './errorHandling'
 import { warn } from './warning'
-import { toHandlerKey } from '@vue/shared'
+import { toHandlerKey } from '@arrange/vue-shared'
 import {
   type DebuggerEvent,
   pauseTracking,
   resetTracking,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import { LifecycleHooks } from './enums'
 
 export { onActivated, onDeactivated } from './components/KeepAlive'
@@ -114,3 +114,4 @@ export function onErrorCaptured<TError = Error>(
 ): void {
   injectHook(LifecycleHooks.ERROR_CAPTURED, hook, target)
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CodegenResult,
   type CompilerOptions,
   type DirectiveTransform,
@@ -8,7 +8,7 @@ import {
   baseCompile,
   baseParse,
   noopDirectiveTransform,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { parserOptions } from './parserOptions'
 import { transformStyle } from './transforms/transformStyle'
 import { transformVHtml } from './transforms/vHtml'
@@ -20,7 +20,7 @@ import { transformTransition } from './transforms/Transition'
 import { stringifyStatic } from './transforms/stringifyStatic'
 import { ignoreSideEffectTags } from './transforms/ignoreSideEffectTags'
 import { validateHtmlNesting } from './transforms/validateHtmlNesting'
-import { extend } from '@vue/shared'
+import { extend } from '@arrange/vue-shared'
 
 export { parserOptions }
 
@@ -74,4 +74,5 @@ export {
   DOMErrorCodes,
   DOMErrorMessages,
 } from './errors'
-export * from '@vue/compiler-core'
+export * from '@arrange/vue-compiler-core'
+

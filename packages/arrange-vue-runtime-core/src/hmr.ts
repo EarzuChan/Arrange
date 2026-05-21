@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-globals */
+﻿/* eslint-disable no-restricted-globals */
 import {
   type ClassComponent,
   type ComponentInternalInstance,
@@ -8,7 +8,7 @@ import {
   isClassComponent,
 } from './component'
 import { SchedulerJobFlags, queueJob, queuePostFlushCb } from './scheduler'
-import { extend, getGlobalThis } from '@vue/shared'
+import { extend, getGlobalThis } from '@arrange/vue-shared'
 
 type HMRComponent = ComponentOptions | ClassComponent
 
@@ -214,3 +214,4 @@ function tryWrap(fn: (id: string, arg: any) => any): Function {
     }
   }
 }
+

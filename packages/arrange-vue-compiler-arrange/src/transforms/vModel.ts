@@ -1,4 +1,4 @@
-import {
+﻿import {
   type DirectiveTransform,
   ElementTypes,
   NodeTypes,
@@ -7,7 +7,7 @@ import {
   findProp,
   hasDynamicKeyVBind,
   isStaticArgOf,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 import {
   V_MODEL_CHECKBOX,
@@ -125,3 +125,4 @@ export const transformModel: DirectiveTransform = (dir, node, context) => {
 
   return baseResult
 }
+

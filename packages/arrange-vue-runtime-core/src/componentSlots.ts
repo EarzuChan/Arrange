@@ -1,4 +1,4 @@
-import { type ComponentInternalInstance, currentInstance } from './component'
+﻿import { type ComponentInternalInstance, currentInstance } from './component'
 import {
   type VNode,
   type VNodeChild,
@@ -14,7 +14,7 @@ import {
   def,
   isArray,
   isFunction,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from './warning'
 import { isKeepAlive } from './components/KeepAlive'
 import {
@@ -24,7 +24,7 @@ import {
 } from './componentRenderContext'
 import { isHmrUpdating } from './hmr'
 import { DeprecationTypes, isCompatEnabled } from './compat/compatConfig'
-import { TriggerOpTypes, trigger } from '@vue/reactivity'
+import { TriggerOpTypes, trigger } from '@arrange/vue-reactivity'
 import { createInternalObject } from './internalObject'
 
 export type Slot<T extends any = any> = (
@@ -250,3 +250,4 @@ export const updateSlots = (
     }
   }
 }
+

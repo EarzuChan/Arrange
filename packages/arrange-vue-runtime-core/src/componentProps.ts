@@ -1,10 +1,10 @@
-import {
+﻿import {
   TriggerOpTypes,
   shallowReactive,
   shallowReadonly,
   toRaw,
   trigger,
-} from '@vue/reactivity'
+} from '@arrange/vue-reactivity'
 import {
   EMPTY_ARR,
   EMPTY_OBJ,
@@ -24,7 +24,7 @@ import {
   isSymbol,
   makeMap,
   toRawType,
-} from '@vue/shared'
+} from '@arrange/vue-shared'
 import { warn } from './warning'
 import {
   type ComponentInternalInstance,
@@ -822,3 +822,4 @@ function isCoercible(...args: string[]): boolean {
     return value !== 'boolean' && value !== 'symbol'
   })
 }
+

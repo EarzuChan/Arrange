@@ -1,8 +1,8 @@
-import {
+﻿import {
   type DirectiveTransform,
   createObjectProperty,
   createSimpleExpression,
-} from '@vue/compiler-core'
+} from '@arrange/vue-compiler-core'
 import { DOMErrorCodes, createDOMCompilerError } from '../errors'
 
 export const transformVHtml: DirectiveTransform = (dir, node, context) => {
@@ -27,3 +27,4 @@ export const transformVHtml: DirectiveTransform = (dir, node, context) => {
     ],
   }
 }
+

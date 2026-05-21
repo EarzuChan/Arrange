@@ -1,4 +1,4 @@
-import { isArray, isObject, isPromise } from '@vue/shared'
+﻿import { isArray, isObject, isPromise } from '@arrange/vue-shared'
 import { defineAsyncComponent } from '../apiAsyncComponent'
 import type { Component } from '../component'
 import { isVNode } from '../vnode'
@@ -59,3 +59,4 @@ export function convertLegacyAsyncComponent(
   normalizedAsyncComponentMap.set(comp, converted)
   return converted
 }
+
