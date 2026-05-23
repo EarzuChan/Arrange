@@ -1,24 +1,24 @@
-import { baseParse } from '../src/parser'
-import { type NodeTransform, transform } from '../src/transform'
+import { baseParse } from '../src/parser.ts'
+import { type NodeTransform, transform } from '../src/transform.ts'
 import {
   type DirectiveNode,
   type ElementNode,
   type ExpressionNode,
   NodeTypes,
   type VNodeCall,
-} from '../src/ast'
-import { ErrorCodes, createCompilerError } from '../src/errors'
+} from '../src/ast.ts'
+import { ErrorCodes, createCompilerError } from '../src/errors.ts'
 import {
   CREATE_COMMENT,
   FRAGMENT,
   RENDER_SLOT,
   TO_DISPLAY_STRING,
-} from '../src/runtimeHelpers'
-import { transformIf } from '../src/transforms/vIf'
-import { transformFor } from '../src/transforms/vFor'
-import { transformElement } from '../src/transforms/transformElement'
-import { transformSlotOutlet } from '../src/transforms/transformSlotOutlet'
-import { transformText } from '../src/transforms/transformText'
+} from '../src/runtimeHelpers.ts'
+import { transformIf } from '../src/transforms/vIf.ts'
+import { transformFor } from '../src/transforms/vFor.ts'
+import { transformElement } from '../src/transforms/transformElement.ts'
+import { transformSlotOutlet } from '../src/transforms/transformSlotOutlet.ts'
+import { transformText } from '../src/transforms/transformText.ts'
 import { PatchFlags } from '@vue/shared'
 
 describe('compiler: transform', () => {

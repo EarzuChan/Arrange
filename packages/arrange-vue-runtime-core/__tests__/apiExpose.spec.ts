@@ -1,5 +1,5 @@
 import { createApp, nodeOps, render } from '@vue/runtime-test'
-import { defineComponent, h, ref } from '../src'
+import { defineComponent, h, ref } from '../src/index.ts'
 
 describe('api: expose', () => {
   test('via setup context', () => {

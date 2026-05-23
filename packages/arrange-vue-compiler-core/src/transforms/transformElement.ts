@@ -1,4 +1,4 @@
-﻿import type { NodeTransform, TransformContext } from '../transform'
+﻿import type { NodeTransform, TransformContext } from '../transform.ts'
 import {
   type ArrayExpression,
   type CallExpression,
@@ -21,7 +21,7 @@ import {
   createObjectProperty,
   createSimpleExpression,
   createVNodeCall,
-} from '../ast'
+} from '../ast.ts'
 import {
   PatchFlags,
   camelize,
@@ -32,7 +32,7 @@ import {
   isReservedProp,
   isSymbol,
 } from '@arrange/vue-shared'
-import { ErrorCodes, createCompilerError } from '../errors'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
   GUARD_REACTIVE_PROPS,
   KEEP_ALIVE,
@@ -47,23 +47,23 @@ import {
   TELEPORT,
   TO_HANDLERS,
   UNREF,
-} from '../runtimeHelpers'
+} from '../runtimeHelpers.ts'
 import {
   findProp,
   isCoreComponent,
   isStaticArgOf,
   isStaticExp,
   toValidAssetId,
-} from '../utils'
-import { buildSlots } from './vSlot'
-import { getConstantType } from './cacheStatic'
-import { BindingTypes } from '../options'
+} from '../utils.ts'
+import { buildSlots } from './vSlot.ts'
+import { getConstantType } from './cacheStatic.ts'
+import { BindingTypes } from '../options.ts'
 import {
   CompilerDeprecationTypes,
   checkCompatEnabled,
   isCompatEnabled,
-} from '../compat/compatConfig'
-import { processExpression } from './transformExpression'
+} from '../compat/compatConfig.ts'
+import { processExpression } from './transformExpression.ts'
 
 // some directive transforms (e.g. v-model) may return a symbol for runtime
 // import, which should be used instead of a resolveDirective call.

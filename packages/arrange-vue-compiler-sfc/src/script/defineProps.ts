@@ -7,12 +7,12 @@
   ObjectProperty,
 } from '@babel/types'
 import { BindingTypes, isFunctionType, unwrapTSNode } from '@arrange/vue-compiler-arrange'
-import type { ScriptCompileContext } from './context'
+import type { ScriptCompileContext } from './context.ts'
 import {
   type TypeResolveContext,
   inferRuntimeType,
   resolveTypeElements,
-} from './resolveType'
+} from './resolveType.ts'
 import {
   UNKNOWN_TYPE,
   concatStrings,
@@ -21,10 +21,10 @@ import {
   isLiteralNode,
   resolveObjectKey,
   toRuntimeTypeString,
-} from './utils'
-import { genModelProps } from './defineModel'
-import { getObjectOrArrayExpressionKeys } from './analyzeScriptBindings'
-import { processPropsDestructure } from './definePropsDestructure'
+} from './utils.ts'
+import { genModelProps } from './defineModel.ts'
+import { getObjectOrArrayExpressionKeys } from './analyzeScriptBindings.ts'
+import { processPropsDestructure } from './definePropsDestructure.ts'
 
 export const DEFINE_PROPS = 'defineProps'
 export const WITH_DEFAULTS = 'withDefaults'

@@ -1,4 +1,4 @@
-import { baseCompile as compile } from '../src'
+import { baseCompile as compile } from '../src/index.ts'
 import { type RawSourceMap, SourceMapConsumer } from 'source-map-js'
 
 describe('compiler: integration tests', () => {

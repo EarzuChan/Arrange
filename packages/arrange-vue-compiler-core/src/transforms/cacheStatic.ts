@@ -19,8 +19,8 @@
   createArrayExpression,
   getVNodeBlockHelper,
   getVNodeHelper,
-} from '../ast'
-import type { TransformContext } from '../transform'
+} from '../ast.ts'
+import type { TransformContext } from '../transform.ts'
 import {
   PatchFlagNames,
   PatchFlags,
@@ -28,14 +28,14 @@ import {
   isString,
   isSymbol,
 } from '@arrange/vue-shared'
-import { findDir, isSlotOutlet } from '../utils'
+import { findDir, isSlotOutlet } from '../utils.ts'
 import {
   GUARD_REACTIVE_PROPS,
   NORMALIZE_CLASS,
   NORMALIZE_PROPS,
   NORMALIZE_STYLE,
   OPEN_BLOCK,
-} from '../runtimeHelpers'
+} from '../runtimeHelpers.ts'
 
 export function cacheStatic(root: RootNode, context: TransformContext): void {
   walk(

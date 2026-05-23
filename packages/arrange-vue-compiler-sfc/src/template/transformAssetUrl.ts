@@ -15,7 +15,7 @@ import {
   isRelativeUrl,
   normalizeDecodedImportPath,
   parseUrl,
-} from './templateUtils'
+} from './templateUtils.ts'
 import { isArray } from '@arrange/vue-shared'
 
 export interface AssetURLTagConfig {

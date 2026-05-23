@@ -9,8 +9,8 @@
   toRaw,
 } from '@arrange/vue-reactivity'
 import { EMPTY_OBJ, extend, isArray, isFunction, isObject } from '@arrange/vue-shared'
-import type { ComponentInternalInstance, ComponentOptions } from './component'
-import type { ComponentPublicInstance } from './componentPublicInstance'
+import type { ComponentInternalInstance, ComponentOptions } from './component.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
 
 export function initCustomFormatter(): void {
   /* eslint-disable no-restricted-globals */

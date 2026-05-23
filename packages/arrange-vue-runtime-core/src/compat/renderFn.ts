@@ -16,13 +16,13 @@ import type {
   ComponentOptions,
   Data,
   InternalRenderFunction,
-} from '../component'
-import { currentRenderingInstance } from '../componentRenderContext'
-import { type DirectiveArguments, withDirectives } from '../directives'
+} from '../component.ts'
+import { currentRenderingInstance } from '../componentRenderContext.ts'
+import { type DirectiveArguments, withDirectives } from '../directives.ts'
 import {
   resolveDirective,
   resolveDynamicComponent,
-} from '../helpers/resolveAssets'
+} from '../helpers/resolveAssets.ts'
 import {
   Comment,
   type VNode,
@@ -31,13 +31,13 @@ import {
   createVNode,
   isVNode,
   normalizeChildren,
-} from '../vnode'
+} from '../vnode.ts'
 import {
   DeprecationTypes,
   checkCompatEnabled,
   isCompatEnabled,
-} from './compatConfig'
-import { compatModelEventPrefix } from './componentVModel'
+} from './compatConfig.ts'
+import { compatModelEventPrefix } from './componentVModel.ts'
 
 export function convertLegacyRenderFn(
   instance: ComponentInternalInstance,

@@ -20,9 +20,9 @@ import {
   walkFunctionParams,
 } from '@arrange/vue-compiler-arrange'
 import { genPropsAccessExp } from '@arrange/vue-shared'
-import { isCallOf, resolveObjectKey } from './utils'
-import type { ScriptCompileContext } from './context'
-import { DEFINE_PROPS } from './defineProps'
+import { isCallOf, resolveObjectKey } from './utils.ts'
+import type { ScriptCompileContext } from './context.ts'
+import { DEFINE_PROPS } from './defineProps.ts'
 
 export function processPropsDestructure(
   ctx: ScriptCompileContext,

@@ -1,4 +1,4 @@
-import { generateCodeFrame } from '../src/codeframe'
+import { generateCodeFrame } from '../src/codeframe.ts'
 
 describe('compiler: codeframe', () => {
   const source = `

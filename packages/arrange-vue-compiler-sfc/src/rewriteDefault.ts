@@ -2,7 +2,7 @@ import { parse } from '@babel/parser'
 import MagicString from 'magic-string'
 import type { ParserPlugin } from '@babel/parser'
 import type { Identifier, Statement } from '@babel/types'
-import { resolveParserPlugins } from './script/context'
+import { resolveParserPlugins } from './script/context.ts'
 
 export function rewriteDefault(
   input: string,

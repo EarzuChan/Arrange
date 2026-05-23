@@ -11,18 +11,18 @@ return withDirectives(h(comp), [
 ])
 */
 
-import type { VNode } from './vnode'
+import type { VNode } from './vnode.ts'
 import { EMPTY_OBJ, isBuiltInDirective, isFunction } from '@arrange/vue-shared'
-import { warn } from './warning'
+import { warn } from './warning.ts'
 import {
   type ComponentInternalInstance,
   type Data,
   getComponentPublicInstance,
-} from './component'
-import { currentRenderingInstance } from './componentRenderContext'
-import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import type { ComponentPublicInstance } from './componentPublicInstance'
-import { mapCompatDirectiveHook } from './compat/customDirective'
+} from './component.ts'
+import { currentRenderingInstance } from './componentRenderContext.ts'
+import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+import { mapCompatDirectiveHook } from './compat/customDirective.ts'
 import { pauseTracking, resetTracking, traverse } from '@arrange/vue-reactivity'
 
 export interface DirectiveBinding<

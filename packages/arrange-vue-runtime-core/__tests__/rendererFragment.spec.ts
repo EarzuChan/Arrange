@@ -17,7 +17,7 @@ import {
   serializeInner,
 } from '@vue/runtime-test'
 import { PatchFlags } from '@vue/shared'
-import { renderList } from '../src/helpers/renderList'
+import { renderList } from '../src/helpers/renderList.ts'
 
 describe('renderer: fragment', () => {
   it('should allow returning multiple component root nodes', () => {

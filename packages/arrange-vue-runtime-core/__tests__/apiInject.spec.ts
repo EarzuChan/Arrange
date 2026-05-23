@@ -11,7 +11,7 @@ import {
   reactive,
   readonly,
   ref,
-} from '../src/index'
+} from '../src/index.ts'
 import { createApp, nodeOps, render, serialize } from '@vue/runtime-test'
 
 describe('api: provide/inject', () => {

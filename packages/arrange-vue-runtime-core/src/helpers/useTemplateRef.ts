@@ -1,6 +1,6 @@
 ﻿import { type ShallowRef, readonly, shallowRef } from '@arrange/vue-reactivity'
-import { type Data, getCurrentInstance } from '../component'
-import { warn } from '../warning'
+import { type Data, getCurrentInstance } from '../component.ts'
+import { warn } from '../warning.ts'
 import { EMPTY_OBJ } from '@arrange/vue-shared'
 
 export const knownTemplateRefs: WeakSet<ShallowRef> = new WeakSet()

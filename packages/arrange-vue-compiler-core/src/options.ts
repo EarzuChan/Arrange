@@ -4,14 +4,14 @@ import type {
   Namespaces,
   ParentNode,
   TemplateChildNode,
-} from './ast'
-import type { CompilerError } from './errors'
+} from './ast.ts'
+import type { CompilerError } from './errors.ts'
 import type {
   DirectiveTransform,
   NodeTransform,
   TransformContext,
-} from './transform'
-import type { CompilerCompatOptions } from './compat/compatConfig'
+} from './transform.ts'
+import type { CompilerCompatOptions } from './compat/compatConfig.ts'
 import type { ParserPlugin } from '@babel/parser'
 
 export interface ErrorHandlingOptions {

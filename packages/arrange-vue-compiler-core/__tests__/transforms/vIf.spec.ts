@@ -1,8 +1,8 @@
-import { baseParse as parse } from '../../src/parser'
-import { transform } from '../../src/transform'
-import { transformIf } from '../../src/transforms/vIf'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet'
+import { baseParse as parse } from '../../src/parser.ts'
+import { transform } from '../../src/transform.ts'
+import { transformIf } from '../../src/transforms/vIf.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet.ts'
 import {
   type CommentNode,
   type ConditionalExpression,
@@ -15,22 +15,22 @@ import {
   type SimpleExpressionNode,
   type TextNode,
   type VNodeCall,
-} from '../../src/ast'
-import { ErrorCodes } from '../../src/errors'
+} from '../../src/ast.ts'
+import { ErrorCodes } from '../../src/errors.ts'
 import {
   type CompilerOptions,
   TO_HANDLERS,
   generate,
   transformVBindShorthand,
-} from '../../src'
+} from '../../src/index.ts'
 import {
   CREATE_COMMENT,
   FRAGMENT,
   MERGE_PROPS,
   NORMALIZE_PROPS,
   RENDER_SLOT,
-} from '../../src/runtimeHelpers'
-import { createObjectMatcher } from '../testUtils'
+} from '../../src/runtimeHelpers.ts'
+import { createObjectMatcher } from '../testUtils.ts'
 
 function parseWithIfTransform(
   template: string,

@@ -9,21 +9,21 @@
 import type {
   ComponentPublicInstance,
   PublicPropertiesMap,
-} from '../componentPublicInstance'
-import { getCompatChildren } from './instanceChildren'
+} from '../componentPublicInstance.ts'
+import { getCompatChildren } from './instanceChildren.ts'
 import {
   DeprecationTypes,
   assertCompatEnabled,
   isCompatEnabled,
   warnDeprecation,
-} from './compatConfig'
-import { off, on, once } from './instanceEventEmitter'
-import { getCompatListeners } from './instanceListeners'
+} from './compatConfig.ts'
+import { off, on, once } from './instanceEventEmitter.ts'
+import { getCompatListeners } from './instanceListeners.ts'
 import { shallowReadonly } from '@arrange/vue-reactivity'
-import { legacySlotProxyHandlers } from './componentFunctional'
-import { compatH } from './renderFn'
-import { createCommentVNode, createTextVNode } from '../vnode'
-import { renderList } from '../helpers/renderList'
+import { legacySlotProxyHandlers } from './componentFunctional.ts'
+import { compatH } from './renderFn.ts'
+import { createCommentVNode, createTextVNode } from '../vnode.ts'
+import { renderList } from '../helpers/renderList.ts'
 import {
   legacyBindDynamicKeys,
   legacyBindObjectListeners,
@@ -34,10 +34,10 @@ import {
   legacyRenderSlot,
   legacyRenderStatic,
   legacyResolveScopedSlots,
-} from './renderHelpers'
-import { resolveFilter } from '../helpers/resolveAssets'
-import type { Slots } from '../componentSlots'
-import { resolveMergedOptions } from '../componentOptions'
+} from './renderHelpers.ts'
+import { resolveFilter } from '../helpers/resolveAssets.ts'
+import type { Slots } from '../componentSlots.ts'
+import { resolveMergedOptions } from '../componentOptions.ts'
 
 export type LegacyPublicInstance = ComponentPublicInstance &
   LegacyPublicProperties

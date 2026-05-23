@@ -6,17 +6,17 @@
   currentInstance,
   getComponentName,
   isInSSRComponentSetup,
-} from './component'
+} from './component.ts'
 import { isFunction, isObject } from '@arrange/vue-shared'
-import type { ComponentPublicInstance } from './componentPublicInstance'
-import { type VNode, createVNode } from './vnode'
-import { defineComponent } from './apiDefineComponent'
-import { warn } from './warning'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+import { type VNode, createVNode } from './vnode.ts'
+import { defineComponent } from './apiDefineComponent.ts'
+import { warn } from './warning.ts'
 import { ref } from '@arrange/vue-reactivity'
-import { ErrorCodes, handleError } from './errorHandling'
-import { isKeepAlive } from './components/KeepAlive'
-import { markAsyncBoundary } from './helpers/useId'
-import { type HydrationStrategy, forEachElement } from './hydrationStrategies'
+import { ErrorCodes, handleError } from './errorHandling.ts'
+import { isKeepAlive } from './components/KeepAlive.ts'
+import { markAsyncBoundary } from './helpers/useId.ts'
+import { type HydrationStrategy, forEachElement } from './hydrationStrategies.ts'
 
 export type AsyncComponentResolveResult<T = Component> = T | { default: T } // es modules
 

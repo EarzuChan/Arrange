@@ -20,8 +20,8 @@ import {
   type ConcreteComponent,
   type Data,
   isClassComponent,
-} from './component'
-import type { RawSlots } from './componentSlots'
+} from './component.ts'
+import type { RawSlots } from './componentSlots.ts'
 import {
   type ReactiveFlags,
   type Ref,
@@ -29,37 +29,37 @@ import {
   isRef,
   toRaw,
 } from '@arrange/vue-reactivity'
-import type { AppContext } from './apiCreateApp'
+import type { AppContext } from './apiCreateApp.ts'
 import {
   type Suspense,
   type SuspenseBoundary,
   type SuspenseImpl,
   isSuspense,
-} from './components/Suspense'
-import type { DirectiveBinding } from './directives'
+} from './components/Suspense.ts'
+import type { DirectiveBinding } from './directives.ts'
 import {
   type TransitionHooks,
   setTransitionHooks,
-} from './components/BaseTransition'
-import { warn } from './warning'
+} from './components/BaseTransition.ts'
+import { warn } from './warning.ts'
 import {
   type Teleport,
   type TeleportImpl,
   isTeleport,
-} from './components/Teleport'
+} from './components/Teleport.ts'
 import {
   currentRenderingInstance,
   currentScopeId,
-} from './componentRenderContext'
-import type { RendererElement, RendererNode } from './renderer'
-import { NULL_DYNAMIC_COMPONENT } from './helpers/resolveAssets'
-import { hmrDirtyComponents } from './hmr'
-import { convertLegacyComponent } from './compat/component'
-import { convertLegacyVModelProps } from './compat/componentVModel'
-import { defineLegacyVNodeProperties } from './compat/renderFn'
-import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import type { ComponentPublicInstance } from './componentPublicInstance'
-import { isInternalObject } from './internalObject'
+} from './componentRenderContext.ts'
+import type { RendererElement, RendererNode } from './renderer.ts'
+import { NULL_DYNAMIC_COMPONENT } from './helpers/resolveAssets.ts'
+import { hmrDirtyComponents } from './hmr.ts'
+import { convertLegacyComponent } from './compat/component.ts'
+import { convertLegacyVModelProps } from './compat/componentVModel.ts'
+import { defineLegacyVNodeProperties } from './compat/renderFn.ts'
+import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+import { isInternalObject } from './internalObject.ts'
 
 export const Fragment = Symbol.for('v-fgt') as any as {
   __isFragment: true

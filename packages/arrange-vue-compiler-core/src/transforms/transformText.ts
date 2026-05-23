@@ -1,4 +1,4 @@
-﻿import type { NodeTransform } from '../transform'
+﻿import type { NodeTransform } from '../transform.ts'
 import {
   type CallExpression,
   type CompoundExpressionNode,
@@ -7,11 +7,11 @@ import {
   NodeTypes,
   createCallExpression,
   createCompoundExpression,
-} from '../ast'
-import { isText } from '../utils'
-import { CREATE_TEXT } from '../runtimeHelpers'
+} from '../ast.ts'
+import { isText } from '../utils.ts'
+import { CREATE_TEXT } from '../runtimeHelpers.ts'
 import { PatchFlagNames, PatchFlags } from '@arrange/vue-shared'
-import { getConstantType } from './cacheStatic'
+import { getConstantType } from './cacheStatic.ts'
 
 // Merge adjacent text nodes and expressions into a single expression
 // e.g. <div>abc {{ d }} {{ e }}</div> should have a single expression node as child.

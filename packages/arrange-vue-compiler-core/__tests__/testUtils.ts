@@ -7,7 +7,7 @@ import {
   type SimpleExpressionNode,
   type VNodeCall,
   locStub,
-} from '../src'
+} from '../src/index.ts'
 import {
   PatchFlagNames,
   type PatchFlags,

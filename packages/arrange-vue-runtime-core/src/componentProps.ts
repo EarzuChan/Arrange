@@ -25,21 +25,21 @@ import {
   makeMap,
   toRawType,
 } from '@arrange/vue-shared'
-import { warn } from './warning'
+import { warn } from './warning.ts'
 import {
   type ComponentInternalInstance,
   type ComponentOptions,
   type ConcreteComponent,
   type Data,
   setCurrentInstance,
-} from './component'
-import { isEmitListener } from './componentEmits'
-import type { AppContext } from './apiCreateApp'
-import { createPropsDefaultThis } from './compat/props'
-import { isCompatEnabled, softAssertCompatEnabled } from './compat/compatConfig'
-import { DeprecationTypes } from './compat/compatConfig'
-import { shouldSkipAttr } from './compat/attrsFallthrough'
-import { createInternalObject } from './internalObject'
+} from './component.ts'
+import { isEmitListener } from './componentEmits.ts'
+import type { AppContext } from './apiCreateApp.ts'
+import { createPropsDefaultThis } from './compat/props.ts'
+import { isCompatEnabled, softAssertCompatEnabled } from './compat/compatConfig.ts'
+import { DeprecationTypes } from './compat/compatConfig.ts'
+import { shouldSkipAttr } from './compat/attrsFallthrough.ts'
+import { createInternalObject } from './internalObject.ts'
 
 export type ComponentPropsOptions<P = Data> =
   | ComponentObjectPropsOptions<P>

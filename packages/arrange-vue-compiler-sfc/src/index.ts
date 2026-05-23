@@ -1,14 +1,14 @@
 ﻿export const version: string = __VERSION__
 
 // API
-export { parse } from './parse'
-export { compileTemplate } from './compileTemplate'
-export { compileStyle, compileStyleAsync } from './compileStyle'
-export { compileScript } from './compileScript'
-export { rewriteDefault, rewriteDefaultAST } from './rewriteDefault'
-export { resolveTypeElements, inferRuntimeType } from './script/resolveType'
+export { parse } from './parse.ts'
+export { compileTemplate } from './compileTemplate.ts'
+export { compileStyle, compileStyleAsync } from './compileStyle.ts'
+export { compileScript } from './compileScript.ts'
+export { rewriteDefault, rewriteDefaultAST } from './rewriteDefault.ts'
+export { resolveTypeElements, inferRuntimeType } from './script/resolveType.ts'
 
-import { type SFCParseResult, parseCache as _parseCache } from './parse'
+import { type SFCParseResult, parseCache as _parseCache } from './parse.ts'
 // #9521 export parseCache as a simple map to avoid exposing LRU types
 export const parseCache = _parseCache as Map<string, SFCParseResult>
 
@@ -40,9 +40,9 @@ export {
 } from '@arrange/vue-compiler-core'
 
 // Internals for type resolution
-export { invalidateTypeCache, registerTS } from './script/resolveType'
-export { extractRuntimeProps } from './script/defineProps'
-export { extractRuntimeEmits } from './script/defineEmits'
+export { invalidateTypeCache, registerTS } from './script/resolveType.ts'
+export { extractRuntimeProps } from './script/defineProps.ts'
+export { extractRuntimeEmits } from './script/defineEmits.ts'
 
 // Types
 export type {
@@ -53,28 +53,28 @@ export type {
   SFCTemplateBlock,
   SFCScriptBlock,
   SFCStyleBlock,
-} from './parse'
+} from './parse.ts'
 export type {
   TemplateCompiler,
   SFCTemplateCompileOptions,
   SFCTemplateCompileResults,
-} from './compileTemplate'
+} from './compileTemplate.ts'
 export type {
   SFCStyleCompileOptions,
   SFCAsyncStyleCompileOptions,
   SFCStyleCompileResults,
-} from './compileStyle'
-export type { SFCScriptCompileOptions } from './compileScript'
-export type { ScriptCompileContext } from './script/context'
+} from './compileStyle.ts'
+export type { SFCScriptCompileOptions } from './compileScript.ts'
+export type { ScriptCompileContext } from './script/context.ts'
 export type {
   TypeResolveContext,
   SimpleTypeResolveOptions,
   SimpleTypeResolveContext,
-} from './script/resolveType'
+} from './script/resolveType.ts'
 export type {
   AssetURLOptions,
   AssetURLTagConfig,
-} from './template/transformAssetUrl'
+} from './template/transformAssetUrl.ts'
 export type {
   CompilerOptions,
   CompilerError,

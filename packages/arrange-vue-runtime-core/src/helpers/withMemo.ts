@@ -1,5 +1,5 @@
 ﻿import { hasChanged } from '@arrange/vue-shared'
-import { type VNode, currentBlock, isBlockTreeEnabled } from '../vnode'
+import { type VNode, currentBlock, isBlockTreeEnabled } from '../vnode.ts'
 
 export function withMemo(
   memo: any[],

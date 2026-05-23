@@ -5,30 +5,30 @@
   type Data,
   getComponentPublicInstance,
   validateComponentName,
-} from './component'
+} from './component.ts'
 import type {
   ComponentOptions,
   MergedComponentOptions,
   RuntimeCompilerOptions,
-} from './componentOptions'
+} from './componentOptions.ts'
 import type {
   ComponentCustomProperties,
   ComponentPublicInstance,
-} from './componentPublicInstance'
-import { type Directive, validateDirectiveName } from './directives'
-import type { ElementNamespace, RootRenderFunction } from './renderer'
-import type { InjectionKey } from './apiInject'
-import { warn } from './warning'
-import { type VNode, cloneVNode, createVNode } from './vnode'
-import type { RootHydrateFunction } from './hydration'
-import { devtoolsInitApp, devtoolsUnmountApp } from './devtools'
+} from './componentPublicInstance.ts'
+import { type Directive, validateDirectiveName } from './directives.ts'
+import type { ElementNamespace, RootRenderFunction } from './renderer.ts'
+import type { InjectionKey } from './apiInject.ts'
+import { warn } from './warning.ts'
+import { type VNode, cloneVNode, createVNode } from './vnode.ts'
+import type { RootHydrateFunction } from './hydration.ts'
+import { devtoolsInitApp, devtoolsUnmountApp } from './devtools.ts'
 import { NO, extend, hasOwn, isFunction, isObject } from '@arrange/vue-shared'
-import { version } from '.'
-import { installAppCompatProperties } from './compat/global'
-import type { NormalizedPropsOptions } from './componentProps'
-import type { ObjectEmitsOptions } from './componentEmits'
-import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import type { DefineComponent } from './apiDefineComponent'
+import { version } from './index.ts'
+import { installAppCompatProperties } from './compat/global.ts'
+import type { NormalizedPropsOptions } from './componentProps.ts'
+import type { ObjectEmitsOptions } from './componentEmits.ts'
+import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
+import type { DefineComponent } from './apiDefineComponent.ts'
 
 export interface App<HostElement = any> {
   version: string

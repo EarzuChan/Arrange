@@ -5,16 +5,16 @@ import {
   transform,
   transformVBindShorthand,
 } from '@vue/compiler-core'
-import { transformModel } from '../../src/transforms/vModel'
+import { transformModel } from '../../src/transforms/vModel.ts'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
-import { DOMErrorCodes } from '../../src/errors'
+import { DOMErrorCodes } from '../../src/errors.ts'
 import {
   V_MODEL_CHECKBOX,
   V_MODEL_DYNAMIC,
   V_MODEL_RADIO,
   V_MODEL_SELECT,
   V_MODEL_TEXT,
-} from '../../src/runtimeHelpers'
+} from '../../src/runtimeHelpers.ts'
 
 function transformWithModel(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

@@ -3,7 +3,7 @@
   type ComponentOptions,
   type SetupContext,
   getCurrentInstance,
-} from '../component'
+} from '../component.ts'
 import {
   Comment,
   Fragment,
@@ -12,17 +12,17 @@ import {
   cloneVNode,
   createCommentVNode,
   isSameVNodeType,
-} from '../vnode'
-import { warn } from '../warning'
-import { isKeepAlive } from './KeepAlive'
+} from '../vnode.ts'
+import { warn } from '../warning.ts'
+import { isKeepAlive } from './KeepAlive.ts'
 import { toRaw } from '@arrange/vue-reactivity'
-import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling'
+import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling.ts'
 import { PatchFlags, ShapeFlags, isArray, isFunction } from '@arrange/vue-shared'
-import { onBeforeUnmount, onMounted } from '../apiLifecycle'
-import { isTeleport } from './Teleport'
-import type { RendererElement } from '../renderer'
-import { SchedulerJobFlags } from '../scheduler'
-import { isHmrUpdating } from '../hmr'
+import { onBeforeUnmount, onMounted } from '../apiLifecycle.ts'
+import { isTeleport } from './Teleport.ts'
+import type { RendererElement } from '../renderer.ts'
+import { SchedulerJobFlags } from '../scheduler.ts'
+import { isHmrUpdating } from '../hmr.ts'
 
 type Hook<T = () => void> = T | T[]
 

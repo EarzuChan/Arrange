@@ -1,11 +1,11 @@
 ﻿import { isArray } from '@arrange/vue-shared'
-import { inject } from '../apiInject'
-import type { ComponentInternalInstance, Data } from '../component'
+import { inject } from '../apiInject.ts'
+import type { ComponentInternalInstance, Data } from '../component.ts'
 import {
   type ComponentOptions,
   resolveMergedOptions,
-} from '../componentOptions'
-import { DeprecationTypes, warnDeprecation } from './compatConfig'
+} from '../componentOptions.ts'
+import { DeprecationTypes, warnDeprecation } from './compatConfig.ts'
 
 export function createPropsDefaultThis(
   instance: ComponentInternalInstance,

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { computed, ref } from '@vue/reactivity'
-import { toDisplayString } from '../src'
+import { toDisplayString } from '../src/index.ts'
 
 describe('toDisplayString', () => {
   test('nullish values', () => {

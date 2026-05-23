@@ -5,7 +5,7 @@
   Statement,
 } from '@babel/types'
 import { type BindingMetadata, BindingTypes } from '@arrange/vue-compiler-arrange'
-import { resolveObjectKey } from './utils'
+import { resolveObjectKey } from './utils.ts'
 
 /**
  * Analyze bindings in normal `<script>`

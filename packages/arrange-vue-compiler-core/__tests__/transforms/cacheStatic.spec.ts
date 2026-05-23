@@ -9,20 +9,20 @@ import {
   generate,
   baseParse as parse,
   transform,
-} from '../../src'
+} from '../../src/index.ts'
 import {
   FRAGMENT,
   NORMALIZE_CLASS,
   RENDER_LIST,
-} from '../../src/runtimeHelpers'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { transformIf } from '../../src/transforms/vIf'
-import { transformFor } from '../../src/transforms/vFor'
-import { transformBind } from '../../src/transforms/vBind'
-import { transformOn } from '../../src/transforms/vOn'
-import { createObjectMatcher } from '../testUtils'
-import { transformText } from '../../src/transforms/transformText'
+} from '../../src/runtimeHelpers.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { transformIf } from '../../src/transforms/vIf.ts'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { createObjectMatcher } from '../testUtils.ts'
+import { transformText } from '../../src/transforms/transformText.ts'
 import { PatchFlags } from '@vue/shared'
 
 const cachedChildrenArrayMatcher = (

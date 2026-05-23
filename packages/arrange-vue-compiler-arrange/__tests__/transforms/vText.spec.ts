@@ -4,11 +4,11 @@ import {
   baseParse as parse,
   transform,
 } from '@vue/compiler-core'
-import { transformVText } from '../../src/transforms/vText'
+import { transformVText } from '../../src/transforms/vText.ts'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
 import { createObjectMatcher } from '../../../compiler-core/__tests__/testUtils'
 import { PatchFlags } from '@vue/shared'
-import { DOMErrorCodes } from '../../src/errors'
+import { DOMErrorCodes } from '../../src/errors.ts'
 
 function transformWithVText(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

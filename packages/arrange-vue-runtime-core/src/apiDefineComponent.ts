@@ -7,7 +7,7 @@
   ComputedOptions,
   MethodOptions,
   RenderFunction,
-} from './componentOptions'
+} from './componentOptions.ts'
 import type {
   AllowedComponentProps,
   Component,
@@ -15,27 +15,27 @@ import type {
   GlobalComponents,
   GlobalDirectives,
   SetupContext,
-} from './component'
+} from './component.ts'
 import type {
   ComponentObjectPropsOptions,
   ComponentPropsOptions,
   ExtractDefaultPropTypes,
   ExtractPropTypes,
-} from './componentProps'
+} from './componentProps.ts'
 import type {
   EmitsOptions,
   EmitsToProps,
   TypeEmitsToOptions,
-} from './componentEmits'
+} from './componentEmits.ts'
 import { type IsKeyValues, extend, isFunction } from '@arrange/vue-shared'
-import type { VNodeProps } from './vnode'
+import type { VNodeProps } from './vnode.ts'
 import type {
   ComponentPublicInstanceConstructor,
   CreateComponentPublicInstanceWithMixins,
-} from './componentPublicInstance'
-import type { SlotsType } from './componentSlots'
-import type { Directive } from './directives'
-import type { ComponentTypeEmits } from './apiSetupHelpers'
+} from './componentPublicInstance.ts'
+import type { SlotsType } from './componentSlots.ts'
+import type { Directive } from './directives.ts'
+import type { ComponentTypeEmits } from './apiSetupHelpers.ts'
 
 export type PublicProps = VNodeProps &
   AllowedComponentProps &

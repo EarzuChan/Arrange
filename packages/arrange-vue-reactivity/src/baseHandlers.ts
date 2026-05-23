@@ -9,10 +9,10 @@
   shallowReactiveMap,
   shallowReadonlyMap,
   toRaw,
-} from './reactive'
-import { arrayInstrumentations } from './arrayInstrumentations'
-import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { ITERATE_KEY, track, trigger } from './dep'
+} from './reactive.ts'
+import { arrayInstrumentations } from './arrayInstrumentations.ts'
+import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants.ts'
+import { ITERATE_KEY, track, trigger } from './dep.ts'
 import {
   hasChanged,
   hasOwn,
@@ -22,8 +22,8 @@ import {
   isSymbol,
   makeMap,
 } from '@arrange/vue-shared'
-import { isRef } from './ref'
-import { warn } from './warning'
+import { isRef } from './ref.ts'
+import { warn } from './warning.ts'
 
 const isNonTrackableKeys = /*@__PURE__*/ makeMap(`__proto__,__v_isRef,__isVue`)
 

@@ -19,7 +19,7 @@ export {
   type ShallowUnwrapRef,
   type RefUnwrapBailTypes,
   type CustomRefFactory,
-} from './ref'
+} from './ref.ts'
 export {
   reactive,
   readonly,
@@ -39,7 +39,7 @@ export {
   type UnwrapNestedRefs,
   type Reactive,
   type ReactiveMarker,
-} from './reactive'
+} from './reactive.ts'
 export {
   computed,
   type ComputedRef,
@@ -48,7 +48,7 @@ export {
   type ComputedGetter,
   type ComputedSetter,
   type ComputedRefImpl,
-} from './computed'
+} from './computed.ts'
 export {
   effect,
   stop,
@@ -64,22 +64,22 @@ export {
   type DebuggerOptions,
   type DebuggerEvent,
   type DebuggerEventExtraInfo,
-} from './effect'
+} from './effect.ts'
 export {
   trigger,
   track,
   ITERATE_KEY,
   ARRAY_ITERATE_KEY,
   MAP_KEY_ITERATE_KEY,
-} from './dep'
+} from './dep.ts'
 export {
   effectScope,
   EffectScope,
   getCurrentScope,
   onScopeDispose,
-} from './effectScope'
-export { reactiveReadArray, shallowReadArray } from './arrayInstrumentations'
-export { TrackOpTypes, TriggerOpTypes, ReactiveFlags } from './constants'
+} from './effectScope.ts'
+export { reactiveReadArray, shallowReadArray } from './arrayInstrumentations.ts'
+export { TrackOpTypes, TriggerOpTypes, ReactiveFlags } from './constants.ts'
 export {
   watch,
   getCurrentWatcher,
@@ -94,4 +94,4 @@ export {
   type WatchSource,
   type WatchCallback,
   type OnCleanup,
-} from './watch'
+} from './watch.ts'

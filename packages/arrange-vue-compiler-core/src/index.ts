@@ -1,4 +1,4 @@
-﻿export { baseCompile } from './compile'
+﻿export { baseCompile } from './compile.ts'
 
 // Also expose lower level APIs & types
 export {
@@ -9,8 +9,8 @@ export {
   type HoistTransform,
   type BindingMetadata,
   BindingTypes,
-} from './options'
-export { baseParse } from './parser'
+} from './options.ts'
+export { baseParse } from './parser.ts'
 export {
   transform,
   type TransformContext,
@@ -20,55 +20,55 @@ export {
   type NodeTransform,
   type StructuralDirectiveTransform,
   type DirectiveTransform,
-} from './transform'
+} from './transform.ts'
 export {
   generate,
   type CodegenContext,
   type CodegenResult,
   type CodegenSourceMapGenerator,
   type RawSourceMap,
-} from './codegen'
+} from './codegen.ts'
 export {
   ErrorCodes,
   errorMessages,
   createCompilerError,
   type CoreCompilerError,
   type CompilerError,
-} from './errors'
+} from './errors.ts'
 
-export * from './ast'
-export * from './utils'
-export * from './babelUtils'
-export * from './runtimeHelpers'
+export * from './ast.ts'
+export * from './utils.ts'
+export * from './babelUtils.ts'
+export * from './runtimeHelpers.ts'
 
-export { getBaseTransformPreset, type TransformPreset } from './compile'
-export { transformModel } from './transforms/vModel'
-export { transformOn } from './transforms/vOn'
-export { transformBind } from './transforms/vBind'
-export { noopDirectiveTransform } from './transforms/noopDirectiveTransform'
-export { processIf } from './transforms/vIf'
-export { processFor, createForLoopParams } from './transforms/vFor'
+export { getBaseTransformPreset, type TransformPreset } from './compile.ts'
+export { transformModel } from './transforms/vModel.ts'
+export { transformOn } from './transforms/vOn.ts'
+export { transformBind } from './transforms/vBind.ts'
+export { noopDirectiveTransform } from './transforms/noopDirectiveTransform.ts'
+export { processIf } from './transforms/vIf.ts'
+export { processFor, createForLoopParams } from './transforms/vFor.ts'
 export {
   transformExpression,
   processExpression,
   stringifyExpression,
-} from './transforms/transformExpression'
+} from './transforms/transformExpression.ts'
 export {
   buildSlots,
   type SlotFnBuilder,
   trackVForSlotScopes,
   trackSlotScopes,
-} from './transforms/vSlot'
+} from './transforms/vSlot.ts'
 export {
   transformElement,
   resolveComponentType,
   buildProps,
   buildDirectiveArgs,
   type PropsExpression,
-} from './transforms/transformElement'
-export { transformVBindShorthand } from './transforms/transformVBindShorthand'
-export { processSlotOutlet } from './transforms/transformSlotOutlet'
-export { getConstantType } from './transforms/cacheStatic'
+} from './transforms/transformElement.ts'
+export { transformVBindShorthand } from './transforms/transformVBindShorthand.ts'
+export { processSlotOutlet } from './transforms/transformSlotOutlet.ts'
+export { getConstantType } from './transforms/cacheStatic.ts'
 export { generateCodeFrame } from '@arrange/vue-shared'
 
 // v2 compat only
@@ -76,5 +76,5 @@ export {
   checkCompatEnabled,
   warnDeprecation,
   CompilerDeprecationTypes,
-} from './compat/compatConfig'
+} from './compat/compatConfig.ts'
 

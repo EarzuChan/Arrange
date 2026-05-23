@@ -1,6 +1,6 @@
-﻿import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling'
+﻿import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling.ts'
 import { NOOP, isArray } from '@arrange/vue-shared'
-import { type ComponentInternalInstance, getComponentName } from './component'
+import { type ComponentInternalInstance, getComponentName } from './component.ts'
 
 export enum SchedulerJobFlags {
   QUEUED = 1 << 0,

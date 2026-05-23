@@ -6,7 +6,7 @@
   currentInstance,
   getComponentName,
   getCurrentInstance,
-} from '../component'
+} from '../component.ts'
 import {
   Comment,
   type VNode,
@@ -15,15 +15,15 @@ import {
   invokeVNodeHook,
   isSameVNodeType,
   isVNode,
-} from '../vnode'
-import { warn } from '../warning'
+} from '../vnode.ts'
+import { warn } from '../warning.ts'
 import {
   injectHook,
   onBeforeUnmount,
   onMounted,
   onUnmounted,
   onUpdated,
-} from '../apiLifecycle'
+} from '../apiLifecycle.ts'
 import {
   ShapeFlags,
   invokeArrayFns,
@@ -32,7 +32,7 @@ import {
   isString,
   remove,
 } from '@arrange/vue-shared'
-import { watch } from '../apiWatch'
+import { watch } from '../apiWatch.ts'
 import {
   type ElementNamespace,
   MoveType,
@@ -41,13 +41,13 @@ import {
   type RendererNode,
   invalidateMount,
   queuePostRenderEffect,
-} from '../renderer'
-import { setTransitionHooks } from './BaseTransition'
-import type { ComponentRenderContext } from '../componentPublicInstance'
-import { devtoolsComponentAdded } from '../devtools'
-import { isAsyncWrapper } from '../apiAsyncComponent'
-import { isSuspense } from './Suspense'
-import { LifecycleHooks } from '../enums'
+} from '../renderer.ts'
+import { setTransitionHooks } from './BaseTransition.ts'
+import type { ComponentRenderContext } from '../componentPublicInstance.ts'
+import { devtoolsComponentAdded } from '../devtools.ts'
+import { isAsyncWrapper } from '../apiAsyncComponent.ts'
+import { isSuspense } from './Suspense.ts'
+import { LifecycleHooks } from '../enums.ts'
 
 type MatchPattern = string | RegExp | (string | RegExp)[]
 

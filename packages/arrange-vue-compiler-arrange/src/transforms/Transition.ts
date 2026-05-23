@@ -6,8 +6,8 @@
   NodeTypes,
   isCommentOrWhitespace,
 } from '@arrange/vue-compiler-core'
-import { TRANSITION } from '../runtimeHelpers'
-import { DOMErrorCodes, createDOMCompilerError } from '../errors'
+import { TRANSITION } from '../runtimeHelpers.ts'
+import { DOMErrorCodes, createDOMCompilerError } from '../errors.ts'
 
 export const transformTransition: NodeTransform = (node, context) => {
   if (

@@ -1,5 +1,5 @@
-import type { ParserOptions } from '../src/options'
-import { ErrorCodes } from '../src/errors'
+import type { ParserOptions } from '../src/options.ts'
+import { ErrorCodes } from '../src/errors.ts'
 import {
   type CommentNode,
   ConstantTypes,
@@ -11,9 +11,9 @@ import {
   NodeTypes,
   type Position,
   type TextNode,
-} from '../src/ast'
+} from '../src/ast.ts'
 
-import { baseParse } from '../src/parser'
+import { baseParse } from '../src/parser.ts'
 import type { Program } from '@babel/types'
 
 describe('compiler: parse', () => {

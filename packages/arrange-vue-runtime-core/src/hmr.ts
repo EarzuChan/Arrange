@@ -6,8 +6,8 @@ import {
   type ConcreteComponent,
   type InternalRenderFunction,
   isClassComponent,
-} from './component'
-import { SchedulerJobFlags, queueJob, queuePostFlushCb } from './scheduler'
+} from './component.ts'
+import { SchedulerJobFlags, queueJob, queuePostFlushCb } from './scheduler.ts'
 import { extend, getGlobalThis } from '@arrange/vue-shared'
 
 type HMRComponent = ComponentOptions | ClassComponent

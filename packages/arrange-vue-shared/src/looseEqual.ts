@@ -1,4 +1,4 @@
-import { isArray, isDate, isObject, isSymbol } from './general'
+import { isArray, isDate, isObject, isSymbol } from './general.ts'
 
 function looseCompareArrays(a: any[], b: any[]) {
   if (a.length !== b.length) return false

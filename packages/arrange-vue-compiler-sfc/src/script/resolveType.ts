@@ -32,13 +32,13 @@ import {
   getStringLiteralKey,
   joinPaths,
   normalizePath,
-} from './utils'
-import { type ScriptCompileContext, resolveParserPlugins } from './context'
-import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript'
+} from './utils.ts'
+import { type ScriptCompileContext, resolveParserPlugins } from './context.ts'
+import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript.ts'
 import { capitalize, hasOwn } from '@arrange/vue-shared'
 import { parse as babelParse } from '@babel/parser'
-import { parse } from '../parse'
-import { createCache } from '../cache'
+import { parse } from '../parse.ts'
+import { createCache } from '../cache.ts'
 import type TS from 'typescript'
 import { dirname, extname, join } from 'path'
 import { minimatch as isMatch } from 'minimatch'

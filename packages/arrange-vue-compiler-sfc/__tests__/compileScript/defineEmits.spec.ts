@@ -1,5 +1,5 @@
 import { BindingTypes } from '@vue/compiler-core'
-import { assertCode, compileSFCScript as compile } from '../utils'
+import { assertCode, compileSFCScript as compile } from '../utils.ts'
 
 describe('defineEmits', () => {
   test('basic usage', () => {

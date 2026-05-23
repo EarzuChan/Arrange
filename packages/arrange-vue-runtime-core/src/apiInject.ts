@@ -1,7 +1,7 @@
 ﻿import { isFunction } from '@arrange/vue-shared'
-import { currentInstance, getCurrentInstance } from './component'
-import { currentApp } from './apiCreateApp'
-import { warn } from './warning'
+import { currentInstance, getCurrentInstance } from './component.ts'
+import { currentApp } from './apiCreateApp.ts'
+import { warn } from './warning.ts'
 
 interface InjectionConstraint<T> {}
 

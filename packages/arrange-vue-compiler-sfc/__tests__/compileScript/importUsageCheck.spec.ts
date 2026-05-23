@@ -1,4 +1,4 @@
-import { assertCode, compileSFCScript as compile } from '../utils'
+import { assertCode, compileSFCScript as compile } from '../utils.ts'
 
 // in dev mode, declared bindings are returned as an object from setup()
 // when using TS, users may import types which should not be returned as

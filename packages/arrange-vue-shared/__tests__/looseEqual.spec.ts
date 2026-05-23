@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { looseEqual } from '../src'
+import { looseEqual } from '../src/index.ts'
 
 describe('utils/looseEqual', () => {
   test('compares booleans correctly', () => {

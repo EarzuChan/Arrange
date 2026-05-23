@@ -4,7 +4,7 @@
   type NodeTransform,
   NodeTypes,
 } from '@arrange/vue-compiler-core'
-import { isValidHTMLNesting } from '../htmlNesting'
+import { isValidHTMLNesting } from '../htmlNesting.ts'
 
 export const validateHtmlNesting: NodeTransform = (node, context) => {
   if (

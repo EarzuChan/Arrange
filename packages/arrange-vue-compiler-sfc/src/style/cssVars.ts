@@ -7,7 +7,7 @@
   createTransformContext,
   processExpression,
 } from '@arrange/vue-compiler-arrange'
-import type { SFCDescriptor } from '../parse'
+import type { SFCDescriptor } from '../parse.ts'
 import type { PluginCreator } from 'postcss'
 import hash from 'hash-sum'
 import { getEscapedCssVarName } from '@arrange/vue-shared'

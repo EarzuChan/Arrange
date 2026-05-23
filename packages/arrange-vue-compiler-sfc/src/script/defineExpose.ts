@@ -1,6 +1,6 @@
 import type { Node } from '@babel/types'
-import { isCallOf } from './utils'
-import type { ScriptCompileContext } from './context'
+import { isCallOf } from './utils.ts'
+import type { ScriptCompileContext } from './context.ts'
 
 export const DEFINE_EXPOSE = 'defineExpose'
 

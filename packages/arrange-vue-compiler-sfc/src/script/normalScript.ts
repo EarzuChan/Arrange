@@ -1,9 +1,9 @@
-import { analyzeScriptBindings } from './analyzeScriptBindings'
-import type { ScriptCompileContext } from './context'
+import { analyzeScriptBindings } from './analyzeScriptBindings.ts'
+import type { ScriptCompileContext } from './context.ts'
 import MagicString from 'magic-string'
-import { rewriteDefaultAST } from '../rewriteDefault'
-import { genNormalScriptCssVarsCode } from '../style/cssVars'
-import type { SFCScriptBlock } from '../parse'
+import { rewriteDefaultAST } from '../rewriteDefault.ts'
+import { genNormalScriptCssVarsCode } from '../style/cssVars.ts'
+import type { SFCScriptBlock } from '../parse.ts'
 
 export const normalScriptDefaultVar = `__default__`
 

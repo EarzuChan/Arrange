@@ -1,4 +1,4 @@
-﻿import type { VNode, VNodeChild } from '../vnode'
+﻿import type { VNode, VNodeChild } from '../vnode.ts'
 import {
   isReactive,
   isReadonly,
@@ -8,7 +8,7 @@ import {
   toReadonly,
 } from '@arrange/vue-reactivity'
 import { isArray, isObject, isString } from '@arrange/vue-shared'
-import { warn } from '../warning'
+import { warn } from '../warning.ts'
 
 /**
  * v-for string

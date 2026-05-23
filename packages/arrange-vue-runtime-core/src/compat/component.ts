@@ -1,12 +1,12 @@
 ﻿import { isFunction, isObject } from '@arrange/vue-shared'
-import type { Component, ComponentInternalInstance } from '../component'
+import type { Component, ComponentInternalInstance } from '../component.ts'
 import {
   DeprecationTypes,
   checkCompatEnabled,
   softAssertCompatEnabled,
-} from './compatConfig'
-import { convertLegacyAsyncComponent } from './componentAsync'
-import { convertLegacyFunctionalComponent } from './componentFunctional'
+} from './compatConfig.ts'
+import { convertLegacyAsyncComponent } from './componentAsync.ts'
+import { convertLegacyFunctionalComponent } from './componentFunctional.ts'
 
 export function convertLegacyComponent(
   comp: any,

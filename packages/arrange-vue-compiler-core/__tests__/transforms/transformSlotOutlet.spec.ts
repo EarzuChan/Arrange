@@ -5,13 +5,13 @@ import {
   NodeTypes,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformOn } from '../../src/transforms/vOn'
-import { transformBind } from '../../src/transforms/vBind'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { RENDER_SLOT } from '../../src/runtimeHelpers'
-import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet'
+} from '../../src/index.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { RENDER_SLOT } from '../../src/runtimeHelpers.ts'
+import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet.ts'
 
 function parseWithSlots(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

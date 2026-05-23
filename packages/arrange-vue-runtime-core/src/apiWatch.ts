@@ -8,20 +8,20 @@
   type WatchSource,
   watch as baseWatch,
 } from '@arrange/vue-reactivity'
-import { type SchedulerJob, SchedulerJobFlags, queueJob } from './scheduler'
+import { type SchedulerJob, SchedulerJobFlags, queueJob } from './scheduler.ts'
 import { EMPTY_OBJ, NOOP, extend, isFunction, isString } from '@arrange/vue-shared'
 import {
   type ComponentInternalInstance,
   currentInstance,
   isInSSRComponentSetup,
   setCurrentInstance,
-} from './component'
-import { callWithAsyncErrorHandling } from './errorHandling'
-import { queuePostRenderEffect } from './renderer'
-import { warn } from './warning'
-import type { ObjectWatchOptionItem } from './componentOptions'
-import { useSSRContext } from './helpers/useSsrContext'
-import type { ComponentPublicInstance } from './componentPublicInstance'
+} from './component.ts'
+import { callWithAsyncErrorHandling } from './errorHandling.ts'
+import { queuePostRenderEffect } from './renderer.ts'
+import { warn } from './warning.ts'
+import type { ObjectWatchOptionItem } from './componentOptions.ts'
+import { useSSRContext } from './helpers/useSsrContext.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
 
 export type {
   WatchHandle,

@@ -8,14 +8,14 @@
   hasDynamicKeyVBind,
   isStaticArgOf,
 } from '@arrange/vue-compiler-core'
-import { DOMErrorCodes, createDOMCompilerError } from '../errors'
+import { DOMErrorCodes, createDOMCompilerError } from '../errors.ts'
 import {
   V_MODEL_CHECKBOX,
   V_MODEL_DYNAMIC,
   V_MODEL_RADIO,
   V_MODEL_SELECT,
   V_MODEL_TEXT,
-} from '../runtimeHelpers'
+} from '../runtimeHelpers.ts'
 
 export const transformModel: DirectiveTransform = (dir, node, context) => {
   const baseResult = baseTransform(dir, node, context)

@@ -1,11 +1,11 @@
-import type { AppConfig } from '../apiCreateApp'
+import type { AppConfig } from '../apiCreateApp.ts'
 import {
   DeprecationTypes,
   softAssertCompatEnabled,
   warnDeprecation,
-} from './compatConfig'
-import { isCopyingConfig } from './global'
-import { internalOptionMergeStrats } from '../componentOptions'
+} from './compatConfig.ts'
+import { isCopyingConfig } from './global.ts'
+import { internalOptionMergeStrats } from '../componentOptions.ts'
 
 // legacy config warnings
 export type LegacyConfig = {

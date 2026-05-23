@@ -1,4 +1,4 @@
-import { makeMap } from './makeMap'
+import { makeMap } from './makeMap.ts'
 
 const GLOBALS_ALLOWED =
   'Infinity,undefined,NaN,isFinite,isNaN,parseFloat,parseInt,decodeURI,' +

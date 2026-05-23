@@ -1,4 +1,4 @@
-﻿import type { SFCDescriptor } from '../parse'
+﻿import type { SFCDescriptor } from '../parse.ts'
 import {
   type ExpressionNode,
   NodeTypes,
@@ -8,7 +8,7 @@ import {
   parserOptions,
   walkIdentifiers,
 } from '@arrange/vue-compiler-arrange'
-import { createCache } from '../cache'
+import { createCache } from '../cache.ts'
 import { camelize, capitalize, isBuiltInDirective } from '@arrange/vue-shared'
 
 /**

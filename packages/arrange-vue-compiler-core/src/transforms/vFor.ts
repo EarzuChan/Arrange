@@ -2,7 +2,7 @@
   type NodeTransform,
   type TransformContext,
   createStructuralDirectiveTransform,
-} from '../transform'
+} from '../transform.ts'
 import {
   type BlockCodegenNode,
   ConstantTypes,
@@ -30,23 +30,23 @@ import {
   createVNodeCall,
   getVNodeBlockHelper,
   getVNodeHelper,
-} from '../ast'
-import { ErrorCodes, createCompilerError } from '../errors'
+} from '../ast.ts'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
   findDir,
   findProp,
   injectProp,
   isSlotOutlet,
   isTemplateNode,
-} from '../utils'
+} from '../utils.ts'
 import {
   FRAGMENT,
   IS_MEMO_SAME,
   OPEN_BLOCK,
   RENDER_LIST,
-} from '../runtimeHelpers'
-import { processExpression } from './transformExpression'
-import { validateBrowserExpression } from '../validateExpression'
+} from '../runtimeHelpers.ts'
+import { processExpression } from './transformExpression.ts'
+import { validateBrowserExpression } from '../validateExpression.ts'
 import { PatchFlags } from '@arrange/vue-shared'
 
 export const transformFor: NodeTransform = createStructuralDirectiveTransform(

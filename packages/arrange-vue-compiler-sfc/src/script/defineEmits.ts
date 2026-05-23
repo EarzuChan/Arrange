@@ -6,13 +6,13 @@ import type {
   ObjectPattern,
   RestElement,
 } from '@babel/types'
-import { isCallOf } from './utils'
-import type { ScriptCompileContext } from './context'
+import { isCallOf } from './utils.ts'
+import type { ScriptCompileContext } from './context.ts'
 import {
   type TypeResolveContext,
   resolveTypeElements,
   resolveUnionType,
-} from './resolveType'
+} from './resolveType.ts'
 
 export const DEFINE_EMITS = 'defineEmits'
 

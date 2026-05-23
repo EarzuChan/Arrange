@@ -7,13 +7,13 @@ import {
   isWhitespaceText,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformFor } from '../../src/transforms/vFor'
-import { transformText } from '../../src/transforms/transformText'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { transformElement } from '../../src/transforms/transformElement'
-import { CREATE_TEXT } from '../../src/runtimeHelpers'
-import { genFlagText } from '../testUtils'
+} from '../../src/index.ts'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { transformText } from '../../src/transforms/transformText.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { CREATE_TEXT } from '../../src/runtimeHelpers.ts'
+import { genFlagText } from '../testUtils.ts'
 import { PatchFlags } from '@vue/shared'
 
 function transformWithTextOpt(template: string, options: CompilerOptions = {}) {

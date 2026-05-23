@@ -1,4 +1,4 @@
-import { makeMap } from './makeMap'
+import { makeMap } from './makeMap.ts'
 
 /**
  * On the client we only need to offer special cases for boolean attributes that

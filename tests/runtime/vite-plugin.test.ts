@@ -1,7 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {resolve} from "node:path"
-import arrange, {buildDevBundle, DEV_BUNDLE_PATH} from "../../packages/vite-plugin/src/index.ts"
+import arrange from "../../packages/vite-plugin/src/plugin.ts"
+import {DEV_BUNDLE_PATH} from "../../packages/vite-plugin/src/constraints.ts"
+import {buildDevBundle} from "../../packages/vite-plugin/src/dev-bundle.ts"
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()

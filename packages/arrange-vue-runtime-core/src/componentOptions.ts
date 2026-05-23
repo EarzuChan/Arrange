@@ -7,7 +7,7 @@
   type InternalRenderFunction,
   type SetupContext,
   currentInstance,
-} from './component'
+} from './component.ts'
 import {
   type LooseRequired,
   NOOP,
@@ -20,14 +20,14 @@ import {
   isString,
 } from '@arrange/vue-shared'
 import { type Ref, getCurrentScope, isRef, traverse } from '@arrange/vue-reactivity'
-import { computed } from './apiComputed'
+import { computed } from './apiComputed.ts'
 import {
   type WatchCallback,
   type WatchOptions,
   createPathGetter,
   watch,
-} from './apiWatch'
-import { inject, provide } from './apiInject'
+} from './apiWatch.ts'
+import { inject, provide } from './apiInject.ts'
 import {
   type DebuggerHook,
   type ErrorCapturedHook,
@@ -43,7 +43,7 @@ import {
   onServerPrefetch,
   onUnmounted,
   onUpdated,
-} from './apiLifecycle'
+} from './apiLifecycle.ts'
 import {
   type ComputedGetter,
   type WritableComputedOptions,
@@ -54,38 +54,38 @@ import type {
   ComponentPropsOptions,
   ExtractDefaultPropTypes,
   ExtractPropTypes,
-} from './componentProps'
+} from './componentProps.ts'
 import type {
   EmitsOptions,
   EmitsToProps,
   TypeEmitsToOptions,
-} from './componentEmits'
-import type { Directive } from './directives'
+} from './componentEmits.ts'
+import type { Directive } from './directives.ts'
 import {
   type ComponentPublicInstance,
   type CreateComponentPublicInstanceWithMixins,
   type IntersectionMixin,
   type UnwrapMixinsType,
   isReservedPrefix,
-} from './componentPublicInstance'
-import { warn } from './warning'
-import type { VNodeChild } from './vnode'
-import { callWithAsyncErrorHandling } from './errorHandling'
-import { deepMergeData } from './compat/data'
-import { DeprecationTypes, checkCompatEnabled } from './compat/compatConfig'
+} from './componentPublicInstance.ts'
+import { warn } from './warning.ts'
+import type { VNodeChild } from './vnode.ts'
+import { callWithAsyncErrorHandling } from './errorHandling.ts'
+import { deepMergeData } from './compat/data.ts'
+import { DeprecationTypes, checkCompatEnabled } from './compat/compatConfig.ts'
 import {
   type CompatConfig,
   isCompatEnabled,
   softAssertCompatEnabled,
-} from './compat/compatConfig'
-import type { OptionMergeFunction } from './apiCreateApp'
-import { LifecycleHooks } from './enums'
-import type { SlotsType } from './componentSlots'
+} from './compat/compatConfig.ts'
+import type { OptionMergeFunction } from './apiCreateApp.ts'
+import { LifecycleHooks } from './enums.ts'
+import type { SlotsType } from './componentSlots.ts'
 import {
   type ComponentTypeEmits,
   normalizePropsOrEmits,
-} from './apiSetupHelpers'
-import { markAsyncBoundary } from './helpers/useId'
+} from './apiSetupHelpers.ts'
+import { markAsyncBoundary } from './helpers/useId.ts'
 
 /**
  * Interface for declaring custom options.

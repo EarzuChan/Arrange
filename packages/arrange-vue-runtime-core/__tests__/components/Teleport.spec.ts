@@ -26,10 +26,10 @@ import {
   createTextVNode,
   createVNode,
   openBlock,
-} from '../../src/vnode'
+} from '../../src/vnode.ts'
 import { toDisplayString } from '@vue/shared'
 import { compile, createApp as createDOMApp, render as domRender } from 'vue'
-import type { HMRRuntime } from '../../src/hmr'
+import type { HMRRuntime } from '../../src/hmr.ts'
 
 declare var __VUE_HMR_RUNTIME__: HMRRuntime
 const { rerender, createRecord } = __VUE_HMR_RUNTIME__

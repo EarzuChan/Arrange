@@ -10,8 +10,8 @@ import {
   shallowReactive,
   stop,
   toRaw,
-} from '../src/index'
-import { type Dep, ITERATE_KEY, getDepFromReactive } from '../src/dep'
+} from '../src/index.ts'
+import { type Dep, ITERATE_KEY, getDepFromReactive } from '../src/dep.ts'
 import {
   computed,
   h,
@@ -27,7 +27,7 @@ import {
   pauseTracking,
   resetTracking,
   startBatch,
-} from '../src/effect'
+} from '../src/effect.ts'
 
 describe('reactivity/effect', () => {
   it('should run the passed function once (wrapped by a effect)', () => {

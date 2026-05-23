@@ -1,15 +1,15 @@
 import { normalize } from 'node:path'
 import type { Identifier } from '@babel/types'
-import { type SFCScriptCompileOptions, parse } from '../../src'
-import { ScriptCompileContext } from '../../src/script/context'
+import { type SFCScriptCompileOptions, parse } from '../../src/index.ts'
+import { ScriptCompileContext } from '../../src/script/context.ts'
 import {
   inferRuntimeType,
   invalidateTypeCache,
   recordImports,
   registerTS,
   resolveTypeElements,
-} from '../../src/script/resolveType'
-import { UNKNOWN_TYPE } from '../../src/script/utils'
+} from '../../src/script/resolveType.ts'
+import { UNKNOWN_TYPE } from '../../src/script/utils.ts'
 import ts from 'typescript'
 
 registerTS(() => ts)

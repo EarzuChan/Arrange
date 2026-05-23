@@ -1,4 +1,4 @@
-import { rewriteDefault } from '../src'
+import { rewriteDefault } from '../src/index.ts'
 
 describe('compiler sfc: rewriteDefault', () => {
   test('without export default', () => {

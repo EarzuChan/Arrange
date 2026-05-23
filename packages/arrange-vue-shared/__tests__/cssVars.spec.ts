@@ -1,4 +1,4 @@
-import { normalizeCssVarValue } from '../src'
+import { normalizeCssVarValue } from '../src/index.ts'
 
 describe('utils/cssVars', () => {
   test('should normalize css binding values correctly', () => {

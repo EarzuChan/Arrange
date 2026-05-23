@@ -1,5 +1,5 @@
 ﻿import { ElementTypes, type NodeTransform, NodeTypes } from '@arrange/vue-compiler-core'
-import { DOMErrorCodes, createDOMCompilerError } from '../errors'
+import { DOMErrorCodes, createDOMCompilerError } from '../errors.ts'
 
 export const ignoreSideEffectTags: NodeTransform = (node, context) => {
   if (

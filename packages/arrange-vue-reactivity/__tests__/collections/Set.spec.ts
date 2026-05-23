@@ -5,7 +5,7 @@ import {
   readonly,
   shallowReactive,
   toRaw,
-} from '../../src'
+} from '../../src/index.ts'
 
 describe('reactivity/collections', () => {
   function coverCollectionFn(collection: Set<any>, fnName: string) {

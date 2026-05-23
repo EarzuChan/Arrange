@@ -9,14 +9,14 @@
   isSameVNodeType,
   normalizeVNode,
   openBlock,
-} from '../vnode'
+} from '../vnode.ts'
 import { ShapeFlags, isArray, isFunction, toNumber } from '@arrange/vue-shared'
 import {
   type ComponentInternalInstance,
   handleSetupResult,
   unsetCurrentInstance,
-} from '../component'
-import type { Slots } from '../componentSlots'
+} from '../component.ts'
+import type { Slots } from '../componentSlots.ts'
 import {
   type ElementNamespace,
   MoveType,
@@ -25,17 +25,17 @@ import {
   type RendererNode,
   type SetupRenderEffectFn,
   queuePostRenderEffect,
-} from '../renderer'
-import { queuePostFlushCb } from '../scheduler'
-import { filterSingleRoot, updateHOCHostEl } from '../componentRenderUtils'
+} from '../renderer.ts'
+import { queuePostFlushCb } from '../scheduler.ts'
+import { filterSingleRoot, updateHOCHostEl } from '../componentRenderUtils.ts'
 import {
   assertNumber,
   popWarningContext,
   pushWarningContext,
   warn,
-} from '../warning'
-import { ErrorCodes, handleError } from '../errorHandling'
-import { NULL_DYNAMIC_COMPONENT } from '../helpers/resolveAssets'
+} from '../warning.ts'
+import { ErrorCodes, handleError } from '../errorHandling.ts'
+import { NULL_DYNAMIC_COMPONENT } from '../helpers/resolveAssets.ts'
 
 export interface SuspenseProps {
   onResolve?: () => void

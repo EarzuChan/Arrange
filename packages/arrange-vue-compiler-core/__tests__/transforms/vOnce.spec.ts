@@ -5,8 +5,8 @@ import {
   getBaseTransformPreset,
   baseParse as parse,
   transform,
-} from '../../src'
-import { RENDER_SLOT, SET_BLOCK_TRACKING } from '../../src/runtimeHelpers'
+} from '../../src/index.ts'
+import { RENDER_SLOT, SET_BLOCK_TRACKING } from '../../src/runtimeHelpers.ts'
 
 function transformWithOnce(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

@@ -17,7 +17,7 @@ import {
   serializeInner,
   watch,
 } from '@vue/runtime-test'
-import { useModel } from '../../src/helpers/useModel'
+import { useModel } from '../../src/helpers/useModel.ts'
 
 describe('useModel', () => {
   test('basic', async () => {

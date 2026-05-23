@@ -1,7 +1,7 @@
 ﻿import { Namespaces, NodeTypes, type ParserOptions } from '@arrange/vue-compiler-core'
 import { isHTMLTag, isMathMLTag, isSVGTag, isVoidTag } from '@arrange/vue-shared'
-import { TRANSITION, TRANSITION_GROUP } from './runtimeHelpers'
-import { decodeHtmlBrowser } from './decodeHtmlBrowser'
+import { TRANSITION, TRANSITION_GROUP } from './runtimeHelpers.ts'
+import { decodeHtmlBrowser } from './decodeHtmlBrowser.ts'
 
 export const parserOptions: ParserOptions = {
   parseMode: 'html',

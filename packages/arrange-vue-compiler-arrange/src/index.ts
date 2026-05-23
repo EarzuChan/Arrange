@@ -9,17 +9,17 @@
   baseParse,
   noopDirectiveTransform,
 } from '@arrange/vue-compiler-core'
-import { parserOptions } from './parserOptions'
-import { transformStyle } from './transforms/transformStyle'
-import { transformVHtml } from './transforms/vHtml'
-import { transformVText } from './transforms/vText'
-import { transformModel } from './transforms/vModel'
-import { transformOn } from './transforms/vOn'
-import { transformShow } from './transforms/vShow'
-import { transformTransition } from './transforms/Transition'
-import { stringifyStatic } from './transforms/stringifyStatic'
-import { ignoreSideEffectTags } from './transforms/ignoreSideEffectTags'
-import { validateHtmlNesting } from './transforms/validateHtmlNesting'
+import { parserOptions } from './parserOptions.ts'
+import { transformStyle } from './transforms/transformStyle.ts'
+import { transformVHtml } from './transforms/vHtml.ts'
+import { transformVText } from './transforms/vText.ts'
+import { transformModel } from './transforms/vModel.ts'
+import { transformOn } from './transforms/vOn.ts'
+import { transformShow } from './transforms/vShow.ts'
+import { transformTransition } from './transforms/Transition.ts'
+import { stringifyStatic } from './transforms/stringifyStatic.ts'
+import { ignoreSideEffectTags } from './transforms/ignoreSideEffectTags.ts'
+import { validateHtmlNesting } from './transforms/validateHtmlNesting.ts'
 import { extend } from '@arrange/vue-shared'
 
 export { parserOptions }
@@ -67,12 +67,12 @@ export function parse(template: string, options: ParserOptions = {}): RootNode {
   return baseParse(template, extend({}, parserOptions, options))
 }
 
-export * from './runtimeHelpers'
-export { transformStyle } from './transforms/transformStyle'
+export * from './runtimeHelpers.ts'
+export { transformStyle } from './transforms/transformStyle.ts'
 export {
   createDOMCompilerError,
   DOMErrorCodes,
   DOMErrorMessages,
-} from './errors'
+} from './errors.ts'
 export * from '@arrange/vue-compiler-core'
 

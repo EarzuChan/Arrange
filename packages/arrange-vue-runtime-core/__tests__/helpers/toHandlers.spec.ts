@@ -1,4 +1,4 @@
-import { toHandlers } from '../../src/helpers/toHandlers'
+import { toHandlers } from '../../src/helpers/toHandlers.ts'
 
 describe('toHandlers', () => {
   it('should not accept non-objects', () => {

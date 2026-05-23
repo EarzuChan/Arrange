@@ -9,9 +9,9 @@ import {
   baseCompile,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformIf } from '../../src/transforms/vIf'
-import { transformExpression } from '../../src/transforms/transformExpression'
+} from '../../src/index.ts'
+import { transformIf } from '../../src/transforms/vIf.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
 import { PatchFlagNames, PatchFlags } from '../../../shared/src'
 
 function parseWithExpressionTransform(

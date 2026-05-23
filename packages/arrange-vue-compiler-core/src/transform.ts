@@ -1,4 +1,4 @@
-﻿import type { TransformOptions } from './options'
+﻿import type { TransformOptions } from './options.ts'
 import {
   type ArrayExpression,
   type CacheExpression,
@@ -19,7 +19,7 @@ import {
   createCacheExpression,
   createSimpleExpression,
   createVNodeCall,
-} from './ast'
+} from './ast.ts'
 import {
   EMPTY_OBJ,
   NOOP,
@@ -29,16 +29,16 @@ import {
   isArray,
   isString,
 } from '@arrange/vue-shared'
-import { defaultOnError, defaultOnWarn } from './errors'
+import { defaultOnError, defaultOnWarn } from './errors.ts'
 import {
   CREATE_COMMENT,
   FRAGMENT,
   TO_DISPLAY_STRING,
   helperNameMap,
-} from './runtimeHelpers'
-import { isVSlot } from './utils'
-import { cacheStatic, getSingleElementRoot } from './transforms/cacheStatic'
-import type { CompilerCompatOptions } from './compat/compatConfig'
+} from './runtimeHelpers.ts'
+import { isVSlot } from './utils.ts'
+import { cacheStatic, getSingleElementRoot } from './transforms/cacheStatic.ts'
+import type { CompilerCompatOptions } from './compat/compatConfig.ts'
 
 // There are two types of transforms:
 //

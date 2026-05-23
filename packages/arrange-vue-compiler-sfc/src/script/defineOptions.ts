@@ -1,11 +1,11 @@
 ﻿import type { Node } from '@babel/types'
 import { unwrapTSNode } from '@arrange/vue-compiler-arrange'
-import type { ScriptCompileContext } from './context'
-import { isCallOf } from './utils'
-import { DEFINE_PROPS } from './defineProps'
-import { DEFINE_EMITS } from './defineEmits'
-import { DEFINE_EXPOSE } from './defineExpose'
-import { DEFINE_SLOTS } from './defineSlots'
+import type { ScriptCompileContext } from './context.ts'
+import { isCallOf } from './utils.ts'
+import { DEFINE_PROPS } from './defineProps.ts'
+import { DEFINE_EMITS } from './defineEmits.ts'
+import { DEFINE_EXPOSE } from './defineExpose.ts'
+import { DEFINE_SLOTS } from './defineSlots.ts'
 
 export const DEFINE_OPTIONS = 'defineOptions'
 

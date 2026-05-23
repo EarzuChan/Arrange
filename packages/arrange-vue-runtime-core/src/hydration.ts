@@ -9,11 +9,11 @@
   createVNode,
   invokeVNodeHook,
   normalizeVNode,
-} from './vnode'
-import { flushPostFlushCbs } from './scheduler'
-import type { ComponentInternalInstance, ComponentOptions } from './component'
-import { invokeDirectiveHook } from './directives'
-import { warn } from './warning'
+} from './vnode.ts'
+import { flushPostFlushCbs } from './scheduler.ts'
+import type { ComponentInternalInstance, ComponentOptions } from './component.ts'
+import { invokeDirectiveHook } from './directives.ts'
+import { warn } from './warning.ts'
 import {
   PatchFlags,
   ShapeFlags,
@@ -32,17 +32,17 @@ import {
   normalizeStyle,
   stringifyStyle,
 } from '@arrange/vue-shared'
-import { type RendererInternals, needTransition } from './renderer'
-import { setRef } from './rendererTemplateRef'
+import { type RendererInternals, needTransition } from './renderer.ts'
+import { setRef } from './rendererTemplateRef.ts'
 import {
   type SuspenseBoundary,
   type SuspenseImpl,
   queueEffectWithSuspense,
-} from './components/Suspense'
-import type { TeleportImpl, TeleportVNode } from './components/Teleport'
-import { isAsyncWrapper } from './apiAsyncComponent'
+} from './components/Suspense.ts'
+import type { TeleportImpl, TeleportVNode } from './components/Teleport.ts'
+import { isAsyncWrapper } from './apiAsyncComponent.ts'
 import { isReactive } from '@arrange/vue-reactivity'
-import { updateHOCHostEl } from './componentRenderUtils'
+import { updateHOCHostEl } from './componentRenderUtils.ts'
 
 export type RootHydrateFunction = (
   vnode: VNode<Node, Element>,

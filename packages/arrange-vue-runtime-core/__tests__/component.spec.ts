@@ -5,7 +5,7 @@ import {
   nodeOps,
   render,
 } from '@vue/runtime-test'
-import { formatComponentName } from '../src/component'
+import { formatComponentName } from '../src/component.ts'
 
 describe('formatComponentName', () => {
   test('default name', () => {

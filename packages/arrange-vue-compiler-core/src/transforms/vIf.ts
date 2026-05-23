@@ -3,7 +3,7 @@
   type TransformContext,
   createStructuralDirectiveTransform,
   traverseNode,
-} from '../transform'
+} from '../transform.ts'
 import {
   type AttributeNode,
   type BlockCodegenNode,
@@ -26,19 +26,19 @@ import {
   createSimpleExpression,
   createVNodeCall,
   locStub,
-} from '../ast'
-import { ErrorCodes, createCompilerError } from '../errors'
-import { processExpression } from './transformExpression'
-import { validateBrowserExpression } from '../validateExpression'
-import { cloneLoc } from '../parser'
-import { CREATE_COMMENT, FRAGMENT } from '../runtimeHelpers'
+} from '../ast.ts'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
+import { processExpression } from './transformExpression.ts'
+import { validateBrowserExpression } from '../validateExpression.ts'
+import { cloneLoc } from '../parser.ts'
+import { CREATE_COMMENT, FRAGMENT } from '../runtimeHelpers.ts'
 import {
   findDir,
   findProp,
   getMemoedVNodeCall,
   injectProp,
   isCommentOrWhitespace,
-} from '../utils'
+} from '../utils.ts'
 import { PatchFlags } from '@arrange/vue-shared'
 
 export const transformIf: NodeTransform = createStructuralDirectiveTransform(

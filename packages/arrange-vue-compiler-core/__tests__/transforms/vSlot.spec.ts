@@ -13,22 +13,22 @@ import {
   generate,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformOn } from '../../src/transforms/vOn'
-import { transformBind } from '../../src/transforms/vBind'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet'
+} from '../../src/index.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet.ts'
 import {
   trackSlotScopes,
   trackVForSlotScopes,
-} from '../../src/transforms/vSlot'
-import { CREATE_SLOTS, RENDER_LIST } from '../../src/runtimeHelpers'
-import { createObjectMatcher } from '../testUtils'
+} from '../../src/transforms/vSlot.ts'
+import { CREATE_SLOTS, RENDER_LIST } from '../../src/runtimeHelpers.ts'
+import { createObjectMatcher } from '../testUtils.ts'
 import { PatchFlags } from '@vue/shared'
-import { transformFor } from '../../src/transforms/vFor'
-import { transformIf } from '../../src/transforms/vIf'
-import { transformText } from '../../src/transforms/transformText'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { transformIf } from '../../src/transforms/vIf.ts'
+import { transformText } from '../../src/transforms/transformText.ts'
 
 function parseWithSlots(
   template: string,

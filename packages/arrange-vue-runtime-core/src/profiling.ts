@@ -2,8 +2,8 @@
 import {
   type ComponentInternalInstance,
   formatComponentName,
-} from './component'
-import { devtoolsPerfEnd, devtoolsPerfStart } from './devtools'
+} from './component.ts'
+import { devtoolsPerfEnd, devtoolsPerfStart } from './devtools.ts'
 
 let supported: boolean
 let perf: Performance

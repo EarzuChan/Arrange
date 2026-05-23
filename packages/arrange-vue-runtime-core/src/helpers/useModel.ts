@@ -1,10 +1,10 @@
 ﻿import { type Ref, customRef, ref } from '@arrange/vue-reactivity'
 import { EMPTY_OBJ, camelize, hasChanged, hyphenate } from '@arrange/vue-shared'
-import type { DefineModelOptions, ModelRef } from '../apiSetupHelpers'
-import { getCurrentInstance } from '../component'
-import { warn } from '../warning'
-import type { NormalizedProps } from '../componentProps'
-import { watchSyncEffect } from '../apiWatch'
+import type { DefineModelOptions, ModelRef } from '../apiSetupHelpers.ts'
+import { getCurrentInstance } from '../component.ts'
+import { warn } from '../warning.ts'
+import type { NormalizedProps } from '../componentProps.ts'
+import { watchSyncEffect } from '../apiWatch.ts'
 
 export function useModel<
   M extends PropertyKey,

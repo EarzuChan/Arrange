@@ -13,7 +13,7 @@ import {
   watch,
   watchEffect,
 } from '@vue/runtime-test'
-import { ErrorCodes, ErrorTypeStrings } from '../src/errorHandling'
+import { ErrorCodes, ErrorTypeStrings } from '../src/errorHandling.ts'
 
 describe('error handling', () => {
   test('propagation', () => {

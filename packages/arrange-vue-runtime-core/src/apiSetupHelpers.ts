@@ -16,22 +16,22 @@ import {
   setCurrentInstance,
   setInSSRSetupState,
   unsetCurrentInstance,
-} from './component'
-import type { EmitFn, EmitsOptions, ObjectEmitsOptions } from './componentEmits'
+} from './component.ts'
+import type { EmitFn, EmitsOptions, ObjectEmitsOptions } from './componentEmits.ts'
 import type {
   ComponentOptionsBase,
   ComponentOptionsMixin,
   ComputedOptions,
   MethodOptions,
-} from './componentOptions'
+} from './componentOptions.ts'
 import type {
   ComponentObjectPropsOptions,
   ComponentPropsOptions,
   ExtractPropTypes,
   PropOptions,
-} from './componentProps'
-import { warn } from './warning'
-import type { SlotsType, StrictUnwrapSlotsType } from './componentSlots'
+} from './componentProps.ts'
+import { warn } from './warning.ts'
+import type { SlotsType, StrictUnwrapSlotsType } from './componentSlots.ts'
 import type { Ref } from '@arrange/vue-reactivity'
 
 // dev only

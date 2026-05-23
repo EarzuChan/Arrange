@@ -2,50 +2,18 @@
   "name": "@arrange/vue-compiler-arrange",
   "version": "0.0.0",
   "description": "Arrange host target compiler",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "unpkg": "dist/compiler-dom.global.js",
-  "jsdelivr": "dist/compiler-dom.global.js",
-  "files": [
-    "dist"
-  ],
+  "private": true,
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
   "sideEffects": false,
-  "buildOptions": {
-    "name": "VueCompilerDOM",
-    "compat": true,
-    "formats": [
-      "esm-bundler",
-      "esm-browser",
-      "cjs",
-      "global"
-    ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vuejs/core.git",
-    "directory": "packages/compiler-dom"
-  },
-  "keywords": [
-    "vue"
-  ],
-  "author": "Evan You",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/vuejs/core/issues"
-  },
-  "homepage": "https://github.com/vuejs/core/tree/main/packages/compiler-dom#readme",
   "dependencies": {
     "@arrange/vue-shared": "workspace:*",
     "@arrange/vue-compiler-core": "workspace:*"
   },
-  "private": true,
-  "type": "module"
+  "license": "MIT"
 }

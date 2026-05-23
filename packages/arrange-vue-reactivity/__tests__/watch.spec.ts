@@ -8,7 +8,7 @@ import {
   onWatcherCleanup,
   ref,
   watch,
-} from '../src'
+} from '../src/index.ts'
 
 const queue: (() => void)[] = []
 

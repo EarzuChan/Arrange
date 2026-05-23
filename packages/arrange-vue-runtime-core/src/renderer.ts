@@ -12,7 +12,7 @@
   invokeVNodeHook,
   isSameVNodeType,
   normalizeVNode,
-} from './vnode'
+} from './vnode.ts'
 import {
   type ComponentInternalInstance,
   type ComponentOptions,
@@ -20,13 +20,13 @@ import {
   type LifecycleHook,
   createComponentInstance,
   setupComponent,
-} from './component'
+} from './component.ts'
 import {
   filterSingleRoot,
   renderComponentRoot,
   shouldUpdateComponent,
   updateHOCHostEl,
-} from './componentRenderUtils'
+} from './componentRenderUtils.ts'
 import {
   EMPTY_ARR,
   EMPTY_OBJ,
@@ -47,51 +47,51 @@ import {
   flushPreFlushCbs,
   queueJob,
   queuePostFlushCb,
-} from './scheduler'
+} from './scheduler.ts'
 import {
   EffectFlags,
   ReactiveEffect,
   pauseTracking,
   resetTracking,
 } from '@arrange/vue-reactivity'
-import { updateProps } from './componentProps'
-import { updateSlots } from './componentSlots'
-import { popWarningContext, pushWarningContext, warn } from './warning'
-import { type CreateAppFunction, createAppAPI } from './apiCreateApp'
-import { setRef } from './rendererTemplateRef'
+import { updateProps } from './componentProps.ts'
+import { updateSlots } from './componentSlots.ts'
+import { popWarningContext, pushWarningContext, warn } from './warning.ts'
+import { type CreateAppFunction, createAppAPI } from './apiCreateApp.ts'
+import { setRef } from './rendererTemplateRef.ts'
 import {
   type SuspenseBoundary,
   type SuspenseImpl,
   isSuspense,
   queueEffectWithSuspense,
-} from './components/Suspense'
+} from './components/Suspense.ts'
 import {
   TeleportEndKey,
   type TeleportImpl,
   type TeleportVNode,
-} from './components/Teleport'
-import { type KeepAliveContext, isKeepAlive } from './components/KeepAlive'
+} from './components/Teleport.ts'
+import { type KeepAliveContext, isKeepAlive } from './components/KeepAlive.ts'
 import {
   isHmrUpdating,
   registerHMR,
   setHmrUpdating,
   unregisterHMR,
-} from './hmr'
-import { type RootHydrateFunction, createHydrationFunctions } from './hydration'
-import { invokeDirectiveHook } from './directives'
-import { endMeasure, startMeasure } from './profiling'
+} from './hmr.ts'
+import { type RootHydrateFunction, createHydrationFunctions } from './hydration.ts'
+import { invokeDirectiveHook } from './directives.ts'
+import { endMeasure, startMeasure } from './profiling.ts'
 import {
   devtoolsComponentAdded,
   devtoolsComponentRemoved,
   devtoolsComponentUpdated,
   setDevtoolsHook,
-} from './devtools'
-import { initFeatureFlags } from './featureFlags'
-import { isAsyncWrapper } from './apiAsyncComponent'
-import { isCompatEnabled } from './compat/compatConfig'
-import { DeprecationTypes } from './compat/compatConfig'
-import { type TransitionHooks, leaveCbKey } from './components/BaseTransition'
-import type { ComponentCustomElementInterface } from './component'
+} from './devtools.ts'
+import { initFeatureFlags } from './featureFlags.ts'
+import { isAsyncWrapper } from './apiAsyncComponent.ts'
+import { isCompatEnabled } from './compat/compatConfig.ts'
+import { DeprecationTypes } from './compat/compatConfig.ts'
+import { type TransitionHooks, leaveCbKey } from './components/BaseTransition.ts'
+import type { ComponentCustomElementInterface } from './component.ts'
 
 export interface Renderer<HostElement = RendererElement> {
   render: RootRenderFunction<HostElement>

@@ -8,16 +8,16 @@ import {
   type VNodeCall,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformBind } from '../../src/transforms/vBind'
-import { transformElement } from '../../src/transforms/transformElement'
+} from '../../src/index.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
 import {
   CAMELIZE,
   NORMALIZE_PROPS,
   helperNameMap,
-} from '../../src/runtimeHelpers'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { transformVBindShorthand } from '../../src/transforms/transformVBindShorthand'
+} from '../../src/runtimeHelpers.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { transformVBindShorthand } from '../../src/transforms/transformVBindShorthand.ts'
 
 function parseWithVBind(
   template: string,

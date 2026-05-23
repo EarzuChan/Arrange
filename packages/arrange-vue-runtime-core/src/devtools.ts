@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-globals */
-import type { App } from './apiCreateApp'
-import { Comment, Fragment, Static, Text } from './vnode'
-import type { ComponentInternalInstance } from './component'
+import type { App } from './apiCreateApp.ts'
+import { Comment, Fragment, Static, Text } from './vnode.ts'
+import type { ComponentInternalInstance } from './component.ts'
 
 interface AppRecord {
   id: number

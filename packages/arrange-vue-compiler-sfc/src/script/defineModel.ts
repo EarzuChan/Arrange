@@ -1,7 +1,7 @@
 ﻿import type { LVal, Node, TSType } from '@babel/types'
-import type { ScriptCompileContext } from './context'
-import { inferRuntimeType } from './resolveType'
-import { UNKNOWN_TYPE, isCallOf, toRuntimeTypeString } from './utils'
+import type { ScriptCompileContext } from './context.ts'
+import { inferRuntimeType } from './resolveType.ts'
+import { UNKNOWN_TYPE, isCallOf, toRuntimeTypeString } from './utils.ts'
 import { BindingTypes, unwrapTSNode } from '@arrange/vue-compiler-arrange'
 
 export const DEFINE_MODEL = 'defineModel'

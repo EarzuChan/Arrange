@@ -1,4 +1,4 @@
-import { nextTick, ref, watch, watchEffect } from '../src'
+import { nextTick, ref, watch, watchEffect } from '../src/index.ts'
 import { bench } from 'vitest'
 
 bench('create watcher', () => {

@@ -1,5 +1,5 @@
 ﻿import { isObject, toHandlerKey } from '@arrange/vue-shared'
-import { warn } from '../warning'
+import { warn } from '../warning.ts'
 
 /**
  * For prefixing keys in v-on="obj" with "on"

@@ -25,7 +25,7 @@ import {
   serializeInner,
   shallowRef,
 } from '@vue/runtime-test'
-import type { KeepAliveProps } from '../../src/components/KeepAlive'
+import type { KeepAliveProps } from '../../src/components/KeepAlive.ts'
 
 const timeout = (n: number = 0) => new Promise(r => setTimeout(r, n))
 

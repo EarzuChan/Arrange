@@ -24,8 +24,8 @@
   type VNodeCall,
   createCallExpression,
   createObjectExpression,
-} from './ast'
-import type { TransformContext } from './transform'
+} from './ast.ts'
+import type { TransformContext } from './transform.ts'
 import {
   BASE_TRANSITION,
   GUARD_REACTIVE_PROPS,
@@ -36,13 +36,13 @@ import {
   TELEPORT,
   TO_HANDLERS,
   WITH_MEMO,
-} from './runtimeHelpers'
+} from './runtimeHelpers.ts'
 import { NOOP, isObject, isString } from '@arrange/vue-shared'
-import type { PropsExpression } from './transforms/transformElement'
+import type { PropsExpression } from './transforms/transformElement.ts'
 import { parseExpression } from '@babel/parser'
 import type { Expression, Node } from '@babel/types'
-import { unwrapTSNode } from './babelUtils'
-import { isWhitespace } from './tokenizer'
+import { unwrapTSNode } from './babelUtils.ts'
+import { isWhitespace } from './tokenizer.ts'
 
 export const isStaticExp = (p: JSChildNode): p is SimpleExpressionNode =>
   p.type === NodeTypes.SIMPLE_EXPRESSION && p.isStatic

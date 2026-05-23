@@ -9,11 +9,11 @@ import {
   helperNameMap,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformFor } from '../../src/transforms/vFor'
-import { transformOn } from '../../src/transforms/vOn'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformExpression } from '../../src/transforms/transformExpression'
+} from '../../src/index.ts'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
 
 function parseWithVOn(template: string, options: CompilerOptions = {}) {
   const ast = parse(template, options)

@@ -5,8 +5,8 @@ import {
   transform,
 } from '@vue/compiler-core'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
-import { transformShow } from '../../src/transforms/vShow'
-import { DOMErrorCodes } from '../../src/errors'
+import { transformShow } from '../../src/transforms/vShow.ts'
+import { DOMErrorCodes } from '../../src/errors.ts'
 
 function transformWithShow(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

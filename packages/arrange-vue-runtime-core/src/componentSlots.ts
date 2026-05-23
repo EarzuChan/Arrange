@@ -1,10 +1,10 @@
-﻿import { type ComponentInternalInstance, currentInstance } from './component'
+﻿import { type ComponentInternalInstance, currentInstance } from './component.ts'
 import {
   type VNode,
   type VNodeChild,
   type VNodeNormalizedChildren,
   normalizeVNode,
-} from './vnode'
+} from './vnode.ts'
 import {
   EMPTY_OBJ,
   type IfAny,
@@ -15,17 +15,17 @@ import {
   isArray,
   isFunction,
 } from '@arrange/vue-shared'
-import { warn } from './warning'
-import { isKeepAlive } from './components/KeepAlive'
+import { warn } from './warning.ts'
+import { isKeepAlive } from './components/KeepAlive.ts'
 import {
   type ContextualRenderFn,
   currentRenderingInstance,
   withCtx,
-} from './componentRenderContext'
-import { isHmrUpdating } from './hmr'
-import { DeprecationTypes, isCompatEnabled } from './compat/compatConfig'
+} from './componentRenderContext.ts'
+import { isHmrUpdating } from './hmr.ts'
+import { DeprecationTypes, isCompatEnabled } from './compat/compatConfig.ts'
 import { TriggerOpTypes, trigger } from '@arrange/vue-reactivity'
-import { createInternalObject } from './internalObject'
+import { createInternalObject } from './internalObject.ts'
 
 export type Slot<T extends any = any> = (
   ...args: IfAny<T, any[], [T] | (T extends undefined ? [] : never)>

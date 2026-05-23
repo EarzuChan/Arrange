@@ -1,4 +1,4 @@
-﻿import type { DirectiveTransform, DirectiveTransformResult } from '../transform'
+﻿import type { DirectiveTransform, DirectiveTransformResult } from '../transform.ts'
 import {
   type DirectiveNode,
   ElementTypes,
@@ -8,13 +8,13 @@ import {
   createCompoundExpression,
   createObjectProperty,
   createSimpleExpression,
-} from '../ast'
+} from '../ast.ts'
 import { camelize, toHandlerKey } from '@arrange/vue-shared'
-import { ErrorCodes, createCompilerError } from '../errors'
-import { processExpression } from './transformExpression'
-import { validateBrowserExpression } from '../validateExpression'
-import { hasScopeRef, isFnExpression, isMemberExpression } from '../utils'
-import { TO_HANDLER_KEY } from '../runtimeHelpers'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
+import { processExpression } from './transformExpression.ts'
+import { validateBrowserExpression } from '../validateExpression.ts'
+import { hasScopeRef, isFnExpression, isMemberExpression } from '../utils.ts'
+import { TO_HANDLER_KEY } from '../runtimeHelpers.ts'
 
 export interface VOnDirectiveNode extends DirectiveNode {
   // v-on without arg is handled directly in ./transformElement.ts due to its affecting

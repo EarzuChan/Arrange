@@ -4,10 +4,10 @@ import {
   reactive,
   shallowReactive,
   shallowReadonly,
-} from '../src/reactive'
+} from '../src/reactive.ts'
 
-import { effect } from '../src/effect'
-import { type Ref, isRef, ref } from '../src/ref'
+import { effect } from '../src/effect.ts'
+import { type Ref, isRef, ref } from '../src/ref.ts'
 
 describe('shallowReactive', () => {
   test('should not make non-reactive properties reactive', () => {

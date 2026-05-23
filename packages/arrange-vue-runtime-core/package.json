@@ -2,45 +2,18 @@
   "name": "@arrange/vue-runtime-core",
   "version": "0.0.0",
   "description": "Arrange-specialized Vue runtime core",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "private": true,
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
-  "buildOptions": {
-    "name": "VueRuntimeCore",
-    "formats": [
-      "esm-bundler",
-      "cjs"
-    ]
-  },
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vuejs/core.git",
-    "directory": "packages/runtime-core"
-  },
-  "keywords": [
-    "vue"
-  ],
-  "author": "Evan You",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/vuejs/core/issues"
-  },
-  "homepage": "https://github.com/vuejs/core/tree/main/packages/runtime-core#readme",
   "dependencies": {
     "@arrange/vue-shared": "workspace:*",
     "@arrange/vue-reactivity": "workspace:*"
   },
-  "private": true,
-  "type": "module"
+  "license": "MIT"
 }

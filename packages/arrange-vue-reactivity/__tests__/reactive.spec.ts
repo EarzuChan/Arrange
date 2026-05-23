@@ -1,4 +1,4 @@
-import { isRef, ref, shallowRef } from '../src/ref'
+import { isRef, ref, shallowRef } from '../src/ref.ts'
 import {
   isProxy,
   isReactive,
@@ -10,10 +10,10 @@ import {
   shallowReactive,
   shallowReadonly,
   toRaw,
-} from '../src/reactive'
-import { computed } from '../src/computed'
-import { effect } from '../src/effect'
-import { targetMap } from '../src/dep'
+} from '../src/reactive.ts'
+import { computed } from '../src/computed.ts'
+import { effect } from '../src/effect.ts'
+import { targetMap } from '../src/dep.ts'
 
 describe('reactivity/reactive', () => {
   test('Object', () => {

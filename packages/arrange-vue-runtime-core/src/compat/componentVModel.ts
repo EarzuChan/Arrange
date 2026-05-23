@@ -1,14 +1,14 @@
 ﻿import { ShapeFlags, extend } from '@arrange/vue-shared'
-import type { ComponentInternalInstance, ComponentOptions } from '../component'
-import { createAppContext } from '../apiCreateApp'
-import { ErrorCodes, callWithErrorHandling } from '../errorHandling'
-import type { VNode } from '../vnode'
-import { popWarningContext, pushWarningContext } from '../warning'
+import type { ComponentInternalInstance, ComponentOptions } from '../component.ts'
+import { createAppContext } from '../apiCreateApp.ts'
+import { ErrorCodes, callWithErrorHandling } from '../errorHandling.ts'
+import type { VNode } from '../vnode.ts'
+import { popWarningContext, pushWarningContext } from '../warning.ts'
 import {
   DeprecationTypes,
   isCompatEnabled,
   warnDeprecation,
-} from './compatConfig'
+} from './compatConfig.ts'
 
 export const compatModelEventPrefix = `onModelCompat:`
 

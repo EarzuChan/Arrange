@@ -1,4 +1,4 @@
-import { escapeHtml, escapeHtmlComment } from '../src'
+import { escapeHtml, escapeHtmlComment } from '../src/index.ts'
 
 describe('escapeHtml', () => {
   test('ssr: escapeHTML', () => {

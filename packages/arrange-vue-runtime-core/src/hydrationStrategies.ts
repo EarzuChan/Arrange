@@ -1,5 +1,5 @@
 ﻿import { getGlobalThis, isString } from '@arrange/vue-shared'
-import { DOMNodeTypes, isComment } from './hydration'
+import { DOMNodeTypes, isComment } from './hydration.ts'
 
 // Polyfills for Safari support
 // see https://caniuse.com/requestidlecallback

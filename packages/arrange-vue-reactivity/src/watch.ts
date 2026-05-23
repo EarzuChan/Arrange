@@ -10,9 +10,9 @@
   isSet,
   remove,
 } from '@arrange/vue-shared'
-import { warn } from './warning'
-import type { ComputedRef } from './computed'
-import { ReactiveFlags } from './constants'
+import { warn } from './warning.ts'
+import type { ComputedRef } from './computed.ts'
+import { ReactiveFlags } from './constants.ts'
 import {
   type DebuggerOptions,
   EffectFlags,
@@ -20,10 +20,10 @@ import {
   ReactiveEffect,
   pauseTracking,
   resetTracking,
-} from './effect'
-import { isReactive, isShallow } from './reactive'
-import { type Ref, isRef } from './ref'
-import { getCurrentScope } from './effectScope'
+} from './effect.ts'
+import { isReactive, isShallow } from './reactive.ts'
+import { type Ref, isRef } from './ref.ts'
+import { getCurrentScope } from './effectScope.ts'
 
 // These errors were transferred from `packages/runtime-core/src/errorHandling.ts`
 // to @arrange/vue-reactivity to allow co-location with the moved base watch logic, hence

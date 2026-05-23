@@ -1,7 +1,7 @@
-import { type ComputedRef, computed } from '../src/computed'
-import { isReactive, reactive, shallowReactive, toRaw } from '../src/reactive'
-import { isRef, ref } from '../src/ref'
-import { effect } from '../src/effect'
+import { type ComputedRef, computed } from '../src/computed.ts'
+import { isReactive, reactive, shallowReactive, toRaw } from '../src/reactive.ts'
+import { isRef, ref } from '../src/ref.ts'
+import { effect } from '../src/effect.ts'
 
 describe('reactivity/reactive/Array', () => {
   test('should make Array reactive', () => {

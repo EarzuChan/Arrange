@@ -1,179 +1,127 @@
-import {createRequire} from "node:module"
-import {existsSync, rmSync, mkdirSync, writeFileSync} from "node:fs"
+﻿import {existsSync, readdirSync, readFileSync, rmSync, statSync} from "node:fs"
 import {resolve} from "node:path"
-import {pathToFileURL} from "node:url"
 import {repoRoot} from "./common.ts"
 
-type ViteBuildOutputChunk = {
-    type: "chunk"
-    fileName: string
-    code: string
+type PackageManifest = {
+    name?: unknown
+    exports?: unknown
+    main?: unknown
+    module?: unknown
+    types?: unknown
+    files?: unknown
+    unpkg?: unknown
+    jsdelivr?: unknown
 }
 
-type ViteBuildOutput = {
-    output?: Array<{type?: string; fileName?: string; code?: string}>
+type ExportTarget = string | Record<string, unknown>
+
+const packagesRoot = resolve(repoRoot, "packages")
+const forbiddenPublicFields = ["main", "module", "types", "unpkg", "jsdelivr"] as const
+const forbiddenExportKeys = new Set(["types", "require", "default"])
+const allowedExportKeys = new Set(["arrange-ts", "import"])
+const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
+const internalPackagePattern = /^@arrange\//
+
+function fail(message: string): never {
+    throw new Error(message)
 }
 
-type ViteModule = {
-    build: (config: Record<string, unknown>) => Promise<ViteBuildOutput | ViteBuildOutput[]>
+function readJson(path: string): PackageManifest {
+    return JSON.parse(readFileSync(path, "utf8")) as PackageManifest
 }
 
-const packageRoot = resolve(repoRoot, "packages")
-const viteRequire = createRequire(resolve(repoRoot, "package.json"))
-const vite = await import(pathToFileURL(viteRequire.resolve("vite")).href) as unknown as ViteModule
-
-const arrVueDefines = {
-    __DEV__: `process.env.NODE_ENV !== "production"`,
-    __TEST__: "false",
-    __BROWSER__: "false",
-    __SSR__: "false",
-    __GLOBAL__: "false",
-    __CJS__: "false",
-    __ESM_BROWSER__: "false",
-    __ESM_BUNDLER__: "true",
-    __COMPAT__: "false",
-    __FEATURE_OPTIONS_API__: "false",
-    __FEATURE_SUSPENSE__: "true",
-    __FEATURE_PROD_DEVTOOLS__: "false",
-    __FEATURE_PROD_HYDRATION_MISMATCH_DETAILS__: "false",
-    __VERSION__: JSON.stringify("3.5.34-arrange"),
+function assertTsEntry(pkgDir: string, pkgName: string, target: unknown, path: string): void {
+    if (typeof target !== "string") fail(`${pkgName} export ${path} must be a direct TS path string`)
+    if (!target.startsWith("./")) fail(`${pkgName} export ${path} must be package-relative`)
+    if (!target.endsWith(".ts")) fail(`${pkgName} export ${path} must point to .ts, got ${target}`)
+    if (target.includes("/dist/") || target.startsWith("./dist/")) fail(`${pkgName} export ${path} points to dist: ${target}`)
+    const entryPath = resolve(pkgDir, target)
+    if (!existsSync(entryPath)) fail(`${pkgName} export ${path} target does not exist: ${target}`)
 }
 
-const sharedAliases = {
-    "@vue/shared": resolve(packageRoot, "arrange-vue-shared/src/index.ts"),
-    "@vue/reactivity": resolve(packageRoot, "arrange-vue-reactivity/src/index.ts"),
-    "@vue/runtime-core": resolve(packageRoot, "arrange-vue-runtime-core/src/index.ts"),
-    "@vue/compiler-core": resolve(packageRoot, "arrange-vue-compiler-core/src/index.ts"),
-    "@vue/compiler-dom": resolve(packageRoot, "arrange-vue-compiler-arrange/src/index.ts"),
-}
-
-type PackageBuildOptions = {
-    name: string
-    entry: string
-    outDir: string
-    aliases?: Record<string, string>
-    external?: Array<string | RegExp>
-    define?: Record<string, string>
-}
-
-function outputFiles(result: ViteBuildOutput | ViteBuildOutput[]): ViteBuildOutputChunk[] {
-    const items = Array.isArray(result) ? result : [result]
-    return items.flatMap((item) => item.output ?? []).filter((item): item is ViteBuildOutputChunk => item.type === "chunk")
-}
-
-function ensureDir(path: string): void {
-    mkdirSync(path, {recursive: true})
-}
-
-async function buildPackage(options: PackageBuildOptions): Promise<void> {
-    rmSync(options.outDir, {recursive: true, force: true})
-    ensureDir(options.outDir)
-    const result = await vite.build({
-        configFile: false,
-        logLevel: "silent",
-        define: {
-            ...arrVueDefines,
-            "process.env.NODE_ENV": JSON.stringify("production"),
-            ...options.define,
-        },
-        resolve: {
-            alias: options.aliases ?? {},
-        },
-        build: {
-            write: false,
-            target: "es2022",
-            lib: {
-                entry: options.entry,
-                formats: ["es", "cjs"],
-                fileName: "index",
-            },
-            rollupOptions: {
-                external: options.external ?? [],
-            },
-        },
-    })
-    const chunks = outputFiles(result)
-    for (const chunk of chunks) {
-        const filePath = resolve(options.outDir, chunk.fileName)
-        ensureDir(resolve(filePath, ".."))
-        writeFileSync(filePath, chunk.code, "utf8")
+function assertExportTarget(pkgDir: string, pkgName: string, target: ExportTarget, path: string): void {
+    if (typeof target === "string") {
+        assertTsEntry(pkgDir, pkgName, target, path)
+        return
     }
-    console.log(`built ${options.name}`)
+    for (const [key, value] of Object.entries(target)) {
+        if (forbiddenExportKeys.has(key)) fail(`${pkgName} export ${path}.${key} is forbidden in TS-first packages`)
+        if (!allowedExportKeys.has(key)) fail(`${pkgName} export ${path}.${key} is not an Arrange TS-first condition`)
+        if (typeof value === "string") assertTsEntry(pkgDir, pkgName, value, `${path}.${key}`)
+        else if (value && typeof value === "object") assertExportTarget(pkgDir, pkgName, value as ExportTarget, `${path}.${key}`)
+        else fail(`${pkgName} export ${path}.${key} has invalid target`)
+    }
 }
 
-await buildPackage({
-    name: "@arrange/vue-shared",
-    entry: resolve(packageRoot, "arrange-vue-shared/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-shared/dist"),
-    external: [],
-})
+function assertNoDistDirectory(pkgDir: string, pkgName: string): void {
+    const distPath = resolve(pkgDir, "dist")
+    if (!existsSync(distPath)) return
+    rmSync(distPath, {recursive: true, force: true})
+    if (existsSync(distPath)) fail(`${pkgName} dist directory remains after removal`)
+    console.log(`removed forbidden package dist: ${pkgName}`)
+}
 
-await buildPackage({
-    name: "@arrange/vue-reactivity",
-    entry: resolve(packageRoot, "arrange-vue-reactivity/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-reactivity/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+function assertNoPublicDistFields(manifest: PackageManifest, pkgName: string): void {
+    for (const field of forbiddenPublicFields) {
+        if (field in manifest) fail(`${pkgName} must not declare public ${field}`)
+    }
+    if (Array.isArray(manifest.files) && manifest.files.some((item) => String(item).includes("dist"))) {
+        fail(`${pkgName} must not publish dist in files`)
+    }
+}
 
-await buildPackage({
-    name: "@arrange/vue-runtime-core",
-    entry: resolve(packageRoot, "arrange-vue-runtime-core/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-runtime-core/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+function assertNoSourceDirectInternalImports(path: string, source: string): void {
+    const directImportPattern = /from\s+["'](@arrange\/[^"']*\/(?:src|dist)\/[^"']*)["']|import\s*\(\s*["'](@arrange\/[^"']*\/(?:src|dist)\/[^"']*)["']\s*\)/g
+    let match: RegExpExecArray | null
+    while ((match = directImportPattern.exec(source))) {
+        fail(`${path} bypasses package exports: ${match[1] ?? match[2]}`)
+    }
+}
 
-await buildPackage({
-    name: "@arrange/vue-compiler-core",
-    entry: resolve(packageRoot, "arrange-vue-compiler-core/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-compiler-core/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+function walkFiles(dir: string, visit: (path: string) => void): void {
+    if (!existsSync(dir)) return
+    for (const item of readdirSync(dir)) {
+        const path = resolve(dir, item)
+        const stat = statSync(path)
+        if (stat.isDirectory()) {
+            if (item === "node_modules" || item === ".git" || item === "build" || item === "artifacts") continue
+            walkFiles(path, visit)
+        } else {
+            visit(path)
+        }
+    }
+}
 
-await buildPackage({
-    name: "@arrange/vue-compiler-arrange",
-    entry: resolve(packageRoot, "arrange-vue-compiler-arrange/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-compiler-arrange/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+function assertNoMacrosInBundle(path: string): void {
+    if (!existsSync(path)) fail(`missing Arrange app bundle: ${path}`)
+    const source = readFileSync(path, "utf8")
+    const match = source.match(macroPattern)
+    if (match) fail(`unresolved Arrange Vue macro in app bundle ${path}: ${match[0]}`)
+}
 
-await buildPackage({
-    name: "@arrange/vue-compiler-sfc",
-    entry: resolve(packageRoot, "arrange-vue-compiler-sfc/src/index.ts"),
-    outDir: resolve(packageRoot, "arrange-vue-compiler-sfc/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+const packageDirs = readdirSync(packagesRoot)
+    .map((name) => resolve(packagesRoot, name))
+    .filter((path) => statSync(path).isDirectory() && existsSync(resolve(path, "package.json")))
 
-await buildPackage({
-    name: "@arrange/runtime",
-    entry: resolve(packageRoot, "runtime/src/index.ts"),
-    outDir: resolve(packageRoot, "runtime/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//],
-})
+for (const pkgDir of packageDirs) {
+    const manifest = readJson(resolve(pkgDir, "package.json"))
+    const pkgName = typeof manifest.name === "string" ? manifest.name : fail(`${pkgDir} missing package name`)
+    if (!internalPackagePattern.test(pkgName)) fail(`${pkgName} is not an Arrange internal package`)
+    assertNoPublicDistFields(manifest, pkgName)
+    if (!manifest.exports || typeof manifest.exports !== "object") fail(`${pkgName} must declare package exports`)
+    for (const [key, target] of Object.entries(manifest.exports as Record<string, ExportTarget>)) {
+        assertExportTarget(pkgDir, pkgName, target, `exports.${key}`)
+    }
+    assertNoDistDirectory(pkgDir, pkgName)
+}
 
-await buildPackage({
-    name: "@arrange/vite-plugin",
-    entry: resolve(packageRoot, "vite-plugin/src/index.ts"),
-    outDir: resolve(packageRoot, "vite-plugin/dist"),
-    aliases: {
-        ...sharedAliases,
-    },
-    external: [/^@arrange\//, "vite"],
-})
+for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
+    walkFiles(resolve(repoRoot, root), (path) => {
+        if (!/\.(?:ts|tsx|js|jsx|vue|json)$/.test(path)) return
+        if (path.endsWith("package.json")) return
+        assertNoSourceDirectInternalImports(path, readFileSync(path, "utf8"))
+    })
+}
+
+assertNoMacrosInBundle(resolve(repoRoot, "demo", "plugin-src", "ui", "app.js"))
+console.log("verified TS-first internal package contract")

@@ -1,8 +1,8 @@
 ﻿import { isArray } from '@arrange/vue-shared'
-import type { ComponentInternalInstance } from '../component'
-import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling'
-import { DeprecationTypes, assertCompatEnabled } from './compatConfig'
-import type { ComponentPublicInstance } from '../componentPublicInstance'
+import type { ComponentInternalInstance } from '../component.ts'
+import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling.ts'
+import { DeprecationTypes, assertCompatEnabled } from './compatConfig.ts'
+import type { ComponentPublicInstance } from '../componentPublicInstance.ts'
 
 interface EventRegistry {
   [event: string]: Function[] | undefined

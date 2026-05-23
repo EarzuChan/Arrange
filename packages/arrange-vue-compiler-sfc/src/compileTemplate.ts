@@ -17,15 +17,15 @@ import {
   createAssetUrlTransformWithOptions,
   normalizeOptions,
   transformAssetUrl,
-} from './template/transformAssetUrl'
+} from './template/transformAssetUrl.ts'
 import {
   createSrcsetTransformWithOptions,
   transformSrcset,
-} from './template/transformSrcset'
+} from './template/transformSrcset.ts'
 import { generateCodeFrame, isObject } from '@arrange/vue-shared'
 import * as CompilerDOM from '@arrange/vue-compiler-arrange'
-import { warnOnce } from './warn'
-import { genCssVarsFromList } from './style/cssVars'
+import { warnOnce } from './warn.ts'
+import { genCssVarsFromList } from './style/cssVars.ts'
 
 export interface TemplateCompiler {
   compile(source: string | RootNode, options: CompilerOptions): CodegenResult

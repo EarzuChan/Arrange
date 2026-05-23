@@ -1,5 +1,5 @@
-import { inject } from '../apiInject'
-import { warn } from '../warning'
+import { inject } from '../apiInject.ts'
+import { warn } from '../warning.ts'
 
 export const ssrContextKey: unique symbol = Symbol.for('v-scx')
 

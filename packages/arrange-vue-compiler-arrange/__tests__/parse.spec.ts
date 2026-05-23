@@ -9,7 +9,7 @@ import {
   type TextNode,
   baseParse as parse,
 } from '@vue/compiler-core'
-import { parserOptions } from '../src/parserOptions'
+import { parserOptions } from '../src/parserOptions.ts'
 
 describe('DOM parser', () => {
   describe('Text', () => {

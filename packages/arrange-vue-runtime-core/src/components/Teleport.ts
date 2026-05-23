@@ -1,5 +1,5 @@
-﻿import type { ComponentInternalInstance } from '../component'
-import type { SuspenseBoundary } from './Suspense'
+﻿import type { ComponentInternalInstance } from '../component.ts'
+import type { SuspenseBoundary } from './Suspense.ts'
 import {
   type ElementNamespace,
   MoveType,
@@ -9,12 +9,12 @@ import {
   type RendererOptions,
   queuePostRenderEffect,
   traverseStaticChildren,
-} from '../renderer'
-import type { VNode, VNodeArrayChildren, VNodeProps } from '../vnode'
+} from '../renderer.ts'
+import type { VNode, VNodeArrayChildren, VNodeProps } from '../vnode.ts'
 import { ShapeFlags, isString } from '@arrange/vue-shared'
-import { warn } from '../warning'
-import { isHmrUpdating } from '../hmr'
-import { type SchedulerJob, SchedulerJobFlags } from '../scheduler'
+import { warn } from '../warning.ts'
+import { isHmrUpdating } from '../hmr.ts'
+import { type SchedulerJob, SchedulerJobFlags } from '../scheduler.ts'
 
 export type TeleportVNode = VNode<RendererNode, RendererElement, TeleportProps>
 

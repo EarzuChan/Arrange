@@ -19,19 +19,19 @@ import {
   type ComponentOptions,
   type ConcreteComponent,
   formatComponentName,
-} from './component'
-import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import { warn } from './warning'
-import { devtoolsComponentEmit } from './devtools'
-import type { AppContext } from './apiCreateApp'
-import { emit as compatInstanceEmit } from './compat/instanceEventEmitter'
+} from './component.ts'
+import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
+import { warn } from './warning.ts'
+import { devtoolsComponentEmit } from './devtools.ts'
+import type { AppContext } from './apiCreateApp.ts'
+import { emit as compatInstanceEmit } from './compat/instanceEventEmitter.ts'
 import {
   compatModelEmit,
   compatModelEventPrefix,
-} from './compat/componentVModel'
-import type { ComponentTypeEmits } from './apiSetupHelpers'
-import { getModelModifiers } from './helpers/useModel'
-import type { ComponentPublicInstance } from './componentPublicInstance'
+} from './compat/componentVModel.ts'
+import type { ComponentTypeEmits } from './apiSetupHelpers.ts'
+import { getModelModifiers } from './helpers/useModel.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
 
 export type ObjectEmitsOptions = Record<
   string,

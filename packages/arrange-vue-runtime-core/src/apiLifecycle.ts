@@ -3,19 +3,19 @@
   currentInstance,
   isInSSRComponentSetup,
   setCurrentInstance,
-} from './component'
-import type { ComponentPublicInstance } from './componentPublicInstance'
-import { ErrorTypeStrings, callWithAsyncErrorHandling } from './errorHandling'
-import { warn } from './warning'
+} from './component.ts'
+import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+import { ErrorTypeStrings, callWithAsyncErrorHandling } from './errorHandling.ts'
+import { warn } from './warning.ts'
 import { toHandlerKey } from '@arrange/vue-shared'
 import {
   type DebuggerEvent,
   pauseTracking,
   resetTracking,
 } from '@arrange/vue-reactivity'
-import { LifecycleHooks } from './enums'
+import { LifecycleHooks } from './enums.ts'
 
-export { onActivated, onDeactivated } from './components/KeepAlive'
+export { onActivated, onDeactivated } from './components/KeepAlive.ts'
 
 export function injectHook(
   type: LifecycleHooks,

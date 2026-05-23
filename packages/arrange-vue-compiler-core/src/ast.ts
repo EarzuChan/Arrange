@@ -11,9 +11,9 @@ import {
   type RENDER_SLOT,
   WITH_DIRECTIVES,
   type WITH_MEMO,
-} from './runtimeHelpers'
-import type { PropsExpression } from './transforms/transformElement'
-import type { ImportItem, TransformContext } from './transform'
+} from './runtimeHelpers.ts'
+import type { PropsExpression } from './transforms/transformElement.ts'
+import type { ImportItem, TransformContext } from './transform.ts'
 import type { Node as BabelNode } from '@babel/types'
 
 // Vue template is a platform-agnostic superset of HTML (syntax only).

@@ -5,14 +5,14 @@
   type Data,
   getComponentPublicInstance,
   isStatefulComponent,
-} from './component'
-import { nextTick, queueJob } from './scheduler'
+} from './component.ts'
+import { nextTick, queueJob } from './scheduler.ts'
 import {
   type OnCleanup,
   type WatchOptions,
   type WatchStopHandle,
   instanceWatch,
-} from './apiWatch'
+} from './apiWatch.ts'
 import {
   EMPTY_OBJ,
   type IfAny,
@@ -48,14 +48,14 @@ import {
   type OptionTypesType,
   resolveMergedOptions,
   shouldCacheAccess,
-} from './componentOptions'
-import type { EmitFn, EmitsOptions } from './componentEmits'
-import type { SlotsType, UnwrapSlotsType } from './componentSlots'
-import { markAttrsAccessed } from './componentRenderUtils'
-import { currentRenderingInstance } from './componentRenderContext'
-import { warn } from './warning'
-import { installCompatInstanceProperties } from './compat/instance'
-import type { Directive } from './directives'
+} from './componentOptions.ts'
+import type { EmitFn, EmitsOptions } from './componentEmits.ts'
+import type { SlotsType, UnwrapSlotsType } from './componentSlots.ts'
+import { markAttrsAccessed } from './componentRenderUtils.ts'
+import { currentRenderingInstance } from './componentRenderContext.ts'
+import { warn } from './warning.ts'
+import { installCompatInstanceProperties } from './compat/instance.ts'
+import type { Directive } from './directives.ts'
 
 /**
  * Custom properties added to component instances in any way and can be accessed through `this`

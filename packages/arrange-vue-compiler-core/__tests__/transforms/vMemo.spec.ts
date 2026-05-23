@@ -1,4 +1,4 @@
-import { baseCompile } from '../../src'
+import { baseCompile } from '../../src/index.ts'
 
 describe('compiler: v-memo transform', () => {
   function compile(content: string) {

@@ -1,5 +1,5 @@
 ﻿import { isPlainObject } from '@arrange/vue-shared'
-import { DeprecationTypes, warnDeprecation } from './compatConfig'
+import { DeprecationTypes, warnDeprecation } from './compatConfig.ts'
 
 export function deepMergeData(to: any, from: any): any {
   for (const key in from) {

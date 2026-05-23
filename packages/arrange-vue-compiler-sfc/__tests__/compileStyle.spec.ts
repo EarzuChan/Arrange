@@ -2,7 +2,7 @@ import {
   type SFCStyleCompileOptions,
   compileStyle,
   compileStyleAsync,
-} from '../src/compileStyle'
+} from '../src/compileStyle.ts'
 import path from 'node:path'
 
 export function compileScoped(

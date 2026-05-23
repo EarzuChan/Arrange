@@ -12,13 +12,13 @@ import {
   generate,
   baseParse as parse,
   transform,
-} from '../../src'
-import { ErrorCodes } from '../../src/errors'
-import { transformModel } from '../../src/transforms/vModel'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformExpression } from '../../src/transforms/transformExpression'
-import { transformFor } from '../../src/transforms/vFor'
-import { trackSlotScopes } from '../../src/transforms/vSlot'
+} from '../../src/index.ts'
+import { ErrorCodes } from '../../src/errors.ts'
+import { transformModel } from '../../src/transforms/vModel.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { trackSlotScopes } from '../../src/transforms/vSlot.ts'
 import type { CallExpression } from '@babel/types'
 
 function parseWithVModel(template: string, options: CompilerOptions = {}) {

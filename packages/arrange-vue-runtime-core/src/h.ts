@@ -8,19 +8,19 @@
   createVNode,
   isVNode,
   setBlockTracking,
-} from './vnode'
-import type { Teleport, TeleportProps } from './components/Teleport'
-import type { Suspense, SuspenseProps } from './components/Suspense'
+} from './vnode.ts'
+import type { Teleport, TeleportProps } from './components/Teleport.ts'
+import type { Suspense, SuspenseProps } from './components/Suspense.ts'
 import { type IfAny, isArray, isObject } from '@arrange/vue-shared'
-import type { RawSlots } from './componentSlots'
+import type { RawSlots } from './componentSlots.ts'
 import type {
   Component,
   ComponentOptions,
   ConcreteComponent,
   FunctionalComponent,
-} from './component'
-import type { EmitsOptions } from './componentEmits'
-import type { DefineComponent } from './apiDefineComponent'
+} from './component.ts'
+import type { EmitsOptions } from './componentEmits.ts'
+import type { DefineComponent } from './apiDefineComponent.ts'
 
 // `h` is a more user-friendly version of `createVNode` that allows omitting the
 // props when possible. It is intended for manually written render functions.

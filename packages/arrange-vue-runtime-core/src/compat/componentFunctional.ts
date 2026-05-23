@@ -2,11 +2,11 @@ import {
   type ComponentOptions,
   type FunctionalComponent,
   getCurrentInstance,
-} from '../component'
-import { resolveInjections } from '../componentOptions'
-import type { InternalSlots } from '../componentSlots'
-import { getCompatListeners } from './instanceListeners'
-import { compatH } from './renderFn'
+} from '../component.ts'
+import { resolveInjections } from '../componentOptions.ts'
+import type { InternalSlots } from '../componentSlots.ts'
+import { getCompatListeners } from './instanceListeners.ts'
+import { compatH } from './renderFn.ts'
 
 const normalizedFunctionalComponentMap = new WeakMap<
   ComponentOptions,

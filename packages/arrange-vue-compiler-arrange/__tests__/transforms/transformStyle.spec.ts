@@ -8,7 +8,7 @@ import {
 } from '@vue/compiler-core'
 import { transformBind } from '../../../compiler-core/src/transforms/vBind'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
-import { transformStyle } from '../../src/transforms/transformStyle'
+import { transformStyle } from '../../src/transforms/transformStyle.ts'
 
 function transformWithStyleTransform(
   template: string,

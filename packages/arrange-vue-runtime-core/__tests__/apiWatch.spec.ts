@@ -11,7 +11,7 @@ import {
   ref,
   watch,
   watchEffect,
-} from '../src/index'
+} from '../src/index.ts'
 import {
   type TestElement,
   createApp,

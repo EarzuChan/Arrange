@@ -1,5 +1,5 @@
-import { type CompilerError, compile } from '../../src'
-import { isValidHTMLNesting } from '../../src/htmlNesting'
+import { type CompilerError, compile } from '../../src/index.ts'
+import { isValidHTMLNesting } from '../../src/htmlNesting.ts'
 
 describe('validate html nesting', () => {
   it('should warn with p > div', () => {

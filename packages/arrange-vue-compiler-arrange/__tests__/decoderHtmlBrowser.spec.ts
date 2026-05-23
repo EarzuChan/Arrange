@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { decodeHtmlBrowser } from '../src/decodeHtmlBrowser'
+import { decodeHtmlBrowser } from '../src/decodeHtmlBrowser.ts'
 
 describe('decodeHtmlBrowser', () => {
   it('should decode HTML correctly', () => {

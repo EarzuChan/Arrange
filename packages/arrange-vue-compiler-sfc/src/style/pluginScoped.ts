@@ -6,7 +6,7 @@ import {
   Rule,
 } from 'postcss'
 import selectorParser from 'postcss-selector-parser'
-import { warn } from '../warn'
+import { warn } from '../warn.ts'
 
 const animationNameRE = /^(?:-\w+-)?animation-name$/
 const animationRE = /^(?:-\w+-)?animation$/

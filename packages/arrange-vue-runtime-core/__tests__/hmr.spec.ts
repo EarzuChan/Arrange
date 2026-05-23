@@ -1,6 +1,6 @@
-import type { HMRRuntime } from '../src/hmr'
-import '../src/hmr'
-import type { ComponentOptions, InternalRenderFunction } from '../src/component'
+import type { HMRRuntime } from '../src/hmr.ts'
+import '../src/hmr.ts'
+import type { ComponentOptions, InternalRenderFunction } from '../src/component.ts'
 import {
   type TestElement,
   h,

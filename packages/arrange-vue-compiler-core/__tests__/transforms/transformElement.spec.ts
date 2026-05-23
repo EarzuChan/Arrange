@@ -7,7 +7,7 @@ import {
   baseParse as parse,
   transform,
   transformExpression,
-} from '../../src'
+} from '../../src/index.ts'
 import {
   BASE_TRANSITION,
   CREATE_VNODE,
@@ -24,21 +24,21 @@ import {
   TELEPORT,
   TO_HANDLERS,
   helperNameMap,
-} from '../../src/runtimeHelpers'
+} from '../../src/runtimeHelpers.ts'
 import {
   type DirectiveNode,
   NodeTypes,
   type RootNode,
   type VNodeCall,
   createObjectProperty,
-} from '../../src/ast'
-import { transformElement } from '../../src/transforms/transformElement'
+} from '../../src/ast.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
 import { transformStyle } from '../../../compiler-dom/src/transforms/transformStyle'
-import { transformOn } from '../../src/transforms/vOn'
-import { transformBind } from '../../src/transforms/vBind'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
 import { PatchFlags } from '@vue/shared'
-import { createObjectMatcher } from '../testUtils'
-import { transformText } from '../../src/transforms/transformText'
+import { createObjectMatcher } from '../testUtils.ts'
+import { transformText } from '../../src/transforms/transformText.ts'
 import { parseWithForTransform } from './vFor.spec'
 
 function parseWithElementTransform(

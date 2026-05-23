@@ -8,16 +8,16 @@ import {
   toRef,
   toRefs,
   toValue,
-} from '../src/index'
+} from '../src/index.ts'
 import { computed } from '@vue/runtime-dom'
-import { customRef, shallowRef, triggerRef, unref } from '../src/ref'
+import { customRef, shallowRef, triggerRef, unref } from '../src/ref.ts'
 import {
   isReadonly,
   isShallow,
   readonly,
   shallowReactive,
   shallowReadonly,
-} from '../src/reactive'
+} from '../src/reactive.ts'
 
 describe('reactivity/ref', () => {
   it('should hold a value', () => {

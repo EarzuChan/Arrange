@@ -1,10 +1,10 @@
-﻿import type { SuspenseBoundary } from './components/Suspense'
+﻿import type { SuspenseBoundary } from './components/Suspense.ts'
 import type {
   VNode,
   VNodeNormalizedRef,
   VNodeNormalizedRefAtom,
   VNodeRef,
-} from './vnode'
+} from './vnode.ts'
 import {
   EMPTY_OBJ,
   NO,
@@ -15,14 +15,14 @@ import {
   isString,
   remove,
 } from '@arrange/vue-shared'
-import { isAsyncWrapper } from './apiAsyncComponent'
-import { warn } from './warning'
+import { isAsyncWrapper } from './apiAsyncComponent.ts'
+import { warn } from './warning.ts'
 import { isRef, toRaw } from '@arrange/vue-reactivity'
-import { ErrorCodes, callWithErrorHandling } from './errorHandling'
-import { type SchedulerJob, SchedulerJobFlags } from './scheduler'
-import { queuePostRenderEffect } from './renderer'
-import { type ComponentOptions, getComponentPublicInstance } from './component'
-import { isTemplateRefKey, knownTemplateRefs } from './helpers/useTemplateRef'
+import { ErrorCodes, callWithErrorHandling } from './errorHandling.ts'
+import { type SchedulerJob, SchedulerJobFlags } from './scheduler.ts'
+import { queuePostRenderEffect } from './renderer.ts'
+import { type ComponentOptions, getComponentPublicInstance } from './component.ts'
+import { isTemplateRefKey, knownTemplateRefs } from './helpers/useTemplateRef.ts'
 
 const pendingSetRefMap = new WeakMap<VNodeNormalizedRef, SchedulerJob>()
 /**

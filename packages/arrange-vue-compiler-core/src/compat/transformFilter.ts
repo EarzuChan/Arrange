@@ -1,18 +1,18 @@
-import { RESOLVE_FILTER } from '../runtimeHelpers'
+import { RESOLVE_FILTER } from '../runtimeHelpers.ts'
 import {
   type AttributeNode,
   type DirectiveNode,
   type ExpressionNode,
   NodeTypes,
   type SimpleExpressionNode,
-} from '../ast'
+} from '../ast.ts'
 import {
   CompilerDeprecationTypes,
   isCompatEnabled,
   warnDeprecation,
-} from './compatConfig'
-import type { NodeTransform, TransformContext } from '../transform'
-import { toValidAssetId } from '../utils'
+} from './compatConfig.ts'
+import type { NodeTransform, TransformContext } from '../transform.ts'
+import { toValidAssetId } from '../utils.ts'
 
 const validDivisionCharRE = /[\w).+\-_$\]]/
 

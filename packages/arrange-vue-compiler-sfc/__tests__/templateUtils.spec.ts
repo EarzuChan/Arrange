@@ -2,7 +2,7 @@ import {
   isDataUrl,
   isExternalUrl,
   isRelativeUrl,
-} from '../src/template/templateUtils'
+} from '../src/template/templateUtils.ts'
 
 describe('compiler sfc:templateUtils isRelativeUrl', () => {
   test('should return true when The first character of the string path is .', () => {

@@ -43,7 +43,7 @@ import {
   provide,
 } from 'vue'
 import type { RawSlots } from 'packages/runtime-core/src/componentSlots'
-import { resetSuspenseId } from '../../src/components/Suspense'
+import { resetSuspenseId } from '../../src/components/Suspense.ts'
 import { PatchFlags } from '@vue/shared'
 
 describe('Suspense', () => {

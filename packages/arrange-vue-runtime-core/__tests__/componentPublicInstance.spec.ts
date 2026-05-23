@@ -10,7 +10,7 @@ import {
 import type {
   ComponentInternalInstance,
   ComponentOptions,
-} from '../src/component'
+} from '../src/component.ts'
 
 describe('component: proxy', () => {
   test('data', () => {

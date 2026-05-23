@@ -5,8 +5,8 @@ import {
   reactive,
   shallowRef as ref,
   toRaw,
-} from '../src/index'
-import { getDepFromReactive } from '../src/dep'
+} from '../src/index.ts'
+import { getDepFromReactive } from '../src/dep.ts'
 
 describe.skipIf(!global.gc)('reactivity/gc', () => {
   const gc = () => {

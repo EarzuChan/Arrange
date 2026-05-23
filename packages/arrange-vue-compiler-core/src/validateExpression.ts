@@ -1,6 +1,6 @@
-import type { SimpleExpressionNode } from './ast'
-import type { TransformContext } from './transform'
-import { ErrorCodes, createCompilerError } from './errors'
+import type { SimpleExpressionNode } from './ast.ts'
+import type { TransformContext } from './transform.ts'
+import { ErrorCodes, createCompilerError } from './errors.ts'
 
 // these keywords should not appear inside expressions, but operators like
 // 'typeof', 'instanceof', and 'in' are allowed

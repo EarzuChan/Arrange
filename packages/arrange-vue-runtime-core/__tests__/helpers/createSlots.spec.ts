@@ -1,5 +1,5 @@
-import type { Slot } from '../../src/componentSlots'
-import { createSlots } from '../../src/helpers/createSlots'
+import type { Slot } from '../../src/componentSlots.ts'
+import { createSlots } from '../../src/helpers/createSlots.ts'
 
 describe('createSlot', () => {
   const slot = () => []

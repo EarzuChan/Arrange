@@ -9,7 +9,7 @@ import {
   DEFAULT_FILENAME,
   type SFCDescriptor,
   type SFCScriptBlock,
-} from './parse'
+} from './parse.ts'
 import type { ParserPlugin } from '@babel/parser'
 import { generateCodeFrame } from '@arrange/vue-shared'
 import type {
@@ -32,43 +32,43 @@ import {
 import {
   normalScriptDefaultVar,
   processNormalScript,
-} from './script/normalScript'
-import { CSS_VARS_HELPER, genCssVarsCode } from './style/cssVars'
+} from './script/normalScript.ts'
+import { CSS_VARS_HELPER, genCssVarsCode } from './style/cssVars.ts'
 import {
   type SFCTemplateCompileOptions,
   compileTemplate,
-} from './compileTemplate'
-import { warnOnce } from './warn'
-import { transformDestructuredProps } from './script/definePropsDestructure'
-import { ScriptCompileContext } from './script/context'
+} from './compileTemplate.ts'
+import { warnOnce } from './warn.ts'
+import { transformDestructuredProps } from './script/definePropsDestructure.ts'
+import { ScriptCompileContext } from './script/context.ts'
 import {
   DEFINE_PROPS,
   WITH_DEFAULTS,
   genRuntimeProps,
   processDefineProps,
-} from './script/defineProps'
+} from './script/defineProps.ts'
 import {
   DEFINE_EMITS,
   genRuntimeEmits,
   processDefineEmits,
-} from './script/defineEmits'
-import { DEFINE_EXPOSE, processDefineExpose } from './script/defineExpose'
-import { DEFINE_OPTIONS, processDefineOptions } from './script/defineOptions'
-import { DEFINE_SLOTS, processDefineSlots } from './script/defineSlots'
-import { DEFINE_MODEL, processDefineModel } from './script/defineModel'
+} from './script/defineEmits.ts'
+import { DEFINE_EXPOSE, processDefineExpose } from './script/defineExpose.ts'
+import { DEFINE_OPTIONS, processDefineOptions } from './script/defineOptions.ts'
+import { DEFINE_SLOTS, processDefineSlots } from './script/defineSlots.ts'
+import { DEFINE_MODEL, processDefineModel } from './script/defineModel.ts'
 import {
   getImportedName,
   isCallOf,
   isJS,
   isLiteralNode,
   isTS,
-} from './script/utils'
-import { analyzeScriptBindings } from './script/analyzeScriptBindings'
+} from './script/utils.ts'
+import { analyzeScriptBindings } from './script/analyzeScriptBindings.ts'
 import {
   isImportUsed,
   resolveTemplateVModelIdentifiers,
-} from './script/importUsageCheck'
-import { processAwait } from './script/topLevelAwait'
+} from './script/importUsageCheck.ts'
+import { processAwait } from './script/topLevelAwait.ts'
 
 export interface SFCScriptCompileOptions {
   /**

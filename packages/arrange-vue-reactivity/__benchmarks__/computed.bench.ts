@@ -1,5 +1,5 @@
 import { bench, describe } from 'vitest'
-import type { ComputedRef, Ref } from '../src'
+import type { ComputedRef, Ref } from '../src/index.ts'
 import { computed, effect, ref } from '../dist/reactivity.esm-browser.prod'
 
 declare module '../dist/reactivity.esm-browser.prod' {

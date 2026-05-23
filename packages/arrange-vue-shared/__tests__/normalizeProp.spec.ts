@@ -4,7 +4,7 @@ import {
   normalizeStyle,
   parseStringStyle,
   stringifyStyle,
-} from '../src'
+} from '../src/index.ts'
 
 describe('normalizeClass', () => {
   test('handles undefined correctly', () => {

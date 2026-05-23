@@ -2,42 +2,14 @@
   "name": "@arrange/vue-compiler-sfc",
   "version": "0.0.0",
   "description": "Arrange-specialized Vue SFC compiler",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "private": true,
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
-  "buildOptions": {
-    "name": "VueCompilerSFC",
-    "formats": [
-      "cjs",
-      "esm-browser"
-    ],
-    "prod": false,
-    "enableNonBrowserBranches": true
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vuejs/core.git",
-    "directory": "packages/compiler-sfc"
-  },
-  "keywords": [
-    "vue"
-  ],
-  "author": "Evan You",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/vuejs/core/issues"
-  },
-  "homepage": "https://github.com/vuejs/core/tree/main/packages/compiler-sfc#readme",
   "dependencies": {
     "@babel/parser": "catalog:",
     "estree-walker": "catalog:",
@@ -59,6 +31,5 @@
     "pug": "^3.0.4",
     "sass": "^1.99.0"
   },
-  "private": true,
-  "type": "module"
+  "license": "MIT"
 }

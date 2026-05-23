@@ -1,5 +1,5 @@
-import type { NodeTransform } from '../transform'
-import { findDir } from '../utils'
+import type { NodeTransform } from '../transform.ts'
+import { findDir } from '../utils.ts'
 import {
   ElementTypes,
   type MemoExpression,
@@ -8,8 +8,8 @@ import {
   convertToBlock,
   createCallExpression,
   createFunctionExpression,
-} from '../ast'
-import { WITH_MEMO } from '../runtimeHelpers'
+} from '../ast.ts'
+import { WITH_MEMO } from '../runtimeHelpers.ts'
 
 const seen = new WeakSet()
 

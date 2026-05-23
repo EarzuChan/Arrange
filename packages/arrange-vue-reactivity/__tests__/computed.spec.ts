@@ -24,9 +24,9 @@ import {
   shallowRef,
   toRaw,
   triggerRef,
-} from '../src'
-import { EffectFlags, pauseTracking, resetTracking } from '../src/effect'
-import type { ComputedRef, ComputedRefImpl } from '../src/computed'
+} from '../src/index.ts'
+import { EffectFlags, pauseTracking, resetTracking } from '../src/effect.ts'
+import type { ComputedRef, ComputedRefImpl } from '../src/computed.ts'
 
 describe('reactivity/computed', () => {
   it('should return updated value', () => {

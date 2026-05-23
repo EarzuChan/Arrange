@@ -1,9 +1,9 @@
 ﻿import { pauseTracking, resetTracking } from '@arrange/vue-reactivity'
-import type { VNode } from './vnode'
-import type { ComponentInternalInstance } from './component'
-import { popWarningContext, pushWarningContext, warn } from './warning'
+import type { VNode } from './vnode.ts'
+import type { ComponentInternalInstance } from './component.ts'
+import { popWarningContext, pushWarningContext, warn } from './warning.ts'
 import { EMPTY_OBJ, isArray, isFunction, isPromise } from '@arrange/vue-shared'
-import { LifecycleHooks } from './enums'
+import { LifecycleHooks } from './enums.ts'
 import { WatchErrorCodes } from '@arrange/vue-reactivity'
 
 // contexts where user provided function may be executed, in addition to

@@ -4,8 +4,8 @@ import {
   reactive,
   readonly,
   shallowReactive,
-} from '../../src/index'
-import { renderList } from '../../src/helpers/renderList'
+} from '../../src/index.ts'
+import { renderList } from '../../src/helpers/renderList.ts'
 
 describe('renderList', () => {
   it('should render items in an array', () => {

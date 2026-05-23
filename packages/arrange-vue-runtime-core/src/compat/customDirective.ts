@@ -1,7 +1,7 @@
 ﻿import { isArray } from '@arrange/vue-shared'
-import type { ComponentInternalInstance } from '../component'
-import type { DirectiveHook, ObjectDirective } from '../directives'
-import { DeprecationTypes, softAssertCompatEnabled } from './compatConfig'
+import type { ComponentInternalInstance } from '../component.ts'
+import type { DirectiveHook, ObjectDirective } from '../directives.ts'
+import { DeprecationTypes, softAssertCompatEnabled } from './compatConfig.ts'
 
 export interface LegacyDirective {
   bind?: DirectiveHook

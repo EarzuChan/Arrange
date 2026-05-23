@@ -2,41 +2,14 @@
   "name": "@arrange/vue-compiler-core",
   "version": "0.0.0",
   "description": "Arrange-specialized Vue compiler core",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "private": true,
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
-  "buildOptions": {
-    "name": "VueCompilerCore",
-    "compat": true,
-    "formats": [
-      "esm-bundler",
-      "cjs"
-    ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vuejs/core.git",
-    "directory": "packages/compiler-core"
-  },
-  "keywords": [
-    "vue"
-  ],
-  "author": "Evan You",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/vuejs/core/issues"
-  },
-  "homepage": "https://github.com/vuejs/core/tree/main/packages/compiler-core#readme",
   "dependencies": {
     "@babel/parser": "catalog:",
     "entities": "catalog:",
@@ -47,6 +20,5 @@
   "devDependencies": {
     "@babel/types": "catalog:"
   },
-  "private": true,
-  "type": "module"
+  "license": "MIT"
 }

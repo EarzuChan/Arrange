@@ -1,8 +1,8 @@
 import {
   type ComponentInternalInstance,
   getCurrentInstance,
-} from '../component'
-import { warn } from '../warning'
+} from '../component.ts'
+import { warn } from '../warning.ts'
 
 export function useId(): string {
   const i = getCurrentInstance()

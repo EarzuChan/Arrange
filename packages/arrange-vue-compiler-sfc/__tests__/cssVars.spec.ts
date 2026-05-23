@@ -1,5 +1,5 @@
-import { compileStyle, parse } from '../src'
-import { assertCode, compileSFCScript, mockId } from './utils'
+import { compileStyle, parse } from '../src/index.ts'
+import { assertCode, compileSFCScript, mockId } from './utils.ts'
 
 describe('CSS vars injection', () => {
   test('generating correct code for nested paths', () => {

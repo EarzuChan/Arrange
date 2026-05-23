@@ -9,7 +9,7 @@ import {
   onScopeDispose,
   reactive,
   ref,
-} from '../src'
+} from '../src/index.ts'
 
 describe('reactivity/effect/scope', () => {
   it('should run', () => {

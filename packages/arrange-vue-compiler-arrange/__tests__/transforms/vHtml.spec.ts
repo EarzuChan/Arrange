@@ -4,11 +4,11 @@ import {
   baseParse as parse,
   transform,
 } from '@vue/compiler-core'
-import { transformVHtml } from '../../src/transforms/vHtml'
+import { transformVHtml } from '../../src/transforms/vHtml.ts'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
 import { createObjectMatcher } from '../../../compiler-core/__tests__/testUtils'
 import { PatchFlags } from '@vue/shared'
-import { DOMErrorCodes } from '../../src/errors'
+import { DOMErrorCodes } from '../../src/errors.ts'
 
 function transformWithVHtml(template: string, options: CompilerOptions = {}) {
   const ast = parse(template)

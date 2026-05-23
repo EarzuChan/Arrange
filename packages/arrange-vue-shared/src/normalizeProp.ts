@@ -1,4 +1,4 @@
-import { hyphenate, isArray, isObject, isString } from './general'
+import { hyphenate, isArray, isObject, isString } from './general.ts'
 
 export type NormalizedStyle = Record<string, string | number>
 

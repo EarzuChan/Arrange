@@ -19,9 +19,9 @@
   createObjectExpression,
   createObjectProperty,
   createSimpleExpression,
-} from '../ast'
-import type { NodeTransform, TransformContext } from '../transform'
-import { ErrorCodes, createCompilerError } from '../errors'
+} from '../ast.ts'
+import type { NodeTransform, TransformContext } from '../transform.ts'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
   assert,
   findDir,
@@ -31,9 +31,9 @@ import {
   isTemplateNode,
   isVSlot,
   isWhitespaceText,
-} from '../utils'
-import { CREATE_SLOTS, RENDER_LIST, WITH_CTX } from '../runtimeHelpers'
-import { createForLoopParams, finalizeForParseResult } from './vFor'
+} from '../utils.ts'
+import { CREATE_SLOTS, RENDER_LIST, WITH_CTX } from '../runtimeHelpers.ts'
+import { createForLoopParams, finalizeForParseResult } from './vFor.ts'
 import { SlotFlags, slotFlagsText } from '@arrange/vue-shared'
 
 const defaultFallback = createSimpleExpression(`undefined`, false)

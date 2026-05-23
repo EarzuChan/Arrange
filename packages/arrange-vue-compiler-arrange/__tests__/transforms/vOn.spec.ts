@@ -10,8 +10,8 @@ import {
   baseParse as parse,
   transform,
 } from '@vue/compiler-core'
-import { transformOn } from '../../src/transforms/vOn'
-import { V_ON_WITH_KEYS, V_ON_WITH_MODIFIERS } from '../../src/runtimeHelpers'
+import { transformOn } from '../../src/transforms/vOn.ts'
+import { V_ON_WITH_KEYS, V_ON_WITH_MODIFIERS } from '../../src/runtimeHelpers.ts'
 import { transformElement } from '../../../compiler-core/src/transforms/transformElement'
 import { transformExpression } from '../../../compiler-core/src/transforms/transformExpression'
 import { PatchFlags } from '@vue/shared'

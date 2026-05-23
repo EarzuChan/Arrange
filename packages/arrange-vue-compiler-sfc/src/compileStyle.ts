@@ -5,16 +5,16 @@
   type Result,
   type SourceMap,
 } from 'postcss'
-import trimPlugin from './style/pluginTrim'
-import scopedPlugin from './style/pluginScoped'
+import trimPlugin from './style/pluginTrim.ts'
+import scopedPlugin from './style/pluginScoped.ts'
 import {
   type PreprocessLang,
   type StylePreprocessor,
   type StylePreprocessorResults,
   processors,
-} from './style/preprocessors'
+} from './style/preprocessors.ts'
 import type { RawSourceMap } from '@arrange/vue-compiler-core'
-import { cssVarsPlugin } from './style/cssVars'
+import { cssVarsPlugin } from './style/cssVars.ts'
 import postcssModules from 'postcss-modules'
 
 export interface SFCStyleCompileOptions {

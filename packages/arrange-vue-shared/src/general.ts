@@ -1,4 +1,4 @@
-import { makeMap } from './makeMap'
+import { makeMap } from './makeMap.ts'
 
 export const EMPTY_OBJ: { readonly [key: string]: any } = __DEV__
   ? Object.freeze({})

@@ -1,6 +1,6 @@
 ﻿import type { DirectiveTransform } from '@arrange/vue-compiler-core'
-import { DOMErrorCodes, createDOMCompilerError } from '../errors'
-import { V_SHOW } from '../runtimeHelpers'
+import { DOMErrorCodes, createDOMCompilerError } from '../errors.ts'
+import { V_SHOW } from '../runtimeHelpers.ts'
 
 export const transformShow: DirectiveTransform = (dir, node, context) => {
   const { exp, loc } = dir

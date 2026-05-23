@@ -1,9 +1,9 @@
 ﻿import { extend, hasChanged } from '@arrange/vue-shared'
-import type { ComputedRefImpl } from './computed'
-import type { TrackOpTypes, TriggerOpTypes } from './constants'
-import { type Link, globalVersion } from './dep'
-import { activeEffectScope } from './effectScope'
-import { warn } from './warning'
+import type { ComputedRefImpl } from './computed.ts'
+import type { TrackOpTypes, TriggerOpTypes } from './constants.ts'
+import { type Link, globalVersion } from './dep.ts'
+import { activeEffectScope } from './effectScope.ts'
+import { warn } from './warning.ts'
 
 export type EffectScheduler = (...args: any[]) => any
 

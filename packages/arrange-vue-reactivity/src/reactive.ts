@@ -4,16 +4,16 @@ import {
   readonlyHandlers,
   shallowReactiveHandlers,
   shallowReadonlyHandlers,
-} from './baseHandlers'
+} from './baseHandlers.ts'
 import {
   mutableCollectionHandlers,
   readonlyCollectionHandlers,
   shallowCollectionHandlers,
   shallowReadonlyCollectionHandlers,
-} from './collectionHandlers'
-import type { RawSymbol, Ref, UnwrapRefSimple } from './ref'
-import { ReactiveFlags } from './constants'
-import { warn } from './warning'
+} from './collectionHandlers.ts'
+import type { RawSymbol, Ref, UnwrapRefSimple } from './ref.ts'
+import { ReactiveFlags } from './constants.ts'
+import { warn } from './warning.ts'
 
 export interface Target {
   [ReactiveFlags.SKIP]?: boolean

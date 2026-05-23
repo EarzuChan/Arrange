@@ -14,7 +14,7 @@
   createSimpleExpression,
   isStaticExp,
 } from '@arrange/vue-compiler-core'
-import { V_ON_WITH_KEYS, V_ON_WITH_MODIFIERS } from '../runtimeHelpers'
+import { V_ON_WITH_KEYS, V_ON_WITH_MODIFIERS } from '../runtimeHelpers.ts'
 import { capitalize, makeMap } from '@arrange/vue-shared'
 
 const isEventOptionModifier = /*@__PURE__*/ makeMap(`passive,once,capture`)

@@ -22,7 +22,7 @@ import {
   createVNodeCall,
   generate,
   locStub,
-} from '../src'
+} from '../src/index.ts'
 import {
   CREATE_COMMENT,
   CREATE_ELEMENT_VNODE,
@@ -33,8 +33,8 @@ import {
   RESOLVE_DIRECTIVE,
   TO_DISPLAY_STRING,
   helperNameMap,
-} from '../src/runtimeHelpers'
-import { createElementWithCodegen, genFlagText } from './testUtils'
+} from '../src/runtimeHelpers.ts'
+import { createElementWithCodegen, genFlagText } from './testUtils.ts'
 import { PatchFlags } from '@vue/shared'
 
 function createRoot(options: Partial<RootNode> = {}): RootNode {

@@ -9,8 +9,8 @@ import {
   serializeInner,
   useSlots,
 } from '@vue/runtime-test'
-import { createBlock, normalizeVNode } from '../src/vnode'
-import { createSlots } from '../src/helpers/createSlots'
+import { createBlock, normalizeVNode } from '../src/vnode.ts'
+import { createSlots } from '../src/helpers/createSlots.ts'
 
 describe('component: slots', () => {
   function renderWithSlots(slots: any): any {

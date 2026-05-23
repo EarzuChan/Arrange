@@ -4,11 +4,11 @@ import {
   NodeTypes,
   compile,
   createSimpleExpression,
-} from '../../src'
+} from '../../src/index.ts'
 import {
   StringifyThresholds,
   stringifyStatic,
-} from '../../src/transforms/stringifyStatic'
+} from '../../src/transforms/stringifyStatic.ts'
 
 describe('stringify static html', () => {
   function compileWithStringify(template: string) {

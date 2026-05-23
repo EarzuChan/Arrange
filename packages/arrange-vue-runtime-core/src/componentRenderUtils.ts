@@ -3,7 +3,7 @@
   type Data,
   type FunctionalComponent,
   getComponentName,
-} from './component'
+} from './component.ts'
 import {
   Comment,
   type VNode,
@@ -13,8 +13,8 @@ import {
   createVNode,
   isVNode,
   normalizeVNode,
-} from './vnode'
-import { ErrorCodes, handleError } from './errorHandling'
+} from './vnode.ts'
+import { ErrorCodes, handleError } from './errorHandling.ts'
 import {
   PatchFlags,
   ShapeFlags,
@@ -23,18 +23,18 @@ import {
   isOn,
   looseEqual,
 } from '@arrange/vue-shared'
-import { warn } from './warning'
-import { isHmrUpdating } from './hmr'
-import type { NormalizedProps } from './componentProps'
-import { isEmitListener } from './componentEmits'
-import { setCurrentRenderingInstance } from './componentRenderContext'
+import { warn } from './warning.ts'
+import { isHmrUpdating } from './hmr.ts'
+import type { NormalizedProps } from './componentProps.ts'
+import { isEmitListener } from './componentEmits.ts'
+import { setCurrentRenderingInstance } from './componentRenderContext.ts'
 import {
   DeprecationTypes,
   isCompatEnabled,
   warnDeprecation,
-} from './compat/compatConfig'
+} from './compat/compatConfig.ts'
 import { shallowReadonly } from '@arrange/vue-reactivity'
-import { setTransitionHooks } from './components/BaseTransition'
+import { setTransitionHooks } from './components/BaseTransition.ts'
 
 /**
  * dev only flag to track whether $attrs was used during render.

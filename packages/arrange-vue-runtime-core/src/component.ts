@@ -1,4 +1,4 @@
-﻿import { type VNode, type VNodeChild, isVNode } from './vnode'
+﻿import { type VNode, type VNodeChild, isVNode } from './vnode.ts'
 import {
   EffectScope,
   type ReactiveEffect,
@@ -20,28 +20,28 @@ import {
   exposePropsOnRenderContext,
   exposeSetupStateOnRenderContext,
   publicPropertiesMap,
-} from './componentPublicInstance'
+} from './componentPublicInstance.ts'
 import {
   type ComponentPropsOptions,
   type NormalizedPropsOptions,
   initProps,
   normalizePropsOptions,
-} from './componentProps'
+} from './componentProps.ts'
 import {
   type InternalSlots,
   type Slots,
   type SlotsType,
   type UnwrapSlotsType,
   initSlots,
-} from './componentSlots'
-import { warn } from './warning'
-import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling'
+} from './componentSlots.ts'
+import { warn } from './warning.ts'
+import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling.ts'
 import {
   type AppConfig,
   type AppContext,
   createAppContext,
-} from './apiCreateApp'
-import { type Directive, validateDirectiveName } from './directives'
+} from './apiCreateApp.ts'
+import { type Directive, validateDirectiveName } from './directives.ts'
 import {
   type ComponentOptions,
   type ComputedOptions,
@@ -49,7 +49,7 @@ import {
   type MethodOptions,
   applyOptions,
   resolveMergedOptions,
-} from './componentOptions'
+} from './componentOptions.ts'
 import {
   type EmitFn,
   type EmitsOptions,
@@ -58,7 +58,7 @@ import {
   type ShortEmitsToObject,
   emit,
   normalizeEmitsOptions,
-} from './componentEmits'
+} from './componentEmits.ts'
 import {
   EMPTY_OBJ,
   type IfAny,
@@ -72,29 +72,29 @@ import {
   isPromise,
   makeMap,
 } from '@arrange/vue-shared'
-import type { SuspenseBoundary } from './components/Suspense'
+import type { SuspenseBoundary } from './components/Suspense.ts'
 import type { CompilerOptions } from '@arrange/vue-compiler-core'
-import { markAttrsAccessed } from './componentRenderUtils'
-import { currentRenderingInstance } from './componentRenderContext'
-import { endMeasure, startMeasure } from './profiling'
-import { convertLegacyRenderFn } from './compat/renderFn'
+import { markAttrsAccessed } from './componentRenderUtils.ts'
+import { currentRenderingInstance } from './componentRenderContext.ts'
+import { endMeasure, startMeasure } from './profiling.ts'
+import { convertLegacyRenderFn } from './compat/renderFn.ts'
 import {
   type CompatConfig,
   globalCompatConfig,
   validateCompatConfig,
-} from './compat/compatConfig'
-import type { SchedulerJob } from './scheduler'
-import type { LifecycleHooks } from './enums'
+} from './compat/compatConfig.ts'
+import type { SchedulerJob } from './scheduler.ts'
+import type { LifecycleHooks } from './enums.ts'
 
 // Augment GlobalComponents
-import type { TeleportProps } from './components/Teleport'
-import type { SuspenseProps } from './components/Suspense'
-import type { KeepAliveProps } from './components/KeepAlive'
-import type { BaseTransitionProps } from './components/BaseTransition'
-import type { DefineComponent } from './apiDefineComponent'
-import { markAsyncBoundary } from './helpers/useId'
-import { isAsyncWrapper } from './apiAsyncComponent'
-import type { RendererElement } from './renderer'
+import type { TeleportProps } from './components/Teleport.ts'
+import type { SuspenseProps } from './components/Suspense.ts'
+import type { KeepAliveProps } from './components/KeepAlive.ts'
+import type { BaseTransitionProps } from './components/BaseTransition.ts'
+import type { DefineComponent } from './apiDefineComponent.ts'
+import { markAsyncBoundary } from './helpers/useId.ts'
+import { isAsyncWrapper } from './apiAsyncComponent.ts'
+import type { RendererElement } from './renderer.ts'
 
 export type Data = Record<string, unknown>
 

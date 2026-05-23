@@ -1,4 +1,4 @@
-import { assertCode, compileSFCScript as compile } from '../utils'
+import { assertCode, compileSFCScript as compile } from '../utils.ts'
 
 describe('defineSlots()', () => {
   test('basic usage', () => {

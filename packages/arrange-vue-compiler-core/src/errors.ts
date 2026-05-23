@@ -1,4 +1,4 @@
-import type { SourceLocation } from './ast'
+import type { SourceLocation } from './ast.ts'
 
 export interface CompilerError extends SyntaxError {
   code: number | string

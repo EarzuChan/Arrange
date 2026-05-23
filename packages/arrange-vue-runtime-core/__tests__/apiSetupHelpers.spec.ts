@@ -24,7 +24,7 @@ import {
   useSlots,
   withAsyncContext,
   withDefaults,
-} from '../src/apiSetupHelpers'
+} from '../src/apiSetupHelpers.ts'
 import type { ComputedRefImpl } from '../../reactivity/src/computed'
 import { EffectFlags, type ReactiveEffectRunner, effect } from '@vue/reactivity'
 

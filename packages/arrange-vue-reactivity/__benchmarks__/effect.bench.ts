@@ -1,5 +1,5 @@
 import { bench, describe } from 'vitest'
-import type { Ref } from '../src'
+import type { Ref } from '../src/index.ts'
 import { effect, ref } from '../dist/reactivity.esm-browser.prod'
 
 describe('effect', () => {

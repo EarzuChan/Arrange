@@ -30,7 +30,7 @@ import {
   withCtx,
 } from '@vue/runtime-test'
 import { PatchFlags, SlotFlags, toDisplayString } from '@vue/shared'
-import { SuspenseImpl } from '../src/components/Suspense'
+import { SuspenseImpl } from '../src/components/Suspense.ts'
 
 describe('renderer: optimized mode', () => {
   let root: TestElement

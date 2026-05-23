@@ -6,7 +6,7 @@ import {
   nextTick,
   queueJob,
   queuePostFlushCb,
-} from '../src/scheduler'
+} from '../src/scheduler.ts'
 
 describe('scheduler', () => {
   it('nextTick', async () => {

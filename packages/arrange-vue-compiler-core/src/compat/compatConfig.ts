@@ -1,7 +1,7 @@
-import type { SourceLocation } from '../ast'
-import type { CompilerError } from '../errors'
-import type { MergedParserOptions } from '../parser'
-import type { TransformContext } from '../transform'
+import type { SourceLocation } from '../ast.ts'
+import type { CompilerError } from '../errors.ts'
+import type { MergedParserOptions } from '../parser.ts'
+import type { TransformContext } from '../transform.ts'
 
 export type CompilerCompatConfig = Partial<
   Record<CompilerDeprecationTypes, boolean | 'suppress-warning'>

@@ -1,6 +1,6 @@
 ﻿import { isOn } from '@arrange/vue-shared'
-import type { ComponentInternalInstance } from '../component'
-import { DeprecationTypes, isCompatEnabled } from './compatConfig'
+import type { ComponentInternalInstance } from '../component.ts'
+import { DeprecationTypes, isCompatEnabled } from './compatConfig.ts'
 
 export function shouldSkipAttr(
   key: string,

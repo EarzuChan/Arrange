@@ -17,7 +17,7 @@ import {
   serializeInner,
   withScopeId,
 } from '@vue/runtime-test'
-import { withCtx } from '../src/componentRenderContext'
+import { withCtx } from '../src/componentRenderContext.ts'
 import { PatchFlags } from '@vue/shared'
 
 describe('scopeId runtime support', () => {

@@ -5,9 +5,9 @@
   toRaw,
   toReactive,
   toReadonly,
-} from './reactive'
-import { ITERATE_KEY, MAP_KEY_ITERATE_KEY, track, trigger } from './dep'
-import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
+} from './reactive.ts'
+import { ITERATE_KEY, MAP_KEY_ITERATE_KEY, track, trigger } from './dep.ts'
+import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants.ts'
 import {
   capitalize,
   extend,
@@ -16,7 +16,7 @@ import {
   isMap,
   toRawType,
 } from '@arrange/vue-shared'
-import { warn } from './warning'
+import { warn } from './warning.ts'
 
 type CollectionTypes = IterableCollections | WeakCollections
 

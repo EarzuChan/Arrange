@@ -11,12 +11,12 @@ import {
   normalizeVNode,
   openBlock,
   transformVNodeArgs,
-} from '../src/vnode'
-import type { Data } from '../src/component'
+} from '../src/vnode.ts'
+import type { Data } from '../src/component.ts'
 import { PatchFlags, ShapeFlags } from '@vue/shared'
-import { h, isReactive, reactive, ref, setBlockTracking, withCtx } from '../src'
+import { h, isReactive, reactive, ref, setBlockTracking, withCtx } from '../src/index.ts'
 import { createApp, nodeOps, serializeInner } from '@vue/runtime-test'
-import { setCurrentRenderingInstance } from '../src/componentRenderContext'
+import { setCurrentRenderingInstance } from '../src/componentRenderContext.ts'
 
 describe('vnode', () => {
   test('create with just tag', () => {

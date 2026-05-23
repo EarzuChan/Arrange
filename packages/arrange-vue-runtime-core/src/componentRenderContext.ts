@@ -1,6 +1,6 @@
-import type { ComponentInternalInstance } from './component'
-import { devtoolsComponentUpdated } from './devtools'
-import { setBlockTracking } from './vnode'
+import type { ComponentInternalInstance } from './component.ts'
+import { devtoolsComponentUpdated } from './devtools.ts'
+import { setBlockTracking } from './vnode.ts'
 
 /**
  * mark the current rendering instance for asset resolution (e.g.

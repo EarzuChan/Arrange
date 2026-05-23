@@ -7,11 +7,11 @@ import {
   activeSub,
   batch,
   refreshComputed,
-} from './effect'
-import type { Ref } from './ref'
-import { warn } from './warning'
-import { Dep, type Link, globalVersion } from './dep'
-import { ReactiveFlags, TrackOpTypes } from './constants'
+} from './effect.ts'
+import type { Ref } from './ref.ts'
+import { warn } from './warning.ts'
+import { Dep, type Link, globalVersion } from './dep.ts'
+import { ReactiveFlags, TrackOpTypes } from './constants.ts'
 
 declare const ComputedRefSymbol: unique symbol
 declare const WritableComputedRefSymbol: unique symbol

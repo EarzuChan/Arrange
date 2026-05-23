@@ -3,14 +3,14 @@ import {
   type ExpressionNode,
   type TransformContext,
   isReferencedIdentifier,
-} from '../src'
-import { type Position, createSimpleExpression } from '../src/ast'
+} from '../src/index.ts'
+import { type Position, createSimpleExpression } from '../src/ast.ts'
 import {
   advancePositionWithClone,
   isMemberExpressionBrowser,
   isMemberExpressionNode,
   toValidAssetId,
-} from '../src/utils'
+} from '../src/utils.ts'
 
 function p(line: number, column: number, offset: number): Position {
   return { column, line, offset }

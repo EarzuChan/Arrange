@@ -1,9 +1,9 @@
-﻿import type { Data } from '../component'
-import type { RawSlots, Slots } from '../componentSlots'
+﻿import type { Data } from '../component.ts'
+import type { RawSlots, Slots } from '../componentSlots.ts'
 import {
   type ContextualRenderFn,
   currentRenderingInstance,
-} from '../componentRenderContext'
+} from '../componentRenderContext.ts'
 import {
   Comment,
   Fragment,
@@ -13,10 +13,10 @@ import {
   createVNode,
   isVNode,
   openBlock,
-} from '../vnode'
+} from '../vnode.ts'
 import { PatchFlags, SlotFlags, isSymbol } from '@arrange/vue-shared'
-import { warn } from '../warning'
-import { isAsyncWrapper } from '../apiAsyncComponent'
+import { warn } from '../warning.ts'
+import { isAsyncWrapper } from '../apiAsyncComponent.ts'
 
 /**
  * Compiler runtime helper for rendering `<slot/>`

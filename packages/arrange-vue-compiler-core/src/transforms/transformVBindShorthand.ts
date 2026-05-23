@@ -3,10 +3,10 @@ import {
   NodeTypes,
   type SimpleExpressionNode,
   createSimpleExpression,
-} from '../ast'
-import type { NodeTransform } from '../transform'
-import { ErrorCodes, createCompilerError } from '../errors'
-import { validFirstIdentCharRE } from '../utils'
+} from '../ast.ts'
+import type { NodeTransform } from '../transform.ts'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
+import { validFirstIdentCharRE } from '../utils.ts'
 
 export const transformVBindShorthand: NodeTransform = (node, context) => {
   if (node.type === NodeTypes.ELEMENT) {

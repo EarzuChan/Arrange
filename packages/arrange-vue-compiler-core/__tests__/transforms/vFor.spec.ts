@@ -1,11 +1,11 @@
-import { baseParse as parse } from '../../src/parser'
-import { transform } from '../../src/transform'
-import { transformIf } from '../../src/transforms/vIf'
-import { transformFor } from '../../src/transforms/vFor'
-import { transformBind } from '../../src/transforms/vBind'
-import { transformElement } from '../../src/transforms/transformElement'
-import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet'
-import { transformExpression } from '../../src/transforms/transformExpression'
+import { baseParse as parse } from '../../src/parser.ts'
+import { transform } from '../../src/transform.ts'
+import { transformIf } from '../../src/transforms/vIf.ts'
+import { transformFor } from '../../src/transforms/vFor.ts'
+import { transformBind } from '../../src/transforms/vBind.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
+import { transformSlotOutlet } from '../../src/transforms/transformSlotOutlet.ts'
+import { transformExpression } from '../../src/transforms/transformExpression.ts'
 import {
   ConstantTypes,
   type ElementNode,
@@ -15,13 +15,13 @@ import {
   NodeTypes,
   type RootNode,
   type SimpleExpressionNode,
-} from '../../src/ast'
-import { ErrorCodes } from '../../src/errors'
-import { type CompilerOptions, generate } from '../../src'
-import { FRAGMENT, RENDER_LIST, RENDER_SLOT } from '../../src/runtimeHelpers'
+} from '../../src/ast.ts'
+import { ErrorCodes } from '../../src/errors.ts'
+import { type CompilerOptions, generate } from '../../src/index.ts'
+import { FRAGMENT, RENDER_LIST, RENDER_SLOT } from '../../src/runtimeHelpers.ts'
 import { PatchFlags } from '@vue/shared'
-import { createObjectMatcher } from '../testUtils'
-import { transformVBindShorthand } from '../../src/transforms/transformVBindShorthand'
+import { createObjectMatcher } from '../testUtils.ts'
+import { transformVBindShorthand } from '../../src/transforms/transformVBindShorthand.ts'
 
 export function parseWithForTransform(
   template: string,

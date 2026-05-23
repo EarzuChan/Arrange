@@ -3,10 +3,10 @@ import { parse as babelParse } from '@babel/parser'
 import {
   type SFCTemplateCompileOptions,
   compileTemplate,
-} from '../src/compileTemplate'
-import { type SFCTemplateBlock, parse } from '../src/parse'
-import { compileScript } from '../src'
-import { getPositionInCode } from './utils'
+} from '../src/compileTemplate.ts'
+import { type SFCTemplateBlock, parse } from '../src/parse.ts'
+import { compileScript } from '../src/index.ts'
+import { getPositionInCode } from './utils.ts'
 
 function compile(opts: Omit<SFCTemplateCompileOptions, 'id'>) {
   return compileTemplate({

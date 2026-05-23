@@ -1,4 +1,4 @@
-import { compile } from '../src'
+import { compile } from '../src/index.ts'
 
 describe('compile', () => {
   it('should contain standard transforms', () => {

@@ -1,13 +1,13 @@
-﻿import type { VNode } from './vnode'
+﻿import type { VNode } from './vnode.ts'
 import {
   type ComponentInternalInstance,
   type ConcreteComponent,
   type Data,
   formatComponentName,
-} from './component'
+} from './component.ts'
 import { isFunction, isString } from '@arrange/vue-shared'
 import { isRef, pauseTracking, resetTracking, toRaw } from '@arrange/vue-reactivity'
-import { ErrorCodes, callWithErrorHandling } from './errorHandling'
+import { ErrorCodes, callWithErrorHandling } from './errorHandling.ts'
 
 type ComponentVNode = VNode & {
   type: ConcreteComponent

@@ -1,4 +1,4 @@
-import { baseCompile } from '../src/compile'
+import { baseCompile } from '../src/compile.ts'
 
 /**
  * Ensure all slot functions are wrapped with _withCtx

@@ -3,7 +3,7 @@
   createObjectProperty,
   createSimpleExpression,
 } from '@arrange/vue-compiler-core'
-import { DOMErrorCodes, createDOMCompilerError } from '../errors'
+import { DOMErrorCodes, createDOMCompilerError } from '../errors.ts'
 
 export const transformVHtml: DirectiveTransform = (dir, node, context) => {
   const { exp, loc } = dir

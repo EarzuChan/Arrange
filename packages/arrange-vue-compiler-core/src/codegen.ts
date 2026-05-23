@@ -1,4 +1,4 @@
-﻿import type { CodegenOptions } from './options'
+﻿import type { CodegenOptions } from './options.ts'
 import {
   type ArrayExpression,
   type AssignmentExpression,
@@ -27,14 +27,14 @@ import {
   getVNodeBlockHelper,
   getVNodeHelper,
   locStub,
-} from './ast'
+} from './ast.ts'
 import { SourceMapGenerator } from 'source-map-js'
 import {
   advancePositionWithMutation,
   assert,
   isSimpleIdentifier,
   toValidAssetId,
-} from './utils'
+} from './utils.ts'
 import {
   PatchFlagNames,
   type PatchFlags,
@@ -57,8 +57,8 @@ import {
   WITH_CTX,
   WITH_DIRECTIVES,
   helperNameMap,
-} from './runtimeHelpers'
-import type { ImportItem } from './transform'
+} from './runtimeHelpers.ts'
+import type { ImportItem } from './transform.ts'
 
 /**
  * The `SourceMapGenerator` type from `source-map-js` is a bit incomplete as it

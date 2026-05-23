@@ -1,5 +1,5 @@
-﻿import { TrackOpTypes } from './constants'
-import { endBatch, pauseTracking, resetTracking, startBatch } from './effect'
+﻿import { TrackOpTypes } from './constants.ts'
+import { endBatch, pauseTracking, resetTracking, startBatch } from './effect.ts'
 import {
   isProxy,
   isReactive,
@@ -8,8 +8,8 @@ import {
   toRaw,
   toReactive,
   toReadonly,
-} from './reactive'
-import { ARRAY_ITERATE_KEY, track } from './dep'
+} from './reactive.ts'
+import { ARRAY_ITERATE_KEY, track } from './dep.ts'
 import { isArray } from '@arrange/vue-shared'
 
 /**

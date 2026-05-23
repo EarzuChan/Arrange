@@ -4,8 +4,8 @@ import {
   noopDirectiveTransform,
   baseParse as parse,
   transform,
-} from '../../src'
-import { transformElement } from '../../src/transforms/transformElement'
+} from '../../src/index.ts'
+import { transformElement } from '../../src/transforms/transformElement.ts'
 
 describe('compiler: noop directive transform', () => {
   test('should add no props to DOM', () => {

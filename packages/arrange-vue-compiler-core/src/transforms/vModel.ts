@@ -1,4 +1,4 @@
-﻿import type { DirectiveTransform } from '../transform'
+﻿import type { DirectiveTransform } from '../transform.ts'
 import {
   ConstantTypes,
   ElementTypes,
@@ -8,16 +8,16 @@ import {
   createCompoundExpression,
   createObjectProperty,
   createSimpleExpression,
-} from '../ast'
-import { ErrorCodes, createCompilerError } from '../errors'
+} from '../ast.ts'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
   hasScopeRef,
   isMemberExpression,
   isSimpleIdentifier,
   isStaticExp,
-} from '../utils'
-import { IS_REF } from '../runtimeHelpers'
-import { BindingTypes } from '../options'
+} from '../utils.ts'
+import { IS_REF } from '../runtimeHelpers.ts'
+import { BindingTypes } from '../options.ts'
 import { camelize } from '@arrange/vue-shared'
 
 export const transformModel: DirectiveTransform = (dir, node, context) => {

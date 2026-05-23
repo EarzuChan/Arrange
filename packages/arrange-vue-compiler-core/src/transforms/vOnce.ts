@@ -1,7 +1,7 @@
-import type { NodeTransform } from '../transform'
-import { findDir } from '../utils'
-import { type ElementNode, type ForNode, type IfNode, NodeTypes } from '../ast'
-import { SET_BLOCK_TRACKING } from '../runtimeHelpers'
+import type { NodeTransform } from '../transform.ts'
+import { findDir } from '../utils.ts'
+import { type ElementNode, type ForNode, type IfNode, NodeTypes } from '../ast.ts'
+import { SET_BLOCK_TRACKING } from '../runtimeHelpers.ts'
 
 const seen = new WeakSet()
 

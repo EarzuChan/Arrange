@@ -11,7 +11,7 @@ import {
   render,
   toHandlers,
 } from '@vue/runtime-test'
-import { isEmitListener } from '../src/componentEmits'
+import { isEmitListener } from '../src/componentEmits.ts'
 
 describe('component: emit', () => {
   test('trigger handlers', () => {

@@ -13,7 +13,7 @@ import {
 import {
   type ComponentInternalInstance,
   currentInstance,
-} from '../src/component'
+} from '../src/component.ts'
 
 describe('directives', () => {
   it('should work', async () => {

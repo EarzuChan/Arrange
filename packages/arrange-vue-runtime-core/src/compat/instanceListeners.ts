@@ -1,6 +1,6 @@
 ﻿import { isOn } from '@arrange/vue-shared'
-import type { ComponentInternalInstance } from '../component'
-import { DeprecationTypes, assertCompatEnabled } from './compatConfig'
+import type { ComponentInternalInstance } from '../component.ts'
+import { DeprecationTypes, assertCompatEnabled } from './compatConfig.ts'
 
 export function getCompatListeners(
   instance: ComponentInternalInstance,

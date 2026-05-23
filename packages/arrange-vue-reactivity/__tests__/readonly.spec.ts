@@ -11,7 +11,7 @@ import {
   shallowRef,
   toRaw,
   triggerRef,
-} from '../src'
+} from '../src/index.ts'
 
 /**
  * @see https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-4.html

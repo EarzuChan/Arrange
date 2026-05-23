@@ -13,8 +13,8 @@
   type TemplateChildNode,
   createRoot,
   createSimpleExpression,
-} from './ast'
-import type { ParserOptions } from './options'
+} from './ast.ts'
+import type { ParserOptions } from './options.ts'
 import Tokenizer, {
   CharCodes,
   ParseMode,
@@ -23,21 +23,21 @@ import Tokenizer, {
   State,
   isWhitespace,
   toCharCodes,
-} from './tokenizer'
+} from './tokenizer.ts'
 import {
   type CompilerCompatOptions,
   CompilerDeprecationTypes,
   checkCompatEnabled,
   isCompatEnabled,
   warnDeprecation,
-} from './compat/compatConfig'
+} from './compat/compatConfig.ts'
 import { NO, extend } from '@arrange/vue-shared'
 import {
   ErrorCodes,
   createCompilerError,
   defaultOnError,
   defaultOnWarn,
-} from './errors'
+} from './errors.ts'
 import {
   forAliasRE,
   isAllWhitespace,
@@ -45,7 +45,7 @@ import {
   isSimpleIdentifier,
   isStaticArgOf,
   isVPre,
-} from './utils'
+} from './utils.ts'
 import { decodeHTML } from 'entities/decode'
 import {
   type ParserOptions as BabelOptions,

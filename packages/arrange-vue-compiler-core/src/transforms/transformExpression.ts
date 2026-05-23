@@ -7,7 +7,7 @@
 // - This transform is only applied in non-browser builds because it relies on
 //   an additional JavaScript parser. In the browser, there is no source-map
 //   support and the code is wrapped in `with (this) { ... }`.
-import type { NodeTransform, TransformContext } from '../transform'
+import type { NodeTransform, TransformContext } from '../transform.ts'
 import {
   type CompoundExpressionNode,
   ConstantTypes,
@@ -16,15 +16,15 @@ import {
   type SimpleExpressionNode,
   createCompoundExpression,
   createSimpleExpression,
-} from '../ast'
+} from '../ast.ts'
 import {
   isInDestructureAssignment,
   isInNewExpression,
   isStaticProperty,
   isStaticPropertyKey,
   walkIdentifiers,
-} from '../babelUtils'
-import { advancePositionWithClone, findDir, isSimpleIdentifier } from '../utils'
+} from '../babelUtils.ts'
+import { advancePositionWithClone, findDir, isSimpleIdentifier } from '../utils.ts'
 import {
   genPropsAccessExp,
   hasOwn,
@@ -32,17 +32,17 @@ import {
   isString,
   makeMap,
 } from '@arrange/vue-shared'
-import { ErrorCodes, createCompilerError } from '../errors'
+import { ErrorCodes, createCompilerError } from '../errors.ts'
 import type {
   AssignmentExpression,
   Identifier,
   Node,
   UpdateExpression,
 } from '@babel/types'
-import { validateBrowserExpression } from '../validateExpression'
+import { validateBrowserExpression } from '../validateExpression.ts'
 import { parseExpression } from '@babel/parser'
-import { IS_REF, UNREF } from '../runtimeHelpers'
-import { BindingTypes } from '../options'
+import { IS_REF, UNREF } from '../runtimeHelpers.ts'
+import { BindingTypes } from '../options.ts'
 
 const isLiteralWhitelisted = /*@__PURE__*/ makeMap('true,false,null,this')
 

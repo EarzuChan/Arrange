@@ -1,4 +1,4 @@
-import { isReactive, isReadonly, shallowReadonly } from '../../src'
+import { isReactive, isReadonly, shallowReadonly } from '../../src/index.ts'
 
 describe('reactivity/collections', () => {
   describe('shallowReadonly/Map', () => {

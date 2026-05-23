@@ -5,7 +5,7 @@ import {
   compileSFCScript as compile,
   getPositionInCode,
   mockId,
-} from './utils'
+} from './utils.ts'
 import { type RawSourceMap, SourceMapConsumer } from 'source-map-js'
 
 vi.mock('../src/warn', () => ({
@@ -13,7 +13,7 @@ vi.mock('../src/warn', () => ({
   warnOnce: vi.fn(),
 }))
 
-import { warnOnce } from '../src/warn'
+import { warnOnce } from '../src/warn.ts'
 
 const warnOnceMock = vi.mocked(warnOnce)
 

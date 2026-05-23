@@ -4,7 +4,7 @@ import {
   type SFCScriptCompileOptions,
   compileScript,
   parse,
-} from '../src'
+} from '../src/index.ts'
 import { parse as babelParse } from '@babel/parser'
 
 export const mockId = 'xxxxxxxx'

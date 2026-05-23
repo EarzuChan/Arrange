@@ -14,11 +14,11 @@ import {
   isRelativeUrl,
   normalizeDecodedImportPath,
   parseUrl,
-} from './templateUtils'
+} from './templateUtils.ts'
 import {
   type AssetURLOptions,
   defaultAssetUrlOptions,
-} from './transformAssetUrl'
+} from './transformAssetUrl.ts'
 
 const srcsetTags = ['img', 'source']
 

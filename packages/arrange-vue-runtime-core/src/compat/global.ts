@@ -15,16 +15,16 @@ import {
   isObject,
   isString,
 } from '@arrange/vue-shared'
-import { warn } from '../warning'
-import { cloneVNode, createVNode } from '../vnode'
-import type { ElementNamespace, RootRenderFunction } from '../renderer'
+import { warn } from '../warning.ts'
+import { cloneVNode, createVNode } from '../vnode.ts'
+import type { ElementNamespace, RootRenderFunction } from '../renderer.ts'
 import type {
   App,
   AppConfig,
   AppContext,
   CreateAppFunction,
   Plugin,
-} from '../apiCreateApp'
+} from '../apiCreateApp.ts'
 import {
   type Component,
   type ComponentOptions,
@@ -32,23 +32,23 @@ import {
   finishComponentSetup,
   isRuntimeOnly,
   setupComponent,
-} from '../component'
+} from '../component.ts'
 import {
   type RenderFunction,
   internalOptionMergeStrats,
   mergeOptions,
-} from '../componentOptions'
-import type { ComponentPublicInstance } from '../componentPublicInstance'
-import { devtoolsInitApp, devtoolsUnmountApp } from '../devtools'
-import type { Directive } from '../directives'
-import { nextTick } from '../scheduler'
-import { version } from '..'
+} from '../componentOptions.ts'
+import type { ComponentPublicInstance } from '../componentPublicInstance.ts'
+import { devtoolsInitApp, devtoolsUnmountApp } from '../devtools.ts'
+import type { Directive } from '../directives.ts'
+import { nextTick } from '../scheduler.ts'
+import { version } from '../index.ts'
 import {
   type LegacyConfig,
   installLegacyConfigWarnings,
   installLegacyOptionMergeStrats,
-} from './globalConfig'
-import type { LegacyDirective } from './customDirective'
+} from './globalConfig.ts'
+import type { LegacyDirective } from './customDirective.ts'
 import {
   DeprecationTypes,
   assertCompatEnabled,
@@ -56,8 +56,8 @@ import {
   isCompatEnabled,
   softAssertCompatEnabled,
   warnDeprecation,
-} from './compatConfig'
-import type { LegacyPublicInstance } from './instance'
+} from './compatConfig.ts'
+import type { LegacyPublicInstance } from './instance.ts'
 
 /**
  * @deprecated the default `Vue` export has been removed in Vue 3. The type for

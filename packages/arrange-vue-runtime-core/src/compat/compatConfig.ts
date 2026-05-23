@@ -7,8 +7,8 @@ import {
   getComponentName,
   getCurrentInstance,
   isRuntimeOnly,
-} from '../component'
-import { warn } from '../warning'
+} from '../component.ts'
+import { warn } from '../warning.ts'
 
 export enum DeprecationTypes {
   GLOBAL_MOUNT = 'GLOBAL_MOUNT',

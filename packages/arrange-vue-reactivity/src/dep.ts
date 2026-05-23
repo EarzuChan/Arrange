@@ -1,6 +1,6 @@
 ﻿import { extend, isArray, isIntegerKey, isMap, isSymbol } from '@arrange/vue-shared'
-import type { ComputedRefImpl } from './computed'
-import { type TrackOpTypes, TriggerOpTypes } from './constants'
+import type { ComputedRefImpl } from './computed.ts'
+import { type TrackOpTypes, TriggerOpTypes } from './constants.ts'
 import {
   type DebuggerEventExtraInfo,
   EffectFlags,
@@ -9,7 +9,7 @@ import {
   endBatch,
   shouldTrack,
   startBatch,
-} from './effect'
+} from './effect.ts'
 
 /**
  * Incremented every time a reactive change happens

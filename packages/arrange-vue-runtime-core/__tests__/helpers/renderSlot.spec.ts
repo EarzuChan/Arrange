@@ -1,4 +1,4 @@
-import { renderSlot } from '../../src/helpers/renderSlot'
+import { renderSlot } from '../../src/helpers/renderSlot.ts'
 import {
   Fragment,
   type Slot,
@@ -8,9 +8,9 @@ import {
   h,
   openBlock,
   withCtx,
-} from '../../src'
+} from '../../src/index.ts'
 import { PatchFlags } from '@vue/shared'
-import { setCurrentRenderingInstance } from '../../src/componentRenderContext'
+import { setCurrentRenderingInstance } from '../../src/componentRenderContext.ts'
 
 describe('renderSlot', () => {
   beforeEach(() => {

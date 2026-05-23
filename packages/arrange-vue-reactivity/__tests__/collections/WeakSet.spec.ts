@@ -1,4 +1,4 @@
-import { effect, isReactive, reactive, toRaw } from '../../src'
+import { effect, isReactive, reactive, toRaw } from '../../src/index.ts'
 
 describe('reactivity/collections', () => {
   describe('WeakSet', () => {

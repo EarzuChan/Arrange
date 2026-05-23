@@ -7,7 +7,7 @@
   isObject,
   isSymbol,
 } from '@arrange/vue-shared'
-import { Dep, getDepFromReactive } from './dep'
+import { Dep, getDepFromReactive } from './dep.ts'
 import {
   type Builtin,
   type ShallowReactiveBrand,
@@ -18,10 +18,10 @@ import {
   isShallow,
   toRaw,
   toReactive,
-} from './reactive'
-import type { ComputedRef, WritableComputedRef } from './computed'
-import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { warn } from './warning'
+} from './reactive.ts'
+import type { ComputedRef, WritableComputedRef } from './computed.ts'
+import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants.ts'
+import { warn } from './warning.ts'
 
 declare const RefSymbol: unique symbol
 export declare const RawSymbol: unique symbol
