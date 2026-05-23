@@ -21,7 +21,7 @@ namespace arrange::juce {
         RuntimePackageLoadResult result;
         const auto resolved = resolver.resolveDebug(config.app, config.devServerUrl);
         const auto bundleUrl = arrange::devBundleHttpUrl(resolved.devServerUrl);
-        result.packageDir = std::filesystem::absolute(config.app.distPath()).lexically_normal();
+        result.packageDir = resolved.packageDir;
 
         if (!resolved.ok || bundleUrl.empty()) {
             result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error.empty() ? "Arrange dev server URL is invalid." : resolved.error, {}, resolved.devServerUrl);

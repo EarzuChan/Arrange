@@ -16,7 +16,7 @@ void ArrangeDemoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 
 juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
     arrange::juce::EditorConfig config;
-    config.app.useDist("../ui");
+    config.app.useDist();
     config.width = 520;
     config.height = 380;
     config.window.title = "Arrange Demo";

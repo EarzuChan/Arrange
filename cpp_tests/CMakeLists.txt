@@ -13,6 +13,6 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   target_link_libraries(arrange_juce_runtime_smoke PRIVATE arrange_core arrange_juce arrange_quickjs)
   add_test(
     NAME arrange_juce_runtime_smoke
-    COMMAND arrange_juce_runtime_smoke "${CMAKE_SOURCE_DIR}/demo/plugin-src/ui/app.ts"
+    COMMAND arrange_juce_runtime_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js"
   )
 endif()

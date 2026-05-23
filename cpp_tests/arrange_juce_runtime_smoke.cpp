@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
 
     const auto entry = argc > 1
         ? std::filesystem::path(argv[1])
-        : std::filesystem::absolute("demo/plugin-src/ui/app.js");
+        : std::filesystem::absolute("build/demo-ui-dist/app.js");
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
     arrange::quickjs::AppScriptLoader loader(*host);

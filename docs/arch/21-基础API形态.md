@@ -45,7 +45,7 @@ Vue SFC / template / render function
 ```cpp
 arrange::juce::EditorConfig config;
 
-config.app.useDist("../ui");
+config.app.useDist();
 config.app.useLive();
 
 return new arrange::juce::ArrangeEditor(*this, std::move(config));
@@ -53,7 +53,7 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 
 ```cpp
 config.app.useDist();
-config.app.useDist("../ui");
+config.app.useDist("ui");
 config.app.useLive();
 config.app.useLive("http://host:port");
 ```

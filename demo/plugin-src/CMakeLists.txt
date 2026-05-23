@@ -40,3 +40,17 @@ target_link_libraries(ArrangeDemoPlugin PRIVATE
   juce::juce_recommended_lto_flags
   juce::juce_recommended_warning_flags
 )
+
+if(DEFINED ARRANGE_DEMO_UI_DIST_DIR AND NOT ARRANGE_DEMO_UI_DIST_DIR STREQUAL "")
+  foreach(format_target IN ITEMS ArrangeDemoPlugin_Standalone ArrangeDemoPlugin_VST3)
+    if(TARGET ${format_target})
+      add_custom_command(TARGET ${format_target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+                -DARRANGE_DEMO_UI_DIST_DIR=${ARRANGE_DEMO_UI_DIST_DIR}
+                -DARRANGE_DEMO_TARGET_FILE_DIR=$<TARGET_FILE_DIR:${format_target}>
+                -P ${CMAKE_SOURCE_DIR}/cmake/copy-demo-ui-dist.cmake
+        VERBATIM
+      )
+    endif()
+  endforeach()
+endif()

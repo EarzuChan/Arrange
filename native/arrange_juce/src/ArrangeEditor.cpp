@@ -7,6 +7,7 @@
 #include <utility>
 
 namespace arrange::juce {
+
 void EditorShellDriver::afterConfigure(ArrangeEditor& editor) const {
     editor.updateWindowTitle();
     editor.updateTimerState();
@@ -71,7 +72,9 @@ ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor)
 
 ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig config)
     : ::juce::AudioProcessorEditor(processor),
-      sceneHost_(std::make_unique<EditorSceneHost>()) { configure(std::move(config)); }
+      sceneHost_(std::make_unique<EditorSceneHost>()) {
+    configure(std::move(config));
+}
 
 ArrangeEditor::~ArrangeEditor() { frameClock_.stop(static_cast<::juce::Timer&>(*this)); }
 

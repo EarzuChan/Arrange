@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <filesystem>
-#include <source_location>
 #include <string>
 #include <utility>
 
@@ -10,9 +9,8 @@ namespace arrange {
     public:
         App() = default;
 
-        App& useDist(std::filesystem::path path = std::filesystem::path("ui"), const std::source_location& location = std::source_location::current()) {
+        App& useDist(std::filesystem::path path = std::filesystem::path("ui")) {
             distEnabled_ = true;
-            if (path.is_relative()) path = std::filesystem::path(location.file_name()).parent_path() / path;
             distPath_ = std::move(path);
             return *this;
         }
