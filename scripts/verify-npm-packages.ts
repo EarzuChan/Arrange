@@ -1,6 +1,6 @@
 import {cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs"
 import {resolve} from "node:path"
-import {repoRoot, run} from "./common.ts"
+import {npmSubprocessEnv, repoRoot, run} from "./common.ts"
 import {readArrangeVersionContract} from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
@@ -10,11 +10,12 @@ const vitePluginTarball = resolve(repoRoot, `artifacts/npm/arrange-vite-plugin-$
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 
 async function runNpm(args: readonly string[]): Promise<void> {
+    const env = npmSubprocessEnv()
     if (process.platform === "win32") {
-        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], {cwd: consumerDir})
+        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], {cwd: consumerDir, env})
         return
     }
-    await run("npm", args, {cwd: consumerDir})
+    await run("npm", args, {cwd: consumerDir, env})
 }
 
 if (!existsSync(runtimeTarball) || !existsSync(vitePluginTarball)) {

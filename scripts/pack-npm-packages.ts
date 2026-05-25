@@ -1,6 +1,6 @@
 import {cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from "node:fs"
 import {basename, dirname, resolve} from "node:path"
-import {repoRoot, run} from "./common.ts"
+import {npmSubprocessEnv, repoRoot, run} from "./common.ts"
 import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
 
 type PackageSpec = {
@@ -39,11 +39,12 @@ function writeJson(path: string, value: Record<string, unknown>): void {
 }
 
 async function runNpm(args: readonly string[]): Promise<void> {
+    const env = npmSubprocessEnv()
     if (process.platform === "win32") {
-        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args])
+        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], {env})
         return
     }
-    await run("npm", args)
+    await run("npm", args, {env})
 }
 
 function copyIfExists(source: string, target: string): void {
