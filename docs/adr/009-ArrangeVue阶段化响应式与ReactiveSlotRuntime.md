@@ -1,4 +1,6 @@
-﻿# ADR 009：Arrange Vue、阶段化响应式与 Reactive Slot Runtime
+﻿本篇不可再他妈的变更，这是他妈的历史文件！与更新文档冲突的设定也不他妈的具有参考价值！
+
+# ADR 009：Arrange Vue、阶段化响应式与 Reactive Slot Runtime
 
 日期：2026-05-17
 
