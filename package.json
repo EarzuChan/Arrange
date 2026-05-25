@@ -11,18 +11,21 @@
     "test:runtime": "node --experimental-transform-types --test tests/runtime/*.test.ts",
     "test:native": "node scripts/test-native.ts",
     "test:quickjs": "node scripts/test-quickjs-app.ts",
-    "smoke:demo": "node tests/smoke/basic-editor-smoke.ts",
-    "verify:m1-slice": "node scripts/verify-m1-slice.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepare:deps": "node scripts/prepare-deps.ts",
     "build:packages": "node scripts/build-internal-packages.ts",
     "build:demo-ui": "node scripts/build-demo-ui.ts",
     "build:demo": "node scripts/build-demo.ts",
-    "verify:demo-dev": "node scripts/verify-demo-dev-endpoint.ts"
+    "verify:demo-dev": "node scripts/verify-demo-dev-endpoint.ts",
+    "sync:version": "node --experimental-transform-types scripts/sync-version.ts",
+    "verify:version": "node --experimental-transform-types scripts/verify-version.ts",
+    "pack:packages": "node --experimental-transform-types scripts/pack-npm-packages.ts",
+    "verify:npm-packages": "node --experimental-transform-types scripts/verify-npm-packages.ts",
+    "verify:native-fetchcontent": "node --experimental-transform-types scripts/verify-native-fetchcontent.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.0",
     "typescript": "^5.9.0",
     "vite": "8.0.11"
-  }
+  },
+  "version": "0.0.0-m.2.0"
 }

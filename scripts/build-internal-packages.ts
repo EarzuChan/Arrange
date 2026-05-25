@@ -1,14 +1,23 @@
-﻿import {existsSync, readdirSync, readFileSync, rmSync, statSync} from "node:fs"
+import {existsSync, readdirSync, readFileSync, rmSync, statSync} from "node:fs"
 import {resolve} from "node:path"
 import {repoRoot} from "./common.ts"
+import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
 
 type PackageManifest = {
     name?: unknown
+    version?: unknown
+    private?: unknown
     exports?: unknown
     main?: unknown
     module?: unknown
     types?: unknown
     files?: unknown
+    publishConfig?: unknown
+    dependencies?: unknown
+    devDependencies?: unknown
+    peerDependencies?: unknown
+    bundledDependencies?: unknown
+    bundleDependencies?: unknown
     unpkg?: unknown
     jsdelivr?: unknown
 }
@@ -21,6 +30,11 @@ const forbiddenExportKeys = new Set(["types", "require", "default"])
 const allowedExportKeys = new Set(["arrange-ts", "import"])
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const internalPackagePattern = /^@arrange\//
+const publicPackageNames = new Set(["@arrange/runtime", "@arrange/vite-plugin"])
+const publicBundleDeps = new Map<string, readonly string[]>([
+    ["@arrange/runtime", ["@arrange/vue-reactivity", "@arrange/vue-runtime-core", "@arrange/vue-shared"]],
+    ["@arrange/vite-plugin", ["@arrange/vue-compiler-arrange", "@arrange/vue-compiler-core", "@arrange/vue-compiler-sfc", "@arrange/vue-shared"]],
+])
 
 function fail(message: string): never {
     throw new Error(message)
@@ -70,6 +84,46 @@ function assertNoPublicDistFields(manifest: PackageManifest, pkgName: string): v
     }
 }
 
+function dependencyEntries(manifest: PackageManifest): Array<[string, string, string]> {
+    const fields = ["dependencies", "devDependencies", "peerDependencies"] as const
+    const entries: Array<[string, string, string]> = []
+    for (const field of fields) {
+        const deps = manifest[field]
+        if (!deps || typeof deps !== "object" || Array.isArray(deps)) continue
+        for (const [name, spec] of Object.entries(deps as Record<string, unknown>)) {
+            if (typeof spec === "string") entries.push([field, name, spec])
+        }
+    }
+    return entries
+}
+
+function assertNoWorkspaceOrCatalogSpecs(manifest: PackageManifest, pkgName: string): void {
+    for (const [field, name, spec] of dependencyEntries(manifest)) {
+        if (spec.startsWith("workspace:") || spec === "catalog:") {
+            fail(`${pkgName} ${field}.${name} leaks non-publishable spec ${spec}`)
+        }
+    }
+}
+
+function assertPublicPackageContract(manifest: PackageManifest, pkgName: string): void {
+    if (!publicPackageNames.has(pkgName)) return
+    if (manifest.private === true) fail(`${pkgName} is a public package but private=true`)
+    if (!Array.isArray(manifest.files) || manifest.files.length === 0) fail(`${pkgName} must constrain npm publish files`)
+    const publishConfig = manifest.publishConfig
+    if (!publishConfig || typeof publishConfig !== "object") fail(`${pkgName} must declare publishConfig`)
+    const publishRecord = publishConfig as Record<string, unknown>
+    if (publishRecord.access !== "public") fail(`${pkgName} publishConfig.access must be public`)
+    if (publishRecord.tag !== "m") fail(`${pkgName} publishConfig.tag must be m for milestone packages`)
+
+    const expectedBundleDeps = publicBundleDeps.get(pkgName) ?? []
+    const actual = manifest.bundledDependencies ?? manifest.bundleDependencies
+    if (!Array.isArray(actual)) fail(`${pkgName} must bundle internal Arrange Vue packages`)
+    const actualNames = new Set(actual.map(String))
+    for (const dep of expectedBundleDeps) {
+        if (!actualNames.has(dep)) fail(`${pkgName} must bundle ${dep}`)
+    }
+}
+
 function assertNoSourceDirectInternalImports(path: string, source: string): void {
     const directImportPattern = /from\s+["'](@arrange\/[^"']*\/(?:src|dist)\/[^"']*)["']|import\s*\(\s*["'](@arrange\/[^"']*\/(?:src|dist)\/[^"']*)["']\s*\)/g
     let match: RegExpExecArray | null
@@ -93,21 +147,36 @@ function walkFiles(dir: string, visit: (path: string) => void): void {
 }
 
 function assertNoMacrosInBundle(path: string): void {
-    if (!existsSync(path)) fail(`missing Arrange app bundle: ${path}`)
     const source = readFileSync(path, "utf8")
     const match = source.match(macroPattern)
     if (match) fail(`unresolved Arrange Vue macro in app bundle ${path}: ${match[0]}`)
+}
+
+function assertNoMacrosInBuiltDemoBundle(): void {
+    const candidates = [
+        resolve(repoRoot, "build", "demo-ui-dist", "app.js"),
+        resolve(repoRoot, "demo", "plugin-src", "ui", "app.js"),
+    ]
+    const bundle = candidates.find((path) => existsSync(path))
+    if (!bundle) fail(`missing Arrange app bundle; run build:demo-ui before package boundary verification`)
+    assertNoMacrosInBundle(bundle)
 }
 
 const packageDirs = readdirSync(packagesRoot)
     .map((name) => resolve(packagesRoot, name))
     .filter((path) => statSync(path).isDirectory() && existsSync(resolve(path, "package.json")))
 
+const contract = readArrangeVersionContract()
+assertArrangeVersionContract()
+
 for (const pkgDir of packageDirs) {
     const manifest = readJson(resolve(pkgDir, "package.json"))
     const pkgName = typeof manifest.name === "string" ? manifest.name : fail(`${pkgDir} missing package name`)
     if (!internalPackagePattern.test(pkgName)) fail(`${pkgName} is not an Arrange internal package`)
+    if (manifest.version !== contract.version) fail(`${pkgName} version must be ${contract.version}`)
     assertNoPublicDistFields(manifest, pkgName)
+    assertNoWorkspaceOrCatalogSpecs(manifest, pkgName)
+    assertPublicPackageContract(manifest, pkgName)
     if (!manifest.exports || typeof manifest.exports !== "object") fail(`${pkgName} must declare package exports`)
     for (const [key, target] of Object.entries(manifest.exports as Record<string, ExportTarget>)) {
         assertExportTarget(pkgDir, pkgName, target, `exports.${key}`)
@@ -123,5 +192,5 @@ for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
     })
 }
 
-assertNoMacrosInBundle(resolve(repoRoot, "demo", "plugin-src", "ui", "app.js"))
-console.log("verified TS-first internal package contract")
+assertNoMacrosInBuiltDemoBundle()
+console.log("verified TS-first package and publish boundary contract")

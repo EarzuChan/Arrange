@@ -1,9 +1,12 @@
-﻿add_library(arrange_quickjs STATIC
+add_library(arrange_quickjs STATIC
   src/AppScriptLoader.cpp
 )
 
-target_include_directories(arrange_quickjs PUBLIC include)
-target_link_libraries(arrange_quickjs PUBLIC arrange_core)
+add_library(Arrange::quickjs ALIAS arrange_quickjs)
+target_include_directories(arrange_quickjs PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(arrange_quickjs PUBLIC Arrange::core)
 
 if(TARGET qjs)
   target_sources(arrange_quickjs PRIVATE

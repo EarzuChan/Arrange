@@ -7,8 +7,11 @@ add_library(arrange_juce STATIC
   src/ScenePipelineState.cpp
 )
 
-target_include_directories(arrange_juce PUBLIC include)
-target_link_libraries(arrange_juce PUBLIC arrange_core arrange_quickjs)
+add_library(Arrange::juce ALIAS arrange_juce)
+target_include_directories(arrange_juce PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(arrange_juce PUBLIC Arrange::core Arrange::quickjs)
 
 if(TARGET juce::juce_audio_processors)
   target_sources(arrange_juce PRIVATE

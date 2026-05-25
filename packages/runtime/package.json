@@ -1,7 +1,7 @@
 {
   "name": "@arrange/runtime",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.0-m.2.0",
+  "private": false,
   "type": "module",
   "exports": {
     ".": {
@@ -10,7 +10,22 @@
     }
   },
   "dependencies": {
-    "@arrange/vue-reactivity": "workspace:*",
-    "@arrange/vue-runtime-core": "workspace:*"
-  }
+    "@arrange/vue-reactivity": "0.0.0-m.2.0",
+    "@arrange/vue-runtime-core": "0.0.0-m.2.0",
+    "@arrange/vue-shared": "0.0.0-m.2.0"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "m"
+  },
+  "bundledDependencies": [
+    "@arrange/vue-reactivity",
+    "@arrange/vue-runtime-core",
+    "@arrange/vue-shared"
+  ]
 }

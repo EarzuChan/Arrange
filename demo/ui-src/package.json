@@ -7,10 +7,11 @@
     "build": "arrange-vite build --outDir ../../build/demo-ui-dist --emptyOutDir"
   },
   "dependencies": {
-    "@arrange/runtime": "workspace:*",
-    "@arrange/vite-plugin": "workspace:*"
+    "@arrange/runtime": "0.0.0-m.2.0",
+    "@arrange/vite-plugin": "0.0.0-m.2.0"
   },
   "devDependencies": {
     "vite": "8.0.11"
-  }
+  },
+  "version": "0.0.0-m.2.0"
 }

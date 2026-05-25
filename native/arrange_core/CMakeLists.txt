@@ -19,6 +19,8 @@ add_library(arrange_core STATIC
   src/InputEditing.cpp
   src/Paint.cpp
 )
-target_include_directories(arrange_core PUBLIC include)
-
-
+add_library(Arrange::core ALIAS arrange_core)
+target_include_directories(arrange_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_compile_features(arrange_core PUBLIC cxx_std_20)

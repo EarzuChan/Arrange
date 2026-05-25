@@ -1,12 +1,16 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import {spawn} from "node:child_process"
+import {createRequire} from "node:module"
 import {dirname, resolve} from "node:path"
 import {fileURLToPath} from "node:url"
 
-const vitePackage = await import("vite/package.json", {with: {type: "json"}})
+const require = createRequire(import.meta.url)
+const vitePackage = require("vite/package.json") as {bin: {vite: string} | string}
 const viteEntry = await import.meta.resolve("vite")
-const viteBin = resolve(dirname(fileURLToPath(viteEntry)), "..", "..", vitePackage.default.bin.vite)
-const nodeOptions = [process.env.NODE_OPTIONS, "--experimental-transform-types"].filter(Boolean).join(" ")
+const viteBinName = typeof vitePackage.bin === "string" ? vitePackage.bin : vitePackage.bin.vite
+const viteBin = resolve(dirname(fileURLToPath(viteEntry)), "..", "..", viteBinName)
+const tsxEntry = await import.meta.resolve("tsx")
+const nodeOptions = [process.env.NODE_OPTIONS, "--import", tsxEntry].filter(Boolean).join(" ")
 const child = spawn(process.execPath, [viteBin, ...process.argv.slice(2)], {
     stdio: "inherit",
     env: {

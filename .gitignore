@@ -1,10 +1,42 @@
-third_party/
-cmake-build-*/
-build/
-dist/
+# Operating-system noise
+.DS_Store
+Thumbs.db
+
+# Editor / IDE local state
 .idea/
-tests/smoke/*.output.json
+.vscode/
+
+# Package-manager state
 node_modules/
 .pnpm-store/
+npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local third-party dependency checkouts
+third_party/
+
+# Build outputs and generated artifacts
+build/
+dist/
 artifacts/
+cmake-build-*/
+
+# CMake accidental in-source configure outputs
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+
+# Logs, temp files, and local process markers
+*.log
+*.pid
+*.tmp
+*.bak
+*.orig
+*.tsbuildinfo
+
+# Test / smoke local outputs
+tests/smoke/*.output.json

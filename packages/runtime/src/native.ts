@@ -1,5 +1,6 @@
 import type {Modifier} from "./modifier.ts"
 import type {ColorValue} from "./primitives.ts"
+import {ARRANGE_PROTOCOL_VERSION} from "./version.ts"
 
 export type NodeId = number
 export type NativeEventCallback = (...args: unknown[]) => unknown
@@ -74,4 +75,4 @@ export type NativeTransactionTarget = {
 
 export type NativeMutation = (target: NativeTransactionTarget) => void
 
-export const ARRANGE_RUNTIME_VERSION = 1
+export const ARRANGE_RUNTIME_VERSION = ARRANGE_PROTOCOL_VERSION

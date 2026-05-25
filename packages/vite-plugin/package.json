@@ -1,7 +1,7 @@
 {
   "name": "@arrange/vite-plugin",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.0-m.2.0",
+  "private": false,
   "type": "module",
   "exports": {
     ".": {
@@ -10,7 +10,7 @@
     }
   },
   "bin": {
-    "arrange-vite": "./src/cli.ts"
+    "arrange-vite": "./bin/arrange-vite.cjs"
   },
   "peerDependencies": {
     "vite": ">=5"
@@ -21,6 +21,37 @@
     }
   },
   "dependencies": {
-    "@arrange/vue-compiler-sfc": "workspace:*"
-  }
+    "@arrange/vue-compiler-arrange": "0.0.0-m.2.0",
+    "@arrange/vue-compiler-core": "0.0.0-m.2.0",
+    "@arrange/vue-compiler-sfc": "0.0.0-m.2.0",
+    "@arrange/vue-shared": "0.0.0-m.2.0",
+    "@babel/parser": "7.29.3",
+    "entities": "7.0.1",
+    "estree-walker": "2.0.2",
+    "magic-string": "0.30.21",
+    "postcss": "^8.5.14",
+    "source-map-js": "1.2.1",
+    "tsx": "4.22.3",
+    "hash-sum": "^2.0.0",
+    "lru-cache": "10.1.0",
+    "merge-source-map": "^1.1.0",
+    "minimatch": "~10.2.5",
+    "postcss-modules": "^6.0.1",
+    "postcss-selector-parser": "^7.1.1"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "m"
+  },
+  "bundledDependencies": [
+    "@arrange/vue-compiler-arrange",
+    "@arrange/vue-compiler-core",
+    "@arrange/vue-compiler-sfc",
+    "@arrange/vue-shared"
+  ]
 }

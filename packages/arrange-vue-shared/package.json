@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vue-shared",
-  "version": "0.0.0",
+  "version": "0.0.0-m.2.0",
   "description": "Arrange-specialized Vue shared utilities",
   "private": true,
   "type": "module",
@@ -11,5 +11,11 @@
     }
   },
   "sideEffects": false,
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vue-reactivity",
-  "version": "0.0.0",
+  "version": "0.0.0-m.2.0",
   "description": "Arrange-specialized Vue reactivity",
   "private": true,
   "type": "module",
@@ -12,7 +12,13 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@arrange/vue-shared": "workspace:*"
+    "@arrange/vue-shared": "0.0.0-m.2.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ]
 }

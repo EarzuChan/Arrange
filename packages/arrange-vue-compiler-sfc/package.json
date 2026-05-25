@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vue-compiler-sfc",
-  "version": "0.0.0",
+  "version": "0.0.0-m.2.0",
   "description": "Arrange-specialized Vue SFC compiler",
   "private": true,
   "type": "module",
@@ -11,17 +11,17 @@
     }
   },
   "dependencies": {
-    "@babel/parser": "catalog:",
-    "estree-walker": "catalog:",
-    "magic-string": "catalog:",
+    "@babel/parser": "7.29.3",
+    "estree-walker": "2.0.2",
+    "magic-string": "0.30.21",
     "postcss": "^8.5.14",
-    "source-map-js": "catalog:",
-    "@arrange/vue-shared": "workspace:*",
-    "@arrange/vue-compiler-core": "workspace:*",
-    "@arrange/vue-compiler-arrange": "workspace:*"
+    "source-map-js": "1.2.1",
+    "@arrange/vue-shared": "0.0.0-m.2.0",
+    "@arrange/vue-compiler-core": "0.0.0-m.2.0",
+    "@arrange/vue-compiler-arrange": "0.0.0-m.2.0"
   },
   "devDependencies": {
-    "@babel/types": "catalog:",
+    "@babel/types": "7.29.0",
     "hash-sum": "^2.0.0",
     "lru-cache": "10.1.0",
     "merge-source-map": "^1.1.0",
@@ -31,5 +31,11 @@
     "pug": "^3.0.4",
     "sass": "^1.99.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ]
 }
