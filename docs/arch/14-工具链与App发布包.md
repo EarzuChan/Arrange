@@ -1,39 +1,32 @@
-﻿# 开发模式
+# 开发模式
 
 UI 源码项目通常长这样：
 
 ```txt
 ui-src/
   package.json
-  vite.config.ts
   src/main.ts
   src/App.vue
 ```
 
-`vite.config.ts`：
+用户安装：
 
-```ts
-import arrange from "@arrange/vite-plugin"
-
-export default {
-  plugins: [arrange()],
-}
-```
-
-`@arrange/vite-plugin` 提供 Arrange Vue SFC 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
-
-```
-server: {
-  host: "127.0.0.1",
-  port: 9178,
-  strictPort: true,
-}
+```bash
+pnpm add @arrange/framework
 ```
 
 用户启动：
 
 ```bash
-pnpm dev
+arrange dev
+```
+
+`arrange dev` 提供 Arrange Vue SFC 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
+
+```txt
+host: 127.0.0.1
+port: 9178
+strictPort: true
 ```
 
 # 构建模式
@@ -41,10 +34,10 @@ pnpm dev
 用户执行：
 
 ```bash
-pnpm build
+arrange build
 ```
 
-源码项目构建输出仍叫 `dist/`，这是 Vite/源码项目内部概念。
+源码项目构建输出仍叫 `dist/`，这是源码项目内部概念。
 
 Arrange 约定：`dist/` 是 UI 产物包。运行期如果配置 `useDist()`，AppResolver 默认会找名为 `ui/` 的 UI 产物包，但用户也可以显式提供别的目录名。
 
@@ -62,14 +55,15 @@ ui/
 
 默认提供一种发布规则：
 
-- 构建二进制时一并把 `dist/` 改名并复制到约定运行时目录下
+- 构建二进制时一并把 `dist/` 改名并复制到约定运行时目录下。
 
 C++ 发布版按约定优先找 `ui/`；若用户显式给了别的目录，则按显式目录加载。
+
 Windows 是可执行文件同级目录下的 `ui/`；macOS 和各类 bundle 则是资源目录里的 `ui/`。Debug 是否启用 live，不改变 dist 的打包位置与发现方式。
 
 # 诊断
 
-Vite 插件应在开发期诊断：
+Arrange 工具链应在开发期诊断：
 
 - 无法 lowering 到 Arrange host target 的节点、属性或语法。
 - 未知 Arrange host component。
@@ -90,7 +84,7 @@ const play = new URL("./assets/play.svg", import.meta.url)
 Arrange runtime 可接收：
 
 - Vite 产出的资源字符串。
-- Arrange Vite 插件规范化出的 `ResourceRef` 对象。
+- Arrange 工具链规范化出的 `ResourceRef` 对象。
 - 指向 UI package 内资源的字符串路径。
 
 字符串路径规则：
@@ -101,7 +95,7 @@ Arrange runtime 可接收：
 - 禁止 `../` 逃逸 UI package。
 - 禁止隐式相对当前工作目录查找。
 - 默认不加载远程网络资源；未来若支持 remote resource，必须单独设计缓存、错误、权限和诊断。
-- 默认不读取用户数据目录、开发者自定义缓存目录或任意外部路径；这类能力未设定好，之后我们（开发组）必会进入单独的数据、缓存与权限设计。
+- 默认不读取用户数据目录、开发者自定义缓存目录或任意外部路径；这类能力必须进入单独的数据、缓存与权限设计。
 
 `Image` 主要加载位图资源，具体解码格式由平台图片解码能力决定。`Icon` 加载 Arrange Icon resource schema 定义的 SVG 子集，具体规则见 [内建组件](12-内建组件.md)。
 
@@ -129,7 +123,3 @@ Arrange runtime 可接收：
 - 多实例隔离与并发写入。
 - cache 可清理、user data 不可随意清理。
 - 权限、隐私、迁移、诊断导出与错误处理。
-
-
-
-

@@ -37,9 +37,9 @@ SFC / template / script setup
 - 不把 DOM renderer、browser global、CSS style patch 当成 Arrange 生产路径。
 - 上游同步策略必须清楚，不能把改造散落成不可维护补丁。
 
-## 2. `@arrange/runtime` 成为用户唯一主入口
+## 2. `@arrange/framework` 成为用户唯一主入口
 
-`@arrange/runtime` 必须 re-export Arrange Vue authoring API：
+`@arrange/framework` 必须 re-export Arrange Vue authoring API：
 
 - `ref`
 - `reactive`
@@ -54,7 +54,7 @@ SFC / template / script setup
 要求：
 
 - 用户写 Arrange App 时不需要从外部 `vue` 包导入核心响应式 API。
-- demo、测试、文档中的用户示例必须改为从 `@arrange/runtime` 导入。
+- demo、测试、文档中的用户示例必须改为从 `@arrange/framework` 导入。
 - 外部标准 Vue 不能继续作为 Arrange UI 主链路事实源。
 
 ## 3. Arrange host target compiler lowering
@@ -104,7 +104,7 @@ lowering 必须产生 typed host op，而不是泛用 DOM prop patch。
 
 ## 4. Vite 插件接入 Arrange Vue compiler
 
-`@arrange/vite-plugin` 必须使用 Arrange Vue compiler 作为 SFC 编译入口。
+`Arrange 工具链` 必须使用 Arrange Vue compiler 作为 SFC 编译入口。
 
 要求：
 
@@ -161,7 +161,7 @@ explicit native invalidation
 # 完成标准
 
 - demo UI 通过 Arrange Vue compiler / runtime 主链路运行。
-- `@arrange/runtime` 是用户 import 的主入口。
+- `@arrange/framework` 是用户 import 的主入口。
 - 外部标准 Vue 不再作为生产 authoring runtime 事实源。
 - SFC、template、`<script setup>`、`v-if`、`v-for`、`v-model`、用户组件可用。
 - host component lowering 产出 typed mutation 与 typed slot binding。

@@ -65,13 +65,13 @@ config.app.useLive("http://host:port");
 源码项目入口负责 `createApp` 与应用配置：
 
 ```ts
-import { createApp } from "@arrange/runtime"
+import { createApp } from "@arrange/framework"
 import App from "./App.vue"
 
 createApp(App).mount()
 ```
 
-正式 authoring 路径为 SFC / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/runtime` 是 authoring API 主入口。
+正式 authoring 路径为 SFC / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
 
 # 路径约定
 

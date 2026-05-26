@@ -6,23 +6,22 @@
 
 ```json
 {
-  "name": "@arrange/runtime",
+  "name": "@arrange/framework",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.ts"
+      "import": "./src/index.ts"
     }
   }
 }
 ```
 
-`@arrange/runtime` 必须提供完整类型声明。源码与代码风格要求见 `../proj/5：具体开发的额外约束.md`。
+`@arrange/framework` 以 TS-first 方式发布。源码与代码风格要求见 `../proj/5：具体开发的额外约束.md`。
 
 # Authoring 入口
 
 ```ts
-import { createApp } from "@arrange/runtime"
+import { createApp } from "@arrange/framework"
 import App from "./App.vue"
 
 createApp(App).mount()
@@ -38,7 +37,7 @@ Vue SFC / template / render function
 -> MutationTransaction / SlotUpdateBatch
 ```
 
-`@arrange/runtime` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
+`@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
 
 # C++ App source
 
@@ -62,7 +61,7 @@ config.app.useLive("http://host:port");
 
 # 导出总表
 
-`@arrange/runtime` 至少导出：
+`@arrange/framework` 至少导出：
 
 ```ts
 createApp

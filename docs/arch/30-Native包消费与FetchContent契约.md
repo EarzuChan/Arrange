@@ -4,37 +4,41 @@
 
 # 目标
 
-Arrange 原生侧先提供：
+Arrange 原生侧提供：
 
 ```txt
 FetchContent source package
--> Arrange C++ targets
+-> Arrange::framework
 -> 用户插件 / 应用
 ```
 
-当前不提供 vcpkg、Conan、微软中央仓库二进制包，也暂未打算把 system install 作为首要发行形态。
+当前不提供 vcpkg、Conan、微软中央仓库二进制包，也不把 system install 作为首要发行形态。
 
 # 消费边界
 
 - 用户通过 CMake `FetchContent` 拉取 Arrange 源码包。
-- 用户通过公开 target 链接 Arrange。
+- 用户只链接公开 target `Arrange::framework`。
 - 用户工程不应依赖仓库内部路径、临时 demo 特供路径或旧 `_deps` 缓存。
 - 原生消费面必须可在干净检出和显式源码覆盖条件下复现。
 
 # 公开 target
 
-原生包应对外稳定暴露命名空间 target：
+原生包对外稳定暴露命名空间 target：
 
-- `Arrange::core`
-- `Arrange::quickjs`
-- `Arrange::juce`
+```txt
+Arrange::framework
+```
 
-具体导出形态可以在后续安装/导出阶段完善，但目标名与消费语义应先固定。
+`Arrange::framework` 包含 Arrange 当前可用所需的 native 能力：core、QuickJS-NG 接入与 JUCE 接入。
+
+`Arrange::core`、`Arrange::quickjs`、`Arrange::juce` 只作为内部模块边界，不作为用户文档入口。
 
 # 依赖策略
 
-- JUCE 与 QuickJS-NG 允许以源码方式进入构建树。
-- 外部用户可通过显式源码目录覆盖或 FetchContent 获取依赖。
+- QuickJS-NG 是 Arrange 不可分割的运行基础。
+- JUCE 是 Arrange 当前唯一面向的平台。
+- QuickJS-NG 与 JUCE 不作为外部 feature toggle。
+- 用户可以通过显式源码目录覆盖依赖来源。
 - 不要求用户先安装到系统包管理器。
 - 不把 demo 构建当作原生消费前提。
 
@@ -53,4 +57,4 @@ FetchContent source package
 - xmake helper。
 - 归档布局。
 
-这些是可能是未来的方向，当前未实现、未提供，不要精神错乱。
+这些能力必须先设计、写文档、再实现。
