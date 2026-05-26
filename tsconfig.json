@@ -18,10 +18,16 @@
       "@arrange/vue-runtime-core": ["packages/arrange-vue-runtime-core/src/index.ts"],
       "@arrange/vue-compiler-core": ["packages/arrange-vue-compiler-core/src/index.ts"],
       "@arrange/vue-compiler-sfc": ["packages/arrange-vue-compiler-sfc/src/index.ts"],
-      "@arrange/vue-compiler-arrange": ["packages/arrange-vue-compiler-arrange/src/index.ts"]
+      "@arrange/vue-compiler-arrange": ["packages/arrange-vue-compiler-arrange/src/index.ts"],
+      "@arrange/runtime": ["packages/runtime/src/index.ts"],
+      "@arrange/vite-plugin": ["packages/vite-plugin/src/index.ts"],
+      "@arrange/framework": ["packages/framework/src/index.ts"],
+      "@arrange/framework/vite": ["packages/framework/src/vite.ts"],
+      "@arrange/framework/*": ["packages/framework/src/*"]
     }
   },
   "include": [
+    "packages/framework/src/**/*.ts",
     "packages/runtime/src/**/*.ts",
     "packages/vite-plugin/src/**/*.ts",
     "scripts/**/*.ts",

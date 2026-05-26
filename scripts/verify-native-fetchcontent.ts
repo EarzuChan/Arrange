@@ -37,7 +37,7 @@ include(FetchContent)
 ${arrangeFetchContentDeclaration()}
 FetchContent_MakeAvailable(arrange)
 add_executable(arrange_fetchcontent_consumer main.cpp)
-target_link_libraries(arrange_fetchcontent_consumer PRIVATE Arrange::juce)
+target_link_libraries(arrange_fetchcontent_consumer PRIVATE Arrange::framework)
 `.trimStart())
 
 writeFileSync(resolve(consumerRoot, "main.cpp"), `

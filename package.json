@@ -18,14 +18,15 @@
     "verify:demo-dev": "node scripts/verify-demo-dev-endpoint.ts",
     "sync:version": "node --experimental-transform-types scripts/sync-version.ts",
     "verify:version": "node --experimental-transform-types scripts/verify-version.ts",
-    "pack:packages": "node --experimental-transform-types scripts/pack-npm-packages.ts",
-    "verify:npm-packages": "node --experimental-transform-types scripts/verify-npm-packages.ts",
-    "verify:native-fetchcontent": "node --experimental-transform-types scripts/verify-native-fetchcontent.ts"
+    "verify:native-fetchcontent": "node --experimental-transform-types scripts/verify-native-fetchcontent.ts",
+    "pack:package": "node --experimental-transform-types scripts/pack-npm-package.ts",
+    "verify:npm-package": "node --experimental-transform-types scripts/verify-npm-package.ts",
+    "verify:npm-registry-package": "node --experimental-transform-types scripts/verify-npm-registry-package.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.0",
     "typescript": "^5.9.0",
     "vite": "8.0.11"
   },
-  "version": "0.0.0-m.2.0"
+  "version": "0.0.0-m.2.1"
 }

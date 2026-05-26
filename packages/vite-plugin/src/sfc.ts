@@ -46,7 +46,7 @@ export function isHotSourceFile(id: unknown): boolean {
 export function injectHmrClient(code: string): string {
     if (code.includes(HMR_CLIENT_MARKER)) return code
     return `${code}
-import { installArrangeHmrClient as ${HMR_CLIENT_MARKER} } from "@arrange/runtime"
+import { installArrangeHmrClient as ${HMR_CLIENT_MARKER} } from "@arrange/framework"
 if (import.meta.hot) ${HMR_CLIENT_MARKER}(import.meta.hot)
 `
 }
@@ -92,7 +92,7 @@ export function compileArrangeSfc(code: string, id: string): ArrangeSfcCompileRe
     if (descriptor.styles.length > 0) warnings.push("Arrange ignores SFC <style> blocks; use Modifier and theme tokens instead.")
 
     const shortId = hashId(filename, source)
-    const compilerOptions = {runtimeModuleName: "@arrange/runtime"}
+    const compilerOptions = {runtimeModuleName: "@arrange/framework"}
     const needsEsbuild = supportsTs(descriptor.script?.lang) || supportsTs(descriptor.scriptSetup?.lang)
 
     if (descriptor.scriptSetup || descriptor.script) {

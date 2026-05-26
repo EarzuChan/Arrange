@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vue-runtime-core",
-  "version": "0.0.0-m.2.0",
+  "version": "0.0.0-m.2.1",
   "description": "Arrange-specialized Vue runtime core",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@arrange/vue-shared": "0.0.0-m.2.0",
-    "@arrange/vue-reactivity": "0.0.0-m.2.0"
+    "@arrange/vue-shared": "0.0.0-m.2.1",
+    "@arrange/vue-reactivity": "0.0.0-m.2.1"
   },
   "license": "MIT",
   "files": [

@@ -24,7 +24,6 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 ```txt
 ui-src/
   package.json
-  vite.config.ts
   src/main.ts
   src/App.vue
 ```

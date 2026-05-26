@@ -82,7 +82,7 @@ namespace arrange::juce {
 #else
         result.error = makeErrorScreenModel(
             ErrorSource::ScriptRuntime,
-            "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
+            "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Build through Arrange::framework.",
             {},
             bundleUrl);
         setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute live app.js.", true);
@@ -124,7 +124,7 @@ namespace arrange::juce {
 #else
         result.error = makeErrorScreenModel(
             ErrorSource::ScriptRuntime,
-            "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Reconfigure with ARRANGE_WITH_QUICKJS_NG=ON.",
+            "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Build through Arrange::framework.",
             "Arrange runtime has no serialized fallback path; the native transaction API requires QuickJS-NG.",
             resolved.entryPath);
         setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute dist ui/app.js.", true);

@@ -30,10 +30,18 @@ const forbiddenExportKeys = new Set(["types", "require", "default"])
 const allowedExportKeys = new Set(["arrange-ts", "import"])
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const internalPackagePattern = /^@arrange\//
-const publicPackageNames = new Set(["@arrange/runtime", "@arrange/vite-plugin"])
+const publicPackageNames = new Set(["@arrange/framework"])
 const publicBundleDeps = new Map<string, readonly string[]>([
-    ["@arrange/runtime", ["@arrange/vue-reactivity", "@arrange/vue-runtime-core", "@arrange/vue-shared"]],
-    ["@arrange/vite-plugin", ["@arrange/vue-compiler-arrange", "@arrange/vue-compiler-core", "@arrange/vue-compiler-sfc", "@arrange/vue-shared"]],
+    ["@arrange/framework", [
+        "@arrange/runtime",
+        "@arrange/vite-plugin",
+        "@arrange/vue-reactivity",
+        "@arrange/vue-runtime-core",
+        "@arrange/vue-compiler-arrange",
+        "@arrange/vue-compiler-core",
+        "@arrange/vue-compiler-sfc",
+        "@arrange/vue-shared",
+    ]],
 ])
 
 function fail(message: string): never {

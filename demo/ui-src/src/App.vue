@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <Column
         :modifier="m.fillMaxSize().padding(dp(12)).background(Color(0xFF000000))"
         :vertical-arrangement="Arrangement.spacedBy(dp(8))"
@@ -82,7 +82,7 @@
 </template>
 
 <script setup>
-import {animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/runtime"
+import {animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/framework"
 
 const clicks = ref(0)
 const preset = ref("Preset A")

@@ -1,20 +1,17 @@
 cmake_minimum_required(VERSION 3.24)
 project(ArrangeDemoPlugin LANGUAGES C CXX)
 
-if(NOT TARGET Arrange::juce)
+if(NOT TARGET Arrange::framework)
   set(ARRANGE_DEMO_ARRANGE_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../.." CACHE PATH "Arrange source tree for the demo user-sample build")
   if(NOT EXISTS "${ARRANGE_DEMO_ARRANGE_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "ARRANGE_DEMO_ARRANGE_SOURCE_DIR must point to an Arrange source tree")
   endif()
-  set(ARRANGE_WITH_JUCE ON CACHE BOOL "Demo requires JUCE-backed Arrange target" FORCE)
-  set(ARRANGE_WITH_QUICKJS_NG ON CACHE BOOL "Demo requires QuickJS-backed Arrange target" FORCE)
-  set(ARRANGE_BUILD_DEMO OFF CACHE BOOL "Do not recursively build the demo while adding Arrange" FORCE)
   set(ARRANGE_BUILD_TESTS OFF CACHE BOOL "Do not build Arrange tests from the demo user-sample" FORCE)
   add_subdirectory("${ARRANGE_DEMO_ARRANGE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/_deps/arrange-build")
 endif()
 
 if(NOT TARGET juce::juce_core)
-  message(FATAL_ERROR "Arrange demo requires JUCE. Configure Arrange with ARRANGE_WITH_JUCE=ON before building the demo.")
+  message(FATAL_ERROR "Arrange demo requires JUCE from Arrange::framework.")
 endif()
 
 juce_add_plugin(ArrangeDemoPlugin
@@ -46,7 +43,7 @@ target_compile_definitions(ArrangeDemoPlugin PUBLIC
 )
 
 target_link_libraries(ArrangeDemoPlugin PRIVATE
-  Arrange::juce
+  Arrange::framework
   juce::juce_audio_utils
   juce::juce_dsp
   juce::juce_recommended_config_flags

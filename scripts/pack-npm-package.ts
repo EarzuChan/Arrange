@@ -1,33 +1,20 @@
 import {cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from "node:fs"
-import {basename, dirname, resolve} from "node:path"
+import {basename, resolve} from "node:path"
 import {npmSubprocessEnv, repoRoot, run} from "./common.ts"
 import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
 
-type PackageSpec = {
-    sourceDir: string
-    bundleDirs: string[]
-}
-
 const artifactsDir = resolve(repoRoot, "artifacts/npm")
 const stagingRoot = resolve(artifactsDir, "staging")
-const packageSpecs: PackageSpec[] = [
-    {
-        sourceDir: resolve(repoRoot, "packages/runtime"),
-        bundleDirs: [
-            resolve(repoRoot, "packages/arrange-vue-reactivity"),
-            resolve(repoRoot, "packages/arrange-vue-runtime-core"),
-            resolve(repoRoot, "packages/arrange-vue-shared"),
-        ],
-    },
-    {
-        sourceDir: resolve(repoRoot, "packages/vite-plugin"),
-        bundleDirs: [
-            resolve(repoRoot, "packages/arrange-vue-compiler-arrange"),
-            resolve(repoRoot, "packages/arrange-vue-compiler-core"),
-            resolve(repoRoot, "packages/arrange-vue-compiler-sfc"),
-            resolve(repoRoot, "packages/arrange-vue-shared"),
-        ],
-    },
+const frameworkSourceDir = resolve(repoRoot, "packages/framework")
+const frameworkBundleDirs = [
+    resolve(repoRoot, "packages/runtime"),
+    resolve(repoRoot, "packages/vite-plugin"),
+    resolve(repoRoot, "packages/arrange-vue-reactivity"),
+    resolve(repoRoot, "packages/arrange-vue-runtime-core"),
+    resolve(repoRoot, "packages/arrange-vue-compiler-arrange"),
+    resolve(repoRoot, "packages/arrange-vue-compiler-core"),
+    resolve(repoRoot, "packages/arrange-vue-compiler-sfc"),
+    resolve(repoRoot, "packages/arrange-vue-shared"),
 ]
 
 function readJson(path: string): Record<string, unknown> {
@@ -60,14 +47,17 @@ function copyPackageSource(sourceDir: string, targetDir: string): void {
     for (const item of ["src", "bin", "LICENSE", "README.md", "UPSTREAM.md"]) {
         copyIfExists(resolve(sourceDir, item), resolve(targetDir, item))
     }
-    const manifest = readJson(resolve(sourceDir, "package.json"))
-    writeJson(resolve(targetDir, "package.json"), manifest)
+    writeJson(resolve(targetDir, "package.json"), readJson(resolve(sourceDir, "package.json")))
 }
 
 function packageStageName(sourceDir: string): string {
     const manifest = readJson(resolve(sourceDir, "package.json"))
     const rawName = String(manifest.name ?? basename(sourceDir))
     return rawName.replace(/^@/, "").replaceAll("/", "-")
+}
+
+function packageScopeName(sourceDir: string): string {
+    return basename(sourceDir).replace(/^arrange-/, "")
 }
 
 function assertStagedTreeClean(stageDir: string): void {
@@ -94,18 +84,16 @@ rmSync(stagingRoot, {recursive: true, force: true})
 mkdirSync(artifactsDir, {recursive: true})
 mkdirSync(stagingRoot, {recursive: true})
 
-for (const spec of packageSpecs) {
-    const stageDir = resolve(stagingRoot, packageStageName(spec.sourceDir))
-    copyPackageSource(spec.sourceDir, stageDir)
+const stageDir = resolve(stagingRoot, packageStageName(frameworkSourceDir))
+copyPackageSource(frameworkSourceDir, stageDir)
 
-    const arrangeScopeDir = resolve(stageDir, "node_modules/@arrange")
-    mkdirSync(arrangeScopeDir, {recursive: true})
-    for (const bundleDir of spec.bundleDirs) {
-        copyPackageSource(bundleDir, resolve(arrangeScopeDir, basename(bundleDir).replace(/^arrange-/, "")))
-    }
-
-    assertStagedTreeClean(stageDir)
-    await runNpm(["pack", stageDir, "--pack-destination", artifactsDir])
+const arrangeScopeDir = resolve(stageDir, "node_modules/@arrange")
+mkdirSync(arrangeScopeDir, {recursive: true})
+for (const bundleDir of frameworkBundleDirs) {
+    copyPackageSource(bundleDir, resolve(arrangeScopeDir, packageScopeName(bundleDir)))
 }
 
-console.log(`packed Arrange npm packages ${contract.version} into ${artifactsDir}`)
+assertStagedTreeClean(stageDir)
+await runNpm(["pack", stageDir, "--pack-destination", artifactsDir])
+
+console.log(`packed @arrange/framework ${contract.version} into ${artifactsDir}`)

@@ -4,6 +4,7 @@ import {resolve} from "node:path"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
 import {DEV_BUNDLE_PATH} from "../../packages/vite-plugin/src/constraints.ts"
 import {buildDevBundle} from "../../packages/vite-plugin/src/dev-bundle.ts"
+import {normalizeArgs} from "../../packages/framework/src/cli-core.ts"
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -35,7 +36,6 @@ test("vite plugin can build the native dev app.js bundle on demand", {timeout: 1
         config: {
             root,
             mode: "development",
-            configFile: resolve(root, "vite.config.ts"),
         },
     }, "src/main.ts")
     assert.match(code, /__ARRANGE_NATIVE__/)
@@ -47,7 +47,7 @@ test("vite plugin injects Arrange HMR client into the configured entry", async (
     const transformed = await plugin.transform.call({
         warn() {
         }
-    }, 'import { createApp } from "@arrange/runtime";\n', "C:/demo/ui-src/src/main.ts")
+    }, 'import { createApp } from "@arrange/framework";\n', "C:/demo/ui-src/src/main.ts")
     assert.ok(transformed)
     assert.match(transformed, /installArrangeHmrClient/)
     assert.match(transformed, /import\.meta\.hot/)
@@ -137,4 +137,15 @@ test("vite plugin accepts Arrange component template without warnings", () => {
         }
     }, '<template><Column><Text text="ok" /><Input placeholder="ok" /></Column></template>', 'App.vue')
     assert.deepEqual(warnings, [])
+})
+
+test("arrange CLI injects Arrange Vite config by default", () => {
+    const devArgs = normalizeArgs(["dev"])
+    assert.deepEqual(devArgs.slice(0, 5), ["--host", "127.0.0.1", "--port", "9178", "--strictPort"])
+    assert.ok(devArgs.includes("--config"))
+
+    const buildArgs = normalizeArgs(["build", "--outDir", "dist"])
+    assert.equal(buildArgs[0], "build")
+    assert.ok(buildArgs.includes("--config"))
+    assert.ok(buildArgs.includes("--outDir"))
 })

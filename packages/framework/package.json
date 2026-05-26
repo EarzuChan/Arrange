@@ -1,26 +1,26 @@
 {
-  "name": "@arrange/vite-plugin",
+  "name": "@arrange/framework",
   "version": "0.0.0-m.2.1",
-  "private": true,
+  "private": false,
   "type": "module",
   "exports": {
     ".": {
       "arrange-ts": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./vite": {
+      "arrange-ts": "./src/vite.ts",
+      "import": "./src/vite.ts"
     }
   },
   "bin": {
-    "arrange-vite": "./bin/arrange-vite.cjs"
-  },
-  "peerDependencies": {
-    "vite": ">=5"
-  },
-  "peerDependenciesMeta": {
-    "vite": {
-      "optional": true
-    }
+    "arrange": "./bin/arrange.cjs"
   },
   "dependencies": {
+    "@arrange/runtime": "0.0.0-m.2.1",
+    "@arrange/vite-plugin": "0.0.0-m.2.1",
+    "@arrange/vue-reactivity": "0.0.0-m.2.1",
+    "@arrange/vue-runtime-core": "0.0.0-m.2.1",
     "@arrange/vue-compiler-arrange": "0.0.0-m.2.1",
     "@arrange/vue-compiler-core": "0.0.0-m.2.1",
     "@arrange/vue-compiler-sfc": "0.0.0-m.2.1",
@@ -32,6 +32,7 @@
     "postcss": "^8.5.14",
     "source-map-js": "1.2.1",
     "tsx": "4.22.3",
+    "vite": "8.0.11",
     "hash-sum": "^2.0.0",
     "lru-cache": "10.1.0",
     "merge-source-map": "^1.1.0",
@@ -40,8 +41,23 @@
     "postcss-selector-parser": "^7.1.1"
   },
   "license": "MIT",
+  "sideEffects": false,
   "files": [
     "src",
     "bin"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "m"
+  },
+  "bundledDependencies": [
+    "@arrange/runtime",
+    "@arrange/vite-plugin",
+    "@arrange/vue-reactivity",
+    "@arrange/vue-runtime-core",
+    "@arrange/vue-compiler-arrange",
+    "@arrange/vue-compiler-core",
+    "@arrange/vue-compiler-sfc",
+    "@arrange/vue-shared"
   ]
 }

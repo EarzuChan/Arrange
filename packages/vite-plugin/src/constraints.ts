@@ -1,8 +1,8 @@
 export const ARRANGE_VUE_VERSION = "3.5.34-arrange"
 
 export const DEV_BUNDLE_PATH = "/@arrange/app.js"
-export const PUBLIC_PLUGIN_NAME = "arrange-vite-plugin"
-export const DEV_BUNDLE_PLUGIN_NAME = "arrange-vite-plugin:dev-bundle"
+export const PUBLIC_PLUGIN_NAME = "arrange-framework"
+export const DEV_BUNDLE_PLUGIN_NAME = "arrange-framework:dev-bundle"
 
 export const ARRANGE_VUE_DEFINE_KEYS = [
     "__DEV__",

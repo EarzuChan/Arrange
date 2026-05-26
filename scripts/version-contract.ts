@@ -14,7 +14,7 @@ const milestoneVersionPattern = /^0\.0\.0-m\.(\d+)\.(\d+)$/
 export const versionFile = resolve(repoRoot, "arrange.version.json")
 
 export function readArrangeVersionContract(): ArrangeVersionContract {
-    const parsed = JSON.parse(readFileSync(versionFile, "utf8")) as Partial<ArrangeVersionContract>
+    const parsed = JSON.parse(readFileSync(versionFile, "utf8").replace(/^\uFEFF/, "")) as Partial<ArrangeVersionContract>
     if (typeof parsed.version !== "string" || !milestoneVersionPattern.test(parsed.version)) {
         throw new Error(`Arrange version must use 0.0.0-m.<N>.<sub>, got ${String(parsed.version)}`)
     }
@@ -26,7 +26,7 @@ export function readArrangeVersionContract(): ArrangeVersionContract {
 }
 
 function readJson(path: string): JsonObject {
-    return JSON.parse(readFileSync(path, "utf8")) as JsonObject
+    return JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, "")) as JsonObject
 }
 
 function writeJson(path: string, value: JsonObject): void {
@@ -58,6 +58,16 @@ export function syncArrangeVersionContract(): void {
     for (const path of packageJsonPaths()) {
         const manifest = readJson(path)
         manifest.version = contract.version
+        for (const field of ["dependencies", "devDependencies", "peerDependencies"] as const) {
+            const dependencies = manifest[field]
+            if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) continue
+            const dependencyRecord = dependencies as Record<string, unknown>
+            for (const name of Object.keys(dependencyRecord)) {
+                if (name.startsWith("@arrange/")) {
+                    dependencyRecord[name] = contract.version
+                }
+            }
+        }
         writeJson(path, manifest)
     }
 
@@ -96,6 +106,15 @@ export function assertArrangeVersionContract(): void {
     for (const path of packageJsonPaths()) {
         const manifest = readJson(path)
         assertEqual(manifest.version, contract.version, `${path} version diverges from arrange.version.json`)
+        for (const field of ["dependencies", "devDependencies", "peerDependencies"] as const) {
+            const dependencies = manifest[field]
+            if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) continue
+            for (const [name, spec] of Object.entries(dependencies as Record<string, unknown>)) {
+                if (name.startsWith("@arrange/")) {
+                    assertEqual(spec, contract.version, `${path} ${field}.${name} diverges from arrange.version.json`)
+                }
+            }
+        }
     }
     assertFileContains(resolve(repoRoot, "packages/runtime/src/version.ts"), `ARRANGE_PACKAGE_VERSION = ${JSON.stringify(contract.version)}`)
     assertFileContains(resolve(repoRoot, "packages/runtime/src/version.ts"), `ARRANGE_PROTOCOL_VERSION = ${contract.protocolVersion}`)

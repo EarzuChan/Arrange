@@ -86,7 +86,7 @@ export function configureSmokeBuild(buildDir: string): Promise<void> {
         : ""
     return runInVsDev(
         `"${cmakeExe()}" -S . -B ${buildDir} -G Ninja -DCMAKE_MAKE_PROGRAM="${ninjaExe()}" `
-        + `-DCMAKE_BUILD_TYPE=Debug -DARRANGE_WITH_QUICKJS_NG=ON -DARRANGE_BUILD_TESTS=ON${quickJsDirArg}`,
+        + `-DCMAKE_BUILD_TYPE=Debug -DARRANGE_BUILD_TESTS=ON${quickJsDirArg}`,
     )
 }
 
