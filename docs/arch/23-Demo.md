@@ -11,7 +11,7 @@ Demo 是 Arrange 的实际测试场地，也是面向用户的主样板，不是
 
 Demo 数量宁少勿多。优先维护一个长期成长的主 Demo，而不是多个散装示例。
 
-Demo 必须走真实消费路径：TS 侧通过 `@arrange/framework`，C++ 侧通过 `Arrange::framework`。除非确有必要，不另建其它伪 Demo。
+Demo 必须走真实消费路径：通过 Arrange CLI 编排工程，TS 侧通过 `@arrange/framework`，C++ 侧通过 `Arrange::framework`。除非确有必要，不另建其它伪 Demo。
 
 # 工程形态
 
@@ -25,7 +25,7 @@ demo/
 
 `ui-src/` 是 UI 源码项目；发布运行时的 `ui/` 是构建产物目录。
 
-Demo 是独立用户样板，不从根 CMake 作为内部子工程构建。根 CMake 不提供 `ARRANGE_BUILD_DEMO`。
+Demo 当前目录名可因仓库历史原因仍为 `xx-src/`，其消费方式对齐 Arrange CLI 标准工程，未来会让 Demo 改为由我们的 CLI 管理。Demo 是独立用户样板，不从根 CMake 作为内部子工程构建。根 CMake 不提供 `ARRANGE_BUILD_DEMO`。标准工程形态见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)。
 
 # 插件形态
 

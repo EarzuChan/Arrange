@@ -1,27 +1,29 @@
-# 开发模式
+# 定位
 
-UI 源码项目通常长这样：
+本文定义 UI App bundle、开发服务器、资源处理与运行时 `ui/` 包规则。Arrange 工程级 CLI、create / adopt / build / package 与 artifacts 规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)。
+
+# UI 源码项目
+
+UI 源码项目位于标准 Arrange 工程下的 `ui/` 目录：
 
 ```txt
-ui-src/
+ui/
   package.json
   src/main.ts
   src/App.vue
 ```
 
-用户安装：
+该 `ui/` 是 Node / Arrange Vue 项目。工程根目录不是 Node 项目。
 
-```bash
-pnpm add @arrange/framework
-```
+# 开发模式
 
-用户启动：
+用户在工程根执行：
 
 ```bash
 arrange dev
 ```
 
-`arrange dev` 提供 Arrange Vue SFC 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
+Arrange CLI 调用 UI 工具链，提供 Arrange Vue SFC 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
 
 ```txt
 host: 127.0.0.1
@@ -31,17 +33,17 @@ strictPort: true
 
 # 构建模式
 
-用户执行：
+用户在工程根执行：
 
 ```bash
 arrange build
 ```
 
-源码项目构建输出仍叫 `dist/`，这是源码项目内部概念。
-
-Arrange 约定：`dist/` 是 UI 产物包。运行期如果配置 `useDist()`，AppResolver 默认会找名为 `ui/` 的 UI 产物包，但用户也可以显式提供别的目录名。
+UI 源码项目内部构建输出或仍叫 `dist/`，这是 UI 项目内部概念。Arrange 的最终交付物由 CLI 整理到工程根目录下的 `artifacts/`。
 
 # 运行时 ui 目录
+
+运行期可加载的 UI 产物包目录默认叫 `ui/`：
 
 ```txt
 ui/
@@ -51,13 +53,11 @@ ui/
   其他入口文件（可选）
 ```
 
+`useDist()` 默认寻找名为 `ui/` 的 UI 产物包，用户也可以显式提供别的目录名。
+
 # 结合到 C++ 发布包
 
-默认提供一种发布规则：
-
-- 构建二进制时一并把 `dist/` 改名并复制到约定运行时目录下。
-
-C++ 发布版按约定优先找 `ui/`；若用户显式给了别的目录，则按显式目录加载。
+Arrange CLI 的 package phase 负责把 UI 产物与 native 产物整理到 `artifacts/`。C++ 发布版按约定优先找 `ui/`；若用户显式在代码中申明了别的目录，则按显式目录加载。
 
 Windows 是可执行文件同级目录下的 `ui/`；macOS 和各类 bundle 则是资源目录里的 `ui/`。Debug 是否启用 live，不改变 dist 的打包位置与发现方式。
 

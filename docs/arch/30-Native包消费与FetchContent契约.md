@@ -2,6 +2,8 @@
 
 本文定义 Arrange 原生侧对外消费的长期边界。它只约束 C++ / JUCE 用户如何获取、链接和验证 Arrange 原生包，不替代 [工具链与App发布包](14-工具链与App发布包.md)、[内部包构建与分发契约](29-内部包构建与分发契约.md) 或 [Demo](23-Demo.md)。
 
+标准 Arrange 工程中，FetchContent 接入通常由 Arrange CLI 创建或维护；本文仍是原生消费边界的事实源。
+
 # 目标
 
 Arrange 原生侧提供：
@@ -53,7 +55,6 @@ Arrange::framework
 后续或会继续完善：
 
 - install/export。
-- CMake helper。
 - xmake helper。
 - 归档布局。
 

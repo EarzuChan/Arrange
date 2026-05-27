@@ -19,10 +19,10 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 
 ## UI 源码项目
 
-这是用户的 Node/Vite 项目，可以叫 `ui-src/`、`frontend/` 或别的名字。
+这是用户的 Node 项目。标准 Arrange 工程中默认位于 `ui/`，也可由 `arrange.config.ts` 指向其它目录。
 
 ```txt
-ui-src/
+ui/
   package.json
   src/main.ts
   src/App.vue
@@ -30,14 +30,12 @@ ui-src/
 
 ## 运行时 ui 目录
 
-常指插件发布包下、可执行文件旁边或资源目录里的 `ui/`。它是一个 UI 产物包目录；不要求 manifest。
+常指插件发布包下，可执行文件旁边或结构化资源目录里的 `ui/`。它是一个 UI 产物包目录。
 
 ```txt
 ui/
   app.js
-  chunks/...
-  assets/...
-  其他入口文件（可选）
+  其他资产
 ```
 
 `useDist(path)` 指 UI 产物包目录，不是 UI 项目源码目录。若用户显式传其他目录，则按显式路径加载。
@@ -141,7 +139,7 @@ Standalone 应尽量完整尊重这些配置；插件宿主中按宿主允许范
 - Authoring 上是 App。
 - 实现上可分 Runtime、SceneHost、VBlankSource adapter、SceneFramePipeline 与 passive paint adapter。
 - 加载 source 必须显式、可诊断、可重试。
-- 必要信息写在代码里；CMake、宏、打包工具只作为可选增强。
+- 必要运行信息写在代码里；工程编排、构建与打包由 Arrange CLI 处理。
 
 
 

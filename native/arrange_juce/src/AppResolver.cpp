@@ -27,11 +27,8 @@ namespace arrange {
         std::filesystem::path currentModulePath() {
 #if defined(_WIN32)
             HMODULE module = nullptr;
-            constexpr DWORD flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
-                                    | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
-            if (!GetModuleHandleExW(flags, reinterpret_cast<LPCWSTR>(&moduleAnchor), &module)) {
-                return {};
-            }
+            constexpr DWORD flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
+            if (!GetModuleHandleExW(flags, reinterpret_cast<LPCWSTR>(&moduleAnchor), &module)) return {};
 
             std::wstring buffer(512, L'\0');
             for (;;) {
@@ -39,9 +36,7 @@ namespace arrange {
                     module,
                     buffer.data(),
                     static_cast<DWORD>(buffer.size()));
-                if (size == 0) {
-                    return {};
-                }
+                if (size == 0) return {};
                 if (size < buffer.size() - 1) {
                     buffer.resize(size);
                     return std::filesystem::path(buffer);
@@ -61,15 +56,11 @@ namespace arrange {
 
         std::filesystem::path runtimeResourceRoot() {
             const auto modulePath = currentModulePath();
-            if (modulePath.empty()) {
-                return {};
-            }
+            if (modulePath.empty()) return {};
 
             const auto normalized = std::filesystem::absolute(modulePath).lexically_normal();
             for (auto current = normalized.parent_path(); !current.empty();) {
-                if (current.filename() == "Contents") {
-                    return current / "Resources";
-                }
+                if (current.filename() == "Contents") return current / "Resources";
                 const auto parent = current.parent_path();
                 if (parent == current) break;
                 current = parent;
@@ -78,14 +69,10 @@ namespace arrange {
         }
 
         std::filesystem::path resolvePackageDir(const std::filesystem::path& configuredPath) {
-            if (configuredPath.is_absolute()) {
-                return std::filesystem::absolute(configuredPath).lexically_normal();
-            }
+            if (configuredPath.is_absolute()) return std::filesystem::absolute(configuredPath).lexically_normal();
 
             const auto root = runtimeResourceRoot();
-            if (root.empty()) {
-                return {};
-            }
+            if (root.empty()) return {};
             return (root / configuredPath).lexically_normal();
         }
     } // namespace
@@ -129,8 +116,7 @@ namespace arrange {
         ResolvedApp result;
         result.ok = true;
         result.devServer = true;
-        result.devServerUrl = devServerUrlFromEnvironment(
-            explicitDevServerUrl.empty() ? app.liveUrl() : explicitDevServerUrl);
+        result.devServerUrl = devServerUrlFromEnvironment( explicitDevServerUrl.empty() ? app.liveUrl() : explicitDevServerUrl);
 
         const auto distPath = app.hasDist() ? app.distPath() : std::filesystem::path("ui");
         result.packageDir = resolvePackageDir(distPath);
@@ -139,9 +125,7 @@ namespace arrange {
 
     std::string AppResolver::devServerUrlFromEnvironment(std::string_view explicitDevServerUrl) const {
         if (!explicitDevServerUrl.empty()) return std::string(explicitDevServerUrl);
-        if (const char* env = std::getenv("ARRANGE_DEV_SERVER")) {
-            if (*env != '\0') return std::string(env);
-        }
+        if (const char* env = std::getenv("ARRANGE_DEV_SERVER")) if (*env != '\0') return std::string(env);
         return DefaultDevServer;
     }
 
