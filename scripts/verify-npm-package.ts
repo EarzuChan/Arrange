@@ -5,7 +5,7 @@ import {readArrangeVersionContract} from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
 const consumerDir = resolve(repoRoot, "build/npm-package-consumer")
-const frameworkTarball = resolve(repoRoot, `artifacts/npm/arrange-framework-${contract.version}.tgz`)
+const frameworkTarball = resolve(repoRoot, `artifacts/npm/arrange-framework-${contract.frameworkVersion}.tgz`)
 const cliManifest = JSON.parse(readFileSync(resolve(repoRoot, "cli/package.json"), "utf8")) as {version: string}
 const cliTarball = resolve(repoRoot, `artifacts/npm/arrange-cli-${cliManifest.version}.tgz`)
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
@@ -30,7 +30,7 @@ mkdirSync(resolve(consumerDir, "src"), {recursive: true})
 cpSync(resolve(repoRoot, "demo/ui-src/src"), resolve(consumerDir, "src"), {recursive: true})
 writeFileSync(resolve(consumerDir, "arrange.config.yaml"), [
     "arrange:",
-    `  version: ${contract.version}`,
+    `  version: ${contract.frameworkVersion}`,
     "",
     "project:",
     "  name: PackageConsumer",
@@ -50,8 +50,6 @@ writeFileSync(resolve(consumerDir, "arrange.config.yaml"), [
     "  path: native",
     "  cmake:",
     "    buildDir: build",
-    "    configureArgs: []",
-    "    buildArgs: []",
     "",
     "artifacts:",
     "  path: artifacts",
@@ -66,7 +64,7 @@ writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
         build: "arrange build --ui-only",
     },
     dependencies: {
-        "@arrange/framework": `file:../../artifacts/npm/arrange-framework-${contract.version}.tgz`,
+        "@arrange/framework": `file:../../artifacts/npm/arrange-framework-${contract.frameworkVersion}.tgz`,
         "@arrange/cli": `file:../../artifacts/npm/arrange-cli-${cliManifest.version}.tgz`,
     },
 }, null, 2)}\n`)
@@ -80,4 +78,4 @@ const source = readFileSync(appBundle, "utf8")
 const macro = source.match(macroPattern)
 if (macro) throw new Error(`npm package consumer bundle contains unresolved Arrange Vue macro ${macro[0]}`)
 
-console.log(`verified @arrange/framework ${contract.version} and @arrange/cli ${cliManifest.version} npm package consumer`)
+console.log(`verified @arrange/framework ${contract.frameworkVersion} and @arrange/cli ${cliManifest.version} npm package consumer`)

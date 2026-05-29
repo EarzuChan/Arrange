@@ -104,4 +104,4 @@ assertStagedTreeClean(cliStageDir)
 await runNpm(["pack", cliStageDir, "--pack-destination", artifactsDir])
 
 const cliManifest = readJson(resolve(cliSourceDir, "package.json"))
-console.log(`packed @arrange/framework ${contract.version} and ${cliManifest.name} ${cliManifest.version} into ${artifactsDir}`)
+console.log(`packed @arrange/framework ${contract.frameworkVersion} and ${cliManifest.name} ${cliManifest.version} into ${artifactsDir}`)

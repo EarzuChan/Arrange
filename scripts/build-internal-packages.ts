@@ -150,7 +150,7 @@ function assertPublicPackageContract(manifest: PackageManifest, pkgName: string)
 function assertCliPackageContract(): void {
     const manifest = readJson(cliPackagePath)
     if (manifest.name !== "@arrange/cli") fail("cli/package.json must publish @arrange/cli")
-    if (manifest.version !== "1.0.0") fail("@arrange/cli version must stay independent at 1.0.0")
+    if (manifest.version !== contract.cliVersion) fail(`@arrange/cli version must be ${contract.cliVersion}`)
     if (manifest.private === true) fail("@arrange/cli must be publishable")
     const bin = manifest.bin
     if (!bin || typeof bin !== "object" || Array.isArray(bin) || (bin as Record<string, unknown>).arrange !== "./bin/arrange.cjs") {
@@ -218,7 +218,7 @@ for (const pkgDir of packageDirs) {
     const manifest = readJson(resolve(pkgDir, "package.json"))
     const pkgName = typeof manifest.name === "string" ? manifest.name : fail(`${pkgDir} missing package name`)
     if (!internalPackagePattern.test(pkgName)) fail(`${pkgName} is not an Arrange internal package`)
-    if (manifest.version !== contract.version) fail(`${pkgName} version must be ${contract.version}`)
+    if (manifest.version !== contract.frameworkVersion) fail(`${pkgName} version must be ${contract.frameworkVersion}`)
     assertNoPublicDistFields(manifest, pkgName)
     assertNoWorkspaceOrCatalogSpecs(manifest, pkgName)
     assertPublicPackageContract(manifest, pkgName)

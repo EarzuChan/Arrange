@@ -36,29 +36,33 @@ Arrange::framework  native framework target，由 CLI 写入 native CMake
 ```txt
 project/
   arrange.config.yaml
+  arrange.local.yaml
   ui/
   native/
   artifacts/
 ```
 
-- `arrange.config.yaml` 是 Arrange 工程唯一配置真源。
+- `arrange.config.yaml` 是工程配置，必须提交。
+- `arrange.local.yaml` 是本机工具链配置，默认不提交。
 - `ui/` 是 TypeScript UI 源码项目。
 - `native/` 是 CMake / JUCE native 项目。
 - `artifacts/` 是 Arrange CLI 整理后的最终交付物目录。
 
 构建过程中的临时文件仍由对应工具放在自己的默认位置，例如 `native/build/`、`ui/dist/`、`node_modules/`。Arrange CLI 会从这些目录定位产物，但不维护长期 `generated/` 目录。
 
-# 配置文件
+# 工程配置
 
-Arrange 工程只使用 `arrange.config.yaml`。不提供 JSON、TOML、TypeScript 配置入口，也不提供 `.yml` 别名；文件中不写 schema 版本。
+`arrange.config.yaml` 描述工程事实。它是团队共享配置，必须提交。
 
-配置文件只描述 Arrange 必须知道的工程事实。它不是通用构建 DSL，不承载任意 CMake / Vite 逻辑。
+`arrange.config.yaml` 不提供 JSON、TOML、TypeScript 配置入口，也不提供 `.yml` 别名；文件中不写 schema 版本。
+
+它不是通用构建 DSL，不承载任意 CMake / Vite 逻辑，也不写本机工具路径、CMake generator、MSVC 环境或本机追加参数。
 
 完整形态：
 
 ```yaml
 arrange:
-  version: 0.0.0-m.2.1
+  version: 0.0.0-m.2.2
 
 project:
   name: MyPlugin
@@ -79,9 +83,6 @@ native:
   path: native
   cmake:
     buildDir: build
-    generator: Ninja
-    configureArgs: []
-    buildArgs: []
 
 artifacts:
   path: artifacts
@@ -138,9 +139,8 @@ UI 官方模板固定 TypeScript，不提供纯 JavaScript 模板。
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `buildDir` | path string | 否 | `build` | CMake build 根目录。相对 `native.path`。 |
-| `generator` | string | 否 | CLI 自动选择 | CMake generator，例如 `Ninja`。 |
-| `configureArgs` | string[] | 否 | `[]` | 追加给 `cmake -S -B` 的参数。 |
-| `buildArgs` | string[] | 否 | `[]` | 追加给 `cmake --build` 的参数。 |
+
+CMake generator、CMake 可执行文件、Ninja / MSBuild 路径、MSVC 环境与本机追加参数都属于 `arrange.local.yaml`，不得写入 `arrange.config.yaml`。
 
 用户不能在配置文件中自定义构建风味。Arrange CLI 支持两个 flavor：
 
@@ -164,7 +164,7 @@ native:
 native/build
 ```
 
-CLI 应按平台准备 CMake 调用环境。Windows 下可自动寻找并使用 Visual Studio Developer Command Prompt 环境。
+CLI 必须按平台准备 CMake 调用环境。Windows 下 native configure、build 与 run 必须使用已验证的 Visual Studio Developer Command Prompt 环境。
 
 ## artifacts
 
@@ -199,9 +199,161 @@ artifacts/
 
 若 `includeVersionDir: false`，则省略 `<version?>` 层。
 
+# 本机配置
+
+`arrange.local.yaml` 描述当前机器如何调用外部工具。它由 CLI 生成和维护，默认写入 `.gitignore`，不得提交。
+
+`arrange.local.yaml` 不提供 JSON、TOML、TypeScript 配置入口，也不提供 `.yml` 别名；文件中不写 schema 版本。
+
+完整形态按平台分区。当前平台只读取 `platform` 指定的分区。
+
+Windows 示例：
+
+```yaml
+platform: windows
+
+windows:
+  shell:
+    command: "C:/Windows/System32/cmd.exe"
+  packageManager:
+    command: "C:/Users/user/AppData/Local/pnpm/pnpm.cmd"
+  cmake:
+    command: "D:/Microsoft Visual Studio/18/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
+    generator: "Ninja"
+    makeProgram: "D:/Microsoft Visual Studio/18/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe"
+    configureArgs: []
+    buildArgs: []
+  msvc:
+    devCmd: "D:/Microsoft Visual Studio/18/BuildTools/Common7/Tools/VsDevCmd.bat"
+    arch: x64
+    hostArch: x64
+```
+
+macOS 示例（警告：由于当前未到mac调教期，关于mac的部分只是初步设定，目前不要求良好实现、也不保证有效）：
+
+```yaml
+platform: macos
+
+macos:
+  shell:
+    command: "/bin/zsh"
+  packageManager:
+    command: "/opt/homebrew/bin/pnpm"
+  cmake:
+    command: "/opt/homebrew/bin/cmake"
+    generator: "Ninja"
+    makeProgram: "/opt/homebrew/bin/ninja"
+    configureArgs: []
+    buildArgs: []
+```
+
+## local 顶层
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `platform` | enum | 是 | 生成时使用当前平台 | `windows` 或 `macos`。 |
+| `windows` | object | Windows 是 | 无 | Windows 本机配置。 |
+| `macos` | object | macOS 是 | 无 | macOS 本机配置。 |
+
+## windows
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `shell.command` | path string | 否 | `cmd.exe` | 执行 `.cmd` / `.bat` 的 shell。 |
+| `packageManager.command` | path string | 是 | 无 | 当前工程所选包管理器的可执行文件。 |
+| `cmake.command` | path string | native 需要时是 | 无 | CMake 可执行文件。 |
+| `cmake.generator` | string | native 需要时是 | 无 | CMake generator。 |
+| `cmake.makeProgram` | path string | generator 需要时是 | 无 | Ninja 等构建程序路径。 |
+| `cmake.configureArgs` | string[] | 否 | `[]` | 本机追加给 `cmake -S -B` 的参数。 |
+| `cmake.buildArgs` | string[] | 否 | `[]` | 本机追加给 `cmake --build` 的参数。 |
+| `msvc.devCmd` | path string | Windows native 需要时是 | 无 | Visual Studio Developer Command Prompt 脚本。 |
+| `msvc.arch` | string | 否 | `x64` | 目标架构。 |
+| `msvc.hostArch` | string | 否 | `x64` | host 架构。 |
+
+## macos
+
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `shell.command` | path string | 否 | `/bin/zsh` | 执行外部命令的 shell。 |
+| `packageManager.command` | path string | 是 | 无 | 当前工程所选包管理器的可执行文件。 |
+| `cmake.command` | path string | native 需要时是 | 无 | CMake 可执行文件。 |
+| `cmake.generator` | string | native 需要时是 | 无 | CMake generator。 |
+| `cmake.makeProgram` | path string | generator 需要时是 | 无 | Ninja 等构建程序路径。 |
+| `cmake.configureArgs` | string[] | 否 | `[]` | 本机追加给 `cmake -S -B` 的参数。 |
+| `cmake.buildArgs` | string[] | 否 | `[]` | 本机追加给 `cmake --build` 的参数。 |
+
+`pnpm` / `npm` 的选择写在 `arrange.config.yaml` 的 `ui.packageManager`。`arrange.local.yaml` 只记录当前机器上如何调用这个包管理器。
+
+# 工具链准备
+
+需要外部工具的命令在执行前必须确保本机工具链可用。若 `arrange.local.yaml` 不存在、缺字段或字段失效，CLI 必须进入工具链准备流程。
+
+流程：
+
+1. 根据命令确定需要的能力：UI install、UI dev、UI build、CMake configure、native build、native run。
+2. 读取并校验 `arrange.local.yaml`。
+3. 对缺失或失效项按平台查找候选工具。
+4. 候选唯一且可验证时使用；候选不唯一或无法确认时询问用户。
+5. 验证可执行文件与必要环境。
+6. 写入或更新 `arrange.local.yaml`，并确保 `.gitignore` 忽略它。
+7. 继续执行原命令。
+
+Windows native 工具链必须验证 MSVC 环境。验证命令等价于：
+
+```bat
+call VsDevCmd.bat -arch=x64 -host_arch=x64 && cl
+```
+
+CLI 不静默安装工具，不修改全局 PATH。无法发现或验证时，必须说明缺什么、试过什么、用户应提供什么。
+
+# 外部命令执行
+
+业务命令不得直接调用 `spawn` 执行外部工具。所有外部命令必须经过统一执行入口。
+
+既有工程命令处理顺序：
+
+1. 读取当前目录的工程配置。
+2. 检查 CLI 与 Arrange framework 兼容性。
+3. 需要修改工程文件时执行 project sync。
+4. 需要外部工具时准备本机工具链。
+5. 通过统一执行入口调用包管理器、Vite、CMake 或 native 程序。
+6. 需要整理交付物时执行 package。
+
+执行入口负责：
+
+- 按平台选择 shell 与环境。
+- 正确处理 `.cmd`、`.bat`、普通可执行文件。
+- 用 `arrange.local.yaml` 中的路径调用工具。
+- 把底层执行错误转成可操作提示。
+
+Windows 规则：
+
+- `.cmd` / `.bat` 必须经 `cmd.exe /d /s /c` 执行。
+- native CMake configure / build / run 必须包在 `call VsDevCmd.bat ... && <command>` 环境中。
+- `spawn ENOENT`、`spawn EINVAL` 等底层错误不得原样抛给用户。
+- 路径与参数必须分开处理，不能靠拼接整条命令字符串传递普通参数。
+
+macOS 使用独立的平台执行规则。M2.2 先实现 Windows，但业务命令不得写死 Windows 细节。
+
+# 错误处理
+
+CLI 报错必须说明问题与修复动作。
+
+错误类型：
+
+- 配置错误：YAML 字段错误、enum 值错误、必填字段缺失。
+- 本机配置错误：工具路径不存在、本机平台不匹配、local 与工程配置不一致。
+- 工具链错误：找不到包管理器、CMake、构建程序或 MSVC 环境。
+- 命令执行错误：外部命令退出码非 0。
+- 产物错误：找不到 Standalone / VST3 等构建产物。
+
+底层 Node 错误不得直接作为最终用户提示。
+
 # 版本来源与兼容性
 
-`@arrange/cli` 独立维护其版本。工程使用的 Arrange framework 版本写在 `arrange.config.yaml` 的 `arrange.version`。
+Arrange 仓库的版本真源是根目录 `arrange.version.json`，具体在[内部包构建与分发契约](29-内部包构建与分发契约.md)有详细说明。
+
+用户工程使用的 Arrange framework 版本记录在 `arrange.config.yaml` 的 `arrange.version`。
 
 Arrange CLI 在代码中持有当前 CLI 兼容性码。`arrange create` / `arrange adopt` 的 Arrange 版本选择来自 npm registry 中 `@arrange/framework` 的包数据。CLI 读取该包的 packument，使用其中的 `dist-tags`、`versions` 和 package metadata 生成候选列表。
 
@@ -247,17 +399,27 @@ CLI 必须严格校验 `arrange.config.yaml`：
 - 外部路径必须显式写入配置文件。
 - YAML 中不支持表达式、变量展开或脚本逻辑。
 
+CLI 必须严格校验 `arrange.local.yaml`：
+
+- 未知顶层字段报错。
+- 未知平台分区字段报错。
+- `platform` 必须与当前机器平台一致。
+- `packageManager.command` 必须能执行 `ui.packageManager` 指定的包管理器。
+- 需要 native 能力时，CMake 与平台编译环境字段必须完整。
+- 路径字段必须指向存在的可执行文件或脚本。
+
 # 当前目录规则
 
 既有工程命令只读取当前目录的：
 
 ```txt
 ./arrange.config.yaml
+./arrange.local.yaml
 ```
 
 CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供 `--config` / `--cwd` / `--root` 来改变工程根。
 
-如果当前目录没有 `arrange.config.yaml`，命令必须报错并要求用户进入 Arrange 工程根或运行 `arrange create` / `arrange adopt`。
+如果当前目录没有 `arrange.config.yaml`，命令必须报错并要求用户进入 Arrange 工程根或运行 `arrange create` / `arrange adopt`。如果 `arrange.local.yaml` 不存在或失效，需要外部工具的命令必须先进入工具链准备流程。
 
 # create
 
@@ -284,7 +446,7 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 - JUCE 版本由 Arrange 验证版本决定。
 - QuickJS-NG 版本是 Arrange 内部细节。
 
-创建前必须展示最终信息。用户确认后，CLI 按模板生成 `arrange.config.yaml`、`ui/`、`native/` 与必要工程文件。
+创建前必须展示最终信息。用户确认后，CLI 按模板生成 `arrange.config.yaml`、`ui/`、`native/` 与必要工程文件。若用户选择立即 sync，CLI 必须先准备本机工具链。
 
 # adopt
 
@@ -304,6 +466,8 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 复制模式会把子工程复制到 Arrange 工程目录，之后不依赖原路径。原位引用模式会在 `arrange.config.yaml` 中指向外部目录；CLI 可以正常开发、构建和打包，但编辑器工作区、相对路径和版本管理体验由用户自行处理。
 
 自动识别只用于给向导提供默认值。识别不到的信息必须询问用户；复杂 CMake 不靠猜测强行改写。
+
+若用户选择立即 sync，CLI 必须先准备本机工具链。
 
 # 工程文件维护
 
@@ -331,6 +495,8 @@ CLI 只重写完整、未损坏的 managed region。region 缺 begin/end、重�
 
 1. project sync：维护 Arrange 负责的工程文件区域，例如 CMake managed region 与 UI `package.json`。
 2. toolchain sync：调用外部工具做预同步，例如 `pnpm install` / `npm install` 与 CMake configure。
+
+toolchain sync 执行前必须准备本机工具链。
 
 无参数时：
 
@@ -384,6 +550,7 @@ sync 遇到正常文件可自动维护；遇到损坏或无法安全处理的文
 - `--flavor` 只影响 native。
 - dev 不执行 package。
 - dev 不静默修改工程文件；工程不同步时应提示用户运行 `arrange sync`。
+- dev 执行前必须准备本机工具链。
 
 # build
 
@@ -407,6 +574,7 @@ package artifacts
 | `--no-package` | 完整 build，但不整理 artifacts。 |
 | `--product standalone` | 只处理 standalone，可重复传。 |
 | `--product vst3` | 只处理 vst3，可重复传。 |
+| `--clean` | 在完整 build + package 时先清理本次将要写入的 artifacts product 目录。 |
 
 规则：
 
@@ -414,7 +582,9 @@ package artifacts
 - `--ui-only` 与 `--native-only` 互斥。
 - `--product` 不传时使用 `project.products`。
 - 单独构建 UI 或 native 时不执行 package。
+- `--clean` 只在完整 build 执行 package 时合法；与 `--ui-only`、`--native-only` 或 `--no-package` 同用必须报错。
 - build 不静默修改工程文件；工程不同步时应提示用户运行 `arrange sync`。
+- build 执行前必须准备本机工具链。
 
 # package
 

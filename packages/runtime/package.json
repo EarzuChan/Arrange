@@ -1,6 +1,6 @@
 {
   "name": "@arrange/runtime",
-  "version": "0.0.0-m.2.1",
+  "version": "0.0.0-m.2.2",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,9 +10,9 @@
     }
   },
   "dependencies": {
-    "@arrange/vue-reactivity": "0.0.0-m.2.1",
-    "@arrange/vue-runtime-core": "0.0.0-m.2.1",
-    "@arrange/vue-shared": "0.0.0-m.2.1"
+    "@arrange/vue-reactivity": "0.0.0-m.2.2",
+    "@arrange/vue-runtime-core": "0.0.0-m.2.2",
+    "@arrange/vue-shared": "0.0.0-m.2.2"
   },
   "license": "MIT",
   "sideEffects": false,

@@ -2,4 +2,4 @@ import {assertArrangeVersionContract, readArrangeVersionContract} from "./versio
 
 const contract = readArrangeVersionContract()
 assertArrangeVersionContract()
-console.log(`verified Arrange version contract ${contract.version} protocol=${contract.protocolVersion}`)
+console.log(`verified Arrange version contract framework=${contract.frameworkVersion} frameworkProtocol=${contract.frameworkInternalProtocolCode} cli=${contract.cliVersion} cliCompatibility=${contract.cliCompatibility}`)

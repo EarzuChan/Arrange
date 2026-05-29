@@ -7,9 +7,10 @@ import {CLI_COMPATIBILITY, CLI_VERSION} from "./constants.ts"
 import {assertCompatible, fetchFrameworkMetadata, readInstalledFrameworkMetadata} from "./framework.ts"
 import {adoptProject, createProject} from "./wizard.ts"
 import {cmakeBuildArgs, cmakeConfigureArgs, ensureProjectFiles} from "./project.ts"
-import {cmakeExe, commandName, run} from "./process.ts"
+import {run} from "./process.ts"
 import {runVite, spawnNativeStandalone} from "./vite.ts"
 import {readArrangeRegistryFromNpmrc} from "./package-resolve.ts"
+import {ensureToolchain, type ResolvedToolchain} from "./local.ts"
 
 export type CliResult = {exitCode: number}
 
@@ -98,9 +99,14 @@ async function sync(parsed: Parsed): Promise<void> {
         if (changed.length) console.log(`${check ? "需要更新" : "已更新"}: ${changed.join(", ")}`)
         else console.log("project sync 无需更新。")
     }
+    if (!projectOnly && check) {
+        await ensureToolchain(config, process.cwd(), {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"}, {interactive: false, write: false})
+        console.log("toolchain check 通过。")
+    }
     if (!projectOnly && !check) {
-        if (scope === "all" || scope === "ui") await run(commandName(config.ui.packageManager), ["install"], {cwd: resolve(process.cwd(), config.ui.path)})
-        if (scope === "all" || scope === "native") await configureNative(config, "debug")
+        const toolchain = await ensureToolchain(config, process.cwd(), {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"})
+        if (scope === "all" || scope === "ui") await run(toolchain.packageManagerCommand!, ["install"], {cwd: resolve(process.cwd(), config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
+        if (scope === "all" || scope === "native") await configureNative(config, "debug", toolchain)
     }
 }
 
@@ -110,17 +116,18 @@ async function dev(parsed: Parsed): Promise<void> {
     const uiOnly = parsed.flags.has("ui-only")
     const nativeOnly = parsed.flags.has("native-only")
     if (uiOnly && nativeOnly) throw new Error("--ui-only 与 --native-only 互斥。")
+    const toolchain = await ensureToolchain(config, process.cwd(), {ui: !nativeOnly, native: !uiOnly})
     if (nativeOnly) {
-        await spawnNativeStandalone(config, flavor)
+        await spawnNativeStandalone(config, flavor, toolchain)
         return
     }
     if (uiOnly) {
-        await runVite(config, "dev")
+        await runVite(config, "dev", [], toolchain)
         return
     }
     await Promise.all([
-        runVite(config, "dev"),
-        spawnNativeStandalone(config, flavor),
+        runVite(config, "dev", [], toolchain),
+        spawnNativeStandalone(config, flavor, toolchain),
     ])
 }
 
@@ -134,10 +141,11 @@ async function build(parsed: Parsed): Promise<void> {
     }
     const config = await loadAndCheckProject()
     const products = productsOf(parsed, config.project.products)
-    if (!nativeOnly) await runVite(config, "build")
+    const toolchain = await ensureToolchain(config, process.cwd(), {ui: !nativeOnly, native: !uiOnly})
+    if (!nativeOnly) await runVite(config, "build", [], toolchain)
     if (!uiOnly) {
-        await configureNative(config, flavor)
-        await buildNative(config, flavor, products)
+        await configureNative(config, flavor, toolchain)
+        await buildNative(config, flavor, products, toolchain)
     }
     if (!uiOnly && !nativeOnly && !parsed.flags.has("no-package")) {
         const written = packageArtifacts(config, process.cwd(), {flavor, products, clean: parsed.flags.has("clean")})
@@ -163,14 +171,16 @@ async function loadAndCheckProject() {
     return config
 }
 
-async function configureNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor): Promise<void> {
+async function configureNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
+    if (!toolchain.cmake) throw new Error("native configure 需要 CMake，但本机工具链未提供。")
     mkdirSync(resolve(process.cwd(), config.native.path, config.native.cmake.buildDir, flavor), {recursive: true})
-    await run(cmakeExe(), cmakeConfigureArgs(config, process.cwd(), flavor))
+    await run(toolchain.cmake.command, cmakeConfigureArgs(config, process.cwd(), flavor, toolchain.cmake), {toolchain, msvc: true, label: "cmake configure"})
 }
 
-async function buildNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor, products: Product[]): Promise<void> {
+async function buildNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor, products: Product[], toolchain: ResolvedToolchain): Promise<void> {
+    if (!toolchain.cmake) throw new Error("native build 需要 CMake，但本机工具链未提供。")
     const targets = products.map((product) => `${config.project.name}_${product === "standalone" ? "Standalone" : "VST3"}`)
-    for (const target of targets) await run(cmakeExe(), [...cmakeBuildArgs(config, process.cwd(), flavor), "--target", target])
+    for (const target of targets) await run(toolchain.cmake.command, [...cmakeBuildArgs(config, process.cwd(), flavor, toolchain.cmake), "--target", target], {toolchain, msvc: true, label: `cmake build ${target}`})
 }
 
 function scopeOf(parsed: Parsed): "all" | "ui" | "native" {

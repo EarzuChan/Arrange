@@ -1,7 +1,7 @@
-﻿import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs"
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs"
 import {dirname, relative, resolve} from "node:path"
 import type {ArrangeConfig, Flavor, Product} from "./config.ts"
-import {defaultCmakeGenerator} from "./process.ts"
+import type {LocalCMakeConfig} from "./local.ts"
 
 export type SyncScope = "all" | "ui" | "native"
 export type SyncMode = "all" | "project" | "toolchain" | "check"
@@ -311,21 +311,21 @@ export function cmakeBuildDir(config: ArrangeConfig, root: string, flavor: Flavo
     return resolve(root, config.native.path, config.native.cmake.buildDir, flavor)
 }
 
-export function cmakeConfigureArgs(config: ArrangeConfig, root: string, flavor: Flavor): string[] {
+export function cmakeConfigureArgs(config: ArrangeConfig, root: string, flavor: Flavor, cmake: LocalCMakeConfig): string[] {
     const nativeDir = resolve(root, config.native.path)
     const buildDir = cmakeBuildDir(config, root, flavor)
-    const generator = config.native.cmake.generator ?? defaultCmakeGenerator()
     return [
         "-S", nativeDir,
         "-B", buildDir,
-        ...(generator ? ["-G", generator] : []),
+        "-G", cmake.generator,
+        ...(cmake.makeProgram ? [`-DCMAKE_MAKE_PROGRAM=${cmake.makeProgram}`] : []),
         `-DCMAKE_BUILD_TYPE=${flavor === "debug" ? "Debug" : "Release"}`,
-        ...config.native.cmake.configureArgs,
+        ...cmake.configureArgs,
     ]
 }
 
-export function cmakeBuildArgs(config: ArrangeConfig, root: string, flavor: Flavor): string[] {
-    return ["--build", cmakeBuildDir(config, root, flavor), "--config", flavor === "debug" ? "Debug" : "Release", ...config.native.cmake.buildArgs]
+export function cmakeBuildArgs(config: ArrangeConfig, root: string, flavor: Flavor, cmake: LocalCMakeConfig): string[] {
+    return ["--build", cmakeBuildDir(config, root, flavor), "--config", flavor === "debug" ? "Debug" : "Release", ...cmake.buildArgs]
 }
 
 export function productTargetName(config: ArrangeConfig, product: Product): string {

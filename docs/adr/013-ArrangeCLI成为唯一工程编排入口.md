@@ -6,7 +6,7 @@
 
 ADR 012 将外部消费收束为 `@arrange/framework`、`Arrange::framework` 与 `arrange`。随着工程正规化继续推进，`arrange` 的地位必须进一步明确。
 
-标准 Arrange 工程根目录不是 Node 项目，而是由 `arrange.config.yaml`、`ui/`、`native/` 与 `artifacts/` 组成。若把 CLI 作为 `@arrange/framework` 的项目依赖，会迫使根目录承担 Node 项目职责，破坏工程边界。
+标准 Arrange 工程根目录不是 Node 项目，而是由 `arrange.config.yaml`、`arrange.local.yaml`、`ui/`、`native/` 与 `artifacts/` 组成。若把 CLI 作为 `@arrange/framework` 的项目依赖，会迫使根目录承担 Node 项目职责，破坏工程边界。
 
 ## 决策
 
@@ -30,7 +30,8 @@ Arrange CLI 负责创建、收编、同步、开发、构建和打包 Arrange �
 
 - `create-arrange`、framework 内置 CLI、Vite 专用 CLI 等将被收埋，以后只用牢大。
 - 工程根目录不是 `Node 项目`，当然也更不会需要 `package.json`。
-- `arrange.config.yaml` 是工程配置真源。
+- `arrange.config.yaml` 是工程共享配置。
+- `arrange.local.yaml` 是本机工具链配置，默认不提交。
 - `artifacts/` 是 Arrange CLI 负责整理的最终交付物目录。
 - 文档、demo 与后续实现应以 Arrange CLI 作为用户工程入口。
 

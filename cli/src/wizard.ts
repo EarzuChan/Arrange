@@ -6,8 +6,9 @@ import type {ArrangeConfig, PackageManager, PluginType, Product} from "./config.
 import {defaultConfig, writeProjectConfig} from "./config.ts"
 import {CLI_COMPATIBILITY, DEFAULT_FRAMEWORK_VERSION} from "./constants.ts"
 import {cmakeBuildDir, cmakeConfigureArgs, ensureProjectFiles} from "./project.ts"
-import {cmakeExe, commandName, run} from "./process.ts"
+import {run} from "./process.ts"
 import {assertCompatible, fetchFrameworkCandidates, fetchFrameworkMetadata, normalizeRegistryUrl, type FrameworkVersionCandidate} from "./framework.ts"
+import {ensureToolchain} from "./local.ts"
 
 export type WizardOptions = {
     registry?: string
@@ -33,6 +34,7 @@ export async function createProject(options: WizardOptions = {}): Promise<void> 
         const changed = ensureProjectFiles(config, process.cwd(), {scope: "all", registry})
         console.log(`已创建 Arrange 工程：${changed.join(", ")}`)
         if (await confirm(rl, "现在执行 sync")) {
+            rl.close()
             await runToolchainSync(config, registry)
         }
     } finally {
@@ -62,6 +64,7 @@ export async function adoptProject(options: WizardOptions = {}): Promise<void> {
         const changed = ensureProjectFiles(config, process.cwd(), {scope: "all", registry})
         console.log(`已接入 Arrange 工程：${changed.join(", ")}`)
         if (await confirm(rl, "现在执行 sync")) {
+            rl.close()
             await runToolchainSync(config, registry)
         }
     } finally {
@@ -70,10 +73,12 @@ export async function adoptProject(options: WizardOptions = {}): Promise<void> {
 }
 
 async function runToolchainSync(config: ArrangeConfig, registry?: string): Promise<void> {
+    const toolchain = await ensureToolchain(config, process.cwd(), {ui: true, native: true})
+    if (!toolchain.cmake) throw new Error("sync native 需要 CMake，但本机工具链未提供。")
     const installArgs = registry ? ["install", "--registry", registry] : ["install"]
-    await run(commandName(config.ui.packageManager), installArgs, {cwd: resolve(process.cwd(), config.ui.path)})
+    await run(toolchain.packageManagerCommand!, installArgs, {cwd: resolve(process.cwd(), config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
     mkdirSync(cmakeBuildDir(config, process.cwd(), "debug"), {recursive: true})
-    await run(cmakeExe(), cmakeConfigureArgs(config, process.cwd(), "debug"))
+    await run(toolchain.cmake.command, cmakeConfigureArgs(config, process.cwd(), "debug", toolchain.cmake), {toolchain, msvc: true, label: "cmake configure"})
 }
 
 async function ask(rl: ReturnType<typeof createInterface>, label: string, defaultValue: string): Promise<string> {

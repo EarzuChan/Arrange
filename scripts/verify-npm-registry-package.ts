@@ -28,7 +28,7 @@ mkdirSync(resolve(consumerDir, "src"), {recursive: true})
 cpSync(resolve(repoRoot, "demo/ui-src/src"), resolve(consumerDir, "src"), {recursive: true})
 writeFileSync(resolve(consumerDir, "arrange.config.yaml"), [
     "arrange:",
-    `  version: ${contract.version}`,
+    `  version: ${contract.frameworkVersion}`,
     "",
     "project:",
     "  name: RegistryConsumer",
@@ -48,8 +48,6 @@ writeFileSync(resolve(consumerDir, "arrange.config.yaml"), [
     "  path: native",
     "  cmake:",
     "    buildDir: build",
-    "    configureArgs: []",
-    "    buildArgs: []",
     "",
     "artifacts:",
     "  path: artifacts",
@@ -64,7 +62,7 @@ writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
         build: "arrange build --ui-only",
     },
     dependencies: {
-        "@arrange/framework": contract.version,
+        "@arrange/framework": contract.frameworkVersion,
         "@arrange/cli": `file:../../artifacts/npm/arrange-cli-${cliManifest.version}.tgz`,
     },
 }, null, 2)}\n`)
@@ -78,4 +76,4 @@ const source = readFileSync(appBundle, "utf8")
 const macro = source.match(macroPattern)
 if (macro) throw new Error(`npm registry consumer bundle contains unresolved Arrange Vue macro ${macro[0]}`)
 
-console.log(`verified @arrange/framework registry consumer for Arrange ${contract.version} with @arrange/cli ${cliManifest.version}`)
+console.log(`verified @arrange/framework registry consumer for Arrange ${contract.frameworkVersion} with @arrange/cli ${cliManifest.version}`)

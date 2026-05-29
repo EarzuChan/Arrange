@@ -1,4 +1,6 @@
 {
-  "version": "0.0.0-m.2.1",
-  "protocolVersion": 1
+  "frameworkVersion": "0.0.0-m.2.2",
+  "frameworkInternalProtocolCode": 1,
+  "cliVersion": "1.0.1",
+  "cliCompatibility": 1
 }

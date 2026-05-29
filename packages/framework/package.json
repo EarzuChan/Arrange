@@ -1,6 +1,6 @@
 {
   "name": "@arrange/framework",
-  "version": "0.0.0-m.2.1",
+  "version": "0.0.0-m.2.2",
   "private": false,
   "type": "module",
   "exports": {
@@ -14,14 +14,14 @@
     }
   },
   "dependencies": {
-    "@arrange/runtime": "0.0.0-m.2.1",
-    "@arrange/vite-plugin": "0.0.0-m.2.1",
-    "@arrange/vue-reactivity": "0.0.0-m.2.1",
-    "@arrange/vue-runtime-core": "0.0.0-m.2.1",
-    "@arrange/vue-compiler-arrange": "0.0.0-m.2.1",
-    "@arrange/vue-compiler-core": "0.0.0-m.2.1",
-    "@arrange/vue-compiler-sfc": "0.0.0-m.2.1",
-    "@arrange/vue-shared": "0.0.0-m.2.1",
+    "@arrange/runtime": "0.0.0-m.2.2",
+    "@arrange/vite-plugin": "0.0.0-m.2.2",
+    "@arrange/vue-reactivity": "0.0.0-m.2.2",
+    "@arrange/vue-runtime-core": "0.0.0-m.2.2",
+    "@arrange/vue-compiler-arrange": "0.0.0-m.2.2",
+    "@arrange/vue-compiler-core": "0.0.0-m.2.2",
+    "@arrange/vue-compiler-sfc": "0.0.0-m.2.2",
+    "@arrange/vue-shared": "0.0.0-m.2.2",
     "@babel/parser": "7.29.3",
     "entities": "7.0.1",
     "estree-walker": "2.0.2",

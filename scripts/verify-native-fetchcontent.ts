@@ -44,7 +44,7 @@ writeFileSync(resolve(consumerRoot, "main.cpp"), `
 #include <arrange/core/Version.h>
 
 int main() {
-    static_assert(arrange::core::RuntimeVersion == ${contract.protocolVersion}u);
+    static_assert(arrange::core::RuntimeVersion == ${contract.frameworkInternalProtocolCode}u);
     return arrange::core::version()[0] == '\\0';
 }
 `.trimStart())
@@ -54,4 +54,4 @@ await runInVsDev(`"${cmakeExe()}" --build "${buildDir}"`)
 await runInVsDev(`"${resolve(buildDir, "arrange_fetchcontent_consumer.exe")}"`)
 
 const sourceLabel = gitRepository && gitTag ? `${gitRepository}#${gitTag}` : arrangeSource
-console.log(`verified native FetchContent consumer for Arrange ${contract.version} from ${sourceLabel}`)
+console.log(`verified native FetchContent consumer for Arrange ${contract.frameworkVersion} from ${sourceLabel}`)

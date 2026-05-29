@@ -505,7 +505,7 @@ useContentColor(): ArrangeColor
 
 ```ts
 interface RuntimeHello {
-    protocolVersion: number
+    frameworkInternalProtocolCode: number
     runtimeVersion: string
     appId?: string
 }

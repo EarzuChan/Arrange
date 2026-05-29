@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vue-compiler-core",
-  "version": "0.0.0-m.2.1",
+  "version": "0.0.0-m.2.2",
   "description": "Arrange-specialized Vue compiler core",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "entities": "7.0.1",
     "estree-walker": "2.0.2",
     "source-map-js": "1.2.1",
-    "@arrange/vue-shared": "0.0.0-m.2.1"
+    "@arrange/vue-shared": "0.0.0-m.2.2"
   },
   "devDependencies": {
     "@babel/types": "7.29.0"

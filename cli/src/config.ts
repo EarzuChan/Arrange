@@ -25,9 +25,6 @@ export type ArrangeConfig = {
         path: string
         cmake: {
             buildDir: string
-            generator?: string
-            configureArgs: string[]
-            buildArgs: string[]
         }
     }
     artifacts: {
@@ -95,8 +92,6 @@ export function defaultConfig(args: {
             path: args.nativePath ?? "native",
             cmake: {
                 buildDir: "build",
-                configureArgs: [],
-                buildArgs: [],
             },
         },
         artifacts: {
@@ -121,7 +116,7 @@ function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
     assertKnownKeys(project, "project", ["name", "version", "companyName", "companyCode", "pluginCode", "pluginType", "products"])
     assertKnownKeys(ui, "ui", ["path", "packageManager"])
     assertKnownKeys(native, "native", ["path", "cmake"])
-    assertKnownKeys(cmake, "native.cmake", ["buildDir", "generator", "configureArgs", "buildArgs"])
+    assertKnownKeys(cmake, "native.cmake", ["buildDir"])
     assertKnownKeys(artifacts, "artifacts", ["path", "includeVersionDir"])
 
     const arrangeVersion = expectString(arrange.version, "arrange.version")
@@ -161,9 +156,6 @@ function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
             path: native.path === undefined ? "native" : expectString(native.path, "native.path"),
             cmake: {
                 buildDir: cmake.buildDir === undefined ? "build" : expectString(cmake.buildDir, "native.cmake.buildDir"),
-                generator: cmake.generator === undefined ? undefined : expectString(cmake.generator, "native.cmake.generator"),
-                configureArgs: cmake.configureArgs === undefined ? [] : expectStringArray(cmake.configureArgs, "native.cmake.configureArgs"),
-                buildArgs: cmake.buildArgs === undefined ? [] : expectStringArray(cmake.buildArgs, "native.cmake.buildArgs"),
             },
         },
         artifacts: {
@@ -196,9 +188,6 @@ export function stringifyConfig(config: ArrangeConfig): string {
         `  path: ${config.native.path}`,
         "  cmake:",
         `    buildDir: ${config.native.cmake.buildDir}`,
-        ...(config.native.cmake.generator ? [`    generator: ${config.native.cmake.generator}`] : []),
-        `    configureArgs: [${config.native.cmake.configureArgs.map((value) => JSON.stringify(value)).join(", ")}]`,
-        `    buildArgs: [${config.native.cmake.buildArgs.map((value) => JSON.stringify(value)).join(", ")}]`,
         "",
         "artifacts:",
         `  path: ${config.artifacts.path}`,
@@ -207,7 +196,7 @@ export function stringifyConfig(config: ArrangeConfig): string {
     ].join("\n")
 }
 
-function parseYaml(source: string): unknown {
+export function parseYaml(source: string): unknown {
     const root: Record<string, unknown> = {}
     const stack: Array<{indent: number; value: Record<string, unknown> | unknown[]}> = [{indent: -1, value: root}]
     const lines = source.replace(/^\uFEFF/, "").split(/\r?\n/)
@@ -269,39 +258,40 @@ function parseScalar(value: string): unknown {
         return inner.split(",").map((item) => parseScalar(item.trim()))
     }
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if (value.startsWith('"')) return JSON.parse(value) as string
         return value.slice(1, -1)
     }
     return value
 }
 
-function expectRecord(value: unknown, label: string): Record<string, unknown> {
+export function expectRecord(value: unknown, label: string): Record<string, unknown> {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} 必须是对象。`)
     return value as Record<string, unknown>
 }
 
-function optionalRecord(value: unknown): Record<string, unknown> {
+export function optionalRecord(value: unknown): Record<string, unknown> {
     if (value === undefined) return {}
     return expectRecord(value, "配置项")
 }
 
-function assertKnownKeys(value: Record<string, unknown>, label: string, allowed: readonly string[]): void {
+export function assertKnownKeys(value: Record<string, unknown>, label: string, allowed: readonly string[]): void {
     const allowedSet = new Set(allowed)
     for (const key of Object.keys(value)) {
         if (!allowedSet.has(key)) throw new Error(`${label}: 未知字段 ${key}`)
     }
 }
 
-function expectString(value: unknown, label: string): string {
+export function expectString(value: unknown, label: string): string {
     if (typeof value !== "string" || value.length === 0) throw new Error(`${label} 必须是非空字符串。`)
     return value
 }
 
-function expectBoolean(value: unknown, label: string): boolean {
+export function expectBoolean(value: unknown, label: string): boolean {
     if (typeof value !== "boolean") throw new Error(`${label} 必须是 boolean。`)
     return value
 }
 
-function expectStringArray(value: unknown, label: string): string[] {
+export function expectStringArray(value: unknown, label: string): string[] {
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`${label} 必须是字符串数组。`)
     return value as string[]
 }
