@@ -205,6 +205,8 @@ artifacts/
 
 Arrange CLI 在代码中持有当前 CLI 兼容性码。`arrange create` / `arrange adopt` 的 Arrange 版本选择来自 npm registry 中 `@arrange/framework` 的包数据。CLI 读取该包的 packument，使用其中的 `dist-tags`、`versions` 和 package metadata 生成候选列表。
 
+`arrange create` / `arrange adopt` 可显式传入 `--registry <url>`。该参数只改变本次向导读取 `@arrange/framework` packument / metadata 的 registry；工程配置中仍只写具体 Arrange 版本。若使用了 `--registry`，CLI 会在 UI 工程写入 `@arrange:registry=<url>` 的 `.npmrc`，使后续 `sync` 与兼容性检查继续使用同一 Arrange 包源。
+
 framework package metadata 的结构见 [内部包构建与分发契约](29-内部包构建与分发契约.md)。
 
 规则：
@@ -259,7 +261,7 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 
 # create
 
-`arrange create` 创建新的标准 Arrange 工程。它是交互式命令，不接收参数。
+`arrange create` 创建新的标准 Arrange 工程。它是交互式命令。除 `--registry <url>` 外，不接收其它参数。
 
 向导收集：
 
@@ -286,7 +288,7 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 
 # adopt
 
-`arrange adopt` 将已有 native / UI 项目纳入 Arrange 工程模式。它是交互式命令，不接收参数。
+`arrange adopt` 将已有 native / UI 项目纳入 Arrange 工程模式。它是交互式命令。除 `--registry <url>` 外，不接收其它参数。
 
 流程：
 

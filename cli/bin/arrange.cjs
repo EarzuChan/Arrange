@@ -6,14 +6,10 @@ const {resolve} = require("node:path")
 
 const requireFromHere = createRequire(__filename)
 const tsxEntry = pathToFileURL(requireFromHere.resolve("tsx")).href
-const cliEntry = resolve(__dirname, "../src/cli.ts")
-const nodeOptions = [process.env.NODE_OPTIONS, "--import", tsxEntry].filter(Boolean).join(" ")
+const cliEntry = resolve(__dirname, "../src/index.ts")
 const result = spawnSync(process.execPath, ["--import", tsxEntry, cliEntry, ...process.argv.slice(2)], {
   stdio: "inherit",
-  env: {
-    ...process.env,
-    NODE_OPTIONS: nodeOptions,
-  },
+  env: process.env,
 })
 
 if (result.error) throw result.error

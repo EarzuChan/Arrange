@@ -13,9 +13,6 @@
       "import": "./src/vite.ts"
     }
   },
-  "bin": {
-    "arrange": "./bin/arrange.cjs"
-  },
   "dependencies": {
     "@arrange/runtime": "0.0.0-m.2.1",
     "@arrange/vite-plugin": "0.0.0-m.2.1",
@@ -31,7 +28,6 @@
     "magic-string": "0.30.21",
     "postcss": "^8.5.14",
     "source-map-js": "1.2.1",
-    "tsx": "4.22.3",
     "vite": "8.0.11",
     "hash-sum": "^2.0.0",
     "lru-cache": "10.1.0",
@@ -43,8 +39,7 @@
   "license": "MIT",
   "sideEffects": false,
   "files": [
-    "src",
-    "bin"
+    "src"
   ],
   "publishConfig": {
     "access": "public",
@@ -59,5 +54,8 @@
     "@arrange/vue-compiler-core",
     "@arrange/vue-compiler-sfc",
     "@arrange/vue-shared"
-  ]
+  ],
+  "arrange": {
+    "cliCompatibility": 1
+  }
 }

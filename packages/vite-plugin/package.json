@@ -9,9 +9,6 @@
       "import": "./src/index.ts"
     }
   },
-  "bin": {
-    "arrange-vite": "./bin/arrange-vite.cjs"
-  },
   "peerDependencies": {
     "vite": ">=5"
   },
@@ -31,7 +28,6 @@
     "magic-string": "0.30.21",
     "postcss": "^8.5.14",
     "source-map-js": "1.2.1",
-    "tsx": "4.22.3",
     "hash-sum": "^2.0.0",
     "lru-cache": "10.1.0",
     "merge-source-map": "^1.1.0",
@@ -41,7 +37,6 @@
   },
   "license": "MIT",
   "files": [
-    "src",
-    "bin"
+    "src"
   ]
 }

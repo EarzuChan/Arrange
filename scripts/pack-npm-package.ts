@@ -6,6 +6,7 @@ import {assertArrangeVersionContract, readArrangeVersionContract} from "./versio
 const artifactsDir = resolve(repoRoot, "artifacts/npm")
 const stagingRoot = resolve(artifactsDir, "staging")
 const frameworkSourceDir = resolve(repoRoot, "packages/framework")
+const cliSourceDir = resolve(repoRoot, "cli")
 const frameworkBundleDirs = [
     resolve(repoRoot, "packages/runtime"),
     resolve(repoRoot, "packages/vite-plugin"),
@@ -42,9 +43,10 @@ function copyIfExists(source: string, target: string): void {
     })
 }
 
-function copyPackageSource(sourceDir: string, targetDir: string): void {
+function copyPackageSource(sourceDir: string, targetDir: string, options: {includeBin?: boolean} = {}): void {
     mkdirSync(targetDir, {recursive: true})
-    for (const item of ["src", "bin", "LICENSE", "README.md", "UPSTREAM.md"]) {
+    const items = ["src", ...(options.includeBin ? ["bin"] : []), "LICENSE", "README.md", "UPSTREAM.md"]
+    for (const item of items) {
         copyIfExists(resolve(sourceDir, item), resolve(targetDir, item))
     }
     writeJson(resolve(targetDir, "package.json"), readJson(resolve(sourceDir, "package.json")))
@@ -96,4 +98,10 @@ for (const bundleDir of frameworkBundleDirs) {
 assertStagedTreeClean(stageDir)
 await runNpm(["pack", stageDir, "--pack-destination", artifactsDir])
 
-console.log(`packed @arrange/framework ${contract.version} into ${artifactsDir}`)
+const cliStageDir = resolve(stagingRoot, packageStageName(cliSourceDir))
+copyPackageSource(cliSourceDir, cliStageDir, {includeBin: true})
+assertStagedTreeClean(cliStageDir)
+await runNpm(["pack", cliStageDir, "--pack-destination", artifactsDir])
+
+const cliManifest = readJson(resolve(cliSourceDir, "package.json"))
+console.log(`packed @arrange/framework ${contract.version} and ${cliManifest.name} ${cliManifest.version} into ${artifactsDir}`)

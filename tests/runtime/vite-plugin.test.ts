@@ -4,7 +4,7 @@ import {resolve} from "node:path"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
 import {DEV_BUNDLE_PATH} from "../../packages/vite-plugin/src/constraints.ts"
 import {buildDevBundle} from "../../packages/vite-plugin/src/dev-bundle.ts"
-import {normalizeArgs} from "../../packages/framework/src/cli-core.ts"
+import {normalizeViteArgs} from "../../cli/src/vite.ts"
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -140,11 +140,11 @@ test("vite plugin accepts Arrange component template without warnings", () => {
 })
 
 test("arrange CLI injects Arrange Vite config by default", () => {
-    const devArgs = normalizeArgs(["dev"])
+    const devArgs = normalizeViteArgs("dev")
     assert.deepEqual(devArgs.slice(0, 5), ["--host", "127.0.0.1", "--port", "9178", "--strictPort"])
     assert.ok(devArgs.includes("--config"))
 
-    const buildArgs = normalizeArgs(["build", "--outDir", "dist"])
+    const buildArgs = normalizeViteArgs("build", ["--outDir", "dist"])
     assert.equal(buildArgs[0], "build")
     assert.ok(buildArgs.includes("--config"))
     assert.ok(buildArgs.includes("--outDir"))

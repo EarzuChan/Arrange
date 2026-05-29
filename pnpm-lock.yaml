@@ -18,6 +18,22 @@ importers:
         specifier: 8.0.11
         version: 8.0.11(@types/node@20.19.40)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)
 
+  cli:
+    dependencies:
+      tsx:
+        specifier: 4.22.3
+        version: 4.22.3
+      vite:
+        specifier: 8.0.11
+        version: 8.0.11(@types/node@20.19.40)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.0
+        version: 20.19.40
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   demo/ui-src:
     dependencies:
       '@arrange/framework':
@@ -189,9 +205,6 @@ importers:
       source-map-js:
         specifier: 1.2.1
         version: 1.2.1
-      tsx:
-        specifier: 4.22.3
-        version: 4.22.3
       vite:
         specifier: 8.0.11
         version: 8.0.11(@types/node@20.19.40)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)
@@ -258,9 +271,6 @@ importers:
       source-map-js:
         specifier: 1.2.1
         version: 1.2.1
-      tsx:
-        specifier: 4.22.3
-        version: 4.22.3
       vite:
         specifier: '>=5'
         version: 8.0.11(@types/node@20.19.40)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)

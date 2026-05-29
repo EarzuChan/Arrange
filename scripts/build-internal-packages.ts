@@ -6,6 +6,8 @@ import {assertArrangeVersionContract, readArrangeVersionContract} from "./versio
 type PackageManifest = {
     name?: unknown
     version?: unknown
+    arrange?: unknown
+    bin?: unknown
     private?: unknown
     exports?: unknown
     main?: unknown
@@ -25,6 +27,7 @@ type PackageManifest = {
 type ExportTarget = string | Record<string, unknown>
 
 const packagesRoot = resolve(repoRoot, "packages")
+const cliPackagePath = resolve(repoRoot, "cli", "package.json")
 const forbiddenPublicFields = ["main", "module", "types", "unpkg", "jsdelivr"] as const
 const forbiddenExportKeys = new Set(["types", "require", "default"])
 const allowedExportKeys = new Set(["arrange-ts", "import"])
@@ -87,6 +90,7 @@ function assertNoPublicDistFields(manifest: PackageManifest, pkgName: string): v
     for (const field of forbiddenPublicFields) {
         if (field in manifest) fail(`${pkgName} must not declare public ${field}`)
     }
+    if ("bin" in manifest) fail(`${pkgName} must not declare CLI bin; Arrange CLI lives in @arrange/cli`)
     if (Array.isArray(manifest.files) && manifest.files.some((item) => String(item).includes("dist"))) {
         fail(`${pkgName} must not publish dist in files`)
     }
@@ -129,6 +133,39 @@ function assertPublicPackageContract(manifest: PackageManifest, pkgName: string)
     const actualNames = new Set(actual.map(String))
     for (const dep of expectedBundleDeps) {
         if (!actualNames.has(dep)) fail(`${pkgName} must bundle ${dep}`)
+    }
+
+    if (pkgName === "@arrange/framework") {
+        const arrange = manifest.arrange
+        if (!arrange || typeof arrange !== "object" || Array.isArray(arrange)) {
+            fail(`${pkgName} must declare arrange package metadata`)
+        }
+        const compatibility = (arrange as Record<string, unknown>).cliCompatibility
+        if (typeof compatibility !== "number" || !Number.isInteger(compatibility) || compatibility <= 0) {
+            fail(`${pkgName} arrange.cliCompatibility must be a positive integer`)
+        }
+    }
+}
+
+function assertCliPackageContract(): void {
+    const manifest = readJson(cliPackagePath)
+    if (manifest.name !== "@arrange/cli") fail("cli/package.json must publish @arrange/cli")
+    if (manifest.version !== "1.0.0") fail("@arrange/cli version must stay independent at 1.0.0")
+    if (manifest.private === true) fail("@arrange/cli must be publishable")
+    const bin = manifest.bin
+    if (!bin || typeof bin !== "object" || Array.isArray(bin) || (bin as Record<string, unknown>).arrange !== "./bin/arrange.cjs") {
+        fail("@arrange/cli must own arrange bin at ./bin/arrange.cjs")
+    }
+    if (!Array.isArray(manifest.files) || !manifest.files.includes("src") || !manifest.files.includes("bin")) {
+        fail("@arrange/cli must publish src and bin files")
+    }
+    const publishConfig = manifest.publishConfig
+    if (!publishConfig || typeof publishConfig !== "object" || (publishConfig as Record<string, unknown>).access !== "public") {
+        fail("@arrange/cli publishConfig.access must be public")
+    }
+    assertNoWorkspaceOrCatalogSpecs(manifest, "@arrange/cli")
+    for (const [, name] of dependencyEntries(manifest)) {
+        if (name === "@arrange/framework") fail("@arrange/cli must not directly depend on @arrange/framework")
     }
 }
 
@@ -201,4 +238,5 @@ for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
 }
 
 assertNoMacrosInBuiltDemoBundle()
+assertCliPackageContract()
 console.log("verified TS-first package and publish boundary contract")
