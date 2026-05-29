@@ -19,7 +19,7 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 
 ## UI 源码项目
 
-这是用户的 Node 项目。标准 Arrange 工程中默认位于 `ui/`，也可由 `arrange.config.ts` 指向其它目录。
+这是用户的 Node 项目。标准 Arrange 工程中默认位于 `ui/`，也可由 `arrange.config.yaml` 指向其它目录。
 
 ```txt
 ui/

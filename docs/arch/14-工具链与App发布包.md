@@ -1,6 +1,6 @@
 # 定位
 
-本文定义 UI App bundle、开发服务器、资源处理与运行时 `ui/` 包规则。Arrange 工程级 CLI、create / adopt / build / package 与 artifacts 规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)。
+本文定义 UI App bundle、开发服务器、资源处理与运行时 `ui/` 包规则。Arrange 工程级 CLI、create / adopt / sync / build / package 与 artifacts 规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)。
 
 # UI 源码项目
 

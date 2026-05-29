@@ -6,7 +6,7 @@
 
 ADR 012 将外部消费收束为 `@arrange/framework`、`Arrange::framework` 与 `arrange`。随着工程正规化继续推进，`arrange` 的地位必须进一步明确。
 
-标准 Arrange 工程根目录不是 Node 项目，而是由 `arrange.config.ts`、`ui/`、`native/` 与 `artifacts/` 组成。若把 CLI 作为 `@arrange/framework` 的项目依赖，会迫使根目录承担 Node 项目职责，破坏工程边界。
+标准 Arrange 工程根目录不是 Node 项目，而是由 `arrange.config.yaml`、`ui/`、`native/` 与 `artifacts/` 组成。若把 CLI 作为 `@arrange/framework` 的项目依赖，会迫使根目录承担 Node 项目职责，破坏工程边界。
 
 ## 决策
 
@@ -22,7 +22,7 @@ Arrange::framework -> native framework target
 
 `Arrange::framework` 仍是 native 侧唯一公开 target。
 
-Arrange CLI 负责创建、收编、检查、开发、构建和打包 Arrange 工程，并把 `@arrange/framework` 写入 `ui/package.json`，把 `Arrange::framework` 写入或维护 native CMake 的 Arrange 区域。
+Arrange CLI 负责创建、收编、同步、开发、构建和打包 Arrange 工程，并把 `@arrange/framework` 写入 `ui/package.json`，把 `Arrange::framework` 写入或维护 native CMake 的 Arrange 区域。
 
 官方不再维护其它并列 CLI 或脚手架入口。
 
@@ -30,7 +30,7 @@ Arrange CLI 负责创建、收编、检查、开发、构建和打包 Arrange �
 
 - `create-arrange`、framework 内置 CLI、Vite 专用 CLI 等将被收埋，以后只用牢大。
 - 工程根目录不是 `Node 项目`，当然也更不会需要 `package.json`。
-- `arrange.config.ts` 是工程配置真源。
+- `arrange.config.yaml` 是工程配置真源。
 - `artifacts/` 是 Arrange CLI 负责整理的最终交付物目录。
 - 文档、demo 与后续实现应以 Arrange CLI 作为用户工程入口。
 
