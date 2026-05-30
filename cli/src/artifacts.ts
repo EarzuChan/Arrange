@@ -11,16 +11,36 @@ export function packageArtifacts(config: ArrangeConfig, root: string, args: {fla
         if (args.clean) rmSync(destination, {recursive: true, force: true})
         mkdirSync(destination, {recursive: true})
         const nativeArtifact = findNativeArtifact(config, root, args.flavor, product)
-        if (!nativeArtifact) throw new Error(`找不到 ${product} 的 ${args.flavor} native 产物。请先运行 arrange build。`)
-        cpSync(nativeArtifact, resolve(destination, basename(nativeArtifact)), {recursive: true})
-        written.push(relative(root, resolve(destination, basename(nativeArtifact))))
+        if (!nativeArtifact) throw missingArtifactError(config, root, args.flavor, product)
+        const nativeDestination = resolve(destination, basename(nativeArtifact))
+        cpSync(nativeArtifact, nativeDestination, {recursive: true})
+        written.push(relative(root, nativeDestination))
+
         const uiDist = resolve(root, config.ui.path, "dist")
         if (existsSync(uiDist)) {
-            cpSync(uiDist, resolve(destination, "ui"), {recursive: true})
-            written.push(relative(root, resolve(destination, "ui")))
+            const uiDestination = productUiDestination(destination, product, nativeDestination)
+            rmSync(uiDestination, {recursive: true, force: true})
+            mkdirSync(uiDestination, {recursive: true})
+            cpSync(uiDist, uiDestination, {recursive: true})
+            written.push(relative(root, uiDestination))
         }
     }
     return written
+}
+
+function productUiDestination(productDestination: string, product: Product, nativeDestination: string): string {
+    if (product === "vst3" || process.platform === "darwin" && nativeDestination.toLowerCase().endsWith(".app")) return resolve(nativeDestination, "Contents", "Resources", "ui")
+    return resolve(productDestination, "ui")
+}
+
+function missingArtifactError(config: ArrangeConfig, root: string, flavor: Flavor, product: Product): Error {
+    return new Error([
+        `Native artifact not found.`,
+        `  flavor: ${flavor}`,
+        `  product: ${product}`,
+        `Run: arrange build --native-only --flavor ${flavor} --product ${product}`,
+        `Build directory: ${cmakeBuildDir(config, root, flavor)}`,
+    ].join("\n"))
 }
 
 export function artifactProductDir(config: ArrangeConfig, root: string, flavor: Flavor, product: Product): string {

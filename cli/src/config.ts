@@ -1,5 +1,6 @@
 ﻿import {existsSync, readFileSync, writeFileSync} from "node:fs"
 import {resolve} from "node:path"
+import {parse as parseYamlSource, stringify as stringifyYamlValue} from "yaml"
 
 export type PluginType = "effect" | "instrument"
 export type Product = "standalone" | "vst3"
@@ -51,7 +52,7 @@ export function hasConfig(cwd = process.cwd()): boolean {
 
 export function readProjectConfig(cwd = process.cwd()): ArrangeConfig {
     const path = configPath(cwd)
-    if (!existsSync(path)) throw new Error(`当前目录没有 ${CONFIG_FILE}。请进入 Arrange 工程根，或运行 arrange create / arrange adopt。`)
+    if (!existsSync(path)) throw new Error(`No ${CONFIG_FILE} was found in the current directory. Run Arrange CLI from the Arrange project root.`)
     return normalizeConfig(parseYaml(readFileSync(path, "utf8")), path)
 }
 
@@ -102,10 +103,9 @@ export function defaultConfig(args: {
 }
 
 function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
-    const object = expectRecord(raw, `${path}`)
-    for (const key of Object.keys(object)) {
-        if (!topLevelKeys.has(key)) throw new Error(`${path}: 未知顶层字段 ${key}`)
-    }
+    const object = expectRecord(raw, path)
+    for (const key of Object.keys(object)) if (!topLevelKeys.has(key)) throw new Error(`${path}: unknown top-level field ${key}`)
+
     const arrange = expectRecord(object.arrange, "arrange")
     const project = expectRecord(object.project, "project")
     const ui = optionalRecord(object.ui)
@@ -120,22 +120,20 @@ function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
     assertKnownKeys(artifacts, "artifacts", ["path", "includeVersionDir"])
 
     const arrangeVersion = expectString(arrange.version, "arrange.version")
-    if (arrangeVersion === "latest") throw new Error("arrange.version 不能是 latest，必须是具体版本号。")
+    if (arrangeVersion === "latest") throw new Error("arrange.version must be a concrete version, not latest.")
 
     const projectVersion = expectString(project.version, "project.version")
-    if (!semverPattern.test(projectVersion)) throw new Error(`project.version 必须是 semver， got ${projectVersion}`)
+    if (!semverPattern.test(projectVersion)) throw new Error(`project.version must be semver; received ${projectVersion}`)
 
     const pluginType = (project.pluginType === undefined ? "effect" : expectString(project.pluginType, "project.pluginType")) as PluginType
-    if (!pluginTypes.has(pluginType)) throw new Error(`project.pluginType 只能是 effect 或 instrument，got ${pluginType}`)
+    if (!pluginTypes.has(pluginType)) throw new Error(`project.pluginType must be effect or instrument; received ${pluginType}`)
 
     const productList = project.products === undefined ? ["standalone", "vst3"] : expectStringArray(project.products, "project.products")
-    if (productList.length === 0) throw new Error("project.products 不能为空。")
-    for (const product of productList) {
-        if (!products.has(product)) throw new Error(`project.products 只支持 standalone 或 vst3，got ${product}`)
-    }
+    if (productList.length === 0) throw new Error("project.products must not be empty.")
+    for (const product of productList) if (!products.has(product)) throw new Error(`project.products only supports standalone or vst3; received ${product}`)
 
     const packageManager = (ui.packageManager === undefined ? "pnpm" : expectString(ui.packageManager, "ui.packageManager")) as PackageManager
-    if (!packageManagers.has(packageManager)) throw new Error(`ui.packageManager 只支持 pnpm 或 npm，got ${packageManager}`)
+    if (!packageManagers.has(packageManager)) throw new Error(`ui.packageManager only supports pnpm or npm; received ${packageManager}`)
 
     return {
         arrange: {version: arrangeVersion},
@@ -166,132 +164,49 @@ function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
 }
 
 export function stringifyConfig(config: ArrangeConfig): string {
-    return [
-        "arrange:",
-        `  version: ${config.arrange.version}`,
-        "",
-        "project:",
-        `  name: ${config.project.name}`,
-        `  version: ${config.project.version}`,
-        `  companyName: ${config.project.companyName}`,
-        `  companyCode: ${config.project.companyCode}`,
-        `  pluginCode: ${config.project.pluginCode}`,
-        `  pluginType: ${config.project.pluginType}`,
-        "  products:",
-        ...config.project.products.map((product) => `    - ${product}`),
-        "",
-        "ui:",
-        `  path: ${config.ui.path}`,
-        `  packageManager: ${config.ui.packageManager}`,
-        "",
-        "native:",
-        `  path: ${config.native.path}`,
-        "  cmake:",
-        `    buildDir: ${config.native.cmake.buildDir}`,
-        "",
-        "artifacts:",
-        `  path: ${config.artifacts.path}`,
-        `  includeVersionDir: ${config.artifacts.includeVersionDir}`,
-        "",
-    ].join("\n")
+    return stringifyYaml(config)
 }
 
 export function parseYaml(source: string): unknown {
-    const root: Record<string, unknown> = {}
-    const stack: Array<{indent: number; value: Record<string, unknown> | unknown[]}> = [{indent: -1, value: root}]
-    const lines = source.replace(/^\uFEFF/, "").split(/\r?\n/)
-    for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-        const original = stripComment(lines[lineNumber]).replace(/\s+$/, "")
-        if (!original.trim()) continue
-        const indent = original.match(/^ */)?.[0].length ?? 0
-        const text = original.trim()
-        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop()
-        const parent = stack[stack.length - 1].value
-        if (text.startsWith("- ")) {
-            if (!Array.isArray(parent)) throw new Error(`YAML 第 ${lineNumber + 1} 行不是有效列表项。`)
-            parent.push(parseScalar(text.slice(2).trim()))
-            continue
-        }
-        const match = /^(?<key>[A-Za-z][A-Za-z0-9]*):(?:\s*(?<value>.*))?$/.exec(text)
-        if (!match?.groups) throw new Error(`YAML 第 ${lineNumber + 1} 行无法解析：${lines[lineNumber]}`)
-        if (Array.isArray(parent)) throw new Error(`YAML 第 ${lineNumber + 1} 行不能在列表中定义对象字段。`)
-        const key = match.groups.key
-        const rawValue = match.groups.value ?? ""
-        if (rawValue === "") {
-            const next = nextMeaningfulLine(lines, lineNumber + 1)
-            const child: Record<string, unknown> | unknown[] = next && next.indent > indent && next.text.startsWith("- ") ? [] : {}
-            parent[key] = child
-            stack.push({indent, value: child})
-        } else {
-            parent[key] = parseScalar(rawValue)
-        }
+    try {
+        return parseYamlSource(source)
+    } catch (error) {
+        throw new Error(`YAML syntax error: ${error instanceof Error ? error.message : String(error)}`)
     }
-    return root
 }
 
-function nextMeaningfulLine(lines: string[], start: number): {indent: number; text: string} | null {
-    for (let index = start; index < lines.length; index++) {
-        const line = stripComment(lines[index]).replace(/\s+$/, "")
-        if (!line.trim()) continue
-        return {indent: line.match(/^ */)?.[0].length ?? 0, text: line.trim()}
-    }
-    return null
-}
-
-function stripComment(line: string): string {
-    let quote: string | null = null
-    for (let index = 0; index < line.length; index++) {
-        const char = line[index]
-        if ((char === '"' || char === "'") && line[index - 1] !== "\\") quote = quote === char ? null : quote ?? char
-        if (char === "#" && !quote) return line.slice(0, index)
-    }
-    return line
-}
-
-function parseScalar(value: string): unknown {
-    if (value === "true") return true
-    if (value === "false") return false
-    if (value === "[]") return []
-    if (value.startsWith("[") && value.endsWith("]")) {
-        const inner = value.slice(1, -1).trim()
-        if (!inner) return []
-        return inner.split(",").map((item) => parseScalar(item.trim()))
-    }
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-        if (value.startsWith('"')) return JSON.parse(value) as string
-        return value.slice(1, -1)
-    }
-    return value
+export function stringifyYaml(value: unknown): string {
+    return stringifyYamlValue(value, {lineWidth: 0})
 }
 
 export function expectRecord(value: unknown, label: string): Record<string, unknown> {
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} 必须是对象。`)
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`)
     return value as Record<string, unknown>
 }
 
 export function optionalRecord(value: unknown): Record<string, unknown> {
     if (value === undefined) return {}
-    return expectRecord(value, "配置项")
+    return expectRecord(value, "config item")
 }
 
 export function assertKnownKeys(value: Record<string, unknown>, label: string, allowed: readonly string[]): void {
     const allowedSet = new Set(allowed)
     for (const key of Object.keys(value)) {
-        if (!allowedSet.has(key)) throw new Error(`${label}: 未知字段 ${key}`)
+        if (!allowedSet.has(key)) throw new Error(`${label}: unknown field ${key}`)
     }
 }
 
 export function expectString(value: unknown, label: string): string {
-    if (typeof value !== "string" || value.length === 0) throw new Error(`${label} 必须是非空字符串。`)
+    if (typeof value !== "string" || value.length === 0) throw new Error(`${label} must be a non-empty string.`)
     return value
 }
 
 export function expectBoolean(value: unknown, label: string): boolean {
-    if (typeof value !== "boolean") throw new Error(`${label} 必须是 boolean。`)
+    if (typeof value !== "boolean") throw new Error(`${label} must be a boolean.`)
     return value
 }
 
 export function expectStringArray(value: unknown, label: string): string[] {
-    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`${label} 必须是字符串数组。`)
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`${label} must be an array of strings.`)
     return value as string[]
 }

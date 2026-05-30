@@ -6,11 +6,13 @@ import {dirname, resolve} from "node:path"
 import {defaultConfig, readProjectConfig, writeProjectConfig} from "../src/config.ts"
 import {ensureProjectFiles} from "../src/project.ts"
 import {normalizeViteArgs} from "../src/vite.ts"
-import {main} from "../src/main.ts"
-import {normalizeRegistryUrl, readInstalledFrameworkMetadata} from "../src/framework.ts"
+import {ensureDevStandalone, main} from "../src/main.ts"
+import {candidateIncompatibility, fetchFrameworkCandidates, normalizeRegistryUrl, readInstalledFrameworkMetadata} from "../src/framework.ts"
 import {readArrangeRegistryFromNpmrc} from "../src/package-resolve.ts"
 import {currentLocalPlatform, ensureToolchain, readLocalConfig, stringifyLocalConfig, writeLocalConfig, type LocalConfig} from "../src/local.ts"
 import {CLI_COMPATIBILITY} from "../src/constants.ts"
+import {findNativeArtifact, packageArtifacts} from "../src/artifacts.ts"
+import {ExternalCommandError, renderError} from "../src/errors.ts"
 
 test("config yaml roundtrips with defaults and strict validation", () => {
     const root = mkdtempSync(resolve(tmpdir(), "arrange-cli-"))
@@ -51,7 +53,7 @@ test("config rejects machine-local cmake fields", () => {
             "    generator: Ninja",
             "",
         ].join("\n"))
-        assert.throws(() => readProjectConfig(root), /native\.cmake: 未知字段 generator/)
+        assert.throws(() => readProjectConfig(root), /native\.cmake: unknown field generator/)
     } finally {
         rmSync(root, {recursive: true, force: true})
     }
@@ -145,7 +147,7 @@ test("toolchain uses arrange.local.yaml without accepting wrong package manager"
         if (platform === "windows") wrong.windows!.packageManager.command = npm
         else wrong.macos!.packageManager.command = npm
         writeLocalConfig(wrong, root)
-        await assert.rejects(() => ensureToolchain(config, root, {ui: true}), /当前工程要求 pnpm/)
+        await assert.rejects(() => ensureToolchain(config, root, {ui: true}), /This project requires pnpm/)
     } finally {
         rmSync(root, {recursive: true, force: true})
     }
@@ -231,7 +233,7 @@ test("toolchain refuses ambiguous discovered candidates without user choice", as
         writeTool(resolve(first, platform === "windows" ? "pnpm.cmd" : "pnpm"), platform)
         writeTool(resolve(second, platform === "windows" ? "pnpm.cmd" : "pnpm"), platform)
         process.env.PATH = `${first}${platform === "windows" ? ";" : ":"}${second}${platform === "windows" ? ";" : ":"}${systemPathForTest(platform)}`
-        await assert.rejects(() => ensureToolchain(config, root, {ui: true}, {interactive: false}), /找到多个 pnpm/)
+        await assert.rejects(() => ensureToolchain(config, root, {ui: true}, {interactive: false}), /Multiple pnpm/)
     } finally {
         process.env.PATH = oldPath
         rmSync(root, {recursive: true, force: true})
@@ -290,6 +292,43 @@ function writeFailingTool(path: string, platform: ReturnType<typeof currentLocal
         writeFileSync(path, "#!/bin/sh\nexit 1\n")
         chmodSync(path, 0o755)
     }
+}
+
+function writeFakeDevCmd(toolDir: string): string {
+    const devCmd = resolve(toolDir, "VsDevCmd.bat")
+    writeFileSync(devCmd, `@echo off\r\nset PATH=${toolDir};%PATH%\r\nexit /b 0\r\n`)
+    for (const tool of ["cl", "link", "lib", "rc", "mt"]) writeTool(resolve(toolDir, `${tool}.cmd`), "windows")
+    return devCmd
+}
+
+function writeFakeCmake(toolDir: string, platform: ReturnType<typeof currentLocalPlatform>, projectName: string): string {
+    const script = resolve(toolDir, "fake-cmake.cjs")
+    writeFileSync(script, [
+        "const fs = require('fs')",
+        "const path = require('path')",
+        "const args = process.argv.slice(2)",
+        "if (args.includes('--version')) process.exit(0)",
+        "const buildIndex = args.indexOf('--build')",
+        "if (buildIndex >= 0) {",
+        "  const buildDir = args[buildIndex + 1]",
+        "  const outDir = path.join(buildDir, 'fake-output')",
+        "  fs.mkdirSync(outDir, {recursive: true})",
+        platform === "windows"
+            ? `  fs.copyFileSync(process.execPath, path.join(outDir, ${JSON.stringify(`${projectName}.exe`)}))`
+            : platform === "macos"
+                ? `  fs.mkdirSync(path.join(outDir, ${JSON.stringify(`${projectName}.app`)}), {recursive: true})`
+                : `  fs.copyFileSync(process.execPath, path.join(outDir, ${JSON.stringify(projectName)}))`,
+        "}",
+        "process.exit(0)",
+        "",
+    ].join("\n"))
+    const command = resolve(toolDir, platform === "windows" ? "cmake.cmd" : "cmake")
+    if (platform === "windows") writeFileSync(command, `@echo off\r\n\"${process.execPath}\" \"${script}\" %*\r\n`)
+    else {
+        writeFileSync(command, `#!/bin/sh\n\"${process.execPath}\" \"${script}\" \"$@\"\n`)
+        chmodSync(command, 0o755)
+    }
+    return command
 }
 
 function testPathWithOnlyToolDir(toolDir: string, platform: ReturnType<typeof currentLocalPlatform>): string {
@@ -458,7 +497,7 @@ test("invalid config reports unknown top-level field", () => {
     const root = mkdtempSync(resolve(tmpdir(), "arrange-cli-"))
     try {
         writeFileSync(resolve(root, "arrange.config.yaml"), "bad: true\n")
-        assert.throws(() => readProjectConfig(root), /未知顶层字段 bad/)
+        assert.throws(() => readProjectConfig(root), /unknown top-level field bad/)
     } finally {
         rmSync(root, {recursive: true, force: true})
     }
@@ -480,8 +519,109 @@ test("invalid config reports unknown nested field", () => {
             "  surprise: nope",
             "",
         ].join("\n"))
-        assert.throws(() => readProjectConfig(root), /project: 未知字段 surprise/)
+        assert.throws(() => readProjectConfig(root), /project: unknown field surprise/)
     } finally {
         rmSync(root, {recursive: true, force: true})
     }
+})
+
+
+test("framework candidates keep latest and newest versions while marking incompatible manifests", async () => {
+    const oldFetch = globalThis.fetch
+    try {
+        globalThis.fetch = (async (url: string | URL | Request) => {
+            assert.equal(String(url), "http://registry.test/@arrange%2fframework")
+            return new Response(JSON.stringify({
+                "dist-tags": {latest: "0.0.0-m.2.1"},
+                time: {
+                    "0.0.0-m.2.0": "2026-05-28T00:00:00.000Z",
+                    "0.0.0-m.2.1": "2026-05-29T00:00:00.000Z",
+                    "0.0.0-m.2.2": "2026-05-30T00:00:00.000Z",
+                },
+                versions: {
+                    "0.0.0-m.2.0": {version: "0.0.0-m.2.0", arrange: {cliCompatibility: CLI_COMPATIBILITY - 1}},
+                    "0.0.0-m.2.1": {version: "0.0.0-m.2.1"},
+                    "0.0.0-m.2.2": {version: "0.0.0-m.2.2", arrange: {cliCompatibility: CLI_COMPATIBILITY}},
+                },
+            }), {status: 200, headers: {"content-type": "application/json"}})
+        }) as typeof fetch
+        const candidates = await fetchFrameworkCandidates(2, "http://registry.test")
+        assert.deepEqual(candidates.map((candidate) => candidate.version), ["0.0.0-m.2.1", "0.0.0-m.2.2", "0.0.0-m.2.1"])
+        assert.equal(candidateIncompatibility(candidates[0]), "incompatible: no compatibility code")
+        assert.equal(candidateIncompatibility(candidates[1]), null)
+    } finally {
+        globalThis.fetch = oldFetch
+    }
+})
+
+test("package puts VST3 UI resources under Contents/Resources/ui", () => {
+    const root = mkdtempSync(resolve(tmpdir(), "arrange-cli-"))
+    try {
+        const config = defaultConfig({
+            frameworkVersion: "0.0.0-m.2.2",
+            projectName: "MyPlugin",
+            projectVersion: "0.1.0",
+            companyName: "Company",
+            companyCode: "Comp",
+            pluginCode: "Plug",
+        })
+        const vst3 = resolve(root, "native/build/release/out/MyPlugin.vst3")
+        mkdirSync(resolve(vst3, "Contents"), {recursive: true})
+        mkdirSync(resolve(root, "ui/dist"), {recursive: true})
+        writeFileSync(resolve(root, "ui/dist/app.js"), "export {}\n")
+        const written = packageArtifacts(config, root, {flavor: "release", products: ["vst3"]})
+        const artifactRoot = written.find((item) => item.replace(/\\/g, "/").endsWith("MyPlugin.vst3/Contents/Resources/ui"))
+        assert.ok(artifactRoot)
+        assert.equal(readFileSync(resolve(root, artifactRoot!, "app.js"), "utf8"), "export {}\n")
+    } finally {
+        rmSync(root, {recursive: true, force: true})
+    }
+})
+
+test("dev builds the requested Standalone artifact when it is missing", async () => {
+    const root = mkdtempSync(resolve(tmpdir(), "arrange-cli-"))
+    try {
+        const platform = currentLocalPlatform()
+        const config = defaultConfig({
+            frameworkVersion: "0.0.0-m.2.2",
+            projectName: "MyPlugin",
+            projectVersion: "0.1.0",
+            companyName: "Company",
+            companyCode: "Comp",
+            pluginCode: "Plug",
+        })
+        assert.equal(findNativeArtifact(config, root, "debug", "standalone"), null)
+        const toolDir = resolve(root, "tools")
+        mkdirSync(toolDir, {recursive: true})
+        const cmake = writeFakeCmake(toolDir, platform, config.project.name)
+        const ninja = resolve(toolDir, platform === "windows" ? "ninja.cmd" : "ninja")
+        writeTool(ninja, platform)
+        const toolchain = platform === "windows"
+            ? {
+                platform,
+                shellCommand: "cmd.exe",
+                cmake: {command: cmake, generator: "Ninja", makeProgram: ninja, configureArgs: [], buildArgs: []},
+                msvc: {devCmd: writeFakeDevCmd(toolDir), arch: "x64", hostArch: "x64"},
+            }
+            : {
+                platform,
+                shellCommand: "/bin/zsh",
+                cmake: {command: cmake, generator: "Ninja", makeProgram: ninja, configureArgs: [], buildArgs: []},
+            }
+        await ensureDevStandalone(config, root, "debug", toolchain)
+        assert.ok(findNativeArtifact(config, root, "debug", "standalone"))
+    } finally {
+        rmSync(root, {recursive: true, force: true})
+    }
+})
+
+test("error renderer includes stack and external command diagnostics", () => {
+    const output = renderError(new ExternalCommandError("cmake failed", "cmake --build build", "C:/project", 1))
+    assert.match(output, /Arrange CLI failed/)
+    assert.match(output, /External command:/)
+    assert.match(output, /command: cmake --build build/)
+    assert.match(output, /cwd: C:\/project/)
+    assert.match(output, /exitCode: 1/)
+    assert.match(output, /ExternalCommandError: cmake failed/)
+    assert.equal(output.match(/ExternalCommandError: cmake failed/g)?.length, 1)
 })

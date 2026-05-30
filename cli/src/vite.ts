@@ -14,14 +14,14 @@ const CLI_PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
 type VitePackage = {bin: {vite: string} | string}
 
-export async function runVite(config: ArrangeConfig, command: "dev" | "build", args: string[] = [], toolchain?: ResolvedToolchain): Promise<void> {
+export async function runVite(config: ArrangeConfig, projectRoot: string, command: "dev" | "build", args: string[] = [], toolchain?: ResolvedToolchain): Promise<void> {
     const vitePackage = require("vite/package.json") as VitePackage
     const viteEntry = await import.meta.resolve("vite")
     const viteBinName = typeof vitePackage.bin === "string" ? vitePackage.bin : vitePackage.bin.vite
     const viteBin = resolve(dirname(fileURLToPath(viteEntry)), "..", "..", viteBinName)
     const tsxEntry = await import.meta.resolve("tsx")
     const nodeOptions = [process.env.NODE_OPTIONS, "--import", tsxEntry].filter(Boolean).join(" ")
-    const uiRoot = resolve(process.cwd(), config.ui.path)
+    const uiRoot = resolve(projectRoot, config.ui.path)
     const viteArgs = command === "dev" ? devArgs(uiRoot, args, true) : buildArgs(uiRoot, args, true)
     await runForward(process.execPath, [viteBin, ...viteArgs], {
         cwd: uiRoot,
@@ -44,9 +44,7 @@ function buildArgs(uiRoot: string, extra: string[], resolveFramework = true): st
 }
 
 function arrangeConfigFile(uiRoot: string, resolveFramework: boolean): string {
-    const arrangeViteEntry = resolveFramework
-        ? pathToFileURL(frameworkExportPath(uiRoot, "./vite")).href
-        : "@arrange/framework/vite"
+    const arrangeViteEntry = resolveFramework ? pathToFileURL(frameworkExportPath(uiRoot, "./vite")).href : "@arrange/framework/vite"
     const configPath = resolve(tmpdir(), `arrange-cli-vite-config-${process.pid}-${Date.now()}.mjs`)
     writeFileSync(configPath, [
         `import arrange from ${JSON.stringify(arrangeViteEntry)}`,
@@ -56,16 +54,13 @@ function arrangeConfigFile(uiRoot: string, resolveFramework: boolean): string {
     return configPath
 }
 
-export async function spawnNativeStandalone(config: ArrangeConfig, flavor: Flavor, toolchain?: ResolvedToolchain): Promise<void> {
-    const executable = await findStandaloneExecutable(config, flavor)
-    if (!executable) {
-        console.log("未找到 native Standalone 产物；请先运行 arrange build --native-only 或使用宿主加载插件。")
-        return
-    }
+export async function spawnNativeStandalone(config: ArrangeConfig, projectRoot: string, flavor: Flavor, toolchain?: ResolvedToolchain): Promise<void> {
+    const executable = await findStandaloneExecutable(config, projectRoot, flavor)
+    if (!executable) throw new Error(`No ${flavor} Standalone artifact was found. Run arrange build --native-only --flavor ${flavor} --product standalone.`)
     await runForward(executable, [], {cwd: dirname(executable), env: process.env, toolchain, msvc: true, label: "native Standalone"})
 }
 
-async function findStandaloneExecutable(config: ArrangeConfig, flavor: Flavor): Promise<string | null> {
+async function findStandaloneExecutable(config: ArrangeConfig, projectRoot: string, flavor: Flavor): Promise<string | null> {
     const {findNativeArtifact} = await import("./artifacts.ts")
-    return findNativeArtifact(config, process.cwd(), flavor, "standalone")
+    return findNativeArtifact(config, projectRoot, flavor, "standalone")
 }

@@ -21,9 +21,7 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
     const mainPath = resolve(srcDir, "main.ts")
     const appPath = resolve(srcDir, "App.vue")
     const changes: string[] = []
-    const manifest = existsSync(packagePath)
-        ? JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown>
-        : {name: packageName(config.project.name), private: true, type: "module"}
+    const manifest = existsSync(packagePath) ? JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown> : {name: packageName(config.project.name), private: true, type: "module"}
     const dependencies = asRecord(manifest.dependencies)
     if (dependencies["@arrange/framework"] !== config.arrange.version) {
         dependencies["@arrange/framework"] = config.arrange.version
@@ -90,8 +88,8 @@ export function ensureNativeProject(config: ArrangeConfig, root: string, check: 
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            console.error(`${relative(root, cmakePath)} 受控区域损坏，已跳过该文件：${message}`)
-            console.error("请修复对应的 # arrange:begin ... / # arrange:end ... 注释后重新运行 arrange sync。")
+            console.error(`${relative(root, cmakePath)} has a damaged managed region and was skipped: ${message}`)
+            console.error("Fix the matching # arrange:begin ... / # arrange:end ... comments, then rerun arrange sync.")
         }
     }
     if (!check) {
@@ -137,7 +135,7 @@ function replaceRegion(source: string, name: string, body: string): string {
     const beginIndex = source.indexOf(begin)
     const endIndex = source.indexOf(end)
     if (beginIndex === -1 && endIndex === -1) return `${source.replace(/\s*$/, "\n\n")}${managedRegion(name, body)}\n`
-    if (beginIndex === -1 || endIndex === -1 || endIndex < beginIndex) throw new Error(`CMake managed region ${name} 损坏，请修复 ${begin} / ${end}。`)
+    if (beginIndex === -1 || endIndex === -1 || endIndex < beginIndex) throw new Error(`CMake managed region ${name} is damaged. Fix ${begin} / ${end}.`)
     const endLine = source.indexOf("\n", endIndex)
     const after = endLine === -1 ? source.length : endLine + 1
     return `${source.slice(0, beginIndex)}${managedRegion(name, body)}\n${source.slice(after)}`

@@ -1,9 +1,10 @@
 ﻿import {mkdirSync} from "node:fs"
 import {resolve} from "node:path"
-import {packageArtifacts} from "./artifacts.ts"
-import type {Flavor, Product} from "./config.ts"
+import {packageArtifacts, findNativeArtifact} from "./artifacts.ts"
+import type {ArrangeConfig, Flavor, Product} from "./config.ts"
 import {hasConfig, readProjectConfig} from "./config.ts"
 import {CLI_COMPATIBILITY, CLI_VERSION} from "./constants.ts"
+import {renderError} from "./errors.ts"
 import {assertCompatible, fetchFrameworkMetadata, readInstalledFrameworkMetadata} from "./framework.ts"
 import {adoptProject, createProject} from "./wizard.ts"
 import {cmakeBuildArgs, cmakeConfigureArgs, ensureProjectFiles} from "./project.ts"
@@ -15,6 +16,11 @@ import {ensureToolchain, type ResolvedToolchain} from "./local.ts"
 export type CliResult = {exitCode: number}
 
 type Parsed = {command: string; flags: Map<string, string[]>; positionals: string[]}
+
+type ProjectContext = {
+    root: string
+    config: ArrangeConfig
+}
 
 export async function main(argv = process.argv.slice(2)): Promise<CliResult> {
     try {
@@ -50,10 +56,10 @@ export async function main(argv = process.argv.slice(2)): Promise<CliResult> {
                 await packageOnly(parsed)
                 return {exitCode: 0}
             default:
-                throw new Error(`未知命令：${parsed.command}\n运行 arrange --help 查看用法。`)
+                throw new Error(`Unknown command: ${parsed.command}\nRun arrange --help for usage.`)
         }
     } catch (error) {
-        console.error(error instanceof Error ? error.message : String(error))
+        console.error(renderError(error))
         return {exitCode: 1}
     }
 }
@@ -62,8 +68,8 @@ function help(): CliResult {
     console.log(`Arrange CLI ${CLI_VERSION} (cliCompatibility ${CLI_COMPATIBILITY})
 
 Usage:
-  arrange create [--registry http://localhost:4873]
-  arrange adopt [--registry http://localhost:4873]
+  arrange create [--registry <YOUR_BASE_URL>]
+  arrange adopt [--registry <YOUR_BASE_URL>]
   arrange sync [--project-only|--toolchain-only] [--ui|--native] [--check]
   arrange dev [--ui-only|--native-only] [--flavor debug|release]
   arrange build [--flavor debug|release] [--ui-only|--native-only] [--no-package] [--product standalone|vst3] [--clean]
@@ -71,141 +77,6 @@ Usage:
   arrange --version
 `)
     return {exitCode: 0}
-}
-
-function optionalFlag(parsed: Parsed, name: string): string | undefined {
-    const values = parsed.flags.get(name) ?? []
-    if (values.length > 1) throw new Error(`--${name} 只能出现一次。`)
-    return values.at(-1)
-}
-
-function assertFlags(parsed: Parsed, allowed: readonly string[]): void {
-    if (parsed.positionals.length > 0) throw new Error(`${parsed.command} 不接收位置参数：${parsed.positionals.join(" ")}`)
-    const allowedSet = new Set(allowed)
-    for (const flag of parsed.flags.keys()) {
-        if (!allowedSet.has(flag)) throw new Error(`${parsed.command} 不支持参数 --${flag}。运行 arrange --help 查看用法。`)
-    }
-}
-
-async function sync(parsed: Parsed): Promise<void> {
-    const config = await loadAndCheckProject()
-    const projectOnly = parsed.flags.has("project-only")
-    const toolchainOnly = parsed.flags.has("toolchain-only")
-    const check = parsed.flags.has("check")
-    if (projectOnly && toolchainOnly) throw new Error("--project-only 与 --toolchain-only 互斥。")
-    const scope = scopeOf(parsed)
-    if (!toolchainOnly) {
-        const changed = ensureProjectFiles(config, process.cwd(), {scope, check})
-        if (changed.length) console.log(`${check ? "需要更新" : "已更新"}: ${changed.join(", ")}`)
-        else console.log("project sync 无需更新。")
-    }
-    if (!projectOnly && check) {
-        await ensureToolchain(config, process.cwd(), {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"}, {interactive: false, write: false})
-        console.log("toolchain check 通过。")
-    }
-    if (!projectOnly && !check) {
-        const toolchain = await ensureToolchain(config, process.cwd(), {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"})
-        if (scope === "all" || scope === "ui") await run(toolchain.packageManagerCommand!, ["install"], {cwd: resolve(process.cwd(), config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
-        if (scope === "all" || scope === "native") await configureNative(config, "debug", toolchain)
-    }
-}
-
-async function dev(parsed: Parsed): Promise<void> {
-    const config = await loadAndCheckProject()
-    const flavor = flavorOf(parsed, "debug")
-    const uiOnly = parsed.flags.has("ui-only")
-    const nativeOnly = parsed.flags.has("native-only")
-    if (uiOnly && nativeOnly) throw new Error("--ui-only 与 --native-only 互斥。")
-    const toolchain = await ensureToolchain(config, process.cwd(), {ui: !nativeOnly, native: !uiOnly})
-    if (nativeOnly) {
-        await spawnNativeStandalone(config, flavor, toolchain)
-        return
-    }
-    if (uiOnly) {
-        await runVite(config, "dev", [], toolchain)
-        return
-    }
-    await Promise.all([
-        runVite(config, "dev", [], toolchain),
-        spawnNativeStandalone(config, flavor, toolchain),
-    ])
-}
-
-async function build(parsed: Parsed): Promise<void> {
-    const flavor = flavorOf(parsed, "release")
-    const uiOnly = parsed.flags.has("ui-only")
-    const nativeOnly = parsed.flags.has("native-only")
-    if (uiOnly && nativeOnly) throw new Error("--ui-only 与 --native-only 互斥。")
-    if (parsed.flags.has("clean") && (uiOnly || nativeOnly || parsed.flags.has("no-package"))) {
-        throw new Error("--clean 只在完整 build 并整理 artifacts 时可用。")
-    }
-    const config = await loadAndCheckProject()
-    const products = productsOf(parsed, config.project.products)
-    const toolchain = await ensureToolchain(config, process.cwd(), {ui: !nativeOnly, native: !uiOnly})
-    if (!nativeOnly) await runVite(config, "build", [], toolchain)
-    if (!uiOnly) {
-        await configureNative(config, flavor, toolchain)
-        await buildNative(config, flavor, products, toolchain)
-    }
-    if (!uiOnly && !nativeOnly && !parsed.flags.has("no-package")) {
-        const written = packageArtifacts(config, process.cwd(), {flavor, products, clean: parsed.flags.has("clean")})
-        console.log(`已整理 artifacts: ${written.join(", ")}`)
-    }
-}
-
-async function packageOnly(parsed: Parsed): Promise<void> {
-    const config = await loadAndCheckProject()
-    const flavor = flavorOf(parsed, "release")
-    const products = productsOf(parsed, config.project.products)
-    const written = packageArtifacts(config, process.cwd(), {flavor, products, clean: parsed.flags.has("clean")})
-    console.log(`已整理 artifacts: ${written.join(", ")}`)
-}
-
-async function loadAndCheckProject() {
-    if (!hasConfig()) throw new Error("当前目录没有 arrange.config.yaml。既有工程命令必须在 Arrange 工程根执行。")
-    const config = readProjectConfig()
-    const uiRoot = resolve(process.cwd(), config.ui.path)
-    const metadata = readInstalledFrameworkMetadata(process.cwd(), config.ui.path)
-        ?? await fetchFrameworkMetadata(config.arrange.version, readArrangeRegistryFromNpmrc(uiRoot))
-    assertCompatible(metadata)
-    return config
-}
-
-async function configureNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
-    if (!toolchain.cmake) throw new Error("native configure 需要 CMake，但本机工具链未提供。")
-    mkdirSync(resolve(process.cwd(), config.native.path, config.native.cmake.buildDir, flavor), {recursive: true})
-    await run(toolchain.cmake.command, cmakeConfigureArgs(config, process.cwd(), flavor, toolchain.cmake), {toolchain, msvc: true, label: "cmake configure"})
-}
-
-async function buildNative(config: ReturnType<typeof readProjectConfig>, flavor: Flavor, products: Product[], toolchain: ResolvedToolchain): Promise<void> {
-    if (!toolchain.cmake) throw new Error("native build 需要 CMake，但本机工具链未提供。")
-    const targets = products.map((product) => `${config.project.name}_${product === "standalone" ? "Standalone" : "VST3"}`)
-    for (const target of targets) await run(toolchain.cmake.command, [...cmakeBuildArgs(config, process.cwd(), flavor, toolchain.cmake), "--target", target], {toolchain, msvc: true, label: `cmake build ${target}`})
-}
-
-function scopeOf(parsed: Parsed): "all" | "ui" | "native" {
-    const ui = parsed.flags.has("ui")
-    const native = parsed.flags.has("native")
-    if (ui && native) throw new Error("--ui 与 --native 互斥。")
-    return ui ? "ui" : native ? "native" : "all"
-}
-
-function flavorOf(parsed: Parsed, defaultFlavor: Flavor): Flavor {
-    const raw = parsed.flags.get("flavor")?.at(-1)
-    if (!raw) return defaultFlavor
-    if (raw !== "debug" && raw !== "release") throw new Error("--flavor 只能是 debug 或 release。")
-    return raw
-}
-
-function productsOf(parsed: Parsed, defaults: Product[]): Product[] {
-    const raw = parsed.flags.get("product") ?? []
-    if (raw.length === 0) return defaults
-    const result: Product[] = []
-    for (const item of raw) {
-        if (item !== "standalone" && item !== "vst3") throw new Error("--product 只能是 standalone 或 vst3。")
-        result.push(item)
-    }
-    return result
 }
 
 export function parse(argv: string[]): Parsed {
@@ -221,10 +92,180 @@ export function parse(argv: string[]): Parsed {
         const name = arg.slice(2)
         const takesValue = name === "flavor" || name === "product" || name === "registry"
         const value = takesValue ? rest[++index] : "true"
-        if (takesValue && (!value || value.startsWith("--"))) throw new Error(`--${name} 需要参数。`)
+        if (takesValue && (!value || value.startsWith("--"))) throw new Error(`--${name} requires a value.`)
         const values = flags.get(name) ?? []
         values.push(value)
         flags.set(name, values)
     }
     return {command, flags, positionals}
+}
+
+function optionalFlag(parsed: Parsed, name: string): string | undefined {
+    const values = parsed.flags.get(name) ?? []
+    if (values.length > 1) throw new Error(`--${name} may only be provided once.`)
+    return values.at(-1)
+}
+
+function assertFlags(parsed: Parsed, allowed: readonly string[]): void {
+    if (parsed.positionals.length > 0) throw new Error(`${parsed.command} does not accept positional arguments: ${parsed.positionals.join(" ")}`)
+    const allowedSet = new Set(allowed)
+    for (const flag of parsed.flags.keys()) if (!allowedSet.has(flag)) throw new Error(`${parsed.command} does not support --${flag}. Run arrange --help for usage.`)
+}
+
+function scopeOf(parsed: Parsed): "all" | "ui" | "native" {
+    const ui = parsed.flags.has("ui")
+    const native = parsed.flags.has("native")
+    if (ui && native) throw new Error("--ui and --native are mutually exclusive.")
+    return ui ? "ui" : native ? "native" : "all"
+}
+
+function flavorOf(parsed: Parsed, defaultFlavor: Flavor): Flavor {
+    const raw = parsed.flags.get("flavor")?.at(-1)
+    if (!raw) return defaultFlavor
+    if (raw !== "debug" && raw !== "release") throw new Error("--flavor must be debug or release.")
+    return raw
+}
+
+function productsOf(parsed: Parsed, defaults: Product[]): Product[] {
+    const raw = parsed.flags.get("product") ?? []
+    if (raw.length === 0) return defaults
+    const result: Product[] = []
+    for (const item of raw) {
+        if (item !== "standalone" && item !== "vst3") throw new Error("--product must be standalone or vst3.")
+        result.push(item)
+    }
+    return result
+}
+
+// CMD IMPLs
+
+async function sync(parsed: Parsed): Promise<void> {
+    const {root, config} = await loadAndCheckProject()
+    const projectOnly = parsed.flags.has("project-only")
+    const toolchainOnly = parsed.flags.has("toolchain-only")
+    const check = parsed.flags.has("check")
+    if (projectOnly && toolchainOnly) throw new Error("--project-only and --toolchain-only are mutually exclusive.")
+    const scope = scopeOf(parsed)
+    if (!toolchainOnly) {
+        const changed = ensureProjectFiles(config, root, {scope, check})
+        reportProjectSync(changed, check)
+    }
+    if (!projectOnly && check) {
+        await ensureToolchain(config, root, {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"}, {interactive: false, write: false})
+        console.log("Toolchain check passed.")
+    }
+    if (!projectOnly && !check) {
+        const toolchain = await ensureToolchain(config, root, {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"})
+        if (scope === "all" || scope === "ui") await run(toolchain.packageManagerCommand!, ["install"], {cwd: resolve(root, config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
+        if (scope === "all" || scope === "native") await configureNative(config, root, "debug", toolchain)
+    }
+}
+
+async function dev(parsed: Parsed): Promise<void> {
+    const {root, config} = await loadAndCheckProject()
+    const flavor = flavorOf(parsed, "debug")
+    const uiOnly = parsed.flags.has("ui-only")
+    const nativeOnly = parsed.flags.has("native-only")
+    if (uiOnly && nativeOnly) throw new Error("--ui-only and --native-only are mutually exclusive.")
+    const toolchain = await ensureToolchain(config, root, {ui: !nativeOnly, native: !uiOnly})
+    if (!uiOnly) await ensureDevStandalone(config, root, flavor, toolchain)
+    if (nativeOnly) {
+        await spawnNativeStandalone(config, root, flavor, toolchain)
+        return
+    }
+    if (uiOnly) {
+        await runVite(config, root, "dev", [], toolchain)
+        return
+    }
+    await Promise.all([
+        runVite(config, root, "dev", [], toolchain),
+        spawnNativeStandalone(config, root, flavor, toolchain),
+    ])
+}
+
+async function build(parsed: Parsed): Promise<void> {
+    const flavor = flavorOf(parsed, "release")
+    const uiOnly = parsed.flags.has("ui-only")
+    const nativeOnly = parsed.flags.has("native-only")
+    if (uiOnly && nativeOnly) throw new Error("--ui-only and --native-only are mutually exclusive.")
+    if (parsed.flags.has("clean") && (uiOnly || nativeOnly || parsed.flags.has("no-package"))) throw new Error("--clean is only valid for a full build that also packages artifacts.")
+    const {root, config} = await loadAndCheckProject()
+    const products = productsOf(parsed, config.project.products)
+    const toolchain = await ensureToolchain(config, root, {ui: !nativeOnly, native: !uiOnly})
+    if (!nativeOnly) await runVite(config, root, "build", [], toolchain)
+    if (!uiOnly) {
+        await configureNative(config, root, flavor, toolchain)
+        await buildNative(config, root, flavor, products, toolchain)
+    }
+    if (!uiOnly && !nativeOnly && !parsed.flags.has("no-package")) {
+        const written = packageArtifacts(config, root, {flavor, products, clean: parsed.flags.has("clean")})
+        reportArtifacts(written)
+    }
+}
+
+async function packageOnly(parsed: Parsed): Promise<void> {
+    const {root, config} = await loadAndCheckProject()
+    const flavor = flavorOf(parsed, "release")
+    const products = productsOf(parsed, config.project.products)
+    const written = packageArtifacts(config, root, {flavor, products, clean: parsed.flags.has("clean")})
+    reportArtifacts(written)
+}
+
+async function loadAndCheckProject(): Promise<ProjectContext> {
+    const root = process.cwd()
+    if (!hasConfig(root)) throw new Error("No arrange.config.yaml was found in the current directory. Existing project commands must be run from the Arrange project root.")
+
+    const config = readProjectConfig(root)
+    const uiRoot = resolve(root, config.ui.path)
+    const metadata = readInstalledFrameworkMetadata(root, config.ui.path) ?? await fetchFrameworkMetadata(config.arrange.version, readArrangeRegistryFromNpmrc(uiRoot))
+
+    assertCompatible(metadata)
+    return {root, config}
+}
+
+export async function ensureDevStandalone(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
+    if (findNativeArtifact(config, root, flavor, "standalone")) return
+    console.log(`No ${flavor} Standalone artifact was found. Building it before starting dev.`)
+    await configureNative(config, root, flavor, toolchain)
+    await buildNative(config, root, flavor, ["standalone"], toolchain)
+}
+
+async function configureNative(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
+    if (!toolchain.cmake) throw new Error("Native configure requires CMake, but the local toolchain does not provide it.")
+    mkdirSync(resolve(root, config.native.path, config.native.cmake.buildDir, flavor), {recursive: true})
+    await run(toolchain.cmake.command, cmakeConfigureArgs(config, root, flavor, toolchain.cmake), {cwd: root, toolchain, msvc: true, label: "cmake configure"})
+}
+
+async function buildNative(config: ArrangeConfig, root: string, flavor: Flavor, products: Product[], toolchain: ResolvedToolchain): Promise<void> {
+    if (!toolchain.cmake) throw new Error("Native build requires CMake, but the local toolchain does not provide it.")
+    const targets = products.map((product) => `${config.project.name}_${product === "standalone" ? "Standalone" : "VST3"}`)
+    for (const target of targets) await run(toolchain.cmake.command, [...cmakeBuildArgs(config, root, flavor, toolchain.cmake), "--target", target], {cwd: root, toolchain, msvc: true, label: `cmake build ${target}`})
+}
+
+function reportProjectSync(changed: string[], check: boolean): void {
+    if (changed.length === 0) {
+        console.log("Project sync: no project file updates needed.")
+        return
+    }
+
+    console.log(check ? "Project sync check: updates are needed:" : "Project sync updated:")
+    for (const item of changed) console.log(`  ${describeProjectChange(item)}`)
+}
+
+function describeProjectChange(item: string): string {
+    const normalized = item.replace(/\\/g, "/")
+    if (normalized.endsWith("CMakeLists.txt")) return `${item} (managed regions: fetchcontent, link-framework)`
+    if (normalized.endsWith("package.json")) return `${item} (dependencies: @arrange/framework)`
+    if (normalized.endsWith(".npmrc")) return `${item} (@arrange registry scope)`
+    return item
+}
+
+function reportArtifacts(written: string[]): void {
+    if (written.length === 0) {
+        console.log("Artifacts: nothing copied.")
+        return
+    }
+
+    console.log("Artifacts written:")
+    for (const item of written) console.log(`  ${item}`)
 }

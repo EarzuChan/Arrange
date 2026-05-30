@@ -2,6 +2,7 @@ import {spawn, spawnSync} from "node:child_process"
 import {existsSync} from "node:fs"
 import {extname, resolve} from "node:path"
 import type {ResolvedToolchain} from "./local.ts"
+import {ExternalCommandError} from "./errors.ts"
 
 export type RunOptions = {
     cwd?: string
@@ -22,10 +23,10 @@ export function run(command: string, args: readonly string[], options: RunOption
             shell: false,
             windowsVerbatimArguments: invocation.windowsVerbatimArguments,
         })
-        child.on("error", (error) => reject(new Error(formatSpawnError(error, invocation.display))))
+        child.on("error", (error) => reject(new ExternalCommandError(formatSpawnError(error, invocation.display), invocation.display, options.cwd ?? process.cwd())))
         child.on("exit", (code) => {
             if (code === 0 || options.allowFailure) resolvePromise()
-            else reject(new Error(`${invocation.display} 执行失败，退出码 ${code}。`))
+            else reject(new ExternalCommandError(`${invocation.display} failed with exit code ${code}.`, invocation.display, options.cwd ?? process.cwd(), code))
         })
     })
 }
@@ -59,12 +60,12 @@ export function runForward(command: string, args: readonly string[], options: Ru
         }
         child.on("error", (error) => {
             cleanupSignals()
-            reject(new Error(formatSpawnError(error, invocation.display)))
+            reject(new ExternalCommandError(formatSpawnError(error, invocation.display), invocation.display, options.cwd ?? process.cwd()))
         })
         child.on("exit", (code, signal) => {
             cleanupSignals()
-            if (typeof code === "number" && code !== 0) reject(new Error(`${invocation.display} 执行失败，退出码 ${code}。`))
-            else if (signal) reject(new Error(`${invocation.display} 被信号 ${signal} 终止。`))
+            if (typeof code === "number" && code !== 0) reject(new ExternalCommandError(`${invocation.display} failed with exit code ${code}.`, invocation.display, options.cwd ?? process.cwd(), code))
+            else if (signal) reject(new ExternalCommandError(`${invocation.display} was terminated by signal ${signal}.`, invocation.display, options.cwd ?? process.cwd()))
             else resolvePromise()
         })
     })
@@ -80,10 +81,10 @@ export function runQuiet(command: string, args: readonly string[], options: RunO
             shell: false,
             windowsVerbatimArguments: invocation.windowsVerbatimArguments,
         })
-        child.on("error", (error) => reject(new Error(formatSpawnError(error, invocation.display))))
+        child.on("error", (error) => reject(new ExternalCommandError(formatSpawnError(error, invocation.display), invocation.display, options.cwd ?? process.cwd())))
         child.on("exit", (code) => {
             if (code === 0 || options.allowFailure) resolvePromise()
-            else reject(new Error(`${invocation.display} 验证失败，退出码 ${code}。`))
+            else reject(new ExternalCommandError(`${invocation.display} verification failed with exit code ${code}.`, invocation.display, options.cwd ?? process.cwd(), code))
         })
     })
 }
@@ -106,7 +107,7 @@ function createInvocation(command: string, args: readonly string[], options: Run
     const toolchain = options.toolchain
     if (process.platform === "win32") {
         if (options.msvc) {
-            if (!toolchain?.msvc) throw new Error("native 命令需要 MSVC 环境，但 arrange.local.yaml 缺少 windows.msvc。")
+            if (!toolchain?.msvc) throw new Error("Native commands require an MSVC environment, but arrange.local.yaml does not define windows.msvc.")
             return {
                 command: toolchain.shellCommand,
                 args: ["/d", "/s", "/c", commandLine([
@@ -153,10 +154,10 @@ function commandDisplay(command: string, args: readonly string[]): string {
 }
 
 function formatSpawnError(error: NodeJS.ErrnoException, display: string): string {
-    if (error.code === "ENOENT") return `${display} 启动失败：找不到命令或文件。请检查 arrange.local.yaml 中的工具路径。`
-    if (error.code === "EINVAL") return `${display} 启动失败：命令行参数无效。请检查工具路径与参数是否被错误拼接。`
-    if (error.code === "EACCES") return `${display} 启动失败：没有执行权限。请检查工具路径与权限。`
-    return `${display} 启动失败：系统无法启动该命令${error.code ? `（${error.code}）` : ""}。请检查工具路径、权限与本机环境。`
+    if (error.code === "ENOENT") return `${display} failed to start: command or file not found. Check the tool path in arrange.local.yaml.`
+    if (error.code === "EINVAL") return `${display} failed to start: invalid command line. Check tool paths and arguments in arrange.local.yaml.`
+    if (error.code === "EACCES") return `${display} failed to start: permission denied. Check the tool path and file permissions.`
+    return `${display} failed to start${error.code ? ` (${error.code})` : ""}. Check tool paths, permissions, and the local environment.`
 }
 
 export function platformArch(): string {

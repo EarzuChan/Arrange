@@ -1,4 +1,4 @@
-import {resolve} from "node:path"
+﻿import {resolve} from "node:path"
 import {CLI_COMPATIBILITY} from "./constants.ts"
 import {readFrameworkPackageJson} from "./package-resolve.ts"
 
@@ -7,9 +7,12 @@ export type FrameworkMetadata = {
     cliCompatibility: number
 }
 
-export type FrameworkVersionCandidate = FrameworkMetadata & {
+export type FrameworkVersionCandidate = {
+    version: string
+    cliCompatibility: number | null
     latest: boolean
     stable: boolean
+    publishedAt: string | null
 }
 
 export function normalizeRegistryUrl(registry?: string): string {
@@ -25,49 +28,64 @@ export async function fetchFrameworkMetadata(version: string, registry?: string)
     const registryUrl = normalizeRegistryUrl(registry)
     const url = `${registryUrl}/@arrange%2fframework/${encodeURIComponent(version)}`
     const response = await fetch(url, {headers: {Accept: "application/json"}})
-    if (!response.ok) throw new Error(`无法从 npm registry ${registryUrl} 读取 @arrange/framework@${version}: HTTP ${response.status}`)
+    if (!response.ok) throw new Error(`Cannot read @arrange/framework@${version} from ${registryUrl}: HTTP ${response.status}`)
     const json = await response.json() as {version?: unknown; arrange?: {cliCompatibility?: unknown}}
     const actualVersion = typeof json.version === "string" ? json.version : version
     const compatibility = json.arrange?.cliCompatibility
     if (typeof compatibility !== "number" || !Number.isInteger(compatibility)) {
-        throw new Error(`@arrange/framework@${actualVersion} 缺少 arrange.cliCompatibility。`)
+        throw new Error(`@arrange/framework@${actualVersion} does not declare arrange.cliCompatibility.`)
     }
     return {version: actualVersion, cliCompatibility: compatibility}
 }
 
-export async function fetchFrameworkCandidates(limit = 6, registry?: string): Promise<FrameworkVersionCandidate[]> {
+export async function fetchFrameworkCandidates(recentLimit = 5, registry?: string): Promise<FrameworkVersionCandidate[]> {
     const registryUrl = normalizeRegistryUrl(registry)
     const response = await fetch(`${registryUrl}/@arrange%2fframework`, {headers: {Accept: "application/json"}})
-    if (!response.ok) throw new Error(`无法从 npm registry ${registryUrl} 读取 @arrange/framework packument: HTTP ${response.status}`)
+    if (!response.ok) throw new Error(`Cannot read @arrange/framework packument from ${registryUrl}: HTTP ${response.status}`)
     const json = await response.json() as {
         "dist-tags"?: Record<string, string>
-        versions?: Record<string, {version?: string; arrange?: {cliCompatibility?: number}}>
+        time?: Record<string, string>
+        versions?: Record<string, {version?: string; arrange?: {cliCompatibility?: unknown}}>
     }
     const latest = json["dist-tags"]?.latest
     const versions = Object.values(json.versions ?? {})
-        .map((manifest) => {
-            const version = manifest.version
-            const compatibility = manifest.arrange?.cliCompatibility
-            if (typeof version !== "string" || typeof compatibility !== "number" || !Number.isInteger(compatibility)) return null
-            return {version, cliCompatibility: compatibility, latest: version === latest, stable: !version.includes("-")}
-        })
+        .map((manifest) => toCandidate(manifest, latest, json.time))
         .filter((item): item is FrameworkVersionCandidate => item !== null)
-        .sort((a, b) => b.version.localeCompare(a.version, undefined, {numeric: true, sensitivity: "base"}))
+    const byPublishedTime = [...versions].sort((a, b) => comparePublishedTimeDesc(a, b))
     const selected: FrameworkVersionCandidate[] = []
-    const latestCandidate = versions.find((item) => item.latest)
-    if (latestCandidate) selected.push(latestCandidate)
-    for (const candidate of versions) {
-        if (selected.some((item) => item.version === candidate.version)) continue
-        selected.push(candidate)
-        if (selected.length >= limit) break
-    }
+    const latestCandidate = latest ? versions.find((item) => item.version === latest) : undefined
+    if (latestCandidate) selected.push({...latestCandidate, latest: true})
+    selected.push(...byPublishedTime.slice(0, recentLimit).map((item) => ({...item, latest: item.version === latest})))
     return selected
 }
 
-export function assertCompatible(metadata: FrameworkMetadata): void {
-    if (metadata.cliCompatibility !== CLI_COMPATIBILITY) {
-        throw new Error(`CLI 兼容性不一致：当前 CLI 是 ${CLI_COMPATIBILITY}，@arrange/framework@${metadata.version} 是 ${metadata.cliCompatibility}。`)
+function toCandidate(manifest: {version?: string; arrange?: {cliCompatibility?: unknown}}, latest: string | undefined, time: Record<string, string> | undefined): FrameworkVersionCandidate | null {
+    if (typeof manifest.version !== "string") return null
+    const compatibility = manifest.arrange?.cliCompatibility
+    return {
+        version: manifest.version,
+        cliCompatibility: typeof compatibility === "number" && Number.isInteger(compatibility) ? compatibility : null,
+        latest: manifest.version === latest,
+        stable: !manifest.version.includes("-"),
+        publishedAt: time?.[manifest.version] ?? null,
     }
+}
+
+function comparePublishedTimeDesc(a: FrameworkVersionCandidate, b: FrameworkVersionCandidate): number {
+    const aTime = a.publishedAt ? Date.parse(a.publishedAt) : 0
+    const bTime = b.publishedAt ? Date.parse(b.publishedAt) : 0
+    if (aTime !== bTime) return bTime - aTime
+    return b.version.localeCompare(a.version, undefined, {numeric: true, sensitivity: "base"})
+}
+
+export function candidateIncompatibility(candidate: FrameworkVersionCandidate): string | null {
+    if (candidate.cliCompatibility === null) return "incompatible: no compatibility code"
+    if (candidate.cliCompatibility !== CLI_COMPATIBILITY) return `incompatible: ${candidate.cliCompatibility}`
+    return null
+}
+
+export function assertCompatible(metadata: FrameworkMetadata): void {
+    if (metadata.cliCompatibility !== CLI_COMPATIBILITY) throw new Error(`CLI compatibility mismatch: this CLI is ${CLI_COMPATIBILITY}, but @arrange/framework@${metadata.version} is ${metadata.cliCompatibility}.`)
 }
 
 export function readInstalledFrameworkMetadata(projectRoot: string, uiPath: string): FrameworkMetadata | null {

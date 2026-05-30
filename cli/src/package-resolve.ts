@@ -3,9 +3,7 @@ import {resolve} from "node:path"
 
 export function frameworkPackageRoot(uiRoot: string): string {
     const packageRoot = resolve(uiRoot, "node_modules", "@arrange", "framework")
-    if (!existsSync(resolve(packageRoot, "package.json"))) {
-        throw new Error(`UI 项目未安装 @arrange/framework。请先运行 arrange sync --ui。`)
-    }
+    if (!existsSync(resolve(packageRoot, "package.json"))) throw new Error("The UI project has not installed @arrange/framework. Run arrange sync --ui first.")
     return packageRoot
 }
 
@@ -31,9 +29,7 @@ export function frameworkExportPath(uiRoot: string, exportName: "." | "./vite"):
     const root = frameworkPackageRoot(uiRoot)
     const manifest = readFrameworkPackageJson(uiRoot)
     const exportsField = manifest.exports
-    if (!exportsField || typeof exportsField !== "object" || Array.isArray(exportsField)) {
-        throw new Error("@arrange/framework 缺少 exports。")
-    }
+    if (!exportsField || typeof exportsField !== "object" || Array.isArray(exportsField)) throw new Error("@arrange/framework does not define exports.")
     const target = (exportsField as Record<string, unknown>)[exportName]
     const path = exportTargetPath(target)
     return resolve(root, path)
@@ -41,16 +37,16 @@ export function frameworkExportPath(uiRoot: string, exportName: "." | "./vite"):
 
 function exportTargetPath(target: unknown): string {
     if (typeof target === "string") return normalizePackageRelative(target)
-    if (!target || typeof target !== "object" || Array.isArray(target)) throw new Error("@arrange/framework export 结构无效。")
+    if (!target || typeof target !== "object" || Array.isArray(target)) throw new Error("@arrange/framework export shape is invalid.")
     const record = target as Record<string, unknown>
     for (const key of ["arrange-ts", "import"] as const) {
         const value = record[key]
         if (typeof value === "string") return normalizePackageRelative(value)
     }
-    throw new Error("@arrange/framework export 缺少 arrange-ts/import 入口。")
+    throw new Error("@arrange/framework export is missing an arrange-ts/import entry.")
 }
 
 function normalizePackageRelative(path: string): string {
-    if (!path.startsWith("./")) throw new Error(`@arrange/framework export 不是包内路径：${path}`)
+    if (!path.startsWith("./")) throw new Error(`@arrange/framework export is not package-relative: ${path}`)
     return path.slice(2)
 }
