@@ -9,5 +9,8 @@
   "dependencies": {
     "@arrange/framework": "0.0.0-m.2.2"
   },
-  "version": "0.0.0-m.2.2"
+  "version": "0.0.0-m.2.2",
+  "engines": {
+    "node": ">=24"
+  }
 }

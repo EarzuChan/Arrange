@@ -18,5 +18,8 @@
   "sideEffects": false,
   "files": [
     "src"
-  ]
+  ],
+  "engines": {
+    "node": ">=24"
+  }
 }

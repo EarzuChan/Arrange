@@ -1,5 +1,6 @@
 {
   "name": "@arrange/cli",
+  "description": "The official CLI of Arrange",
   "version": "1.0.1",
   "private": false,
   "type": "module",
@@ -13,13 +14,14 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "tsx": "4.22.3",
+    "@clack/prompts": "^1.5.0",
+    "commander": "^15.0.0",
     "vite": "8.0.11",
-    "@inquirer/prompts": "^8.5.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.19.0",
+    "@types/node": "^24.12.4",
     "typescript": "^5.9.0"
   },
   "license": "MIT",
@@ -28,5 +30,8 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

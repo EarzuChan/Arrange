@@ -1,5 +1,5 @@
 ﻿import {mkdirSync} from "node:fs"
-import {resolve} from "node:path"
+import {relative, resolve} from "node:path"
 import type {ArrangeConfig, PackageManager, PluginType, Product} from "./config.ts"
 import {defaultConfig, writeProjectConfig} from "./config.ts"
 import {CLI_COMPATIBILITY, DEFAULT_FRAMEWORK_VERSION} from "./constants.ts"
@@ -34,22 +34,23 @@ export async function createProject(options: WizardOptions = {}): Promise<void> 
         {name: "npm", value: "npm"},
     ])
     const products = await promptProducts()
-    const config = defaultConfig({frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products})
-    printSummary(config)
-    if (!await promptExplicitConfirm("Create this Arrange project?")) return
     const location = await promptSelect<"subdir" | "current">("Where should the project be created?", [
         {name: `Create in ./${projectName}`, value: "subdir", description: "Recommended for a new project."},
         {name: "Create in the current directory", value: "current", description: "Use only when the current directory is already the project root."},
     ])
     const projectRoot = location === "subdir" ? resolve(process.cwd(), projectName) : process.cwd()
+    const config = defaultConfig({frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products})
+    printSummary(config, projectRoot)
+    if (!await promptExplicitConfirm("Create this Arrange project?")) return
     mkdirSync(projectRoot, {recursive: true})
     writeProjectConfig(config, projectRoot)
     const changed = ensureProjectFiles(config, projectRoot, {scope: "all", registry})
     reportProjectChanges(changed, "Project scaffolded")
-    if (projectRoot !== process.cwd()) console.log(`Project root: ${projectRoot}. Run future Arrange commands from that directory.`)
     if (await promptExplicitConfirm("Run sync now?")) await runToolchainSync(config, projectRoot, registry)
+    printCreateNextSteps(projectRoot)
 }
 
+// HACK：狗屎
 export async function adoptProject(options: WizardOptions = {}): Promise<void> {
     const registry = options.registry ? normalizeRegistryUrl(options.registry) : undefined
     const nativePath = await promptRequiredText("Native project path", {hint: "relative or absolute path; use native for the standard layout"})
@@ -110,8 +111,8 @@ async function promptCode(label: string): Promise<string> {
 
 async function promptProducts(): Promise<Product[]> {
     return promptCheckbox<Product>("Products", [
-        {name: "Standalone", value: "standalone"},
-        {name: "VST3", value: "vst3"},
+        {name: "Standalone", value: "standalone", checked: true},
+        {name: "VST3", value: "vst3", checked: true},
     ])
 }
 
@@ -140,20 +141,25 @@ async function chooseFrameworkVersion(registry?: string): Promise<string> {
             {name: "Custom version", value: custom},
         ])
         if (selected !== custom) return selected.version
-        const version = await promptRequiredText("Custom Arrange framework version", {hint: "exact published version, for example 0.0.0-m.2.2"})
+        const version = await promptSemver("Custom Arrange framework version")
         try {
             const metadata = await fetchFrameworkMetadata(version, registry)
             assertCompatible(metadata)
-            candidates = [...candidates, {version: metadata.version, cliCompatibility: metadata.cliCompatibility, latest: false, stable: !metadata.version.includes("-"), publishedAt: null}]
-            return metadata.version
+            const candidate: FrameworkVersionCandidate = {version: metadata.version, cliCompatibility: metadata.cliCompatibility, latest: false, stable: !metadata.version.includes("-"), publishedAt: null}
+            const existing = candidates.find((item) => item.version === metadata.version)
+            candidates = existing
+                ? candidates.map((item) => item.version === metadata.version ? {...candidate, latest: item.latest, publishedAt: item.publishedAt} : item)
+                : [...candidates, candidate]
+            console.log(`${existing ? "Updated" : "Added"} @arrange/framework@${metadata.version} in the version list. Select it to continue.`)
         } catch (error) {
             console.log(`Custom version is not usable: ${error instanceof Error ? error.message : String(error)}`)
         }
     }
 }
 
-function printSummary(config: ArrangeConfig): void {
+function printSummary(config: ArrangeConfig, projectRoot?: string): void {
     console.log("\nArrange project summary:")
+    if (projectRoot) console.log(`  root: ${projectRoot}`)
     console.log(`  project: ${config.project.name}@${config.project.version}`)
     console.log(`  framework: ${config.arrange.version}`)
     console.log(`  company: ${config.project.companyName} (${config.project.companyCode})`)
@@ -162,6 +168,20 @@ function printSummary(config: ArrangeConfig): void {
     console.log(`  ui: ${config.ui.path}, ${config.ui.packageManager}`)
     console.log(`  native: ${config.native.path}`)
     console.log("")
+}
+
+function printCreateNextSteps(projectRoot: string): void {
+    if (projectRoot === process.cwd()) return
+    const relativeRoot = relative(process.cwd(), projectRoot)
+    const target = relativeRoot && !relativeRoot.startsWith("..") ? relativeRoot : projectRoot
+    console.log("")
+    console.log("Next:")
+    console.log(`  cd ${shellPath(target)}`)
+    console.log("  arrange dev")
+}
+
+function shellPath(path: string): string {
+    return /[\s"&|<>^]/.test(path) ? `"${path.replace(/"/g, '\\"')}"` : path
 }
 
 function reportProjectChanges(changed: string[], heading: string): void {

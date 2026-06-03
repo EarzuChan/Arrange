@@ -57,5 +57,8 @@
   ],
   "arrange": {
     "cliCompatibility": 1
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

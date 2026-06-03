@@ -63,6 +63,52 @@ export type ResolvedToolchain = {
     }
 }
 
+const PROJECT_GITIGNORE_ENTRIES = [
+    "arrange.local.yaml",
+    "artifacts/",
+    "node_modules/",
+    "dist/",
+    "coverage/",
+    ".vite/",
+    ".turbo/",
+    ".cache/",
+    "tmp/",
+    "temp/",
+    "*.tsbuildinfo",
+    "npm-debug.log*",
+    "yarn-debug.log*",
+    "yarn-error.log*",
+    "pnpm-debug.log*",
+    "build/",
+    "cmake-build-*/",
+    "CMakeFiles/",
+    "CMakeCache.txt",
+    "cmake_install.cmake",
+    "compile_commands.json",
+    ".ninja_deps",
+    ".ninja_log",
+    "*.o",
+    "*.obj",
+    "*.a",
+    "*.lib",
+    "*.so",
+    "*.dylib",
+    "*.dll",
+    "*.exe",
+    "*.pdb",
+    "*.ilk",
+    "*.exp",
+    "*.tmp",
+    "*.temp",
+    "*.bak",
+    "*.swp",
+    "*.swo",
+    ".DS_Store",
+    "Thumbs.db",
+    ".vs/",
+    "*.user",
+]
+
 type DiscoveryIssue = {
     field: string
     message: string
@@ -85,13 +131,20 @@ export function writeLocalConfig(config: LocalConfig, cwd = process.cwd()): void
 }
 
 export function ensureLocalGitignore(cwd = process.cwd()): void {
+    ensureProjectGitignore(cwd)
+}
+
+export function ensureProjectGitignore(cwd = process.cwd(), check = false): boolean {
     const path = resolve(cwd, ".gitignore")
-    const entry = LOCAL_CONFIG_FILE
     const source = existsSync(path) ? readFileSync(path, "utf8") : ""
     const lines = source.split(/\r?\n/).map((line) => line.trim())
-    if (lines.includes(entry)) return
+    const missing = PROJECT_GITIGNORE_ENTRIES.filter((entry) => !lines.includes(entry))
+    if (missing.length === 0) return false
+    if (check) return true
     const prefix = source.length > 0 && !source.endsWith("\n") ? "\n" : ""
-    writeFileSync(path, `${source}${prefix}${entry}\n`)
+    const separator = source.length > 0 ? "\n" : ""
+    writeFileSync(path, `${source}${prefix}${separator}${missing.join("\n")}\n`)
+    return true
 }
 
 export async function ensureToolchain(config: ArrangeConfig, cwd: string, need: ToolchainNeed, options: EnsureToolchainOptions = {}): Promise<ResolvedToolchain> {

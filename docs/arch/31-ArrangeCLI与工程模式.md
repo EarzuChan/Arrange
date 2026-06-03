@@ -4,6 +4,8 @@
 
 Arrange CLI 的命令名是 `arrange`。内部因其起的作用（用户工程的“总管”）可称作“牢大”，正式表述（产品名）为 Arrange CLI。
 
+**2026.6.1警告：目前正在重构中，理念不变，具体命令、架构以[在工作中的定义](../proj/m2/2)为准。本行在重构完成后会删除。**
+
 # 地位
 
 Arrange CLI 是 Arrange 工程的全局编排器。它不替代 npm / pnpm、CMake、Vite 或 JUCE，而是调用这些工具完成正确的工作。
@@ -22,9 +24,9 @@ Arrange CLI
 # 包与入口
 
 ```txt
-@arrange/cli        全局 CLI 包，提供 arrange 命令
-@arrange/framework  UI framework 包，由 CLI 写入 ui/package.json
-Arrange::framework  native framework target，由 CLI 写入 native CMake
+@arrange/cli # 全局 CLI 包，提供 arrange 命令
+@arrange/framework # UI framework 包，由 CLI 写入 ui/package.json
+Arrange::framework # native framework target，由 CLI 写入 native CMake
 ```
 
 用户主要与 `arrange` 命令交互。`@arrange/framework` 不提供任何对外 CLI、bin 或命令入口。
@@ -35,15 +37,15 @@ Arrange::framework  native framework target，由 CLI 写入 native CMake
 
 ```txt
 project/
-  arrange.config.yaml
+  arrange.project.yaml
   arrange.local.yaml
   ui/
   native/
   artifacts/
 ```
 
-- `arrange.config.yaml` 是工程配置，必须提交。
-- `arrange.local.yaml` 是本机工具链配置，默认不提交。
+- `arrange.project.yaml` 是项目级配置。
+- `arrange.local.yaml` 是本机工具链配置，不需要提交到Git。
 - `ui/` 是 TypeScript UI 源码项目。
 - `native/` 是 CMake / JUCE native 项目。
 - `artifacts/` 是 Arrange CLI 整理后的最终交付物目录。
@@ -52,9 +54,9 @@ project/
 
 # 工程配置
 
-`arrange.config.yaml` 描述工程事实。它是团队共享配置，必须提交。
+`arrange.project.yaml` 描述工程事实。它是团队共享配置，必须提交。
 
-`arrange.config.yaml` 不提供 JSON、TOML、TypeScript 配置入口，也不提供 `.yml` 别名；文件中不写 schema 版本。
+`arrange.project.yaml` 不提供 JSON、TOML、TypeScript 配置入口，也不提供 `.yml` 别名；文件中不写 schema 版本。
 
 它不是通用构建 DSL，不承载任意 CMake / Vite 逻辑，也不写本机工具路径、CMake generator、MSVC 环境或本机追加参数。
 
@@ -140,7 +142,7 @@ UI 官方模板固定 TypeScript，不提供纯 JavaScript 模板。
 | :--- | :--- | :--- | :--- | :--- |
 | `buildDir` | path string | 否 | `build` | CMake build 根目录。相对 `native.path`。 |
 
-CMake generator、CMake 可执行文件、Ninja / MSBuild 路径、MSVC 环境与本机追加参数都属于 `arrange.local.yaml`，不得写入 `arrange.config.yaml`。
+CMake generator、CMake 可执行文件、Ninja / MSBuild 路径、MSVC 环境与本机追加参数都属于 `arrange.local.yaml`，不得写入 `arrange.project.yaml`。
 
 用户不能在配置文件中自定义构建风味。Arrange CLI 支持两个 flavor：
 
@@ -282,7 +284,7 @@ macos:
 | `cmake.configureArgs` | string[] | 否 | `[]` | 本机追加给 `cmake -S -B` 的参数。 |
 | `cmake.buildArgs` | string[] | 否 | `[]` | 本机追加给 `cmake --build` 的参数。 |
 
-`pnpm` / `npm` 的选择写在 `arrange.config.yaml` 的 `ui.packageManager`。`arrange.local.yaml` 只记录当前机器上如何调用这个包管理器。
+`pnpm` / `npm` 的选择写在 `arrange.project.yaml` 的 `ui.packageManager`。`arrange.local.yaml` 只记录当前机器上如何调用这个包管理器。
 
 # 工具链准备
 
@@ -353,7 +355,7 @@ CLI 报错必须说明问题与修复动作。
 
 Arrange 仓库的版本真源是根目录 `arrange.version.json`，具体在[内部包构建与分发契约](29-内部包构建与分发契约.md)有详细说明。
 
-用户工程使用的 Arrange framework 版本记录在 `arrange.config.yaml` 的 `arrange.version`。
+用户工程使用的 Arrange framework 版本记录在 `arrange.project.yaml` 的 `arrange.version`。
 
 Arrange CLI 在代码中持有当前 CLI 兼容性码。`arrange create` / `arrange adopt` 的 Arrange 版本选择来自 npm registry 中 `@arrange/framework` 的包数据。CLI 读取该包的 packument，使用其中的 `dist-tags`、`versions` 和 package metadata 生成候选列表。
 
@@ -369,7 +371,7 @@ framework package metadata 的结构见 [内部包构建与分发契约](29-内�
 - 兼容版本不显示 `cliCompatibility`，保持列表清爽。
 - 不兼容版本仍展示，但标记为 `不兼容：<该版本的 cliCompatibility>`，且不可选。
 - 自定义版本被选中后要求用户输入版本号；输入后读取该版本 metadata 并检查兼容性。通过时新增一条可选候选；不通过时只提示原因，不加入候选列表。
-- 用户最终选择的版本写入 `arrange.config.yaml` 时必须是具体版本号，不能是 `latest`。
+- 用户最终选择的版本写入 `arrange.project.yaml` 时必须是具体版本号，不能是 `latest`。
 
 示例：
 
@@ -388,7 +390,7 @@ sync、dev、build、package 都必须检查 CLI 与工程 Arrange framework 版
 
 # 配置校验
 
-CLI 必须严格校验 `arrange.config.yaml`：
+CLI 必须严格校验 `arrange.project.yaml`：
 
 - 未知顶层字段报错。
 - 未知 enum 值报错。
@@ -413,13 +415,13 @@ CLI 必须严格校验 `arrange.local.yaml`：
 既有工程命令只读取当前目录的：
 
 ```txt
-./arrange.config.yaml
+./arrange.project.yaml
 ./arrange.local.yaml
 ```
 
 CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供 `--config` / `--cwd` / `--root` 来改变工程根。
 
-如果当前目录没有 `arrange.config.yaml`，命令必须报错并要求用户进入 Arrange 工程根或运行 `arrange create` / `arrange adopt`。如果 `arrange.local.yaml` 不存在或失效，需要外部工具的命令必须先进入工具链准备流程。
+如果当前目录没有 `arrange.project.yaml`，命令必须报错并要求用户进入 Arrange 工程根或运行 `arrange create` / `arrange adopt`。如果 `arrange.local.yaml` 不存在或失效，需要外部工具的命令必须先进入工具链准备流程。
 
 # create
 
@@ -446,7 +448,7 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 - JUCE 版本由 Arrange 验证版本决定。
 - QuickJS-NG 版本是 Arrange 内部细节。
 
-创建前必须展示最终信息。用户确认后，CLI 按模板生成 `arrange.config.yaml`、`ui/`、`native/` 与必要工程文件。若用户选择立即 sync，CLI 必须先准备本机工具链。
+创建前必须展示最终信息。用户确认后，CLI 按模板生成 `arrange.project.yaml`、`ui/`、`native/` 与必要工程文件。若用户选择立即 sync，CLI 必须先准备本机工具链。
 
 # adopt
 
@@ -461,9 +463,9 @@ CLI 不向上级目录查找，不支持隐式 workspace root 推断，不提供
 5. 对缺失或冲突的信息专项询问。
 6. 选择创建目录。
 7. 展示最终工程信息与将要修改的文件。
-8. 用户确认后创建 `arrange.config.yaml` 并接入工程。
+8. 用户确认后创建 `arrange.project.yaml` 并接入工程。
 
-复制模式会把子工程复制到 Arrange 工程目录，之后不依赖原路径。原位引用模式会在 `arrange.config.yaml` 中指向外部目录；CLI 可以正常开发、构建和打包，但编辑器工作区、相对路径和版本管理体验由用户自行处理。
+复制模式会把子工程复制到 Arrange 工程目录，之后不依赖原路径。原位引用模式会在 `arrange.project.yaml` 中指向外部目录；CLI 可以正常开发、构建和打包，但编辑器工作区、相对路径和版本管理体验由用户自行处理。
 
 自动识别只用于给向导提供默认值。识别不到的信息必须询问用户；复杂 CMake 不靠猜测强行改写。
 
@@ -491,7 +493,7 @@ CLI 只重写完整、未损坏的 managed region。region 缺 begin/end、重�
 
 # sync
 
-`arrange sync` 让工程与 `arrange.config.yaml` 对齐。它包含两层：
+`arrange sync` 让工程与 `arrange.project.yaml` 对齐。它包含两层：
 
 1. project sync：维护 Arrange 负责的工程文件区域，例如 CMake managed region 与 UI `package.json`。
 2. toolchain sync：调用外部工具做预同步，例如 `pnpm install` / `npm install` 与 CMake configure。

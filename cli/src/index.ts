@@ -1,9 +1,10 @@
-﻿#!/usr/bin/env node
-import {main} from "./main.ts"
+import {Command} from "commander"
+import pkg from '../package.json' with { type: 'json' }
+import {registerCreateCommand} from "./commands/create.ts";
 
-const result = await main()
-process.exit(result.exitCode)
+const program = new Command()
 
-export {main}
-export {normalizeViteArgs} from "./vite.ts"
-export {readProjectConfig, stringifyConfig, defaultConfig} from "./config.ts"
+// 命令注册
+registerCreateCommand(program)
+
+program.name('Arrange CLI').description(pkg.description).version(pkg.version)

@@ -167,6 +167,7 @@ async function dev(parsed: Parsed): Promise<void> {
     const uiOnly = parsed.flags.has("ui-only")
     const nativeOnly = parsed.flags.has("native-only")
     if (uiOnly && nativeOnly) throw new Error("--ui-only and --native-only are mutually exclusive.")
+    if (!uiOnly && !hasProduct(config, "standalone")) throw new Error("arrange dev requires project.products to include standalone. Add standalone and run arrange sync, or use arrange dev --ui-only.")
     const toolchain = await ensureToolchain(config, root, {ui: !nativeOnly, native: !uiOnly})
     if (!uiOnly) await ensureDevStandalone(config, root, flavor, toolchain)
     if (nativeOnly) {
@@ -224,10 +225,15 @@ async function loadAndCheckProject(): Promise<ProjectContext> {
 }
 
 export async function ensureDevStandalone(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
+    if (!hasProduct(config, "standalone")) throw new Error("arrange dev requires project.products to include standalone. Add standalone and run arrange sync, or use arrange dev --ui-only.")
     if (findNativeArtifact(config, root, flavor, "standalone")) return
     console.log(`No ${flavor} Standalone artifact was found. Building it before starting dev.`)
     await configureNative(config, root, flavor, toolchain)
     await buildNative(config, root, flavor, ["standalone"], toolchain)
+}
+
+function hasProduct(config: ArrangeConfig, product: Product): boolean {
+    return config.project.products.includes(product)
 }
 
 async function configureNative(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {

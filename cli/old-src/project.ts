@@ -1,13 +1,14 @@
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs"
 import {dirname, relative, resolve} from "node:path"
 import type {ArrangeConfig, Flavor, Product} from "./config.ts"
-import type {LocalCMakeConfig} from "./local.ts"
+import {ensureProjectGitignore, type LocalCMakeConfig} from "./local.ts"
 
 export type SyncScope = "all" | "ui" | "native"
 export type SyncMode = "all" | "project" | "toolchain" | "check"
 
 export function ensureProjectFiles(config: ArrangeConfig, root: string, options: {scope: SyncScope; check?: boolean; registry?: string}): string[] {
     const changes: string[] = []
+    if (ensureProjectGitignore(root, options.check ?? false)) changes.push(".gitignore")
     if (options.scope === "all" || options.scope === "ui") changes.push(...ensureUiProject(config, root, options.check ?? false, options.registry))
     if (options.scope === "all" || options.scope === "native") changes.push(...ensureNativeProject(config, root, options.check ?? false))
     return changes

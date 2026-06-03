@@ -17,5 +17,8 @@
     "LICENSE",
     "README.md",
     "UPSTREAM.md"
-  ]
+  ],
+  "engines": {
+    "node": ">=24"
+  }
 }

@@ -5,6 +5,7 @@ export type Choice<T> = {
     value: T
     description?: string
     disabled?: string | boolean
+    checked?: boolean
 }
 
 export async function promptRequiredText(message: string, args: {hint: string; validate?: (value: string) => true | string | Promise<true | string>}): Promise<string> {
