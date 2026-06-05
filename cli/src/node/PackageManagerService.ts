@@ -24,11 +24,5 @@ export class PackageManagerService {
         }
     }
 
-    createDevSpec(context: ProjectContext): ProcessSpec {
-        return {
-            command: context.state.project.ui.packageManager,
-            args: ["run", "dev"],
-            cwd: context.state.project.ui.directory,
-        }
-    }
+    // TIPS：Dev由我们CLI内建能力负责
 }

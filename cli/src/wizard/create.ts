@@ -5,40 +5,38 @@ import {packageJsonManagedItemKeys} from "../node/PackageJsonManagedItems.ts"
 import type {CreateProjectRequest} from "../project/ProjectCreateModel.ts"
 import type {NativeProduct, PackageManagerName, PluginType} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/PromptUtils.ts"
+import {selectFrameworkVersion} from "./frameworkVersion.ts"
 
 export interface CreateWizardInput {
     readonly registryUrl?: string
 }
 
-export type CreateWizardResult = false | CreateProjectRequest
-
 const projectNamePattern = /^[A-Za-z][A-Za-z0-9_]*$/
 
-export async function runCreateWizard(input: CreateWizardInput = {}): Promise<CreateWizardResult> {
+// THINK：以后能不能让每一项的Ctrl+C变为“上一步”
+export async function runCreateWizard(input: CreateWizardInput = {}): Promise<false | CreateProjectRequest> {
     try {
         intro("Create Arrange project")
 
         const answers = await group({
             projectName: () => requiredText("Project name", {
-                placeholder: "MyPlugin",
+                placeholder: "e.g YourPlugin",
                 validate: (value) => projectNamePattern.test(value) ? undefined : "Use letters, numbers, and underscore; start with a letter.",
             }),
             projectVersion: () => requiredText("Project version", {
-                initialValue: "0.1.0", // TODO：正式版需变为Placeholder
+                placeholder: "e.g 1.0.0",
                 validate: validateSemver,
             }),
-            // FIXME：从服务器拉取，甘霖娘
-            frameworkVersion: () => requiredText("Arrange framework version", {
-                initialValue: "0.0.0-m.2.2",
-                validate: validateSemver,
+            frameworkVersion: () => selectFrameworkVersion({registryUrl: input.registryUrl}),
+            vendorName: () => requiredText("Vendor name", {
+                placeholder: "Your name or company"
             }),
-            companyName: () => requiredText("Company name", {placeholder: "Your name or company"}),
-            companyCode: () => requiredText("Company code", {
-                placeholder: "Arng",
+            vendorCode: () => requiredText("Vendor code", {
+                placeholder: "e.g AbCd",
                 validate: validateFourCharCode,
             }),
             pluginCode: () => requiredText("Plugin code", {
-                placeholder: "Demo",
+                placeholder: "e.g EfGh",
                 validate: validateFourCharCode,
             }),
             pluginType: () => select({
@@ -49,14 +47,14 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<Cr
                 ],
             }),
             packageManager: () => select({
-                message: "UI package manager",
+                message: "Package manager of the UI subproject",
                 options: [
                     {label: "pnpm", value: "pnpm"},
                     {label: "npm", value: "npm"},
                 ],
             }),
             products: () => multiselect({
-                message: "Native products", // TODO：未来支持更多类型
+                message: "Products", // TODO：未来支持更多类型
                 required: true,
                 options: [
                     {label: "Standalone", value: "standalone", hint: "recommended"},
@@ -85,7 +83,7 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<Cr
         const packageManager = answers.packageManager as PackageManagerName
         const products = answers.products as NativeProduct[]
 
-        log.info(`Arrange project summary:\n\nroot: ${rootDir}\nproject: ${answers.projectName}@${answers.projectVersion}\nframework: ${answers.frameworkVersion}\ncompany: ${answers.companyName} (${answers.companyCode})\nplugin: ${answers.pluginCode}, ${pluginType}\nproducts: ${products.join(", ")}\nui: ${directories.uiDirectory}, ${packageManager}\nnative: ${directories.nativeDirectory}\nartifacts: ${directories.artifactsDirectory}`)
+        log.info(`Arrange project summary:\n\nroot: ${rootDir}\nproject: ${answers.projectName}@${answers.projectVersion}\nframework: ${answers.frameworkVersion}\ncompany: ${answers.vendorName} (${answers.vendorCode})\nplugin: ${answers.pluginCode}, ${pluginType}\nproducts: ${products.join(", ")}\nui: ${directories.uiDirectory}, ${packageManager}\nnative: ${directories.nativeDirectory}\nartifacts: ${directories.artifactsDirectory}`)
 
         const confirmed = await confirm({message: "Create this Arrange project?", initialValue: true})
         if (isCancel(confirmed) || !confirmed) throw new PromptCancelled()
@@ -97,8 +95,8 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<Cr
             projectVersion: answers.projectVersion,
             frameworkVersion: answers.frameworkVersion,
             frameworkRegistryUrl: input.registryUrl,
-            companyName: answers.companyName,
-            companyCode: answers.companyCode,
+            vendorName: answers.vendorName,
+            vendorCode: answers.vendorCode,
             pluginCode: answers.pluginCode,
             pluginType,
             packageManager,
@@ -187,7 +185,8 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
         initialValue: true,
     })
     if (isCancel(manageAll)) throw new PromptCancelled()
-    if (manageAll) return createManagedItems(true, true)
+
+    if (manageAll) return {...createCmakeManagedItems(true, true, true), ...createNodeManagedItems(true)}
 
     const cmakeItems = await promptCmakeManagedItems()
     const nodeItems = await promptNodeManagedItems()
@@ -222,39 +221,13 @@ async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
 }
 
 async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
-    const manageAllNode = await confirm({
-        message: "Let Arrange manage all UI package.json items?",
+    const manageNode = await confirm({
+        message: "Let Arrange manage UI package.json framework dependency version?",
         initialValue: true,
     })
-    if (isCancel(manageAllNode)) throw new PromptCancelled()
-    if (manageAllNode) {
-        return createNodeManagedItems(true, true, true)
-    }
+    if (isCancel(manageNode)) throw new PromptCancelled()
 
-    const dependencies = await confirm({
-        message: "Manage package.json dependencies?",
-        initialValue: true,
-    })
-    if (isCancel(dependencies)) throw new PromptCancelled()
-    const devDependencies = await confirm({
-        message: "Manage package.json devDependencies?",
-        initialValue: true,
-    })
-    if (isCancel(devDependencies)) throw new PromptCancelled()
-    const scripts = await confirm({
-        message: "Manage package.json scripts?",
-        initialValue: true,
-    })
-    if (isCancel(scripts)) throw new PromptCancelled()
-
-    return createNodeManagedItems(dependencies, devDependencies, scripts)
-}
-
-function createManagedItems(manageCmake: boolean, managePackageJson: boolean): Record<string, boolean> {
-    return {
-        ...createCmakeManagedItems(manageCmake, manageCmake, manageCmake),
-        ...createNodeManagedItems(managePackageJson, managePackageJson, managePackageJson),
-    }
+    return createNodeManagedItems(manageNode)
 }
 
 function createCmakeManagedItems(fetchContent: boolean, pluginTarget: boolean, linkFramework: boolean): Record<string, boolean> {
@@ -265,10 +238,8 @@ function createCmakeManagedItems(fetchContent: boolean, pluginTarget: boolean, l
     }
 }
 
-function createNodeManagedItems(dependencies: boolean, devDependencies: boolean, scripts: boolean): Record<string, boolean> {
+function createNodeManagedItems(dependencies: boolean): Record<string, boolean> {
     return {
         [packageJsonManagedItemKeys.dependencies]: dependencies,
-        [packageJsonManagedItemKeys.devDependencies]: devDependencies,
-        [packageJsonManagedItemKeys.scripts]: scripts,
     }
 }

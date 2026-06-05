@@ -1,4 +1,4 @@
-import type { ManagedItemCheckResult } from "../management/ManagedItem.ts"
+import type { ManagedItemCheckResult } from "../managed/ManagedItem.ts"
 
 export type SyncIssueSeverity = "info" | "warning" | "error"
 export type SyncArea = "project" | "local" | "configured"

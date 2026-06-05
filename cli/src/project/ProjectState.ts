@@ -11,8 +11,8 @@ export interface ProjectState {
 export interface ProjectDefinition {
     readonly name: string
     readonly version: string
-    readonly companyName: string
-    readonly companyCode: string
+    readonly vendorName: string
+    readonly vendorCode: string
     readonly pluginCode: string
     readonly pluginType: PluginType
     readonly framework: FrameworkDefinition

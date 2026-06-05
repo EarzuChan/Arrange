@@ -65,8 +65,8 @@ function createPluginTargetBlock(state: ProjectState): string {
     return [
         `juce_add_plugin(${state.project.name}`,
         `  VERSION ${state.project.version}`,
-        `  COMPANY_NAME "${state.project.companyName}"`,
-        `  PLUGIN_MANUFACTURER_CODE ${state.project.companyCode}`,
+        `  COMPANY_NAME "${state.project.vendorName}"`,
+        `  PLUGIN_MANUFACTURER_CODE ${state.project.vendorCode}`,
         `  PLUGIN_CODE ${state.project.pluginCode}`,
         `  FORMATS ${formats}`,
         `  PRODUCT_NAME "${state.project.name}"`,

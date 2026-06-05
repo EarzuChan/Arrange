@@ -1,6 +1,6 @@
-import { relative, resolve } from "node:path"
-import type { ProjectState } from "../project/ProjectState.ts"
-import { writeTextFile } from "../utils/Utils.ts"
+import {relative, resolve} from "node:path"
+import type {ProjectState} from "../project/ProjectState.ts"
+import {writeTextFile} from "../utils/Utils.ts"
 
 export class NodeProjectGenerator {
     async generate(rootDir: string, state: ProjectState): Promise<string[]> {
@@ -12,10 +12,10 @@ export class NodeProjectGenerator {
         const appPath = resolve(srcDir, "App.vue")
 
         const files = [
-            { path: packageJsonPath, content: createPackageJson(state) },
-            ...(state.project.framework.registryUrl ? [{ path: npmrcPath, content: createNpmrc(state.project.framework.registryUrl) }] : []),
-            { path: mainPath, content: createMainTs() },
-            { path: appPath, content: createAppVue(state) },
+            {path: packageJsonPath, content: createPackageJson(state)},
+            ...(state.project.framework.registryUrl ? [{path: npmrcPath, content: createNpmrc(state.project.framework.registryUrl)}] : []),
+            {path: mainPath, content: createMainTs()},
+            {path: appPath, content: createAppVue(state)},
         ]
 
         const written: string[] = []
@@ -32,19 +32,7 @@ function createPackageJson(state: ProjectState): string {
         name: packageName(state.project.name),
         private: true,
         type: "module",
-        scripts: {
-            dev: "vite",
-            build: "vite build",
-        },
-        dependencies: {
-            "@arrange/framework": state.project.framework.version,
-        },
-        devDependencies: {
-            "@vitejs/plugin-vue": "^6.0.0",
-            "typescript": "^5.9.0",
-            "vite": "^8.0.0",
-            "vue": "^3.5.0",
-        },
+        dependencies: {"@arrange/framework": state.project.framework.version}
     }, null, 2)}\n`
 }
 

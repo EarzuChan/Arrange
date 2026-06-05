@@ -3,8 +3,8 @@ import { z } from "zod"
 export const projectYamlSchema = z.object({
     name: z.string(),
     version: z.string(),
-    companyName: z.string(),
-    companyCode: z.string(),
+    vendorName: z.string(),
+    vendorCode: z.string(),
     pluginCode: z.string(),
     pluginType: z.enum(["effect", "instrument"]),
     framework: z.object({

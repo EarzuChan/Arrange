@@ -24,8 +24,7 @@ export function registerCreateCommand(program: Command, services: CliServices): 
             await services.projectStateStore.save(request.rootDir, state)
             const writtenFiles = [...scaffold.writtenFiles, projectFileNames.project]
 
-            console.log("Project created:")
-            console.log(`  root: ${request.rootDir}`)
+            console.log(`Project created:\n  root: ${request.rootDir}\n`)
             for (const file of writtenFiles) console.log(`  created ${file}`)
 
             // TODO：询问用户是否立即运行 sync；sync 模块后续专项落地后接入

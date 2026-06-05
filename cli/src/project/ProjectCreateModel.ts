@@ -6,8 +6,8 @@ export interface CreateProjectRequest {
     readonly projectVersion: string
     readonly frameworkVersion: string
     readonly frameworkRegistryUrl?: string
-    readonly companyName: string
-    readonly companyCode: string
+    readonly vendorName: string
+    readonly vendorCode: string
     readonly pluginCode: string
     readonly pluginType: PluginType
     readonly packageManager: PackageManagerName
@@ -24,8 +24,8 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
         project: {
             name: request.projectName,
             version: request.projectVersion,
-            companyName: request.companyName,
-            companyCode: request.companyCode,
+            vendorName: request.vendorName,
+            vendorCode: request.vendorCode,
             pluginCode: request.pluginCode,
             pluginType: request.pluginType,
             framework: {

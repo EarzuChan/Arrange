@@ -1,4 +1,4 @@
-import { ConfigurationService } from "../management/ConfigurationService.ts"
+import { ConfigurationService } from "../managed/ConfigurationService.ts"
 import type { ProjectContext } from "../project/ProjectContext.ts"
 import type { SyncCheckReport, SyncIssue } from "./SyncCheckReport.ts"
 
