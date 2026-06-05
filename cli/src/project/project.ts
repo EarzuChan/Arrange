@@ -5,7 +5,8 @@ export interface CreateProjectRequest {
     readonly projectName: string
     readonly projectVersion: string
     readonly frameworkVersion: string
-    readonly frameworkRegistryUrl?: string
+    readonly frameworkNodeRegistryUrl?: string
+    readonly frameworkCmakeFetchContentUrl?: string
     readonly vendorName: string
     readonly vendorCode: string
     readonly pluginCode: string
@@ -30,7 +31,8 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             pluginType: request.pluginType,
             framework: {
                 version: request.frameworkVersion,
-                registryUrl: request.frameworkRegistryUrl,
+                ...(request.frameworkNodeRegistryUrl ? {nodeRegistryUrl: request.frameworkNodeRegistryUrl} : {}),
+                ...(request.frameworkCmakeFetchContentUrl ? {cmakeFetchContentUrl: request.frameworkCmakeFetchContentUrl} : {}),
             },
             ui: {
                 directory: request.uiDirectory,

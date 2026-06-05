@@ -17,7 +17,8 @@ export type PluginType = z.infer<typeof pluginTypeSchema>
 
 export const frameworkDefinitionSchema = z.object({
     version: z.string(),
-    registryUrl: z.string().optional(),
+    nodeRegistryUrl: z.string().optional(),
+    cmakeFetchContentUrl: z.string().optional(),
 })
 export type FrameworkDefinition = z.infer<typeof frameworkDefinitionSchema>
 

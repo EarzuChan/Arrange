@@ -7,15 +7,20 @@ import {runCreateWizard} from "../wizard/create.ts"
 
 export interface CreateCommandOptions {
     registry?: string
+    fetchContent?: string
 }
 
 export function registerCreateCommand(program: Command, services: CliServices): void {
     program
         .command("create")
         .description("Create a new Arrange project")
-        .option("--registry <url>", "Framework package registry URL")
+        .option("--registry <url>", "Framework npm registry URL")
+        .option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: CreateCommandOptions) => {
-            const request = await runCreateWizard({registryUrl: options.registry})
+            const request = await runCreateWizard({
+                nodeRegistryUrl: options.registry,
+                cmakeFetchContentUrl: options.fetchContent,
+            })
 
             if (!request) return
 

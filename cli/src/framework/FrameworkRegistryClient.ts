@@ -1,9 +1,9 @@
 import type {FrameworkMetadata, FrameworkVersionCandidate} from "./FrameworkMamba.ts"
 
-export const defaultFrameworkRegistryUrl = "https://registry.npmjs.org"
+export const defaultNodeRegistryUrl = "https://registry.npmjs.org"
 
 export function normalizeRegistryUrl(registryUrl?: string): string { // CHECK：是否带派
-    const raw = registryUrl?.trim() || defaultFrameworkRegistryUrl
+    const raw = registryUrl?.trim() || defaultNodeRegistryUrl
     return raw.replace(/\/+$/, "")
 }
 

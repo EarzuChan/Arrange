@@ -3,6 +3,8 @@ import { writeTextFile } from "../utils/utils.ts"
 import { cmakeManagedItemKeys } from "./CmakeManagedItems.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
 
+const defaultCmakeFetchContentUrl = "https://github.com/EarzuChan/Arrange.git"
+
 export class CmakeProjectGenerator {
     async generate(rootDir: string, state: ProjectState): Promise<string[]> {
         const nativeDir = resolve(rootDir, state.project.native.directory)
@@ -52,7 +54,7 @@ function createFetchContentBlock(state: ProjectState): string {
     return [
         "include(FetchContent)",
         "FetchContent_Declare(arrange",
-        "  GIT_REPOSITORY https://github.com/EarzuChan/Arrange.git",
+        `  GIT_REPOSITORY ${state.project.framework.cmakeFetchContentUrl ?? defaultCmakeFetchContentUrl}`,
         `  GIT_TAG v${state.project.framework.version}`,
         ")",
         "FetchContent_MakeAvailable(arrange)",

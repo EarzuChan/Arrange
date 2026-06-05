@@ -8,7 +8,8 @@ import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} fro
 import {selectFrameworkVersion} from "./frameworkVersion.ts"
 
 export interface CreateWizardInput {
-    readonly registryUrl?: string
+    readonly nodeRegistryUrl?: string
+    readonly cmakeFetchContentUrl?: string
 }
 
 const projectNamePattern = /^[A-Za-z][A-Za-z0-9_]*$/
@@ -27,7 +28,7 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<fa
                 placeholder: "e.g 1.0.0",
                 validate: validateSemver,
             }),
-            frameworkVersion: () => selectFrameworkVersion({registryUrl: input.registryUrl}),
+            frameworkVersion: () => selectFrameworkVersion({registryUrl: input.nodeRegistryUrl}),
             vendorName: () => requiredText("Vendor name", {
                 placeholder: "Your name or company"
             }),
@@ -94,7 +95,8 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<fa
             projectName: answers.projectName,
             projectVersion: answers.projectVersion,
             frameworkVersion: answers.frameworkVersion,
-            frameworkRegistryUrl: input.registryUrl,
+            frameworkNodeRegistryUrl: input.nodeRegistryUrl,
+            frameworkCmakeFetchContentUrl: input.cmakeFetchContentUrl,
             vendorName: answers.vendorName,
             vendorCode: answers.vendorCode,
             pluginCode: answers.pluginCode,

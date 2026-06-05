@@ -13,7 +13,7 @@ export class NodeProjectGenerator {
 
         const files = [
             {path: packageJsonPath, content: createPackageJson(state)},
-            ...(state.project.framework.registryUrl ? [{path: npmrcPath, content: createNpmrc(state.project.framework.registryUrl)}] : []),
+            ...(state.project.framework.nodeRegistryUrl ? [{path: npmrcPath, content: createNpmrc(state.project.framework.nodeRegistryUrl)}] : []),
             {path: mainPath, content: createMainTs()},
             {path: appPath, content: createAppVue(state)},
         ]
