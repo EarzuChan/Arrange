@@ -1,7 +1,7 @@
 import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "@clack/prompts"
 import {resolve} from "node:path"
 import {cmakeManagedItemKeys} from "../cmake/CmakeManagedItems.ts"
-import {packageJsonManagedItemKeys} from "../node/PackageJsonManagedItems.ts"
+import {nodeManagedItemKeys} from "../node/NodeManagedItems.ts"
 import type {CreateProjectRequest} from "../project/project.ts"
 import type {NativeProduct, PackageManagerName, PluginType} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/promptUtils.ts"
@@ -188,7 +188,7 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
     })
     if (isCancel(manageAll)) throw new PromptCancelled()
 
-    if (manageAll) return {...createCmakeManagedItems(true, true, true), ...createNodeManagedItems(true)}
+    if (manageAll) return {...createCmakeManagedItems(true, true, true), ...createNodeManagedItems(true, true)}
 
     const cmakeItems = await promptCmakeManagedItems()
     const nodeItems = await promptNodeManagedItems()
@@ -223,13 +223,26 @@ async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
 }
 
 async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
-    const manageNode = await confirm({
-        message: "Let Arrange manage UI package.json framework dependency version?",
+    const manageAllNode = await confirm({
+        message: "Let Arrange manage all UI Node items?",
         initialValue: true,
     })
-    if (isCancel(manageNode)) throw new PromptCancelled()
+    if (isCancel(manageAllNode)) throw new PromptCancelled()
+    if (manageAllNode) return createNodeManagedItems(true, true)
 
-    return createNodeManagedItems(manageNode)
+    const packageJsonFrameworkDependency = await confirm({
+        message: "Manage package.json @arrange/framework dependency version?",
+        initialValue: true,
+    })
+    if (isCancel(packageJsonFrameworkDependency)) throw new PromptCancelled()
+
+    const npmrcArrangeRegistry = await confirm({
+        message: "Manage .npmrc @arrange:registry entry?",
+        initialValue: true,
+    })
+    if (isCancel(npmrcArrangeRegistry)) throw new PromptCancelled()
+
+    return createNodeManagedItems(packageJsonFrameworkDependency, npmrcArrangeRegistry)
 }
 
 function createCmakeManagedItems(fetchContent: boolean, pluginTarget: boolean, linkFramework: boolean): Record<string, boolean> {
@@ -240,8 +253,9 @@ function createCmakeManagedItems(fetchContent: boolean, pluginTarget: boolean, l
     }
 }
 
-function createNodeManagedItems(dependencies: boolean): Record<string, boolean> {
+function createNodeManagedItems(packageJsonFrameworkDependency: boolean, npmrcArrangeRegistry: boolean): Record<string, boolean> {
     return {
-        [packageJsonManagedItemKeys.dependencies]: dependencies,
+        [nodeManagedItemKeys.packageJsonFrameworkDependency]: packageJsonFrameworkDependency,
+        [nodeManagedItemKeys.npmrcArrangeRegistry]: npmrcArrangeRegistry,
     }
 }

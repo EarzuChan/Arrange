@@ -1,6 +1,7 @@
 import {relative, resolve} from "node:path"
 import type {ProjectState} from "../project/ProjectState.ts"
 import {writeTextFile} from "../utils/utils.ts"
+import {nodeManagedItemKeys} from "./NodeManagedItems.ts"
 
 export class NodeProjectGenerator {
     async generate(rootDir: string, state: ProjectState): Promise<string[]> {
@@ -13,7 +14,7 @@ export class NodeProjectGenerator {
 
         const files = [
             {path: packageJsonPath, content: createPackageJson(state)},
-            ...(state.project.framework.nodeRegistryUrl ? [{path: npmrcPath, content: createNpmrc(state.project.framework.nodeRegistryUrl)}] : []),
+            ...(state.project.framework.nodeRegistryUrl ? [{path: npmrcPath, content: createNpmrc(state, state.project.framework.nodeRegistryUrl)}] : []),
             {path: mainPath, content: createMainTs()},
             {path: appPath, content: createAppVue(state)},
         ]
@@ -36,8 +37,17 @@ function createPackageJson(state: ProjectState): string {
     }, null, 2)}\n`
 }
 
-function createNpmrc(registryUrl: string): string {
-    return `@arrange:registry=${registryUrl.replace(/\/+$/, "")}\n`
+function createNpmrc(state: ProjectState, registryUrl: string): string {
+    const body = `@arrange:registry=${registryUrl.replace(/\/+$/, "")}`
+
+    if (state.project.managed.items[nodeManagedItemKeys.npmrcArrangeRegistry]?.managed) return [
+        `# arrange:begin ${nodeManagedItemKeys.npmrcArrangeRegistry}`,
+        body,
+        `# arrange:end ${nodeManagedItemKeys.npmrcArrangeRegistry}`,
+        "",
+    ].join("\n")
+
+    return `${body}\n`
 }
 
 function createMainTs(): string {
