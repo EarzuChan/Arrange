@@ -2,6 +2,7 @@
   "name": "@arrange/cli",
   "description": "The official CLI of Arrange",
   "version": "1.0.1",
+  "compatibility": 1,
   "private": false,
   "type": "module",
   "bin": {

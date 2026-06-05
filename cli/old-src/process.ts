@@ -107,7 +107,7 @@ function createInvocation(command: string, args: readonly string[], options: Run
     const toolchain = options.toolchain
     if (process.platform === "win32") {
         if (options.msvc) {
-            if (!toolchain?.msvc) throw new Error("Native commands require an MSVC environment, but arrange.local.yaml does not define windows.msvc.")
+            if (!toolchain?.msvc) throw new Error("Native command require an MSVC environment, but arrange.local.yaml does not define windows.msvc.")
             return {
                 command: toolchain.shellCommand,
                 args: ["/d", "/s", "/c", commandLine([

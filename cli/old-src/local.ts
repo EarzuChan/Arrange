@@ -271,7 +271,7 @@ function reconcileLocalConfig(local: LocalConfig, packageManager: PackageManager
     const defaultShell = local.platform === "windows" ? "cmd.exe" : "/bin/zsh"
     if (!validExecutable(section.shell.command)) section.shell.command = defaultShell
     if (!validExecutable(section.shell.command)) {
-        issues.push({field: `${local.platform}.shell.command`, message: "Shell for external commands was not found."})
+        issues.push({field: `${local.platform}.shell.command`, message: "Shell for external command was not found."})
     }
 
     if (!validExecutable(section.packageManager.command)) {

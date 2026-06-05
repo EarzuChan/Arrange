@@ -214,7 +214,7 @@ async function packageOnly(parsed: Parsed): Promise<void> {
 
 async function loadAndCheckProject(): Promise<ProjectContext> {
     const root = process.cwd()
-    if (!hasConfig(root)) throw new Error("No arrange.config.yaml was found in the current directory. Existing project commands must be run from the Arrange project root.")
+    if (!hasConfig(root)) throw new Error("No arrange.config.yaml was found in the current directory. Existing project command must be run from the Arrange project root.")
 
     const config = readProjectConfig(root)
     const uiRoot = resolve(root, config.ui.path)
