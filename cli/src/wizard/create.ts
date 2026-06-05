@@ -2,9 +2,9 @@ import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "
 import {resolve} from "node:path"
 import {cmakeManagedItemKeys} from "../cmake/CmakeManagedItems.ts"
 import {packageJsonManagedItemKeys} from "../node/PackageJsonManagedItems.ts"
-import type {CreateProjectRequest} from "../project/ProjectCreateModel.ts"
+import type {CreateProjectRequest} from "../project/project.ts"
 import type {NativeProduct, PackageManagerName, PluginType} from "../project/ProjectState.ts"
-import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/PromptUtils.ts"
+import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/promptUtils.ts"
 import {selectFrameworkVersion} from "./frameworkVersion.ts"
 
 export interface CreateWizardInput {

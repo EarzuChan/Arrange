@@ -1,8 +1,8 @@
 ﻿import type {Command} from "commander"
 import {relative} from "node:path"
 import type {CliServices} from "../services.ts"
-import {createInitialProjectState} from "../project/ProjectCreateModel.ts"
-import {projectFileNames} from "../project/ProjectFiles.ts"
+import {createInitialProjectState} from "../project/project.ts"
+import {projectFileNames} from "../project/ProjectStateStore.ts"
 import {runCreateWizard} from "../wizard/create.ts"
 
 export interface CreateCommandOptions {
@@ -45,4 +45,3 @@ function displayPath(path: string): string {
 function shellPath(path: string): string {
     return /[\s"&|<>^]/.test(path) ? `"${path.replace(/"/g, '\\"')}"` : path
 }
-

@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 
 export interface ArtifactLocation {
     readonly name: string

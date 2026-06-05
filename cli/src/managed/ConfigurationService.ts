@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 import type { ManagedItemCheckResult } from "./ManagedItem.ts"
 import { ManagedItemRegistry } from "./ManagedItemRegistry.ts"
 

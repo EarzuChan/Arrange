@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 
 export type ManagedItemStatus = "ok" | "missing" | "damaged" | "outdated" | "disabled"
 

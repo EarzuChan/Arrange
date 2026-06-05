@@ -1,5 +1,5 @@
 import { ConfigurationService } from "../managed/ConfigurationService.ts"
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 import type { SyncCheckReport, SyncIssue } from "./SyncCheckReport.ts"
 
 export class SyncChecker {

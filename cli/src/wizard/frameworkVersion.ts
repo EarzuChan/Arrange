@@ -1,9 +1,9 @@
 import {confirm, isCancel, log, select, spinner} from "@clack/prompts"
-import {cliCompatibility} from "../CliMetadata.ts"
+import {cliCompatibility} from "../cliMetadata.ts"
 import {FrameworkRegistryClient, normalizeRegistryUrl} from "../framework/FrameworkRegistryClient.ts"
 import {assertFrameworkCompatible, addIncompatibilityIfPresenceFor, FrameworkVersionSelectionCandidate, FrameworkVersionCandidate} from "../framework/FrameworkMamba.ts"
-import {PromptCancelled, requiredText, validateSemver} from "../utils/PromptUtils.ts"
-import {formatTimestampToDate} from "../utils/Utils.ts";
+import {PromptCancelled, requiredText, validateSemver} from "../utils/promptUtils.ts"
+import {formatTimestampToDate} from "../utils/utils.ts";
 
 export interface FrameworkVersionWizardInput {
     readonly registryUrl?: string

@@ -1,65 +1,90 @@
-export type ArrangeSide = "ui" | "native"
-export type BuildFlavor = "debug" | "release"
-export type NativeProduct = "standalone" | "vst3"
-export type PackageManagerName = "pnpm" | "npm" | "yarn"
+import {z} from "zod"
 
-export interface ProjectState {
-    readonly project: ProjectDefinition
-    readonly local: LocalDefinition | null
-}
+export const arrangeSubprojectSchema = z.enum(["ui", "native"])
+export type ArrangeSubproject = z.infer<typeof arrangeSubprojectSchema>
 
-export interface ProjectDefinition {
-    readonly name: string
-    readonly version: string
-    readonly vendorName: string
-    readonly vendorCode: string
-    readonly pluginCode: string
-    readonly pluginType: PluginType
-    readonly framework: FrameworkDefinition
-    readonly ui: UiProjectDefinition
-    readonly native: NativeProjectDefinition
-    readonly artifacts: ArtifactDefinition
-    readonly managed: ManagedProjectDefinition
-}
+export const buildFlavorSchema = z.enum(["debug", "release"])
+export type BuildFlavor = z.infer<typeof buildFlavorSchema>
 
-export type PluginType = "effect" | "instrument"
+export const nativeProductSchema = z.enum(["standalone", "vst3"])
+export type NativeProduct = z.infer<typeof nativeProductSchema>
 
-export interface FrameworkDefinition {
-    readonly version: string
-    readonly registryUrl?: string
-}
+export const packageManagerNameSchema = z.enum(["pnpm", "npm", "yarn"])
+export type PackageManagerName = z.infer<typeof packageManagerNameSchema>
 
-export interface UiProjectDefinition {
-    readonly directory: string
-    readonly packageManager: PackageManagerName
-}
+export const pluginTypeSchema = z.enum(["effect", "instrument"])
+export type PluginType = z.infer<typeof pluginTypeSchema>
 
-export interface NativeProjectDefinition {
-    readonly directory: string
-    readonly products: NativeProduct[]
-}
+export const frameworkDefinitionSchema = z.object({
+    version: z.string(),
+    registryUrl: z.string().optional(),
+})
+export type FrameworkDefinition = z.infer<typeof frameworkDefinitionSchema>
 
-export interface ArtifactDefinition {
-    readonly directory: string
-    readonly includeVersionDirectory: boolean
-}
+export const uiProjectDefinitionSchema = z.object({
+    directory: z.string(),
+    packageManager: packageManagerNameSchema,
+})
+export type UiProjectDefinition = z.infer<typeof uiProjectDefinitionSchema>
 
-export interface ManagedProjectDefinition {
-    readonly items: Record<string, ManagedItemState>
-}
+export const nativeProjectDefinitionSchema = z.object({
+    directory: z.string(),
+    products: z.array(nativeProductSchema),
+})
+export type NativeProjectDefinition = z.infer<typeof nativeProjectDefinitionSchema>
 
-export interface ManagedItemState {
-    readonly managed: boolean
-}
+export const artifactDefinitionSchema = z.object({
+    directory: z.string(),
+    includeVersionDirectory: z.boolean(),
+})
+export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>
 
-export interface LocalDefinition {
-    readonly node?: ToolPathDefinition
-    readonly packageManager?: ToolPathDefinition
-    readonly cmake?: ToolPathDefinition
-    readonly nativeCompiler?: ToolPathDefinition
-}
+export const managedItemStateSchema = z.object({
+    managed: z.boolean(),
+})
+export type ManagedItemState = z.infer<typeof managedItemStateSchema>
 
-export interface ToolPathDefinition {
-    readonly path: string
-    readonly version?: string
+export const managedProjectDefinitionSchema = z.object({
+    items: z.record(z.string(), managedItemStateSchema),
+})
+export type ManagedProjectDefinition = z.infer<typeof managedProjectDefinitionSchema>
+
+export const projectDefinitionSchema = z.object({
+    name: z.string(),
+    version: z.string(),
+    vendorName: z.string(),
+    vendorCode: z.string(),
+    pluginCode: z.string(),
+    pluginType: pluginTypeSchema,
+    framework: frameworkDefinitionSchema,
+    ui: uiProjectDefinitionSchema,
+    native: nativeProjectDefinitionSchema,
+    artifacts: artifactDefinitionSchema,
+    managed: managedProjectDefinitionSchema,
+})
+export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>
+
+export const toolPathDefinitionSchema = z.object({
+    path: z.string(),
+    version: z.string().optional(),
+})
+export type ToolPathDefinition = z.infer<typeof toolPathDefinitionSchema>
+
+export const localDefinitionSchema = z.object({
+    node: toolPathDefinitionSchema.optional(),
+    packageManager: toolPathDefinitionSchema.optional(),
+    cmake: toolPathDefinitionSchema.optional(),
+    nativeCompiler: toolPathDefinitionSchema.optional(),
+})
+export type LocalDefinition = z.infer<typeof localDefinitionSchema>
+
+export const projectStateSchema = z.object({
+    project: projectDefinitionSchema,
+    local: localDefinitionSchema.nullable(),
+})
+export type ProjectState = z.infer<typeof projectStateSchema>
+
+export interface ProjectContext {
+    readonly rootDir: string
+    readonly state: ProjectState
 }

@@ -27,9 +27,8 @@ export class DevSupervisor {
     }
 
     protected stopAll(): void {
-        for (const child of this.children.values()) {
-            child.kill()
-        }
+        for (const child of this.children.values()) child.kill()
+
         this.children.clear()
     }
 }

@@ -1,6 +1,6 @@
 import {relative, resolve} from "node:path"
 import type {ProjectState} from "../project/ProjectState.ts"
-import {writeTextFile} from "../utils/Utils.ts"
+import {writeTextFile} from "../utils/utils.ts"
 
 export class NodeProjectGenerator {
     async generate(rootDir: string, state: ProjectState): Promise<string[]> {

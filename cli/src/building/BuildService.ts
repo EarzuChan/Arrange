@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 import { NativeBuildService } from "./NativeBuildService.ts"
 import { UiBuildService } from "./UiBuildService.ts"
 

@@ -1,5 +1,5 @@
 import { relative, resolve } from "node:path"
-import { writeTextFile } from "../utils/Utils.ts"
+import { writeTextFile } from "../utils/utils.ts"
 import { cmakeManagedItemKeys } from "./CmakeManagedItems.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
 
@@ -22,6 +22,7 @@ export class CmakeProjectGenerator {
             await writeTextFile(file.path, file.content)
             written.push(relative(rootDir, file.path))
         }
+
         return written
     }
 }

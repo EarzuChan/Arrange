@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env node
 import { Command } from "commander"
-import {cliCompatibility, cliDescription, cliName, cliVersion} from "./CliMetadata.ts"
+import {cliCompatibility, cliDescription, cliName, cliVersion} from "./cliMetadata.ts"
 import { createCliServices } from "./services.ts"
 import { registerAdoptCommand } from "./command/adopt.ts"
 import { registerBuildCommand } from "./command/build.ts"

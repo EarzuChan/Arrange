@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises"
 import { relative, resolve } from "node:path"
 import { CmakeProjectGenerator } from "../cmake/CmakeProjectGenerator.ts"
 import { NodeProjectGenerator } from "../node/NodeProjectGenerator.ts"
-import { writeTextFile } from "../utils/Utils.ts"
+import { writeTextFile } from "../utils/utils.ts"
 import type { ProjectState } from "./ProjectState.ts"
 
 export interface ProjectScaffoldResult {
@@ -10,10 +10,7 @@ export interface ProjectScaffoldResult {
 }
 
 export class ProjectScaffoldGenerator {
-    constructor(
-        private readonly cmakeGenerator = new CmakeProjectGenerator(),
-        private readonly nodeGenerator = new NodeProjectGenerator(),
-    ) {}
+    constructor(private readonly cmakeGenerator = new CmakeProjectGenerator(), private readonly nodeGenerator = new NodeProjectGenerator(),) {}
 
     async generate(rootDir: string, state: ProjectState): Promise<ProjectScaffoldResult> {
         const writtenFiles: string[] = []

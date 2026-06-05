@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 import { PlatformService, type PlatformCheckResult } from "./PlatformService.ts"
 
 export class WindowsPlatformService extends PlatformService {

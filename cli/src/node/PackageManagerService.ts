@@ -1,5 +1,5 @@
 import type { ProcessSpec } from "../platform/ProcessSpec.ts"
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 
 export class PackageManagerService {
     async checkInstalled(context: ProjectContext): Promise<boolean> {

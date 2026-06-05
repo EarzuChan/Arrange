@@ -13,7 +13,7 @@ export function registerAdoptCommand(program: Command, services: CliServices): v
         .action(async (options: AdoptCommandOptions) => {
             void options
             void services
-            // TODO：调用 AdoptWizard + AdoptService
+            // TODO：调用 AdoptWizard 等
             // adopt 的 raw 工程识别、托管选择、二次确认必须在专项流程中完成
         })
 }

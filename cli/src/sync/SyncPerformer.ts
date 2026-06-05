@@ -1,5 +1,5 @@
 import { ProjectConfigurer } from "../configuring/ProjectConfigurer.ts"
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 import type { SyncCheckReport } from "./SyncCheckReport.ts"
 
 export class SyncPerformer {

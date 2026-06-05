@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectContext.ts"
+import type { ProjectContext } from "../project/ProjectState.ts"
 
 export class NodeConfigService {
     async checkPackageJsonState(context: ProjectContext): Promise<boolean> {
