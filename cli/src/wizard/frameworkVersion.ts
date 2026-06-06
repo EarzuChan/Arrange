@@ -136,7 +136,7 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 log.warn(`Using unverified @arrange/framework@${version}. Later sync/install may fail if this version does not exist or is incompatible.`)
                 return {
                     version,
-                    cliCompatibility: cliCompatibility, // TIPS：认为它以兼容
+                    cliCompatibility: cliCompatibility, // TIPS：强行认为它以兼容
                     markedLatest: false,
                     publishedAt: null,
                     incompatibility: null,

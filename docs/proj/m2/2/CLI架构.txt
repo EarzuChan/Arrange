@@ -1,8 +1,3 @@
-哥哥，我觉得这个方向是对的，而且比现在代码层次健康太多。按 TS/CLI 生态可以稍微“TS 化”，但核心分层我赞同。
-
-我会微调成这样：
-
-```txt
 cli/src/
   index.ts // 入口
 
@@ -18,40 +13,40 @@ cli/src/
     SyncPerformer
 
   project/
-    // 要有一个轻量级无状态服务来“从本地加载工程”，“工程状态保存”
-    ProjectContext.ts // 包含Config、Local状态
+    ProjectStateStore.ts
+    ProjectState.ts // 包含Config、Local状态
 
-  management/
-    ManagedItem.ts
-    ManagedPolicy.ts
-    ManagedItemRegistry.ts
+  managed/
     ConfigurationService.ts
+    ManagedItem.ts
+    ManagedItemRegistry.ts
 
   cmake/
     CmakeConfigService
-    CmakeManagedItems
     CmakeDetector
+    CmakeManagedItems
+    CmakeProjectGenerator
 
   node/
     NodeConfigService
-    PackageJsonManagedItems
     PackageManagerService
+    NodeManagedItems
+    NodeProjectGenerator
 
-  toolchain/
-    ToolchainService
-    WindowsToolchainService
-    MacToolchainService
+  platform/
+    PlatformService
+    WindowsPlatformService
+    MacPlatformService
     Executor // 负责管理调起程序（比如Dev Server）和生命周期
+    ProcessSpec
 
   runner/ // 负责管理调起程序（比如Dev Server）和生命周期
 
-  build/
+  building/
     BuildService
     NativeBuildService
     UiBuildService
-    Configurer
 
-  package/
+  packing/
     Packer
     ArtifactLocator
-```

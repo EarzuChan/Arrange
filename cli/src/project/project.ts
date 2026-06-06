@@ -46,11 +46,9 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
                 directory: request.artifactsDirectory,
                 includeVersionDirectory: true,
             },
-            managed: {
-                items: Object.fromEntries(
-                    Object.entries(request.managedItems).map(([key, managed]) => [key, { managed }]),
-                ),
-            },
+            "managed-items": Object.entries(request.managedItems)
+                .filter(([, managed]) => managed)
+                .map(([key]) => key),
         },
         local: null, // TIPS：初次创建时尚未有Local配置，这个是被Sync阶段生成
     }

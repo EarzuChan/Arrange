@@ -18,9 +18,9 @@ export interface FrameworkVersionSelectionCandidate extends FrameworkVersionCand
 
 export function addIncompatibilityIfPresenceFor(candidates: readonly FrameworkVersionCandidate[]): FrameworkVersionSelectionCandidate[] {
     return candidates.map((candidate) => {
-        const candidateCompatibility = candidate.cliCompatibility
+        const compatibility = candidate.cliCompatibility
 
-        return {...candidate, incompatibility: candidateCompatibility === null ? "incompatible: no compatibility code" : (candidateCompatibility !== cliCompatibility ? `incompatible: ${candidateCompatibility}` : null)}
+        return {...candidate, incompatibility: compatibility === null ? "incompatible: no compatibility code" : (compatibility !== cliCompatibility ? `incompatible: ${compatibility}` : null)}
     })
 }
 

@@ -40,16 +40,6 @@ export const artifactDefinitionSchema = z.object({
 })
 export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>
 
-export const managedItemStateSchema = z.object({
-    managed: z.boolean(),
-})
-export type ManagedItemState = z.infer<typeof managedItemStateSchema>
-
-export const managedProjectDefinitionSchema = z.object({
-    items: z.record(z.string(), managedItemStateSchema),
-})
-export type ManagedProjectDefinition = z.infer<typeof managedProjectDefinitionSchema>
-
 export const projectDefinitionSchema = z.object({
     name: z.string(),
     version: z.string(),
@@ -61,7 +51,7 @@ export const projectDefinitionSchema = z.object({
     ui: uiProjectDefinitionSchema,
     native: nativeProjectDefinitionSchema,
     artifacts: artifactDefinitionSchema,
-    managed: managedProjectDefinitionSchema,
+    "managed-items": z.array(z.string()),
 })
 export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>
 
@@ -88,4 +78,9 @@ export type ProjectState = z.infer<typeof projectStateSchema>
 export interface ProjectContext {
     readonly rootDir: string
     readonly state: ProjectState
+}
+
+// 一个小工具方法
+export function isManagedItem(state: ProjectState, key: string): boolean {
+    return state.project["managed-items"].includes(key)
 }

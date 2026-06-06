@@ -1,5 +1,5 @@
 import {relative, resolve} from "node:path"
-import type {ProjectState} from "../project/ProjectState.ts"
+import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
 import {writeTextFile} from "../utils/utils.ts"
 import {nodeManagedItemKeys} from "./NodeManagedItems.ts"
 
@@ -40,7 +40,7 @@ function createPackageJson(state: ProjectState): string {
 function createNpmrc(state: ProjectState, registryUrl: string): string {
     const body = `@arrange:registry=${registryUrl.replace(/\/+$/, "")}`
 
-    if (state.project.managed.items[nodeManagedItemKeys.npmrcArrangeRegistry]?.managed) return [
+    if (isManagedItem(state, nodeManagedItemKeys.npmrcArrangeRegistry)) return [
         `# arrange:begin ${nodeManagedItemKeys.npmrcArrangeRegistry}`,
         body,
         `# arrange:end ${nodeManagedItemKeys.npmrcArrangeRegistry}`,

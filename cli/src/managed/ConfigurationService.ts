@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectState.ts"
+import {isManagedItem, type ProjectContext} from "../project/ProjectState.ts"
 import type { ManagedItemCheckResult } from "./ManagedItem.ts"
 import { ManagedItemRegistry } from "./ManagedItemRegistry.ts"
 
@@ -9,9 +9,7 @@ export class ConfigurationService {
         const results: ManagedItemCheckResult[] = []
 
         for (const item of this.registry.list()) {
-            const policy = context.state.project.managed.items[item.key]
-
-            if (!policy?.managed) {
+            if (!isManagedItem(context.state, item.key)) {
                 results.push({ key: item.key, status: "disabled" })
                 continue
             }

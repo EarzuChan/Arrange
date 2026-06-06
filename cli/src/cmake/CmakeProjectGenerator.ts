@@ -1,7 +1,7 @@
 import { relative, resolve } from "node:path"
 import { writeTextFile } from "../utils/utils.ts"
 import { cmakeManagedItemKeys } from "./CmakeManagedItems.ts"
-import type { ProjectState } from "../project/ProjectState.ts"
+import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
 
 const defaultCmakeFetchContentUrl = "https://github.com/EarzuChan/Arrange.git"
 
@@ -47,7 +47,7 @@ function createCmakeLists(state: ProjectState): string {
 }
 
 function createMaybeManagedBlock(state: ProjectState, key: string, regionName: string, body: string): string {
-    return !state.project.managed.items[key]?.managed ? body : managedRegion(regionName, body)
+    return !isManagedItem(state, key) ? body : managedRegion(regionName, body)
 }
 
 function createFetchContentBlock(state: ProjectState): string {
