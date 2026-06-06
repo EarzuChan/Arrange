@@ -4,22 +4,28 @@ import { CmakeProjectGenerator } from "../cmake/CmakeProjectGenerator.ts"
 import { NodeProjectGenerator } from "../node/NodeProjectGenerator.ts"
 import { writeTextFile } from "../utils/utils.ts"
 import type { ProjectState } from "./ProjectState.ts"
+import type {PluginType} from "./CreateProject.ts"
 
 export interface ProjectScaffoldResult {
     readonly writtenFiles: string[]
 }
 
+// 一次性的参数
+export interface ProjectScaffoldOptions {
+    readonly pluginType: PluginType
+}
+
 export class ProjectScaffoldGenerator {
     constructor(private readonly cmakeGenerator = new CmakeProjectGenerator(), private readonly nodeGenerator = new NodeProjectGenerator(),) {}
 
-    async generate(rootDir: string, state: ProjectState): Promise<ProjectScaffoldResult> {
+    async generate(rootDir: string, state: ProjectState, options: ProjectScaffoldOptions): Promise<ProjectScaffoldResult> {
         const writtenFiles: string[] = []
 
         await mkdir(rootDir, { recursive: true })
 
         writtenFiles.push(...await this.writeRootFiles(rootDir, state))
         writtenFiles.push(...await this.nodeGenerator.generate(rootDir, state))
-        writtenFiles.push(...await this.cmakeGenerator.generate(rootDir, state))
+        writtenFiles.push(...await this.cmakeGenerator.generate(rootDir, state, {pluginType: options.pluginType}))
 
         return { writtenFiles: unique(writtenFiles) }
     }

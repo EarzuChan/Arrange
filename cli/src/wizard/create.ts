@@ -2,8 +2,8 @@ import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "
 import {resolve} from "node:path"
 import {cmakeManagedItemKeys} from "../cmake/CmakeManagedItems.ts"
 import {nodeManagedItemKeys} from "../node/NodeManagedItems.ts"
-import type {CreateProjectRequest} from "../project/project.ts"
-import type {NativeProduct, PackageManagerName, PluginType} from "../project/ProjectState.ts"
+import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
+import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/promptUtils.ts"
 import {selectFrameworkVersion} from "./frameworkVersion.ts"
 
@@ -197,7 +197,7 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
 
 async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
     const manageAllCmake = await confirm({
-        message: "Let Arrange manage all native CMake items?",
+        message: "Let Arrange manage all native config items?",
         initialValue: true,
     })
     if (isCancel(manageAllCmake)) throw new PromptCancelled()
@@ -224,7 +224,7 @@ async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
 
 async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
     const manageAllNode = await confirm({
-        message: "Let Arrange manage all UI Node items?",
+        message: "Let Arrange manage all UI config items?",
         initialValue: true,
     })
     if (isCancel(manageAllNode)) throw new PromptCancelled()

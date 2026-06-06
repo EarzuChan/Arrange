@@ -1,4 +1,6 @@
-import type { NativeProduct, PackageManagerName, PluginType, ProjectState } from "./ProjectState.ts"
+import type {NativeProduct, PackageManagerName, ProjectState} from "./ProjectState.ts"
+
+export type PluginType = "effect" | "instrument"
 
 export interface CreateProjectRequest {
     readonly rootDir: string
@@ -23,12 +25,14 @@ export interface CreateProjectRequest {
 export function createInitialProjectState(request: CreateProjectRequest): ProjectState {
     return {
         project: {
-            name: request.projectName,
-            version: request.projectVersion,
-            vendorName: request.vendorName,
-            vendorCode: request.vendorCode,
-            pluginCode: request.pluginCode,
-            pluginType: request.pluginType,
+            project: {
+                name: request.projectName,
+                version: request.projectVersion,
+                vendorName: request.vendorName,
+                vendorCode: request.vendorCode,
+                pluginCode: request.pluginCode,
+                products: request.products,
+            },
             framework: {
                 version: request.frameworkVersion,
                 ...(request.frameworkNodeRegistryUrl ? {nodeRegistryUrl: request.frameworkNodeRegistryUrl} : {}),
@@ -40,7 +44,6 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             native: {
                 directory: request.nativeDirectory,
-                products: request.products,
             },
             artifacts: {
                 directory: request.artifactsDirectory,

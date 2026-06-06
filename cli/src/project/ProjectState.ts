@@ -12,9 +12,6 @@ export type NativeProduct = z.infer<typeof nativeProductSchema>
 export const packageManagerNameSchema = z.enum(["pnpm", "npm", "yarn"])
 export type PackageManagerName = z.infer<typeof packageManagerNameSchema>
 
-export const pluginTypeSchema = z.enum(["effect", "instrument"])
-export type PluginType = z.infer<typeof pluginTypeSchema>
-
 export const frameworkDefinitionSchema = z.object({
     version: z.string(),
     nodeRegistryUrl: z.string().optional(),
@@ -30,7 +27,6 @@ export type UiProjectDefinition = z.infer<typeof uiProjectDefinitionSchema>
 
 export const nativeProjectDefinitionSchema = z.object({
     directory: z.string(),
-    products: z.array(nativeProductSchema),
 })
 export type NativeProjectDefinition = z.infer<typeof nativeProjectDefinitionSchema>
 
@@ -40,13 +36,18 @@ export const artifactDefinitionSchema = z.object({
 })
 export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>
 
-export const projectDefinitionSchema = z.object({
+export const projectMetadataSchema = z.object({
     name: z.string(),
     version: z.string(),
     vendorName: z.string(),
     vendorCode: z.string(),
     pluginCode: z.string(),
-    pluginType: pluginTypeSchema,
+    products: z.array(nativeProductSchema),
+})
+export type ProjectMetadata = z.infer<typeof projectMetadataSchema>
+
+export const projectDefinitionSchema = z.object({
+    project: projectMetadataSchema,
     framework: frameworkDefinitionSchema,
     ui: uiProjectDefinitionSchema,
     native: nativeProjectDefinitionSchema,

@@ -2,21 +2,27 @@ import { relative, resolve } from "node:path"
 import { writeTextFile } from "../utils/utils.ts"
 import { cmakeManagedItemKeys } from "./CmakeManagedItems.ts"
 import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
+import type {PluginType} from "../project/CreateProject.ts"
 
 const defaultCmakeFetchContentUrl = "https://github.com/EarzuChan/Arrange.git"
 
+// 一次性的参数
+export interface CmakeProjectGeneratorOptions {
+    readonly pluginType: PluginType
+}
+
 export class CmakeProjectGenerator {
-    async generate(rootDir: string, state: ProjectState): Promise<string[]> {
+    async generate(rootDir: string, state: ProjectState, options: CmakeProjectGeneratorOptions): Promise<string[]> {
         const nativeDir = resolve(rootDir, state.project.native.directory)
         const sourceDir = resolve(nativeDir, "Source")
         const cmakePath = resolve(nativeDir, "CMakeLists.txt")
-        const processorHeaderPath = resolve(sourceDir, `${state.project.name}Processor.h`)
-        const processorSourcePath = resolve(sourceDir, `${state.project.name}Processor.cpp`)
+        const processorHeaderPath = resolve(sourceDir, `${state.project.project.name}Processor.h`)
+        const processorSourcePath = resolve(sourceDir, `${state.project.project.name}Processor.cpp`)
 
         const files = [
-            { path: cmakePath, content: createCmakeLists(state) },
-            { path: processorHeaderPath, content: createProcessorHeader(state) },
-            { path: processorSourcePath, content: createProcessorSource(state) },
+            { path: cmakePath, content: createCmakeLists(state, options.pluginType) },
+            { path: processorHeaderPath, content: createProcessorHeader(state, options.pluginType) },
+            { path: processorSourcePath, content: createProcessorSource(state, options.pluginType) },
         ]
 
         const written: string[] = []
@@ -29,17 +35,17 @@ export class CmakeProjectGenerator {
     }
 }
 
-function createCmakeLists(state: ProjectState): string {
+function createCmakeLists(state: ProjectState, pluginType: PluginType): string {
     return [
         "cmake_minimum_required(VERSION 3.24)",
-        `project(${state.project.name} LANGUAGES C CXX)`,
+        `project(${state.project.project.name} LANGUAGES C CXX)`,
         "",
         "set(CMAKE_CXX_STANDARD 20)",
         "set(CMAKE_CXX_STANDARD_REQUIRED ON)",
         "",
         createMaybeManagedBlock(state, cmakeManagedItemKeys.fetchContent, "fetchcontent", createFetchContentBlock(state)),
         "",
-        createMaybeManagedBlock(state, cmakeManagedItemKeys.pluginTarget, "plugin-target", createPluginTargetBlock(state)),
+        createMaybeManagedBlock(state, cmakeManagedItemKeys.pluginTarget, "plugin-target", createPluginTargetBlock(state, pluginType)),
         "",
         createMaybeManagedBlock(state, cmakeManagedItemKeys.linkFramework, "link-framework", createLinkFrameworkBlock(state)),
         "",
@@ -61,18 +67,18 @@ function createFetchContentBlock(state: ProjectState): string {
     ].join("\n")
 }
 
-function createPluginTargetBlock(state: ProjectState): string {
-    const formats = state.project.native.products.map((product) => product === "standalone" ? "Standalone" : "VST3").join(" ")
-    const isSynth = state.project.pluginType === "instrument" ? "TRUE" : "FALSE"
+function createPluginTargetBlock(state: ProjectState, pluginType: PluginType): string {
+    const formats = state.project.project.products.map((product) => product === "standalone" ? "Standalone" : "VST3").join(" ")
+    const isSynth = pluginType === "instrument" ? "TRUE" : "FALSE"
 
     return [
-        `juce_add_plugin(${state.project.name}`,
-        `  VERSION ${state.project.version}`,
-        `  COMPANY_NAME "${state.project.vendorName}"`,
-        `  PLUGIN_MANUFACTURER_CODE ${state.project.vendorCode}`,
-        `  PLUGIN_CODE ${state.project.pluginCode}`,
+        `juce_add_plugin(${state.project.project.name}`,
+        `  VERSION ${state.project.project.version}`,
+        `  COMPANY_NAME "${state.project.project.vendorName}"`,
+        `  PLUGIN_MANUFACTURER_CODE ${state.project.project.vendorCode}`,
+        `  PLUGIN_CODE ${state.project.project.pluginCode}`,
         `  FORMATS ${formats}`,
-        `  PRODUCT_NAME "${state.project.name}"`,
+        `  PRODUCT_NAME "${state.project.project.name}"`,
         `  IS_SYNTH ${isSynth}`,
         `  NEEDS_MIDI_INPUT ${isSynth}`,
         "  NEEDS_MIDI_OUTPUT FALSE",
@@ -80,17 +86,17 @@ function createPluginTargetBlock(state: ProjectState): string {
         "  EDITOR_WANTS_KEYBOARD_FOCUS TRUE",
         "  COPY_PLUGIN_AFTER_BUILD FALSE",
         ")",
-        `juce_generate_juce_header(${state.project.name})`,
+        `juce_generate_juce_header(${state.project.project.name})`,
         "",
-        `target_sources(${state.project.name} PRIVATE`,
-        `  Source/${state.project.name}Processor.cpp`,
+        `target_sources(${state.project.project.name} PRIVATE`,
+        `  Source/${state.project.project.name}Processor.cpp`,
         ")",
         "",
-        `target_compile_definitions(${state.project.name} PRIVATE`,
+        `target_compile_definitions(${state.project.project.name} PRIVATE`,
         "  JUCE_WEB_BROWSER=0",
         "  JUCE_USE_CURL=0",
         ")",
-        `target_compile_definitions(${state.project.name} PUBLIC`,
+        `target_compile_definitions(${state.project.project.name} PUBLIC`,
         "  JUCE_VST3_CAN_REPLACE_VST2=0",
         ")",
     ].join("\n")
@@ -98,7 +104,7 @@ function createPluginTargetBlock(state: ProjectState): string {
 
 function createLinkFrameworkBlock(state: ProjectState): string {
     return [
-        `target_link_libraries(${state.project.name} PRIVATE`,
+        `target_link_libraries(${state.project.project.name} PRIVATE`,
         "  Arrange::framework",
         "  juce::juce_audio_utils",
         "  juce::juce_dsp",
@@ -109,9 +115,9 @@ function createLinkFrameworkBlock(state: ProjectState): string {
     ].join("\n")
 }
 
-function createProcessorHeader(state: ProjectState): string {
-    const className = `${state.project.name}Processor`
-    const isSynth = state.project.pluginType === "instrument"
+function createProcessorHeader(state: ProjectState, pluginType: PluginType): string {
+    const className = `${state.project.project.name}Processor`
+    const isSynth = pluginType === "instrument"
 
     return [
         "#pragma once",
@@ -123,7 +129,7 @@ function createProcessorHeader(state: ProjectState): string {
         `    ${className}();`,
         `    ~${className}() override = default;`,
         "",
-        `    const juce::String getName() const override { return ${cppString(state.project.name)}; }`,
+        `    const juce::String getName() const override { return ${cppString(state.project.project.name)}; }`,
         `    bool acceptsMidi() const override { return ${isSynth ? "true" : "false"}; }`,
         "    bool producesMidi() const override { return false; }",
         "    bool isMidiEffect() const override { return false; }",
@@ -153,12 +159,12 @@ function createProcessorHeader(state: ProjectState): string {
     ].join("\n")
 }
 
-function createProcessorSource(state: ProjectState): string {
-    const className = `${state.project.name}Processor`
-    const inputBus = state.project.pluginType === "instrument" ? "" : '.withInput("Input", juce::AudioChannelSet::stereo(), true)'
+function createProcessorSource(state: ProjectState, pluginType: PluginType): string {
+    const className = `${state.project.project.name}Processor`
+    const inputBus = pluginType === "instrument" ? "" : '.withInput("Input", juce::AudioChannelSet::stereo(), true)'
 
     return [
-        `#include "${state.project.name}Processor.h"`,
+        `#include "${state.project.project.name}Processor.h"`,
         "",
         "#include <arrange/juce/ArrangeEditor.h>",
         "#include <utility>",
@@ -169,7 +175,7 @@ function createProcessorSource(state: ProjectState): string {
         "",
         `bool ${className}::isBusesLayoutSupported(const BusesLayout& layouts) const {`,
         "    if (layouts.getMainOutputChannelSet().isDisabled()) return false;",
-        state.project.pluginType === "instrument"
+        pluginType === "instrument"
             ? "    return true;"
             : "    return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet();",
         "}",
@@ -184,7 +190,7 @@ function createProcessorSource(state: ProjectState): string {
         "    config.app.useDist();",
         "    config.width = 520;",
         "    config.height = 380;",
-        `    config.window.title = ${cppString(state.project.name)};`,
+        `    config.window.title = ${cppString(state.project.project.name)};`,
         "    config.window.resizable = true;",
         "    config.window.useCornerResizer = true;",
         "    config.window.minWidth = 420;",
@@ -205,6 +211,7 @@ function createProcessorSource(state: ProjectState): string {
     ].join("\n")
 }
 
+// CHECK：这个可能要被NPMRC复用
 function managedRegion(name: string, body: string): string {
     return [`# arrange:begin ${name}`, body.trimEnd(), `# arrange:end ${name}`].join("\n")
 }

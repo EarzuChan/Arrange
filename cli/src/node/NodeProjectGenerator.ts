@@ -30,13 +30,14 @@ export class NodeProjectGenerator {
 
 function createPackageJson(state: ProjectState): string {
     return `${JSON.stringify({
-        name: packageName(state.project.name),
+        name: packageName(state.project.project.name),
         private: true,
         type: "module",
         dependencies: {"@arrange/framework": state.project.framework.version}
     }, null, 2)}\n`
 }
 
+// HACK：这里硬编码了，操！
 function createNpmrc(state: ProjectState, registryUrl: string): string {
     const body = `@arrange:registry=${registryUrl.replace(/\/+$/, "")}`
 
@@ -64,7 +65,7 @@ function createAppVue(state: ProjectState): string {
     return [
         "<template>",
         "  <Column>",
-        `    <Text text="${escapeVueAttribute(state.project.name)}" />`,
+        `    <Text text="${escapeVueAttribute(state.project.project.name)}" />`,
         "  </Column>",
         "</template>",
         "",

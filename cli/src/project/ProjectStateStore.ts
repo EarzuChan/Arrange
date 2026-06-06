@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import {join} from "node:path"
-import { parse, stringify } from "yaml"
+import { parse, stringify, Document} from "yaml"
 import { localDefinitionSchema, projectDefinitionSchema, projectStateSchema, type ProjectState } from "./ProjectState.ts"
 import {writeTextFile} from "../utils/utils.ts"
 

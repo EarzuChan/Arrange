@@ -1,7 +1,7 @@
 ﻿import type {Command} from "commander"
 import {relative} from "node:path"
 import type {CliServices} from "../services.ts"
-import {createInitialProjectState} from "../project/project.ts"
+import {createInitialProjectState} from "../project/CreateProject.ts"
 import {projectFileNames} from "../project/ProjectStateStore.ts"
 import {runCreateWizard} from "../wizard/create.ts"
 
@@ -25,7 +25,7 @@ export function registerCreateCommand(program: Command, services: CliServices): 
             if (!request) return
 
             const state = createInitialProjectState(request)
-            const scaffold = await services.projectScaffoldGenerator.generate(request.rootDir, state)
+            const scaffold = await services.projectScaffoldGenerator.generate(request.rootDir, state, {pluginType: request.pluginType})
             await services.projectStateStore.save(request.rootDir, state)
             const writtenFiles = [...scaffold.writtenFiles, projectFileNames.project]
 
