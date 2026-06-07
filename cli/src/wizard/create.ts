@@ -1,7 +1,7 @@
 import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "@clack/prompts"
 import {resolve} from "node:path"
-import {cmakeManagedItemKeys} from "../cmake/CmakeManagedItems.ts"
-import {nodeManagedItemKeys} from "../node/NodeManagedItems.ts"
+import {CmakeFetchContentItem, CmakePluginFormatsItem, CmakePluginIdentityItem, CmakePluginVersionItem, CmakeProductNameItem} from "../cmake/CmakeManagedItems.ts"
+import {NpmrcArrangeRegistryItem, PackageJsonFrameworkDependencyItem, PackageJsonNameItem} from "../node/NodeManagedItems.ts"
 import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
 import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/promptUtils.ts"
@@ -188,7 +188,7 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
     })
     if (isCancel(manageAll)) throw new PromptCancelled()
 
-    if (manageAll) return {...createCmakeManagedItems(true, true, true), ...createNodeManagedItems(true, true)}
+    if (manageAll) return {...createCmakeManagedItems(true, true, true, true, true), ...createNodeManagedItems(true, true, true)}
 
     const cmakeItems = await promptCmakeManagedItems()
     const nodeItems = await promptNodeManagedItems()
@@ -201,25 +201,35 @@ async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
         initialValue: true,
     })
     if (isCancel(manageAllCmake)) throw new PromptCancelled()
-    if (manageAllCmake) return createCmakeManagedItems(true, true, true)
+    if (manageAllCmake) return createCmakeManagedItems(true, true, true, true, true)
 
     const fetchContent = await confirm({
         message: "Manage CMake FetchContent block?",
         initialValue: true,
     })
     if (isCancel(fetchContent)) throw new PromptCancelled()
-    const pluginTarget = await confirm({
-        message: "Manage CMake JUCE plugin target block?",
+    const pluginVersion = await confirm({
+        message: "Manage CMake JUCE plugin version?",
         initialValue: true,
     })
-    if (isCancel(pluginTarget)) throw new PromptCancelled()
-    const linkFramework = await confirm({
-        message: "Manage CMake Arrange framework link block?",
+    if (isCancel(pluginVersion)) throw new PromptCancelled()
+    const pluginIdentity = await confirm({
+        message: "Manage CMake JUCE plugin identity?",
         initialValue: true,
     })
-    if (isCancel(linkFramework)) throw new PromptCancelled()
+    if (isCancel(pluginIdentity)) throw new PromptCancelled()
+    const pluginFormats = await confirm({
+        message: "Manage CMake JUCE plugin formats?",
+        initialValue: true,
+    })
+    if (isCancel(pluginFormats)) throw new PromptCancelled()
+    const productName = await confirm({
+        message: "Manage CMake JUCE product name?",
+        initialValue: true,
+    })
+    if (isCancel(productName)) throw new PromptCancelled()
 
-    return createCmakeManagedItems(fetchContent, pluginTarget, linkFramework)
+    return createCmakeManagedItems(fetchContent, pluginVersion, pluginIdentity, pluginFormats, productName)
 }
 
 async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
@@ -228,7 +238,13 @@ async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
         initialValue: true,
     })
     if (isCancel(manageAllNode)) throw new PromptCancelled()
-    if (manageAllNode) return createNodeManagedItems(true, true)
+    if (manageAllNode) return createNodeManagedItems(true, true, true)
+
+    const packageJsonName = await confirm({
+        message: "Manage package.json package name?",
+        initialValue: true,
+    })
+    if (isCancel(packageJsonName)) throw new PromptCancelled()
 
     const packageJsonFrameworkDependency = await confirm({
         message: "Manage package.json @arrange/framework dependency version?",
@@ -242,20 +258,23 @@ async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
     })
     if (isCancel(npmrcArrangeRegistry)) throw new PromptCancelled()
 
-    return createNodeManagedItems(packageJsonFrameworkDependency, npmrcArrangeRegistry)
+    return createNodeManagedItems(packageJsonName, packageJsonFrameworkDependency, npmrcArrangeRegistry)
 }
 
-function createCmakeManagedItems(fetchContent: boolean, pluginTarget: boolean, linkFramework: boolean): Record<string, boolean> {
+function createCmakeManagedItems(fetchContent: boolean, pluginVersion: boolean, pluginIdentity: boolean, pluginFormats: boolean, productName: boolean): Record<string, boolean> {
     return {
-        [cmakeManagedItemKeys.fetchContent]: fetchContent,
-        [cmakeManagedItemKeys.pluginTarget]: pluginTarget,
-        [cmakeManagedItemKeys.linkFramework]: linkFramework,
+        [CmakeFetchContentItem.key]: fetchContent,
+        [CmakePluginVersionItem.key]: pluginVersion,
+        [CmakePluginIdentityItem.key]: pluginIdentity,
+        [CmakePluginFormatsItem.key]: pluginFormats,
+        [CmakeProductNameItem.key]: productName,
     }
 }
 
-function createNodeManagedItems(packageJsonFrameworkDependency: boolean, npmrcArrangeRegistry: boolean): Record<string, boolean> {
+function createNodeManagedItems(packageJsonName: boolean, packageJsonFrameworkDependency: boolean, npmrcArrangeRegistry: boolean): Record<string, boolean> {
     return {
-        [nodeManagedItemKeys.packageJsonFrameworkDependency]: packageJsonFrameworkDependency,
-        [nodeManagedItemKeys.npmrcArrangeRegistry]: npmrcArrangeRegistry,
+        [PackageJsonNameItem.key]: packageJsonName,
+        [PackageJsonFrameworkDependencyItem.key]: packageJsonFrameworkDependency,
+        [NpmrcArrangeRegistryItem.key]: npmrcArrangeRegistry,
     }
 }

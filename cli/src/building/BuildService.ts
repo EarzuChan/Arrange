@@ -12,7 +12,6 @@ export class BuildService {
     constructor(private readonly uiBuildService = new UiBuildService(), private readonly nativeBuildService = new NativeBuildService(),) {}
 
     async build(context: ProjectContext, options: BuildOptions): Promise<void> {
-        if (options.ui) await this.uiBuildService.build(context)
-        if (options.native) for (const target of options.nativeTargets) await this.nativeBuildService.buildTarget(context, target)
+        // TODO
     }
 }

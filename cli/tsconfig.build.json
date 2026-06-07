@@ -16,6 +16,7 @@
   ],
   "exclude": [
     "node_modules/**",
-    "tests/**"
+    "tests/**",
+    "src/**/待重写*.ts"
   ]
 }

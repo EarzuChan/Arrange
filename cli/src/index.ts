@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { Command } from "commander"
 import {cliCompatibility, cliDescription, cliName, cliVersion} from "./cliMetadata.ts"
 import { createCliServices } from "./services.ts"

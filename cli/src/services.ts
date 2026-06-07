@@ -1,18 +1,18 @@
 import {BuildService} from "./building/BuildService.ts"
 import {ProjectConfigurer} from "./configuring/ProjectConfigurer.ts"
 import {Packer} from "./packing/Packer.ts"
-import {ProjectScaffoldGenerator} from "./project/ProjectScaffoldGenerator.ts"
 import {ProjectStateStore} from "./project/ProjectStateStore.ts"
-import {SyncChecker} from "./sync/SyncChecker.ts"
-import {SyncPerformer} from "./sync/SyncPerformer.ts"
+import {createDefaultManagedItemRegistry, createDefaultTextClusterRegistry} from "./managed/DefaultManagedDefinitions.ts"
+import {ManagedTopologyResolver} from "./managed/ManagedTopology.ts"
+import {ConfigChecker} from "./sync/ConfigChecker.ts"
+import {ConfigPerformer} from "./sync/ConfigPerformer.ts"
 import {SyncService} from "./sync/SyncService.ts"
 
 export interface CliServices {
     readonly projectStateStore: ProjectStateStore
-    readonly projectScaffoldGenerator: ProjectScaffoldGenerator
     readonly syncService: SyncService
-    readonly syncChecker: SyncChecker
-    readonly syncPerformer: SyncPerformer
+    readonly configChecker: ConfigChecker
+    readonly configPerformer: ConfigPerformer
     readonly projectConfigurer: ProjectConfigurer
     readonly buildService: BuildService
     readonly packer: Packer
@@ -20,13 +20,15 @@ export interface CliServices {
 
 export function createCliServices(): CliServices {
     const projectStateStore = new ProjectStateStore()
-    const syncChecker = new SyncChecker()
+    const managedItemRegistry = createDefaultManagedItemRegistry()
+    const textClusterRegistry = createDefaultTextClusterRegistry()
+    const managedTopologyResolver = new ManagedTopologyResolver(managedItemRegistry, textClusterRegistry)
+    const configChecker = new ConfigChecker(managedTopologyResolver, textClusterRegistry)
+    const configPerformer = new ConfigPerformer(managedTopologyResolver, textClusterRegistry)
     const projectConfigurer = new ProjectConfigurer()
-    const syncPerformer = new SyncPerformer(projectConfigurer)
-    const syncService = new SyncService(projectStateStore, syncChecker, syncPerformer)
-    const projectScaffoldGenerator = new ProjectScaffoldGenerator()
+    const syncService = new SyncService(projectStateStore, configChecker, configPerformer)
     const buildService = new BuildService()
     const packer = new Packer()
 
-    return {projectStateStore, projectScaffoldGenerator, syncService, syncChecker, syncPerformer, projectConfigurer, buildService, packer}
+    return {projectStateStore, syncService, configChecker, configPerformer, projectConfigurer, buildService, packer}
 }

@@ -1,22 +1,21 @@
-import type { ProjectContext } from "../project/ProjectState.ts"
+import type {ProjectContext} from "../project/ProjectState.ts"
+import type {JsonRegion} from "./JsonRegion.ts"
+import type {TextRegion} from "./TextRegion.ts"
 
-export type ManagedItemStatus = "ok" | "missing" | "damaged" | "outdated" | "disabled"
+export interface TextManagedItem {
+    readonly id: string
+    readonly kind: "text"
 
-export interface ManagedItemCheckResult {
-    readonly key: string
-    readonly status: ManagedItemStatus
-    readonly message?: string
+    resolveRegions(context: ProjectContext): readonly TextRegion[]
 }
 
-export interface ManagedItemRepairPlan {
-    readonly key: string
-    readonly requiresInteraction: boolean
-    readonly summary: string
+export interface JsonManagedItem {
+    readonly id: string
+    readonly kind: "json"
+
+    filePath(context: ProjectContext): string
+
+    resolveRegions(context: ProjectContext): readonly JsonRegion[]
 }
 
-export interface ManagedItem {
-    readonly key: string
-    check(context: ProjectContext): Promise<ManagedItemCheckResult>
-    planRepair(context: ProjectContext, result: ManagedItemCheckResult): Promise<ManagedItemRepairPlan>
-    performRepair(context: ProjectContext, plan: ManagedItemRepairPlan): Promise<void>
-}
+export type ManagedItem = TextManagedItem | JsonManagedItem

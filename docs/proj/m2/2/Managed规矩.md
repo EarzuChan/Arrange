@@ -147,8 +147,8 @@ managed=false
 | `M-ok` | 有 managed wrapper，内容正确。 |
 | `M-outdated` | 有 managed wrapper，但内容与目标不一致。 |
 | `M-damaged` | 有 managed wrapper，但 marker / 内容损坏，无法可靠处理。 |
-| `U-same` | 有未包裹内容，且与目标值等价。 |
-| `U-different` | 有未包裹内容，且与目标值冲突。 |
+| `U-same` | 有未包裹内容，且与期待值完全相等。 |
+| `U-different` | 有未包裹内容，且与目标值冲突：我感觉无法判断，因为内容非生成的，可能性太多样。 |
 | `N` | 目标内容不存在。 |
 | `X` | 承载文件不可解析，或现场结构无法可靠判断。 |
 

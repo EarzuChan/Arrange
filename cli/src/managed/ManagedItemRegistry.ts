@@ -1,17 +1,13 @@
-import type { ManagedItem } from "./ManagedItem.ts"
+import type {ManagedItem} from "./ManagedItem.ts"
 
 export class ManagedItemRegistry {
-    private readonly items = new Map<string, ManagedItem>()
+    constructor(private readonly items: readonly ManagedItem[]) {}
 
-    register(item: ManagedItem): void {
-        this.items.set(item.key, item)
+    getAll(): readonly ManagedItem[] {
+        return this.items
     }
 
-    get(key: string): ManagedItem | undefined {
-        return this.items.get(key)
-    }
-
-    list(): ManagedItem[] {
-        return [...this.items.values()]
+    getById(id: string): ManagedItem | undefined {
+        return this.items.find((item) => item.id === id)
     }
 }

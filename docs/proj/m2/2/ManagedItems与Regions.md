@@ -118,8 +118,7 @@ Regions：
 
 说明：
 
-- 这三行物理空间连续，应作为一个 region。
-- 不拆成 `company-name` / `manufacturer-code` / `plugin-code` 三段 wrapper。
+- 这三行物理空间连续，合作为一个 region。
 
 ---
 
@@ -172,7 +171,7 @@ Regions：
 
 ---
 
-# 3. JSON managed items
+# 3. NODE managed items
 
 ## 3.1 `node.package-json.framework-dependency`
 
@@ -184,9 +183,9 @@ framework.version
 
 Regions：
 
-| region | 簇 | 内容示例 |
-|---|---|---|
-| `node.package-json.framework-dependency` | `PackageJsonDependenciesCluster` | `"@arrange/framework": "1.1.1"` |
+| region |  内容示例 |
+|---|----|
+| `node.package-json.framework-dependency` | `"@arrange/framework": "1.1.1"` |
 
 说明：
 
@@ -205,9 +204,9 @@ project.name -> packageName(project.name)
 
 Regions：
 
-| region | 簇 | 内容示例 |
-|---|---|---|
-| `node.package-json.name` | `PackageJsonRootCluster` | `"name": "a"` |
+| region                   | 内容示例          |
+|--------------------------|---------------|
+| `node.package-json.name` | `"name": "a"` |
 
 说明：
 
@@ -216,9 +215,7 @@ Regions：
 
 ---
 
-# 4. npmrc managed items
-
-## 4.1 `node.npmrc.arrange-registry`
+## 3.3 `node.npmrc.arrange-registry`
 
 来源：
 

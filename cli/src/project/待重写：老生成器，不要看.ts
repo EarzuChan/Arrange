@@ -16,7 +16,7 @@ export interface ProjectScaffoldOptions {
 }
 
 export class ProjectScaffoldGenerator {
-    constructor(private readonly cmakeGenerator = new CmakeProjectGenerator(), private readonly nodeGenerator = new NodeProjectGenerator(),) {}
+    constructor(private readonly cmakeGenerator = new CmakeProjectGenerator(), private readonly nodeGenerator = new NodeProjectGenerator()) {}
 
     async generate(rootDir: string, state: ProjectState, options: ProjectScaffoldOptions): Promise<ProjectScaffoldResult> {
         const writtenFiles: string[] = []

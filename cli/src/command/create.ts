@@ -1,4 +1,4 @@
-﻿import type {Command} from "commander"
+import type {Command} from "commander"
 import {relative} from "node:path"
 import type {CliServices} from "../services.ts"
 import {createInitialProjectState} from "../project/CreateProject.ts"
@@ -25,12 +25,10 @@ export function registerCreateCommand(program: Command, services: CliServices): 
             if (!request) return
 
             const state = createInitialProjectState(request)
-            const scaffold = await services.projectScaffoldGenerator.generate(request.rootDir, state, {pluginType: request.pluginType})
+            // TODO：调用生成器生成文件
             await services.projectStateStore.save(request.rootDir, state)
-            const writtenFiles = [...scaffold.writtenFiles, projectFileNames.project]
 
             console.log(`Project created:\n  root: ${request.rootDir}\n`)
-            for (const file of writtenFiles) console.log(`  created ${file}`)
 
             // TODO：询问用户是否立即运行 sync；sync 模块后续专项落地后接入
 
