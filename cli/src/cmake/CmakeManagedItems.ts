@@ -66,4 +66,4 @@ export function createCmakeManagedItems(): readonly TextManagedItem[] {
     ]
 }
 
-// TODO：NAME
+// TODO：NAME Item（with its 6 regions）

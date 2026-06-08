@@ -3,26 +3,19 @@ export interface TextSpan {
     readonly end: number
 }
 
-export type TextRegionWrapperLocation = | {
+export type TextRegionWrapperLocation = {
     readonly kind: "wrapped"
     readonly wrapperSpan: TextSpan
     readonly contentSpan: TextSpan
     readonly content: string
 } | { readonly kind: "missing" } | {
     readonly kind: "damaged"
-    readonly span: TextSpan
     readonly message: string
 }
 
 export interface TextRegionWrapperOptions {
     readonly commentPrefix?: string
     readonly newline?: string
-}
-
-interface TextLine {
-    readonly text: string
-    readonly start: number
-    readonly end: number
 }
 
 export const textRegionWrapper = {
@@ -48,61 +41,46 @@ export const textRegionWrapper = {
     locate(regionId: string, text: string, options: TextRegionWrapperOptions = {}): TextRegionWrapperLocation {
         const beginMarker = this.beginMarker(regionId, options)
         const endMarker = this.endMarker(regionId, options)
-        const lines = readLines(text)
-        const beginLines = lines.filter((line) => isMarkerLine(line.text, beginMarker))
-        const endLines = lines.filter((line) => isMarkerLine(line.text, endMarker))
 
-        if (beginLines.length === 0 && endLines.length === 0) return {kind: "missing"}
+        // 使用正则匹配整行标记，允许前后有空格，并捕获换行符
+        const beginRegex = new RegExp(`^[ \\t]*${escapeRegExp(beginMarker)}[ \\t]*(?:\\r?\\n|\\r|$)`, "gm")
+        const endRegex = new RegExp(`^[ \\t]*${escapeRegExp(endMarker)}[ \\t]*(?:\\r?\\n|\\r|$)`, "gm")
 
-        if (beginLines.length !== 1 || endLines.length !== 1) return {
+        const beginMatches = Array.from(text.matchAll(beginRegex))
+        const endMatches = Array.from(text.matchAll(endRegex))
+
+        if (beginMatches.length === 0 && endMatches.length === 0) return {kind: "missing"}
+
+        // TIPS：如前后wrapper mark任不为一，Damaged：span区间失真！Damage 系需要用户未来的介入才能修复
+        if (beginMatches.length !== 1 || endMatches.length !== 1) return {
             kind: "damaged",
-            span: {start: 0, end: text.length},
             message: `Damaged managed wrapper for ${regionId}.`,
         }
 
-        const beginLine = beginLines[0]!
-        const endLine = endLines[0]!
+        const beginMatch = beginMatches[0]!
+        const endMatch = endMatches[0]!
 
-        if (beginLine.start >= endLine.start) return {
+        const beginStart = beginMatch.index!
+        const beginEnd = beginStart + beginMatch[0].length
+
+        const endStart = endMatch.index!
+        const endEnd = endStart + endMatch[0].length
+
+        if (beginStart >= endStart) return {
             kind: "damaged",
-            span: {start: beginLine.start, end: endLine.end},
             message: `Managed wrapper end appears before begin for ${regionId}.`,
         }
 
-        const contentSpan = {start: beginLine.end, end: endLine.start}
-
         return {
             kind: "wrapped",
-            wrapperSpan: {start: beginLine.start, end: endLine.end},
-            contentSpan,
-            content: text.slice(contentSpan.start, contentSpan.end),
+            wrapperSpan: {start: beginStart, end: endEnd},
+            contentSpan: {start: beginEnd, end: endStart},
+            content: text.slice(beginEnd, endStart),
         }
     },
 } as const
 
-function readLines(text: string): readonly TextLine[] {
-    const lines: TextLine[] = []
-    const pattern = /.*(?:\r\n|\n|\r|$)/g
-
-    while (true) {
-        const match = pattern.exec(text)
-        if (match === null) break
-        if (match[0] === "" && match.index === text.length) break
-
-        lines.push({
-            text: match[0],
-            start: match.index,
-            end: match.index + match[0].length,
-        })
-    }
-
-    return lines
-}
-
-function isMarkerLine(line: string, marker: string): boolean {
-    return stripLineBreak(line).trim() === marker
-}
-
-function stripLineBreak(line: string): string {
-    return line.replace(/(?:\r\n|\n|\r)$/, "")
+// 辅助函数：转义正则安全字符
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }

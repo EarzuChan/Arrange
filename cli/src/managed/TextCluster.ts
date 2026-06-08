@@ -1,7 +1,7 @@
 import type {ProjectContext} from "../project/ProjectState.ts"
 import type {TextSpan} from "./TextRegionWrapper.ts"
 
-export type TextClusterLocation = | {
+export type TextClusterLocation = {
     readonly kind: "found"
     readonly span: TextSpan
     readonly text: string
@@ -13,7 +13,7 @@ export type TextClusterLocation = | {
 
 export interface TextCluster {
     readonly id: string
-    readonly canEditMissingCluster: boolean
+    readonly canEditMissingCluster: boolean // HACK：这个很危险
 
     filePath(context: ProjectContext): string
 

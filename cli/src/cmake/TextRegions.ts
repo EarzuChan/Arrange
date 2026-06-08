@@ -147,7 +147,8 @@ export class CmakePluginIdentityRegion extends RequiredTextRegion {
             }
         }
 
-        if (start === null || end === null) return null // CHECK：本行IDE说一直true
+        // noinspection PointlessBooleanExpressionJS，下行IDE说always true，但实际上不是：AI说并非，所以应得到保留
+        if (start === null || end === null) return null
 
         return {
             kind: "unwrapped",

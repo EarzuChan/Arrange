@@ -15,7 +15,7 @@ export class CmakeFetchContentCluster implements TextCluster {
     locate(fileText: string): TextClusterLocation {
         return {
             kind: "found",
-            span: {start: 0, end: fileText.length},
+            span: {start: 0, end: fileText.length}, // ？？根本没定位CmakeFetchContentCluster吧，这不爆炸了？
             text: fileText,
         }
     }

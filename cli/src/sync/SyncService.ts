@@ -12,31 +12,35 @@ export interface SyncRunOptions {
 }
 
 export class SyncService {
-    constructor(private readonly projectStateStore: ProjectStateStore, private readonly configChecker: ConfigChecker, private readonly configPerformer: ConfigPerformer,) {}
+    constructor(private readonly projectStateStore: ProjectStateStore, private readonly configChecker: ConfigChecker, private readonly configPerformer: ConfigPerformer,) {
+    }
 
+    // SYNC分为：
+    // 二阶段：CHECK、PERFORM
+    // 二类型：CONFIG（配置项的没毛病）、SETUP（工具链的已准备妥当）
     async run(options: SyncRunOptions): Promise<void> {
         void options
 
         const rootDir = process.cwd()
         const state = await this.projectStateStore.load(rootDir)
         const context = {rootDir, state}
-        const report = await this.configChecker.check(context)
 
-        if (options.checkOnly) {
-            if (hasConfigProblems(report)) {
-                console.error("Project sync check: updates are needed.")
-                process.exitCode = 1 // HACK：不应由这里直接退出程序
-            } else console.log("Project sync check: ok.")
+        // CHECK
+        const configCheckReport = await this.configChecker.check(context)
+        // TODO：这是远期占位符，之后的Setup Check
 
-            // TODO：这是远期占位符，之后的Setup Check
+        // CONFIG 的阐述这一块
+        if (hasConfigProblems(configCheckReport)) {
+            // TODO：具体阐述问题并停止
+        } else console.log("SYNC: CONFIG check: ok.")
 
-            return
-        }
+        // TODO：SETUP 的阐述这一块
 
-        await this.configPerformer.perform(context, report)
+        if (options.checkOnly) return
 
+        await this.configPerformer.perform(context, configCheckReport)
         // TODO：这是远期占位符，之后的Setup Perform
 
-        console.log("Project config synced.")
+        console.log("SYNC: ALL DONE.")
     }
 }
