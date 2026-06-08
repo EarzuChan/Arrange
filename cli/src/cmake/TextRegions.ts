@@ -1,270 +1,235 @@
 import {CmakeFetchContentCluster, CmakeJuceAddPluginCluster} from "./CmakeClusters.ts"
-import type {TextRegion, TextRegionEditOptions, TextRegionCircumstances, TextRegionResult} from "../managed/TextRegion.ts"
-import {textRegionWrapper} from "../managed/TextRegionWrapper.ts"
+import {RequiredTextRegion, type TextRegionCircumstances, type TextRegionExpected} from "../managed/TextRegion.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 
 const defaultCmakeFetchContentUrl = "https://github.com/EarzuChan/Arrange.git"
 
-export class CmakeFetchContentRegion implements TextRegion {
+export class CmakeFetchContentRegion extends RequiredTextRegion { // TIPS：The only region of that item
     static readonly key = "cmake.fetch-content"
 
     readonly id = CmakeFetchContentRegion.key
     readonly clusterId = CmakeFetchContentCluster.key
 
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText)
-        if (wrapped.kind === "wrapped") return wrapped
-        if (wrapped.kind === "damaged") return wrapped
+    protected seekUnwrapped(clusterText: string): TextRegionCircumstances | null {
+        const match = /include\s*\(\s*FetchContent\s*\)[\s\S]*?FetchContent_Declare\s*\(\s*arrange[\s\S]*?FetchContent_MakeAvailable\s*\(\s*arrange\s*\)\s*/m.exec(clusterText)
+        if (match === null) return null
 
-        const unwrappedMatch = /include\s*\(\s*FetchContent\s*\)[\s\S]*?FetchContent_Declare\s*\(\s*arrange[\s\S]*?FetchContent_MakeAvailable\s*\(\s*arrange\s*\)\s*/m.exec(clusterText)
-        if (unwrappedMatch !== null) return {
+        return {
             kind: "unwrapped",
-            contentSpan: {start: unwrappedMatch.index, end: unwrappedMatch.index + unwrappedMatch[0].length},
-            content: unwrappedMatch[0],
+            contentSpan: {start: match.index, end: match.index + match[0].length},
+            content: match[0],
         }
-
-        return {kind: "missing", insertAt: clusterText.length}
     }
 
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
-
-        const expected = [
-            "include(FetchContent)",
-            "FetchContent_Declare(arrange",
-            `  GIT_REPOSITORY ${state.project.framework.cmakeFetchContentUrl ?? defaultCmakeFetchContentUrl}`,
-            `  GIT_TAG v${state.project.framework.version}`,
-            ")",
-            "FetchContent_MakeAvailable(arrange)",
-        ].join("\n")
-
-        if (circumstances.kind === "unwrapped") return {kind: "unwrapped-existing", current: circumstances.content, expected}
-
-        return circumstances.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() === expected.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-            ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected}
+    protected missingInsertAt(clusterText: string): number {
+        return clusterText.length
     }
 
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = [
-            "include(FetchContent)",
-            "FetchContent_Declare(arrange",
-            `  GIT_REPOSITORY ${state.project.framework.cmakeFetchContentUrl ?? defaultCmakeFetchContentUrl}`,
-            `  GIT_TAG v${state.project.framework.version}`,
-            ")",
-            "FetchContent_MakeAvailable(arrange)",
-        ].join("\n")
-        return options.managed ? textRegionWrapper.wrap(this.id, expected) : expected.endsWith("\n") ? expected : `${expected}\n`
+    protected resolveExpected(state: ProjectState): TextRegionExpected {
+        const version = state.project.framework.version.trim()
+        if (!version) return {kind: "invalid", message: "framework.version is required."}
+
+        const repositoryUrl = state.project.framework.cmakeFetchContentUrl?.trim() || defaultCmakeFetchContentUrl
+        if (!repositoryUrl) return {kind: "invalid", message: "framework.cmakeFetchContentUrl is invalid."}
+
+        return {
+            kind: "present",
+            body: [
+                "include(FetchContent)",
+                "FetchContent_Declare(arrange",
+                `  GIT_REPOSITORY ${repositoryUrl}`,
+                `  GIT_TAG v${version}`,
+                ")",
+                "FetchContent_MakeAvailable(arrange)",
+            ].join("\n"),
+        }
     }
 }
 
-export class CmakePluginFormatsRegion implements TextRegion {
+export class CmakePluginFormatsRegion extends RequiredTextRegion {
     static readonly key = "cmake.plugin-formats"
 
     readonly id = CmakePluginFormatsRegion.key
     readonly clusterId = CmakeJuceAddPluginCluster.key
 
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText)
-        if (wrapped.kind === "wrapped") return wrapped
-        if (wrapped.kind === "damaged") return wrapped
-
+    protected seekUnwrapped(clusterText: string): TextRegionCircumstances | null {
         const linePattern = /.*(?:\r\n|\n|\r|$)/g
         while (true) {
             const match = linePattern.exec(clusterText)
-            if (match === null) break
-            if (match[0] === "" && match.index === clusterText.length) break
+            if (match === null) return null
+            if (match[0] === "" && match.index === clusterText.length) return null
+
             if (/^\s*FORMATS\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) return {
                 kind: "unwrapped",
                 contentSpan: {start: match.index, end: match.index + match[0].length},
                 content: match[0],
             }
         }
+    }
 
+    protected missingInsertAt(clusterText: string): number {
         const firstLineMatch = /.*(?:\r\n|\n|\r|$)/.exec(clusterText)
         let insertAt = firstLineMatch === null ? 0 : firstLineMatch[0].length
-        const insertLinePattern = /.*(?:\r\n|\n|\r|$)/g
+        const linePattern = /.*(?:\r\n|\n|\r|$)/g
+
         while (true) {
-            const match = insertLinePattern.exec(clusterText)
-            if (match === null) break
-            if (match[0] === "" && match.index === clusterText.length) break
+            const match = linePattern.exec(clusterText)
+            if (match === null) return insertAt
+            if (match[0] === "" && match.index === clusterText.length) return insertAt
+
             const line = match[0].replace(/(?:\r\n|\n|\r)$/, "")
             if (/^\s*PLUGIN_CODE\s+/.test(line) || /^\s*PLUGIN_MANUFACTURER_CODE\s+/.test(line) || /^\s*COMPANY_NAME\s+/.test(line) || /^\s*VERSION\s+/.test(line)) insertAt = match.index + match[0].length
         }
-
-        return {kind: "missing", insertAt}
     }
 
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
+    protected resolveExpected(state: ProjectState): TextRegionExpected {
+        const formats = state.project.project.products.map((product) => product === "standalone" ? "Standalone" : "VST3")
+        if (formats.length === 0) return {kind: "invalid", message: "project.products must not be empty."}
 
-        const expected = `  FORMATS ${state.project.project.products.map((product) => product === "standalone" ? "Standalone" : "VST3").join(" ")}`
-
-        if (circumstances.kind === "unwrapped") return {kind: "unwrapped-existing", current: circumstances.content, expected}
-
-        return circumstances.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() === expected.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-            ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected}
-    }
-
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = `  FORMATS ${state.project.project.products.map((product) => product === "standalone" ? "Standalone" : "VST3").join(" ")}`
-        return options.managed ? textRegionWrapper.wrap(this.id, expected) : expected.endsWith("\n") ? expected : `${expected}\n`
+        return {kind: "present", body: `  FORMATS ${formats.join(" ")}`}
     }
 }
 
-export class CmakePluginVersionRegion implements TextRegion {
+export class CmakePluginVersionRegion extends RequiredTextRegion {
     static readonly key = "cmake.plugin-version"
 
     readonly id = CmakePluginVersionRegion.key
     readonly clusterId = CmakeJuceAddPluginCluster.key
 
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText)
-        if (wrapped.kind === "wrapped") return wrapped
-        if (wrapped.kind === "damaged") return wrapped
-
+    protected seekUnwrapped(clusterText: string): TextRegionCircumstances | null {
         const linePattern = /.*(?:\r\n|\n|\r|$)/g
         while (true) {
             const match = linePattern.exec(clusterText)
-            if (match === null) break
-            if (match[0] === "" && match.index === clusterText.length) break
-            if (/^\s*VERSION\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) {
-                return {
-                    kind: "unwrapped",
-                    contentSpan: {start: match.index, end: match.index + match[0].length},
-                    content: match[0],
-                }
+            if (match === null) return null
+            if (match[0] === "" && match.index === clusterText.length) return null
+
+            if (/^\s*VERSION\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) return {
+                kind: "unwrapped",
+                contentSpan: {start: match.index, end: match.index + match[0].length},
+                content: match[0],
             }
         }
+    }
 
+    protected missingInsertAt(clusterText: string): number {
         const firstLineMatch = /.*(?:\r\n|\n|\r|$)/.exec(clusterText)
-        return {kind: "missing", insertAt: firstLineMatch === null ? 0 : firstLineMatch[0].length}
+        return firstLineMatch === null ? 0 : firstLineMatch[0].length
     }
 
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
+    protected resolveExpected(state: ProjectState): TextRegionExpected {
+        const version = state.project.project.version.trim()
+        if (!version) return {kind: "invalid", message: "project.version is required."}
 
-        const expected = `  VERSION ${state.project.project.version}`
-        if (circumstances.kind === "unwrapped") return {kind: "unwrapped-existing", current: circumstances.content, expected}
-
-        return circumstances.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() === expected.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-            ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected}
-    }
-
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = `  VERSION ${state.project.project.version}`
-        return options.managed ? textRegionWrapper.wrap(this.id, expected) : expected.endsWith("\n") ? expected : `${expected}\n`
+        return {kind: "present", body: `  VERSION ${version}`}
     }
 }
 
-export class CmakePluginIdentityRegion implements TextRegion {
+export class CmakePluginIdentityRegion extends RequiredTextRegion {
     static readonly key = "cmake.plugin-identity"
 
     readonly id = CmakePluginIdentityRegion.key
     readonly clusterId = CmakeJuceAddPluginCluster.key
 
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText)
-        if (wrapped.kind === "wrapped") return wrapped
-        if (wrapped.kind === "damaged") return wrapped
-
-        const unwrapped = /^\s*COMPANY_NAME\s+.+(?:\r?\n|\r)\s*PLUGIN_MANUFACTURER_CODE\s+.+(?:\r?\n|\r)\s*PLUGIN_CODE\s+.+(?:\r?\n|\r)?/m.exec(clusterText)
-        if (unwrapped !== null) return {
-            kind: "unwrapped",
-            contentSpan: {start: unwrapped.index, end: unwrapped.index + unwrapped[0].length},
-            content: unwrapped[0],
-        }
-
-        const firstLineMatch = /.*(?:\r\n|\n|\r|$)/.exec(clusterText)
-        let insertAt = firstLineMatch === null ? 0 : firstLineMatch[0].length
+    protected seekUnwrapped(clusterText: string): TextRegionCircumstances | null {
         const linePattern = /.*(?:\r\n|\n|\r|$)/g
+        let start: number | null = null
+        let end: number | null = null
+
         while (true) {
             const match = linePattern.exec(clusterText)
             if (match === null) break
             if (match[0] === "" && match.index === clusterText.length) break
-            if (/^\s*VERSION\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) insertAt = match.index + match[0].length
+
+            const line = match[0].replace(/(?:\r\n|\n|\r)$/, "")
+            if (/^\s*COMPANY_NAME\s+/.test(line) || /^\s*PLUGIN_MANUFACTURER_CODE\s+/.test(line) || /^\s*PLUGIN_CODE\s+/.test(line)) {
+                start ??= match.index
+                end = match.index + match[0].length
+            }
         }
 
-        return {kind: "missing", insertAt}
+        if (start === null || end === null) return null // CHECK：本行IDE说一直true
+
+        return {
+            kind: "unwrapped",
+            contentSpan: {start, end},
+            content: clusterText.slice(start, end),
+        }
     }
 
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
+    protected missingInsertAt(clusterText: string): number {
+        const firstLineMatch = /.*(?:\r\n|\n|\r|$)/.exec(clusterText)
+        let insertAt = firstLineMatch === null ? 0 : firstLineMatch[0].length
+        const linePattern = /.*(?:\r\n|\n|\r|$)/g
 
-        const expected = [
-            `  COMPANY_NAME "${state.project.project.vendorName}"`,
-            `  PLUGIN_MANUFACTURER_CODE ${state.project.project.vendorCode}`,
-            `  PLUGIN_CODE ${state.project.project.pluginCode}`,
-        ].join("\n")
-        if (circumstances.kind === "unwrapped") return {kind: "unwrapped-existing", current: circumstances.content, expected}
+        while (true) {
+            const match = linePattern.exec(clusterText)
+            if (match === null) return insertAt
+            if (match[0] === "" && match.index === clusterText.length) return insertAt
 
-        return circumstances.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() === expected.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-            ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected}
+            if (/^\s*VERSION\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) insertAt = match.index + match[0].length
+        }
     }
 
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = [
-            `  COMPANY_NAME "${state.project.project.vendorName}"`,
-            `  PLUGIN_MANUFACTURER_CODE ${state.project.project.vendorCode}`,
-            `  PLUGIN_CODE ${state.project.project.pluginCode}`,
-        ].join("\n")
-        return options.managed ? textRegionWrapper.wrap(this.id, expected) : expected.endsWith("\n") ? expected : `${expected}\n`
+    protected resolveExpected(state: ProjectState): TextRegionExpected {
+        const vendorName = state.project.project.vendorName.trim()
+        const vendorCode = state.project.project.vendorCode.trim()
+        const pluginCode = state.project.project.pluginCode.trim()
+
+        if (!vendorName) return {kind: "invalid", message: "project.vendorName is required."}
+        if (!/^[A-Za-z0-9]{4}$/.test(vendorCode)) return {kind: "invalid", message: "project.vendorCode must be a four-character code."}
+        if (!/^[A-Za-z0-9]{4}$/.test(pluginCode)) return {kind: "invalid", message: "project.pluginCode must be a four-character code."}
+
+        return {
+            kind: "present",
+            body: [
+                `  COMPANY_NAME "${vendorName}"`,
+                `  PLUGIN_MANUFACTURER_CODE ${vendorCode}`,
+                `  PLUGIN_CODE ${pluginCode}`,
+            ].join("\n"),
+        }
     }
 }
 
-export class CmakeProductNameRegion implements TextRegion {
+export class CmakeProductNameRegion extends RequiredTextRegion {
     static readonly key = "cmake.product-name"
 
     readonly id = CmakeProductNameRegion.key
     readonly clusterId = CmakeJuceAddPluginCluster.key
 
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText)
-        if (wrapped.kind === "wrapped") return wrapped
-        if (wrapped.kind === "damaged") return wrapped
-
+    protected seekUnwrapped(clusterText: string): TextRegionCircumstances | null {
         const linePattern = /.*(?:\r\n|\n|\r|$)/g
         while (true) {
             const match = linePattern.exec(clusterText)
-            if (match === null) break
-            if (match[0] === "" && match.index === clusterText.length) break
+            if (match === null) return null
+            if (match[0] === "" && match.index === clusterText.length) return null
+
             if (/^\s*PRODUCT_NAME\s+/.test(match[0].replace(/(?:\r\n|\n|\r)$/, ""))) return {
                 kind: "unwrapped",
                 contentSpan: {start: match.index, end: match.index + match[0].length},
                 content: match[0],
             }
         }
+    }
 
+    protected missingInsertAt(clusterText: string): number {
         const firstLineMatch = /.*(?:\r\n|\n|\r|$)/.exec(clusterText)
         let insertAt = firstLineMatch === null ? 0 : firstLineMatch[0].length
-        const insertLinePattern = /.*(?:\r\n|\n|\r|$)/g
+        const linePattern = /.*(?:\r\n|\n|\r|$)/g
+
         while (true) {
-            const match = insertLinePattern.exec(clusterText)
-            if (match === null) break
-            if (match[0] === "" && match.index === clusterText.length) break
+            const match = linePattern.exec(clusterText)
+            if (match === null) return insertAt
+            if (match[0] === "" && match.index === clusterText.length) return insertAt
+
             const line = match[0].replace(/(?:\r\n|\n|\r)$/, "")
             if (/^\s*FORMATS\s+/.test(line) || /^\s*PLUGIN_CODE\s+/.test(line) || /^\s*PLUGIN_MANUFACTURER_CODE\s+/.test(line) || /^\s*COMPANY_NAME\s+/.test(line) || /^\s*VERSION\s+/.test(line)) insertAt = match.index + match[0].length
         }
-
-        return {kind: "missing", insertAt}
     }
 
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
+    protected resolveExpected(state: ProjectState): TextRegionExpected {
+        const name = state.project.project.name.trim()
+        if (!name) return {kind: "invalid", message: "project.name is required."}
 
-        const expected = `  PRODUCT_NAME "${state.project.project.name}"`
-        if (circumstances.kind === "unwrapped") return {kind: "unwrapped-existing", current: circumstances.content, expected}
-
-        return circumstances.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() === expected.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-            ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected}
-    }
-
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = `  PRODUCT_NAME "${state.project.project.name}"`
-        return options.managed ? textRegionWrapper.wrap(this.id, expected) : expected.endsWith("\n") ? expected : `${expected}\n`
+        return {kind: "present", body: `  PRODUCT_NAME "${name}"`}
     }
 }
