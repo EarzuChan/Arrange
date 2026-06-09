@@ -6,15 +6,9 @@ import {ManagedItemRegistry} from "./ManagedItemRegistry.ts"
 import {TextClusterRegistry} from "./TextCluster.ts"
 
 export function createDefaultManagedItemRegistry(): ManagedItemRegistry {
-    return new ManagedItemRegistry([
-        ...createNodeManagedItems(),
-        ...createCmakeManagedItems(),
-    ])
+    return new ManagedItemRegistry([...createNodeManagedItems(), ...createCmakeManagedItems()])
 }
 
 export function createDefaultTextClusterRegistry(): TextClusterRegistry {
-    return new TextClusterRegistry([
-        ...createNodeTextClusters(),
-        ...createCmakeTextClusters(),
-    ])
+    return new TextClusterRegistry([...createNodeTextClusters(), ...createCmakeTextClusters()])
 }

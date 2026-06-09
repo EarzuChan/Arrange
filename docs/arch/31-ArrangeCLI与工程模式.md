@@ -1,3 +1,7 @@
+本文已严重过时，绝不可采信
+本文已严重过时，绝不可采信
+本文已严重过时，绝不可采信
+
 # Arrange CLI 与工程模式
 
 本文定义 Arrange 用户工程的长期形态、配置文件、版本规则、命令行为与构建 / 打包权责。它是 Arrange CLI 的母文档。
@@ -495,34 +499,34 @@ CLI 只重写完整、未损坏的 managed region。region 缺 begin/end、重�
 
 `arrange sync` 让工程与 `arrange.project.yaml` 对齐。它包含两层：
 
-1. project sync：维护 Arrange 负责的工程文件区域，例如 CMake managed region 与 UI `package.json`。
-2. toolchain sync：调用外部工具做预同步，例如 `pnpm install` / `npm install` 与 CMake configure。
+1. CONFIG：维护 Arrange 负责的工程文件区域，例如 CMake managed region 与 UI `package.json`。
+2. SETUP：调用外部工具以Make it Ready to Dev，例如 `pnpm install` / `npm install` 与 CMake configure。
 
-toolchain sync 执行前必须准备本机工具链。
+SETUP 执行前必须检查/准备本机工具链。
 
 无参数时：
 
 ```txt
-project sync + toolchain sync
-ui + native
+CONFIG + SETUP
+UI + NATIVE（也即NODE + CMAKE）
 ```
 
 参数：
 
-| 参数 | 说明 |
-| :--- | :--- |
-| `--project-only` | 只执行 project sync，不运行外部工具。 |
-| `--toolchain-only` | 只执行 toolchain sync，不修改工程文件。 |
-| `--ui` | 只作用于 UI。 |
-| `--native` | 只作用于 native。 |
-| `--check` | 只检查，不写文件，不运行外部工具。 |
+| 参数              | 说明                |
+|:----------------|:------------------|
+| `--config-only` | 只执行 config 板块。    |
+| `--setup-only`  | 只执行 setup 板块。     |
+| `--ui`          | 只作用于 UI。          |
+| `--native`      | 只作用于 native。      |
+| `--check`       | 只检查，不写文件，不运行外部工具。 |
 
 组合规则：
 
-- `--project-only` 与 `--toolchain-only` 互斥。
+- `--config-only` 与 `--setup-only` 互斥。
 - `--ui` 与 `--native` 互斥。
 - `--check` 可与 `--ui` 或 `--native` 组合。
-- 例如 `arrange sync --ui --project-only` 合法。
+- 例如 `arrange sync --ui --config-only` 合法。
 
 sync 遇到正常文件可自动维护；遇到损坏或无法安全处理的文件必须跳过并打印明确修复说明。
 

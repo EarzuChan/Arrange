@@ -1,3 +1,5 @@
+可能有过时：以代码为准
+
 # Managed Items 与 Regions
 
 本文记录当前确定的 managed item、管理簇与 region 设计。

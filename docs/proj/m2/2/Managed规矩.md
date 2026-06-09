@@ -1,3 +1,5 @@
+可能有过时
+
 本文规定 Arrange CLI 对 managed item 的语义、检查、修复、create / adopt / sync 之间的分工。
 
 核心目标：

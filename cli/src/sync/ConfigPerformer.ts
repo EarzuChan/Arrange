@@ -27,7 +27,7 @@ export class ConfigPerformer {
             const fileReport = report.textFiles.find((file) => file.filePath === fileTopology.filePath)
             const absolutePath = resolve(context.rootDir, fileTopology.filePath)
             const exists = existsSync(absolutePath)
-            let fileText = exists ? await readFile(absolutePath, "utf8") : "" // TODO：如果文件缺乏，要走重建流程，未来设想。不能搞空字符串假设
+            let fileText = exists ? await readFile(absolutePath, "utf8") : "" // TODO：如果文件缺乏，要走重建流程（文件重建的具体到簇的重建思考参见`TextCluster.ts`的`我现在在想...`），未来严肃设想！不能搞空字符串假设
 
             if (fileReport?.fileHash !== null && fileReport?.fileHash !== undefined && hashText(fileText) !== fileReport.fileHash) throw new Error(`File changed since config check: ${fileTopology.filePath}`)
 
@@ -39,15 +39,15 @@ export class ConfigPerformer {
                 const clusterLocation = cluster.locate(fileText)
 
                 if (clusterLocation.kind !== "found" && !cluster.canEditMissingCluster) throw new Error(`Cannot edit ${clusterTopology.clusterId}: cluster structure is missing.`)
-                // TODO：之后设想结构缺乏/文件缺乏的解决方案。现在这个canEditMissingCluster，可能是有办法重建结构？但要工程化可解释，而不是“从何而来”。所以我觉得难绷，CHECK！
+                // TODO：之后将设想结构缺乏/文件缺乏的处理方案！现在这个canEditMissingCluster=true，假定有办法重建结构？但这是伪装能用，掩耳盗铃，不是吗。所以我觉得难绷，FUCK！
 
-                let editedClusterText = clusterLocation.kind === "found" ? clusterLocation.text : ""
+                let editedClusterText = clusterLocation.kind === "found" ? clusterLocation.text : "" // FUCK：他妈的，空字符串伪装实际创建结构，这更是弥天大谎，奇耻大辱
 
                 for (const resolvedRegion of clusterTopology.regions) {
                     const regionReport = clusterReport.regions.find((region) => region.regionId === resolvedRegion.region.id)
                     if (regionReport === undefined) throw new Error(`Missing config check report for region: ${resolvedRegion.region.id}`)
 
-                    if (!shouldEdit(regionReport.result.kind)) continue
+                    if (!shouldEdit(regionReport.result.kind)) continue // HACK：不该Continue，问题没解决（如Damage等），我交互式这一块呢！操！
 
                     const location = resolvedRegion.region.seek(editedClusterText)
                     editedClusterText = this.applyTextRegionEdit(context, editedClusterText, resolvedRegion.region, location, {managed: true})
@@ -68,7 +68,7 @@ export class ConfigPerformer {
             const fileReport = report.jsonFiles.find((file) => file.filePath === fileTopology.filePath)
             const absolutePath = resolve(context.rootDir, fileTopology.filePath)
             const exists = existsSync(absolutePath)
-            const raw = exists ? await readFile(absolutePath, "utf8") : "{}" // TODO：同样的，得走重建流程，不能来个空Json假设。未来设想
+            const raw = exists ? await readFile(absolutePath, "utf8") : "{}" // TODO：同样的，得走重建流程，不能来个空Json假设。未来设想。反正Json也有基本结构，也或会在Generator中定义如何创建！！！
 
             if (fileReport?.fileHash !== null && fileReport?.fileHash !== undefined && hashText(raw) !== fileReport.fileHash) throw new Error(`File changed since config check: ${fileTopology.filePath}`)
 
@@ -113,13 +113,16 @@ export class ConfigPerformer {
     }
 
     private applyTextRegionEdit(context: ProjectContext, clusterText: string, region: TextRegion, location: TextRegionCircumstances, options: TextRegionEditOptions): string {
-        // CHECK：但Seek返回的Region Damaged怎么办，会不会炸肛了
+        // CHECK：Region Damaged怎么办，会不会炸肛了。虽说Damaged进不到本处，但依旧是掩耳盗铃，在Perform阶段什么都没解决！
+
         const replacement = region.renderText(context.state, options)
 
+        // HACK：这个也得交互式，因为这个insert at不一定正确
         if (location.kind === "missing") return `${clusterText.slice(0, location.insertAt)}${replacement}${clusterText.slice(location.insertAt)}`
 
         if (location.kind === "wrapped") return replaceSpan(clusterText, location.wrapperSpan.start, location.wrapperSpan.end, replacement)
 
+        // HACK：UNWRAPPED 是粗定位，得用户复查/交互式允许写入
         if (location.kind === "unwrapped") return replaceSpan(clusterText, location.contentSpan.start, location.contentSpan.end, replacement)
 
         throw new Error(location.message)

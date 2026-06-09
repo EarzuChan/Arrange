@@ -1,4 +1,4 @@
-import type {JsonRegionResult} from "../managed/JsonRegion.ts"
+import type {JsonRegionResult, PathToken} from "../managed/JsonRegion.ts"
 import type {TextRegionCircumstances, TextRegionResult} from "../managed/TextRegion.ts"
 import type {TextClusterLocation} from "../managed/TextCluster.ts"
 
@@ -42,7 +42,7 @@ export interface JsonRegionCheckReport {
     readonly itemId: string
     readonly regionId: string
     readonly filePath: string
-    readonly path: readonly string[]
+    readonly path: readonly PathToken[]
     readonly result: JsonRegionResult
 }
 

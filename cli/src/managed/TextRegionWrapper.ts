@@ -1,3 +1,5 @@
+// VERIFIED：基本没问题
+
 export interface TextSpan {
     readonly start: number
     readonly end: number

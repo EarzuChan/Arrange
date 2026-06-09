@@ -1,6 +1,9 @@
 import type {ProjectState} from "../project/ProjectState.ts"
 import {textRegionWrapper, type TextSpan} from "./TextRegionWrapper.ts"
 
+// VERIFIED：我觉得基本行了
+// 涵盖了在SYNC中使用；以及被Adopting/Generating阶段使用的区域粗定位、区域全新内容创建
+
 export type TextRegionCircumstances = {
     readonly kind: "wrapped"
     readonly wrapperSpan: TextSpan

@@ -27,7 +27,7 @@ export class ConfigChecker {
         for (const file of files) {
             const absolutePath = resolve(context.rootDir, file.filePath)
             const exists = existsSync(absolutePath)
-            const fileText = exists ? await readFile(absolutePath, "utf8") : "" // TODO：同Performer，byd文件缺乏就必须不能这样。干你妈
+            const fileText = exists ? await readFile(absolutePath, "utf8") : "" // TODO：同Performer，byd文件缺乏就必须不能这样（创建空文本掩耳盗铃继续执行检查流程）。干你妈
             const fileHash = exists ? hashText(fileText) : null
 
             reports.push({
@@ -67,7 +67,7 @@ export class ConfigChecker {
             const absolutePath = resolve(context.rootDir, file.filePath)
             const exists = existsSync(absolutePath)
 
-            if (!exists) {  // TODO：同Performer，byd文件缺乏就必须不能这样。干你妈
+            if (!exists) {  // CHECK：文件缺乏报Missing，还不错，但？还有没有什么问题？待检查
                 reports.push({
                     filePath: file.filePath, exists: false, fileHash: null, regions: file.regions.map((resolvedRegion) => ({
                         itemId: resolvedRegion.item.id, regionId: resolvedRegion.region.id,

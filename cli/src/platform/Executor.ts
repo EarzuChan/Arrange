@@ -3,7 +3,7 @@ import type { ProcessResult, ProcessSpec } from "./ProcessSpec.ts"
 
 export class Executor {
     run(spec: ProcessSpec): Promise<ProcessResult> {
-        // CHECK：这好吗？
+        // CHECK：这好吗？UNVERIFIED，多平台也不清楚情况
         return new Promise((resolve, reject) => {
             const child = spawn(spec.command, spec.args, {
                 cwd: spec.cwd,
