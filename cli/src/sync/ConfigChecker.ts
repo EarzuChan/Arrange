@@ -24,6 +24,7 @@ export class ConfigChecker {
     private async checkText(context: ProjectContext, files: ReturnType<ManagedTopologyResolver["resolve"]>["textFiles"]): Promise<readonly TextFileCheckReport[]> {
         const reports: TextFileCheckReport[] = []
 
+        // TIPS：目前File是靠拓扑解析的（解析出其文件的Cluster，XxCluster是各特异实现类），而不是靠一个Xx（比如Cmakelists.txt）File的“该文件实现类”。不知道这样对File Cluster的统筹管理，特异File的Generating会不会有影响（意思是逻辑比较分散，特异File Generating的逻辑们被放在Generator中（比如renderCmakeListsTxt(state)））
         for (const file of files) {
             const absolutePath = resolve(context.rootDir, file.filePath)
             const exists = existsSync(absolutePath)
