@@ -24,6 +24,7 @@ export interface CreateProjectRequest {
 // Wizard返回的Request包装为State，Vamos！
 export function createInitialProjectState(request: CreateProjectRequest): ProjectState {
     return {
+        rootDir: request.rootDir,
         project: {
             project: {
                 name: request.projectName,

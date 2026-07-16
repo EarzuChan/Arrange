@@ -71,15 +71,11 @@ export const localDefinitionSchema = z.object({
 export type LocalDefinition = z.infer<typeof localDefinitionSchema>
 
 export const projectStateSchema = z.object({
+    rootDir: z.string(),
     project: projectDefinitionSchema,
     local: localDefinitionSchema.nullable(),
 })
 export type ProjectState = z.infer<typeof projectStateSchema>
-
-export interface ProjectContext {
-    readonly rootDir: string
-    readonly state: ProjectState
-}
 
 // 一个小工具方法
 export function isManagedItem(state: ProjectState, key: string): boolean {

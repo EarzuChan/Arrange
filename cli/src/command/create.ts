@@ -26,16 +26,16 @@ export function registerCreateCommand(program: Command, services: CliServices): 
 
             const state = createInitialProjectState(request)
             // TODO：调用生成器生成文件
-            await services.projectStateStore.save(request.rootDir, state)
+            await services.projectStateStore.save(state)
 
-            console.log(`Project created:\n  root: ${request.rootDir}\n`)
+            console.log(`Project created:\n  root: ${state.rootDir}\n`)
 
             // TODO：询问用户是否立即运行 sync；sync 模块后续专项落地后接入
 
-            if (request.rootDir !== process.cwd()) {
+            if (state.rootDir !== process.cwd()) {
                 console.log("")
                 console.log("To continue work:")
-                console.log(`  cd ${shellPath(displayPath(request.rootDir))}`)
+                console.log(`  cd ${shellPath(displayPath(state.rootDir))}`)
             }
         })
 }

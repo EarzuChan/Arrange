@@ -1,46 +1,20 @@
 import type {ProjectStateStore} from "../project/ProjectStateStore.ts"
-import {hasConfigProblems} from "./ConfigReport.ts"
-import {ConfigChecker} from "./ConfigChecker.ts"
-import {ConfigPerformer} from "./ConfigPerformer.ts"
+import {ProjectState} from "../project/ProjectState.ts";
 
 export interface SyncRunOptions {
-    readonly checkOnly: boolean
-    readonly projectOnly: boolean
-    readonly toolchainOnly: boolean
-    readonly uiOnly: boolean
-    readonly nativeOnly: boolean
+    readonly scanOnly: boolean // 仅执行SCAN阶段，并打印可读的报告
+
+    readonly configOnly: boolean // 仅搞CONFIG的PART
+    readonly setupOnly: boolean // 仅搞SETUP的PART
+
+    readonly uiOnly: boolean // 每PART中只搞UI项目（NODE）相关
+    readonly nativeOnly: boolean // 每PART中只搞NATIVE项目（CMAKE）相关
 }
 
 export class SyncService {
-    constructor(private readonly projectStateStore: ProjectStateStore, private readonly configChecker: ConfigChecker, private readonly configPerformer: ConfigPerformer,) {
-    }
+    constructor(private readonly projectStateStore: ProjectStateStore) { }
 
-    // SYNC分为：
-    // 二阶段：CHECK、PERFORM
-    // 二类型：CONFIG（配置项的没毛病）、SETUP（工具链的已准备妥当）
-    async run(options: SyncRunOptions): Promise<void> {
-        void options
+    async run(options: SyncRunOptions, state: ProjectState): Promise<void> {
 
-        const rootDir = process.cwd()
-        const state = await this.projectStateStore.load(rootDir)
-        const context = {rootDir, state}
-
-        // CHECK
-        const configCheckReport = await this.configChecker.check(context)
-        // TODO：这是远期占位符，之后的Setup Check
-
-        // CONFIG 的阐述这一块
-        if (hasConfigProblems(configCheckReport)) {
-            // TODO：具体阐述问题并停止
-        } else console.log("SYNC: CONFIG check: ok.")
-
-        // TODO：SETUP 的阐述这一块
-
-        if (options.checkOnly) return
-
-        await this.configPerformer.perform(context, configCheckReport)
-        // TODO：这是远期占位符，之后的Setup Perform
-
-        console.log("SYNC: ALL DONE.")
     }
 }

@@ -15,15 +15,15 @@ export class ProjectStateStore {
         const project = await this.readProjectYaml(rootDir)
         const local = await this.readLocalYaml(rootDir)
 
-        return projectStateSchema.parse({project, local})
+        return projectStateSchema.parse({rootDir, project, local})
     }
 
-    async save(rootDir: string, state: ProjectState): Promise<void> {
+    async save(state: ProjectState): Promise<void> {
         const validatedState = projectStateSchema.parse(state)
 
-        await writeTextFile(join(rootDir, projectFileNames.project), stringify(validatedState.project))
+        await writeTextFile(join(state.rootDir, projectFileNames.project), stringify(validatedState.project))
 
-        if (validatedState.local !== null) await writeTextFile(join(rootDir, projectFileNames.local), stringify(validatedState.local))
+        if (validatedState.local !== null) await writeTextFile(join(state.rootDir, projectFileNames.local), stringify(validatedState.local))
     }
 
     private async readProjectYaml(rootDir: string) {
