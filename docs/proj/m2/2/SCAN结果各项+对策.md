@@ -1,39 +1,62 @@
-# SCAN 结果各项（分层级）与对策
+# SCAN 结果与 RESOLVE 对策
 
-**文件级**
+本文只定义 M2.2 当前扫描报告的结果分类和交互对策。模型本身见 [Arrange CLI 托管与同步模型](../../../arch/32-ArrangeCLI托管与同步模型.md)。
 
-| 层       | kind            | 含义                   |
-|---------|-----------------|----------------------|
-| 文本文件    | `present(text)` | 文件在 → 下钻簇            |
-|         | `file-missing`  | 文件不存在 → 整文件生成（自动决定项） |
-| Json 文件 | `present(json)` | 可解析 → 下钻域            |
-|         | `file-missing`  | 文件不存在 → 整文件生成（自动决定项） |
-|         | `unparsable`    | 文件不存在 → 整文件生成（自动决定项） |
+## 文件级
 
-（Text 无 unparsable：我们不整体 AST 解析文本，结构问题只在簇级显现。）
+| 层级 | kind | 含义 | SCAN 行为 |
+|---|---|---|---|
+| 文本文件 | `present(text)` | 文件可读取 | 下钻 Cluster |
+| 文本文件 | `file-missing` | 文件不存在 | 报告阻塞问题，不创建 |
+| JSON 文件 | `present(json)` | 文件存在且可解析 | 下钻 JsonRegion |
+| JSON 文件 | `file-missing` | 文件不存在 | 报告阻塞问题，不创建 |
+| JSON 文件 | `unparsable` | 文件存在但无法解析 | 报告阻塞问题，不修改 |
 
-**簇级（仅 文本文件 有）**
+## Cluster 级
 
-| kind                 | 含义                                                                                        |
-|----------------------|-------------------------------------------------------------------------------------------|
-| `found(span, text)`  | 特征定位到 → 下钻其域                                                                              |
-| `missing-or-damaged` | 定位不到（缺失/损坏不可辨）→ SCAN时其内域全跳过（前提门控）→ RESOLVE用户动笔贴MARKER（插入点位标记），我们识别到后替换为Cluster全新文本 → loop |
+仅在文本文件存在且可读取时下钻 Cluster；Cluster 缺失或损坏时跳过其下所有 Region。
 
-**TextRegion 级（仅当所属簇 found）**
+| kind | 含义 | RESOLVE 对策 |
+|---|---|---|
+| `found(span, text)` | 定位到唯一结构 | 继续扫描 Region |
+| `missing` | 找不到结构 | 智能定位并确认；否则用户定位或贴临时 marker，写入后重扫 |
+| `ambiguous(candidates)` | 存在多个候选 | 用户选择；不接受则手动定位或放弃 |
+| `damaged(message)` | 结构边界损坏 | 用户修复、重新定位或放弃；确认写入后重扫 |
 
-| kind                                     | 含义                                  | 对策                                         |
-|------------------------------------------|-------------------------------------|--------------------------------------------|
-| `idle`                                   | 已对齐                                 | 丢弃                                         |
-| `outdated(current, expected)`            | 自有 wrapped 内容值过期（各种和Expected不同就算过期） | 自动                                         |
-| `missing`                                | 目标该有、域不在、无 unwrapped 疑似             | RESOLVE 处理：yes 就地创建空 wrapper→重跑 / no ABORT |
-| `unwrapped-existing(current, expected?)` | 模糊匹配到疑似未托管内容                        | RESOLVE 处理：yes 就地 wrap→重跑 / no ABORT       |
-| `wrapper-damaged(msg)`                   | 域 marker 撕裂                         | RESOLVE 处理：yes 用户动笔修 → loop / no ABORT     |
-| `config-invalid(msg)`                    | 该域目标值算不出/非法                         | ABORT                                      |
+## TextRegion 级
 
-**JsonRegion 级（仅当文件 present）**
+仅在所属 Cluster `found` 时产生 Region 结果。
 
-| kind                          | 含义                                               | 对策    |
-|-------------------------------|--------------------------------------------------|-------|
-| `idle`                        | 已对齐                                              | 丢弃    |
-| `outdated(current, expected)` | 字段值过期（各种和Expected不同就算过期，无该字段时，current=undefined） | 自动    |
-| `config-invalid(msg)`         | 目标值非法                                            | ABORT |
+| kind | 含义 | RESOLVE／APPLY 对策 |
+|---|---|---|
+| `idle` | 当前内容与配置一致 | 丢弃 |
+| `outdated(current, expected)` | 已托管内容过期 | 进入 APPLY 批量更新 |
+| `missing(insertAt?)` | 没有目标区域 | 用户确认插入点；写入后重扫 |
+| `unwrapped-existing(current)` | 找到疑似内容但没有 wrapper | 接管并加 wrapper、删除、放弃 |
+| `extraneous(current)` | 配置期望为空但文件中仍有内容 | 删除、承认现状并更新配置、放弃 |
+| `wrapper-damaged(message)` | wrapper 标记不完整或顺序错误 | 用户修复、重新定位或放弃 |
+| `config-invalid(message)` | 无法从 state 计算合法期望值 | 报错终止 |
+
+如果 `insertAt` 不能安全确定，不能自动猜位置；用户可以选择候选位置，或在文件中贴临时定位 marker 后重新扫描。
+
+## JsonRegion 级
+
+仅在 JSON 文件 `present(json)` 时产生结果。
+
+| kind | 含义 | RESOLVE／APPLY 对策 |
+|---|---|---|
+| `idle` | 字段已对齐 | 丢弃 |
+| `outdated(current, expected)` | 字段值过期 | 进入 APPLY 批量更新 |
+| `missing` | 目标字段不存在 | 用户确认补入后重扫 |
+| `extraneous(current)` | 配置期望为空但字段存在 | 删除、承认现状并更新配置、放弃 |
+| `config-invalid(message)` | 无法计算合法目标值 | 报错终止 |
+
+## 统一循环
+
+```txt
+SCAN → 有阻塞问题 → RESOLVE 首个问题
+     → 有副作用 → reload ProjectState → 全量 SCAN
+SCAN → 无阻塞问题 → APPLY 确定性更新
+```
+
+`--scan` 只输出报告并结束；SCAN 本身不写文件、不改配置、不运行外部工具。
