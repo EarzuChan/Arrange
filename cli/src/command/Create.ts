@@ -3,7 +3,7 @@ import {relative} from "node:path"
 import type {ServiceHub} from "../ServiceHub.ts"
 import {createInitialProjectState} from "../project/CreateProject.ts"
 import {projectFileNames} from "../project/ProjectStateStore.ts"
-import {runCreateWizard} from "../wizard/create.ts"
+import {runCreateWizard} from "../wizard/Create.ts"
 
 export interface CreateCommandOptions {
     registry?: string

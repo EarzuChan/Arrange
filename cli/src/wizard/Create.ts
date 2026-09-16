@@ -4,7 +4,7 @@ import {resolve} from "node:path"
 import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
 import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../util/PromptUtils.ts"
-import {selectFrameworkVersion} from "./frameworkVersion.ts"
+import {selectFrameworkVersion} from "./FrameworkVersion.ts"
 
 export interface CreateWizardInput {
     readonly nodeRegistryUrl?: string

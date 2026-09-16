@@ -9,13 +9,15 @@ export const projectFileNames = {project: "arrange.project.yaml", local: "arrang
 export interface StateDiagnostic {readonly path: string, readonly message: string}
 
 export class ProjectStateStore {
-    async inspect(rootDir: string) {
+    async deepLoad(rootDir: string) {
         const root = resolve(rootDir)
+
         const snapshots: FileSnapshot[] = []
         const errors: StateDiagnostic[] = []
 
         const read = async (name: string, optional: boolean): Promise<unknown> => {
             const path = join(root, name)
+            
             try {
                 const snapshot = await readSnapshot(path)
                 snapshots.push(snapshot)
@@ -36,18 +38,20 @@ export class ProjectStateStore {
         }
 
         const projectRaw = await read(projectFileNames.project, false)
-        const localRaw = await read(projectFileNames.local, true)
         const project = projectDefinitionSchema.safeParse(projectRaw)
-        const local = localDefinitionSchema.nullable().safeParse(localRaw)
         if (!project.success && projectRaw !== undefined) errors.push({path: join(root, projectFileNames.project), message: project.error.message})
+        
+        const localRaw = await read(projectFileNames.local, true)
+        const local = localDefinitionSchema.nullable().safeParse(localRaw)
         if (!local.success && localRaw !== undefined) errors.push({path: join(root, projectFileNames.local), message: local.error.message})
-        // CONFIG 不依赖本机工具状态；local 的诊断仍阻止任何写入。
+        
+        // CONFIG 不依赖本机工具状态；local 的诊断仍阻止任何写入
         const state: ProjectState | null = project.success ? {rootDir: root, project: project.data, local: local.success ? local.data : null} : null
         return {state, snapshots, errors}
     }
 
     async load(rootDir: string): Promise<ProjectState> {
-        const result = await this.inspect(rootDir)
+        const result = await this.deepLoad(rootDir)
         if (result.errors.length || result.state === null) throw new Error(result.errors.map(error => `${error.path}: ${error.message}`).join("\n"))
         return result.state
     }

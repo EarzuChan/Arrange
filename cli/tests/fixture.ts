@@ -6,7 +6,7 @@ import type {ProjectState} from "../src/project/ProjectState.ts"
 import {ProjectStateStore} from "../src/project/ProjectStateStore.ts"
 import {managedFiles, managedItems} from "../src/managed/ManagedDefinitions.ts"
 import type {ResolveChoice} from "../src/sync/ConfigResolver.ts"
-import {SyncWizard} from "../src/wizard/config.ts"
+import {SyncWizard} from "../src/wizard/Sync.ts"
 import type {ConfigScanReport, ResolvableIssue} from "../src/sync/ConfigScanReport.ts"
 
 export function stateFor(rootDir: string): ProjectState {

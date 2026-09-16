@@ -2,7 +2,7 @@ import type { ProjectState } from "../project/ProjectState.ts"
 import { ArtifactLocator } from "./ArtifactLocator.ts"
 
 export class Packer {
-    constructor(private readonly artifactLocator = new ArtifactLocator()) {}
+    private readonly artifactLocator = new ArtifactLocator()
 
     async pack(context: ProjectState): Promise<void> {
         const artifacts = await this.artifactLocator.locate(context)

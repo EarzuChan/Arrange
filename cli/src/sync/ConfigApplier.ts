@@ -4,7 +4,7 @@ import {ConfigWriter, type FileChange} from "./ConfigWriter.ts"
 import type {FileSnapshot} from "../util/FileUtils.ts"
 
 export class ConfigApplier {
-    constructor(readonly writer = new ConfigWriter()) {}
+    readonly writer = new ConfigWriter()
 
     async apply(rootDir: string, report: ConfigScanReport, guards: readonly FileSnapshot[] = []): Promise<void> {
         if (report.fatal.length || report.resolvable.length) throw new Error("CONFIG 仍有阻塞，不能 Apply")

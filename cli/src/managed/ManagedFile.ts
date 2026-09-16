@@ -17,12 +17,18 @@ async function readText(path: string) {
     }
 }
 
-export class TextFile {
+// THINKING：以前是自己的check只对自己负责。现在是还会级联探索子级。这不能说不干净，但也是某种设计😂
+
+export abstract class TextFile {
     readonly kind = "text-file"
 
-    constructor(readonly id: string, readonly scope: Exclude<ConfigScope, "Global">, readonly path: (state: ProjectState) => string, readonly clusters: readonly TextCluster[], private readonly content: (state: ProjectState) => string) {}
+    abstract readonly id: string
+    abstract readonly scope: Exclude<ConfigScope, "Global">
+    abstract readonly clusters: readonly TextCluster[]
 
-    make(state: ProjectState): string { return this.content(state) }
+    abstract path(state: ProjectState): string
+
+    abstract make(state: ProjectState): string
 
     async check(state: ProjectState, path: string) {
         const result = await readText(path)
@@ -34,13 +40,19 @@ export class TextFile {
     }
 }
 
-export class JsonFile {
+export abstract class JsonFile {
     readonly kind = "json-file"
 
-    constructor(readonly id: string, readonly scope: Exclude<ConfigScope, "Global">, readonly path: (state: ProjectState) => string, readonly regions: readonly JsonRegion[], private readonly content: (state: ProjectState) => JsonValue) {}
+    abstract readonly id: string
+    abstract readonly scope: Exclude<ConfigScope, "Global">
+    abstract readonly regions: readonly JsonRegion[]
+
+    abstract path(state: ProjectState): string
+
+    protected abstract makeContent(state: ProjectState): JsonValue
 
     make(state: ProjectState): string {
-        const json = this.content(state)
+        const json = this.makeContent(state)
 
         for (const region of this.regions) setJsonPath(json, region.locate(state), region.make(state))
 

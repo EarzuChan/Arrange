@@ -1,9 +1,8 @@
-import {ProjectStateStore} from "../project/ProjectStateStore.ts"
+import {serviceHub} from "../ServiceHub.ts"
 import {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
 import {assertFrameworkCompatible} from "../framework/FrameworkMamba.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 import {errorMessage} from "../util/Utils.ts"
-import {SyncWizard} from "../wizard/config.ts"
 import {ConfigScanner} from "./ConfigScanner.ts"
 import {ConfigApplier} from "./ConfigApplier.ts"
 import {ConfigResolver} from "./ConfigResolver.ts"
@@ -17,7 +16,10 @@ export interface SyncRunOptions {
     readonly nativeOnly?: boolean
 }
 
-export interface SyncResult {readonly status: "completed" | "blocked" | "aborted" | "failed" | "setup-unavailable", readonly report?: ConfigScanReport}
+export interface SyncResult {
+    readonly status: "completed" | "blocked" | "aborted" | "failed" | "setup-unavailable",
+    readonly report?: ConfigScanReport
+}
 
 async function checkCompatibility(state: ProjectState): Promise<void> {
     const candidate = await new FrameworkRegistryClient().fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
@@ -27,12 +29,12 @@ async function checkCompatibility(state: ProjectState): Promise<void> {
 }
 
 export class SyncService {
-    readonly projectStateStore = new ProjectStateStore()
-    readonly syncWizard = new SyncWizard()
+    get projectStateStore() { return serviceHub.projectStateStore }
+    get syncWizard() { return serviceHub.syncWizard }
 
     readonly configScanner = new ConfigScanner()
     readonly configApplier = new ConfigApplier()
-    readonly configResolver = new ConfigResolver(this.syncWizard, this.configApplier.writer)
+    readonly configResolver = new ConfigResolver()
 
     async run(options: SyncRunOptions, rootDir: string): Promise<SyncResult> {
         if (options.configOnly && options.setupOnly) throw new Error("--config 与 --setup 互斥")
@@ -50,16 +52,26 @@ export class SyncService {
     private async runConfig(options: SyncRunOptions, rootDir: string, scope: "Global" | "UI" | "Native"): Promise<SyncResult> {
         try {
             while (true) {
-                const loaded = await this.projectStateStore.inspect(rootDir)
+                // 深度加载状态和校验阶段
 
-                // SCAN 阶段
+                const loadedStuff = await this.projectStateStore.deepLoad(rootDir)
+                const state = loadedStuff.state
 
-                const report: ConfigScanReport = loaded.state ? await this.configScanner.scan(loaded.state, scope) : {scope, fatal: [], resolvable: [], idle: [], applicable: []}
+                if (!state) {
+                    const report: ConfigScanReport = {scope, fatal: loadedStuff.errors.map(error => ({...error, cause: "config-invalid"})), resolvable: [], idle: [], applicable: []}
 
-                report.fatal.push(...loaded.errors.map(error => ({...error, cause: "config-invalid"})))
+                    this.syncWizard.report(report)
+                    return {status: "blocked", report}
+                }
 
-                if (loaded.state) try {
-                    await checkCompatibility(loaded.state)
+                // 扫描阶段
+
+                const report = await this.configScanner.scan(state, scope)
+
+                report.fatal.push(...loadedStuff.errors.map(error => ({...error, cause: "config-invalid"})))
+
+                try {
+                    await checkCompatibility(state)
                 } catch (error) {
                     report.fatal.push({path: "arrange.project.yaml", cause: "framework-incompatible", message: errorMessage(error)})
                 }
@@ -67,22 +79,21 @@ export class SyncService {
                 this.syncWizard.report(report)
 
                 if (report.fatal.length) return {status: "blocked", report}
-                if (options.scanOnly) {
-                    if (report.resolvable.length) return {status: "blocked", report}
-                    return {status: "completed", report}
-                }
 
-                if (!loaded.state) return {status: "blocked", report}
+                if (options.scanOnly) return {status: report.resolvable.length ? "blocked" : "completed", report}
 
                 // RESOLVE 阶段
 
-                const resolved = await this.configResolver.resolve(loaded.state, report, loaded.snapshots)
+                const resolved = await this.configResolver.resolve(state, report, loadedStuff.snapshots)
 
                 if (resolved === "abort") return {status: "aborted", report}
                 if (resolved === "rescan") continue
 
                 // APPLY 阶段
-                await this.configApplier.apply(loaded.state.rootDir, report, loaded.snapshots)
+
+                await this.configApplier.apply(state.rootDir, report, loadedStuff.snapshots)
+
+                // 完成
 
                 this.syncWizard.message("CONFIG 完成")
                 return {status: "completed", report}

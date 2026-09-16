@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import {test} from "node:test"
 import {Wrapper} from "../src/managed/Wrapper.ts"
 import {TextRegion} from "../src/managed/TextRegion.ts"
-import {JsonRegion, readJsonPath, setJsonPath, type JsonValue} from "../src/managed/JsonRegion.ts"
-import {registryRegion, registryCluster} from "../src/node-js/NodeFiles.ts"
+import {JsonRegion, readJsonPath, setJsonPath, type JsonValue, type JsonExpected} from "../src/managed/JsonRegion.ts"
+import {registryRegion, registryCluster} from "../src/node-js/NodeJsFiles.ts"
 import {managedItemIds} from "../src/managed/ManagedItem.ts"
 import {projectDefinitionSchema} from "../src/project/ProjectState.ts"
 import {stateFor} from "./fixture.ts"
@@ -64,7 +64,11 @@ for (const value of [undefined, null, "", "https://registry.example"]) {
 }
 
 test("受管正文逐字符比较，不 trim，不解析语义", () => {
-    const region = new TextRegion("test", managedItemIds.registry, () => "value\n")
+    const region = new class extends TextRegion {
+        readonly id = "test"
+        readonly managedItemId = managedItemIds.registry
+        protected override makeInner(): string { return "value\n" }
+    }()
     assert.equal(region.check(state, region.wrapper.make("value\n")).kind, "Idle")
     for (const body of ["value \n", "\nvalue\n", "value\n# 注释\n", "value\r\n"]) assert.equal(region.check(state, region.wrapper.make(body)).kind, "Applicable")
 })
@@ -80,7 +84,12 @@ for (const [label, expected, json, kind, cause] of [
     ["中间容器损坏", undefined, {dependencies: 123}, "Resolvable", "damaged"],
 ] as const) {
     test(`JSON 矩阵：${label}`, () => {
-        const region = new JsonRegion("test", managedItemIds.registry, ["dependencies", "test"], () => expected)
+        const region = new class extends JsonRegion {
+            readonly id = "test"
+            readonly managedItemId = managedItemIds.registry
+            protected readonly path = ["dependencies", "test"]
+            protected override makeValue(): JsonExpected { return expected }
+        }()
         assert.deepEqual(region.locate(state), ["dependencies", "test"])
         const result = region.check(state, json)
         assert.equal(result.kind, kind)
@@ -89,7 +98,12 @@ for (const [label, expected, json, kind, cause] of [
 }
 
 test("JSON 值比较尊重对象成员、数组顺序，更新保持兄弟字段和原型安全", () => {
-    const region = new JsonRegion("test", managedItemIds.registry, ["value"], () => ({a: 1, b: [2, 3]}))
+    const region = new class extends JsonRegion {
+        readonly id = "test"
+        readonly managedItemId = managedItemIds.registry
+        protected readonly path = ["value"]
+        protected override makeValue(): JsonValue { return {a: 1, b: [2, 3]} }
+    }()
     assert.equal(region.check(state, {value: {b: [2, 3], a: 1}}).kind, "Idle")
     assert.equal(region.check(state, {value: {b: [3, 2], a: 1}}).kind, "Applicable")
     const json: JsonValue = {other: 7}
@@ -108,7 +122,11 @@ test("非法配置不能生成期望，null 不被误作空字符串", () => {
         input.framework.nodeRegistryUrl = value
         assert.equal(projectDefinitionSchema.parse(input).framework.nodeRegistryUrl, value)
     }
-    const region = new TextRegion("invalid", managedItemIds.registry, () => {throw new Error("坏配置")})
+    const region = new class extends TextRegion {
+        readonly id = "invalid"
+        readonly managedItemId = managedItemIds.registry
+        protected override makeInner(): string { throw new Error("坏配置") }
+    }()
     assert.equal(region.check(state, "").kind, "Fatal")
 })
 

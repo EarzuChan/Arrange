@@ -10,7 +10,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./src/index.ts"
+      "import": "./src/Entry.ts"
     }
   }
 }

@@ -54,6 +54,8 @@ ManagedItem 关闭时，创建仍按需生成一次性普通内容，文本 Regi
 
 所有 `check` 都结合期待与实情判断，只读和计算；各级的期待、实际输入和结果不同，具体判定见下文扫描矩阵。File 从 State 确定文件路径，读取后委派子级；Cluster 和 Region 在父级提供的内容中检查自身。
 
+具体定义继承抽象基类，公共检查、定位和包装规则由基类实现。TextRegion/TextCluster 通过受保护的 `makeInner` 生成正文；JsonRegion 通过 `makeValue` 生成值，由公共 `make` 将 null 统一为字段不存在。File 子类实现 `path`，TextFile 实现 `make`，JsonFile 实现 `makeContent` 提供初始对象，再由基类委派 Region 填入字段。固定身份由具体类字段声明，父级自行创建并持有子定义，ManagedItem 关联其中同一份 Region；业务生成逻辑写在方法中，定义实例不保存工程状态。
+
 | 定义 | check | locate | make(state) |
 |---|---|---|---|
 | TextFile | `check(state, path)`：读取并检查文件 | 无 | 整个文件文本，Cluster 内容委派其 make |

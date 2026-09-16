@@ -9,7 +9,8 @@ export interface BuildOptions {
 }
 
 export class BuildService {
-    constructor(private readonly uiBuildService = new UiBuildService(), private readonly nativeBuildService = new NativeBuildService()) {}
+    private readonly uiBuildService = new UiBuildService()
+    private readonly nativeBuildService = new NativeBuildService()
 
     async build(context: ProjectState, options: BuildOptions): Promise<void> {
         // TODO

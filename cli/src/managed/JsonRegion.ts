@@ -40,16 +40,20 @@ export function setJsonPath(json: JsonValue, path: JsonPath, value: JsonExpected
     } else Object.defineProperty(current, key, {value: structuredClone(value), enumerable: true, writable: true, configurable: true})
 }
 
-export class JsonRegion {
+export abstract class JsonRegion {
     readonly kind = "json-region"
+    abstract readonly id: string
+    abstract readonly managedItemId: string
+    protected abstract readonly path: JsonPath
 
-    constructor(readonly id: string, readonly managedItemId: string, private readonly path: JsonPath, private readonly value: (state: ProjectState) => JsonExpected) {
-        if (path.length === 0 || path.some(key => typeof key === "number" && (!Number.isSafeInteger(key) || key < 0))) throw new Error(`非法 JSON 路径：${id}`)
-    }
+    protected abstract makeValue(state: ProjectState): JsonExpected
 
     enabled(state: ProjectState): boolean { return isManagedItem(state, this.managedItemId) }
-    locate(_state: ProjectState): JsonPath { return this.path }
-    make(state: ProjectState): JsonExpected { return this.value(state) ?? undefined }
+    locate(_state: ProjectState): JsonPath {
+        if (this.path.length === 0 || this.path.some(key => typeof key === "number" && (!Number.isSafeInteger(key) || key < 0))) throw new Error(`非法 JSON 路径：${this.id}`)
+        return this.path
+    }
+    make(state: ProjectState): JsonExpected { return this.makeValue(state) ?? undefined }
 
     check(state: ProjectState, json: JsonValue): CheckResult<JsonExpected, JsonPath> {
         let expected: JsonExpected

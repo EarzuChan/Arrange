@@ -2,15 +2,15 @@ import type {ProjectState} from "../project/ProjectState.ts"
 import {TextRegion} from "./TextRegion.ts"
 import {Wrapper, type WrappedLocation} from "./Wrapper.ts"
 
-export class TextCluster {
+export abstract class TextCluster {
     readonly kind = "text-cluster"
-    readonly wrapper: Wrapper
+    abstract readonly id: string
+    abstract readonly regions: readonly TextRegion[]
+    get wrapper(): Wrapper { return new Wrapper(`cluster:${this.id}`) }
 
-    constructor(readonly id: string, readonly regions: readonly TextRegion[], private readonly body: (state: ProjectState) => string) {
-        this.wrapper = new Wrapper(`cluster:${id}`)
-    }
+    protected abstract makeInner(state: ProjectState): string
 
-    make(state: ProjectState): string { return this.wrapper.make(this.body(state)) }
+    make(state: ProjectState): string { return this.wrapper.make(this.makeInner(state)) }
 
     locate(_state: ProjectState, fileText: string): WrappedLocation { return this.wrapper.locate(fileText) }
 

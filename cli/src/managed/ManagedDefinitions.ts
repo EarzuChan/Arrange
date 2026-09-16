@@ -1,5 +1,5 @@
 import {cmakeListsFile, fetchContentRepositoryRegion, frameworkVersionRegion, pluginVersionRegion, pluginIdentityRegion, pluginFormatsRegion, productNameRegion} from "../cmake/CmakeTextStuffs.ts"
-import {npmrcFile, packageJsonFile, registryRegion, packageNameRegion, frameworkDependencyRegion} from "../node-js/NodeFiles.ts"
+import {npmrcFile, packageJsonFile, registryRegion, packageNameRegion, frameworkDependencyRegion} from "../node-js/NodeJsFiles.ts"
 import {managedItemIds, type ManagedItem} from "./ManagedItem.ts"
 import type {ManagedFile} from "./ManagedFile.ts"
 

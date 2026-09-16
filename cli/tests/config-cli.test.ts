@@ -14,7 +14,7 @@ import {cmakeListsFile} from "../src/cmake/CmakeTextStuffs.ts"
 import {cliCompatibility} from "../src/CliMetadata.ts"
 
 const exec = promisify(execFile)
-const sourceEntry = fileURLToPath(new URL("../src/index.ts", import.meta.url))
+const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
 
 async function cli(root: string, args: string[]) {
     try {

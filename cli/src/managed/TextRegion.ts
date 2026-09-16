@@ -3,18 +3,18 @@ import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
 import {type CheckResult, type Located} from "./CheckResult.ts"
 import {Wrapper, type WrappedLocation} from "./Wrapper.ts"
 
-export class TextRegion {
+export abstract class TextRegion {
     readonly kind = "text-region"
-    readonly wrapper: Wrapper
+    abstract readonly id: string
+    abstract readonly managedItemId: string
+    get wrapper(): Wrapper { return new Wrapper(`region:${this.id}`) }
 
-    constructor(readonly id: string, readonly managedItemId: string, private readonly body: (state: ProjectState) => string) {
-        this.wrapper = new Wrapper(`region:${id}`)
-    }
+    protected abstract makeInner(state: ProjectState): string
 
     enabled(state: ProjectState): boolean { return isManagedItem(state, this.managedItemId) }
 
     make(state: ProjectState): string {
-        const inner = this.body(state)
+        const inner = this.makeInner(state)
         return this.enabled(state) ? this.wrapper.make(inner) : inner
     }
 
@@ -22,7 +22,7 @@ export class TextRegion {
 
     check(state: ProjectState, clusterInnerText: string): CheckResult<string, Located> {
         let expected: string
-        try { expected = this.body(state) } catch (error) { return {kind: "Fatal", cause: "config-invalid", message: errorMessage(error)} }
+        try { expected = this.makeInner(state) } catch (error) { return {kind: "Fatal", cause: "config-invalid", message: errorMessage(error)} }
         const location = this.locate(state, clusterInnerText)
         if (location.kind !== "located") return {kind: "Resolvable", cause: location.kind, message: location.kind === "missing" ? `缺少 ${this.id} Wrapper` : location.message, expected}
         const actual = clusterInnerText.slice(location.inner.start, location.inner.end)

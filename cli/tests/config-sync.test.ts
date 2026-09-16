@@ -4,16 +4,17 @@ import {readFile, readdir, rm, mkdir} from "node:fs/promises"
 import {join} from "node:path"
 import {fixture, write, TestSyncWizard} from "./fixture.ts"
 import {ProjectStateStore} from "../src/project/ProjectStateStore.ts"
+import type {ProjectState} from "../src/project/ProjectState.ts"
 import {managedFiles, managedItems} from "../src/managed/ManagedDefinitions.ts"
 import {managedItemIds} from "../src/managed/ManagedItem.ts"
 import {ConfigScanner} from "../src/sync/ConfigScanner.ts"
 import {ConfigApplier} from "../src/sync/ConfigApplier.ts"
 import {ConfigWriter} from "../src/sync/ConfigWriter.ts"
 import {SyncService} from "../src/sync/SyncService.ts"
-import {ConfigResolver} from "../src/sync/ConfigResolver.ts"
+import {serviceHub} from "../src/ServiceHub.ts"
 import {FrameworkRegistryClient} from "../src/framework/FrameworkRegistryClient.ts"
 import {cliCompatibility} from "../src/CliMetadata.ts"
-import {registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion} from "../src/node-js/NodeFiles.ts"
+import {registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion} from "../src/node-js/NodeJsFiles.ts"
 import {cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion} from "../src/cmake/CmakeTextStuffs.ts"
 import {TextFile, JsonFile} from "../src/managed/ManagedFile.ts"
 import {TextCluster} from "../src/managed/TextCluster.ts"
@@ -28,17 +29,13 @@ beforeEach(() => {
 })
 afterEach(() => mock.restoreAll())
 
-class TestSyncService extends SyncService {
-    override readonly syncWizard: TestSyncWizard
-    override readonly configResolver: ConfigResolver
-
-    constructor(syncWizard: TestSyncWizard) {
-        super()
-        this.syncWizard = syncWizard
-        this.configResolver = new ConfigResolver(syncWizard, this.configApplier.writer)
-    }
+function run(syncWizard: TestSyncWizard): SyncService {
+    mock.method(serviceHub.syncWizard, "report", syncWizard.report.bind(syncWizard))
+    mock.method(serviceHub.syncWizard, "choose", syncWizard.choose.bind(syncWizard))
+    mock.method(serviceHub.syncWizard, "edit", syncWizard.edit.bind(syncWizard))
+    mock.method(serviceHub.syncWizard, "message", syncWizard.message.bind(syncWizard))
+    return serviceHub.syncService
 }
-const run = (syncWizard: TestSyncWizard) => new TestSyncService(syncWizard)
 
 async function noJournal(root: string) { await assert.rejects(readdir(join(root, ".arrange")), {code: "ENOENT"}) }
 
@@ -211,7 +208,7 @@ for (const scope of ["UI", "Native"] as const) {
         assert.equal(result.report!.applicable.length, 2)
         assert.ok(result.report!.applicable.every(update => update.target.file.scope === scope))
         assert.equal(await readFile(otherFile.path(state), "utf8"), otherBefore)
-        const loaded = await store.inspect(state.rootDir)
+        const loaded = await store.deepLoad(state.rootDir)
         assert.deepEqual(loaded.state!.project["managed-items"], state.project["managed-items"])
         const remaining = await scanner.scan(loaded.state!, "Global")
         assert.equal(remaining.fatal.length + remaining.resolvable.length, 0)
@@ -331,7 +328,7 @@ test("扫描后文件或 YAML 被外部修改，Apply 拒绝且不覆写", async
     await assert.rejects(new ConfigApplier().apply(state.rootDir, report), /发生变化/)
     assert.equal(await readFile(path, "utf8"), modified)
     const latest = await scanner.scan(state, "Global")
-    const loaded = await store.inspect(state.rootDir)
+    const loaded = await store.deepLoad(state.rootDir)
     await write(join(state.rootDir, "arrange.project.yaml"), "changed")
     await assert.rejects(new ConfigApplier().apply(state.rootDir, latest, loaded.snapshots), /发生变化/)
     await noJournal(state.rootDir)
@@ -342,6 +339,9 @@ test("多文件写入中断保留原文、目标及进度，能区分已写、�
     state.project.project.name = "Changed"
     state.project.project.version = "2.0.0"
     const report = await scanner.scan(state, "Global")
+    class FailingApplier extends ConfigApplier {
+        override readonly writer = new FailingWriter()
+    }
     class FailingWriter extends ConfigWriter {
         calls = 0
         protected override async replaceFile(before: FileSnapshot, after: string, id: string): Promise<void> {
@@ -349,15 +349,15 @@ test("多文件写入中断保留原文、目标及进度，能区分已写、�
             return super.replaceFile(before, after, id)
         }
     }
-    const writer = new FailingWriter()
-    await assert.rejects(new ConfigApplier(writer).apply(state.rootDir, report), /模拟磁盘错误/)
+    const applier = new FailingApplier()
+    await assert.rejects(applier.apply(state.rootDir, report), /模拟磁盘错误/)
     const dir = join(state.rootDir, ".arrange", "transactions")
     const journalPath = join(dir, (await readdir(dir))[0])
-    const recovered = await writer.inspectJournal(journalPath)
+    const recovered = await applier.writer.inspectJournal(journalPath)
     assert.equal(recovered.journal.status, "failed")
     assert.deepEqual(recovered.states, ["expected", "original"])
     await write(recovered.journal.files[1].path, "用户又改了")
-    assert.deepEqual((await writer.inspectJournal(journalPath)).states, ["expected", "conflict"])
+    assert.deepEqual((await applier.writer.inspectJournal(journalPath)).states, ["expected", "conflict"])
     const files = await readdir(state.rootDir, {recursive: true})
     assert.equal(files.some(path => path.endsWith(".tmp")), false)
 })
@@ -381,13 +381,42 @@ test("坏 YAML 收集双方诊断；local 坏时仍扫描独立工程文件；�
 test("同一 ManagedItem 跨文本和 JSON，一支缺失不阻止另一支扫描", async t => {
     const state = await fixture(t, false)
     state.project["managed-items"] = ["both"]
-    const text = new TextRegion("text", "both", () => "expected\n")
-    const cluster = new TextCluster("cluster", [text], s => text.make(s))
-    const textFile = new TextFile("text", "Native", s => join(s.rootDir, "text.txt"), [cluster], s => cluster.make(s))
-    const json = new JsonRegion("json", "both", ["value"], () => undefined)
-    const jsonFile = new JsonFile("json", "UI", s => join(s.rootDir, "data.json"), [json], () => ({}))
+    const text = new class extends TextRegion {
+        readonly id = "text"
+        readonly managedItemId = "both"
+        protected override makeInner(): string { return "expected\n" }
+    }()
+    const cluster = new class extends TextCluster {
+        readonly id = "cluster"
+        readonly regions = [text]
+        protected override makeInner(state: ProjectState): string { return text.make(state) }
+    }()
+    const textFile = new class extends TextFile {
+        readonly id = "text"
+        readonly scope = "Native"
+        readonly clusters = [cluster]
+        override path(state: ProjectState): string { return join(state.rootDir, "text.txt") }
+        override make(state: ProjectState): string { return cluster.make(state) }
+    }()
+    const json = new class extends JsonRegion {
+        readonly id = "json"
+        readonly managedItemId = "both"
+        protected readonly path = ["value"]
+        protected override makeValue(): undefined { return undefined }
+    }()
+    const jsonFile = new class extends JsonFile {
+        readonly id = "json"
+        readonly scope = "UI"
+        readonly regions = [json]
+        override path(state: ProjectState): string { return join(state.rootDir, "data.json") }
+        protected override makeContent() { return {} }
+    }()
     await write(jsonFile.path(state), '{"value":null,"other":7}')
-    const custom = new ConfigScanner([textFile, jsonFile], [{id: "both", label: "both", regions: [text, json]}])
+    class CustomScanner extends ConfigScanner {
+        override readonly files = [textFile, jsonFile]
+        override readonly items = [{id: "both", label: "both", regions: [text, json]}]
+    }
+    const custom = new CustomScanner()
     const report = await custom.scan(state, "Global")
     assert.equal(report.resolvable.length, 1)
     assert.equal(report.applicable.length, 1)

@@ -8,5 +8,6 @@
 | 结果类型 | [托管模型：CONFIG SCAN 的四类结果](../../../arch/32-ArrangeCLI托管与同步模型.md#config-scan-的四类结果) |
 | 目标目录分工 | [CLI 架构](../../../arch/31-ArrangeCLI与工程模式.md#简明架构说明) |
 | CMake 具体定义 | [CmakeTextStuffs.ts](../../../../cli/src/cmake/CmakeTextStuffs.ts) |
+| Node 具体定义 | [NodeJsFiles.ts](../../../../cli/src/node-js/NodeJsFiles.ts) |
 
 实现顺序见[第三期工作区](第三期M2.2的工作.md)，验收见[CONFIG 扫描验收用例](SCAN结果各项+对策.md)。
