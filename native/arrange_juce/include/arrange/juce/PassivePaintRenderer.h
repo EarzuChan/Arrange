@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/core/Node.h>
+#include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/DiagnosticEvent.h>
 #include <arrange/juce/ImageResourceCache.h>
 #include <arrange/juce/JuceDrawOpsPainter.h>
@@ -22,26 +22,11 @@ namespace arrange::juce {
     public:
         void setPackageDir(const std::filesystem::path& packageDir);
         void clearResources();
-        [[nodiscard]] bool prepareResources(
-            ArrangeRuntime& runtime,
-            DiagnosticsState& diagnostics);
+        void prepareResources(const arrange::core::PublishedFrameContent& content);
 
-        void paint(
-            ::juce::Graphics& g,
-            ::juce::Rectangle<int> bounds,
-            const ArrangeRuntime& runtime,
-            const DiagnosticsState& diagnostics,
-            const InteractionStateOwner& interaction,
-            arrange::core::NodeId root,
-            bool loaded,
-            bool detailedErrorScreen,
-            const DiagnosticsBadgeModel& badgeModel);
+        void paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame);
 
     private:
-        void paintDiagnostics(
-            ::juce::Graphics& g,
-            const ArrangeRuntime& runtime,
-            const ImageResourceCache& imageResources) const;
 
         JuceDrawOpsPainter drawOpsPainter_;
         ImageResourceCache imageResources_;

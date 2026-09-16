@@ -1,6 +1,5 @@
 #pragma once
 
-#include <arrange/juce/EditorTimerDriver.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -32,9 +31,9 @@ namespace arrange::juce {
         [[nodiscard]] bool pushManualDiagnosticToast();
         [[nodiscard]] bool copyDiagnosticsToClipboard();
 
-        void repaintDirty(::juce::Component& owner, bool fullIfNoBounds);
+        void repaintDirty(::juce::Component& owner);
         [[nodiscard]] bool consumeDevReloadRequested();
-        [[nodiscard]] EditorTimerDemand timerDemand() const;
+        [[nodiscard]] bool wantsVBlank() const;
         [[nodiscard]] bool pumpFrame(double nowMillis);
         [[nodiscard]] std::string windowTitle(std::string_view baseTitle) const;
 

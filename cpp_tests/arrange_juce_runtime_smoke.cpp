@@ -1,3 +1,4 @@
+#include <arrange/core/PointerInputProcessor.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>
@@ -20,20 +21,16 @@
 #include <string>
 
 namespace {
-    std::optional<arrange::core::EventSlotId> firstCompiledModifierEventSlot(
+    std::optional<arrange::core::EventSlotId> firstModifierEventSlot(
         const arrange::core::LayoutTree& tree,
         arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            const auto& modifier = tree.node(id).modifier;
-            if (kind == arrange::core::EventSlotKind::Click && modifier.input.clickEventSlot.valid()) {
-                return modifier.input.clickEventSlot;
-            }
-            if (kind == arrange::core::EventSlotKind::VerticalScroll && modifier.scroll.verticalEventSlot.valid()) {
-                return modifier.scroll.verticalEventSlot;
-            }
-            if (kind == arrange::core::EventSlotKind::HorizontalScroll && modifier.scroll.horizontalEventSlot.valid()) {
-                return modifier.scroll.horizontalEventSlot;
+            for (const auto& instance : tree.node(id).modifier.elements()) {
+                arrange::core::EventSlotId slot;
+                if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+                if (const auto* input = std::get_if<arrange::core::LayoutModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+                if (slot.kind == kind && slot.valid()) return slot;
             }
         }
         return std::nullopt;
@@ -141,13 +138,23 @@ int main(int argc, char** argv) {
         return 7;
     }
 
-    const auto clickSlot = firstCompiledModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::Click);
+    const auto clickSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::Click);
     if (!clickSlot || !clickSlot->valid()) return 5;
-    const auto scrollSlot = firstCompiledModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
+    const auto scrollSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
     if (!scrollSlot || !scrollSlot->valid()) return 6;
 
+    arrange::core::PointerInputProcessor pointer;
     for (int index = 0; index < 13; ++index) {
-        runtime.enqueueEvent(*clickSlot);
+        const auto& snapshot = *runtime.publishedFrame().content.hitTest;
+        auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) {
+            return candidate.target.eventSlot == *clickSlot;
+        });
+        if (region == snapshot.regions.end()) return 20;
+        const arrange::core::Point point{region->bounds.x + region->bounds.width / 2, region->bounds.y + region->bounds.height / 2};
+        pointer.pointerDown(snapshot, point);
+        const auto clicked = pointer.pointerUp(snapshot, point);
+        if (!clicked.clickTriggered || clicked.eventSlot != *clickSlot) return 21;
+        runtime.enqueueEvent(clicked.eventSlot);
         const auto frame = runtime.pumpFrame(1, constraints, 16.0 * static_cast<double>(index + 1));
         if (!frame.ok) {
             std::cerr << "event frame failed at " << index << ": " << frame.error << "\n";
@@ -155,8 +162,8 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (!treeContainsText(runtime.scene().tree(), "Clicks: 13")) {
-        std::cerr << "counter text did not reach Clicks: 13\n";
+    if (!treeContainsText(runtime.scene().tree(), "撅: 13")) {
+        std::cerr << "counter text did not reach 撅: 13\n";
         return 9;
     }
 
@@ -175,7 +182,7 @@ int main(int argc, char** argv) {
         return 10;
     }
 
-    if (runtime.scene().tree().node(scrollSlot->node).modifier.scroll.verticalValue != 17.0f) {
+    if (arrange::core::ScrollDispatcher::verticalScrollValue(runtime.scene().tree().node(scrollSlot->node)) != 17.0f) {
         std::cerr << "scroll value did not sync through compiled modifier\n";
         return 11;
     }

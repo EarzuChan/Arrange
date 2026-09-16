@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/NativeScene.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
 #include "ScriptHost.h"
@@ -72,11 +73,6 @@ namespace arrange::quickjs {
         bool enabled = false;
     };
 
-    struct ReloadRequest {
-        std::string path;
-        double timestamp = 0.0;
-    };
-
     class QuickJsScriptHost final : public ScriptHost {
     public:
         QuickJsScriptHost();
@@ -93,19 +89,19 @@ namespace arrange::quickjs {
         void setFrameTimeMillis(double nowMillis) noexcept;
         bool hasPendingAnimationFrame() const noexcept;
         CallbackInvokeResult pumpAnimationFrame(double nowMillis);
-        bool reloadRequested() const noexcept { return reloadRequested_; }
-        const ReloadRequest& reloadRequest() const noexcept { return reloadRequest_; }
+        bool hasPendingDiagnostics() const noexcept;
         std::vector<QuickJsDiagnosticEventInput> takeDiagnosticEvents();
         std::vector<QuickJsDiagnosticAction> takeDiagnosticActions();
         std::size_t eventSlotCount() const noexcept;
-        void flushRetiredEventSlots();
+        std::size_t bindingCount() const noexcept;
+        std::size_t modifierInstanceCount() const noexcept;
+        std::uint64_t rejectedBindingUpdates() const noexcept;
+        void publishScene(const arrange::core::NativeScene& scene);
 
     private:
         struct Impl;
         std::unique_ptr<Impl> impl_;
         arrange::core::MutationTransactionQueue pendingTransactions_;
-        bool reloadRequested_ = false;
-        ReloadRequest reloadRequest_;
     };
 
 #endif

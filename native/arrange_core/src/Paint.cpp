@@ -1,3 +1,4 @@
+#include <arrange/core/ModifierGeometry.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/Modifier.h>
 #include <arrange/core/PropValue.h>
@@ -57,17 +58,8 @@ namespace arrange::core {
             return lines;
         }
 
-        Rect applyPadding(Rect rect, const ModifierPadding& padding) {
-            rect.x += padding.start;
-            rect.y += padding.top;
-            rect.width = std::max(0.0f, rect.width - padding.start - padding.end);
-            rect.height = std::max(0.0f, rect.height - padding.top - padding.bottom);
-            return rect;
-        }
-
-
         float zIndexOf(const ArrangeNode& node) {
-            return node.modifier.zIndex;
+            return node.modifier.zIndex();
         }
 
         std::vector<NodeId> childrenInPaintOrder(const LayoutTree& tree, const ArrangeNode& node) {
@@ -77,7 +69,7 @@ namespace arrange::core {
         }
 
         std::uint32_t styleColor(const PaintStyleSemantics& style) {
-            return style.color != 0 ? style.color : style.brush;
+            return style.color;
         }
 
         DrawShapeType shapeType(const PaintStyleSemantics& style) {
@@ -103,91 +95,99 @@ namespace arrange::core {
         return ops;
     }
 
-    void DrawOpsBuilder::collectNode(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float inheritedAlpha) const {
-        const auto& node = tree.node(id);
-        auto contentRect = node.bounds;
-        std::vector<DrawOpType> popStack;
-        float alpha = inheritedAlpha;
+    std::vector<DrawOp> DrawOpsBuilder::collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const {
+        std::vector<DrawOp> ops;
+        const auto path = nodePath(tree, target);
+        if (path.empty()) return ops;
+        std::function<void(std::size_t, float)> wrap = [&](std::size_t index, float alpha) {
+            if (index == path.size()) {
+                for (auto op : content) { op.color = withAlpha(op.color, alpha); ops.push_back(std::move(op)); }
+                return;
+            }
+            collectModifier(tree, path[index], 0, ops, alpha, [&](float nextAlpha) { wrap(index + 1, nextAlpha); }, true);
+        };
+        wrap(0, 1.0f);
+        return ops;
+    }
 
-        if (node.modifier.transform.hasPaintTransform) {
-            const auto& transform = node.modifier.transform;
+    void DrawOpsBuilder::collectNode(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const {
+        collectModifier(tree, id, 0, ops, alpha);
+    }
+
+    void DrawOpsBuilder::collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride, bool geometryOnly) const {
+        const auto& chain = tree.node(id).modifier.elements();
+        if (index == chain.size()) { if (contentOverride) contentOverride(alpha); else collectContent(tree, id, ops, alpha); return; }
+        const auto& instance = chain[index];
+        const auto& value = instance.descriptor.value;
+        const auto content = [&] { collectModifier(tree, id, index + 1, ops, alpha, contentOverride, geometryOnly); };
+        const auto pushClip = [&](const PaintStyleSemantics& shape) {
+            DrawOp op;
+            op.type = DrawOpType::PushClip;
+            op.nodeId = id;
+            op.rect = instance.bounds;
+            op.shape = shapeType(shape);
+            op.cornerRadius = shape.cornerRadius;
+            ops.push_back(op);
+        };
+        const auto pop = [&](DrawOpType type) { DrawOp op; op.type = type; op.nodeId = id; ops.push_back(op); };
+        if (const auto* style = std::get_if<PaintStyleSemantics>(&value)) {
+            if (style->kind == PaintStyleKind::Alpha) { alpha *= style->alpha; content(); return; }
+            if (geometryOnly) { content(); return; }
+            const auto overlay = style->kind == PaintStyleKind::Border || style->kind == PaintStyleKind::InnerShadow;
+            if (overlay) content();
+            if (style->color != 0) {
+                DrawOp op;
+                op.type = overlay ? DrawOpType::StrokeRect : DrawOpType::FillRect;
+                op.nodeId = id;
+                op.rect = instance.bounds;
+                if (style->kind == PaintStyleKind::DropShadow) { op.rect.x += style->shadowOffset.x; op.rect.y += style->shadowOffset.y; }
+                op.color = withAlpha(style->color, alpha);
+                op.strokeWidth = style->strokeWidth;
+                op.shape = shapeType(*style);
+                op.cornerRadius = style->cornerRadius;
+                ops.push_back(op);
+            }
+            if (!overlay) content();
+            return;
+        }
+        if (const auto* clip = std::get_if<ClipModifier>(&value)) {
+            pushClip(clip->shape);
+            content();
+            pop(DrawOpType::PopClip);
+            return;
+        }
+        if (const auto* layer = std::get_if<TransformModifierSemantics>(&value)) {
             DrawOp op;
             op.type = DrawOpType::PushTransform;
-            op.rect = node.bounds;
-            op.scaleX = transform.scaleX;
-            op.scaleY = transform.scaleY;
-            op.rotationZ = transform.rotationZ;
-            op.transformOriginX = transform.transformOriginX;
-            op.transformOriginY = transform.transformOriginY;
+            op.nodeId = id;
+            op.rect = instance.bounds;
+            op.translationX = layer->translationX;
+            op.translationY = layer->translationY;
+            op.scaleX = layer->scaleX;
+            op.scaleY = layer->scaleY;
+            op.rotationZ = layer->rotationZ;
+            op.transformOriginX = layer->transformOriginX;
+            op.transformOriginY = layer->transformOriginY;
             ops.push_back(op);
-            popStack.push_back(DrawOpType::PopTransform);
+            alpha *= layer->alpha;
+            if (layer->clip) pushClip({});
+            content();
+            if (layer->clip) pop(DrawOpType::PopClip);
+            pop(DrawOpType::PopTransform);
+            return;
         }
-
-        {
-            for (const auto& paintOp : node.modifier.paint.chain) {
-                if (paintOp.kind == PaintChainOpKind::ContentPadding) {
-                    contentRect = applyPadding(contentRect, paintOp.padding);
-                    continue;
-                }
-
-                const auto& style = paintOp.style;
-                const auto color = styleColor(style);
-                if (paintOp.kind == PaintChainOpKind::Clip) {
-                    DrawOp clip;
-                    clip.type = DrawOpType::PushClip;
-                    clip.rect = contentRect;
-                    clip.shape = shapeType(style);
-                    clip.cornerRadius = style.cornerRadius;
-                    ops.push_back(clip);
-                    popStack.push_back(DrawOpType::PopClip);
-                }
-                else if (style.kind == PaintStyleKind::Alpha) {
-                    alpha *= style.alpha;
-                }
-                else if (style.kind == PaintStyleKind::DropShadow && color != 0) {
-                    auto rect = contentRect;
-                    rect.x += style.shadowOffset.x;
-                    rect.y += style.shadowOffset.y;
-                    DrawOp op;
-                    op.type = DrawOpType::FillRect;
-                    op.rect = rect;
-                    op.color = withAlpha(color, alpha);
-                    op.shape = shapeType(style);
-                    op.cornerRadius = style.cornerRadius;
-                    ops.push_back(std::move(op));
-                }
-                else if (style.kind == PaintStyleKind::InnerShadow && color != 0) {
-                    DrawOp op;
-                    op.type = DrawOpType::StrokeRect;
-                    op.rect = contentRect;
-                    op.color = withAlpha(color, alpha);
-                    op.strokeWidth = style.strokeWidth;
-                    op.shape = shapeType(style);
-                    op.cornerRadius = style.cornerRadius;
-                    ops.push_back(std::move(op));
-                }
-                else if (style.kind == PaintStyleKind::Background && color != 0) {
-                    DrawOp op;
-                    op.type = DrawOpType::FillRect;
-                    op.rect = contentRect;
-                    op.color = withAlpha(color, alpha);
-                    op.shape = shapeType(style);
-                    op.cornerRadius = style.cornerRadius;
-                    ops.push_back(std::move(op));
-                }
-                else if (style.kind == PaintStyleKind::Border && color != 0) {
-                    DrawOp op;
-                    op.type = DrawOpType::StrokeRect;
-                    op.rect = contentRect;
-                    op.color = withAlpha(color, alpha);
-                    op.strokeWidth = style.strokeWidth;
-                    op.shape = shapeType(style);
-                    op.cornerRadius = style.cornerRadius;
-                    ops.push_back(std::move(op));
-                }
-            }
+        if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value); layout && (layout->kind == LayoutModifierKind::VerticalScroll || layout->kind == LayoutModifierKind::HorizontalScroll)) {
+            pushClip({});
+            content();
+            pop(DrawOpType::PopClip);
+            return;
         }
+        content();
+    }
 
+    void DrawOpsBuilder::collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const {
+        const auto& node = tree.node(id);
+        const auto contentRect = node.contentBounds;
         if (node.type == NodeType::Text && !node.text.empty()) {
             std::uint32_t textColor = 0xff000000u;
             float fontSize = 14.0f;
@@ -276,11 +276,7 @@ namespace arrange::core {
 
         for (auto childId : childrenInPaintOrder(tree, node)) collectNode(tree, childId, ops, alpha);
 
-        for (auto it = popStack.rbegin(); it != popStack.rend(); ++it) {
-            DrawOp pop;
-            pop.type = *it;
-            ops.push_back(pop);
-        }
+
     }
 
     std::string DrawOpsBuilder::textStyleProp(const ArrangeNode& node) { return stringProp(node, "textStyle", "text-style", ""); }
@@ -294,7 +290,7 @@ namespace arrange::core {
 
     TextInputOverlayBuilder::Metrics TextInputOverlayBuilder::metrics(const ArrangeNode& node, float viewportX) {
         Metrics result;
-        result.rect = node.bounds;
+        result.rect = node.contentBounds;
         const auto style = objectProp(node, "textStyle", "text-style");
         result.fontSize = style.number("fontSize", 14.0f);
         result.singleLine = !allowsLineBreak(node);

@@ -43,7 +43,8 @@ namespace arrange::core {
             case NodeType::Row:
             case NodeType::Column:
             case NodeType::Canvas:
-            case NodeType::Unknown:
+            case NodeType::Root:
+        case NodeType::Unknown:
                 return true;
             case NodeType::Spacer:
             case NodeType::Text:
@@ -248,7 +249,14 @@ namespace arrange::core {
             return false;
         }
         if (value.isNull()) {
-            error = "Arrange prop '" + rawKey + "' must not be null";
+            const bool common = isOneOf(key, {"contentDescription", "label", "description", "role", "enabled"});
+            const bool text = isOneOf(key, {"textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
+            const bool input = nodeType == NodeType::Input && isOneOf(key, {"modelValue", "value", "placeholder", "selectAllOnFocus", "textStyle", "singleLine", "minLines", "maxLines"});
+            const bool image = (nodeType == NodeType::Image || nodeType == NodeType::Icon) && isOneOf(key, {"source", "size", "contentScale", "alignment", "alpha"});
+            const bool icon = nodeType == NodeType::Icon && key == "tint";
+            const bool container = isNodeTypeWithChildren(nodeType) && (text || isOneOf(key, {"text", "modelValue", "value", "placeholder", "selectAllOnFocus", "horizontalArrangement", "verticalArrangement", "contentAlignment", "horizontalAlignment", "verticalAlignment"}));
+            if (common || (nodeType == NodeType::Text && text) || input || image || icon || container) return true;
+            error = "Arrange cannot clear unsupported prop '" + rawKey + "'";
             return false;
         }
         if (validateAccessibility(key, value, error)) return true;
@@ -284,6 +292,7 @@ namespace arrange::core {
             break;
         case NodeType::Spacer:
         case NodeType::Canvas:
+        case NodeType::Root:
         case NodeType::Unknown:
             break;
         }

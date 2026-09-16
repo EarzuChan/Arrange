@@ -34,10 +34,7 @@ namespace arrange::juce {
         return plan.hasTickWork;
     }
 
-    int FramePlanner::desiredTimerFrequencyHz(FrameWorkState state) const noexcept {
-        const auto plan = planTick(state);
-        return plan.hasTickWork ? 60 : 20;
-    }
+
 
     void FramePlanner::reset() noexcept {
         framePipelineRunRequested_ = false;

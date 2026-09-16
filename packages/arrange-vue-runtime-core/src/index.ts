@@ -483,3 +483,7 @@ export const DeprecationTypes = (
   __COMPAT__ ? _DeprecationTypes : null
 ) as typeof _DeprecationTypes
 
+
+export {arrangeValue, arrangeProps} from './valueBinding.ts'
+
+export {getArrangeExecutionStats} from './executionStats.ts'

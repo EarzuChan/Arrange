@@ -8,6 +8,7 @@ namespace arrange::juce {
 
     void InteractionStateOwner::reset() {
         input_.reset();
+        pointer_.reset();
     }
 
     const std::optional<arrange::core::NodeId>& InteractionStateOwner::focusedNode() const noexcept {
@@ -20,12 +21,12 @@ namespace arrange::juce {
 
     void InteractionStateOwner::pointerDown(
         arrange::core::LayoutTree& tree,
-        arrange::core::NodeId root,
+        const arrange::core::HitTestSnapshot& snapshot,
         float x,
         float y,
         const TextInputCallbacks& callbacks) {
         const auto point = arrange::core::Point{x, y};
-        const auto pointerResult = pointer_.pointerDown(tree, root, point, 0);
+        const auto pointerResult = pointer_.pointerDown(snapshot, point, 0);
         input_.pointerDown(tree, pointerResult.hit, x, y, callbacks);
     }
 
@@ -40,11 +41,11 @@ namespace arrange::juce {
 
     InteractionPointerUpResult InteractionStateOwner::pointerUp(
         arrange::core::LayoutTree& tree,
-        arrange::core::NodeId root,
+        const arrange::core::HitTestSnapshot& snapshot,
         float x,
         float y) {
         input_.cancelDrag();
-        const auto result = pointer_.pointerUp(tree, root, {x, y}, 0);
+        const auto result = pointer_.pointerUp(snapshot, {x, y}, 0);
         return {result.clickTriggered, result.eventSlot};
     }
 
@@ -54,8 +55,9 @@ namespace arrange::juce {
         float x,
         float y,
         float deltaX,
-        float deltaY) {
-        const auto result = pointer_.wheel(tree, root, {x, y}, deltaX, deltaY);
+        float deltaY,
+        std::uint64_t publishedRevision) {
+        const auto result = pointer_.wheel(tree, root, {x, y}, deltaX, deltaY, publishedRevision);
         return {result.scroll, result.horizontal};
     }
 

@@ -110,7 +110,7 @@ namespace arrange::juce {
         return devReloadRequested_.exchange(false);
     }
 
-    bool PackageRuntimeSource::wantsDevTimer() const {
+    bool PackageRuntimeSource::wantsReloadPolling() const {
         return config_.app.hasLive();
     }
 

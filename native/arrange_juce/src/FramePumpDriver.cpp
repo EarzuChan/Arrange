@@ -6,6 +6,8 @@
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/RuntimeSessionState.h>
+#include <arrange/juce/PassivePaintRenderer.h>
+#include <stdexcept>
 
 #include <string>
 #include <utility>
@@ -69,95 +71,61 @@ namespace arrange::juce {
         RuntimeSessionState& session,
         DiagnosticsState& diagnostics,
         InteractionStateOwner& interaction,
+        PassivePaintRenderer& paint,
         arrange::core::NodeId root,
         const std::filesystem::path& frameErrorPath,
         ::juce::Rectangle<int> diagnosticsBounds,
         bool detailedErrorScreen,
         const DiagnosticsBadgeModel& badgeModel,
         double nowMillis) const {
-        auto diagnosticsChanged = tickDiagnostics(diagnostics, runtime, nowMillis);
-        const auto frame = runtime.pumpFrame(root, session.constraints(), nowMillis);
-        const auto frameErrorChanged = session.applyFrameError(frame, diagnostics, runtime, frameErrorPath);
-        if (frameErrorChanged) {
-            diagnosticsChanged = true;
-        }
-        const auto sceneValidityChanged = frameErrorChanged
-            ? false
-            : validateLoadedScene(runtime, session, diagnostics, root);
-        if (sceneValidityChanged) {
-            diagnosticsChanged = true;
-        }
-
-        if (diagnosticsChanged) {
-            const auto diagnosticsFrame = runtime.pumpFrame(root, session.constraints(), nowMillis);
-            const auto diagnosticsFrameErrorChanged = session.applyFrameError(
-                diagnosticsFrame,
-                diagnostics,
-                runtime,
-                frameErrorPath);
-            diagnosticsChanged = diagnosticsChanged || diagnosticsFrame.changed || diagnosticsFrameErrorChanged;
-            if (diagnosticsFrameErrorChanged) {
-                return true;
+        (void)tickDiagnostics(diagnostics, runtime, nowMillis);
+        std::optional<InteractionStateOwner> candidateInteraction;
+        const auto finalize = [&](const arrange::core::NativeScene& scene, arrange::core::PublishedFrame& frame) {
+            candidateInteraction.emplace(interaction);
+            if (session.loaded() && !diagnostics.hasError() && !scene.contains(root)) {
+                throw std::runtime_error("Arrange layout tree is empty after loading UI package.");
+            }
+            candidateInteraction->synchronizePublishedInput(scene.tree(), session.interactive(diagnostics));
+            candidateInteraction->updateFocusedInputViewport(scene.tree(), session.interactive(diagnostics));
+            frame.content.overlayDrawOps = candidateInteraction->buildFocusedInputOps(scene.tree(), session.interactive(diagnostics));
+            frame.content.focusedInputNode = candidateInteraction->focusedNode();
+            frame.content.focusedInputViewportX = candidateInteraction->viewportX();
+            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
+            frame.content.diagnosticsErrorDrawOps = diagnostics.errorOpsSnapshot();
+            frame.content.diagnosticsBadgeDrawOps = diagnostics.badgeOpsSnapshot();
+            frame.content.diagnosticsToastDrawOps = diagnostics.toastOpsSnapshot();
+            frame.content.errorFrame = diagnostics.hasError() ? std::optional<std::string>(diagnostics.error()->summary) : std::nullopt;
+            paint.prepareResources(frame.content);
+        };
+        const auto revision = runtime.publishedFrame().revision;
+        auto frame = runtime.pumpFrame(root, session.constraints(), nowMillis, finalize);
+        if (frame.ok && !frame.pipelineRan) {
+            try {
+                (void)runtime.publishRetained(finalize);
+            }
+            catch (const std::exception& error) {
+                frame.ok = false;
+                frame.errorPhase = RuntimeFrameErrorPhase::Pipeline;
+                frame.error = error.what();
             }
         }
-
-        diagnosticsChanged = prepareDiagnosticsFrame(
-            runtime,
-            diagnostics,
-            diagnosticsBounds,
-            detailedErrorScreen,
-            badgeModel) || diagnosticsChanged;
-
-        if (frameErrorChanged) {
-            return true;
+        if (!frame.ok) {
+            // JS effects cannot be rolled back. Preserve the last scene, stop this context,
+            // and recover only by loading a fresh context. Core retry remains available to native callers.
+            runtime.suspend();
+            (void)session.applyFrameError(frame, diagnostics, runtime, frameErrorPath);
+            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
+            (void)runtime.publishRetained([&](const auto&, auto& retained) {
+                retained.content.errorFrame = frame.error;
+                retained.content.diagnosticsErrorDrawOps = diagnostics.errorOpsSnapshot();
+                retained.content.diagnosticsBadgeDrawOps = diagnostics.badgeOpsSnapshot();
+                retained.content.diagnosticsToastDrawOps = diagnostics.toastOpsSnapshot();
+            });
         }
-
-        if (frame.pipelineRan && session.loaded() && runtime.scene().contains(root)) {
-            interaction.updateFocusedInputViewport(runtime.scene().tree(), session.loaded());
+        else {
+            if (candidateInteraction) interaction.commitState(std::move(*candidateInteraction));
         }
-        const auto interactionChanged = prepareInteractionFrame(
-            runtime,
-            session,
-            diagnostics,
-            interaction);
-        return diagnosticsChanged || sceneValidityChanged || interactionChanged || frame.changed;
-    }
-
-    bool FramePumpDriver::prepareInteractionFrame(
-        ArrangeRuntime& runtime,
-        RuntimeSessionState& session,
-        DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction) {
-        std::vector<arrange::core::DrawOp> ops;
-        if (session.interactive(diagnostics)) {
-            ops = interaction.buildFocusedInputOps(runtime.scene().tree(), session.loaded());
-        }
-
-        const auto& previous = runtime.publishedFrame().content.overlayDrawOps;
-        const auto changed = ops.size() != previous.size();
-        if (!changed) {
-            auto same = true;
-            for (std::size_t index = 0; index < ops.size(); ++index) {
-                const auto& left = ops[index];
-                const auto& right = previous[index];
-                same = same &&
-                    left.type == right.type &&
-                    left.nodeId == right.nodeId &&
-                    left.rect.x == right.rect.x &&
-                    left.rect.y == right.rect.y &&
-                    left.rect.width == right.rect.width &&
-                    left.rect.height == right.rect.height &&
-                    left.color == right.color &&
-                    left.strokeWidth == right.strokeWidth &&
-                    left.lineEnd.x == right.lineEnd.x &&
-                    left.lineEnd.y == right.lineEnd.y;
-                if (!same) break;
-            }
-            if (same) return false;
-        }
-
-        runtime.publishOverlayDrawOps(std::move(ops), interaction.focusedNode(), interaction.viewportX());
-        return true;
+        return runtime.publishedFrame().revision != revision;
     }
 
     bool FramePumpDriver::tickDiagnostics(
@@ -182,7 +150,7 @@ namespace arrange::juce {
                 event.pathOrUrl = action.path;
                 event.toast = true;
                 changed = diagnostics.emit(std::move(event)) || changed;
-                runtime.enqueueIntent(arrange::core::InputIntent::reload("script requested reload"));
+                runtime.requestReload();
                 break;
             }
             case arrange::quickjs::QuickJsDiagnosticActionKind::TriggerFakeError:
@@ -241,40 +209,6 @@ namespace arrange::juce {
         return true;
     }
 
-    bool FramePumpDriver::validateLoadedScene(
-        ArrangeRuntime& runtime,
-        RuntimeSessionState& session,
-        DiagnosticsState& diagnostics,
-        arrange::core::NodeId root) {
-        if (!session.loaded() || diagnostics.hasError() || runtime.hasPendingTransactions() || runtime.framePipelineRunRequested()) {
-            return false;
-        }
-        if (runtime.scene().contains(root)) {
-            return false;
-        }
-        session.setLayoutTreeEmptyError(diagnostics, runtime);
-        return true;
-    }
-
-    bool FramePumpDriver::prepareDiagnosticsFrame(
-        ArrangeRuntime& runtime,
-        DiagnosticsState& diagnostics,
-        ::juce::Rectangle<int> diagnosticsBounds,
-        bool detailedErrorScreen,
-        const DiagnosticsBadgeModel& badgeModel) {
-        const auto changed = diagnostics.prepareFrame(
-            diagnosticsBounds,
-            detailedErrorScreen,
-            badgeModel);
-        if (changed) {
-            runtime.publishDiagnosticsDrawOps(
-                diagnostics.errorOpsSnapshot(),
-                diagnostics.badgeOpsSnapshot(),
-                diagnostics.toastOpsSnapshot());
-            runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("diagnostics frame prepared"));
-        }
-        return changed;
-    }
 } // namespace arrange::juce
 
 #endif

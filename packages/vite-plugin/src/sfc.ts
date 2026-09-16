@@ -1,7 +1,5 @@
 import {compileScript, compileTemplate, parse} from "@arrange/vue-compiler-sfc"
 
-const DOM_TAG_PATTERN = /<\s*(div|span|input|canvas|button|section|article|main|header|footer)(\s|>|\/)/
-const CLASS_STYLE_PATTERN = /\s(class|style)\s*=/i
 const HMR_CLIENT_MARKER = "__ARRANGE_HMR_CLIENT__"
 const HOT_EXTENSIONS = new Set([".vue", ".ts", ".tsx", ".js", ".jsx"])
 
@@ -87,9 +85,7 @@ export function compileArrangeSfc(code: string, id: string): ArrangeSfcCompileRe
 
     const descriptor = descriptorResult.descriptor
     const warnings: string[] = []
-    if (DOM_TAG_PATTERN.test(source)) warnings.push("Arrange does not render DOM/HTML tags; use Box/Row/Column/Text/Input/Canvas etc.")
-    if (CLASS_STYLE_PATTERN.test(source)) warnings.push("Arrange ignores class/style attributes; use modifier instead.")
-    if (descriptor.styles.length > 0) warnings.push("Arrange ignores SFC <style> blocks; use Modifier and theme tokens instead.")
+    if (descriptor.styles.length > 0) throw new SyntaxError(`Arrange SFC ${filename} 不支持 <style>，请使用 Modifier`)
 
     const shortId = hashId(filename, source)
     const compilerOptions = {runtimeModuleName: "@arrange/framework"}

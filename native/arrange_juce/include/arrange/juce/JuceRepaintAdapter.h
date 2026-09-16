@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/core/LayoutTree.h>
+#include <arrange/core/SceneFramePipeline.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -14,13 +14,8 @@ namespace arrange::juce {
 
     class JuceRepaintAdapter final {
     public:
-        void repaintDirty(
-            ::juce::Component& owner,
-            const ArrangeRuntime& runtime,
-            const DiagnosticsState& diagnostics,
-            arrange::core::NodeId root,
-            bool loaded,
-            bool fullIfNoBounds);
+        void repaintDirty(::juce::Component& owner, const arrange::core::PublishedFrame& frame);
+
     };
 
 #endif

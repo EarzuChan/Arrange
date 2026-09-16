@@ -2,6 +2,7 @@
 
 namespace arrange::core {
     NodeType nodeTypeFromName(std::string_view name) noexcept {
+        if (name == "Root") return NodeType::Root;
         if (name == "Box") return NodeType::Box;
         if (name == "Row") return NodeType::Row;
         if (name == "Column") return NodeType::Column;

@@ -325,6 +325,7 @@ export interface VNodeCall extends Node {
   tag: string | symbol | CallExpression
   props: PropsExpression | undefined
   children:
+    | CallExpression // Arrange 延迟文本表达式
     | TemplateChildNode[] // multiple children
     | TemplateTextChildNode // single text child
     | SlotsExpression // component slots

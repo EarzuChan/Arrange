@@ -1,4 +1,8 @@
-﻿import {
+import {parseExpression} from '@babel/parser'
+import type {ArrowFunctionExpression} from '@babel/types'
+import {extractIdentifiers} from '../babelUtils.ts'
+import {enterSlotAliases, parameterSource, slotParameterName} from './slotAliases.ts'
+import {
   type CallExpression,
   type ConditionalExpression,
   type DirectiveNode,
@@ -59,11 +63,22 @@ export const trackSlotScopes: NodeTransform = (node, context) => {
       if (!__BROWSER__ && context.prefixIdentifiers) {
         slotProps && context.addIdentifiers(slotProps)
       }
+      let leaveAliases: (() => void) | undefined
+      if (slotProps && context.prefixIdentifiers && !context.ssr) {
+        const pattern = parameterSource(slotProps)
+        const parsed = parseExpression(`(${pattern}) => 0`, {plugins: context.expressionPlugins}) as ArrowFunctionExpression
+        const names = parsed.params.flatMap(parameter => extractIdentifiers(parameter).map(identifier => identifier.name))
+        const parameter = slotParameterName(context)
+        // 参数解构在实际消费者读取时执行，普通 TS helper 仍然获得普通值。
+        leaveAliases = enterSlotAliases(context, Object.fromEntries(names.map(name => [name, `((${pattern}) => ${name})(${parameter})`])))
+        vSlot.exp = createSimpleExpression(parameter, false, slotProps.loc)
+      }
       context.scopes.vSlot++
       return () => {
         if (!__BROWSER__ && context.prefixIdentifiers) {
           slotProps && context.removeIdentifiers(slotProps)
         }
+        leaveAliases?.()
         context.scopes.vSlot--
       }
     }
@@ -138,7 +153,7 @@ export function buildSlots(
   // 2. the slot children use the scope variables.
   if (!__BROWSER__ && !context.ssr && context.prefixIdentifiers) {
     hasDynamicSlots =
-      node.props.some(
+      context.scopes.vSlot > 0 || context.scopes.vFor > 0 || node.props.some(
         prop =>
           isVSlot(prop) &&
           (hasScopeRef(prop.arg, context.identifiers) ||

@@ -1,42 +1,26 @@
 #pragma once
 
-#include <arrange/juce/EditorTimerDriver.h>
+#include "VBlankSource.h"
 
 #if ARRANGE_JUCE_WITH_JUCE
-#include <functional>
 #include <memory>
 #include <juce_gui_basics/juce_gui_basics.h>
-#endif
 
 namespace arrange::juce {
-#if ARRANGE_JUCE_WITH_JUCE
-
     class EditorFrameClock final {
     public:
-        using VBlankTickCallback = std::function<void(double timestampMillis)>;
-
-        void sync(
-            ::juce::Component& owner,
-            ::juce::Timer& fallbackTimer,
-            EditorTimerDemand demand,
-            VBlankTickCallback onVBlankTick);
-        void stop(::juce::Timer& fallbackTimer) noexcept;
-
+        using VBlankTickCallback = VBlankSource::Callback;
+        ~EditorFrameClock();
+        void sync(::juce::Component& owner, bool running, VBlankTickCallback onVBlankTick);
+        void stop() noexcept;
         void beginVBlankCallback() noexcept;
-        [[nodiscard]] bool endVBlankCallback() noexcept;
-
-        [[nodiscard]] bool usingVBlank() const noexcept;
-        [[nodiscard]] int activeFallbackFrequencyHz() const noexcept;
+        bool endVBlankCallback() noexcept;
 
     private:
-        [[nodiscard]] static bool shouldUseVBlank(const ::juce::Component& owner, EditorTimerDemand demand) noexcept;
-        void deferResyncAfterVBlank() noexcept;
-
-        EditorTimerDriver fallbackTimer_;
-        std::unique_ptr<::juce::VBlankAttachment> vblank_;
+        std::unique_ptr<VBlankSource> source_;
+        std::unique_ptr<VBlankFrameDriver> driver_;
         bool insideVBlankCallback_ = false;
         bool resyncAfterVBlank_ = false;
     };
-
+}
 #endif
-} // namespace arrange::juce

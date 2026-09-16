@@ -3,8 +3,11 @@
 #include "EventSlot.h"
 #include "Geometry.h"
 #include "LayoutTree.h"
+#include <unordered_map>
 
 namespace arrange::core {
+    using PendingScrollValues = std::unordered_map<std::uint64_t, float>;
+
     struct ScrollResult {
         bool consumed = false;
         NodeId target = 0;
@@ -13,12 +16,13 @@ namespace arrange::core {
         float viewportSize = 0.0f;
         float contentSize = 0.0f;
         EventSlotId eventSlot;
+        ModifierHandle modifier;
     };
 
     class ScrollDispatcher {
     public:
-        ScrollResult verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit = 48.0f) const;
-        ScrollResult horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit = 48.0f) const;
+        ScrollResult verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
+        ScrollResult horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
         static bool hasVerticalScroll(const ArrangeNode& node);
         static bool hasHorizontalScroll(const ArrangeNode& node);
         static float verticalScrollValue(const ArrangeNode& node);

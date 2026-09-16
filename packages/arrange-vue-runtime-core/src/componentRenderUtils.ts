@@ -1,4 +1,7 @@
-﻿import {
+import type {RawSlots} from './componentSlots.ts'
+import {arrangeExecutionStats} from './executionStats.ts'
+import {arrangeValue} from './valueBinding.ts'
+import {
   type ComponentInternalInstance,
   type Data,
   type FunctionalComponent,
@@ -26,7 +29,6 @@ import {
 import { warn } from './warning.ts'
 import { isHmrUpdating } from './hmr.ts'
 import type { NormalizedProps } from './componentProps.ts'
-import { isEmitListener } from './componentEmits.ts'
 import { setCurrentRenderingInstance } from './componentRenderContext.ts'
 import {
   DeprecationTypes,
@@ -52,6 +54,7 @@ type SetRootFn = ((root: VNode) => void) | undefined
 export function renderComponentRoot(
   instance: ComponentInternalInstance,
 ): VNode {
+  arrangeExecutionStats.structureRuns++
   const {
     type: Component,
     vnode,
@@ -174,7 +177,9 @@ export function renderComponentRoot(
             propsOptions,
           )
         }
-        root = cloneVNode(root, fallthroughAttrs, false, true)
+        const source = fallthroughAttrs
+        const bindings = Object.fromEntries(Object.keys(source).map(key => [key, arrangeValue(() => source[key])]))
+        root = cloneVNode(root, bindings, false, true)
       } else if (__DEV__ && !accessedAttrs && root.type !== Comment) {
         const allAttrs = Object.keys(attrs)
         const eventAttrs: string[] = []
@@ -368,106 +373,16 @@ const isElementRoot = (vnode: VNode) => {
   )
 }
 
-export function shouldUpdateComponent(
-  prevVNode: VNode,
-  nextVNode: VNode,
-  optimized?: boolean,
-): boolean {
-  const { props: prevProps, children: prevChildren, component } = prevVNode
-  const { props: nextProps, children: nextChildren, patchFlag } = nextVNode
-  const emits = component!.emitsOptions
-
-  // Parent component's render function was hot-updated. Since this may have
-  // caused the child component's slots content to have changed, we need to
-  // force the child to update as well.
-  if (__DEV__ && (prevChildren || nextChildren) && isHmrUpdating) {
-    return true
-  }
-
-  // force child update for runtime directive or transition on component vnode.
-  if (nextVNode.dirs || nextVNode.transition) {
-    return true
-  }
-
-  if (optimized && patchFlag >= 0) {
-    if (patchFlag & PatchFlags.DYNAMIC_SLOTS) {
-      // slot content that references values that might have changed,
-      // e.g. in a v-for
-      return true
-    }
-    if (patchFlag & PatchFlags.FULL_PROPS) {
-      if (!prevProps) {
-        return !!nextProps
-      }
-      // presence of this flag indicates props are always non-null
-      return hasPropsChanged(prevProps, nextProps!, emits)
-    } else if (patchFlag & PatchFlags.PROPS) {
-      const dynamicProps = nextVNode.dynamicProps!
-      for (let i = 0; i < dynamicProps.length; i++) {
-        const key = dynamicProps[i]
-        if (
-          hasPropValueChanged(nextProps!, prevProps!, key) &&
-          !isEmitListener(emits, key)
-        ) {
-          return true
-        }
-      }
-    }
-  } else {
-    // this path is only taken by manually written render functions
-    // so presence of any children leads to a forced update
-    if (prevChildren || nextChildren) {
-      if (!nextChildren || !(nextChildren as any).$stable) {
-        return true
-      }
-    }
-    if (prevProps === nextProps) {
-      return false
-    }
-    if (!prevProps) {
-      return !!nextProps
-    }
-    if (!nextProps) {
-      return true
-    }
-    return hasPropsChanged(prevProps, nextProps, emits)
-  }
-
-  return false
-}
-
-function hasPropsChanged(
-  prevProps: Data,
-  nextProps: Data,
-  emitsOptions: ComponentInternalInstance['emitsOptions'],
-): boolean {
-  const nextKeys = Object.keys(nextProps)
-  if (nextKeys.length !== Object.keys(prevProps).length) {
-    return true
-  }
-  for (let i = 0; i < nextKeys.length; i++) {
-    const key = nextKeys[i]
-    if (
-      hasPropValueChanged(nextProps, prevProps, key) &&
-      !isEmitListener(emitsOptions, key)
-    ) {
-      return true
-    }
-  }
-  return false
-}
-
-function hasPropValueChanged(
-  nextProps: Data,
-  prevProps: Data,
-  key: string,
-): boolean {
-  const nextProp = nextProps[key]
-  const prevProp = prevProps[key]
-  if (key === 'style' && isObject(nextProp) && isObject(prevProp)) {
-    return !looseEqual(nextProp, prevProp)
-  }
-  return nextProp !== prevProp
+export function shouldUpdateComponent(prevVNode: VNode, nextVNode: VNode, optimized?: boolean): boolean {
+    const previous = prevVNode.children
+    const next = nextVNode.children
+    if (__DEV__ && (previous || next) && isHmrUpdating) return true
+    if (nextVNode.dirs || nextVNode.transition) return true
+    if (nextVNode.patchFlag & PatchFlags.DYNAMIC_SLOTS) return true
+    if (previous === next) return false
+    if (optimized && nextVNode.patchFlag >= 0) return false
+    if (previous || next) return !next || !((next as RawSlots)._ === 1 || (next as RawSlots).$stable)
+    return false
 }
 
 export function updateHOCHostEl(

@@ -780,7 +780,7 @@ function isFragmentTemplate({ tag, props }: ElementNode): boolean {
 }
 
 function isComponent({ tag, props }: ElementNode): boolean {
-  if (currentOptions.isCustomElement(tag)) {
+  if (currentOptions.isCustomElement(tag) || currentOptions.isNativeTag?.(tag)) {
     return false
   }
   if (
@@ -1077,4 +1077,3 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
   currentRoot = null
   return root
 }
-

@@ -198,7 +198,7 @@ export function initProps(
   isSSR = false,
 ): void {
   const props: Data = {}
-  const attrs: Data = createInternalObject()
+  const attrs: Data = shallowReactive(createInternalObject())
 
   instance.propsDefaults = Object.create(null)
 
@@ -225,7 +225,7 @@ export function initProps(
       instance.props = attrs
     } else {
       // functional w/ declared props
-      instance.props = props
+      instance.props = shallowReactive(props)
     }
   }
   instance.attrs = attrs

@@ -79,7 +79,7 @@ namespace arrange::core {
             return stringProp(node, camelCase, kebabCase, fallback);
         }
 
-        std::string alignModifier(const ArrangeNode& node) { return node.modifier.parentData.align; }
+        std::string alignModifier(const ArrangeNode& node) { return node.modifier.parentData().align; }
     } // namespace
 
     LayoutEngine::LayoutEngine() : textLayoutService_(&defaultTextLayoutService()) {}
@@ -92,86 +92,84 @@ namespace arrange::core {
     }
 
     Size LayoutEngine::measure(LayoutTree& tree, NodeId id, Constraints constraints) {
-        const auto& modifier = tree.node(id).modifier;
-        return measureWithModifier(tree, id, modifier, 0, constraints);
+        const auto measured = measureWithModifier(tree, id, 0, constraints);
+        auto& node = tree.node(id);
+        node.bounds.width = measured.width;
+        node.bounds.height = measured.height;
+        return measured;
     }
 
-    Size LayoutEngine::measureWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, Constraints constraints) {
-        if (index >= modifier.layout.size()) return measureContent(tree, id, constraints);
-
-        const auto& element = modifier.layout[index];
-        if (element.kind == LayoutModifierKind::Padding) {
-            const auto start = element.padding.start;
-            const auto top = element.padding.top;
-            const auto end = element.padding.end;
-            const auto bottom = element.padding.bottom;
-            const auto child = measureWithModifier(tree, id, modifier, index + 1, shrink(constraints, start + end, top + bottom));
-            auto& node = tree.node(id);
-            node.bounds.width = clamp(child.width + start + end, constraints.minWidth, constraints.maxWidth);
-            node.bounds.height = clamp(child.height + top + bottom, constraints.minHeight, constraints.maxHeight);
-            return {node.bounds.width, node.bounds.height};
+    Size LayoutEngine::measureWithModifier(LayoutTree& tree, NodeId id, std::size_t index, Constraints constraints) {
+        auto& node = tree.node(id);
+        if (index == node.modifier.elements().size()) {
+            const auto size = measureContent(tree, id, constraints);
+            node.contentBounds.width = size.width;
+            node.contentBounds.height = size.height;
+            return size;
         }
-
-        if (element.kind == LayoutModifierKind::Width) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.value, 0.0f, true, false)); }
-        if (element.kind == LayoutModifierKind::Height) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, element.value, false, true)); }
-        if (element.kind == LayoutModifierKind::Size) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.width, element.height, true, true)); }
-        if (element.kind == LayoutModifierKind::RequiredWidth) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.value, 0.0f, true, false, true)); }
-        if (element.kind == LayoutModifierKind::RequiredHeight) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, element.value, false, true, true)); }
-        if (element.kind == LayoutModifierKind::RequiredSize) { return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, element.width, element.height, true, true, true)); }
-        if (element.kind == LayoutModifierKind::FillMaxWidth) {
-            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
-            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, constraints.maxWidth * fraction, 0.0f, true, false));
+        auto& instance = node.modifier.elements()[index];
+        auto inner = constraints;
+        instance.childOffset = {};
+        const auto* input = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value);
+        bool required = false;
+        bool padding = false;
+        bool scrolling = false;
+        if (input) {
+            const auto& item = *input;
+            switch (item.kind) {
+            case LayoutModifierKind::Padding:
+                padding = true;
+                inner = shrink(constraints, item.padding.start + item.padding.end, item.padding.top + item.padding.bottom);
+                instance.childOffset = {item.padding.start, item.padding.top};
+                break;
+            case LayoutModifierKind::Width: inner = exact(inner, item.value, 0, true, false); break;
+            case LayoutModifierKind::Height: inner = exact(inner, 0, item.value, false, true); break;
+            case LayoutModifierKind::Size: inner = exact(inner, item.width, item.height, true, true); break;
+            case LayoutModifierKind::RequiredWidth: required = true; inner = exact(inner, item.value, 0, true, false, true); break;
+            case LayoutModifierKind::RequiredHeight: required = true; inner = exact(inner, 0, item.value, false, true, true); break;
+            case LayoutModifierKind::RequiredSize: required = true; inner = exact(inner, item.width, item.height, true, true, true); break;
+            case LayoutModifierKind::FillMaxWidth:
+            case LayoutModifierKind::FillMaxHeight:
+            case LayoutModifierKind::FillMaxSize: {
+                const auto fraction = std::clamp(item.fraction, 0.0f, 1.0f);
+                const auto width = item.kind != LayoutModifierKind::FillMaxHeight && inner.maxWidth < InfiniteConstraint;
+                const auto height = item.kind != LayoutModifierKind::FillMaxWidth && inner.maxHeight < InfiniteConstraint;
+                inner = exact(inner, inner.maxWidth * fraction, inner.maxHeight * fraction, width, height);
+                break;
+            }
+            case LayoutModifierKind::WidthIn:
+            case LayoutModifierKind::HeightIn:
+            case LayoutModifierKind::SizeIn:
+                if (item.kind != LayoutModifierKind::HeightIn) {
+                    if (item.minWidth >= 0) inner.minWidth = clamp(item.minWidth, constraints.minWidth, constraints.maxWidth);
+                    if (item.maxWidth >= 0) inner.maxWidth = clamp(item.maxWidth, inner.minWidth, constraints.maxWidth);
+                }
+                if (item.kind != LayoutModifierKind::WidthIn) {
+                    if (item.minHeight >= 0) inner.minHeight = clamp(item.minHeight, constraints.minHeight, constraints.maxHeight);
+                    if (item.maxHeight >= 0) inner.maxHeight = clamp(item.maxHeight, inner.minHeight, constraints.maxHeight);
+                }
+                break;
+            case LayoutModifierKind::DefaultMinSize:
+                if (inner.minWidth == 0 && item.minWidth >= 0) inner.minWidth = std::min(item.minWidth, inner.maxWidth);
+                if (inner.minHeight == 0 && item.minHeight >= 0) inner.minHeight = std::min(item.minHeight, inner.maxHeight);
+                break;
+            case LayoutModifierKind::VerticalScroll: scrolling = true; inner.maxHeight = InfiniteConstraint; break;
+            case LayoutModifierKind::HorizontalScroll: scrolling = true; inner.maxWidth = InfiniteConstraint; break;
+            }
         }
-        if (element.kind == LayoutModifierKind::FillMaxHeight) {
-            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
-            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, 0.0f, constraints.maxHeight * fraction, false, true));
+        instance.childMeasured = measureWithModifier(tree, id, index + 1, inner);
+        auto measured = instance.childMeasured;
+        if (padding) {
+            measured.width += input->padding.start + input->padding.end;
+            measured.height += input->padding.top + input->padding.bottom;
         }
-        if (element.kind == LayoutModifierKind::FillMaxSize) {
-            const auto fraction = clamp(element.fraction, 0.0f, 1.0f);
-            return measureWithModifier(tree, id, modifier, index + 1, exact(constraints, constraints.maxWidth * fraction, constraints.maxHeight * fraction, true, true));
+        if (required || scrolling || padding) {
+            measured.width = clamp(measured.width, constraints.minWidth, constraints.maxWidth);
+            measured.height = clamp(measured.height, constraints.minHeight, constraints.maxHeight);
         }
-        if (element.kind == LayoutModifierKind::WidthIn) {
-            if (const auto minWidth = element.minWidth; minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
-            if (const auto maxWidth = element.maxWidth; maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
-            return measureWithModifier(tree, id, modifier, index + 1, constraints);
-        }
-        if (element.kind == LayoutModifierKind::HeightIn) {
-            if (const auto minHeight = element.minHeight; minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
-            if (const auto maxHeight = element.maxHeight; maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
-            return measureWithModifier(tree, id, modifier, index + 1, constraints);
-        }
-        if (element.kind == LayoutModifierKind::SizeIn) {
-            if (const auto minWidth = element.minWidth; minWidth >= 0.0f) constraints.minWidth = std::max(constraints.minWidth, minWidth);
-            if (const auto maxWidth = element.maxWidth; maxWidth >= 0.0f) constraints.maxWidth = std::min(constraints.maxWidth, maxWidth);
-            if (const auto minHeight = element.minHeight; minHeight >= 0.0f) constraints.minHeight = std::max(constraints.minHeight, minHeight);
-            if (const auto maxHeight = element.maxHeight; maxHeight >= 0.0f) constraints.maxHeight = std::min(constraints.maxHeight, maxHeight);
-            return measureWithModifier(tree, id, modifier, index + 1, constraints);
-        }
-        if (element.kind == LayoutModifierKind::DefaultMinSize) {
-            constraints.minWidth = std::max(constraints.minWidth, element.minWidth);
-            constraints.minHeight = std::max(constraints.minHeight, element.minHeight);
-            return measureWithModifier(tree, id, modifier, index + 1, constraints);
-        }
-        if (element.kind == LayoutModifierKind::VerticalScroll) {
-            auto unbounded = constraints;
-            unbounded.maxHeight = InfiniteConstraint;
-            const auto child = measureWithModifier(tree, id, modifier, index + 1, unbounded);
-            auto& node = tree.node(id);
-            node.bounds.width = clamp(child.width, constraints.minWidth, constraints.maxWidth);
-            node.bounds.height = clamp(child.height, constraints.minHeight, constraints.maxHeight);
-            return {node.bounds.width, node.bounds.height};
-        }
-        if (element.kind == LayoutModifierKind::HorizontalScroll) {
-            auto unbounded = constraints;
-            unbounded.maxWidth = InfiniteConstraint;
-            const auto child = measureWithModifier(tree, id, modifier, index + 1, unbounded);
-            auto& node = tree.node(id);
-            node.bounds.width = clamp(child.width, constraints.minWidth, constraints.maxWidth);
-            node.bounds.height = clamp(child.height, constraints.minHeight, constraints.maxHeight);
-            return {node.bounds.width, node.bounds.height};
-        }
-
-        return measureWithModifier(tree, id, modifier, index + 1, constraints);
+        if (required) instance.childOffset = {(measured.width - instance.childMeasured.width) * 0.5f, (measured.height - instance.childMeasured.height) * 0.5f};
+        instance.measured = measured;
+        return measured;
     }
 
     Size LayoutEngine::measureContent(LayoutTree& tree, NodeId id, Constraints constraints) {
@@ -224,7 +222,7 @@ namespace arrange::core {
             };
             std::vector<WeightedChild> weighted;
             for (auto childId : node.children) {
-                const auto childModifier = modifierMetrics(tree.node(childId));
+                const auto childModifier = tree.node(childId).modifier.parentData();
                 if (childModifier.weight > 0.0f) {
                     totalWeight += childModifier.weight;
                     weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
@@ -259,7 +257,7 @@ namespace arrange::core {
             };
             std::vector<WeightedChild> weighted;
             for (auto childId : node.children) {
-                const auto childModifier = modifierMetrics(tree.node(childId));
+                const auto childModifier = tree.node(childId).modifier.parentData();
                 if (childModifier.weight > 0.0f) {
                     totalWeight += childModifier.weight;
                     weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
@@ -282,11 +280,12 @@ namespace arrange::core {
             content = {width, height};
             break;
         }
+        case NodeType::Root:
         case NodeType::Box: {
             float width = 0.0f;
             float height = 0.0f;
             for (auto childId : node.children) {
-                const auto child = measure(tree, childId, {0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
+                const auto child = measure(tree, childId, node.type == NodeType::Root ? constraints : Constraints{0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
                 width = std::max(width, child.width);
                 height = std::max(height, child.height);
             }
@@ -325,39 +324,28 @@ namespace arrange::core {
 
     void LayoutEngine::place(LayoutTree& tree, NodeId id, float x, float y) {
         auto& node = tree.node(id);
-        const auto& modifier = node.modifier;
-        const auto offsetX = modifier.transform.layoutOffsetX;
-        const auto offsetY = modifier.transform.layoutOffsetY;
-        node.bounds.x = x + offsetX;
-        node.bounds.y = y + offsetY;
-        placeWithModifier(tree, id, modifier, 0, node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
+        node.bounds.x = x;
+        node.bounds.y = y;
+        placeWithModifier(tree, id, 0, x, y);
     }
 
-    void LayoutEngine::placeWithModifier(LayoutTree& tree, NodeId id, const CompiledModifier& modifier, std::size_t index, float x, float y, float width, float height) {
-        if (index >= modifier.layout.size()) {
-            placeContent(tree, id, x, y, width, height);
+    void LayoutEngine::placeWithModifier(LayoutTree& tree, NodeId id, std::size_t index, float x, float y) {
+        auto& node = tree.node(id);
+        if (index == node.modifier.elements().size()) {
+            node.contentBounds.x = x;
+            node.contentBounds.y = y;
+            placeContent(tree, id, x, y, node.contentBounds.width, node.contentBounds.height);
             return;
         }
-
-        const auto& element = modifier.layout[index];
-        if (element.kind == LayoutModifierKind::Padding) {
-            const auto start = element.padding.start;
-            const auto top = element.padding.top;
-            const auto end = element.padding.end;
-            const auto bottom = element.padding.bottom;
-            placeWithModifier(tree, id, modifier, index + 1, x + start, y + top, std::max(0.0f, width - start - end), std::max(0.0f, height - top - bottom));
-            return;
+        auto& instance = node.modifier.elements()[index];
+        instance.bounds = {x, y, instance.measured.width, instance.measured.height};
+        auto offset = instance.childOffset;
+        if (const auto* input = std::get_if<OffsetModifier>(&instance.descriptor.value)) { offset.x += input->x; offset.y += input->y; }
+        if (const auto* input = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value)) {
+            if (input->kind == LayoutModifierKind::VerticalScroll) offset.y -= input->scrollValue;
+            if (input->kind == LayoutModifierKind::HorizontalScroll) offset.x -= input->scrollValue;
         }
-        if (element.kind == LayoutModifierKind::VerticalScroll) {
-            placeWithModifier(tree, id, modifier, index + 1, x, y - element.scrollValue, width, height);
-            return;
-        }
-        if (element.kind == LayoutModifierKind::HorizontalScroll) {
-            placeWithModifier(tree, id, modifier, index + 1, x - element.scrollValue, y, width, height);
-            return;
-        }
-
-        placeWithModifier(tree, id, modifier, index + 1, x, y, width, height);
+        placeWithModifier(tree, id, index + 1, x + offset.x, y + offset.y);
     }
 
     void LayoutEngine::placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height) {
@@ -404,37 +392,7 @@ namespace arrange::core {
         for (auto childId : node.children) place(tree, childId, x, y);
     }
 
-    LayoutEngine::ModifierMetrics LayoutEngine::modifierMetrics(const ArrangeNode& node) {
-        ModifierMetrics metrics;
-        const auto& modifier = node.modifier;
-        metrics.weight = modifier.parentData.weight;
-        metrics.weightFill = modifier.parentData.weightFill;
-        metrics.verticalScroll = modifier.scroll.verticalValue;
-        metrics.horizontalScroll = modifier.scroll.horizontalValue;
-        metrics.hasVerticalScroll = modifier.scroll.vertical;
-        metrics.hasHorizontalScroll = modifier.scroll.horizontal;
-        for (const auto& element : modifier.layout) {
-            if (element.kind == LayoutModifierKind::Padding) {
-                metrics.paddingStart += element.padding.start;
-                metrics.paddingTop += element.padding.top;
-                metrics.paddingEnd += element.padding.end;
-                metrics.paddingBottom += element.padding.bottom;
-            }
-            else if (element.kind == LayoutModifierKind::Size) {
-                metrics.width = element.width;
-                metrics.height = element.height;
-            }
-            else if (element.kind == LayoutModifierKind::Width) metrics.width = element.value;
-            else if (element.kind == LayoutModifierKind::Height) metrics.height = element.value;
-            else if (element.kind == LayoutModifierKind::FillMaxWidth || element.kind == LayoutModifierKind::FillMaxSize) metrics.fillMaxWidth = true;
-            else if (element.kind == LayoutModifierKind::FillMaxHeight || element.kind == LayoutModifierKind::FillMaxSize) metrics.fillMaxHeight = true;
-        }
-        return metrics;
-    }
-
-
     float LayoutEngine::rowSpacing(const ArrangeNode& node) { return spacedByValue(propValue(node, "horizontalArrangement", "horizontal-arrangement")); }
 
     float LayoutEngine::columnSpacing(const ArrangeNode& node) { return spacedByValue(propValue(node, "verticalArrangement", "vertical-arrangement")); }
 } // namespace arrange::core
-

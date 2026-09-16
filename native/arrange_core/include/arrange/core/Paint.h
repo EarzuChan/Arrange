@@ -1,9 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include <cstdint>
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <functional>
 #include "Geometry.h"
 #include "LayoutTree.h"
 #include "TextLayoutService.h"
@@ -49,19 +50,25 @@ namespace arrange::core {
         bool hasTint = false;
         bool inputText = false;
         Point lineEnd;
+        float translationX = 0.0f;
+        float translationY = 0.0f;
         float scaleX = 1.0f;
         float scaleY = 1.0f;
         float rotationZ = 0.0f;
         float transformOriginX = 0.5f;
         float transformOriginY = 0.5f;
+        bool operator==(const DrawOp&) const = default;
     };
 
     class DrawOpsBuilder {
     public:
         std::vector<DrawOp> collect(const LayoutTree& tree, NodeId root) const;
+        std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const;
         static std::string textStyleProp(const ArrangeNode& node);
 
     private:
+        void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false) const;
+        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const;
         void collectNode(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float inheritedAlpha = 1.0f) const;
     };
 

@@ -32,17 +32,18 @@ namespace arrange::core {
         plan.measure =
             invalidation.affects(DirtyFlag::Structure) ||
             invalidation.affects(DirtyFlag::Layout);
-        plan.layout = plan.measure;
-        plan.buildPaint = plan.measure ||
+        plan.measure = plan.measure || plan.fullFallback;
+        plan.layout = plan.measure || invalidation.affects(DirtyFlag::Placement);
+        plan.buildPaint = plan.layout ||
             invalidation.affects(DirtyFlag::Paint) ||
             invalidation.affects(DirtyFlag::Transform) ||
             invalidation.affects(DirtyFlag::Resource) ||
             plan.fullFallback;
-        plan.buildHitTest = plan.measure ||
+        plan.buildHitTest = plan.layout ||
             invalidation.affects(DirtyFlag::HitTest) ||
             invalidation.affects(DirtyFlag::Transform);
         plan.buildDiagnostics = invalidation.affects(DirtyFlag::Accessibility);
-        plan.publishFrame = plan.measure || plan.layout || plan.buildPaint || plan.buildHitTest || plan.buildDiagnostics || plan.fullFallback;
+        plan.publishFrame = plan.measure || plan.layout || plan.buildPaint || plan.buildHitTest || plan.buildDiagnostics || invalidation.affects(DirtyFlag::EventSlot) || invalidation.affects(DirtyFlag::Focus) || plan.fullFallback;
         plan.passivePaint = plan.buildPaint || plan.fullFallback;
 
         if (hasTransaction) plan.reasons.push_back("mutation transaction pending");
@@ -63,95 +64,100 @@ namespace arrange::core {
         Constraints constraints,
         const MutationTransaction* transaction,
         bool framePipelineRequested,
-        PublishedFrame& publishedFrame) {
+        PublishedFrame& publishedFrame,
+        const FrameFinalizer& finalize) {
         SceneFramePipelineResult result;
         result.ran = true;
-        result.phases.clear();
-        auto retainedContent = std::move(publishedFrame.content);
-        publishedFrame.changes = {};
-        publishedFrame.dirty = {};
-        publishedFrame.invalidation = {};
-        publishedFrame.plan = {};
-        publishedFrame.phases.clear();
-        publishedFrame.error.reset();
-        publishedFrame.content = std::move(retainedContent);
-
-        if (transaction != nullptr) {
-            try {
-                scene.apply(*transaction);
-                recordPhase(result.phases, FramePhase::ApplyMutations, true, "applied pending MutationTransaction");
+        // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame。
+        auto candidateScene = scene;
+        auto candidateFrame = publishedFrame;
+        candidateFrame.changes = {};
+        candidateFrame.error.reset();
+        if (transaction) ++counters_.submissions;
+        try {
+            if (transaction) candidateScene.applyUncommitted(*transaction);
+            recordPhase(result.phases, FramePhase::ApplyMutations, transaction != nullptr, transaction ? "applied structural and typed input submission" : "no submission");
+            auto& tree = candidateScene.tree();
+            result.plan = planFrame(candidateScene, root, transaction != nullptr, framePipelineRequested);
+            candidateFrame.dirty = candidateScene.dirtySnapshot();
+            result.invalidation = candidateScene.takeInvalidation();
+            if (!tree.contains(root)) {
+                candidateFrame.content.drawOps.clear();
+                candidateFrame.content.overlayDrawOps.clear();
+                candidateFrame.content.focusedInputNode.reset();
             }
-            catch (const std::exception& exception) {
-                result.error = exception.what();
-                publishedFrame.content.drawOps.clear();
-                publishedFrame.content.overlayDrawOps.clear();
-                publishedFrame.content.diagnosticsErrorDrawOps.clear();
-                publishedFrame.content.diagnosticsBadgeDrawOps.clear();
-                publishedFrame.content.diagnosticsToastDrawOps.clear();
-                publishedFrame.changes.hasDiagnosticsRepaintBounds = false;
-                result.invalidation = scene.takeInvalidation();
-                result.plan = planFrame(scene, root, true, framePipelineRequested);
-                publishedFrame.error = result.error;
-                publishedFrame.dirty = scene.dirtySnapshot();
-                publishedFrame.invalidation = result.invalidation;
-                publishedFrame.plan = result.plan;
-                publishedFrame.phases = result.phases;
-                return result;
+            else {
+                if (result.plan.measure) { layout_.measure(tree, root, constraints); ++counters_.measures; }
+                recordPhase(result.phases, FramePhase::Measure, result.plan.measure, result.plan.measure ? "measured root subtree" : "retained measured sizes");
+                if (result.plan.layout) { layout_.place(tree, root); ++counters_.placements; }
+                recordPhase(result.phases, FramePhase::Layout, result.plan.layout, result.plan.layout ? "placed root subtree" : "retained placement");
+                if (result.plan.buildPaint) {
+                    candidateFrame.content.drawOps = drawOpsBuilder_.collect(tree, root);
+                    ++counters_.paintBuilds;
+                }
+                recordPhase(result.phases, FramePhase::BuildPaint, result.plan.buildPaint, result.plan.buildPaint ? "built DrawOps" : "retained DrawOps");
             }
+            if (result.plan.buildHitTest || !tree.contains(root)) {
+                candidateFrame.content.hitTest = std::make_shared<const HitTestSnapshot>(buildHitTestSnapshot(tree, root));
+                ++counters_.hitBuilds;
+                recordPhase(result.phases, FramePhase::BuildHitTest, true, "built immutable hit regions and constraints");
+            }
+            else recordPhase(result.phases, FramePhase::BuildHitTest, false, "retained hit snapshot");
+            if (finalize) finalize(candidateScene, candidateFrame);
+            candidateFrame.plan = result.plan;
+            finishCandidate(publishedFrame, candidateFrame);
+            result.plan = candidateFrame.plan;
+            recordPhase(result.phases, FramePhase::BuildDiagnostics, result.plan.buildDiagnostics, result.plan.buildDiagnostics ? "diagnostics invalidated" : "diagnostics unchanged");
+            recordPhase(result.phases, FramePhase::PublishFrame, result.plan.publishFrame, result.plan.publishFrame ? "published consistent scene and frame" : "no visual publication needed");
+            recordPhase(result.phases, FramePhase::PassivePaint, result.plan.passivePaint, "paint only consumes published content");
+            candidateFrame.invalidation = result.invalidation;
+            candidateFrame.plan = result.plan;
+            candidateFrame.phases = result.phases;
+            if (result.plan.publishFrame) ++counters_.publications;
+            candidateScene.clearDirty();
+            scene = std::move(candidateScene);
+            publishedFrame = std::move(candidateFrame);
         }
-        else {
-            recordPhase(result.phases, FramePhase::ApplyMutations, false, "no pending MutationTransaction");
+        catch (const std::exception& exception) {
+            ++counters_.failedSubmissions;
+            result.error = exception.what();
+            // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何。
         }
-
-        auto& tree = scene.tree();
-        result.plan = planFrame(scene, root, transaction != nullptr, framePipelineRequested);
-        const auto dirty = scene.dirtySnapshot();
-        result.invalidation = scene.takeInvalidation();
-
-        if (!tree.contains(root)) {
-            publishedFrame.content.drawOps.clear();
-            publishedFrame.content.overlayDrawOps.clear();
-            publishedFrame.dirty = dirty;
-            publishedFrame.invalidation = result.invalidation;
-            publishedFrame.plan = result.plan;
-            publishedFrame.phases = result.phases;
-            recordPhase(publishedFrame.phases, FramePhase::PublishFrame, true, "root unavailable; published empty frame");
-            recordPhase(publishedFrame.phases, FramePhase::PassivePaint, result.plan.passivePaint, result.plan.passivePaint ? "passive paint requested for empty frame" : "no passive paint needed");
-            scene.clearDirty();
-            result.phases = publishedFrame.phases;
-            return result;
-        }
-
-        if (result.plan.measure || result.plan.layout) {
-            layout_.layout(tree, root, constraints);
-            recordPhase(result.phases, FramePhase::Measure, true, "layout engine measured root subtree");
-            recordPhase(result.phases, FramePhase::Layout, true, "layout engine placed root subtree");
-        }
-        else {
-            recordPhase(result.phases, FramePhase::Measure, false, "no layout-affecting invalidation");
-            recordPhase(result.phases, FramePhase::Layout, false, "no layout-affecting invalidation");
-        }
-
-        if (result.plan.buildPaint) {
-            publishedFrame.content.drawOps = drawOpsBuilder_.collect(tree, root);
-            recordPhase(result.phases, FramePhase::BuildPaint, true, "rebuilt DrawOps from dirty frame plan");
-        }
-        else {
-            recordPhase(result.phases, FramePhase::BuildPaint, false, "no paint-affecting invalidation");
-        }
-
-        recordPhase(result.phases, FramePhase::BuildHitTest, result.plan.buildHitTest, result.plan.buildHitTest ? "hit-test model invalidated" : "hit-test model unchanged");
-        recordPhase(result.phases, FramePhase::BuildDiagnostics, result.plan.buildDiagnostics, result.plan.buildDiagnostics ? "diagnostics invalidated" : "diagnostics unchanged");
-        recordPhase(result.phases, FramePhase::PublishFrame, result.plan.publishFrame, result.plan.publishFrame ? "published frame for passive paint" : "no frame publication needed");
-        recordPhase(result.phases, FramePhase::PassivePaint, result.plan.passivePaint, result.plan.passivePaint ? "passive paint consumes PublishedFrame" : "no passive paint needed");
-
-        publishedFrame.dirty = dirty;
-        publishedFrame.invalidation = result.invalidation;
-        publishedFrame.plan = result.plan;
-        publishedFrame.phases = result.phases;
-        publishedFrame.error = result.error;
-        scene.clearDirty();
         return result;
+    }
+
+    void SceneFramePipeline::finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate) {
+        const auto& before = previous.content;
+        const auto& after = candidate.content;
+        candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps ||
+            before.focusedInputNode != after.focusedInputNode || before.focusedInputViewportX != after.focusedInputViewportX;
+        candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps ||
+            before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps ||
+            before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
+        // Transformed overlays require the same full viewport repaint as transformed scene ops.
+        // Local untransformed rectangles cannot safely bound them.
+        if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
+            candidate.plan.publishFrame = true;
+            candidate.plan.passivePaint = true;
+        }
+        candidate.revision = previous.revision + (candidate.plan.publishFrame ? 1 : 0);
+    }
+
+    bool SceneFramePipeline::publishRetained(const NativeScene& scene, PublishedFrame& publishedFrame, const FrameFinalizer& finalize) {
+        auto candidate = publishedFrame;
+        candidate.changes = {};
+        candidate.plan = {};
+        candidate.phases.clear();
+        candidate.dirty = {};
+        candidate.invalidation = {};
+        finalize(scene, candidate);
+        finishCandidate(publishedFrame, candidate);
+        if (!candidate.plan.publishFrame) return false;
+        recordPhase(candidate.phases, FramePhase::BuildDiagnostics, true, "finalized retained scene content");
+        recordPhase(candidate.phases, FramePhase::PublishFrame, true, "published retained scene with finalized attachments");
+        publishedFrame = std::move(candidate);
+        ++counters_.publications;
+        return true;
     }
 
     void SceneFramePipeline::recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason) {

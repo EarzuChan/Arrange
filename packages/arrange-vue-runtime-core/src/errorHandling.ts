@@ -159,7 +159,7 @@ function logError(
   type: ErrorTypes,
   contextVNode: VNode | null,
   throwInDev = true,
-  throwInProd = false,
+  throwInProd = true,
 ) {
   if (__DEV__) {
     const info = ErrorTypeStrings[type]

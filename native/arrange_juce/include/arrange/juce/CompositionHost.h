@@ -1,6 +1,7 @@
-﻿#pragma once
+#pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/NativeScene.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Node.h>
 #include <arrange/core/Scroll.h>
@@ -34,6 +35,7 @@ namespace arrange::juce {
 
         [[nodiscard]] bool hasScriptHost() const noexcept;
         [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;
+        [[nodiscard]] bool hasPendingDiagnostics() const noexcept;
         [[nodiscard]] std::optional<arrange::core::MutationTransaction> takePendingTransaction() noexcept;
 
         [[nodiscard]] CompositionInvokeResult pumpAnimationFrame(double nowMillis);
@@ -52,7 +54,7 @@ namespace arrange::juce {
             double nowMillis,
             const arrange::core::ScrollResult& result);
 
-        void flushRetiredEventSlots();
+        void publishScene(const arrange::core::NativeScene& scene);
 #if ARRANGE_WITH_QUICKJS_NG
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();

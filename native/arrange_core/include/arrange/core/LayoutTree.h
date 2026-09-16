@@ -5,6 +5,7 @@
 #include <utility>
 #include "Invalidation.h"
 #include "Mutation.h"
+#include "HostInput.h"
 #include "Node.h"
 
 namespace arrange::core {
@@ -21,6 +22,7 @@ namespace arrange::core {
         bool contains(NodeId id) const noexcept { return nodes_.find(id) != nodes_.end(); }
         const ArrangeNode& node(NodeId id) const;
         ArrangeNode& node(NodeId id);
+        [[nodiscard]] std::optional<NodeId> parentOf(NodeId id) const noexcept;
         std::size_t size() const noexcept { return nodes_.size(); }
         DirtySnapshot dirtySnapshot(std::uint32_t mask = 0xffffffffu) const noexcept;
         [[nodiscard]] const InvalidationSnapshot& invalidationSnapshot() const noexcept { return invalidation_.snapshot(); }
@@ -32,9 +34,14 @@ namespace arrange::core {
             std::string field,
             std::string reason);
         void clearDirty() noexcept;
+        std::uint32_t setHostInput(NodeId id, HostInput input, const PropValue& value);
+        std::uint32_t setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value);
+        std::uint32_t setModifierChain(NodeId id, const ModifierDescriptors& descriptors);
+        void markInputDirty(NodeId id, std::uint32_t mask);
+
+        void applyMutation(const TreeMutation& mutation);
 
     private:
-        void applyMutation(const TreeMutation& mutation);
         void markDirtyWithPropagation(NodeId id, DirtyFlag flag);
         void markAncestorsDirty(NodeId id, DirtyFlag flag);
         void markDirtyAttributed(
@@ -53,7 +60,6 @@ namespace arrange::core {
         void eraseSubtree(NodeId id);
         void setParent(NodeId child, NodeId parent);
         void clearParent(NodeId child);
-        [[nodiscard]] std::optional<NodeId> parentOf(NodeId id) const noexcept;
         ArrangeNode& require(NodeId id);
         const ArrangeNode& require(NodeId id) const;
         bool isDescendant(NodeId ancestor, NodeId candidate, std::unordered_set<NodeId>& visited) const;

@@ -16,6 +16,7 @@ namespace arrange::core {
     public:
         void begin(std::string value, bool selectAll);
         void reset();
+        void replaceExternal(std::string value);
 
         [[nodiscard]] const std::string& text() const noexcept { return text_; }
         [[nodiscard]] const std::string& committedText() const noexcept { return committedText_; }

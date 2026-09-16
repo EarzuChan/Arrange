@@ -57,6 +57,9 @@ namespace arrange::juce {
         explicit ArrangeRuntime(arrange::core::SceneFramePipeline pipeline = arrange::core::SceneFramePipeline());
 
         void reset();
+        void requestReload() noexcept { reloadRequested_ = true; }
+        [[nodiscard]] bool consumeReloadRequest() noexcept;
+        void suspend() noexcept { suspended_ = true; }
 
 #if ARRANGE_WITH_QUICKJS_NG
         void setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept;
@@ -84,24 +87,20 @@ namespace arrange::juce {
 
         [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;
         [[nodiscard]] bool hasPendingFrameWork() const noexcept;
-        [[nodiscard]] int desiredTimerFrequencyHz() const noexcept;
 
         [[nodiscard]] RuntimeFramePumpResult pumpFrame(
             arrange::core::NodeId root,
             arrange::core::Constraints constraints,
-            double nowMillis);
+            double nowMillis,
+            const arrange::core::FrameFinalizer& finalize = {});
 
         [[nodiscard]] arrange::core::NativeScene& scene() noexcept { return pipelineState_.scene(); }
         [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept { return pipelineState_.scene(); }
         [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept { return pipelineState_.publishedFrame(); }
-        void publishOverlayDrawOps(
-            std::vector<arrange::core::DrawOp> ops,
-            std::optional<arrange::core::NodeId> focusedInputNode,
-            float focusedInputViewportX);
-        void publishDiagnosticsDrawOps(
-            std::vector<arrange::core::DrawOp> errorOps,
-            std::vector<arrange::core::DrawOp> badgeOps,
-            std::vector<arrange::core::DrawOp> toastOps);
+        const arrange::core::FrameExecutionCounters& frameCounters() const noexcept { return pipelineState_.counters(); }
+        bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
+            return pipelineState_.publishRetained(finalize);
+        }
 #if ARRANGE_WITH_QUICKJS_NG
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
@@ -127,8 +126,11 @@ namespace arrange::juce {
         [[nodiscard]] RuntimeStepResult pumpAnimationFrame(double nowMillis);
         [[nodiscard]] RuntimePipelineRunResult runPipeline(
             arrange::core::NodeId root,
-            arrange::core::Constraints constraints);
+            arrange::core::Constraints constraints,
+            const arrange::core::FrameFinalizer& finalize);
 
+        bool suspended_ = false;
+        bool reloadRequested_ = false;
         CompositionHost composition_;
         ScenePipelineState pipelineState_;
         FramePlanner frame_;

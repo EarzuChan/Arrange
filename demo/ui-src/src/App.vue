@@ -6,12 +6,12 @@
         <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
             <Icon
                 source="icons/play.svg"
-                :tint="Color(0xFF00FF00)"
+                :tint="Color(0xFF00FFFF)"
                 :modifier="m.size(dp(20), dp(20))"
             />
             <Text
                 :text="preset"
-                :text-style="{ fontSize: sp(50),  color: Color(0xFFFFFFFF) }"
+                :text-style="{ fontSize: sp(50), color: presetColor }"
                 :modifier="m"
             />
             <Image
@@ -28,11 +28,7 @@
             <Box :modifier="m.size(dp(180), dp(38)).background(Color(0xFFFFB020))"/>
         </Row>
         <Spacer :modifier="m.height(dp(4))"/>
-        <Text
-            :text="`Clicks: ${clicks}`"
-            :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }"
-            :modifier="m.size(dp(160), dp(28)).background(counterColor).clickable(handleTap)"
-        />
+        <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap" />
         <Input
             v-model="preset"
             placeholder="Search preset"
@@ -63,7 +59,7 @@
                 :modifier="m.height(dp(14))"
             />
             <Text
-                text="Wheel/state sync comes next"
+                text="Wheel updates native scroll state"
                 :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }"
                 :modifier="m.height(dp(14))"
             />
@@ -82,50 +78,44 @@
 </template>
 
 <script setup>
-import {animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/framework"
+import {animateDpAsState, animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/framework"
+
+import CounterPanel from './components/CounterPanel.vue'
 
 const clicks = ref(0)
+const counterOffset = animateDpAsState(() => clicks.value % 2 ? dp(6) : dp(0), {durationMillis: 240})
 const preset = ref("Preset A")
+const rainbow = [0xFFFF3030, 0xFFFFFF30, 0xFF30FF30, 0xFF30FFFF, 0xFF3030FF, 0xFFFF30FF]
+const presetColorTarget = ref(Color(rainbow[0]))
+const presetColor = animateColorAsState(presetColorTarget, {durationMillis: 700})
+let rainbowFrame = 0
+let rainbowStartedAt
+let rainbowSegment = -1
+
+function advanceRainbow(now) {
+    rainbowStartedAt ??= now
+    const segment = Math.floor((now - rainbowStartedAt) / 700)
+    if (segment !== rainbowSegment) {
+        rainbowSegment = segment
+        presetColorTarget.value = Color(rainbow[(segment + 1) % rainbow.length])
+    }
+    rainbowFrame = requestAnimationFrame(advanceRainbow)
+}
+
+onMounted(() => {
+    rainbowFrame = requestAnimationFrame(advanceRainbow)
+})
+onUnmounted(() => {
+    cancelAnimationFrame(rainbowFrame)
+    presetColor.stop()
+})
+
 const inputStatus = ref("Input: focus, type, Enter to submit")
 const scrollState = rememberScrollState()
 const counterColor = animateColorAsState(
     () => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE),
     { durationMillis: 240 },
 )
-const rainbowColors = [
-    Color(0xFFFF1744),
-    Color(0xFFFF9100),
-    Color(0xFFFFEA00),
-    Color(0xFF00E676),
-    Color(0xFF00B0FF),
-    Color(0xFF3D5AFE),
-    Color(0xFFD500F9),
-]
-const animeColorTarget = ref(rainbowColors[0])
-const animeColor = animateColorAsState(animeColorTarget, {durationMillis: 520})
-let animeColorFrame = 0
-let animeColorLastSwitch = 0
-let animeColorIndex = 0
-const requestAnimeFrame = typeof requestAnimationFrame === "function" ? requestAnimationFrame : null
-const cancelAnimeFrame = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : null
-
-function tickAnimeColor(now) {
-    if (animeColorLastSwitch === 0) animeColorLastSwitch = now
-    if (now - animeColorLastSwitch >= 620) {
-        animeColorLastSwitch = now
-        animeColorIndex = (animeColorIndex + 1) % rainbowColors.length
-        animeColorTarget.value = rainbowColors[animeColorIndex]
-    }
-    if (requestAnimeFrame) animeColorFrame = requestAnimeFrame(tickAnimeColor)
-}
-
-onMounted(() => {
-    if (requestAnimeFrame) animeColorFrame = requestAnimeFrame(tickAnimeColor)
-})
-onUnmounted(() => {
-    if (animeColorFrame && cancelAnimeFrame) cancelAnimeFrame(animeColorFrame)
-    animeColor.stop?.()
-})
 
 function handleTap() {
     clicks.value += 1

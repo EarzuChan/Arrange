@@ -5,71 +5,50 @@
 #include <utility>
 
 namespace arrange::juce {
-    void EditorFrameClock::sync(
-        ::juce::Component& owner,
-        ::juce::Timer& fallbackTimer,
-        EditorTimerDemand demand,
-        VBlankTickCallback onVBlankTick) {
-        if (shouldUseVBlank(owner, demand)) {
-            fallbackTimer_.stop(fallbackTimer);
-            if (!vblank_) {
-                vblank_ = std::make_unique<::juce::VBlankAttachment>(
-                    &owner,
-                    [callback = std::move(onVBlankTick)](double timestampSeconds) {
-                        callback(timestampSeconds * 1000.0);
-                    });
+    namespace {
+        class JuceVBlankSource final : public VBlankSource {
+        public:
+            explicit JuceVBlankSource(::juce::Component& owner) : owner_(owner) {}
+            void start(Callback callback) override {
+                attachment_ = std::make_unique<::juce::VBlankAttachment>(&owner_,
+                    [callback = std::move(callback)](double seconds) { callback(seconds * 1000.0); });
             }
+            void stop() noexcept override { attachment_.reset(); }
+
+        private:
+            ::juce::Component& owner_;
+            std::unique_ptr<::juce::VBlankAttachment> attachment_;
+        };
+    }
+
+    EditorFrameClock::~EditorFrameClock() = default;
+
+    void EditorFrameClock::sync(::juce::Component& owner, bool running, VBlankTickCallback onVBlankTick) {
+        // 无 peer 时保留待执行工作；不制造 timer 视觉帧。
+        if (!running || owner.getPeer() == nullptr) {
+            stop();
             return;
         }
+        if (!source_) {
+            source_ = std::make_unique<JuceVBlankSource>(owner);
+            driver_ = std::make_unique<VBlankFrameDriver>(*source_);
+        }
+        driver_->start(std::move(onVBlankTick));
+    }
 
+    void EditorFrameClock::stop() noexcept {
         if (insideVBlankCallback_) {
-            deferResyncAfterVBlank();
+            resyncAfterVBlank_ = true;
             return;
         }
-
-        vblank_.reset();
-        fallbackTimer_.sync(fallbackTimer, demand);
+        if (driver_) driver_->stop();
     }
 
-    void EditorFrameClock::stop(::juce::Timer& fallbackTimer) noexcept {
-        if (insideVBlankCallback_) {
-            deferResyncAfterVBlank();
-            return;
-        }
-
-        vblank_.reset();
-        fallbackTimer_.stop(fallbackTimer);
-    }
-
-    void EditorFrameClock::beginVBlankCallback() noexcept {
-        insideVBlankCallback_ = true;
-    }
+    void EditorFrameClock::beginVBlankCallback() noexcept { insideVBlankCallback_ = true; }
 
     bool EditorFrameClock::endVBlankCallback() noexcept {
         insideVBlankCallback_ = false;
         return std::exchange(resyncAfterVBlank_, false);
     }
-
-    bool EditorFrameClock::usingVBlank() const noexcept {
-        return vblank_ != nullptr;
-    }
-
-    int EditorFrameClock::activeFallbackFrequencyHz() const noexcept {
-        return fallbackTimer_.activeFrequencyHz();
-    }
-
-    bool EditorFrameClock::shouldUseVBlank(
-        const ::juce::Component& owner,
-        EditorTimerDemand demand) noexcept {
-        return demand.running
-               && demand.frequencyHz > 0
-               && demand.preferVBlank
-               && owner.getPeer() != nullptr;
-    }
-
-    void EditorFrameClock::deferResyncAfterVBlank() noexcept {
-        resyncAfterVBlank_ = true;
-    }
-} // namespace arrange::juce
-
+}
 #endif

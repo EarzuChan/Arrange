@@ -8,10 +8,13 @@ add_library(arrange_core STATIC
   src/Invalidation.cpp
   src/Mutation.cpp
   src/MutationTransaction.cpp
+  src/HostInput.cpp
+  src/SlotUpdate.cpp
   src/NativeScene.cpp
   src/LayoutTree.cpp
   src/SceneFramePipeline.cpp
   src/Modifier.cpp
+  src/ModifierGeometry.cpp
   src/Layout.cpp
   src/HitTest.cpp
   src/PointerInputProcessor.cpp

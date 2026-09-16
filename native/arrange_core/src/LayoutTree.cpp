@@ -1,6 +1,7 @@
 #include <arrange/core/LayoutTree.h>
 
 #include <arrange/core/PropSchema.h>
+#include <arrange/core/SlotUpdate.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -11,10 +12,6 @@
 
 namespace arrange::core {
     namespace {
-        bool isResourceProp(std::string_view key) { return key == "source" || key == "src"; }
-
-        bool isAccessibilityProp(std::string_view key) { return key == "contentDescription" || key == "content-description" || key == "label" || key == "description" || key == "role" || key == "enabled"; }
-
         bool hasArea(Rect rect) { return rect.width > 0.0f && rect.height > 0.0f; }
 
         Rect unionRect(Rect left, Rect right) {
@@ -37,9 +34,11 @@ namespace arrange::core {
 
     void LayoutTree::applyMutation(const TreeMutation& mutation) {
         if (const auto* op = getIf<CreateNodeMutation>(mutation)) {
+            if (op->id == 0 || contains(op->id)) throw std::invalid_argument("Arrange createNode requires a fresh nonzero node id");
             ArrangeNode node;
             node.id = op->id;
             node.type = op->type;
+            node.generation = op->generation ? op->generation : allocateRuntimeIdentity();
             markDirty(node, DirtyFlag::Structure);
             recordDirtyAttribution(op->id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "node", "create node");
             nodes_[op->id] = std::move(node);
@@ -85,22 +84,9 @@ namespace arrange::core {
         }
 
         if (const auto* op = getIf<SetPropMutation>(mutation)) {
-            auto& node = require(op->id);
-            std::string propError;
-            if (!validateSetPropMutation(node.type, op->key, op->value, propError)) {
-                throw std::runtime_error(propError);
-            }
-            node.props[op->key] = op->value;
-            if (isResourceProp(op->key)) {
-                markDirtyAttributed(op->id, DirtyFlag::Resource, InvalidationSource::NativeMutation, op->key, "resource prop changed");
-                return;
-            }
-            if (isAccessibilityProp(op->key)) {
-                markDirtyAttributed(op->id, DirtyFlag::Accessibility, InvalidationSource::NativeMutation, op->key, "accessibility prop changed");
-                return;
-            }
-            markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, op->key, "layout prop changed");
-            markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, op->key, "paint prop changed");
+            const auto input = hostInputFromName(op->key);
+            if (!input) throw std::invalid_argument("Arrange unknown host input: " + op->key);
+            setHostInput(op->id, *input, op->value);
             return;
         }
 
@@ -122,30 +108,60 @@ namespace arrange::core {
         }
 
         if (const auto* op = getIf<SetModifierMutation>(mutation)) {
-            auto& node = require(op->id);
-            const auto oldModifier = node.modifier;
-            const auto diff = diffCompiledModifier(oldModifier, op->modifier);
-            node.modifier = op->modifier;
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Layout)) != 0) markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, "modifier", "compiled layout modifier changed");
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Paint)) != 0) markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, "modifier", "compiled paint modifier changed");
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Transform)) != 0) markDirtyAttributed(op->id, DirtyFlag::Transform, InvalidationSource::NativeMutation, "modifier", "compiled transform modifier changed");
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::HitTest)) != 0) markDirtyAttributed(op->id, DirtyFlag::HitTest, InvalidationSource::NativeMutation, "modifier", "compiled input/hit-test modifier changed");
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::Focus)) != 0) markDirtyAttributed(op->id, DirtyFlag::Focus, InvalidationSource::NativeMutation, "modifier", "compiled focus modifier changed");
-            if ((diff.dirtyMask & dirtyMask(DirtyFlag::EventSlot)) != 0) markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, "modifier", "compiled event modifier changed");
+            setModifierChain(op->id, op->modifier);
             return;
         }
 
         if (const auto* op = getIf<SetTextMutation>(mutation)) {
-            auto& node = require(op->id);
-            node.text = op->text;
-            markDirtyAttributed(op->id, DirtyFlag::Layout, InvalidationSource::NativeMutation, "text", "text changed");
-            markDirtyAttributed(op->id, DirtyFlag::Paint, InvalidationSource::NativeMutation, "text", "text changed");
+            setHostInput(op->id, HostInput::Text, PropValue::stringValue(op->text));
             return;
         }
 
         if (const auto* op = getIf<NativeInvalidationMutation>(mutation)) {
             markDirtyAttributed(op->id, op->flag, InvalidationSource::NativeState, op->field, op->reason);
         }
+    }
+
+    void LayoutTree::markInputDirty(NodeId id, std::uint32_t mask) {
+        for (auto flag : {DirtyFlag::Layout, DirtyFlag::Placement, DirtyFlag::Paint, DirtyFlag::HitTest, DirtyFlag::Focus, DirtyFlag::EventSlot, DirtyFlag::Resource, DirtyFlag::Accessibility}) {
+            if ((mask & dirtyMask(flag)) != 0) markDirtyAttributed(id, flag, InvalidationSource::NativeMutation, "typed input", "consumer input changed");
+        }
+    }
+
+    std::uint32_t LayoutTree::setHostInput(NodeId id, HostInput input, const PropValue& value) {
+        auto& node = require(id);
+        const auto name = std::string(hostInputName(input));
+        if (input == HostInput::Text) {
+            if (!value.isString()) throw std::invalid_argument("Arrange text input requires string");
+            if (node.text == value.string) return 0;
+            const auto mask = hostInputInvalidation(input, nullptr, value);
+            node.text = value.string;
+            markInputDirty(id, mask);
+            return mask;
+        }
+        std::string error;
+        if (!validateSetPropMutation(node.type, name, value, error)) throw std::invalid_argument(error);
+        const auto previous = node.props.find(name);
+        if (previous == node.props.end() && value.isNull()) return 0;
+        const auto mask = hostInputInvalidation(input, previous == node.props.end() ? nullptr : &previous->second, value);
+        if (mask != 0) {
+            if (value.isNull()) node.props.erase(name);
+            else node.props[name] = value;
+            markInputDirty(id, mask);
+        }
+        return mask;
+    }
+
+    std::uint32_t LayoutTree::setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value) {
+        const auto mask = require(id).modifier.update(handle, value);
+        markInputDirty(id, mask);
+        return mask;
+    }
+
+    std::uint32_t LayoutTree::setModifierChain(NodeId id, const ModifierDescriptors& descriptors) {
+        const auto result = require(id).modifier.reconcile(descriptors);
+        markInputDirty(id, result.dirty);
+        return result.dirty;
     }
 
     const ArrangeNode& LayoutTree::node(NodeId id) const { return require(id); }
@@ -185,6 +201,7 @@ namespace arrange::core {
         case DirtyFlag::Layout:
             markAncestorsDirty(id, DirtyFlag::Layout);
             break;
+        case DirtyFlag::Placement:
         case DirtyFlag::Transform:
             markDirty(dirtyNode, DirtyFlag::Paint);
             markDirty(dirtyNode, DirtyFlag::HitTest);
@@ -237,6 +254,7 @@ namespace arrange::core {
         case DirtyFlag::Structure:
             dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
             break;
+        case DirtyFlag::Placement:
         case DirtyFlag::Transform:
             dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
             break;
@@ -264,6 +282,7 @@ namespace arrange::core {
         case DirtyFlag::Structure:
             dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
             break;
+        case DirtyFlag::Placement:
         case DirtyFlag::Transform:
             dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
             break;

@@ -1,160 +1,91 @@
 #include <arrange/core/Scroll.h>
-#include <arrange/core/Modifier.h>
+#include <arrange/core/ModifierGeometry.h>
 
 #include <algorithm>
-#include <unordered_set>
 #include <vector>
 
 namespace arrange::core {
     namespace {
-        bool contains(const Rect& rect, Point point) noexcept { return point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height; }
+        bool isScroll(const ModifierInstance& instance, bool vertical) {
+            const auto* value = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value);
+            return value && value->enabled && value->kind == (vertical ? LayoutModifierKind::VerticalScroll : LayoutModifierKind::HorizontalScroll);
+        }
 
-        void collectScrollTargets(const LayoutTree& tree, NodeId id, Point point, bool vertical, std::vector<NodeId>& targets, std::unordered_set<NodeId>& visited) {
-            if (!tree.contains(id) || !visited.insert(id).second) return;
+        const ModifierInstance* innerScroll(const ArrangeNode& node, bool vertical) {
+            const auto& chain = node.modifier.elements();
+            for (auto it = chain.rbegin(); it != chain.rend(); ++it) if (isScroll(*it, vertical)) return &*it;
+            return nullptr;
+        }
+
+        struct ScrollTarget { NodeId node; const ModifierInstance* instance; };
+
+        bool collectTargets(const LayoutTree& tree, NodeId id, Point point, bool vertical, std::vector<ScrollTarget>& targets) {
+            if (!nodeInteractionEnabled(tree, id)) return false;
             const auto& node = tree.node(id);
-            if ((vertical ? ScrollDispatcher::hasVerticalScroll(node) : ScrollDispatcher::hasHorizontalScroll(node)) && !contains(node.bounds, point)) return;
-            if (vertical ? ScrollDispatcher::hasVerticalScroll(node) : ScrollDispatcher::hasHorizontalScroll(node)) targets.push_back(id);
-            for (auto childId : node.children) collectScrollTargets(tree, childId, point, vertical, targets, visited);
+            const auto initialSize = targets.size();
+            for (const auto& instance : node.modifier.elements()) {
+                if (!enterModifier(instance, point)) return targets.size() != initialSize;
+                if (isScroll(instance, vertical) && containsRect(instance.bounds, point)) targets.push_back({id, &instance});
+            }
+            auto children = node.children;
+            std::stable_sort(children.begin(), children.end(), [&](NodeId a, NodeId b) { return tree.node(a).modifier.zIndex() < tree.node(b).modifier.zIndex(); });
+            for (auto it = children.rbegin(); it != children.rend(); ++it) if (collectTargets(tree, *it, point, vertical, targets)) break;
+            return targets.size() != initialSize || containsRect(node.contentBounds, point);
+        }
+
+        ScrollResult wheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, bool vertical, const PendingScrollValues* pending) {
+            if (delta == 0) return {};
+            std::vector<ScrollTarget> targets;
+            collectTargets(tree, root, point, vertical, targets);
+            ScrollResult blocked;
+            for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
+                const auto& instance = *it->instance;
+                const auto& input = std::get<LayoutModifierSemantics>(instance.descriptor.value);
+                const auto viewport = vertical ? instance.measured.height : instance.measured.width;
+                const auto content = vertical ? instance.childMeasured.height : instance.childMeasured.width;
+                const auto maximum = std::max(0.0f, content - viewport);
+                const auto current = pending && pending->contains(instance.handle.identity) ? pending->at(instance.handle.identity) : input.scrollValue;
+                const auto next = std::clamp(current - delta * pixels, 0.0f, maximum);
+                ScrollResult result{next != current, it->node, next, maximum, viewport, content, input.eventSlot, instance.handle};
+                if (result.consumed) return result;
+                if (!blocked.target) blocked = result;
+            }
+            return blocked;
         }
     } // namespace
 
-    ScrollResult ScrollDispatcher::verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit) const {
-        if (!tree.contains(root) || wheelDeltaY == 0.0f) return {};
-        std::vector<NodeId> targets;
-        std::unordered_set<NodeId> visited;
-        collectScrollTargets(tree, root, point, true, targets, visited);
-        if (targets.empty()) return {};
-
-        ScrollResult blocked;
-        for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
-            const auto& node = tree.node(*it);
-            const auto contentHeight = verticalContentHeight(tree, node);
-            const auto maxValue = std::max(0.0f, contentHeight - node.bounds.height);
-            const auto current = verticalScrollValue(node);
-            const auto next = std::clamp(current - wheelDeltaY * pixelsPerWheelUnit, 0.0f, maxValue);
-            const auto eventSlot = nativeScrollEventSlot(node, EventSlotKind::VerticalScroll);
-            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.height, contentHeight, eventSlot};
-            if (next == current) continue;
-            return {true, *it, next, maxValue, node.bounds.height, contentHeight, eventSlot};
-        }
-        return blocked;
-    }
-
-    ScrollResult ScrollDispatcher::horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit) const {
-        if (!tree.contains(root) || wheelDeltaX == 0.0f) return {};
-        std::vector<NodeId> targets;
-        std::unordered_set<NodeId> visited;
-        collectScrollTargets(tree, root, point, false, targets, visited);
-        if (targets.empty()) return {};
-
-        ScrollResult blocked;
-        for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
-            const auto& node = tree.node(*it);
-            const auto contentWidth = horizontalContentWidth(tree, node);
-            const auto maxValue = std::max(0.0f, contentWidth - node.bounds.width);
-            const auto current = horizontalScrollValue(node);
-            const auto next = std::clamp(current - wheelDeltaX * pixelsPerWheelUnit, 0.0f, maxValue);
-            const auto eventSlot = nativeScrollEventSlot(node, EventSlotKind::HorizontalScroll);
-            if (!blocked.target) blocked = {false, *it, current, maxValue, node.bounds.width, contentWidth, eventSlot};
-            if (next == current) continue;
-            return {true, *it, next, maxValue, node.bounds.width, contentWidth, eventSlot};
-        }
-        return blocked;
-    }
-
-    bool ScrollDispatcher::hasVerticalScroll(const ArrangeNode& node) {
-        return node.modifier.scroll.vertical;
-    }
-
-    bool ScrollDispatcher::hasHorizontalScroll(const ArrangeNode& node) {
-        return node.modifier.scroll.horizontal;
-    }
-
+    ScrollResult ScrollDispatcher::verticalWheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, const PendingScrollValues* pending) const { return wheel(tree, root, point, delta, pixels, true, pending); }
+    ScrollResult ScrollDispatcher::horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, const PendingScrollValues* pending) const { return wheel(tree, root, point, delta, pixels, false, pending); }
+    bool ScrollDispatcher::hasVerticalScroll(const ArrangeNode& node) { return innerScroll(node, true) != nullptr; }
+    bool ScrollDispatcher::hasHorizontalScroll(const ArrangeNode& node) { return innerScroll(node, false) != nullptr; }
     float ScrollDispatcher::verticalScrollValue(const ArrangeNode& node) {
-        return hasVerticalScroll(node) ? node.modifier.scroll.verticalValue : 0.0f;
+        auto* instance = innerScroll(node, true);
+        return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).scrollValue : 0;
     }
-
     float ScrollDispatcher::horizontalScrollValue(const ArrangeNode& node) {
-        return hasHorizontalScroll(node) ? node.modifier.scroll.horizontalValue : 0.0f;
+        auto* instance = innerScroll(node, false);
+        return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).scrollValue : 0;
     }
-
-    float ScrollDispatcher::verticalContentHeight(const LayoutTree& tree, const ArrangeNode& node) {
-        if (node.children.empty()) return node.bounds.height;
-        float top = 0.0f;
-        float bottom = 0.0f;
-        bool first = true;
-        for (auto childId : node.children) {
-            if (!tree.contains(childId)) continue;
-            const auto& child = tree.node(childId);
-            if (first) {
-                top = child.bounds.y;
-                bottom = child.bounds.y + child.bounds.height;
-                first = false;
-                continue;
-            }
-            top = std::min(top, child.bounds.y);
-            bottom = std::max(bottom, child.bounds.y + child.bounds.height);
-        }
-        if (first) return node.bounds.height;
-        return std::max(0.0f, bottom - top);
+    float ScrollDispatcher::verticalContentHeight(const LayoutTree&, const ArrangeNode& node) {
+        auto* instance = innerScroll(node, true);
+        return instance ? instance->childMeasured.height : node.contentBounds.height;
     }
-
-    float ScrollDispatcher::horizontalContentWidth(const LayoutTree& tree, const ArrangeNode& node) {
-        if (node.children.empty()) return node.bounds.width;
-        float left = 0.0f;
-        float right = 0.0f;
-        bool first = true;
-        for (auto childId : node.children) {
-            if (!tree.contains(childId)) continue;
-            const auto& child = tree.node(childId);
-            if (first) {
-                left = child.bounds.x;
-                right = child.bounds.x + child.bounds.width;
-                first = false;
-                continue;
-            }
-            left = std::min(left, child.bounds.x);
-            right = std::max(right, child.bounds.x + child.bounds.width);
-        }
-        if (first) return node.bounds.width;
-        return std::max(0.0f, right - left);
+    float ScrollDispatcher::horizontalContentWidth(const LayoutTree&, const ArrangeNode& node) {
+        auto* instance = innerScroll(node, false);
+        return instance ? instance->childMeasured.width : node.contentBounds.width;
     }
-
     EventSlotId ScrollDispatcher::nativeScrollEventSlot(const ArrangeNode& node, EventSlotKind kind) {
-        if (kind == EventSlotKind::VerticalScroll) return node.modifier.scroll.verticalEventSlot;
-        if (kind == EventSlotKind::HorizontalScroll) return node.modifier.scroll.horizontalEventSlot;
-        return {};
+        auto* instance = innerScroll(node, kind == EventSlotKind::VerticalScroll);
+        return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).eventSlot : EventSlotId{};
     }
-
     NodeId ScrollDispatcher::findVerticalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
-        std::unordered_set<NodeId> visited;
-        auto currentFallback = fallback;
-        std::vector<NodeId> stack{id};
-        while (!stack.empty()) {
-            const auto current = stack.back();
-            stack.pop_back();
-            if (!tree.contains(current) || !visited.insert(current).second) continue;
-            const auto& node = tree.node(current);
-            if (hasVerticalScroll(node) && !contains(node.bounds, point)) continue;
-            if (hasVerticalScroll(node)) currentFallback = current;
-            for (auto childId : node.children) stack.push_back(childId);
-        }
-        return currentFallback;
+        std::vector<ScrollTarget> targets;
+        collectTargets(tree, id, point, true, targets);
+        return targets.empty() ? fallback : targets.back().node;
     }
-
     NodeId ScrollDispatcher::findHorizontalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
-        std::unordered_set<NodeId> visited;
-        auto currentFallback = fallback;
-        std::vector<NodeId> stack{id};
-        while (!stack.empty()) {
-            const auto current = stack.back();
-            stack.pop_back();
-            if (!tree.contains(current) || !visited.insert(current).second) continue;
-            const auto& node = tree.node(current);
-            if (hasHorizontalScroll(node) && !contains(node.bounds, point)) continue;
-            if (hasHorizontalScroll(node)) currentFallback = current;
-            for (auto childId : node.children) stack.push_back(childId);
-        }
-        return currentFallback;
+        std::vector<ScrollTarget> targets;
+        collectTargets(tree, id, point, false, targets);
+        return targets.empty() ? fallback : targets.back().node;
     }
 } // namespace arrange::core

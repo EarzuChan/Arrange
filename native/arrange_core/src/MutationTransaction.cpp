@@ -1,33 +1,26 @@
 #include <arrange/core/MutationTransaction.h>
 
 #include <utility>
+#include <algorithm>
 
 namespace arrange::core {
     bool MutationTransaction::hasTreeMutations() const noexcept {
-        return !treeMutations.empty();
+        return std::any_of(operations.begin(), operations.end(), [](const auto& op) {
+            return std::holds_alternative<TreeMutation>(op);
+        });
     }
 
     bool MutationTransaction::hasEventSlotChanges() const noexcept {
-        return !eventSlotUpdates.empty() || !retiredEventSlots.empty();
-    }
-
-    bool MutationTransaction::empty() const noexcept {
-        return treeMutations.empty() && eventSlotUpdates.empty() && retiredEventSlots.empty();
+        return std::any_of(operations.begin(), operations.end(), [](const auto& op) {
+            return std::holds_alternative<RegisterEventSlot>(op) ||
+                   std::holds_alternative<RetireEventSlot>(op);
+        });
     }
 
     void MutationTransaction::append(MutationTransaction transaction) {
-        treeMutations.insert(
-            treeMutations.end(),
-            std::make_move_iterator(transaction.treeMutations.begin()),
-            std::make_move_iterator(transaction.treeMutations.end()));
-        eventSlotUpdates.insert(
-            eventSlotUpdates.end(),
-            std::make_move_iterator(transaction.eventSlotUpdates.begin()),
-            std::make_move_iterator(transaction.eventSlotUpdates.end()));
-        retiredEventSlots.insert(
-            retiredEventSlots.end(),
-            std::make_move_iterator(transaction.retiredEventSlots.begin()),
-            std::make_move_iterator(transaction.retiredEventSlots.end()));
+        operations.insert(operations.end(),
+            std::make_move_iterator(transaction.operations.begin()),
+            std::make_move_iterator(transaction.operations.end()));
     }
 
     void MutationTransactionQueue::push(MutationTransaction transaction) {

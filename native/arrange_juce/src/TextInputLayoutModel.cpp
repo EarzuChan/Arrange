@@ -28,7 +28,7 @@ namespace arrange::juce {
 
     TextInputLayoutModel::Metrics TextInputLayoutModel::metrics(const arrange::core::ArrangeNode& node, float viewportX) const {
         Metrics metrics;
-        metrics.rect = ::juce::Rectangle<float>(node.bounds.x, node.bounds.y, node.bounds.width, node.bounds.height);
+        metrics.rect = ::juce::Rectangle<float>(node.contentBounds.x, node.contentBounds.y, node.contentBounds.width, node.contentBounds.height);
         const auto style = arrange::core::objectProp(node, "textStyle", "text-style");
         metrics.fontSize = style.number("fontSize", 14.0f);
         metrics.singleLine = !allowsLineBreak(node);

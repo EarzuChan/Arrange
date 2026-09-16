@@ -1,5 +1,6 @@
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/Layout.h>
+#include <arrange/core/NativeScene.h>
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Mutation.h>
 #include <arrange/core/Paint.h>
@@ -38,10 +39,12 @@ namespace {
         arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            const auto& modifier = tree.node(id).modifier;
-            if (kind == arrange::core::EventSlotKind::Click && modifier.input.clickEventSlot.valid()) return modifier.input.clickEventSlot;
-            if (kind == arrange::core::EventSlotKind::VerticalScroll && modifier.scroll.verticalEventSlot.valid()) return modifier.scroll.verticalEventSlot;
-            if (kind == arrange::core::EventSlotKind::HorizontalScroll && modifier.scroll.horizontalEventSlot.valid()) return modifier.scroll.horizontalEventSlot;
+            for (const auto& instance : tree.node(id).modifier.elements()) {
+                arrange::core::EventSlotId slot;
+                if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+                if (const auto* input = std::get_if<arrange::core::LayoutModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+                if (slot.kind == kind && slot.valid()) return slot;
+            }
         }
         return std::nullopt;
     }
@@ -69,15 +72,16 @@ namespace {
         return click && click->valid() && scroll && scroll->valid() && submit && submit->valid();
     }
 
-    std::optional<std::vector<arrange::core::TreeMutation>> takeTreeMutations(arrange::quickjs::QuickJsScriptHost& host) {
+    std::optional<arrange::core::MutationTransaction> takeSubmission(arrange::quickjs::QuickJsScriptHost& host) {
         auto transaction = host.takePendingTransaction();
-        if (!transaction || !transaction->hasTreeMutations()) return std::nullopt;
-        return std::move(transaction->treeMutations);
+        if (!transaction || transaction->empty()) return std::nullopt;
+        return transaction;
     }
 
-    bool transactionContainsTypedModifier(const std::vector<arrange::core::TreeMutation>& mutations) {
-        for (const auto& mutation : mutations) {
-            if (std::holds_alternative<arrange::core::SetModifierMutation>(mutation)) return true;
+    bool transactionContainsTypedModifier(const arrange::core::MutationTransaction& transaction) {
+        for (const auto& operation : transaction.operations) {
+            const auto* update = std::get_if<arrange::core::SlotUpdate>(&operation);
+            if (update && std::holds_alternative<arrange::core::ModifierDescriptors>(update->value)) return true;
         }
         return false;
     }
@@ -137,7 +141,7 @@ namespace {
         if (actions[3].kind != arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload ||
             actions[3].path != "src/App.vue" ||
             actions[3].timestamp != 12.0) return false;
-        if (!host.reloadRequested() || host.reloadRequest().path != "src/App.vue") return false;
+        if (host.hasPendingDiagnostics()) return false;
         return true;
     }
 
@@ -203,8 +207,9 @@ int main(int argc, char** argv) {
         const auto transaction = host.takePendingTransaction();
         if (!transaction) return 39;
         std::uint32_t modifiers = 0;
-        for (const auto& mutation : transaction->treeMutations) {
-            if (std::holds_alternative<arrange::core::SetModifierMutation>(mutation)) ++modifiers;
+        for (const auto& operation : transaction->operations) {
+            const auto* update = std::get_if<arrange::core::SlotUpdate>(&operation);
+            if (update && std::holds_alternative<arrange::core::ModifierDescriptors>(update->value)) ++modifiers;
         }
         if (modifiers != 2) return 40;
         std::cout << "QuickJS strict modifier smoke accepted valid direct object path\n";
@@ -234,13 +239,15 @@ int main(int argc, char** argv) {
 
     auto initialTransaction = host.takePendingTransaction();
     if (!initialTransaction || !initialTransaction->hasTreeMutations()) return 4;
-    const auto initialEventSlotUpdates = initialTransaction->eventSlotUpdates.size();
-    auto lastMutations = std::optional<std::vector<arrange::core::TreeMutation>>(std::move(initialTransaction->treeMutations));
+    const auto initialEventSlotUpdates = std::count_if(initialTransaction->operations.begin(), initialTransaction->operations.end(), [](const auto& op) { return std::holds_alternative<arrange::core::RegisterEventSlot>(op); });
+    auto lastMutations = std::move(initialTransaction);
     if (!lastMutations || lastMutations->empty()) return 5;
     if (!transactionContainsTypedModifier(*lastMutations)) return 6;
 
-    arrange::core::LayoutTree tree;
-    tree.apply(*lastMutations);
+    arrange::core::NativeScene scene;
+    scene.apply(*lastMutations);
+    host.publishScene(scene);
+    auto& tree = scene.tree();
     arrange::core::LayoutEngine layout;
     layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
     if (!tree.contains(1) || !hasInitialDemoVisuals(tree) || !hasInitialDemoEventSlots(tree)) return 7;
@@ -251,9 +258,12 @@ int main(int argc, char** argv) {
         arg = 4;
     }
     if (argc >= arg + 2 && std::string(argv[arg]) == "--expect-reload") {
-        if (!host.reloadRequested()) return 12;
-        const auto& request = host.reloadRequest();
-        if (request.path.find(argv[arg + 1]) == std::string::npos) return 13;
+        const auto actions = host.takeDiagnosticActions();
+        const auto request = std::find_if(actions.begin(), actions.end(), [](const auto& action) {
+            return action.kind == arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload;
+        });
+        if (request == actions.end()) return 12;
+        if (request->path.find(argv[arg + 1]) == std::string::npos) return 13;
         arg += 2;
     }
 
@@ -290,9 +300,10 @@ int main(int argc, char** argv) {
                     return 24;
                 }
             }
-            lastMutations = takeTreeMutations(host);
+            lastMutations = takeSubmission(host);
             if (!lastMutations) return 25;
-            tree.apply(*lastMutations);
+            scene.apply(*lastMutations);
+            host.publishScene(scene);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             if (!treeContainsText(tree, expectedText)) return 26;
             arg = expectedEnd;
@@ -315,10 +326,11 @@ int main(int argc, char** argv) {
                 std::cerr << invoked.error << "\n";
                 return 28;
             }
-            lastMutations = takeTreeMutations(host);
+            lastMutations = takeSubmission(host);
             if (!lastMutations) return 29;
-            tree.apply(*lastMutations);
-            if (tree.node(slot->node).modifier.scroll.verticalValue != scrollValue) return 30;
+            scene.apply(*lastMutations);
+            host.publishScene(scene);
+            if (arrange::core::ScrollDispatcher::verticalScrollValue(tree.node(slot->node)) != scrollValue) return 30;
             arg += 2;
             continue;
         }
@@ -342,9 +354,10 @@ int main(int argc, char** argv) {
                 std::cerr << invoked.error << "\n";
                 return 32;
             }
-            lastMutations = takeTreeMutations(host);
+            lastMutations = takeSubmission(host);
             if (!lastMutations) return 33;
-            tree.apply(*lastMutations);
+            scene.apply(*lastMutations);
+            host.publishScene(scene);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             if (!treeContainsText(tree, expectedText)) return 34;
             arg = expectedEnd;
@@ -361,10 +374,11 @@ int main(int argc, char** argv) {
                 std::cerr << reloaded.error << "\n";
                 return 35;
             }
-            lastMutations = takeTreeMutations(host);
+            lastMutations = takeSubmission(host);
             if (!lastMutations) return 36;
-            tree = {};
-            tree.apply(*lastMutations);
+            scene.reset();
+            scene.apply(*lastMutations);
+            host.publishScene(scene);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             arg += 2;
             continue;
@@ -373,7 +387,7 @@ int main(int argc, char** argv) {
         return 37;
     }
 
-    std::cout << "QuickJS app smoke typed mutations=" << lastMutations->size() << "\n";
+    std::cout << "QuickJS app smoke ordered operations=" << lastMutations->operations.size() << "\n";
     return 0;
 #endif
 }

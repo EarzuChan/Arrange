@@ -10,61 +10,42 @@ namespace arrange::juce {
 
 void EditorShellDriver::afterConfigure(ArrangeEditor& editor) const {
     editor.updateWindowTitle();
-    editor.updateTimerState();
-    if (editor.sceneHost_->pumpFrame(::juce::Time::getMillisecondCounterHiRes())) {
-        editor.updateWindowTitle();
-    }
-    editor.sceneHost_->repaintDirty(editor, true);
+    editor.updateFrameClockState();
 }
 
 void EditorShellDriver::afterReload(ArrangeEditor& editor) const {
     editor.updateWindowTitle();
-    editor.updateTimerState();
-    if (editor.sceneHost_->pumpFrame(::juce::Time::getMillisecondCounterHiRes())) {
-        editor.updateWindowTitle();
-    }
-    editor.sceneHost_->repaintDirty(editor, true);
+    editor.updateFrameClockState();
 }
 
 void EditorShellDriver::afterResize(ArrangeEditor& editor) const {
     editor.updateWindowTitle();
-    editor.updateTimerState();
-    (void)editor.sceneHost_->pumpFrame(::juce::Time::getMillisecondCounterHiRes());
-    editor.sceneHost_->repaintDirty(editor, true);
+    editor.updateFrameClockState();
 }
 
 void EditorShellDriver::afterPointerDown(ArrangeEditor& editor) const {
     if (auto* peer = editor.getPeer()) {
         peer->refreshTextInputTarget();
     }
-    editor.updateTimerState();
+    editor.updateFrameClockState();
 }
 
-void EditorShellDriver::afterTimerRelevantChange(ArrangeEditor& editor) const {
-    editor.updateTimerState();
+void EditorShellDriver::afterFrameRelevantChange(ArrangeEditor& editor) const {
+    editor.updateFrameClockState();
 }
 
-void EditorShellDriver::afterTitleAndTimerRelevantChange(ArrangeEditor& editor) const {
+void EditorShellDriver::afterTitleAndFrameRelevantChange(ArrangeEditor& editor) const {
     editor.updateWindowTitle();
-    editor.updateTimerState();
+    editor.updateFrameClockState();
 }
 
-void EditorShellDriver::timerTick(ArrangeEditor& editor, double nowMillis) const {
+void EditorShellDriver::vblankTick(ArrangeEditor& editor, double nowMillis) const {
+    // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线。
+    if (editor.sceneHost_->consumeDevReloadRequested()) editor.sceneHost_->reloadFromDevServer();
     const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
     editor.updateWindowTitle();
-    if (!editor.sceneHost_->consumeDevReloadRequested()) {
-        editor.updateTimerState();
-        if (frameChanged) {
-            editor.sceneHost_->repaintDirty(editor, true);
-        }
-        return;
-    }
-
-    editor.sceneHost_->reloadFromDevServer();
-    editor.updateWindowTitle();
-    editor.updateTimerState();
-    (void)editor.sceneHost_->pumpFrame(nowMillis);
-    editor.sceneHost_->repaintDirty(editor, true);
+    editor.updateFrameClockState();
+    if (frameChanged) editor.sceneHost_->repaintDirty(editor);
 }
 
 ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor)
@@ -76,7 +57,7 @@ ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig con
     configure(std::move(config));
 }
 
-ArrangeEditor::~ArrangeEditor() { frameClock_.stop(static_cast<::juce::Timer&>(*this)); }
+ArrangeEditor::~ArrangeEditor() { frameClock_.stop(); }
 
 void ArrangeEditor::configure(EditorConfig config) {
     config_ = config;
@@ -105,7 +86,7 @@ void ArrangeEditor::paint(::juce::Graphics& g) { sceneHost_->paint(g, getLocalBo
 
 void ArrangeEditor::parentHierarchyChanged() {
     updateWindowTitle();
-    updateTimerState();
+    updateFrameClockState();
 }
 
 void ArrangeEditor::mouseDown(const ::juce::MouseEvent& event) {
@@ -116,48 +97,48 @@ void ArrangeEditor::mouseDown(const ::juce::MouseEvent& event) {
 
 void ArrangeEditor::mouseDrag(const ::juce::MouseEvent& event) {
     if (sceneHost_->pointerDrag(event)) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
 }
 
 void ArrangeEditor::mouseUp(const ::juce::MouseEvent& event) {
     sceneHost_->pointerUp(event);
-    shell_.afterTimerRelevantChange(*this);
+    shell_.afterFrameRelevantChange(*this);
 }
 
 void ArrangeEditor::mouseWheelMove(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
     if (sceneHost_->wheelMove(event, wheel)) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
 }
 
 bool ArrangeEditor::keyPressed(const ::juce::KeyPress& key) {
     if (key.isKeyCode(::juce::KeyPress::F5Key)) {
         sceneHost_->manualReload(key.getModifiers().isCommandDown());
-        shell_.afterTitleAndTimerRelevantChange(*this);
+        shell_.afterTitleAndFrameRelevantChange(*this);
         return true;
     }
     if (key.isKeyCode(::juce::KeyPress::F6Key)) {
         if (sceneHost_->pushManualDiagnosticToast()) {
-            shell_.afterTimerRelevantChange(*this);
+            shell_.afterFrameRelevantChange(*this);
         }
         return true;
     }
     if (key.isKeyCode(::juce::KeyPress::F7Key)) {
         if (sceneHost_->triggerManualDiagnosticError()) {
-            shell_.afterTitleAndTimerRelevantChange(*this);
+            shell_.afterTitleAndFrameRelevantChange(*this);
         }
         return true;
     }
     if (key.getModifiers().isCommandDown() && (key.getTextCharacter() == 'c' || key.getTextCharacter() == 'C')) {
         if (sceneHost_->copyDiagnosticsToClipboard()) {
-            shell_.afterTimerRelevantChange(*this);
+            shell_.afterFrameRelevantChange(*this);
             return true;
         }
     }
     const auto consumed = sceneHost_->keyPressed(key);
     if (consumed) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
     return consumed;
 }
@@ -168,13 +149,13 @@ bool ArrangeEditor::isTextInputActive() const { return sceneHost_->isTextInputAc
 
 void ArrangeEditor::setHighlightedRegion(const ::juce::Range<int>& newRange) {
     if (sceneHost_->setHighlightedRegion(newRange)) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
 }
 
 void ArrangeEditor::setTemporaryUnderlining(const ::juce::Array<::juce::Range<int>>& underlinedRegions) {
     if (sceneHost_->setTemporaryUnderlining(underlinedRegions)) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
 }
 
@@ -182,7 +163,7 @@ void ArrangeEditor::setTemporaryUnderlining(const ::juce::Array<::juce::Range<in
 
 void ArrangeEditor::insertTextAtCaret(const ::juce::String& textToInsert) {
     if (sceneHost_->insertTextAtCaret(textToInsert)) {
-        shell_.afterTimerRelevantChange(*this);
+        shell_.afterFrameRelevantChange(*this);
     }
 }
 
@@ -196,18 +177,13 @@ int ArrangeEditor::getCharIndexForPoint(::juce::Point<int> point) const { return
 
 ::juce::RectangleList<int> ArrangeEditor::getTextBounds(::juce::Range<int> textRange) const { return sceneHost_->textBounds(textRange); }
 
-void ArrangeEditor::timerCallback() {
-    shell_.timerTick(*this, ::juce::Time::getMillisecondCounterHiRes());
-}
-
-void ArrangeEditor::updateTimerState() {
+void ArrangeEditor::updateFrameClockState() {
     frameClock_.sync(
         *this,
-        static_cast<::juce::Timer&>(*this),
-        sceneHost_->timerDemand(),
+        sceneHost_->wantsVBlank(),
         [this](double timestampMillis) {
             frameClock_.beginVBlankCallback();
-            shell_.timerTick(*this, timestampMillis);
+            shell_.vblankTick(*this, timestampMillis);
             if (frameClock_.endVBlankCallback()) {
                 requestFrameClockResyncAsync();
             }
@@ -218,7 +194,7 @@ void ArrangeEditor::requestFrameClockResyncAsync() {
     ::juce::Component::SafePointer<ArrangeEditor> safeThis(this);
     ::juce::MessageManager::callAsync([safeThis]() mutable {
         if (auto* editor = safeThis.getComponent()) {
-            editor->updateTimerState();
+            editor->updateFrameClockState();
         }
     });
 }

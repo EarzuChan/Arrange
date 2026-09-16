@@ -11,6 +11,7 @@
 
 #include <iterator>
 #include <optional>
+#include <cmath>
 
 namespace arrange::quickjs {
     namespace {
@@ -163,18 +164,32 @@ namespace arrange::quickjs {
             return line;
         }
 
-        JSValue nativeBeginTransaction(JSContext*, JSValueConst, int, JSValueConst*) { return JS_UNDEFINED; }
-        JSValue nativeEndTransaction(JSContext*, JSValueConst, int, JSValueConst*) { return JS_UNDEFINED; }
+        std::uint32_t readIndex(JSContext* context, JSValueConst value, bool allowZero = false) {
+            double number = 0;
+            if (!JS_IsNumber(value) || JS_ToFloat64(context, &number, value) < 0 || !std::isfinite(number) ||
+                std::floor(number) != number || number < (allowZero ? 0 : 1) || number > UINT32_MAX) {
+                JS_ThrowTypeError(context, "Arrange identity/index must be an exact uint32 number");
+                return 0;
+            }
+            return static_cast<std::uint32_t>(number);
+        }
+
 
         JSValue nativeCreateNode(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto id = reader.toU32(argv[0]);
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            if (!JS_IsString(argv[1])) return JS_ThrowTypeError(context, "Arrange node type must be a string");
             const auto type = arrange::core::nodeTypeFromName(reader.toString(argv[1]));
+            if (type == arrange::core::NodeType::Unknown) return JS_ThrowTypeError(context, "Arrange unknown native node type");
+            if (id == 0 || self->nodeTypes.contains(id)) return JS_ThrowTypeError(context, "Arrange createNode requires a fresh nonzero node id");
+            const auto generation = arrange::core::allocateRuntimeIdentity();
+            self->nodeGenerations[id] = generation;
             if (self->rootNodeId == 0) self->rootNodeId = id;
             self->nodeTypes[id] = type;
-            self->push(arrange::core::CreateNodeMutation{id, type});
+            self->push(arrange::core::CreateNodeMutation{id, type, generation});
             return JS_UNDEFINED;
         }
 
@@ -182,9 +197,10 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 1) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto id = reader.toU32(argv[0]);
-            self->releaseNodeCallbacksRecursive(id);
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
             self->releaseNodeTypesRecursive(id);
+            self->releaseNodeCallbacksRecursive(id);
             self->push(arrange::core::DeleteNodeMutation{id});
             return JS_UNDEFINED;
         }
@@ -193,9 +209,12 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 3) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto parent = reader.toU32(argv[0]);
-            const auto child = reader.toU32(argv[1]);
-            const auto index = reader.toU32(argv[2]);
+            const auto parent = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            const auto child = readIndex(context, argv[1]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            const auto index = readIndex(context, argv[2], true);
+            if (JS_HasException(context)) return JS_EXCEPTION;
             self->attachChild(parent, child, index);
             self->push(arrange::core::InsertChildMutation{parent, child, index});
             return JS_UNDEFINED;
@@ -205,8 +224,10 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto parent = reader.toU32(argv[0]);
-            const auto child = reader.toU32(argv[1]);
+            const auto parent = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            const auto child = readIndex(context, argv[1]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
             self->detachChild(parent, child);
             self->push(arrange::core::RemoveChildMutation{parent, child});
             return JS_UNDEFINED;
@@ -216,7 +237,10 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            self->push(arrange::core::SetTextMutation{reader.toU32(argv[0]), reader.toString(argv[1])});
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
+            self->setHostInput(id, arrange::core::HostInput::Text, arrange::core::PropValue::stringValue(reader.toString(argv[1])));
             return JS_UNDEFINED;
         }
 
@@ -224,23 +248,28 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 3) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto id = reader.toU32(argv[0]);
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
             const auto key = reader.toString(argv[1]);
             const auto slotKind = propEventSlotKind(key);
             if (slotKind != arrange::core::EventSlotKind::None) {
-                self->events.replace(arrange::core::makeEventSlotId(id, slotKind), argv[2], self->currentTransaction());
+                const auto slot = self->events.setNodeCallback(id, slotKind, argv[2], self->currentTransaction());
+                self->setEventInput(id, slotKind, slot);
                 return JS_UNDEFINED;
             }
             if (JS_IsFunction(context, argv[2])) {
                 return JS_ThrowTypeError(context, "Arrange prop '%s' is a function. Event callbacks must use typed EventSlot registration.", key.c_str());
             }
             auto value = reader.propValue(argv[2]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
             std::string propError;
             if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, id), key, value, propError)) {
-                self->nativeError = propError;
                 return JS_ThrowTypeError(context, "%s", propError.c_str());
             }
-            self->push(arrange::core::SetPropMutation{id, key, std::move(value)});
+            const auto input = arrange::core::hostInputFromName(key);
+            if (!input) return JS_ThrowTypeError(context, "Arrange unsupported host input: %s", key.c_str());
+            self->setHostInput(id, *input, std::move(value));
             return JS_UNDEFINED;
         }
 
@@ -248,55 +277,191 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto id = reader.toU32(argv[0]);
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
             QuickJsModifierReader modifierReader(context, self->events, self->currentTransaction());
             auto modifier = modifierReader.read(id, argv[1]);
             if (modifierReader.failed() || JS_HasException(context)) {
-                self->nativeError = "Arrange native setModifier rejected invalid modifier";
                 return JS_EXCEPTION;
             }
-            self->push(arrange::core::SetModifierMutation{id, std::move(modifier)});
+            self->setModifierChain(id, std::move(modifier));
             return JS_UNDEFINED;
         }
 
-        JSValue nativeInvalidate(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        JSValue bindingValue(JSContext* context, arrange::core::BindingHandle handle) {
+            const auto result = JS_NewObject(context);
+            JS_SetPropertyStr(context, result, "identity", JS_NewBigUint64(context, handle.identity));
+            JS_SetPropertyStr(context, result, "generation", JS_NewBigUint64(context, handle.generation));
+            return result;
+        }
+
+        std::optional<arrange::core::BindingHandle> readBinding(JSContext* context, JSValueConst value) {
+            if (!JS_IsObject(value)) { JS_ThrowTypeError(context, "Arrange binding handle must be an object"); return std::nullopt; }
+            ScopedValue identity(context, JS_GetPropertyStr(context, value, "identity"));
+            ScopedValue generation(context, JS_GetPropertyStr(context, value, "generation"));
+            if (!JS_IsBigInt(identity.get()) || !JS_IsBigInt(generation.get())) {
+                JS_ThrowTypeError(context, "Arrange binding identity and generation must be bigint");
+                return std::nullopt;
+            }
+            arrange::core::BindingHandle handle;
+            if (JS_ToBigUint64(context, &handle.identity, identity.get()) < 0 || JS_ToBigUint64(context, &handle.generation, generation.get()) < 0) return std::nullopt;
+            ScopedValue canonicalIdentity(context, JS_NewBigUint64(context, handle.identity));
+            ScopedValue canonicalGeneration(context, JS_NewBigUint64(context, handle.generation));
+            if (!handle.valid() || !JS_IsStrictEqual(context, identity.get(), canonicalIdentity.get()) || !JS_IsStrictEqual(context, generation.get(), canonicalGeneration.get())) {
+                JS_ThrowRangeError(context, "Arrange binding identity and generation must be nonzero uint64");
+                return std::nullopt;
+            }
+            return handle;
+        }
+
+        JSValue nativeModifierInstances(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
-            if (self == nullptr || argc < 2) return JS_UNDEFINED;
+            if (!self || argc != 1) return JS_ThrowTypeError(context, "Arrange modifierInstances expects node id");
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            std::vector<const QuickJsRuntimeContext::PublishedModifier*> instances;
+            for (const auto& [_, instance] : self->publishedModifiers) {
+                if (instance.node.id == id && self->nodeGenerations.contains(id) && self->nodeGenerations.at(id) == instance.node.generation) instances.push_back(&instance);
+            }
+            std::sort(instances.begin(), instances.end(), [](const auto* left, const auto* right) { return left->position < right->position; });
+            const auto result = JS_NewArray(context);
+            std::uint32_t index = 0;
+            for (const auto* instance : instances) {
+                const auto item = bindingValue(context, {instance->handle.identity, instance->handle.generation});
+                JS_SetPropertyStr(context, item, "key", JS_NewString(context, instance->descriptor.key.c_str()));
+                JS_SetPropertyUint32(context, result, index++, item);
+            }
+            return result;
+        }
+
+        JSValue nativeRegisterModifierBinding(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (!self || argc != 2) return JS_ThrowTypeError(context, "Arrange registerModifierBinding expects node id and instance handle");
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            const auto handle = readBinding(context, argv[1]);
+            if (!handle) return JS_EXCEPTION;
+            const auto found = self->publishedModifiers.find(handle->identity);
+            if (found == self->publishedModifiers.end() || found->second.handle.generation != handle->generation ||
+                found->second.node.id != id || !self->nodeGenerations.contains(id) || self->nodeGenerations.at(id) != found->second.node.generation) {
+                ++self->rejectedBindingUpdates;
+                return JS_ThrowReferenceError(context, "Arrange Modifier instance is retired or not published");
+            }
+            std::vector<arrange::core::BindingHandle> previous;
+            for (const auto& [_, binding] : self->bindings) {
+                const auto* target = std::get_if<arrange::core::ModifierInputTarget>(&binding.target);
+                if (target && target->modifier == found->second.handle) previous.push_back(binding.handle);
+            }
+            for (auto binding : previous) self->retireBinding(binding);
+            return bindingValue(context, self->registerBinding(arrange::core::ModifierInputTarget{found->second.node, found->second.handle}));
+        }
+
+        JSValue nativeRegisterBinding(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (self == nullptr || argc != 2 || !JS_IsNumber(argv[0]) || !JS_IsString(argv[1])) return JS_ThrowTypeError(context, "Arrange registerBinding expects node id and input name");
             QuickJsValueReader reader(context);
-            const auto flagName = reader.toString(argv[1]);
-            auto flag = arrange::core::DirtyFlag::EventSlot;
-            if (flagName == "paint") flag = arrange::core::DirtyFlag::Paint;
-            else if (flagName == "layout") flag = arrange::core::DirtyFlag::Layout;
-            else if (flagName == "structure") flag = arrange::core::DirtyFlag::Structure;
-            else if (flagName == "hitTest") flag = arrange::core::DirtyFlag::HitTest;
-            self->push(arrange::core::NativeInvalidationMutation{reader.toU32(argv[0]), flag, flagName, argc > 2 ? reader.toString(argv[2]) : flagName});
+            const auto id = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange binding node does not exist");
+            const arrange::core::NodeHandle node{id, self->nodeGenerations.at(id)};
+            const auto name = reader.toString(argv[1]);
+            arrange::core::BindingHandle handle;
+            if (name == "modifier") {
+                if (const auto previous = self->modifierBindings.find(id); previous != self->modifierBindings.end()) self->retireBinding(previous->second);
+                handle = self->registerBinding(arrange::core::ModifierChainTarget{node});
+                self->modifierBindings[id] = handle;
+            }
+            else if (const auto kind = propEventSlotKind(name); kind != arrange::core::EventSlotKind::None) {
+                if (const auto previous = self->eventBindings[id].find(kind); previous != self->eventBindings[id].end()) self->retireBinding(previous->second);
+                handle = self->registerBinding(arrange::core::EventInputTarget{node, kind});
+                self->eventBindings[id][kind] = handle;
+            }
+            else {
+                const auto input = arrange::core::hostInputFromName(name);
+                if (!input) return JS_ThrowTypeError(context, "Arrange unsupported binding input: %s", name.c_str());
+                if (const auto previous = self->hostBindings[id].find(*input); previous != self->hostBindings[id].end()) self->retireBinding(previous->second);
+                handle = self->registerBinding(arrange::core::HostInputTarget{node, *input});
+                self->hostBindings[id][*input] = handle;
+            }
+            return bindingValue(context, handle);
+        }
+
+        JSValue nativeUpdateBinding(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (self == nullptr || argc != 2) return JS_ThrowTypeError(context, "Arrange updateBinding expects handle and value");
+            const auto handle = readBinding(context, argv[0]);
+            if (!handle) return JS_EXCEPTION;
+            const auto found = self->bindings.find(handle->identity);
+            if (found == self->bindings.end() || found->second.handle != *handle) {
+                ++self->rejectedBindingUpdates;
+                return JS_ThrowReferenceError(context, "Arrange binding is retired or belongs to another context");
+            }
+            const auto target = found->second.target;
+            return std::visit([&](const auto& input) -> JSValue {
+                using T = std::decay_t<decltype(input)>;
+                if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
+                    QuickJsValueReader reader(context);
+                    auto value = reader.propValue(argv[1]);
+                    if (JS_HasException(context)) return JS_EXCEPTION;
+                    std::string error;
+                    if (input.input == arrange::core::HostInput::Text) {
+                        if (!value.isString()) return JS_ThrowTypeError(context, "Arrange text binding requires string");
+                    }
+                    else if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
+                    self->updateBinding(*handle, std::move(value));
+                }
+                else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
+                    QuickJsModifierReader reader(context, self->events, self->currentTransaction());
+                    auto value = reader.read(input.node.id, argv[1]);
+                    if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
+                    self->updateBinding(*handle, std::move(value));
+                }
+                else if constexpr (std::is_same_v<T, arrange::core::EventInputTarget>) {
+                    if (!JS_IsFunction(context, argv[1]) && !JS_IsNull(argv[1]) && !JS_IsUndefined(argv[1])) return JS_ThrowTypeError(context, "Arrange event binding requires callback or null");
+                    const auto value = self->events.setNodeCallback(input.node.id, input.kind, argv[1], self->currentTransaction());
+                    self->updateBinding(*handle, value);
+                }
+                else if constexpr (std::is_same_v<T, arrange::core::ModifierInputTarget>) {
+                    const auto instance = self->publishedModifiers.find(input.modifier.identity);
+                    if (instance == self->publishedModifiers.end()) return JS_ThrowReferenceError(context, "Arrange Modifier instance retired");
+                    ScopedValue array(context, JS_NewArray(context));
+                    JS_SetPropertyUint32(context, array.get(), 0, JS_DupValue(context, argv[1]));
+                    QuickJsModifierReader reader(context, self->events, self->currentTransaction());
+                    auto descriptors = reader.read(input.node.id, array.get(), &instance->second.descriptor.value);
+                    if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
+                    instance->second.descriptor.value = descriptors.front().value;
+                    self->updateBinding(*handle, std::move(descriptors.front().value));
+                }
+                return JS_UNDEFINED;
+            }, target);
+        }
+
+        JSValue nativeReleaseBinding(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (self == nullptr || argc != 1) return JS_ThrowTypeError(context, "Arrange releaseBinding expects handle");
+            const auto handle = readBinding(context, argv[0]);
+            if (!handle) return JS_EXCEPTION;
+            self->retireBinding(*handle);
             return JS_UNDEFINED;
         }
 
         JSValue nativeUnmount(JSContext* context, JSValueConst, int, JSValueConst*) {
             auto* self = runtime(context);
             if (self == nullptr) return JS_UNDEFINED;
-            if (self->rootNodeId != 0) self->push(arrange::core::DeleteNodeMutation{self->rootNodeId});
+            if (self->rootNodeId != 0) self->releaseNodeTypesRecursive(self->rootNodeId);
             self->events.releaseAll(self->currentTransaction());
+            if (self->rootNodeId != 0) self->push(arrange::core::DeleteNodeMutation{self->rootNodeId});
             self->childrenByNode.clear();
             self->parentByNode.clear();
             self->nodeTypes.clear();
+            self->publishedModifiers.clear();
+            self->nodeGenerations.clear();
+            self->hostBindings.clear();
+            self->bindings.clear();
+            self->modifierBindings.clear();
+            self->eventBindings.clear();
             self->rootNodeId = 0;
-            return JS_UNDEFINED;
-        }
-
-        JSValue nativeReload(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr) return JS_UNDEFINED;
-            self->reloadRequested = true;
-            self->reloadRequest = {};
-            const auto payload = argc > 0 ? argv[0] : JS_UNDEFINED;
-            if (!JS_IsObject(payload)) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            ScopedValue path(context, JS_GetPropertyStr(context, payload, "path"));
-            if (JS_IsString(path.get())) self->reloadRequest.path = reader.toString(path.get());
-            ScopedValue timestamp(context, JS_GetPropertyStr(context, payload, "timestamp"));
-            if (JS_IsNumber(timestamp.get())) self->reloadRequest.timestamp = reader.toDouble(timestamp.get());
             return JS_UNDEFINED;
         }
 
@@ -307,12 +472,10 @@ namespace arrange::quickjs {
             const auto level = reader.toString(argv[0]);
             auto event = diagnosticPayload(context, level, argv[1]);
             if (!event) {
-                self->nativeError = "Arrange diagnostics log level is unsupported: " + level;
-                return JS_ThrowTypeError(context, "%s", self->nativeError.c_str());
+                return JS_ThrowTypeError(context, "Arrange diagnostics log level is unsupported: %s", level.c_str());
             }
             if (auto categoryError = unsupportedPayloadCategory(context, argv[1])) {
-                self->nativeError = std::move(*categoryError);
-                return JS_ThrowTypeError(context, "%s", self->nativeError.c_str());
+                return JS_ThrowTypeError(context, "%s", categoryError->c_str());
             }
             self->recordDiagnostic(std::move(*event));
             return JS_UNDEFINED;
@@ -322,15 +485,14 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 1) return JS_UNDEFINED;
             if (auto categoryError = unsupportedPayloadCategory(context, argv[0])) {
-                self->nativeError = std::move(*categoryError);
-                return JS_ThrowTypeError(context, "%s", self->nativeError.c_str());
+                return JS_ThrowTypeError(context, "%s", categoryError->c_str());
             }
             auto event = diagnosticPayload(context, QuickJsDiagnosticLevel::Info, argv[0], true);
             self->recordDiagnostic(event);
             return JS_UNDEFINED;
         }
 
-        JSValue nativeDiagnosticsRequestReload(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        JSValue nativeReload(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
@@ -340,24 +502,20 @@ namespace arrange::quickjs {
             action.message = "Script requested reload";
             const auto payload = argc > 0 ? argv[0] : JS_UNDEFINED;
             if (JS_IsObject(payload)) {
-            action.path = payloadStringField(context, reader, payload, "path");
-            ScopedValue timestamp(context, JS_GetPropertyStr(context, payload, "timestamp"));
-            if (JS_IsNumber(timestamp.get())) action.timestamp = reader.toDouble(timestamp.get());
+                action.path = payloadStringField(context, reader, payload, "path");
+                ScopedValue timestamp(context, JS_GetPropertyStr(context, payload, "timestamp"));
+                if (JS_IsNumber(timestamp.get())) action.timestamp = reader.toDouble(timestamp.get());
+            }
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            self->recordDiagnosticAction(std::move(action));
+            return JS_UNDEFINED;
         }
-        self->recordDiagnosticAction(std::move(action));
-        JSValue reloadPayload = argc > 0 ? JS_DupValue(context, argv[0]) : JS_UNDEFINED;
-        JSValueConst reloadArgv[1] = {reloadPayload};
-        auto result = nativeReload(context, JS_UNDEFINED, JS_IsUndefined(reloadPayload) ? 0 : 1, reloadArgv);
-        JS_FreeValue(context, reloadPayload);
-        return result;
-    }
 
         JSValue nativeDiagnosticsTriggerFakeError(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
             const auto message = argc > 0 ? payloadStringField(context, reader, argv[0], "Manual script diagnostic error") : std::string("Manual script diagnostic error");
-            self->nativeError = message;
             QuickJsDiagnosticAction action;
             action.kind = QuickJsDiagnosticActionKind::TriggerFakeError;
             action.level = QuickJsDiagnosticLevel::Error;
@@ -388,8 +546,7 @@ namespace arrange::quickjs {
             const auto level = reader.toString(argv[0]);
             const auto parsed = diagnosticLevelFromName(level);
             if (!parsed) {
-                self->nativeError = "Arrange diagnostics log level is unsupported: " + level;
-                return JS_ThrowTypeError(context, "%s", self->nativeError.c_str());
+                return JS_ThrowTypeError(context, "Arrange diagnostics log level is unsupported: %s", level.c_str());
             }
             action.level = *parsed;
             self->recordDiagnosticAction(std::move(action));
@@ -444,8 +601,7 @@ namespace arrange::quickjs {
             const auto categoryName = reader.toString(argv[0]);
             const auto category = diagnosticCategoryFromName(categoryName);
             if (!category) {
-                self->nativeError = "Arrange diagnostics category is unsupported: " + categoryName;
-                return JS_ThrowTypeError(context, "%s", self->nativeError.c_str());
+                return JS_ThrowTypeError(context, "Arrange diagnostics category is unsupported: %s", categoryName.c_str());
             }
             action.category = *category;
             action.enabled = reader.toBool(argv[1]);
@@ -482,7 +638,8 @@ namespace arrange::quickjs {
             auto* self = runtime(context);
             if (self == nullptr || argc < 1) return JS_UNDEFINED;
             QuickJsValueReader reader(context);
-            const auto handle = reader.toU32(argv[0]);
+            const auto handle = readIndex(context, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
             if (const auto it = self->animationFrameCallbacks.find(handle); it != self->animationFrameCallbacks.end()) {
                 JS_FreeValue(context, it->second);
                 self->animationFrameCallbacks.erase(it);
@@ -491,8 +648,6 @@ namespace arrange::quickjs {
         }
 
         const JSCFunctionListEntry nativeApiFunctions[] = {
-            JS_CFUNC_DEF("beginTransaction", 0, nativeBeginTransaction),
-            JS_CFUNC_DEF("endTransaction", 0, nativeEndTransaction),
             JS_CFUNC_DEF("createNode", 2, nativeCreateNode),
             JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode),
             JS_CFUNC_DEF("insertChild", 3, nativeInsertChild),
@@ -500,12 +655,16 @@ namespace arrange::quickjs {
             JS_CFUNC_DEF("setText", 2, nativeSetText),
             JS_CFUNC_DEF("setProp", 3, nativeSetProp),
             JS_CFUNC_DEF("setModifier", 2, nativeSetModifier),
-            JS_CFUNC_DEF("invalidate", 3, nativeInvalidate),
+            JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding),
+            JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances),
+            JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding),
+            JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding),
+            JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding),
             JS_CFUNC_DEF("unmount", 0, nativeUnmount),
             JS_CFUNC_DEF("reload", 1, nativeReload),
             JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog),
             JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast),
-            JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeDiagnosticsRequestReload),
+            JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload),
             JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError),
             JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics),
             JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents),

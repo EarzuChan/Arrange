@@ -1098,7 +1098,6 @@ const attrsProxyHandlers = __DEV__
   ? {
       get(target: Data, key: string) {
         markAttrsAccessed()
-        track(target, TrackOpTypes.GET, '')
         return target[key]
       },
       set() {
@@ -1112,7 +1111,6 @@ const attrsProxyHandlers = __DEV__
     }
   : {
       get(target: Data, key: string) {
-        track(target, TrackOpTypes.GET, '')
         return target[key]
       },
     }

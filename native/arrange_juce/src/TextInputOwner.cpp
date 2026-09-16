@@ -3,6 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/core/PropValue.h>
+#include <arrange/core/ModifierGeometry.h>
 #include <arrange/juce/JuceTextServices.h>
 
 #include <algorithm>
@@ -36,6 +37,8 @@ namespace arrange::juce {
 
     void TextInputOwner::reset() {
         session_.reset();
+        focusedGeneration_ = 0;
+        publishedModelValue_.clear();
     }
 
     void TextInputOwner::cancelDrag() noexcept {
@@ -55,7 +58,7 @@ namespace arrange::juce {
         bool runtimeReady) const {
         if (!runtimeReady || !session_.focusedNode() || !tree.contains(*session_.focusedNode())) return nullptr;
         const auto& node = tree.node(*session_.focusedNode());
-        return node.type == arrange::core::NodeType::Input ? &node : nullptr;
+        return node.type == arrange::core::NodeType::Input && node.generation == focusedGeneration_ && arrange::core::nodeInteractionEnabled(tree, node.id) ? &node : nullptr;
     }
 
     arrange::core::ArrangeNode* TextInputOwner::activeInputNode(
@@ -63,7 +66,7 @@ namespace arrange::juce {
         bool runtimeReady) {
         if (!runtimeReady || !session_.focusedNode() || !tree.contains(*session_.focusedNode())) return nullptr;
         auto& node = tree.node(*session_.focusedNode());
-        return node.type == arrange::core::NodeType::Input ? &node : nullptr;
+        return node.type == arrange::core::NodeType::Input && node.generation == focusedGeneration_ && arrange::core::nodeInteractionEnabled(tree, node.id) ? &node : nullptr;
     }
 
     void TextInputOwner::pointerDown(
@@ -72,7 +75,7 @@ namespace arrange::juce {
         float x,
         float y,
         const TextInputCallbacks& callbacks) {
-        if (!hit.hit || !tree.contains(hit.node) || tree.node(hit.node).type != arrange::core::NodeType::Input) {
+        if (!hit.hit || !tree.contains(hit.node) || tree.node(hit.node).type != arrange::core::NodeType::Input || !arrange::core::nodeInteractionEnabled(tree, hit.node)) {
             const auto previous = session_.focusedNode();
             finishFocusedInput(tree, false, callbacks);
             cancelDrag();
@@ -82,18 +85,21 @@ namespace arrange::juce {
             return;
         }
 
-        const auto sameInput = session_.focusedNode() && *session_.focusedNode() == hit.node;
+        const auto sameInput = activeInputNode(tree, true) && *session_.focusedNode() == hit.node;
         if (session_.focusedNode() && *session_.focusedNode() != hit.node) finishFocusedInput(tree, false, callbacks);
         session_.focusedNode() = hit.node;
+        focusedGeneration_ = tree.node(hit.node).generation;
 
         const auto& node = tree.node(hit.node);
         const auto selectAllOnFocus = !sameInput && boolProp(node, "selectAllOnFocus", "select-all-on-focus", false);
         if (!sameInput) {
             session_.viewportX() = 0.0f;
-            session_.state().begin(inputModelValue(node), selectAllOnFocus);
+            publishedModelValue_ = inputModelValue(node);
+            session_.state().begin(publishedModelValue_, selectAllOnFocus);
         }
         if (!selectAllOnFocus) {
-            session_.state().moveCursorTo(text_.textIndexAtPoint(node, session_.state().text(), session_.viewportX(), x, y));
+            const auto point = arrange::core::rootToNodeContent(tree, node.id, {x, y});
+            session_.state().moveCursorTo(text_.textIndexAtPoint(node, session_.state().text(), session_.viewportX(), point.x, point.y));
         }
         updateFocusedInputViewport(tree, true);
         session_.dragAnchor() = session_.state().cursorIndex();
@@ -110,9 +116,10 @@ namespace arrange::juce {
         auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return false;
 
+        const auto point = arrange::core::rootToNodeContent(tree, node->id, {x, y});
         session_.state().selectRange(
             *session_.dragAnchor(),
-            text_.textIndexAtPoint(*node, session_.state().text(), session_.viewportX(), x, y));
+            text_.textIndexAtPoint(*node, session_.state().text(), session_.viewportX(), point.x, point.y));
         updateFocusedInputViewport(tree, runtimeReady);
         if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
         return true;
@@ -210,12 +217,13 @@ namespace arrange::juce {
         ::juce::Point<int> point) const {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return 0;
+        const auto local = arrange::core::rootToNodeContent(tree, node->id, {static_cast<float>(point.x), static_cast<float>(point.y)});
         const auto byteIndex = text_.textIndexAtPoint(
             *node,
             session_.state().text(),
             session_.viewportX(),
-            static_cast<float>(point.x),
-            static_cast<float>(point.y));
+            local.x,
+            local.y);
         return charIndexForByteIndex(session_.state().text(), byteIndex);
     }
 
@@ -330,6 +338,23 @@ namespace arrange::juce {
             }
         }
         session_.reset();
+        focusedGeneration_ = 0;
+        publishedModelValue_.clear();
+    }
+
+    void TextInputOwner::synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
+        const auto* node = activeInputNode(tree, runtimeReady);
+        if (!node) { reset(); return; }
+        const auto value = inputModelValue(*node);
+        if (value == publishedModelValue_) return;
+        publishedModelValue_ = value;
+        // Acknowledging an edit preserves its caret, selection and undo history.
+        // An external replacement resets history and clamps selection to UTF-8 boundaries.
+        if (value != session_.state().text()) {
+            session_.state().replaceExternal(value);
+            session_.temporaryUnderlines().clear();
+            session_.dragAnchor().reset();
+        }
     }
 
     void TextInputOwner::updateFocusedInputViewport(
@@ -337,7 +362,7 @@ namespace arrange::juce {
         bool runtimeReady) {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) {
-            session_.viewportX() = 0.0f;
+            reset();
             return;
         }
         session_.viewportX() = text_.updatedViewportX(
@@ -364,7 +389,7 @@ namespace arrange::juce {
                 byteIndexForCharIndex(state.text, range.getEnd()),
             });
         }
-        return arrange::core::TextInputOverlayBuilder{}.build(*node, state, text_.textLayoutService());
+        return arrange::core::DrawOpsBuilder{}.collectOverlay(tree, node->id, arrange::core::TextInputOverlayBuilder{}.build(*node, state, text_.textLayoutService()));
     }
 
     ::juce::RectangleList<int> TextInputOwner::textBoundsForByteRange(
@@ -375,7 +400,13 @@ namespace arrange::juce {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return {};
         const auto& text = session_.state().text();
-        return text_.textBoundsForByteRange(text_.layout(*node, text, session_.viewportX()), text, start, end);
+        const auto localBounds = text_.textBoundsForByteRange(text_.layout(*node, text, session_.viewportX()), text, start, end);
+        ::juce::RectangleList<int> bounds;
+        for (const auto local : localBounds) {
+            const auto root = arrange::core::nodeContentRectToRoot(tree, node->id, {static_cast<float>(local.getX()), static_cast<float>(local.getY()), static_cast<float>(local.getWidth()), static_cast<float>(local.getHeight())});
+            bounds.add(::juce::Rectangle<float>(root.x, root.y, root.width, root.height).getSmallestIntegerContainer());
+        }
+        return bounds;
     }
 
     std::string TextInputOwner::normalizeInsertionText(const arrange::core::ArrangeNode& node, std::string text) const {

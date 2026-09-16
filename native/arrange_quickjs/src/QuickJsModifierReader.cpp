@@ -33,6 +33,20 @@ namespace arrange::quickjs {
         return value.get();
     }
 
+    float QuickJsModifierReader::numberField(JSValueConst object, const char* key, float fallback) const {
+        ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
+        if (JS_IsUndefined(value.get())) return fallback;
+        if (!JS_IsNumber(value.get())) { JS_ThrowTypeError(context_, "Arrange modifier field '%s' must be a number", key); return fallback; }
+        return static_cast<float>(reader_.toDouble(value.get()));
+    }
+
+    bool QuickJsModifierReader::boolField(JSValueConst object, const char* key, bool fallback) const {
+        ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
+        if (JS_IsUndefined(value.get())) return fallback;
+        if (!JS_IsBool(value.get())) { JS_ThrowTypeError(context_, "Arrange modifier field '%s' must be a boolean", key); return fallback; }
+        return reader_.toBool(value.get());
+    }
+
     float QuickJsModifierReader::requiredNumberField(JSValueConst object, const char* key, std::string_view owner) {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
         if (JS_IsUndefined(value.get()) || JS_IsNull(value.get())) {
@@ -65,10 +79,10 @@ namespace arrange::quickjs {
 
     arrange::core::ModifierPadding QuickJsModifierReader::readPadding(JSValueConst value) {
         return {
-            std::max(0.0f, requiredNumberField(value, "start", "padding modifier")),
-            std::max(0.0f, requiredNumberField(value, "top", "padding modifier")),
-            std::max(0.0f, requiredNumberField(value, "end", "padding modifier")),
-            std::max(0.0f, requiredNumberField(value, "bottom", "padding modifier")),
+            requiredNumberField(value, "start", "padding modifier"),
+            requiredNumberField(value, "top", "padding modifier"),
+            requiredNumberField(value, "end", "padding modifier"),
+            requiredNumberField(value, "bottom", "padding modifier"),
         };
     }
 
@@ -85,8 +99,8 @@ namespace arrange::quickjs {
         ScopedValue origin(context_, JS_GetPropertyStr(context_, value, "transformOrigin"));
         if (JS_IsObject(origin.get())) {
             return {
-                std::clamp(reader_.numberField(origin.get(), "x", 0.5f), 0.0f, 1.0f),
-                std::clamp(reader_.numberField(origin.get(), "y", 0.5f), 0.0f, 1.0f),
+                numberField(origin.get(), "x", 0.5f),
+                numberField(origin.get(), "y", 0.5f),
             };
         }
         return {0.5f, 0.5f};
@@ -105,24 +119,23 @@ namespace arrange::quickjs {
         arrange::core::PaintStyleSemantics style;
         style.kind = kind;
         style.color = colorOrBrush(value, "color", "brush");
-        style.brush = style.color;
-        style.strokeWidth = std::max(1.0f, reader_.numberField(value, "width", 1.0f));
+        style.strokeWidth = numberField(value, "width", 1.0f);
         ScopedValue shape(context_, JS_GetPropertyStr(context_, value, "shape"));
         if (JS_IsObject(shape.get())) {
             style.shapeType = reader_.stringField(shape.get(), "type");
-            style.cornerRadius = style.shapeType == "rounded" ? std::max(0.0f, reader_.numberField(shape.get(), "radius")) : 0.0f;
+            style.cornerRadius = style.shapeType == "rounded" ? numberField(shape.get(), "radius") : 0.0f;
         }
-        style.alpha = std::clamp(reader_.numberField(value, "value", 1.0f), 0.0f, 1.0f);
+        style.alpha = numberField(value, "value", 1.0f);
         ScopedValue offset(context_, JS_GetPropertyStr(context_, value, "offset"));
         style.shadowOffset = {
-            reader_.numberField(value, "offsetX", JS_IsObject(offset.get()) ? reader_.numberField(offset.get(), "x") : 0.0f),
-            reader_.numberField(value, "offsetY", JS_IsObject(offset.get()) ? reader_.numberField(offset.get(), "y") : 0.0f),
+            numberField(value, "offsetX", JS_IsObject(offset.get()) ? numberField(offset.get(), "x") : 0.0f),
+            numberField(value, "offsetY", JS_IsObject(offset.get()) ? numberField(offset.get(), "y") : 0.0f),
         };
         return style;
     }
 
-    arrange::core::CompiledModifier QuickJsModifierReader::read(arrange::core::NodeId id, JSValueConst modifier) {
-        arrange::core::CompiledModifier result;
+    arrange::core::ModifierDescriptors QuickJsModifierReader::read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput) {
+        arrange::core::ModifierDescriptors result;
         failed_ = false;
         if (JS_IsUndefined(modifier) || JS_IsNull(modifier)) {
             (void)throwTypeError("Arrange native setModifier requires a Modifier object, not null/undefined");
@@ -136,9 +149,12 @@ namespace arrange::quickjs {
         }
 
         const auto length = reader_.arrayLength(array);
-        bool hasClick = false;
-        bool hasVerticalScroll = false;
-        bool hasHorizontalScroll = false;
+        struct PendingCallback {
+            std::size_t index;
+            arrange::core::EventSlotKind kind;
+            ScopedValue callback;
+        };
+        std::vector<PendingCallback> callbacks;
 
         for (std::uint32_t i = 0; i < length; ++i) {
             ScopedValue element(context_, JS_GetPropertyUint32(context_, array, i));
@@ -153,14 +169,13 @@ namespace arrange::quickjs {
             JSValueConst payload = payloadFor(element.get(), value, type);
             if (failed_ || JS_IsUndefined(payload)) return {};
 
+            const auto key = reader_.stringField(element.get(), "key");
             if (type == "padding") {
                 arrange::core::LayoutModifierSemantics item;
                 item.kind = arrange::core::LayoutModifierKind::Padding;
                 item.padding = readPadding(payload);
                 if (failed_) return {};
-                result.layout.push_back(item);
-                result.paintContentPadding.push_back(item.padding);
-                result.paint.chain.push_back({arrange::core::PaintChainOpKind::ContentPadding, paintStyle(payload, arrange::core::PaintStyleKind::Background), item.padding});
+                result.push_back({item, key});
             }
             else if (type == "width" || type == "height" || type == "requiredWidth" || type == "requiredHeight") {
                 arrange::core::LayoutModifierSemantics item;
@@ -170,7 +185,7 @@ namespace arrange::quickjs {
                 else item.kind = arrange::core::LayoutModifierKind::RequiredHeight;
                 item.value = requiredNumberField(payload, type == "requiredWidth" ? "width" : type == "requiredHeight" ? "height" : "value", type);
                 if (failed_) return {};
-                result.layout.push_back(item);
+                result.push_back({item, key});
             }
             else if (type == "size" || type == "requiredSize") {
                 arrange::core::LayoutModifierSemantics item;
@@ -178,33 +193,33 @@ namespace arrange::quickjs {
                 item.width = requiredNumberField(payload, "width", type);
                 item.height = requiredNumberField(payload, "height", type);
                 if (failed_) return {};
-                result.layout.push_back(item);
+                result.push_back({item, key});
             }
             else if (type == "fillMaxWidth" || type == "fillMaxHeight" || type == "fillMaxSize") {
                 arrange::core::LayoutModifierSemantics item;
                 if (type == "fillMaxWidth") item.kind = arrange::core::LayoutModifierKind::FillMaxWidth;
                 else if (type == "fillMaxHeight") item.kind = arrange::core::LayoutModifierKind::FillMaxHeight;
                 else item.kind = arrange::core::LayoutModifierKind::FillMaxSize;
-                item.fraction = reader_.numberField(payload, "fraction", 1.0f);
-                result.layout.push_back(item);
+                item.fraction = numberField(payload, "fraction", 1.0f);
+                result.push_back({item, key});
             }
             else if (type == "widthIn" || type == "heightIn" || type == "sizeIn") {
                 arrange::core::LayoutModifierSemantics item;
                 if (type == "widthIn") item.kind = arrange::core::LayoutModifierKind::WidthIn;
                 else if (type == "heightIn") item.kind = arrange::core::LayoutModifierKind::HeightIn;
                 else item.kind = arrange::core::LayoutModifierKind::SizeIn;
-                item.minWidth = reader_.numberField(payload, "min", reader_.numberField(payload, "minWidth", -1.0f));
-                item.maxWidth = reader_.numberField(payload, "max", reader_.numberField(payload, "maxWidth", -1.0f));
-                item.minHeight = reader_.numberField(payload, "min", reader_.numberField(payload, "minHeight", -1.0f));
-                item.maxHeight = reader_.numberField(payload, "max", reader_.numberField(payload, "maxHeight", -1.0f));
-                result.layout.push_back(item);
+                item.minWidth = numberField(payload, "min", numberField(payload, "minWidth", -1.0f));
+                item.maxWidth = numberField(payload, "max", numberField(payload, "maxWidth", -1.0f));
+                item.minHeight = numberField(payload, "min", numberField(payload, "minHeight", -1.0f));
+                item.maxHeight = numberField(payload, "max", numberField(payload, "maxHeight", -1.0f));
+                result.push_back({item, key});
             }
             else if (type == "defaultMinSize") {
                 arrange::core::LayoutModifierSemantics item;
                 item.kind = arrange::core::LayoutModifierKind::DefaultMinSize;
-                item.minWidth = reader_.numberField(payload, "minWidth");
-                item.minHeight = reader_.numberField(payload, "minHeight");
-                result.layout.push_back(item);
+                item.minWidth = numberField(payload, "minWidth");
+                item.minHeight = numberField(payload, "minHeight");
+                result.push_back({item, key});
             }
             else if (type == "verticalScroll" || type == "horizontalScroll") {
                 arrange::core::LayoutModifierSemantics item;
@@ -214,58 +229,43 @@ namespace arrange::quickjs {
                     JS_ThrowTypeError(context_, "Arrange modifier '%.*s' requires object field 'state'", static_cast<int>(type.size()), type.data());
                     return {};
                 }
-                item.scrollValue = std::max(0.0f, reader_.numberField(state.get(), "value"));
-                result.layout.push_back(item);
+                item.scrollValue = numberField(state.get(), "value");
+                item.enabled = boolField(payload, "enabled", true);
                 const auto kind = type == "verticalScroll" ? arrange::core::EventSlotKind::VerticalScroll : arrange::core::EventSlotKind::HorizontalScroll;
-                const auto slot = arrange::core::makeEventSlotId(id, kind);
-                if (type == "verticalScroll") {
-                    result.scroll.vertical = reader_.boolField(payload, "enabled", true);
-                    result.scroll.verticalValue = item.scrollValue;
-                    result.scroll.verticalEventSlot = slot;
-                    hasVerticalScroll = true;
+                callbacks.push_back({result.size(), kind, ScopedValue(context_, JS_GetPropertyStr(context_, state.get(), "__arrangeNativeScroll"))});
+                result.push_back({item, key});
+            }
+            else if (type == "weight" || type == "align") {
+                arrange::core::ParentDataModifierSemantics item;
+                if (type == "weight") {
+                    item.weight = requiredNumberField(payload, "weight", type);
+                    item.weightFill = boolField(payload, "fill", true);
                 }
                 else {
-                    result.scroll.horizontal = reader_.boolField(payload, "enabled", true);
-                    result.scroll.horizontalValue = item.scrollValue;
-                    result.scroll.horizontalEventSlot = slot;
-                    hasHorizontalScroll = true;
+                    item.kind = arrange::core::ParentDataKind::Align;
+                    item.align = requiredStringField(payload, "alignment", type);
                 }
-                ScopedValue callback(context_, JS_GetPropertyStr(context_, state.get(), "__arrangeNativeScroll"));
-                events_.replace(slot, callback.get(), transaction_);
-                result.paint.chain.push_back({arrange::core::PaintChainOpKind::Clip, paintStyle(payload, arrange::core::PaintStyleKind::Background), {}});
-                result.paint.clips.push_back(paintStyle(payload, arrange::core::PaintStyleKind::Background));
-            }
-            else if (type == "weight") {
-                result.parentData.weight = std::max(0.0f, requiredNumberField(payload, "weight", "weight modifier"));
-                if (failed_) return {};
-                result.parentData.weightFill = reader_.boolField(payload, "fill", true);
-            }
-            else if (type == "align") {
-                result.parentData.align = requiredStringField(payload, "alignment", "align modifier");
-                if (failed_) return {};
+                result.push_back({item, key});
             }
             else if (type == "offset" || type == "absoluteOffset") {
-                result.transform.layoutOffsetX += reader_.numberField(payload, "x");
-                result.transform.layoutOffsetY += reader_.numberField(payload, "y");
+                result.push_back({arrange::core::OffsetModifier{numberField(payload, "x"), numberField(payload, "y")}, key});
             }
             else if (type == "graphicsLayer") {
-                result.transform.translationX += reader_.numberField(payload, "translationX");
-                result.transform.translationY += reader_.numberField(payload, "translationY");
-                result.transform.layoutOffsetX += reader_.numberField(payload, "translationX");
-                result.transform.layoutOffsetY += reader_.numberField(payload, "translationY");
-                result.transform.scaleX = reader_.numberField(payload, "scaleX", 1.0f);
-                result.transform.scaleY = reader_.numberField(payload, "scaleY", 1.0f);
-                result.transform.rotationZ = reader_.numberField(payload, "rotationZ");
+                arrange::core::TransformModifierSemantics item;
+                item.translationX = numberField(payload, "translationX");
+                item.translationY = numberField(payload, "translationY");
+                item.scaleX = numberField(payload, "scaleX", 1.0f);
+                item.scaleY = numberField(payload, "scaleY", 1.0f);
+                item.rotationZ = numberField(payload, "rotationZ");
                 const auto origin = transformOriginFrom(payload);
-                result.transform.transformOriginX = origin.first;
-                result.transform.transformOriginY = origin.second;
-                result.transform.hasPaintTransform = std::fabs(result.transform.scaleX - 1.0f) > 0.0001f ||
-                    std::fabs(result.transform.scaleY - 1.0f) > 0.0001f ||
-                    std::fabs(result.transform.rotationZ) > 0.0001f;
+                item.transformOriginX = origin.first;
+                item.transformOriginY = origin.second;
+                item.alpha = numberField(payload, "alpha", 1.0f);
+                item.clip = boolField(payload, "clip", false);
+                result.push_back({item, key});
             }
             else if (type == "zIndex") {
-                result.zIndex = requiredNumberField(payload, "value", "zIndex modifier");
-                if (failed_) return {};
+                result.push_back({arrange::core::ZIndexModifier{requiredNumberField(payload, "value", type)}, key});
             }
             else if (type == "background" || type == "border" || type == "alpha" || type == "dropShadow" || type == "innerShadow") {
                 auto kind = arrange::core::PaintStyleKind::Background;
@@ -273,28 +273,18 @@ namespace arrange::quickjs {
                 else if (type == "alpha") kind = arrange::core::PaintStyleKind::Alpha;
                 else if (type == "dropShadow") kind = arrange::core::PaintStyleKind::DropShadow;
                 else if (type == "innerShadow") kind = arrange::core::PaintStyleKind::InnerShadow;
-                const auto style = paintStyle(payload, kind);
-                result.paint.chain.push_back({arrange::core::PaintChainOpKind::Style, style, {}});
-                result.paint.styles.push_back(style);
+                result.push_back({paintStyle(payload, kind), key});
             }
             else if (type == "clip") {
-                const auto style = paintStyle(payload, arrange::core::PaintStyleKind::Background);
-                result.paint.chain.push_back({arrange::core::PaintChainOpKind::Clip, style, {}});
-                result.paint.clips.push_back(style);
+                result.push_back({arrange::core::ClipModifier{paintStyle(payload, arrange::core::PaintStyleKind::Background)}, key});
             }
-            else if (type == "clickable") {
-                result.input.clickable = reader_.boolField(payload, "enabled", true);
-                result.input.focusable = reader_.boolField(payload, "focusable", true);
-                result.input.clickEventSlot = arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click);
-                ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "onClick"));
-                events_.replace(result.input.clickEventSlot, callback.get(), transaction_);
-                hasClick = JS_IsFunction(context_, callback.get());
-            }
-            else if (type == "hoverable") {
-                result.input.hoverable = reader_.boolField(payload, "enabled", true);
-            }
-            else if (type == "focusable") {
-                result.input.focusable = reader_.boolField(payload, "enabled", true);
+            else if (type == "clickable" || type == "hoverable" || type == "focusable") {
+                arrange::core::InputModifierSemantics item;
+                item.enabled = boolField(payload, "enabled", true);
+                item.focusable = boolField(payload, "focusable", true);
+                if (type == "clickable") callbacks.push_back({result.size(), arrange::core::EventSlotKind::Click, ScopedValue(context_, JS_GetPropertyStr(context_, payload, "onClick"))});
+                else item.kind = type == "hoverable" ? arrange::core::InputModifierKind::Hoverable : arrange::core::InputModifierKind::Focusable;
+                result.push_back({item, key});
             }
             else if (type == "wrapContentWidth" ||
                      type == "wrapContentHeight" ||
@@ -322,9 +312,25 @@ namespace arrange::quickjs {
             }
         }
 
-        if (!hasClick) events_.release(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::Click), transaction_);
-        if (!hasVerticalScroll) events_.release(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::VerticalScroll), transaction_);
-        if (!hasHorizontalScroll) events_.release(arrange::core::makeEventSlotId(id, arrange::core::EventSlotKind::HorizontalScroll), transaction_);
+        if (failed_ || JS_HasException(context_)) { failed_ = true; return {}; }
+        try { arrange::core::validateModifierDescriptors(result); }
+        catch (const std::exception& error) { (void)throwTypeError(error.what()); return {}; }
+        if (instanceInput && (result.size() != 1 || !arrange::core::sameModifierKind(*instanceInput, result.front().value))) {
+            (void)throwTypeError("Arrange Modifier input must preserve its instance kind");
+            return {};
+        }
+        // 整条描述通过校验之后才登记回调，失败的描述不会留下半条注册记录。
+        std::vector<arrange::core::EventSlotId> retained;
+        for (auto& pending : callbacks) {
+            const auto slot = instanceInput
+                ? events_.updateModifierCallback(id, pending.kind, pending.callback.get(), arrange::core::modifierEventSlot(*instanceInput), transaction_)
+                : events_.retainModifierCallback(id, pending.kind, pending.callback.get(), retained, transaction_);
+            auto& input = result[pending.index].value;
+            if (auto* scroll = std::get_if<arrange::core::LayoutModifierSemantics>(&input)) scroll->eventSlot = slot;
+            else std::get<arrange::core::InputModifierSemantics>(input).eventSlot = slot;
+            if (slot.valid()) retained.push_back(slot);
+        }
+        if (!instanceInput) events_.releaseModifierCallbacksExcept(id, retained, transaction_);
         return result;
     }
 }

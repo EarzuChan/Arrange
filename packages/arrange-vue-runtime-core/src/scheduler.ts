@@ -1,5 +1,5 @@
 ﻿import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling.ts'
-import { NOOP, isArray } from '@arrange/vue-shared'
+import { isArray } from '@arrange/vue-shared'
 import { type ComponentInternalInstance, getComponentName } from './component.ts'
 
 export enum SchedulerJobFlags {
@@ -51,7 +51,7 @@ const resolvedPromise = /*@__PURE__*/ Promise.resolve() as Promise<any>
 let currentFlushPromise: Promise<void> | null = null
 
 const RECURSION_LIMIT = 100
-type CountMap = Map<SchedulerJob, number>
+type CountMap = Map<SchedulerJob, number> & {total?: number}
 
 export function nextTick(): Promise<void>
 export function nextTick<T, R>(
@@ -145,16 +145,14 @@ export function flushPreFlushCbs(
   // skip the current job
   i: number = flushIndex + 1,
 ): void {
-  if (__DEV__) {
-    seen = seen || new Map()
-  }
+  seen = seen || new Map()
   for (; i < queue.length; i++) {
     const cb = queue[i]
     if (cb && cb.flags! & SchedulerJobFlags.PRE) {
       if (instance && cb.id !== instance.uid) {
         continue
       }
-      if (__DEV__ && checkRecursiveUpdates(seen!, cb)) {
+      if (checkRecursiveUpdates(seen!, cb)) {
         continue
       }
       queue.splice(i, 1)
@@ -184,9 +182,7 @@ export function flushPostFlushCbs(seen?: CountMap): void {
     }
 
     activePostFlushCbs = deduped
-    if (__DEV__) {
-      seen = seen || new Map()
-    }
+    seen = seen || new Map()
 
     for (
       postFlushIndex = 0;
@@ -194,7 +190,7 @@ export function flushPostFlushCbs(seen?: CountMap): void {
       postFlushIndex++
     ) {
       const cb = activePostFlushCbs[postFlushIndex]
-      if (__DEV__ && checkRecursiveUpdates(seen!, cb)) {
+      if (checkRecursiveUpdates(seen!, cb)) {
         continue
       }
       if (cb.flags! & SchedulerJobFlags.ALLOW_RECURSE) {
@@ -212,24 +208,20 @@ const getId = (job: SchedulerJob): number =>
   job.id == null ? (job.flags! & SchedulerJobFlags.PRE ? -1 : Infinity) : job.id
 
 function flushJobs(seen?: CountMap) {
-  if (__DEV__) {
-    seen = seen || new Map()
-  }
+  seen = seen || new Map()
 
   // conditional usage of checkRecursiveUpdate must be determined out of
   // try ... catch block since Rollup by default de-optimizes treeshaking
   // inside try-catch. This can leave all warning code unshaked. Although
   // they would get eventually shaken by a minifier like terser, some minifiers
   // would fail to do that (e.g. https://github.com/evanw/esbuild/issues/1610)
-  const check = __DEV__
-    ? (job: SchedulerJob) => checkRecursiveUpdates(seen!, job)
-    : NOOP
+  const check = (job: SchedulerJob) => checkRecursiveUpdates(seen!, job)
 
   try {
     for (flushIndex = 0; flushIndex < queue.length; flushIndex++) {
       const job = queue[flushIndex]
       if (job && !(job.flags! & SchedulerJobFlags.DISPOSED)) {
-        if (__DEV__ && check(job)) {
+        if (check(job)) {
           continue
         }
         if (job.flags! & SchedulerJobFlags.ALLOW_RECURSE) {
@@ -268,6 +260,8 @@ function flushJobs(seen?: CountMap) {
 }
 
 function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {
+  seen.total = (seen.total ?? 0) + 1
+  if (seen.total > 10000) throw new Error('Arrange JavaScript work did not stabilize within the scheduler job limit')
   const count = seen.get(fn) || 0
   if (count > RECURSION_LIMIT) {
     const instance = fn.i

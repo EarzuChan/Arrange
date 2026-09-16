@@ -26,7 +26,6 @@ namespace arrange::juce {
 
         [[nodiscard]] EditorFramePlan planTick(FrameWorkState state) const noexcept;
         [[nodiscard]] bool hasPendingFrameWork(FrameWorkState state) const noexcept;
-        [[nodiscard]] int desiredTimerFrequencyHz(FrameWorkState state) const noexcept;
 
         void reset() noexcept;
 

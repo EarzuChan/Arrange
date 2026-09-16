@@ -1,10 +1,10 @@
-import {createRenderer} from "@arrange/vue-runtime-core"
+import {ErrorCodes, callWithAsyncErrorHandling, createRenderer} from "@arrange/vue-runtime-core"
 import type {App as VueApp, Component} from "@arrange/vue-runtime-core"
 import {Text} from "./components.ts"
 import {m, toModifier} from "./modifier.ts"
 import {ARRANGE_RUNTIME_VERSION} from "./native.ts"
 import type {NativeMutation, NativePropValue, NativeTransactionTarget, NodeId} from "./native.ts"
-import type {ArrangeContainer, ArrangeHostEvent, ArrangeHostEventListener, ArrangeHostNode} from "./types.ts"
+import type {ArrangeContainer, ArrangeHostNode} from "./types.ts"
 
 declare global {
     var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
@@ -18,56 +18,34 @@ function isNativePropValue(value: unknown): value is NativePropValue {
 }
 
 function toNativePropValue(key: string, value: unknown): NativePropValue {
-    if (eventPropNames.has(key) && typeof value === "function") return value as NativePropValue
+    if (eventPropNames.has(key)) {
+        if (typeof value === "function") return value as NativePropValue
+        if (Array.isArray(value) && value.every(item => typeof item === "function")) {
+            const callbacks = [...value]
+            return (...args: unknown[]) => callWithAsyncErrorHandling(callbacks, null, ErrorCodes.NATIVE_EVENT_HANDLER, args)
+        }
+    }
     if (isNativePropValue(value)) return value
     throw new TypeError(`Arrange prop '${key}' cannot be sent to native: unsupported value type`)
 }
 
-function makeNode(type: string): ArrangeHostNode {
-    const node = {
+function makeNode(type: string, kind: ArrangeHostNode["kind"] = "element"): ArrangeHostNode {
+    return {
         $$arrangeVNode: true,
         type,
-        tagName: String(type).toUpperCase(),
-        props: {modifier: m},
-        children: [] as ArrangeHostNode[],
-        __arrangeListeners: new Map<string, ArrangeHostEventListener[]>(),
-        addEventListener(this: ArrangeHostNode, name: string, listener: ArrangeHostEventListener): void {
-            const list = this.__arrangeListeners.get(name) ?? []
-            list.push(listener)
-            this.__arrangeListeners.set(name, list)
-        },
-        removeEventListener(this: ArrangeHostNode, name: string, listener: ArrangeHostEventListener): void {
-            const list = this.__arrangeListeners.get(name)
-            if (!list) return
-            const index = list.indexOf(listener)
-            if (index >= 0) list.splice(index, 1)
-        },
-        getRootNode(): {activeElement: null} {
-            return {activeElement: null}
-        },
-        dispatchArrangeEvent(this: ArrangeHostNode, name: string, value: string = this.value): void {
-            this.value = value
-            const event: ArrangeHostEvent = {target: this, currentTarget: this, type: name}
-            for (const listener of this.__arrangeListeners.get(name) ?? []) listener(event)
-        },
+        kind,
+        props: kind === "anchor" ? {} : {modifier: m},
+        __arrangeBindings: new Map(),
+        children: [],
     }
-    Object.defineProperty(node, "value", {
-        configurable: true,
-        get(this: ArrangeHostNode): string {
-            return String(this.props.modelValue ?? this.props["model-value"] ?? this.props.value ?? "")
-        },
-        set(this: ArrangeHostNode, next: unknown) {
-            const value = next == null ? "" : String(next)
-            this.props.modelValue = value
-            this.props.value = value
-            enqueueNativeMutation(this, (native) => native.setProp?.(this.__arrangeNodeId ?? 0, "modelValue", value))
-        },
-    })
-    return node as ArrangeHostNode
+}
+
+function hasNativeNode(node: ArrangeHostNode): boolean {
+    return node.kind !== "anchor" && (node.kind !== "text" || node.props.text !== "" || !!node.__arrangeNodeId)
 }
 
 function makeTextNode(text: string): ArrangeHostNode {
-    const node = makeNode(Text)
+    const node = makeNode(Text, "text")
     node.props.text = String(text)
     return node
 }
@@ -83,28 +61,51 @@ function findContainer(node: ArrangeHostNode | ArrangeContainer | null | undefin
 }
 
 function currentTree(container: ArrangeContainer | null | undefined): ArrangeHostNode | null {
-    return container?.children?.[0] ?? null
+    return container?.children.find(hasNativeNode) ?? null
 }
 
 function assignNodeIds(node: ArrangeHostNode | null | undefined, container: ArrangeContainer): void {
-    if (!node) return
+    if (!node || !hasNativeNode(node)) return
     if (!node.__arrangeNodeId) node.__arrangeNodeId = container.__arrangeNextNodeId++
     for (const child of node.children ?? []) assignNodeIds(child, container)
 }
 
+function inputMutation(node: ArrangeHostNode, key: string, value: unknown): NativeMutation {
+    const id = node.__arrangeNodeId
+    if (!id) throw new Error("Arrange binding target is missing native node id")
+    const typed = key === "modifier" ? toModifier(value as never) : key === "text" ? String(value ?? "") : value == null ? null : toNativePropValue(key, value)
+    return native => {
+        let handle = node.__arrangeBindings.get(key)
+        if (!handle) {
+            handle = native.registerBinding(id, key)
+            node.__arrangeBindings.set(key, handle)
+        }
+        native.updateBinding(handle, typed)
+    }
+}
+
+function releaseSubtreeBindings(node: ArrangeHostNode): NativeMutation[] {
+    const mutations: NativeMutation[] = []
+    for (const child of node.children) mutations.push(...releaseSubtreeBindings(child))
+    mutations.push(native => {
+        for (const handle of node.__arrangeBindings.values()) native.releaseBinding(handle)
+        node.__arrangeBindings.clear()
+    })
+    return mutations
+}
+
 function emitCreateSubtree(node: ArrangeHostNode | null | undefined, parentId: NodeId | null = null, index = 0, mutations: NativeMutation[] = []): NativeMutation[] {
-    if (!node) return mutations
+    if (!node || !hasNativeNode(node)) return mutations
     const id = node.__arrangeNodeId
     if (!id) throw new Error("Arrange host node is missing native node id")
-    mutations.push((native) => native.createNode?.(id, String(node.type)))
+    mutations.push((native) => native.createNode(id, String(node.type)))
     for (const [key, value] of Object.entries(node.props ?? {})) {
         if (key === "modifier") continue
-        if (key === "text" && node.type === Text) mutations.push((native) => native.setText?.(id, String(value)))
-        else mutations.push((native) => native.setProp?.(id, key, toNativePropValue(key, value)))
+        mutations.push(inputMutation(node, key, value))
     }
-    mutations.push((native) => native.setModifier?.(id, toModifier(node.props?.modifier ?? m)))
-    if (parentId != null) mutations.push((native) => native.insertChild?.(parentId, id, index))
-    node.children?.forEach((child, childIndex) => emitCreateSubtree(child, id, childIndex, mutations))
+    mutations.push(inputMutation(node, "modifier", node.props?.modifier ?? m))
+    if (parentId != null) mutations.push((native) => native.insertChild(parentId, id, index))
+    node.children.filter(hasNativeNode).forEach((child, childIndex) => emitCreateSubtree(child, id, childIndex, mutations))
     return mutations
 }
 
@@ -118,12 +119,7 @@ function assertNativeRuntime(target: NativeTransactionTarget | null | undefined)
 
 function commitMutations(target: NativeTransactionTarget, mutations: readonly NativeMutation[]): void {
     if (mutations.length === 0) return
-    target.beginTransaction?.()
-    try {
-        for (const mutation of mutations) mutation(target)
-    } finally {
-        target.endTransaction?.()
-    }
+    for (const mutation of mutations) mutation(target)
 }
 
 function scheduleCommitFrom(node: ArrangeHostNode | ArrangeContainer | null | undefined): void {
@@ -153,88 +149,97 @@ function clearNodeIds(node: ArrangeHostNode | null | undefined): void {
     for (const child of node.children ?? []) clearNodeIds(child)
 }
 
-const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
-    patchProp(el, key, _previous, next) {
-        if (key === "class" || key === "style") return
-        el.props[key] = key === "modifier" ? toModifier(next ?? m) : next
-        const id = el.__arrangeNodeId
-        if (!id) return
-        if (key === "modifier") enqueueNativeMutation(el, (native) => native.setModifier?.(id, toModifier(el.props.modifier ?? m)))
-        else if (key === "text" && el.type === Text) enqueueNativeMutation(el, (native) => native.setText?.(id, String(next)))
-        else enqueueNativeMutation(el, (native) => native.setProp?.(id, key, toNativePropValue(key, el.props[key])))
-    },
-    insert(child, rawParent, anchor = null) {
-        const parent = rawParent as ArrangeHostNode | ArrangeContainer
-        parent.children ??= []
-        const current = parent.children.indexOf(child)
-        if (current >= 0) parent.children.splice(current, 1)
-        child.__arrangeParent = parent
-        if (anchor == null) parent.children.push(child)
+function nativeParentId(parent: ArrangeHostNode | ArrangeContainer): NodeId | undefined {
+    return isHostNode(parent) ? parent.__arrangeNodeId : 1
+}
+
+function nativeIndex(node: ArrangeHostNode, parent: ArrangeHostNode | ArrangeContainer): number {
+    return parent.children.slice(0, parent.children.indexOf(node)).filter(hasNativeNode).length
+}
+
+function insertHostNode(child: ArrangeHostNode, rawParent: ArrangeHostNode, anchor: ArrangeHostNode | null = null): void {
+    const parent = rawParent as ArrangeHostNode | ArrangeContainer
+    const oldParent = child.__arrangeParent
+    const container = findContainer(parent)
+    if (oldParent) {
+        if (findContainer(oldParent) !== container) removeHostNode(child)
         else {
-            const index = parent.children.indexOf(anchor)
-            parent.children.splice(index < 0 ? parent.children.length : index, 0, child)
+            const previousIndex = oldParent.children.indexOf(child)
+            if (previousIndex >= 0) oldParent.children.splice(previousIndex, 1)
         }
-        const container = findContainer(parent)
-        const parentId = isHostNode(parent) ? parent.__arrangeNodeId : undefined
-        if (container?.__arrangeMounted && parentId) {
-            const existingId = child.__arrangeNodeId
-            if (!existingId) assignNodeIds(child, container)
-            const index = parent.children.indexOf(child)
-            enqueueNativeMutation(parent, existingId
-                ? (native) => native.insertChild?.(parentId, existingId, index)
-                : emitCreateSubtree(child, parentId, index, []))
+    }
+    child.__arrangeParent = parent
+    const index = anchor ? parent.children.indexOf(anchor) : -1
+    parent.children.splice(index < 0 ? parent.children.length : index, 0, child)
+    const parentId = nativeParentId(parent)
+    if (!container?.__arrangeMounted || !parentId || !hasNativeNode(child)) return
+    const existingId = child.__arrangeNodeId
+    if (!existingId) assignNodeIds(child, container)
+    const position = nativeIndex(child, parent)
+    enqueueNativeMutation(parent, existingId
+        ? native => native.insertChild(parentId, existingId, position)
+        : emitCreateSubtree(child, parentId, position))
+}
+
+function removeHostNode(child: ArrangeHostNode): void {
+    const parent = child.__arrangeParent
+    if (!parent) return
+    const parentId = nativeParentId(parent)
+    const childId = child.__arrangeNodeId
+    if (parentId && childId) {
+        enqueueNativeMutation(parent, [
+            ...releaseSubtreeBindings(child),
+            native => native.removeChild(parentId, childId),
+            native => native.deleteNode(childId),
+        ])
+        clearNodeIds(child)
+    }
+    const index = parent.children.indexOf(child)
+    if (index >= 0) parent.children.splice(index, 1)
+    child.__arrangeParent = null
+}
+
+function setNodeText(node: ArrangeHostNode, text: string): void {
+    node.props.text = String(text)
+    if (node.__arrangeNodeId) enqueueNativeMutation(node, inputMutation(node, "text", text))
+    else if (text && node.kind === "text") {
+        const container = findContainer(node)
+        const parent = node.__arrangeParent
+        const parentId = parent && nativeParentId(parent)
+        if (container?.__arrangeMounted && parent && parentId) {
+            assignNodeIds(node, container)
+            enqueueNativeMutation(parent, emitCreateSubtree(node, parentId, nativeIndex(node, parent)))
         }
-    },
-    remove(child) {
-        const parent = child.__arrangeParent
-        if (!parent?.children) return
-        const parentId = isHostNode(parent) ? parent.__arrangeNodeId : undefined
-        const childId = child.__arrangeNodeId
-        const index = parent.children.indexOf(child)
-        if (index >= 0) parent.children.splice(index, 1)
-        child.__arrangeParent = null
-        if (parentId && childId) {
-            enqueueNativeMutation(parent, [
-                (native) => native.removeChild?.(parentId, childId),
-                (native) => native.deleteNode?.(childId),
-            ])
-            clearNodeIds(child)
+    }
+}
+
+const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
+    patchProp(el, key, _previous, next, _namespace, owner) {
+        if (eventPropNames.has(key) && next != null) {
+            const callbacks = next
+            next = (...args: unknown[]) => callWithAsyncErrorHandling(callbacks, owner ?? null, ErrorCodes.NATIVE_EVENT_HANDLER, args)
         }
+        if (key === "class" || key === "style") throw new TypeError(`Arrange 不支持 ${key}，请使用 Modifier`)
+        el.props[key] = key === "modifier" ? toModifier(next ?? m) : next
+        if (el.__arrangeNodeId) enqueueNativeMutation(el, inputMutation(el, key, el.props[key]))
     },
-    createElement(type) {
-        return makeNode(type)
-    },
-    createText(text) {
-        return makeTextNode(text)
-    },
-    createComment(text) {
-        const node = makeNode("Comment")
-        node.props.text = String(text ?? "")
-        return node
-    },
-    setText(node, text) {
-        node.props.text = String(text)
-        if (node.__arrangeNodeId) enqueueNativeMutation(node, (native) => native.setText?.(node.__arrangeNodeId ?? 0, String(text)))
-    },
+    insert: insertHostNode,
+    remove: removeHostNode,
+    createElement: type => makeNode(type),
+    createText: makeTextNode,
+    createComment: () => makeNode("Anchor", "anchor"),
+    setText: setNodeText,
     setElementText(node, text) {
-        node.children = []
-        if (node.type === Text) node.props.text = String(text)
-        else if (text !== "") {
-            const child = makeTextNode(text)
-            child.__arrangeParent = node
-            node.children.push(child)
-        }
-        if (node.__arrangeNodeId) {
-            if (node.type === Text) enqueueNativeMutation(node, (native) => native.setText?.(node.__arrangeNodeId ?? 0, String(text)))
-            else enqueueNativeMutation(node, (native) => native.invalidate?.(node.__arrangeNodeId ?? 0, "structure", "subtree text replaced"))
-        }
+        for (const child of [...node.children]) removeHostNode(child)
+        if (node.type === Text) setNodeText(node, text)
+        else if (text !== "") insertHostNode(makeTextNode(text), node)
     },
     parentNode(node) {
-        return isHostNode(node.__arrangeParent) ? node.__arrangeParent : null
+        return (node.__arrangeParent ?? null) as ArrangeHostNode | null
     },
     nextSibling(node) {
         const parent = node.__arrangeParent
-        if (!parent?.children) return null
+        if (!parent) return null
         const index = parent.children.indexOf(node)
         return index >= 0 ? parent.children[index + 1] ?? null : null
     },
@@ -264,20 +269,20 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
         if (!container) return originalUnmount()
         const target = nativeTarget
         originalUnmount()
+        container.__arrangePendingMutations.length = 0
         container.__arrangeMounted = false
         container.__arrangeNativeFlushPending = false
-        target?.beginTransaction?.()
-        try {
-            target?.unmount?.()
-        } finally {
-            target?.endTransaction?.()
-        }
+        target?.unmount()
         container = null
         nativeTarget = null
     }
 
-    app.mount = (target: NativeTransactionTarget = globalThis.__ARRANGE_NATIVE__ ?? {}) => {
+    app.mount = (target: NativeTransactionTarget = globalThis.__ARRANGE_NATIVE__!) => {
+        if (!target?.registerBinding || !target.updateBinding || !target.releaseBinding) throw new Error("Arrange native binding runtime is required")
         assertNativeRuntime(target)
+        for (const operation of ['createNode', 'deleteNode', 'insertChild', 'removeChild', 'unmount'] as const) {
+            if (typeof target[operation] !== 'function') throw new Error(`Arrange native runtime is missing ${operation}`)
+        }
         nativeTarget = target
         container = {
             $$arrangeContainer: true,
@@ -285,19 +290,15 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
             __arrangeNative: target,
             __arrangeNativeFlushPending: false,
             __arrangeMounted: false,
-            __arrangeNextNodeId: 1,
+            __arrangeNextNodeId: 2,
             __arrangePendingMutations: [],
         }
-        if (typeof globalThis.Document !== "function") {
-            Object.defineProperty(globalThis, "Document", {configurable: true, writable: true, value: function ArrangeDocument() {}})
-        }
-        if (typeof globalThis.ShadowRoot !== "function") {
-            Object.defineProperty(globalThis, "ShadowRoot", {configurable: true, writable: true, value: function ArrangeShadowRoot() {}})
-        }
         const result = originalMount(containerAsMountHost(container))
-        assignNodeIds(currentTree(container), container)
+        for (const child of container.children) assignNodeIds(child, container)
         container.__arrangeMounted = true
-        commitMutations(target, emitCreateSubtree(currentTree(container), null, 0, []))
+        const initial: NativeMutation[] = [native => native.createNode(1, "Root")]
+        container.children.filter(hasNativeNode).forEach((child, index) => emitCreateSubtree(child, 1, index, initial))
+        commitMutations(target, initial)
 
         if (result && (typeof result === "object" || typeof result === "function")) {
             try {

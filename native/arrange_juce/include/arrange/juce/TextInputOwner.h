@@ -35,6 +35,11 @@ namespace arrange::juce {
         explicit TextInputOwner(arrange::core::TextLayoutService& textLayoutService) noexcept;
 
         void reset();
+        void commitState(TextInputOwner&& candidate) noexcept {
+            session_ = std::move(candidate.session_);
+            focusedGeneration_ = candidate.focusedGeneration_;
+            publishedModelValue_ = std::move(candidate.publishedModelValue_);
+        }
         void cancelDrag() noexcept;
 
         [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
@@ -99,6 +104,7 @@ namespace arrange::juce {
             arrange::core::LayoutTree& tree,
             bool submit,
             const TextInputCallbacks& callbacks);
+        void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady);
         void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady);
         [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(
             const arrange::core::LayoutTree& tree,
@@ -124,6 +130,8 @@ namespace arrange::juce {
 
         TextInputLayoutModel text_;
         InputTextSession session_;
+        std::uint64_t focusedGeneration_ = 0;
+        std::string publishedModelValue_;
     };
 
 #endif
