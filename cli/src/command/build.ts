@@ -1,5 +1,5 @@
 import type { Command } from "commander"
-import type { CliServices } from "../services.ts"
+import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface BuildCommandOptions {
     flavor?: "debug" | "release" | string
@@ -10,7 +10,7 @@ export interface BuildCommandOptions {
     clean?: boolean
 }
 
-export function registerBuildCommand(program: Command, services: CliServices): void {
+export function registerBuildCommand(program: Command, services: ServiceHub): void {
     program
         .command("build")
         .description("Build Arrange project artifacts")

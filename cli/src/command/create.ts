@@ -1,6 +1,6 @@
 import type {Command} from "commander"
 import {relative} from "node:path"
-import type {CliServices} from "../services.ts"
+import type {ServiceHub} from "../ServiceHub.ts"
 import {createInitialProjectState} from "../project/CreateProject.ts"
 import {projectFileNames} from "../project/ProjectStateStore.ts"
 import {runCreateWizard} from "../wizard/create.ts"
@@ -10,7 +10,7 @@ export interface CreateCommandOptions {
     fetchContent?: string
 }
 
-export function registerCreateCommand(program: Command, services: CliServices): void {
+export function registerCreateCommand(program: Command, services: ServiceHub): void {
     program
         .command("create")
         .description("Create a new Arrange project")

@@ -1,5 +1,5 @@
 import type { Command } from "commander"
-import type { CliServices } from "../services.ts"
+import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface DevCommandOptions {
     uiOnly?: boolean
@@ -7,7 +7,7 @@ export interface DevCommandOptions {
     flavor?: "debug" | "release" | string
 }
 
-export function registerDevCommand(program: Command, services: CliServices): void {
+export function registerDevCommand(program: Command, services: ServiceHub): void {
     program
         .command("dev")
         .description("Run Arrange development environment")

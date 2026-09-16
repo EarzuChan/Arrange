@@ -1,39 +1,24 @@
 import type {ProjectState} from "../project/ProjectState.ts"
-import type {TextSpan} from "./TextRegionWrapper.ts"
+import {TextRegion} from "./TextRegion.ts"
+import {Wrapper, type WrappedLocation} from "./Wrapper.ts"
 
-export type TextClusterLocation = {
-    readonly kind: "found"
-    readonly span: TextSpan
-    readonly text: string
-} | { readonly kind: "missing" } | {
-    readonly kind: "damaged"
-    readonly span: TextSpan
-    readonly message: string
-}
+export class TextCluster {
+    readonly kind = "text-cluster"
+    readonly wrapper: Wrapper
 
-// 正本清源：Cluster是管理文本中的一块部分。目前的实现有些问题，之后要狠狠重构
-export interface TextCluster {
-    readonly id: string
-
-    filePath(state: ProjectState): string
-
-    locate(fileText: string): TextClusterLocation
-}
-
-export class TextClusterRegistry {
-    private readonly clusters = new Map<string, TextCluster>()
-
-    constructor(clusters: readonly TextCluster[] = []) {
-        for (const cluster of clusters) this.register(cluster)
+    constructor(readonly id: string, readonly regions: readonly TextRegion[], private readonly body: (state: ProjectState) => string) {
+        this.wrapper = new Wrapper(`cluster:${id}`)
     }
 
-    register(cluster: TextCluster): void {
-        this.clusters.set(cluster.id, cluster)
-    }
+    make(state: ProjectState): string { return this.wrapper.make(this.body(state)) }
 
-    get(id: string): TextCluster {
-        const cluster = this.clusters.get(id)
-        if (cluster === undefined) throw new Error(`Unknown text cluster: ${id}`)
-        return cluster
+    locate(_state: ProjectState, fileText: string): WrappedLocation { return this.wrapper.locate(fileText) }
+
+    check(state: ProjectState, fileText: string) {
+        const location = this.locate(state, fileText)
+        if (location.kind !== "located") return {kind: "Resolvable" as const, cause: location.kind, message: location.kind === "missing" ? `缺少 ${this.id} Wrapper` : location.message}
+        const inner = fileText.slice(location.inner.start, location.inner.end)
+        const regions = this.regions.filter(region => region.enabled(state)).map(region => ({region, result: region.check(state, inner)}))
+        return {kind: "Idle" as const, location, regions}
     }
 }

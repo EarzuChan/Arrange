@@ -5,6 +5,7 @@ Thumbs.db
 # Editor / IDE local state
 .idea/
 .vscode/
+.proxyai/
 
 # Package-manager state
 node_modules/
@@ -17,11 +18,11 @@ yarn-error.log*
 # Local third-party dependency checkouts
 third_party/
 
-# Build outputs and generated artifacts
+# Build outputs, generated artifacts and temporary references
 build/
 dist/
-artifacts/
 cmake-build-*/
+tmp-refs/
 
 # CMake accidental in-source configure outputs
 CMakeCache.txt
@@ -40,3 +41,7 @@ install_manifest.txt
 
 # Test / smoke local outputs
 tests/smoke/*.output.json
+
+# Arrange local state
+.arrange/
+arrange.local.yaml

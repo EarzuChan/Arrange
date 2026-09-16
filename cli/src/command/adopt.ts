@@ -1,12 +1,12 @@
 import type { Command } from "commander"
-import type { CliServices } from "../services.ts"
+import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface AdoptCommandOptions {
     registry?: string
     fetchContent?: string
 }
 
-export function registerAdoptCommand(program: Command, services: CliServices): void {
+export function registerAdoptCommand(program: Command, services: ServiceHub): void {
     program
         .command("adopt")
         .description("Adopt an existing project into Arrange")

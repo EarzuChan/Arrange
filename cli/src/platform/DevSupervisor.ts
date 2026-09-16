@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process"
-import type { ProcessSpec } from "../platform/ProcessSpec.ts"
+import type { ProcessSpec } from "./ProcessSpec.ts"
 
 export interface LongRunningProcessSpec extends ProcessSpec {
     readonly name: string

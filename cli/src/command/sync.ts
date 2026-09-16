@@ -1,33 +1,18 @@
-import type { Command } from "commander"
-import type { CliServices } from "../services.ts"
+import {Command, Option} from "commander"
+import type {ServiceHub} from "../ServiceHub.ts"
 
-export interface SyncCommandOptions { // 对齐 SyncRunOptions
-    scan: boolean
+export interface SyncCommandOptions {scan?: boolean, config?: boolean, setup?: boolean, ui?: boolean, native?: boolean}
 
-    configOnly: boolean
-    setupOnly: boolean
-
-    ui: boolean
-    native: boolean
-}
-
-export function registerSyncCommand(program: Command, services: CliServices): void {
-    program
-        .command("sync")
-        .description("Synchronize Arrange project state")
-        .option("--scan", "Only check sync state and exit non-zero when updates are required")
-        .option("--config-only", "Only check or update project-managed configuration")
-        .option("--setup-only", "Only check or update local toolchain state")
-        .option("--ui", "Limit operation to UI subproject")
-        .option("--native", "Limit operation to native subproject")
+export function registerSyncCommand(program: Command, services: ServiceHub): void {
+    program.command("sync")
+        .description("同步工程文件与开发准备状态")
+        .option("--scan", "只扫描；有 Fatal 或 Resolvable 时返回非零状态")
+        .addOption(new Option("--config", "只同步工程配置文件").conflicts("setup"))
+        .addOption(new Option("--setup", "只准备开发环境").conflicts("config"))
+        .addOption(new Option("--ui", "仅 UI 范围").conflicts("native"))
+        .addOption(new Option("--native", "仅 native 范围").conflicts("ui"))
         .action(async (options: SyncCommandOptions) => {
-            await services.syncService.run({
-                scanOnly: Boolean(options.scan),
-                configOnly: Boolean(options.configOnly),
-                setupOnly: Boolean(options.setupOnly),
-                uiOnly: Boolean(options.ui),
-                nativeOnly: Boolean(options.native),
-            },await services.projectStateStore.load(process.cwd()))
+            const result = await services.syncService.run({scanOnly: options.scan, configOnly: options.config, setupOnly: options.setup, uiOnly: options.ui, nativeOnly: options.native}, process.cwd())
+            if (result.status !== "completed") process.exitCode = 1
         })
 }
-

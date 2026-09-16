@@ -1,62 +1,55 @@
-# SCAN 结果与 RESOLVE 对策
+# M2.2 CONFIG 扫描验收用例
 
-本文只定义 M2.2 当前扫描报告的结果分类和交互对策。模型本身见 [Arrange CLI 托管与同步模型](../../../arch/32-ArrangeCLI托管与同步模型.md)。
+扫描矩阵、四类结果及其数据定义见[托管模型](../../../arch/32-ArrangeCLI托管与同步模型.md#config-scan-的四类结果)，交互顺序见[命令流程](命令定义.md)。本文只列本期验收案例。
 
-## 文件级
+## 合并报告的示例
 
-| 层级 | kind | 含义 | SCAN 行为 |
-|---|---|---|---|
-| 文本文件 | `present(text)` | 文件可读取 | 下钻 Cluster |
-| 文本文件 | `file-missing` | 文件不存在 | 报告阻塞问题，不创建 |
-| JSON 文件 | `present(json)` | 文件存在且可解析 | 下钻 JsonRegion |
-| JSON 文件 | `file-missing` | 文件不存在 | 报告阻塞问题，不创建 |
-| JSON 文件 | `unparsable` | 文件存在但无法解析 | 报告阻塞问题，不修改 |
+假设工程同时出现：
 
-## Cluster 级
+- `ui/package.json` 语法不合法。
+- `native/CMakeLists.txt` 可读，但目标 Cluster 没有 Wrapper。
+- `ui/.npmrc` 的 Cluster 与受管 Region 都可定位，registry 正文过期。
 
-仅在文本文件存在且可读取时下钻 Cluster；Cluster 缺失或损坏时跳过其下所有 Region。
-
-| kind | 含义 | RESOLVE 对策 |
-|---|---|---|
-| `found(span, text)` | 定位到唯一结构 | 继续扫描 Region |
-| `missing` | 找不到结构 | 智能定位并确认；否则用户定位或贴临时 marker，写入后重扫 |
-| `ambiguous(candidates)` | 存在多个候选 | 用户选择；不接受则手动定位或放弃 |
-| `damaged(message)` | 结构边界损坏 | 用户修复、重新定位或放弃；确认写入后重扫 |
-
-## TextRegion 级
-
-仅在所属 Cluster `found` 时产生 Region 结果。
-
-| kind | 含义 | RESOLVE／APPLY 对策 |
-|---|---|---|
-| `idle` | 当前内容与配置一致 | 丢弃 |
-| `outdated(current, expected)` | 已托管内容过期 | 进入 APPLY 批量更新 |
-| `missing(insertAt?)` | 没有目标区域 | 用户确认插入点；写入后重扫 |
-| `unwrapped-existing(current)` | 找到疑似内容但没有 wrapper | 接管并加 wrapper、删除、放弃 |
-| `extraneous(current)` | 配置期望为空但文件中仍有内容 | 删除、承认现状并更新配置、放弃 |
-| `wrapper-damaged(message)` | wrapper 标记不完整或顺序错误 | 用户修复、重新定位或放弃 |
-| `config-invalid(message)` | 无法从 state 计算合法期望值 | 报错终止 |
-
-如果 `insertAt` 不能安全确定，不能自动猜位置；用户可以选择候选位置，或在文件中贴临时定位 marker 后重新扫描。
-
-## JsonRegion 级
-
-仅在 JSON 文件 `present(json)` 时产生结果。
-
-| kind | 含义 | RESOLVE／APPLY 对策 |
-|---|---|---|
-| `idle` | 字段已对齐 | 丢弃 |
-| `outdated(current, expected)` | 字段值过期 | 进入 APPLY 批量更新 |
-| `missing` | 目标字段不存在 | 用户确认补入后重扫 |
-| `extraneous(current)` | 配置期望为空但字段存在 | 删除、承认现状并更新配置、放弃 |
-| `config-invalid(message)` | 无法计算合法目标值 | 报错终止 |
-
-## 统一循环
+完整 SCAN 应同时给出：
 
 ```txt
-SCAN → 有阻塞问题 → RESOLVE 首个问题
-     → 有副作用 → reload ProjectState → 全量 SCAN
-SCAN → 无阻塞问题 → APPLY 确定性更新
+Fatal
+  ui/package.json: unparsable
+Resolvable
+  native/CMakeLists.txt: 目标 Cluster missing
+Applicable
+  ui/.npmrc: registry Region outdated
 ```
 
-`--scan` 只输出报告并结束；SCAN 本身不写文件、不改配置、不运行外部工具。
+package.json 下的 JsonRegion 与缺失 Cluster 下的 TextRegion 不产生结果。RESOLVE 因 Fatal 阻断，无修复或更新写入。
+
+## 本期验收案例
+
+| 场景 | 应验证的结果 |
+|---|---|
+| ManagedItem 关闭，文件缺失、Region 有裸内容或有旧 Wrapper | 对该 ManagedItem 均不生成 Issue；不因它要求父级存在 |
+| 两个 ManagedItem 共用一个 Cluster，只开启一个 | 只检查开启 ManagedItem 的 Region，保留其他内容 |
+| TextFile 不存在，另一个文件可读 | 只在缺失文件处报 missing，其后代不进入扫描；另一个文件继续扫描 |
+| 同一 ManagedItem 跨文本和 JSON，其中一个物理父级失败 | 另一分支照常扫描，但本轮不能提前 Apply |
+| 共同托管的名称/Framework 版本改变 | 两端使用各自格式更新，保留 CMake target、源路径和普通自定义内容 |
+| FetchContent 地址与 Framework 版本只托管其一 | 更新对应 Region，另一项及其关联内容保持原样 |
+| 共同托管项使用 `--ui` 或 `--native` | 只更新所选物理分支，YAML 中的共同开关不变 |
+| File 内、Cluster 前有普通文本，Cluster 内有 Region Wrapper | Cluster 定位相对 File；Region 定位相对 Cluster inner；两者 outer/inner 截取正确 |
+| State 中切换 ManagedItem 开关后生成文件 | 同一 make 入口按 State 生成带 Wrapper 或裸 Region，Cluster 自身 Wrapper 保留 |
+| Cluster 标记完整，某个 Region 标记缺失 | Cluster located，Region missing；其他可可靠定位的 Region 继续检查 |
+| Wrapper 少一端、重复或交叉闭合 | damaged；不暴露猜测的写入 span；受影响区域不进入扫描 |
+| 可选文本值为 `~`，Region 没有 Wrapper | missing；确认建立空 Wrapper 后，重扫得到 idle |
+| 可选文本值为 `~`，完整 Wrapper 中有赋值语句 | outdated；Apply 仅清空正文 |
+| 配置为合法空字符串，正文为 `@arrange:registry=` | 根据实际生成正文比较，不当作 null |
+| 受管正文多了注释、语句或空白 | 按完整正文比较得到 outdated，替换后周围自定义文本不变 |
+| JSON 期望字段不存在，现实字段为显式 null | outdated；移除该字段，保留相邻字段 |
+| JSON 期望有值，目标路径的父对象不存在 | missing；确认补入时创建缺少的容器 |
+| `dependencies` 为 `123`，目标在其下面 | Region damaged；要求用户手动编辑，不覆盖父值 |
+| 一份报告同时有四类结果 | 全部展示，Fatal 优先阻断，无任何 Resolve/Apply 写入 |
+| 用户给已有 Region 补 Wrapper | 继续后全量重扫；不询问反哺配置，差异转为 Applicable |
+| 用户修复一个 Issue，另一个因此发生变化 | 丢弃旧报告，重新生成全部判定，不处理旧队列的下一项 |
+| 用户未修好或取消 | 未修好仍报告问题；取消 Abort，不能进入 Apply |
+| `--scan --config` | 输出完整报告，无文件、配置或外部工具副作用 |
+| CONFIG Apply 成功 | 当前 CONFIG LSRA 结束，不自动追加复检循环 |
+
+对应自动化测试与执行结果见[第三期工作区](第三期M2.2的工作.md#config-验证)。

@@ -1,10 +1,9 @@
+import {managedItems} from "../managed/ManagedDefinitions.ts"
 import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "@clack/prompts"
 import {resolve} from "node:path"
-import {CmakeFetchContentItem, CmakePluginFormatsItem, CmakePluginIdentityItem, CmakePluginVersionItem, CmakeProductNameItem} from "../cmake/CmakeManagedItems.ts"
-import {NpmrcArrangeRegistryItem, PackageJsonFrameworkDependencyItem, PackageJsonNameItem} from "../node/NodeManagedItems.ts"
 import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
 import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
-import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../utils/promptUtils.ts"
+import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../util/PromptUtils.ts"
 import {selectFrameworkVersion} from "./frameworkVersion.ts"
 
 export interface CreateWizardInput {
@@ -76,7 +75,7 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<fa
             },
         })
 
-        const managedItems = await promptManagedItems()
+        const managedItemChoices = await promptManagedItems()
         const directories = await promptProjectDirectories()
 
         const rootDir = answers.location === "subdir" ? resolve(process.cwd(), answers.projectName) : process.cwd()
@@ -106,7 +105,7 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<fa
             uiDirectory: directories.uiDirectory,
             nativeDirectory: directories.nativeDirectory,
             artifactsDirectory: directories.artifactsDirectory,
-            managedItems,
+            managedItems: managedItemChoices,
         }
     } catch (error) {
         if (error instanceof PromptCancelled) {
@@ -188,93 +187,13 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
     })
     if (isCancel(manageAll)) throw new PromptCancelled()
 
-    if (manageAll) return {...createCmakeManagedItems(true, true, true, true, true), ...createNodeManagedItems(true, true, true)}
+    if (manageAll) return Object.fromEntries(managedItems.map(item => [item.id, true]))
 
-    const cmakeItems = await promptCmakeManagedItems()
-    const nodeItems = await promptNodeManagedItems()
-    return {...cmakeItems, ...nodeItems}
-}
-
-async function promptCmakeManagedItems(): Promise<Record<string, boolean>> {
-    const manageAllCmake = await confirm({
-        message: "Let Arrange manage all native config items?",
-        initialValue: true,
-    })
-    if (isCancel(manageAllCmake)) throw new PromptCancelled()
-    if (manageAllCmake) return createCmakeManagedItems(true, true, true, true, true)
-
-    const fetchContent = await confirm({
-        message: "Manage CMake FetchContent block?",
-        initialValue: true,
-    })
-    if (isCancel(fetchContent)) throw new PromptCancelled()
-    const pluginVersion = await confirm({
-        message: "Manage CMake JUCE plugin version?",
-        initialValue: true,
-    })
-    if (isCancel(pluginVersion)) throw new PromptCancelled()
-    const pluginIdentity = await confirm({
-        message: "Manage CMake JUCE plugin identity?",
-        initialValue: true,
-    })
-    if (isCancel(pluginIdentity)) throw new PromptCancelled()
-    const pluginFormats = await confirm({
-        message: "Manage CMake JUCE plugin formats?",
-        initialValue: true,
-    })
-    if (isCancel(pluginFormats)) throw new PromptCancelled()
-    const productName = await confirm({
-        message: "Manage CMake JUCE product name?",
-        initialValue: true,
-    })
-    if (isCancel(productName)) throw new PromptCancelled()
-
-    return createCmakeManagedItems(fetchContent, pluginVersion, pluginIdentity, pluginFormats, productName)
-}
-
-async function promptNodeManagedItems(): Promise<Record<string, boolean>> {
-    const manageAllNode = await confirm({
-        message: "Let Arrange manage all UI config items?",
-        initialValue: true,
-    })
-    if (isCancel(manageAllNode)) throw new PromptCancelled()
-    if (manageAllNode) return createNodeManagedItems(true, true, true)
-
-    const packageJsonName = await confirm({
-        message: "Manage package.json package name?",
-        initialValue: true,
-    })
-    if (isCancel(packageJsonName)) throw new PromptCancelled()
-
-    const packageJsonFrameworkDependency = await confirm({
-        message: "Manage package.json @arrange/framework dependency version?",
-        initialValue: true,
-    })
-    if (isCancel(packageJsonFrameworkDependency)) throw new PromptCancelled()
-
-    const npmrcArrangeRegistry = await confirm({
-        message: "Manage .npmrc @arrange:registry entry?",
-        initialValue: true,
-    })
-    if (isCancel(npmrcArrangeRegistry)) throw new PromptCancelled()
-
-    return createNodeManagedItems(packageJsonName, packageJsonFrameworkDependency, npmrcArrangeRegistry)
-}
-
-function createCmakeManagedItems(fetchContent: boolean, pluginVersion: boolean, pluginIdentity: boolean, pluginFormats: boolean, productName: boolean): Record<string, boolean> {
-    return {
-        [CmakeFetchContentItem.key]: fetchContent,
-        [CmakePluginVersionItem.key]: pluginVersion,
-        [CmakePluginIdentityItem.key]: pluginIdentity,
-        [CmakePluginFormatsItem.key]: pluginFormats,
-        [CmakeProductNameItem.key]: productName,
+    const choices: Record<string, boolean> = {}
+    for (const item of managedItems) {
+        const enabled = await confirm({message: `持续托管${item.label}？`, initialValue: true})
+        if (isCancel(enabled)) throw new PromptCancelled()
+        choices[item.id] = enabled
     }
-}
-
-function createNodeManagedItems(packageJsonName: boolean, packageJsonFrameworkDependency: boolean, npmrcArrangeRegistry: boolean): Record<string, boolean> {
-    return {
-        [PackageJsonNameItem.key]: packageJsonName,
-        [PackageJsonFrameworkDependencyItem.key]: packageJsonFrameworkDependency,
-        [NpmrcArrangeRegistryItem.key]: npmrcArrangeRegistry,
-    }
+    return choices
 }

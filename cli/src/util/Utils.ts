@@ -25,3 +25,7 @@ export function hashText(text: string): string {
 export function isJsonObject(json: unknown): json is Record<string, unknown> {
     return typeof json === "object" && json !== null && !Array.isArray(json)
 }
+
+export function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+}

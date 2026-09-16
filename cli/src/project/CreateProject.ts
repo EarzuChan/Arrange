@@ -36,8 +36,8 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             framework: {
                 version: request.frameworkVersion,
-                ...(request.frameworkNodeRegistryUrl ? {nodeRegistryUrl: request.frameworkNodeRegistryUrl} : {}),
-                ...(request.frameworkCmakeFetchContentUrl ? {cmakeFetchContentUrl: request.frameworkCmakeFetchContentUrl} : {}),
+                ...(request.frameworkNodeRegistryUrl !== undefined ? {nodeRegistryUrl: request.frameworkNodeRegistryUrl} : {}),
+                ...(request.frameworkCmakeFetchContentUrl !== undefined ? {cmakeFetchContentUrl: request.frameworkCmakeFetchContentUrl} : {}),
             },
             ui: {
                 directory: request.uiDirectory,
@@ -45,6 +45,7 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             native: {
                 directory: request.nativeDirectory,
+                pluginType: request.pluginType,
             },
             artifacts: {
                 directory: request.artifactsDirectory,

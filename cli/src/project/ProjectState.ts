@@ -13,36 +13,37 @@ export const packageManagerNameSchema = z.enum(["pnpm", "npm", "yarn"])
 export type PackageManagerName = z.infer<typeof packageManagerNameSchema>
 
 export const frameworkDefinitionSchema = z.object({
-    version: z.string(),
-    nodeRegistryUrl: z.string().optional(),
-    cmakeFetchContentUrl: z.string().optional(),
+    version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, "需要具体版本号"),
+    nodeRegistryUrl: z.string().refine(value => !/[\r\n]/.test(value), "registry 不得包含换行").nullish(),
+    cmakeFetchContentUrl: z.string().min(1).refine(value => !/[\r\n]/.test(value), "FetchContent URL 不得包含换行").nullish(),
 })
 export type FrameworkDefinition = z.infer<typeof frameworkDefinitionSchema>
 
 export const uiProjectDefinitionSchema = z.object({
-    directory: z.string(),
+    directory: z.string().min(1),
     packageManager: packageManagerNameSchema,
 })
 export type UiProjectDefinition = z.infer<typeof uiProjectDefinitionSchema>
 
 export const nativeProjectDefinitionSchema = z.object({
-    directory: z.string(),
+    directory: z.string().min(1),
+    pluginType: z.enum(["effect", "instrument"]).default("effect"),
 })
 export type NativeProjectDefinition = z.infer<typeof nativeProjectDefinitionSchema>
 
 export const artifactDefinitionSchema = z.object({
-    directory: z.string(),
+    directory: z.string().min(1),
     includeVersionDirectory: z.boolean(),
 })
 export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>
 
 export const projectMetadataSchema = z.object({
-    name: z.string(),
-    version: z.string(),
-    vendorName: z.string(),
-    vendorCode: z.string(),
-    pluginCode: z.string(),
-    products: z.array(nativeProductSchema),
+    name: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/, "名称须以字母开头，仅含字母、数字、下划线"),
+    version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, "需要具体版本号"),
+    vendorName: z.string().min(1).refine(value => !/[\r\n]/.test(value), "厂商名称不得包含换行"),
+    vendorCode: z.string().regex(/^[A-Za-z0-9]{4}$/),
+    pluginCode: z.string().regex(/^[A-Za-z0-9]{4}$/),
+    products: z.array(nativeProductSchema).min(1),
 })
 export type ProjectMetadata = z.infer<typeof projectMetadataSchema>
 

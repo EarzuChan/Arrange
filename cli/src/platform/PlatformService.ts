@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectState.ts"
+import type { ProjectState } from "../project/ProjectState.ts"
 
 export interface PlatformCheckResult {
     readonly ok: boolean
@@ -6,5 +6,5 @@ export interface PlatformCheckResult {
 }
 
 export abstract class PlatformService {
-    abstract checkToolchain(context: ProjectContext): Promise<PlatformCheckResult>
+    abstract checkToolchain(context: ProjectState): Promise<PlatformCheckResult>
 }

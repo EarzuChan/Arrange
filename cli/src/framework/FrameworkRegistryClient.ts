@@ -27,7 +27,7 @@ export class FrameworkRegistryClient {
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
         // 原 fetchManifest 逻辑
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/@arrange%2fframework/${encodeURIComponent(version)}`, {headers: {Accept: "application/json"}})
+        const response = await fetch(`${registry}/@arrange%2fframework/${encodeURIComponent(version)}`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
 
         if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName}@${version} from ${registry}: HTTP ${response.status}`)
 
@@ -44,7 +44,7 @@ export class FrameworkRegistryClient {
     // TIPS：对于所有版本
     async fetchCandidates(recentLimit = 5, registryUrl?: string): Promise<FrameworkVersionCandidate[]> {
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/@arrange%2fframework`, {headers: {Accept: "application/json"}})
+        const response = await fetch(`${registry}/@arrange%2fframework`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
 
         if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName} packument from ${registry}: HTTP ${response.status}`)
 

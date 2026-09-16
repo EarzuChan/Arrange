@@ -1,145 +1,31 @@
-import type {ProjectState} from "../project/ProjectState.ts"
-import {textRegionWrapper, type TextSpan} from "./TextRegionWrapper.ts"
+import {errorMessage} from "../util/Utils.ts"
+import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
+import {type CheckResult, type Located} from "./CheckResult.ts"
+import {Wrapper, type WrappedLocation} from "./Wrapper.ts"
 
-// VERIFIED：我觉得基本行了
-// 涵盖了在SYNC中使用；以及被Adopting/Generating阶段使用的区域粗定位、区域全新内容创建
+export class TextRegion {
+    readonly kind = "text-region"
+    readonly wrapper: Wrapper
 
-export type TextRegionCircumstances = {
-    readonly kind: "wrapped"
-    readonly wrapperSpan: TextSpan
-    readonly contentSpan: TextSpan
-    readonly content: string
-} | {
-    readonly kind: "unwrapped"
-    readonly contentSpan: TextSpan
-    readonly content: string
-} | {
-    readonly kind: "missing"
-    readonly insertAt: number
-} | {
-    readonly kind: "damaged"
-    readonly message: string
-}
-
-export type TextRegionExpected = { readonly kind: "present"; readonly body: string } | { readonly kind: "default" } | { readonly kind: "invalid"; readonly message: string }
-
-export type TextRegionResult = { readonly kind: "ok" } | { readonly kind: "missing" } | { readonly kind: "outdated"; readonly current: string; readonly expected: string }
-    | { readonly kind: "unwrapped-existing"; readonly current: string; readonly expected: string | null } | { readonly kind: "extraneous"; readonly current: string }
-    | { readonly kind: "damaged"; readonly message: string } | { readonly kind: "invalid"; readonly message: string }
-
-export interface TextRegionEditOptions {
-    readonly managed: boolean // 不要删掉我：这是为了Generator生成Unmanaged Region Content
-}
-
-// TIPS：我的金华接口设计
-export interface TextRegion {
-    readonly id: string
-    readonly clusterId: string
-
-    seek(clusterText: string): TextRegionCircumstances
-
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult
-
-    renderText(state: ProjectState, options: TextRegionEditOptions): string
-}
-
-// TIPS：新增的抽象基类，用于消除重复代码
-export abstract class BaseTextRegion implements TextRegion {
-    abstract readonly id: string
-    abstract readonly clusterId: string
-
-    seek(clusterText: string): TextRegionCircumstances {
-        const wrapped = textRegionWrapper.locate(this.id, clusterText) // TIPS：直接复用WrapperLocation同形态对象
-        if (wrapped.kind === "wrapped" || wrapped.kind === "damaged") return wrapped
-        // TIPS：Damaged 导致无法正确定位，在CHECK能处理，是不予通过。未来看在Sync的哪引入交互式修复（让用户自己修markers）
-
-        const unwrapped = this.seekUnwrapped(clusterText)
-        if (unwrapped !== null) return unwrapped
-
-        return {kind: "missing", insertAt: this.missingInsertAt(clusterText)}
+    constructor(readonly id: string, readonly managedItemId: string, private readonly body: (state: ProjectState) => string) {
+        this.wrapper = new Wrapper(`region:${id}`)
     }
 
-    abstract check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult
+    enabled(state: ProjectState): boolean { return isManagedItem(state, this.managedItemId) }
 
-    abstract renderText(state: ProjectState, options: TextRegionEditOptions): string
-
-    protected abstract seekUnwrapped(clusterText: string): TextRegionCircumstances | null
-
-    protected abstract missingInsertAt(clusterText: string): number
-
-    protected abstract resolveExpected(state: ProjectState): TextRegionExpected
-}
-
-export abstract class RequiredTextRegion extends BaseTextRegion {
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        const expected = this.resolveExpected(state)
-        if (expected.kind === "invalid") return {kind: "invalid", message: expected.message}
-        if (expected.kind === "default") return {kind: "invalid", message: `${this.id} is required but resolved to default.`} // CHECK：按理说，Required不会出现Default？
-
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-        if (circumstances.kind === "missing") return {kind: "missing"}
-
-        if (circumstances.kind === "unwrapped") return {
-            kind: "unwrapped-existing",
-            current: circumstances.content,
-            expected: expected.body,
-        }
-
-        return normalizeText(circumstances.content) === normalizeText(expected.body) ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected: expected.body}
+    make(state: ProjectState): string {
+        const inner = this.body(state)
+        return this.enabled(state) ? this.wrapper.make(inner) : inner
     }
 
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = this.resolveExpected(state)
-        if (expected.kind === "invalid") throw new Error(expected.message)
-        if (expected.kind === "default") throw new Error(`${this.id} is required but resolved to default.`)
+    locate(_state: ProjectState, clusterInnerText: string): WrappedLocation { return this.wrapper.locate(clusterInnerText) }
 
-        return options.managed ? textRegionWrapper.wrap(this.id, expected.body) : withTrailingNewline(expected.body)
+    check(state: ProjectState, clusterInnerText: string): CheckResult<string, Located> {
+        let expected: string
+        try { expected = this.body(state) } catch (error) { return {kind: "Fatal", cause: "config-invalid", message: errorMessage(error)} }
+        const location = this.locate(state, clusterInnerText)
+        if (location.kind !== "located") return {kind: "Resolvable", cause: location.kind, message: location.kind === "missing" ? `缺少 ${this.id} Wrapper` : location.message, expected}
+        const actual = clusterInnerText.slice(location.inner.start, location.inner.end)
+        return actual === expected ? {kind: "Idle", actual, expected, location} : {kind: "Applicable", cause: "outdated", actual, expected, location}
     }
-}
-
-export abstract class OptionalTextRegion extends BaseTextRegion {
-    check(state: ProjectState, circumstances: TextRegionCircumstances): TextRegionResult {
-        const expected = this.resolveExpected(state)
-        if (expected.kind === "invalid") return {kind: "invalid", message: expected.message}
-
-        if (circumstances.kind === "damaged") return {kind: "damaged", message: circumstances.message}
-
-        if (expected.kind === "default") {
-            if (circumstances.kind === "missing") return {kind: "ok"}
-
-            if (circumstances.kind === "unwrapped") return {
-                kind: "unwrapped-existing",
-                current: circumstances.content,
-                expected: null,
-            }
-
-            return {kind: "extraneous", current: circumstances.content}
-        }
-
-        if (circumstances.kind === "missing") return {kind: "missing"}
-
-        if (circumstances.kind === "unwrapped") return {
-            kind: "unwrapped-existing",
-            current: circumstances.content,
-            expected: expected.body,
-        }
-
-        return normalizeText(circumstances.content) === normalizeText(expected.body) ? {kind: "ok"} : {kind: "outdated", current: circumstances.content, expected: expected.body}
-    }
-
-    renderText(state: ProjectState, options: TextRegionEditOptions): string {
-        const expected = this.resolveExpected(state)
-        if (expected.kind === "invalid") throw new Error(expected.message)
-        if (expected.kind === "default") return ""
-
-        return options.managed ? textRegionWrapper.wrap(this.id, expected.body) : withTrailingNewline(expected.body)
-    }
-}
-
-function normalizeText(value: string): string {
-    return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()
-}
-
-function withTrailingNewline(value: string): string {
-    return value.endsWith("\n") ? value : `${value}\n`
 }

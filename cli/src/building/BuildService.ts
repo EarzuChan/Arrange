@@ -1,4 +1,4 @@
-import type { ProjectContext } from "../project/ProjectState.ts"
+import type { ProjectState } from "../project/ProjectState.ts"
 import { NativeBuildService } from "./NativeBuildService.ts"
 import { UiBuildService } from "./UiBuildService.ts"
 
@@ -9,9 +9,9 @@ export interface BuildOptions {
 }
 
 export class BuildService {
-    constructor(private readonly uiBuildService = new UiBuildService(), private readonly nativeBuildService = new NativeBuildService(),) {}
+    constructor(private readonly uiBuildService = new UiBuildService(), private readonly nativeBuildService = new NativeBuildService()) {}
 
-    async build(context: ProjectContext, options: BuildOptions): Promise<void> {
+    async build(context: ProjectState, options: BuildOptions): Promise<void> {
         // TODO
     }
 }

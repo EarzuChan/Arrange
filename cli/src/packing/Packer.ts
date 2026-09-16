@@ -1,10 +1,10 @@
-import type { ProjectContext } from "../project/ProjectState.ts"
+import type { ProjectState } from "../project/ProjectState.ts"
 import { ArtifactLocator } from "./ArtifactLocator.ts"
 
 export class Packer {
     constructor(private readonly artifactLocator = new ArtifactLocator()) {}
 
-    async pack(context: ProjectContext): Promise<void> {
+    async pack(context: ProjectState): Promise<void> {
         const artifacts = await this.artifactLocator.locate(context)
         void artifacts
         // TODO：根据 ArtifactLocator 结果生成最终 artifacts/ 工件

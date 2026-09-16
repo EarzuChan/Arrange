@@ -1,4 +1,4 @@
-import {cliCompatibility} from "../cliMetadata.ts"
+import {cliCompatibility} from "../CliMetadata.ts"
 
 export interface FrameworkMetadata {
     readonly version: string
