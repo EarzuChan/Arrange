@@ -186,8 +186,10 @@ namespace {
         const auto revision = runtime.publishedFrame().revision;
         ::juce::Image image(::juce::Image::ARGB, 400, 300, true);
         ::juce::Graphics graphics(image);
+        const auto paintCount = paint.fullViewportPaints();
         paint.paint(graphics, runtime.publishedFrame());
         paint.paint(graphics, runtime.publishedFrame());
+        check(paint.fullViewportPaints() == paintCount + 2 && !paint.lastFullPaintReason().empty(), "passive raster execution counters did not match actual paint calls");
         check(runtime.publishedFrame().revision == revision && runtime.frameCounters().measures == counters.measures &&
               runtime.frameCounters().publications == counters.publications, "paint ran preparation or published state");
         session.reset(runtime, diagnostics, interaction);

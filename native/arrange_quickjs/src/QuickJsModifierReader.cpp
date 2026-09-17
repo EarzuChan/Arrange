@@ -235,6 +235,25 @@ namespace arrange::quickjs {
                 callbacks.push_back({result.size(), kind, ScopedValue(context_, JS_GetPropertyStr(context_, state.get(), "__arrangeNativeScroll"))});
                 result.push_back({item, key});
             }
+            else if (type == "animateContentSize") {
+                arrange::core::AnimateContentSizeModifier item;
+                ScopedValue spec(context_, JS_GetPropertyStr(context_, payload, "animationSpec"));
+                if (!JS_IsObject(spec.get()) || JS_IsArray(spec.get())) { (void)throwTypeError("animateContentSize requires an animationSpec object"); return {}; }
+                const auto kind = requiredStringField(spec.get(), "kind", "animationSpec");
+                if (kind == "tween") item.animationSpec.kind = arrange::core::AnimationKind::Tween;
+                else if (kind == "spring") item.animationSpec.kind = arrange::core::AnimationKind::Spring;
+                else if (kind == "snap") item.animationSpec.kind = arrange::core::AnimationKind::Snap;
+                else { (void)throwTypeError("unknown animation spec"); return {}; }
+                auto& input = item.animationSpec;
+                input.durationMillis = numberField(spec.get(), "durationMillis", 300);
+                input.delayMillis = numberField(spec.get(), "delayMillis", 0);
+                input.stiffness = numberField(spec.get(), "stiffness", 400);
+                input.dampingRatio = numberField(spec.get(), "dampingRatio", 1);
+                input.threshold = numberField(spec.get(), "visibilityThreshold", 0.01f);
+                input.bezier = {numberField(spec.get(), "x1", 0.4f), numberField(spec.get(), "y1", 0), numberField(spec.get(), "x2", 0.2f), numberField(spec.get(), "y2", 1)};
+                item.clip = boolField(payload, "clip", true);
+                result.push_back({item, key});
+            }
             else if (type == "weight" || type == "align") {
                 arrange::core::ParentDataModifierSemantics item;
                 if (type == "weight") {
@@ -299,7 +318,6 @@ namespace arrange::quickjs {
                      type == "focusProperties" ||
                      type == "focusGroup" ||
                      type == "scrollable" ||
-                     type == "animateContentSize" ||
                      type == "pointerInput" ||
                      type == "semantics" ||
                      type == "testTag") {

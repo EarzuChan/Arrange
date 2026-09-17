@@ -27,6 +27,8 @@ export type ArrangeHostNode = Omit<ArrangeElementVNode, "children"> & {
     __arrangeParent?: ArrangeHostNode | ArrangeContainer | null
     __arrangeNodeId?: NodeId
     __arrangeBindings: Map<string, NativeBindingHandle>
+    __arrangeLastInputs: Map<string, unknown>
+    __arrangeModifierBindings: Map<bigint, NativeBindingHandle>
 }
 
 export type ArrangeContainer = {

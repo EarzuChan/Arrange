@@ -1,4 +1,5 @@
 #include <arrange/core/Modifier.h>
+#include <arrange/core/PropValue.h>
 #include <arrange/juce/ArrangeRuntime.h>
 #include <arrange/juce/RuntimePackageBinder.h>
 #include <arrange/juce/RuntimeSessionState.h>
@@ -85,6 +86,7 @@ int main(int argc, char** argv) {
         check(stats.measures == baseline.measures && stats.placements == baseline.placements + 1, "Offset did not reuse measurement");
         check(runtime.publishedFrame().content.hitTest != hit, "Offset failed to rebuild hit geometry");
         command("validate");
+        const auto steadyBindings = runtime.scene().bindingCount();
         command("text");
         check(runtime.frameCounters().measures == baseline.measures + 1, "Text change skipped measurement");
         check(findText(runtime.scene(), "撅: 1") == counter, "Text change replaced the host");
@@ -95,7 +97,7 @@ int main(int argc, char** argv) {
             command("validate");
         }
         check(runtime.frameCounters().measures == baseline.measures + 1, "Repeated value updates accumulated measure work");
-        check(runtime.scene().bindingCount() == bindings && hostView->eventSlotCount() == callbacks, "Repeated value updates leaked native resources");
+        check(runtime.scene().bindingCount() == steadyBindings && hostView->eventSlotCount() == callbacks, "Repeated value updates leaked native resources");
         const auto first = findText(runtime.scene(), "A");
         const auto second = findText(runtime.scene(), "B");
         command("reorder");
@@ -115,6 +117,52 @@ int main(int argc, char** argv) {
         arrange::juce::JuceTextMeasurer measurer;
         TextLayoutService textService(measurer);
         arrange::juce::InteractionStateOwner interaction(textService);
+        const auto galleryBaselineBindings = runtime.scene().bindingCount();
+        const auto galleryBaselineCallbacks = runtime.scene().eventSlotCount();
+        command("gallery");
+        command("gallery:baseline");
+        const auto colorBaseline = runtime.frameCounters();
+        command("gallery:color");
+        for (int i = 0; i < 24; ++i) {
+            const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
+            if (!sample.ok) throw std::runtime_error(sample.error);
+        }
+        command("gallery:validate-color");
+        check(runtime.frameCounters().measures == colorBaseline.measures && runtime.frameCounters().placements == colorBaseline.placements, "real gallery color animation ran geometry phases");
+        check(runtime.frameCounters().paintBuilds > colorBaseline.paintBuilds + 10, "real gallery did not publish intermediate animation samples");
+        check(runtime.frameCounters().paintWork.layersBuilt - colorBaseline.paintWork.layersBuilt <= 24, "gallery color rebuilt unrelated Modifier layers");
+        NodeId focusedInput = 0;
+        for (NodeId id = 1; id < 1024; ++id) if (runtime.scene().contains(id) && runtime.scene().node(id).type == NodeType::Input && stringProp(runtime.scene().node(id), "modelValue", "") == "Focus then hide") focusedInput = id;
+        check(focusedInput != 0, "gallery focus input is missing");
+        auto inputTree = runtime.scene().tree();
+        const auto inputBounds = inputTree.node(focusedInput).contentBounds;
+        interaction.pointerDown(inputTree, *runtime.publishedFrame().content.hitTest, inputBounds.x + 10, inputBounds.y + 10, {});
+        check(interaction.focusedNode() == focusedInput, "gallery input could not acquire focus");
+        command("gallery:all");
+        interaction.synchronizePublishedInput(runtime.scene().tree(), true);
+        check(!interaction.focusedNode(), "exiting AnimatedVisibility retained native input focus");
+        for (const auto& region : runtime.publishedFrame().content.hitTest->regions) check(region.target.node != focusedInput, "exiting AnimatedVisibility retained hit regions");
+        for (int i = 0; i < 4; ++i) {
+            const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
+            if (!sample.ok) throw std::runtime_error(sample.error);
+        }
+        check(runtime.scene().tree().activeAnimationCount() > 0, "gallery content-size animation did not join native frame clock");
+        command("reorder");
+        command("gallery:visibility"); // reverse an exit before retirement
+        for (int i = 0; i < 180 && runtime.hasPendingFrameWork(); ++i) {
+            const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
+            if (!sample.ok) throw std::runtime_error(sample.error);
+        }
+        command("gallery:validate-settled");
+        check(!runtime.hasPendingAnimationFrame() && runtime.scene().tree().activeAnimationCount() == 0, "gallery did not release animation frame demand");
+        command("gallery:all");
+        command("gallery-remove");
+        check(!runtime.hasPendingAnimationFrame(), "removing gallery retained animated scopes");
+        check(runtime.scene().bindingCount() == galleryBaselineBindings && runtime.scene().eventSlotCount() == galleryBaselineCallbacks, "gallery removal leaked binding or callback resources");
+        const auto performance = runtime.frameCounters();
+        std::cout << "Gallery work: measured=" << performance.layoutWork.measuredNodes << ", measure-cache=" << performance.layoutWork.measureCacheHits
+                  << ", paint-layers=" << performance.paintWork.layersBuilt << ", layer-cache=" << performance.paintWork.layerCacheHits
+                  << ", measure-ms=" << performance.measureMillis << ", paint-ms=" << performance.paintBuildMillis << '\n';
         arrange::juce::RuntimeSessionState session;
         arrange::juce::DiagnosticsState diagnostics;
         arrange::juce::PassivePaintRenderer paint;
@@ -123,6 +171,14 @@ int main(int argc, char** argv) {
         session.resize(520, 380, runtime);
         auto oldSubmit = submit;
         for (int iteration = 0; iteration < 4; ++iteration) {
+            // Replace a live context while JS and native animations own resources.
+            runtime.enqueueStringEvent(oldSubmit, "gallery");
+            auto running = runtime.pumpFrame(1, constraints, timestamp += 16);
+            if (!running.ok) throw std::runtime_error(running.error);
+            runtime.enqueueStringEvent(oldSubmit, "gallery:all");
+            running = runtime.pumpFrame(1, constraints, timestamp += 16);
+            if (!running.ok) throw std::runtime_error(running.error);
+            check(runtime.hasPendingAnimationFrame(), "HMR setup did not start animation");
             auto nextHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
             auto* nextView = nextHost.get();
             arrange::quickjs::AppScriptLoader nextLoader(*nextHost);

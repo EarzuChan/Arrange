@@ -51,6 +51,7 @@ export {
 } from './computed.ts'
 export {
   effect,
+  batchUpdates,
   stop,
   enableTracking,
   pauseTracking,

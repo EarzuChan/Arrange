@@ -95,6 +95,62 @@ namespace arrange::core {
         return ops;
     }
 
+    std::shared_ptr<const PaintFragment> DrawOpsBuilder::buildFragment(LayoutTree& tree, NodeId id, float alpha, PaintWorkCounters& counters) const {
+        auto& node = tree.node(id);
+        constexpr auto paintMask = dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Layout) |
+            dirtyMask(DirtyFlag::Placement) | dirtyMask(DirtyFlag::Paint) |
+            dirtyMask(DirtyFlag::Transform) | dirtyMask(DirtyFlag::Resource);
+        if (node.paintCache && node.paintCache->alpha == alpha && !(node.dirty & paintMask)) {
+            ++counters.subtreeCacheHits;
+            return node.paintCache;
+        }
+        ++counters.nodesBuilt;
+        auto fragment = std::make_shared<PaintFragment>();
+        fragment->alpha = alpha;
+        for (std::size_t index = 0; index < node.modifier.elements().size(); ++index) {
+            auto& instance = node.modifier.elements()[index];
+            auto cached = instance.paintCache;
+            if (!cached || cached->value != instance.descriptor.value || cached->bounds != instance.bounds || cached->alpha != alpha) {
+                auto layer = std::make_shared<PaintLayerFragment>();
+                layer->value = instance.descriptor.value;
+                layer->bounds = instance.bounds;
+                layer->alpha = alpha;
+                std::vector<DrawOp> ops;
+                std::size_t split = 0;
+                collectModifier(tree, id, index, ops, alpha, [&](float nextAlpha) {
+                    split = ops.size();
+                    layer->contentAlpha = nextAlpha;
+                }, false, index + 1);
+                layer->before.assign(ops.begin(), ops.begin() + static_cast<std::ptrdiff_t>(split));
+                layer->after.assign(ops.begin() + static_cast<std::ptrdiff_t>(split), ops.end());
+                instance.paintCache = cached = std::move(layer);
+                ++counters.layersBuilt;
+            }
+            else ++counters.layerCacheHits;
+            alpha = cached->contentAlpha;
+            fragment->layers.push_back(std::move(cached));
+        }
+        collectContent(tree, id, fragment->content, alpha, false);
+        for (auto child : childrenInPaintOrder(tree, node)) fragment->children.push_back(buildFragment(tree, child, alpha, counters));
+        node.paintCache = fragment;
+        return fragment;
+    }
+
+    std::vector<DrawOp> DrawOpsBuilder::collectCached(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const {
+        std::vector<DrawOp> ops;
+        if (!tree.contains(root)) return ops;
+        const auto fragment = buildFragment(tree, root, 1, counters);
+        std::function<void(const PaintFragment&)> flatten = [&](const PaintFragment& part) {
+            for (const auto& layer : part.layers) ops.insert(ops.end(), layer->before.begin(), layer->before.end());
+            ops.insert(ops.end(), part.content.begin(), part.content.end());
+            for (const auto& child : part.children) flatten(*child);
+            for (auto layer = part.layers.rbegin(); layer != part.layers.rend(); ++layer) ops.insert(ops.end(), (*layer)->after.begin(), (*layer)->after.end());
+        };
+        flatten(*fragment);
+        counters.emittedOps += ops.size();
+        return ops;
+    }
+
     std::vector<DrawOp> DrawOpsBuilder::collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const {
         std::vector<DrawOp> ops;
         const auto path = nodePath(tree, target);
@@ -114,12 +170,13 @@ namespace arrange::core {
         collectModifier(tree, id, 0, ops, alpha);
     }
 
-    void DrawOpsBuilder::collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride, bool geometryOnly) const {
+    void DrawOpsBuilder::collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride, bool geometryOnly, std::size_t stopAt) const {
+        if (index == stopAt) { contentOverride(alpha); return; }
         const auto& chain = tree.node(id).modifier.elements();
         if (index == chain.size()) { if (contentOverride) contentOverride(alpha); else collectContent(tree, id, ops, alpha); return; }
         const auto& instance = chain[index];
         const auto& value = instance.descriptor.value;
-        const auto content = [&] { collectModifier(tree, id, index + 1, ops, alpha, contentOverride, geometryOnly); };
+        const auto content = [&] { collectModifier(tree, id, index + 1, ops, alpha, contentOverride, geometryOnly, stopAt); };
         const auto pushClip = [&](const PaintStyleSemantics& shape) {
             DrawOp op;
             op.type = DrawOpType::PushClip;
@@ -149,6 +206,9 @@ namespace arrange::core {
             }
             if (!overlay) content();
             return;
+        }
+        if (const auto* animation = std::get_if<AnimateContentSizeModifier>(&value); animation && animation->clip) {
+            pushClip({}); content(); pop(DrawOpType::PopClip); return;
         }
         if (const auto* clip = std::get_if<ClipModifier>(&value)) {
             pushClip(clip->shape);
@@ -185,7 +245,7 @@ namespace arrange::core {
         content();
     }
 
-    void DrawOpsBuilder::collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const {
+    void DrawOpsBuilder::collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha, bool includeChildren) const {
         const auto& node = tree.node(id);
         const auto contentRect = node.contentBounds;
         if (node.type == NodeType::Text && !node.text.empty()) {
@@ -274,7 +334,7 @@ namespace arrange::core {
             ops.push_back(std::move(op));
         }
 
-        for (auto childId : childrenInPaintOrder(tree, node)) collectNode(tree, childId, ops, alpha);
+        if (includeChildren) for (auto childId : childrenInPaintOrder(tree, node)) collectNode(tree, childId, ops, alpha);
 
 
     }

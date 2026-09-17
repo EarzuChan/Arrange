@@ -71,6 +71,19 @@ namespace arrange::core {
         std::uint64_t paintBuilds = 0;
         std::uint64_t hitBuilds = 0;
         std::uint64_t publications = 0;
+        LayoutWorkCounters layoutWork;
+        PaintWorkCounters paintWork;
+        HitWorkCounters hitWork;
+        std::uint64_t nativeAnimationSamples = 0;
+        std::uint64_t candidateNodesCopied = 0;
+        double measureMillis = 0;
+        double placeMillis = 0;
+        double paintBuildMillis = 0;
+        double hitBuildMillis = 0;
+        std::uint64_t fullLayouts = 0;
+        std::uint64_t fullDisplayListBuilds = 0;
+        std::string lastFullLayoutReason;
+        std::string lastFullDisplayListReason;
     };
 
     struct PublishedFrame {
@@ -111,7 +124,7 @@ namespace arrange::core {
             const MutationTransaction* transaction,
             bool framePipelineRequested,
             PublishedFrame& publishedFrame,
-            const FrameFinalizer& finalize = {});
+            const FrameFinalizer& finalize = {}, double timeMillis = 0);
 
         // Diagnostics/interaction can publish against retained geometry without replaying JS.
         bool publishRetained(const NativeScene& scene, PublishedFrame& publishedFrame, const FrameFinalizer& finalize);

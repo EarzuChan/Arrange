@@ -330,6 +330,8 @@ namespace arrange::quickjs {
             for (const auto* instance : instances) {
                 const auto item = bindingValue(context, {instance->handle.identity, instance->handle.generation});
                 JS_SetPropertyStr(context, item, "key", JS_NewString(context, instance->descriptor.key.c_str()));
+                const auto kind = arrange::core::modifierKindName(instance->descriptor.value);
+                JS_SetPropertyStr(context, item, "kind", JS_NewStringLen(context, kind.data(), kind.size()));
                 JS_SetPropertyUint32(context, result, index++, item);
             }
             return result;
@@ -620,6 +622,11 @@ namespace arrange::quickjs {
             return JS_UNDEFINED;
         }
 
+        JSValue performanceMeasureNow(JSContext* context, JSValueConst, int, JSValueConst*) {
+            const auto now = std::chrono::steady_clock::now().time_since_epoch();
+            return JS_NewFloat64(context, std::chrono::duration<double, std::milli>(now).count());
+        }
+
         JSValue performanceNow(JSContext* context, JSValueConst, int, JSValueConst*) {
             auto* self = runtime(context);
             return JS_NewFloat64(context, self == nullptr ? 0.0 : self->frameTimeMillis);
@@ -685,6 +692,7 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(context, global.get(), "cancelAnimationFrame", JS_NewCFunction(context, cancelAnimationFrame, "cancelAnimationFrame", 1));
         ScopedValue performance(context, JS_NewObject(context));
         JS_SetPropertyStr(context, performance.get(), "now", JS_NewCFunction(context, performanceNow, "now", 0));
+        JS_SetPropertyStr(context, performance.get(), "measureNow", JS_NewCFunction(context, performanceMeasureNow, "measureNow", 0));
         JS_SetPropertyStr(context, global.get(), "performance", performance.release());
         ScopedValue console(context, JS_NewObject(context));
         JS_SetPropertyStr(context, console.get(), "log", JS_NewCFunction(context, consoleLog, "log", 1));

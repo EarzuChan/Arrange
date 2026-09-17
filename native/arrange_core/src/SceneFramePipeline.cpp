@@ -1,6 +1,7 @@
 #include <arrange/core/SceneFramePipeline.h>
 
 #include <exception>
+#include <chrono>
 #include <utility>
 
 namespace arrange::core {
@@ -65,11 +66,12 @@ namespace arrange::core {
         const MutationTransaction* transaction,
         bool framePipelineRequested,
         PublishedFrame& publishedFrame,
-        const FrameFinalizer& finalize) {
+        const FrameFinalizer& finalize, double timeMillis) {
         SceneFramePipelineResult result;
         result.ran = true;
         // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame。
         auto candidateScene = scene;
+        counters_.candidateNodesCopied += scene.tree().size();
         auto candidateFrame = publishedFrame;
         candidateFrame.changes = {};
         candidateFrame.error.reset();
@@ -78,28 +80,60 @@ namespace arrange::core {
             if (transaction) candidateScene.applyUncommitted(*transaction);
             recordPhase(result.phases, FramePhase::ApplyMutations, transaction != nullptr, transaction ? "applied structural and typed input submission" : "no submission");
             auto& tree = candidateScene.tree();
+            tree.advanceAnimations(timeMillis);
+            if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints)
+                tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::Resize, "constraints", "root constraints changed");
             result.plan = planFrame(candidateScene, root, transaction != nullptr, framePipelineRequested);
             candidateFrame.dirty = candidateScene.dirtySnapshot();
             result.invalidation = candidateScene.takeInvalidation();
+            if (result.plan.fullFallback) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::NativeState, "fallback", result.plan.fallbackReason);
             if (!tree.contains(root)) {
                 candidateFrame.content.drawOps.clear();
                 candidateFrame.content.overlayDrawOps.clear();
                 candidateFrame.content.focusedInputNode.reset();
             }
             else {
-                if (result.plan.measure) { layout_.measure(tree, root, constraints); ++counters_.measures; }
+                if (result.plan.measure) {
+                    const auto started = std::chrono::steady_clock::now();
+                    layout_.resetCounters();
+                    layout_.measure(tree, root, constraints);
+                    ++counters_.measures;
+                    counters_.measureMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+                    const auto work = layout_.counters();
+                    counters_.nativeAnimationSamples += work.animationSamples;
+                    counters_.layoutWork.measuredNodes += work.measuredNodes;
+                    counters_.layoutWork.measureCacheHits += work.measureCacheHits;
+                    if (work.measureCacheHits == 0) {
+                        ++counters_.fullLayouts;
+                        counters_.lastFullLayoutReason = result.plan.fullFallback ? result.plan.fallbackReason : "all reachable measurement inputs invalid or uncached";
+                    }
+                }
                 recordPhase(result.phases, FramePhase::Measure, result.plan.measure, result.plan.measure ? "measured root subtree" : "retained measured sizes");
-                if (result.plan.layout) { layout_.place(tree, root); ++counters_.placements; }
+                if (result.plan.layout) {
+                    const auto started = std::chrono::steady_clock::now();
+                    layout_.resetCounters();
+                    layout_.place(tree, root);
+                    ++counters_.placements;
+                    counters_.placeMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+                    counters_.layoutWork.placedNodes += layout_.counters().placedNodes;
+                    counters_.layoutWork.placeCacheHits += layout_.counters().placeCacheHits;
+                }
                 recordPhase(result.phases, FramePhase::Layout, result.plan.layout, result.plan.layout ? "placed root subtree" : "retained placement");
                 if (result.plan.buildPaint) {
-                    candidateFrame.content.drawOps = drawOpsBuilder_.collect(tree, root);
+                    const auto started = std::chrono::steady_clock::now();
+                    candidateFrame.content.drawOps = drawOpsBuilder_.collectCached(tree, root, counters_.paintWork);
+                    ++counters_.fullDisplayListBuilds;
+                    counters_.lastFullDisplayListReason = "flatten shared fragments into the publication display list";
                     ++counters_.paintBuilds;
+                    counters_.paintBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
                 }
                 recordPhase(result.phases, FramePhase::BuildPaint, result.plan.buildPaint, result.plan.buildPaint ? "built DrawOps" : "retained DrawOps");
             }
             if (result.plan.buildHitTest || !tree.contains(root)) {
-                candidateFrame.content.hitTest = std::make_shared<const HitTestSnapshot>(buildHitTestSnapshot(tree, root));
+                const auto started = std::chrono::steady_clock::now();
+                candidateFrame.content.hitTest = std::make_shared<const HitTestSnapshot>(buildCachedHitTestSnapshot(tree, root, counters_.hitWork));
                 ++counters_.hitBuilds;
+                counters_.hitBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
                 recordPhase(result.phases, FramePhase::BuildHitTest, true, "built immutable hit regions and constraints");
             }
             else recordPhase(result.phases, FramePhase::BuildHitTest, false, "retained hit snapshot");

@@ -92,8 +92,17 @@ namespace arrange::core {
     }
 
     Size LayoutEngine::measure(LayoutTree& tree, NodeId id, Constraints constraints) {
-        const auto measured = measureWithModifier(tree, id, 0, constraints);
         auto& node = tree.node(id);
+        if (node.measurementValid && node.measuredConstraints == constraints &&
+            !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure)))) {
+            ++counters_.measureCacheHits;
+            return {node.bounds.width, node.bounds.height};
+        }
+        ++counters_.measuredNodes;
+        node.placementValid = false;
+        const auto measured = measureWithModifier(tree, id, 0, constraints);
+        node.measuredConstraints = constraints;
+        node.measurementValid = true;
         node.bounds.width = measured.width;
         node.bounds.height = measured.height;
         return measured;
@@ -168,12 +177,20 @@ namespace arrange::core {
             measured.height = clamp(measured.height, constraints.minHeight, constraints.maxHeight);
         }
         if (required) instance.childOffset = {(measured.width - instance.childMeasured.width) * 0.5f, (measured.height - instance.childMeasured.height) * 0.5f};
+        if (node.baseline >= 0) node.baseline += instance.childOffset.y;
+        if (const auto* animation = std::get_if<AnimateContentSizeModifier>(&instance.descriptor.value)) {
+            if (instance.sizeAnimation.initialized && (instance.sizeAnimation.running || instance.sizeAnimation.target != measured || instance.sizeAnimation.spec != animation->animationSpec)) ++counters_.animationSamples;
+            measured = instance.sizeAnimation.update(measured, animation->animationSpec, tree.frameTimeMillis());
+            measured.width = clamp(measured.width, constraints.minWidth, constraints.maxWidth);
+            measured.height = clamp(measured.height, constraints.minHeight, constraints.maxHeight);
+        }
         instance.measured = measured;
         return measured;
     }
 
     Size LayoutEngine::measureContent(LayoutTree& tree, NodeId id, Constraints constraints) {
         auto& node = tree.node(id);
+        node.baseline = -1.0f;
         Size content;
 
         switch (node.type) {
@@ -242,6 +259,17 @@ namespace arrange::core {
                 height = std::max(height, measuredChild.height);
             }
             width += gaps;
+            const auto defaultAlign = nodeAlignmentProp(node, "verticalAlignment", "vertical-alignment", "Top");
+            float maxBaseline = -1.0f, maxDescent = 0.0f;
+            for (auto childId : node.children) {
+                const auto& child = tree.node(childId);
+                const auto alignment = alignModifier(child);
+                if (child.baseline >= 0 && (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline"))) {
+                    maxBaseline = std::max(maxBaseline, child.baseline);
+                    maxDescent = std::max(maxDescent, child.bounds.height - child.baseline);
+                }
+            }
+            if (maxBaseline >= 0) { height = std::max(height, maxBaseline + maxDescent); node.baseline = maxBaseline; }
             content = {width, height};
             break;
         }
@@ -277,6 +305,7 @@ namespace arrange::core {
                 height += measuredChild.height;
             }
             height += gaps;
+            if (!node.children.empty()) node.baseline = tree.node(node.children.front()).baseline;
             content = {width, height};
             break;
         }
@@ -319,13 +348,31 @@ namespace arrange::core {
 
         node.bounds.width = clamp(content.width, constraints.minWidth, safeMax(constraints.maxWidth, content.width));
         node.bounds.height = clamp(content.height, constraints.minHeight, safeMax(constraints.maxHeight, content.height));
+        if ((node.type == NodeType::Box || node.type == NodeType::Root) && !node.children.empty()) {
+            const auto& child = tree.node(node.children.front());
+            if (child.baseline >= 0) {
+                const auto alignment = alignModifier(child);
+                const auto defaultAlign = nodeAlignmentProp(node, "contentAlignment", "content-alignment", "TopStart");
+                node.baseline = child.baseline + crossAxisOffset(node.bounds.height, child.bounds.height, alignment.empty() ? defaultAlign : alignment, false);
+            }
+        }
         return {node.bounds.width, node.bounds.height};
     }
 
     void LayoutEngine::place(LayoutTree& tree, NodeId id, float x, float y) {
         auto& node = tree.node(id);
+        if (node.placementValid && node.bounds.x == x && node.bounds.y == y &&
+            !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Placement)))) {
+            ++counters_.placeCacheHits;
+            return;
+        }
+        ++counters_.placedNodes;
         node.bounds.x = x;
         node.bounds.y = y;
+        node.placementValid = true;
+        // Geometry is an input to both paint fragments and hit regions.
+        markDirty(node, DirtyFlag::Paint);
+        markDirty(node, DirtyFlag::HitTest);
         placeWithModifier(tree, id, 0, x, y);
     }
 
@@ -353,11 +400,19 @@ namespace arrange::core {
         if (node.type == NodeType::Row) {
             const auto spacing = rowSpacing(node);
             const auto defaultAlign = nodeAlignmentProp(node, "verticalAlignment", "vertical-alignment", "Top");
+            float baseline = -1.0f;
+            for (auto childId : node.children) {
+                const auto& child = tree.node(childId);
+                const auto alignment = alignModifier(child);
+                if (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline")) baseline = std::max(baseline, child.baseline);
+            }
             float cursor = x;
             for (auto childId : node.children) {
                 auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
-                const auto offset = crossAxisOffset(height, child.bounds.height, childAlign.empty() ? defaultAlign : childAlign, false);
+                const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
+                const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline
+                    : crossAxisOffset(height, child.bounds.height, alignment, false);
                 place(tree, childId, cursor, y + offset);
                 cursor += child.bounds.width + spacing;
             }

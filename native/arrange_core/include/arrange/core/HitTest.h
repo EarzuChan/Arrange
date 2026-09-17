@@ -29,6 +29,20 @@ namespace arrange::core {
         std::vector<HitRegion> regions;
     };
 
+    struct HitFragment {
+        HitTestSnapshot local;
+        std::size_t contentConstraint = 0;
+        bool enabled = true;
+        std::vector<std::shared_ptr<const HitFragment>> children;
+    };
+
+    struct HitWorkCounters {
+        std::uint64_t nodesBuilt = 0;
+        std::uint64_t subtreeCacheHits = 0;
+        std::uint64_t emittedRegions = 0;
+    };
+
+    HitTestSnapshot buildCachedHitTestSnapshot(LayoutTree& tree, NodeId root, HitWorkCounters& counters);
     HitTestSnapshot buildHitTestSnapshot(const LayoutTree& tree, NodeId root);
 
     class HitTester {

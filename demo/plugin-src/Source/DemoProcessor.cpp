@@ -16,9 +16,10 @@ void ArrangeDemoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 
 juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
     arrange::juce::EditorConfig config;
+
     config.app.useDist();
-    config.width = 520;
-    config.height = 380;
+    config.width = 680;
+    config.height = 640;
     config.window.title = "Arrange Demo";
     config.window.resizable = true;
     config.window.useCornerResizer = true;
@@ -28,6 +29,7 @@ juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
     config.app.useLive();
     config.diagnostics.badge = arrange::juce::DiagnosticVisibility::Always;
 #endif
+
     return new arrange::juce::ArrangeEditor(*this, std::move(config));
 }
 

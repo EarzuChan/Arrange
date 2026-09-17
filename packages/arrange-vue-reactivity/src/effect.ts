@@ -581,3 +581,9 @@ function cleanupEffect(e: ReactiveEffect) {
   }
 }
 
+
+// Native frame sampling publishes all animated channels before notifying observers.
+export function batchUpdates<T>(work: () => T): T {
+    startBatch()
+    try { return work() } finally { endBatch() }
+}

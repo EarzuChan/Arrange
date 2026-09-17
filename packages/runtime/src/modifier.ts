@@ -1,3 +1,6 @@
+import {computed} from "@arrange/vue-reactivity"
+import {arrangeValue} from "@arrange/vue-runtime-core"
+import {nativeAnimationSpec, spring, type AnimationSpec} from "./animation.ts"
 import {PaddingValues} from "./primitives.ts"
 import type {Brush, PaddingValue, Shape} from "./primitives.ts"
 
@@ -18,10 +21,14 @@ export type ScrollStateLike = {
     [key: string]: unknown
 }
 
+export const modifierAllocationStats = {chains: 0, elementReferences: 0}
+
 export class Modifier {
     readonly elements: readonly ModifierElement[]
 
     constructor(elements: readonly ModifierElement[] = []) {
+        modifierAllocationStats.chains++
+        modifierAllocationStats.elementReferences += elements.length
         this.elements = Object.freeze([...elements])
         Object.freeze(this)
     }
@@ -40,6 +47,10 @@ export class Modifier {
 
     if(condition: boolean, ifModifier: Modifier, elseModifier: Modifier = m): Modifier {
         return condition ? this.then(ifModifier) : this.then(elseModifier)
+    }
+
+    animateContentSize(animationSpec: AnimationSpec = spring(), args: {clip?: boolean} = {}): Modifier {
+        return this.#add("animateContentSize", {animationSpec: nativeAnimationSpec(animationSpec), clip: args.clip ?? true})
     }
 
     width(value: number): Modifier { return this.#add("width", {value}) }
@@ -112,3 +123,29 @@ function scrollStateSnapshot(state: ScrollStateLike): ScrollStateLike {
     }
 }
 
+
+export const modifierStats = {parameterEvaluations: 0, chainsAssembled: 0, instanceWrites: 0, chainWrites: 0, equalWritesSkipped: 0}
+
+const builtinMethods = new Map(Object.getOwnPropertyNames(Modifier.prototype).map(name => [name, (Modifier.prototype as unknown as Record<string, unknown>)[name]]))
+
+/** Compiler-only lowering of a fixed, proven native factory chain. */
+export function arrangeModifier(root: Modifier, segments: readonly (readonly [string, () => unknown[]])[]) {
+    const invoke = (receiver: Modifier, method: string, args: unknown[]) => {
+        const factory = (receiver as unknown as Record<string, (...args: unknown[]) => Modifier>)[method]
+        return factory.apply(receiver, args)
+    }
+    const valid = () => root === m && segments.every(([name]) => (Modifier.prototype as unknown as Record<string, unknown>)[name] === builtinMethods.get(name))
+    const parameters = segments.map(([method, read]) => computed(() => {
+        modifierStats.parameterEvaluations++
+        return invoke(root, method, read())
+    }))
+    return arrangeValue(() => {
+        if (!valid()) {
+            let result = root
+            for (const [method, read] of segments) result = invoke(result, method, read())
+            return result
+        }
+        modifierStats.chainsAssembled++
+        return new Modifier(parameters.flatMap(parameter => parameter.value.elements))
+    })
+}

@@ -217,7 +217,7 @@ interface Modifier {
     verticalScroll(state?: ScrollState): Modifier
     horizontalScroll(state?: ScrollState): Modifier
 
-    animateContentSize(args?: AnimateContentSizeArgs): Modifier
+    animateContentSize(spec?: AnimationSpec, args?: {clip?: boolean}): Modifier
 }
 ```
 

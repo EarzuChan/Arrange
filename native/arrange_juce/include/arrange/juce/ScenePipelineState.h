@@ -27,6 +27,7 @@ namespace arrange::juce {
             arrange::core::Constraints constraints,
             bool framePipelineRequested,
             const arrange::core::FrameFinalizer& finalize = {});
+        void setFrameTime(double timeMillis) noexcept { frameTimeMillis_ = timeMillis; }
 
         [[nodiscard]] arrange::core::NativeScene& scene() noexcept { return scene_; }
         [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept { return scene_; }
@@ -37,6 +38,7 @@ namespace arrange::juce {
         }
 
     private:
+        double frameTimeMillis_ = 0;
         arrange::core::NativeScene scene_;
         arrange::core::SceneFramePipeline pipeline_;
         arrange::core::InputIntentQueue pendingIntents_;

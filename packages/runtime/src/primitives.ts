@@ -76,6 +76,7 @@ export const Alignment = Object.freeze({
     TopStart: "TopStart", TopCenter: "TopCenter", TopEnd: "TopEnd",
     CenterStart: "CenterStart", Center: "Center", CenterEnd: "CenterEnd",
     BottomStart: "BottomStart", BottomCenter: "BottomCenter", BottomEnd: "BottomEnd",
+    Baseline: "Baseline",
     Start: "Start", CenterHorizontally: "CenterHorizontally", End: "End",
     Top: "Top", CenterVertically: "CenterVertically", Bottom: "Bottom",
 })

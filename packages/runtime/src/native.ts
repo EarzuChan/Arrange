@@ -50,7 +50,7 @@ export type NativePropValue =
 
 export type NativeBindingHandle = Readonly<{identity: bigint; generation: bigint}>
 
-export type NativeModifierHandle = NativeBindingHandle & Readonly<{key: string}>
+export type NativeModifierHandle = NativeBindingHandle & Readonly<{key: string; kind: string}>
 
 export type NativeTransactionTarget = {
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle

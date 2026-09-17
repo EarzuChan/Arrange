@@ -529,3 +529,72 @@ test('recursive watchers fail a flush instead of blocking the native frame indef
     } finally { stop() }
     await runtime.nextTick()
 })
+
+test('AnimatedVisibility retains exiting structure, disables interaction immediately and cancels on unmount', async () => {
+    const native = nativeTarget(), clock = runtime.createManualAnimationClock(), visible = runtime.ref(true)
+    const baseline = runtime.animationStats.activeAnimations
+    const app = runtime.createApp({setup: () => () => runtime.h(runtime.AnimatedVisibility, {
+        visible: runtime.arrangeValue(() => visible.value), clock,
+        animationSpec: runtime.tween({durationMillis: 100, easing: runtime.linearEasing}),
+    }, {default: () => runtime.h('Text', {text: 'retained'})})})
+    app.mount(native.target)
+    const count = native.nodes.size
+    visible.value = false; await flush()
+    assert.equal(native.nodes.size, count)
+    assert.equal(native.values.get('2:enabled'), false)
+    clock.advanceBy(40); await flush()
+    assert.equal(native.nodes.size, count)
+    visible.value = true; await flush()
+    clock.advanceBy(100); await flush()
+    assert.equal(native.nodes.size, count)
+    visible.value = false; await flush()
+    clock.advanceBy(100); await flush()
+    assert.equal(native.nodes.size, 1)
+    assert.equal(native.bindings.size, 0)
+    visible.value = true; await flush()
+    app.unmount()
+    assert.equal(clock.pendingFrames, 0)
+    assert.equal(runtime.animationStats.activeAnimations, baseline)
+})
+
+test('Crossfade preserves outgoing state and resurrects interrupted content without duplicate instances', async () => {
+    const native = nativeTarget(), clock = runtime.createManualAnimationClock(), selection = runtime.ref('A')
+    const app = runtime.createApp({setup: () => () => runtime.h(runtime.Crossfade, {
+        targetState: runtime.arrangeValue(() => selection.value), clock,
+        animationSpec: runtime.tween({durationMillis: 100, easing: runtime.linearEasing}),
+    }, {default: ({state}: {state: string}) => runtime.h('Text', {text: state})})})
+    app.mount(native.target); await flush()
+    const count = native.nodes.size
+    selection.value = 'B'; await flush()
+    assert.equal(native.nodes.size, count + 2)
+    clock.advanceBy(40); await flush()
+    selection.value = 'A'; await flush()
+    assert.equal(native.nodes.size, count + 2)
+    clock.advanceBy(100); await flush()
+    assert.equal(native.nodes.size, count)
+    selection.value = 'C'; await flush()
+    app.unmount()
+    assert.equal(clock.pendingFrames, 0)
+})
+
+test('proven Modifier chain isolates parameter reads while helpers and dynamic chains keep ordinary evaluation', async () => {
+    const color = runtime.ref(1), width = runtime.ref(20), native = nativeTarget()
+    const options = {mode: 'function' as const, prefixIdentifiers: true, bindingMetadata: {
+        __arrangeModifierRoots: ['m'], m: 'setup-const', color: 'setup-ref', width: 'setup-ref',
+    } as never}
+    const {code} = compile('<Box :modifier="m.width(width).height(20).background(color)" />', options)
+    assert.match(code, /arrangeModifier/)
+    const render = new Function('Vue', code)(runtime)
+    const setup = {m: runtime.m, get width() {return width.value}, get color() {return color.value}}
+    const app = runtime.createApp({setup: () => () => render({}, [], {}, setup)})
+    app.mount(native.target)
+    const evaluations = runtime.modifierStats.parameterEvaluations
+    color.value = 2; await flush()
+    assert.equal(runtime.modifierStats.parameterEvaluations - evaluations, 1)
+    assert.equal((native.values.get('2:modifier') as runtime.Modifier).elements[2].value.brush, 2)
+    const fallback = compile('<Box :modifier="m.width(helper(width)).background(color)" />', options).code
+    assert.doesNotMatch(fallback, /arrangeModifier/)
+    const dynamic = compile('<Box :modifier="m.width(width).then(extra).background(color)" />', options).code
+    assert.doesNotMatch(dynamic, /arrangeModifier/)
+    app.unmount()
+})

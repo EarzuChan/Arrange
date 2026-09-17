@@ -749,6 +749,9 @@ export function compileScript(
     ctx.userImports,
   )) {
     if (isType) continue
+    if ((source === '@arrange/framework' || source === '@arrange/runtime') && imported === 'm') {
+      (ctx.bindingMetadata.__arrangeModifierRoots ??= []).push(key)
+    }
     ctx.bindingMetadata[key] =
       imported === '*' ||
       (imported === 'default' && source.endsWith('.vue')) ||

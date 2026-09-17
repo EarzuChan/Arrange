@@ -5,6 +5,8 @@ import type {ComponentInternalInstance} from './component.ts'
 import {queueJob, SchedulerJobFlags, type SchedulerJob} from './scheduler.ts'
 import {callWithErrorHandling, ErrorCodes} from './errorHandling.ts'
 
+const measureNow = () => (performance as Performance & {measureNow?: () => number}).measureNow?.() ?? performance.now()
+
 const valueExpression = Symbol('Arrange value expression')
 export const textBindingKey = Symbol('Arrange text content')
 
@@ -57,7 +59,9 @@ export class ValueBinding {
         this.scope = owner?.scope
         const evaluate = () => new ReactiveEffect(() => {
             arrangeExecutionStats.valueEvaluations++
-            const value = this.read()
+            const started = measureNow()
+            let value: unknown
+            try { value = this.read() } finally { arrangeExecutionStats.valueEvaluationMillis += measureNow() - started }
             if (!this.initialized || !Object.is(value, this.value)) {
                 const previous = this.value
                 pauseTracking()

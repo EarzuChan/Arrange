@@ -184,6 +184,25 @@ namespace arrange::core {
         return snapshot;
     }
 
+    std::size_t LayoutTree::activeAnimationCount() const noexcept {
+        std::size_t count = 0;
+        for (const auto& [_, node] : nodes_) for (const auto& instance : node.modifier.elements())
+            if (std::holds_alternative<AnimateContentSizeModifier>(instance.descriptor.value) && instance.sizeAnimation.running) ++count;
+        return count;
+    }
+
+    void LayoutTree::advanceAnimations(double timeMillis) {
+        frameTimeMillis_ = timeMillis;
+        for (auto& [id, node] : nodes_) {
+            for (const auto& instance : node.modifier.elements()) {
+                if (std::holds_alternative<AnimateContentSizeModifier>(instance.descriptor.value) && instance.sizeAnimation.running) {
+                    markDirtyAttributed(id, DirtyFlag::Layout, InvalidationSource::NativeState, "animateContentSize", "VBlank size animation sample");
+                    break;
+                }
+            }
+        }
+    }
+
     void LayoutTree::clearDirty() noexcept { for (auto& [_, node] : nodes_) node.dirty = 0; }
 
     void LayoutTree::markDirtyWithPropagation(NodeId id, DirtyFlag flag) {
@@ -202,6 +221,8 @@ namespace arrange::core {
             markAncestorsDirty(id, DirtyFlag::Layout);
             break;
         case DirtyFlag::Placement:
+            markAncestorsDirty(id, DirtyFlag::Placement);
+            [[fallthrough]];
         case DirtyFlag::Transform:
             markDirty(dirtyNode, DirtyFlag::Paint);
             markDirty(dirtyNode, DirtyFlag::HitTest);
@@ -216,6 +237,8 @@ namespace arrange::core {
             markAncestorsDirty(id, DirtyFlag::Paint);
             break;
         case DirtyFlag::Paint:
+            markAncestorsDirty(id, DirtyFlag::Paint);
+            break;
         case DirtyFlag::Focus:
         case DirtyFlag::Accessibility:
         case DirtyFlag::EventSlot:
@@ -297,6 +320,9 @@ namespace arrange::core {
         case DirtyFlag::EventSlot:
             break;
         }
+        // A viewport resize changes root constraints; descendants validate their
+        // actual incoming constraints instead of receiving an indiscriminate dirty.
+        if (source != InvalidationSource::Resize) for (auto& [_, node] : nodes_) node.dirty |= dirty;
         invalidation_.record(source, std::nullopt, dirty, std::move(field), std::move(reason));
     }
 

@@ -1,7 +1,7 @@
 import {ErrorCodes, callWithAsyncErrorHandling, createRenderer} from "@arrange/vue-runtime-core"
 import type {App as VueApp, Component} from "@arrange/vue-runtime-core"
 import {Text} from "./components.ts"
-import {m, toModifier} from "./modifier.ts"
+import {m, toModifier, modifierStats} from "./modifier.ts"
 import {ARRANGE_RUNTIME_VERSION} from "./native.ts"
 import type {NativeMutation, NativePropValue, NativeTransactionTarget, NodeId} from "./native.ts"
 import type {ArrangeContainer, ArrangeHostNode} from "./types.ts"
@@ -36,6 +36,8 @@ function makeNode(type: string, kind: ArrangeHostNode["kind"] = "element"): Arra
         kind,
         props: kind === "anchor" ? {} : {modifier: m},
         __arrangeBindings: new Map(),
+        __arrangeLastInputs: new Map(),
+        __arrangeModifierBindings: new Map(),
         children: [],
     }
 }
@@ -70,17 +72,59 @@ function assignNodeIds(node: ArrangeHostNode | null | undefined, container: Arra
     for (const child of node.children ?? []) assignNodeIds(child, container)
 }
 
+function equalInput(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) return true
+    if (!left || !right || typeof left !== "object" || typeof right !== "object") return false
+    const a = Object.keys(left), b = Object.keys(right)
+    return a.length === b.length && a.every(key => Object.prototype.hasOwnProperty.call(right, key)
+        && equalInput((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]))
+}
+
+function modifierKind(type: string): string { return type === "absoluteOffset" ? "offset" : type }
+
 function inputMutation(node: ArrangeHostNode, key: string, value: unknown): NativeMutation {
     const id = node.__arrangeNodeId
     if (!id) throw new Error("Arrange binding target is missing native node id")
     const typed = key === "modifier" ? toModifier(value as never) : key === "text" ? String(value ?? "") : value == null ? null : toNativePropValue(key, value)
     return native => {
+        const previous = node.__arrangeLastInputs.get(key)
+        if (node.__arrangeLastInputs.has(key) && equalInput(previous, typed)) {
+            modifierStats.equalWritesSkipped++
+            return
+        }
+        if (key === "modifier") {
+            const next = typed as typeof m
+            const before = previous as typeof m | undefined
+            const sameShape = before && before.elements.length === next.elements.length && next.elements.every((item, index) =>
+                modifierKind(item.type) === modifierKind(before.elements[index].type) && item.key === before.elements[index].key)
+            const instances = sameShape ? native.modifierInstances?.(id) : undefined
+            if (instances && native.registerModifierBinding && instances.length === next.elements.length && instances.every((instance, index) =>
+                instance.key === (next.elements[index].key ?? "") && instance.kind === modifierKind(next.elements[index].type))) {
+                for (let index = 0; index < next.elements.length; index++) {
+                    if (equalInput(before!.elements[index], next.elements[index])) continue
+                    const instance = instances[index]
+                    let binding = node.__arrangeModifierBindings.get(instance.identity)
+                    if (!binding) {
+                        binding = native.registerModifierBinding(id, instance)
+                        node.__arrangeModifierBindings.set(instance.identity, binding)
+                    }
+                    native.updateBinding(binding, next.elements[index])
+                    modifierStats.instanceWrites++
+                }
+                node.__arrangeLastInputs.set(key, typed)
+                return
+            }
+            for (const handle of node.__arrangeModifierBindings.values()) native.releaseBinding(handle)
+            node.__arrangeModifierBindings.clear()
+            modifierStats.chainWrites++
+        }
         let handle = node.__arrangeBindings.get(key)
         if (!handle) {
             handle = native.registerBinding(id, key)
             node.__arrangeBindings.set(key, handle)
         }
         native.updateBinding(handle, typed)
+        node.__arrangeLastInputs.set(key, typed)
     }
 }
 
@@ -90,6 +134,9 @@ function releaseSubtreeBindings(node: ArrangeHostNode): NativeMutation[] {
     mutations.push(native => {
         for (const handle of node.__arrangeBindings.values()) native.releaseBinding(handle)
         node.__arrangeBindings.clear()
+        for (const handle of node.__arrangeModifierBindings.values()) native.releaseBinding(handle)
+        node.__arrangeModifierBindings.clear()
+        node.__arrangeLastInputs.clear()
     })
     return mutations
 }

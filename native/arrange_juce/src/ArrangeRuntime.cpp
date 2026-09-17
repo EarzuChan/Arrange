@@ -99,7 +99,7 @@ namespace arrange::juce {
     }
 
     bool ArrangeRuntime::hasPendingAnimationFrame() const noexcept {
-        return composition_.hasPendingAnimationFrame();
+        return composition_.hasPendingAnimationFrame() || pipelineState_.scene().tree().activeAnimationCount() > 0;
     }
 
     FrameWorkState ArrangeRuntime::frameWorkState() const noexcept {
@@ -191,6 +191,8 @@ namespace arrange::juce {
         const arrange::core::FrameFinalizer& finalize) {
         RuntimeFramePumpResult result;
         if (suspended_) return result;
+        pipelineState_.setFrameTime(nowMillis);
+        if (pipelineState_.scene().tree().activeAnimationCount() > 0) requestFramePipelineRun();
         auto plan = frame_.planTick(frameWorkState());
 
         if (plan.runEvents) {

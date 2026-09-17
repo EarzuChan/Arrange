@@ -174,6 +174,152 @@ namespace {
         check(!HitTester{}.hitTestClickable(tree, 1, {30, 101}).hit, "outer scroll viewport did not clip inner interaction");
     }
 
+    void verifyLocalCaches() {
+        NativeScene scene;
+        SceneFramePipeline pipeline;
+        PublishedFrame frame;
+        MutationTransaction initial;
+        initial.operations = {CreateNodeMutation{1, NodeType::Column}};
+        for (NodeId id = 2; id < 52; ++id) {
+            initial.operations.push_back(CreateNodeMutation{id, NodeType::Box});
+            initial.operations.push_back(SetModifierMutation{id, {{size(100, 20), {}}, {OffsetModifier{}, {}}, {background(0xff123456), {}}, {click("row"), {}}}});
+            initial.operations.push_back(InsertChildMutation{1, id, id - 2});
+        }
+        auto run = [&](MutationTransaction* transaction) {
+            const auto result = pipeline.run(scene, 1, {0, 500, 0, 5000}, transaction, true, frame);
+            check(!result.error, "cached frame failed");
+            check(frame.content.drawOps == DrawOpsBuilder{}.collect(scene.tree(), 1), "cached display list differs from uncached onion traversal");
+            const auto reference = buildHitTestSnapshot(scene.tree(), 1);
+            for (float y = 0; y < 1100; y += 11) {
+                const auto expected = HitTester{}.hitTestClickable(reference, {10, y});
+                const auto actual = HitTester{}.hitTestClickable(*frame.content.hitTest, {10, y});
+                check(expected.hit == actual.hit && expected.node == actual.node && expected.modifier == actual.modifier && expected.eventSlot == actual.eventSlot, "cached hit list differs from uncached hierarchy");
+            }
+        };
+        run(&initial);
+        const auto untouched = scene.node(40).paintCache;
+        auto before = pipeline.counters();
+        MutationTransaction color;
+        color.operations = {SetModifierMutation{2, {{size(100, 20), {}}, {OffsetModifier{}, {}}, {background(0xffabcdef), {}}, {click("row"), {}}}}};
+        run(&color);
+        auto after = pipeline.counters();
+        check(after.layoutWork.measuredNodes == before.layoutWork.measuredNodes && after.layoutWork.placedNodes == before.layoutWork.placedNodes, "local color ran layout");
+        check(after.paintWork.nodesBuilt - before.paintWork.nodesBuilt == 2 && after.paintWork.layersBuilt - before.paintWork.layersBuilt == 1, "color rebuilt unrelated nodes or Modifier layers");
+        check(scene.node(40).paintCache == untouched, "unrelated immutable paint fragment was copied");
+        before = after;
+        MutationTransaction offset;
+        offset.operations = {SetModifierMutation{2, {{size(100, 20), {}}, {OffsetModifier{8, 4}, {}}, {background(0xffabcdef), {}}, {click("row"), {}}}}};
+        run(&offset);
+        after = pipeline.counters();
+        check(after.layoutWork.measuredNodes == before.layoutWork.measuredNodes && after.layoutWork.placedNodes - before.layoutWork.placedNodes == 2, "offset did not isolate placement path");
+        check(after.hitWork.nodesBuilt - before.hitWork.nodesBuilt == 2, "offset rebuilt unrelated hit fragments");
+        before = after;
+        MutationTransaction resize;
+        resize.operations = {SetModifierMutation{2, {{size(120, 20), {}}, {OffsetModifier{8, 4}, {}}, {background(0xffabcdef), {}}, {click("row"), {}}}}};
+        run(&resize);
+        after = pipeline.counters();
+        check(after.layoutWork.measuredNodes - before.layoutWork.measuredNodes == 2, "size change measured unrelated siblings");
+        check(after.layoutWork.measureCacheHits - before.layoutWork.measureCacheHits == 49, "sibling measure cache was not reused");
+        check(after.layoutWork.placedNodes - before.layoutWork.placedNodes == 2, "unchanged sibling positions were recomputed");
+        const auto published = frame.revision;
+        run(&resize);
+        check(frame.revision == published, "equal typed values produced an unnecessary publication");
+
+        TransformModifierSemantics transform;
+        transform.translationX = 20;
+        MutationTransaction wrap;
+        wrap.operations = {SetModifierMutation{1, {{ClipModifier{}, {}}, {transform, {}}}}};
+        run(&wrap);
+        before = pipeline.counters();
+        transform.rotationZ = 12;
+        wrap.operations = {SetModifierMutation{1, {{ClipModifier{}, {}}, {transform, {}}}}};
+        run(&wrap);
+        after = pipeline.counters();
+        check(after.layoutWork.measuredNodes == before.layoutWork.measuredNodes && after.hitWork.nodesBuilt - before.hitWork.nodesBuilt == 1, "ancestor transform failed to retain local child hit data");
+        before = after;
+        transform.alpha = 0.5f;
+        wrap.operations = {SetModifierMutation{1, {{ClipModifier{}, {}}, {transform, {}}}}};
+        run(&wrap);
+        check(pipeline.counters().hitBuilds == before.hitBuilds, "graphicsLayer alpha rebuilt hit data");
+        std::cout << "Local cache evidence: color=2 nodes/1 layer, offset=2 placed, resize=2 measured/49 cache hits\n";
+    }
+
+    void verifyConstraintAndBaselineDependencies() {
+        LayoutTree tree;
+        LayoutEngine layout;
+        ParentDataModifierSemantics weight;
+        weight.weight = 1;
+        tree.apply({CreateNodeMutation{1, NodeType::Row}, CreateNodeMutation{2, NodeType::Box}, CreateNodeMutation{3, NodeType::Box},
+            SetModifierMutation{1, {{size(240, 40), {}}}}, SetModifierMutation{2, {{weight, {}}}}, SetModifierMutation{3, {{weight, {}}}},
+            InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}});
+        layout.layout(tree, 1, {0, 500, 0, 500}); tree.clearDirty();
+        check(near(tree.node(2).bounds.width, 120), "initial weighted constraint failed");
+        weight.weight = 2;
+        tree.setModifierChain(2, {{weight, {}}});
+        layout.layout(tree, 1, {0, 500, 0, 500}); tree.clearDirty();
+        check(near(tree.node(2).bounds.width, 160) && near(tree.node(3).bounds.width, 80), "parent data did not invalidate sibling constraints");
+        layout.resetCounters();
+        layout.layout(tree, 1, {0, 600, 0, 500}); tree.clearDirty();
+        check(layout.counters().measuredNodes == 1 && layout.counters().measureCacheHits == 2, "unchanged descendant constraints missed resize cache");
+        LayoutModifierSemantics padding;
+        padding.padding.top = 7;
+        tree.apply({CreateNodeMutation{4, NodeType::Text}, CreateNodeMutation{5, NodeType::Text}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
+            SetModifierMutation{1, {}}, SetPropMutation{1, "verticalAlignment", PropValue::stringValue("Baseline")},
+            SetTextMutation{4, "small"}, SetTextMutation{5, "large"}, SetModifierMutation{4, {{padding, {}}}},
+            InsertChildMutation{1, 4, 0}, InsertChildMutation{1, 5, 1}});
+        PropValue textStyle = PropValue::objectValue({{"fontSize", PropValue::numberValue(30)}, {"lineHeight", PropValue::numberValue(36)}});
+        tree.setHostInput(5, HostInput::TextStyle, textStyle);
+        layout.layout(tree, 1, {0, 600, 0, 500}); tree.clearDirty();
+        check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "row baselines ignored Modifier padding");
+        const auto previousBaseline = tree.node(1).baseline;
+        textStyle = PropValue::objectValue({{"fontSize", PropValue::numberValue(40)}, {"lineHeight", PropValue::numberValue(48)}});
+        tree.setHostInput(5, HostInput::TextStyle, textStyle);
+        layout.resetCounters(); layout.layout(tree, 1, {0, 600, 0, 500});
+        check(tree.node(1).baseline > previousBaseline && layout.counters().measureCacheHits == 1, "baseline input failed to propagate while retaining sibling measurement");
+        check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "baseline update left stale sibling placement");
+    }
+
+    void verifyContentSizeAnimation() {
+        NativeScene scene;
+        SceneFramePipeline pipeline;
+        PublishedFrame frame;
+        AnimateContentSizeModifier animated;
+        animated.animationSpec.kind = AnimationKind::Tween;
+        animated.animationSpec.durationMillis = 100;
+        animated.animationSpec.bezier = {0, 0, 1, 1};
+        MutationTransaction initial;
+        initial.operations = {
+            CreateNodeMutation{1, NodeType::Column}, CreateNodeMutation{2, NodeType::Box}, CreateNodeMutation{3, NodeType::Box}, CreateNodeMutation{4, NodeType::Box},
+            SetModifierMutation{2, {{animated, "animation"}}}, SetModifierMutation{3, {{size(100, 20), {}}, {background(0xff123456), {}}, {click("animated"), {}}}},
+            SetModifierMutation{4, {{size(100, 20), {}}, {background(0xff654321), {}}}},
+            InsertChildMutation{1, 2, 0}, InsertChildMutation{2, 3, 0}, InsertChildMutation{1, 4, 1},
+        };
+        const auto run = [&](MutationTransaction* transaction, double time, const FrameFinalizer& finalize = {}) {
+            return pipeline.run(scene, 1, {0, 500, 0, 500}, transaction, true, frame, finalize, time);
+        };
+        check(!run(&initial, 0).error && near(scene.node(2).bounds.height, 20), "content size animated its first measurement");
+        MutationTransaction target;
+        target.operations = {SetModifierMutation{3, {{size(100, 100), {}}, {background(0xff123456), {}}, {click("animated"), {}}}}};
+        check(!run(&target, 100).error && near(scene.node(2).bounds.height, 20), "content size jumped to target");
+        check(scene.tree().activeAnimationCount() == 1, "native animation was not retained by instance");
+        const auto before = pipeline.counters();
+        check(!run(nullptr, 150).error && near(scene.node(2).bounds.height, 60), "content size did not sample VBlank timestamp");
+        check(near(scene.node(4).bounds.y, 60), "animated size did not affect sibling placement");
+        check(pipeline.counters().layoutWork.measuredNodes - before.layoutWork.measuredNodes == 2, "content animation remeasured its stable child or sibling");
+        check(!HitTester{}.hitTestClickable(*frame.content.hitTest, {5, 80}).hit && HitTester{}.hitTestClickable(*frame.content.hitTest, {5, 40}).hit, "content animation hit clip disagreed with intermediate size");
+        const auto revision = frame.revision;
+        const auto fail = run(nullptr, 175, [](const auto&, auto&) { throw std::runtime_error("test finalizer failure"); });
+        check(fail.error.has_value() && frame.revision == revision && near(scene.node(2).bounds.height, 60), "failed animation candidate changed published geometry");
+        target.operations = {SetModifierMutation{3, {{size(100, 40), {}}, {background(0xff123456), {}}, {click("animated"), {}}}}};
+        check(!run(&target, 180).error && near(scene.node(2).bounds.height, 60), "retarget did not preserve presented size");
+        check(!run(nullptr, 280).error && near(scene.node(2).bounds.height, 40) && scene.tree().activeAnimationCount() == 0, "content animation did not settle and release clock demand");
+        target.operations = {SetModifierMutation{3, {{size(100, 200), {}}, {background(0xff123456), {}}, {click("animated"), {}}}}};
+        (void)run(&target, 300);
+        MutationTransaction remove;
+        remove.operations = {DeleteNodeMutation{2}};
+        check(!run(&remove, 320).error && scene.tree().activeAnimationCount() == 0, "retired size modifier retained native animation");
+    }
+
     void verifyPhaseSeparation() {
         NativeScene scene;
         SceneFramePipeline pipeline;
@@ -207,6 +353,9 @@ int main() {
         verifyClipRequiredAndOffset();
         verifyRepeatedWrappersAndScroll();
         verifyPhaseSeparation();
+        verifyLocalCaches();
+        verifyContentSizeAnimation();
+        verifyConstraintAndBaselineDependencies();
         std::cout << "Modifier runtime: identity, geometry, painting, hit and phase checks passed\n";
         return 0;
     } catch (const std::exception& error) {

@@ -25,9 +25,13 @@ namespace arrange::juce {
         void prepareResources(const arrange::core::PublishedFrameContent& content);
 
         void paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame);
+        std::uint64_t fullViewportPaints() const noexcept { return fullViewportPaints_; }
+        const std::string& lastFullPaintReason() const noexcept { return lastFullPaintReason_; }
 
     private:
 
+        std::uint64_t fullViewportPaints_ = 0;
+        std::string lastFullPaintReason_;
         JuceDrawOpsPainter drawOpsPainter_;
         ImageResourceCache imageResources_;
     };

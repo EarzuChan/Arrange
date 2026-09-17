@@ -9,6 +9,7 @@ namespace arrange::juce {
 
     void ScenePipelineState::reset() {
         scene_.reset();
+        frameTimeMillis_ = 0;
         pendingIntents_.clear();
         pendingTransactions_.clear();
         failedTransaction_.reset();
@@ -94,7 +95,7 @@ namespace arrange::juce {
             transaction = std::move(failedTransaction_);
             failedTransaction_.reset();
         }
-        auto result = pipeline_.run(scene_, root, constraints, transaction ? &*transaction : nullptr, framePipelineRequested, publishedFrame_, finalize);
+        auto result = pipeline_.run(scene_, root, constraints, transaction ? &*transaction : nullptr, framePipelineRequested, publishedFrame_, finalize, frameTimeMillis_);
         if (result.error) failedTransaction_ = std::move(transaction);
         return result;
     }

@@ -66,6 +66,7 @@ import {
   checkCompatEnabled,
   isCompatEnabled,
 } from '../compat/compatConfig.ts'
+import {splitArrangeModifier} from './arrangeModifier.ts'
 import { processExpression } from './transformExpression.ts'
 
 // some directive transforms (e.g. v-model) may return a symbol for runtime
@@ -761,7 +762,8 @@ export function buildProps(
       const name = property.key.content
       if (isReservedProp(name) || name === 'class' || name === 'style') continue
       if (dynamicPropNames.includes(name) || isOn(name)) {
-        property.value = createCallExpression(context.helper(ARRANGE_VALUE), [
+        const split = name === 'modifier' ? splitArrangeModifier(property.value, context) : undefined
+        property.value = split ?? createCallExpression(context.helper(ARRANGE_VALUE), [
           createFunctionExpression(undefined, property.value, true),
         ])
       }

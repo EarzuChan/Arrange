@@ -98,6 +98,7 @@ namespace arrange::core {
             if (!std::isfinite(point.x) || !std::isfinite(point.y)) return false;
             if (transform->clip && !containsRect(instance.bounds, point)) return false;
         }
+        if (const auto* animation = std::get_if<AnimateContentSizeModifier>(&value); animation && animation->clip && !containsRect(instance.bounds, point)) return false;
         if (const auto* clip = std::get_if<ClipModifier>(&value); clip && !containsShape(instance.bounds, clip->shape, point)) return false;
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value); layout && (layout->kind == LayoutModifierKind::VerticalScroll || layout->kind == LayoutModifierKind::HorizontalScroll) && !containsRect(instance.bounds, point)) return false;
         return true;

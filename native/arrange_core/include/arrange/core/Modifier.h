@@ -1,9 +1,11 @@
 #pragma once
 
 #include "EventSlot.h"
+#include "Animation.h"
 #include "Geometry.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -114,7 +116,13 @@ namespace arrange::core {
         bool operator==(const ZIndexModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier>;
+    struct AnimateContentSizeModifier {
+        AnimationSpec animationSpec;
+        bool clip = true;
+        bool operator==(const AnimateContentSizeModifier&) const = default;
+    };
+
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;
@@ -131,6 +139,8 @@ namespace arrange::core {
         bool operator==(const ModifierHandle&) const = default;
     };
 
+    struct PaintLayerFragment;
+
     struct ModifierInstance {
         ModifierHandle handle;
         ModifierDescriptor descriptor;
@@ -138,6 +148,8 @@ namespace arrange::core {
         Size childMeasured;
         Point childOffset;
         Rect bounds;
+        std::shared_ptr<const PaintLayerFragment> paintCache;
+        SizeAnimation sizeAnimation;
     };
 
     struct ModifierReconcileResult {
@@ -166,6 +178,7 @@ namespace arrange::core {
         return {};
     }
 
+    std::string_view modifierKindName(const ModifierValue& value);
     bool sameModifierKind(const ModifierValue& left, const ModifierValue& right);
     void validateModifierDescriptors(const ModifierDescriptors& descriptors);
     void validateModifierValue(const ModifierValue& value);

@@ -25,3 +25,5 @@ export * from "./local.ts"
 export * from "./modifier.ts"
 export * from "./primitives.ts"
 export * from "./state.ts"
+
+export * from "./transition.ts"

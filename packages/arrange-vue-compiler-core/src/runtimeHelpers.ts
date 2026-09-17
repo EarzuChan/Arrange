@@ -45,6 +45,7 @@ export const CREATE_SLOTS: unique symbol = Symbol(__DEV__ ? `createSlots` : ``)
 export const TO_DISPLAY_STRING: unique symbol = Symbol(
   __DEV__ ? `toDisplayString` : ``,
 )
+export const ARRANGE_MODIFIER: unique symbol = Symbol('arrangeModifier')
 export const ARRANGE_VALUE: unique symbol = Symbol('arrangeValue')
 export const MERGE_PROPS: unique symbol = Symbol(__DEV__ ? `mergeProps` : ``)
 export const NORMALIZE_CLASS: unique symbol = Symbol(
@@ -110,6 +111,7 @@ export const helperNameMap: Record<symbol, string> = {
   [CREATE_SLOTS]: `createSlots`,
   [TO_DISPLAY_STRING]: `toDisplayString`,
   [MERGE_PROPS]: `mergeProps`,
+  [ARRANGE_MODIFIER]: `arrangeModifier`,
   [ARRANGE_VALUE]: `arrangeValue`,
   [NORMALIZE_CLASS]: `normalizeClass`,
   [NORMALIZE_STYLE]: `normalizeStyle`,

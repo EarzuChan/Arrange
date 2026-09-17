@@ -34,6 +34,9 @@ namespace arrange::core {
             std::string field,
             std::string reason);
         void clearDirty() noexcept;
+        void advanceAnimations(double timeMillis);
+        std::size_t activeAnimationCount() const noexcept;
+        double frameTimeMillis() const noexcept { return frameTimeMillis_; }
         std::uint32_t setHostInput(NodeId id, HostInput input, const PropValue& value);
         std::uint32_t setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value);
         std::uint32_t setModifierChain(NodeId id, const ModifierDescriptors& descriptors);
@@ -66,5 +69,6 @@ namespace arrange::core {
         std::unordered_map<NodeId, ArrangeNode> nodes_;
         std::unordered_map<NodeId, NodeId> parentByNode_;
         InvalidationGraph invalidation_;
+        double frameTimeMillis_ = 0;
     };
 } // namespace arrange::core

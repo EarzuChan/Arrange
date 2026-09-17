@@ -69,6 +69,9 @@
                 :modifier="m.height(dp(14))"
             />
         </Column>
+        <Column :modifier="m.fillMaxWidth().height(220).verticalScroll(animationScroll)">
+            <AnimationGallery />
+        </Column>
         <Text
             text="Vue SFC authoring, Compose-like layout, JUCE-native target。度尽劫波兄弟在，相逢一笑泯恩仇"
             :text-style="{ fontSize: sp(13), color: Color(0xFFB8BDC7) }"
@@ -78,16 +81,17 @@
 </template>
 
 <script setup>
-import {animateDpAsState, animateColorAsState, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/framework"
+import {tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, m, onMounted, onUnmounted, ref, rememberScrollState, sp} from "@arrange/framework"
 
 import CounterPanel from './components/CounterPanel.vue'
+import AnimationGallery from './components/AnimationGallery.vue'
 
 const clicks = ref(0)
-const counterOffset = animateDpAsState(() => clicks.value % 2 ? dp(6) : dp(0), {durationMillis: 240})
+const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})
 const preset = ref("Preset A")
 const rainbow = [0xFFFF3030, 0xFFFFFF30, 0xFF30FF30, 0xFF30FFFF, 0xFF3030FF, 0xFFFF30FF]
 const presetColorTarget = ref(Color(rainbow[0]))
-const presetColor = animateColorAsState(presetColorTarget, {durationMillis: 700})
+const presetColor = animatedColorAsRef(presetColorTarget, {animationSpec: tween({durationMillis: 700, easing: linearEasing})})
 let rainbowFrame = 0
 let rainbowStartedAt
 let rainbowSegment = -1
@@ -112,9 +116,10 @@ onUnmounted(() => {
 
 const inputStatus = ref("Input: focus, type, Enter to submit")
 const scrollState = rememberScrollState()
-const counterColor = animateColorAsState(
+const animationScroll = rememberScrollState()
+const counterColor = animatedColorAsRef(
     () => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE),
-    { durationMillis: 240 },
+    {animationSpec: tween({durationMillis: 240, easing: linearEasing})},
 )
 
 function handleTap() {

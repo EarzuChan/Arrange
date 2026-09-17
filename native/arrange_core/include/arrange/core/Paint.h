@@ -60,15 +60,43 @@ namespace arrange::core {
         bool operator==(const DrawOp&) const = default;
     };
 
+    struct PaintLayerFragment {
+        ModifierValue value;
+        Rect bounds;
+        float alpha = 1;
+        float contentAlpha = 1;
+        std::vector<DrawOp> before;
+        std::vector<DrawOp> after;
+    };
+
+    // Immutable shared fragments survive candidate-scene copies without duplicating
+    // every ancestor's flattened subtree. Only publication flattens the rope.
+    struct PaintFragment {
+        float alpha = 1;
+        std::vector<std::shared_ptr<const PaintLayerFragment>> layers;
+        std::vector<DrawOp> content;
+        std::vector<std::shared_ptr<const PaintFragment>> children;
+    };
+
+    struct PaintWorkCounters {
+        std::uint64_t nodesBuilt = 0;
+        std::uint64_t subtreeCacheHits = 0;
+        std::uint64_t layersBuilt = 0;
+        std::uint64_t layerCacheHits = 0;
+        std::uint64_t emittedOps = 0;
+    };
+
     class DrawOpsBuilder {
     public:
         std::vector<DrawOp> collect(const LayoutTree& tree, NodeId root) const;
+        std::vector<DrawOp> collectCached(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
         std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const;
         static std::string textStyleProp(const ArrangeNode& node);
 
     private:
-        void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false) const;
-        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const;
+        void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
+        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha, bool includeChildren = true) const;
+        std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, float alpha, PaintWorkCounters& counters) const;
         void collectNode(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float inheritedAlpha = 1.0f) const;
     };
 

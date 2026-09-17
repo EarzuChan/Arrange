@@ -20,6 +20,7 @@ import type {
   FunctionalComponent,
 } from './component.ts'
 import type { EmitsOptions } from './componentEmits.ts'
+import type {ValueExpression} from './valueBinding.ts'
 import type { DefineComponent } from './apiDefineComponent.ts'
 
 // `h` is a more user-friendly version of `createVNode` that allows omitting the
@@ -52,6 +53,8 @@ h(Component, {}, {}) // named slots
 // named slots without props requires explicit `null` to avoid ambiguity
 h(Component, null, {})
 **/
+
+type ValueProps<P> = {[K in keyof P]: K extends keyof VNodeProps ? P[K] : P[K] | ValueExpression<P[K]>}
 
 type RawProps = VNodeProps & {
   // used to differ from a single VNode object as children
@@ -144,7 +147,7 @@ export function h<
   S extends Record<string, any> = any,
 >(
   type: FunctionalComponent<P, any, S, any>,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren | IfAny<S, RawSlots, S>,
 ): VNode
 
@@ -158,21 +161,21 @@ export function h<P>(
 ): VNode
 export function h<P>(
   type: ConcreteComponent<P> | string,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren,
 ): VNode
 
 // component without props
 export function h<P>(
   type: Component<P>,
-  props?: (RawProps & P) | null,
+  props?: (RawProps & ValueProps<P>) | null,
   children?: RawChildren | RawSlots,
 ): VNode
 
 // exclude `defineComponent` constructors
 export function h<P>(
   type: ComponentOptions<P>,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren | RawSlots,
 ): VNode
 
@@ -180,7 +183,7 @@ export function h<P>(
 export function h(type: Constructor, children?: RawChildren): VNode
 export function h<P>(
   type: Constructor<P>,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren | RawSlots,
 ): VNode
 
@@ -188,7 +191,7 @@ export function h<P>(
 export function h(type: DefineComponent, children?: RawChildren): VNode
 export function h<P>(
   type: DefineComponent<P>,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren | RawSlots,
 ): VNode
 
@@ -196,7 +199,7 @@ export function h<P>(
 export function h(type: string | Component, children?: RawChildren): VNode
 export function h<P>(
   type: string | Component<P>,
-  props?: (RawProps & P) | ({} extends P ? null : never),
+  props?: (RawProps & ValueProps<P>) | ({} extends P ? null : never),
   children?: RawChildren | RawSlots,
 ): VNode
 

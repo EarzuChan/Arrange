@@ -21,6 +21,8 @@ namespace arrange::juce {
     }
 
     void PassivePaintRenderer::paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame) {
+        ++fullViewportPaints_;
+        lastFullPaintReason_ = "host paint replays published transformed scene/overlays within the graphics clip";
         g.fillAll(::juce::Colour(0xff1f232a));
         const auto& content = frame.content;
         if (content.errorFrame) {

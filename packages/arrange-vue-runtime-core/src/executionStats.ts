@@ -2,6 +2,7 @@
 export const arrangeExecutionStats = {
     structureRuns: 0,
     valueEvaluations: 0,
+    valueEvaluationMillis: 0,
     valueWrites: 0,
     activeValueBindings: 0,
 }
