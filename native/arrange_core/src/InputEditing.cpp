@@ -67,6 +67,16 @@ namespace arrange::core {
         }
     }
 
+    void TextInputState::replaceExternal(std::string value) {
+        text_ = std::move(value);
+        committedText_ = text_;
+        cursorIndex_ = clampToBoundary(cursorIndex_);
+        selectionStart_ = clampToBoundary(selectionStart_);
+        selectionEnd_ = clampToBoundary(selectionEnd_);
+        undoStack_.clear();
+        redoStack_.clear();
+    }
+
     void TextInputState::reset() {
         text_.clear();
         committedText_.clear();

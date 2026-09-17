@@ -23,8 +23,9 @@ namespace arrange::quickjs {
         [[nodiscard]] std::size_t size() const noexcept { return eventSlots_.size(); }
         [[nodiscard]] JSValueConst callback(const arrange::core::EventSlotId& slot) const noexcept;
 
-        void replace(
-            const arrange::core::EventSlotId& slot,
+        arrange::core::EventSlotId setNodeCallback(
+            arrange::core::NodeId node,
+            arrange::core::EventSlotKind kind,
             JSValueConst callback,
             arrange::core::MutationTransaction* transaction);
         void release(
@@ -34,16 +35,21 @@ namespace arrange::quickjs {
             arrange::core::NodeId id,
             arrange::core::MutationTransaction* transaction,
             const std::unordered_map<arrange::core::NodeId, std::vector<arrange::core::NodeId>>& childrenByNode);
+        arrange::core::EventSlotId retainModifierCallback(arrange::core::NodeId node, arrange::core::EventSlotKind kind, JSValueConst callback, const std::vector<arrange::core::EventSlotId>& retained, arrange::core::MutationTransaction* transaction);
+        arrange::core::EventSlotId updateModifierCallback(arrange::core::NodeId node, arrange::core::EventSlotKind kind, JSValueConst callback, const arrange::core::EventSlotId& previous, arrange::core::MutationTransaction* transaction);
+        void releaseModifierCallbacksExcept(arrange::core::NodeId node, const std::vector<arrange::core::EventSlotId>& retained, arrange::core::MutationTransaction* transaction);
         void releaseAll(arrange::core::MutationTransaction* transaction);
-        void flushRetired();
+        void publish(const arrange::core::EventSlotSet& active);
 
     private:
-        static std::vector<arrange::core::EventSlotId> builtinSlotsForNode(arrange::core::NodeId id);
+        arrange::core::EventSlotId retain(arrange::core::NodeId node, arrange::core::EventSlotKind kind, arrange::core::EventSlotOwner owner, JSValueConst callback, arrange::core::MutationTransaction* transaction);
         void releaseWithoutTreeWalk(const arrange::core::EventSlotId& slot, arrange::core::MutationTransaction* transaction);
 
         JSContext* context_ = nullptr;
         std::unordered_map<arrange::core::EventSlotId, JSValue, arrange::core::EventSlotIdHash> eventSlots_;
-        std::unordered_set<arrange::core::EventSlotId, arrange::core::EventSlotIdHash> retiredEventSlots_;
+        arrange::core::EventSlotSet retiredEventSlots_;
+        arrange::core::EventSlotSet publishedEventSlots_;
+        std::unordered_map<arrange::core::EventSlotId, arrange::core::EventSlotId, arrange::core::EventSlotIdHash> nodeEventSlots_;
     };
 }
 

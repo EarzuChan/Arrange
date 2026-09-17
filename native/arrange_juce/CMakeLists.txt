@@ -3,6 +3,7 @@ add_library(arrange_juce STATIC
   src/DevServerClient.cpp
   src/ErrorScreenModel.cpp
   src/FramePlanner.cpp
+  src/VBlankSource.cpp
   src/HeadlessArrangeEditor.cpp
   src/ScenePipelineState.cpp
 )
@@ -29,7 +30,6 @@ target_sources(arrange_juce PRIVATE
   src/EditorDebugActions.cpp
   src/EditorFrameClock.cpp
   src/EditorSceneHost.cpp
-  src/EditorTimerDriver.cpp
   src/FramePumpDriver.cpp
   src/ImageResourceCache.cpp
   src/InteractionStateOwner.cpp

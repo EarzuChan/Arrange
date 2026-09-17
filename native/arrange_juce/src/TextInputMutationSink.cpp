@@ -20,7 +20,7 @@ namespace arrange::juce {
         TextInputCallbacks result;
         result.setModelValue = [&runtime](arrange::core::NodeId nodeId, std::string value) {
             arrange::core::MutationTransaction transaction;
-            transaction.treeMutations.push_back(arrange::core::SetPropMutation{nodeId, "modelValue", arrange::core::PropValue::stringValue(std::move(value))});
+            transaction.operations.emplace_back(arrange::core::SetPropMutation{nodeId, "modelValue", arrange::core::PropValue::stringValue(std::move(value))});
             enqueueMutation(runtime, std::move(transaction), "native text input editing state");
         };
         result.invokeStringEvent = [&runtime](
@@ -31,7 +31,7 @@ namespace arrange::juce {
         };
         result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag, std::string reason) {
             arrange::core::MutationTransaction transaction;
-            transaction.treeMutations.push_back(arrange::core::NativeInvalidationMutation{
+            transaction.operations.emplace_back(arrange::core::NativeInvalidationMutation{
                 nodeId,
                 flag,
                 flag == arrange::core::DirtyFlag::Paint ? "nativeInputPaint" : "nativeInputState",

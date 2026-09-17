@@ -3,7 +3,7 @@ import type {NativeReloadPayload, NativeTransactionTarget} from "./native.ts"
 export const ARRANGE_HMR_RELOAD_EVENT = "arrange:reload"
 
 export type ArrangeHmrReloadPayload = NativeReloadPayload
-type NativeReloadTarget = NativeTransactionTarget & {
+type NativeReloadTarget = Pick<NativeTransactionTarget, "reload"> & {
     reload?: (payload: ArrangeHmrReloadPayload) => void
 }
 

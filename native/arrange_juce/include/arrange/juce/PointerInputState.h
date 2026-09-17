@@ -19,15 +19,14 @@ namespace arrange::juce {
 
     class PointerInputState {
     public:
+        void reset();
         [[nodiscard]] PointerDownResult pointerDown(
-            arrange::core::LayoutTree& tree,
-            arrange::core::NodeId root,
+            const arrange::core::HitTestSnapshot& snapshot,
             arrange::core::Point point,
             std::uint32_t pointerId = 0);
 
         [[nodiscard]] arrange::core::PointerDispatchResult pointerUp(
-            arrange::core::LayoutTree& tree,
-            arrange::core::NodeId root,
+            const arrange::core::HitTestSnapshot& snapshot,
             arrange::core::Point point,
             std::uint32_t pointerId = 0);
 
@@ -36,11 +35,14 @@ namespace arrange::juce {
             arrange::core::NodeId root,
             arrange::core::Point point,
             float deltaX,
-            float deltaY);
+            float deltaY,
+            std::uint64_t publishedRevision = 0);
 
     private:
         arrange::core::HitTester hitTester_;
         arrange::core::PointerInputProcessor pointer_;
         arrange::core::ScrollDispatcher scroll_;
+        arrange::core::PendingScrollValues pendingScrollValues_;
+        std::uint64_t scrollRevision_ = 0;
     };
 } // namespace arrange::juce

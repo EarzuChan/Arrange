@@ -26,6 +26,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <utility>
 #include <string>
@@ -56,55 +57,47 @@ namespace {
         return {std::move(key), std::move(value)};
     }
 
-    arrange::core::CompiledModifier size(float width, float height) {
-        arrange::core::CompiledModifier modifier;
+    arrange::core::ModifierDescriptors size(float width, float height) {
+        arrange::core::ModifierDescriptors modifier;
         arrange::core::LayoutModifierSemantics item;
         item.kind = arrange::core::LayoutModifierKind::Size;
         item.width = width;
         item.height = height;
-        modifier.layout.push_back(item);
+        modifier.push_back({item, {}});
         return modifier;
     }
 
-    arrange::core::CompiledModifier background(float width, float height, std::uint32_t color) {
+    arrange::core::ModifierDescriptors background(float width, float height, std::uint32_t color) {
         auto modifier = size(width, height);
         arrange::core::PaintStyleSemantics style;
         style.kind = arrange::core::PaintStyleKind::Background;
         style.color = color;
-        style.brush = color;
-        modifier.paint.chain.push_back({arrange::core::PaintChainOpKind::Style, style, {}});
-        modifier.paint.styles.push_back(style);
+        modifier.push_back({style, {}});
         return modifier;
     }
 
-    arrange::core::CompiledModifier clickableBox(float width, float height, arrange::core::EventSlotId slot) {
+    arrange::core::ModifierDescriptors clickableBox(float width, float height, arrange::core::EventSlotId slot) {
         auto modifier = background(width, height, 0xff3a7afeu);
-        modifier.input.clickable = true;
-        modifier.input.focusable = true;
-        modifier.input.clickEventSlot = std::move(slot);
+        arrange::core::InputModifierSemantics input;
+        input.eventSlot = std::move(slot);
+        modifier.push_back({input, {}});
         return modifier;
     }
 
-    arrange::core::CompiledModifier verticalScroll(float width, float height, float value, arrange::core::EventSlotId slot) {
+    arrange::core::ModifierDescriptors verticalScroll(float width, float height, float value, arrange::core::EventSlotId slot) {
         auto modifier = background(width, height, 0xff151922u);
         arrange::core::LayoutModifierSemantics scroll;
         scroll.kind = arrange::core::LayoutModifierKind::VerticalScroll;
         scroll.scrollValue = value;
-        modifier.layout.push_back(scroll);
-        modifier.scroll.vertical = true;
-        modifier.scroll.verticalValue = value;
-        modifier.scroll.verticalEventSlot = std::move(slot);
-        arrange::core::PaintStyleSemantics clip;
-        clip.kind = arrange::core::PaintStyleKind::Background;
-        modifier.paint.chain.push_back({arrange::core::PaintChainOpKind::Clip, clip, {}});
-        modifier.paint.clips.push_back(clip);
+        scroll.eventSlot = std::move(slot);
+        modifier.push_back({scroll, {}});
         return modifier;
     }
 
     arrange::core::MutationTransaction initialTreeTransaction() {
         using namespace arrange::core;
         MutationTransaction transaction;
-        transaction.treeMutations = {
+        transaction.operations = {
             CreateNodeMutation{1, NodeType::Column},
             SetModifierMutation{1, background(320.0f, 180.0f, 0xff000000u)},
             SetPropMutation{1, "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))})},
@@ -131,18 +124,18 @@ namespace {
             SetModifierMutation{6, background(160.0f, 28.0f, 0xff151922u)},
             InsertChildMutation{1, 6, 3},
         };
-        transaction.eventSlotUpdates = {
-            makeEventSlotId(3, EventSlotKind::Click),
-            makeEventSlotId(4, EventSlotKind::VerticalScroll),
-            makeEventSlotId(6, EventSlotKind::InputSubmit),
-        };
+        transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(3, EventSlotKind::Click)});
+        transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(4, EventSlotKind::VerticalScroll)});
+        transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(6, EventSlotKind::InputSubmit)});
         return transaction;
     }
 
     int verifyTypedLayoutTreePipeline() {
         arrange::core::LayoutTree tree;
         auto transaction = initialTreeTransaction();
-        tree.apply(transaction.treeMutations);
+        for (const auto& operation : transaction.operations) {
+            if (const auto* mutation = std::get_if<arrange::core::TreeMutation>(&operation)) tree.applyMutation(*mutation);
+        }
         if (!tree.contains(1) || tree.node(1).children.size() != 4) return 1;
         if (tree.node(2).text != "Hello typed transaction") return 2;
         if (tree.node(6).props.at("modelValue").stringOr() != "Gain") return 3;
@@ -170,7 +163,9 @@ namespace {
     int verifyTypedDirtyPrecision() {
         arrange::core::LayoutTree tree;
         auto transaction = initialTreeTransaction();
-        tree.apply(transaction.treeMutations);
+        for (const auto& operation : transaction.operations) {
+            if (const auto* mutation = std::get_if<arrange::core::TreeMutation>(&operation)) tree.applyMutation(*mutation);
+        }
         tree.clearDirty();
         (void)tree.takeInvalidation();
 
@@ -184,9 +179,9 @@ namespace {
 
         tree.clearDirty();
         (void)tree.takeInvalidation();
-        tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::SetModifierMutation{3, background(80.0f, 40.0f, 0xff00ff00u)},
-        });
+        auto recolored = clickableBox(80.0f, 40.0f, arrange::core::makeEventSlotId(3, arrange::core::EventSlotKind::Click, "updated"));
+        std::get<arrange::core::PaintStyleSemantics>(recolored[1].value).color = 0xff00ff00u;
+        tree.apply(std::vector<arrange::core::TreeMutation>{arrange::core::SetModifierMutation{3, recolored}});
         snapshot = tree.invalidationSnapshot();
         if (!snapshot.affects(arrange::core::DirtyFlag::Paint)) return 14;
         if (snapshot.affects(arrange::core::DirtyFlag::Layout)) return 15;
@@ -215,7 +210,7 @@ namespace {
                 arrange::core::SetPropMutation{1, "onSubmit", arrange::core::PropValue::stringValue("not an event slot")},
             });
             return 20;
-        } catch (const std::runtime_error&) {
+        } catch (const std::invalid_argument&) {
         }
         const auto snapshot = tree.invalidationSnapshot();
         if (snapshot.affects(arrange::core::DirtyFlag::EventSlot)) return 18;
@@ -251,14 +246,14 @@ namespace {
         if (published.content.drawOps.empty()) return 26;
 
         arrange::core::MutationTransaction eventOnly;
-        eventOnly.eventSlotUpdates.push_back(arrange::core::makeEventSlotId(3, arrange::core::EventSlotKind::Click, "updated"));
+        eventOnly.operations.emplace_back(arrange::core::RegisterEventSlot{arrange::core::makeEventSlotId(3, arrange::core::EventSlotKind::Click, "updated")});
         result = pipeline.run(scene, 1, {0.0f, 320.0f, 0.0f, 240.0f}, &eventOnly, false, published);
         if (result.error) return 27;
         if (phaseRan(published.phases, arrange::core::FramePhase::Measure)) return 28;
         if (phaseRan(published.phases, arrange::core::FramePhase::BuildPaint)) return 29;
 
         arrange::core::MutationTransaction nativeInvalidation;
-        nativeInvalidation.treeMutations.push_back(arrange::core::NativeInvalidationMutation{6, arrange::core::DirtyFlag::Paint, "nativeInputPaint", "caret blink"});
+        nativeInvalidation.operations.emplace_back(arrange::core::NativeInvalidationMutation{6, arrange::core::DirtyFlag::Paint, "nativeInputPaint", "caret blink"});
         result = pipeline.run(scene, 1, {0.0f, 320.0f, 0.0f, 240.0f}, &nativeInvalidation, false, published);
         if (result.error) return 30;
         if (phaseRan(published.phases, arrange::core::FramePhase::Measure)) return 31;
@@ -269,7 +264,9 @@ namespace {
     int verifyPointerScrollAndHitTest() {
         arrange::core::LayoutTree tree;
         auto transaction = initialTreeTransaction();
-        tree.apply(transaction.treeMutations);
+        for (const auto& operation : transaction.operations) {
+            if (const auto* mutation = std::get_if<arrange::core::TreeMutation>(&operation)) tree.applyMutation(*mutation);
+        }
         arrange::core::LayoutEngine{}.layout(tree, 1, {0.0f, 320.0f, 0.0f, 240.0f});
 
         arrange::core::PointerInputProcessor pointer;
@@ -283,7 +280,7 @@ namespace {
         tree.apply(std::vector<arrange::core::TreeMutation>{
             arrange::core::SetModifierMutation{4, verticalScroll(100.0f, 40.0f, scroll.value, arrange::core::makeEventSlotId(4, arrange::core::EventSlotKind::VerticalScroll))},
         });
-        if (!near(tree.node(4).modifier.scroll.verticalValue, 24.0f)) return 43;
+        if (!near(arrange::core::ScrollDispatcher::verticalScrollValue(tree.node(4)), 24.0f)) return 43;
         return 0;
     }
 
@@ -490,27 +487,29 @@ namespace {
         auto result = pipelineState.run(1, {0.0f, 320.0f, 0.0f, 240.0f}, true);
         if (result.error || !pipelineState.scene().contains(1)) return 91;
 
+        const auto initialRevision = pipelineState.publishedFrame().revision;
         pipelineState.enqueueIntent(arrange::core::InputIntent::textInput("native input paint", 6));
         result = pipelineState.run(1, {0.0f, 320.0f, 0.0f, 240.0f}, false);
         if (result.error) return 92;
-        if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::Paint)) return 93;
-        if (pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::EventSlot)) return 96;
+        if (result.ran || pipelineState.publishedFrame().revision != initialRevision) return 93;
 
         pipelineState.enqueueIntent(arrange::core::InputIntent::resize({0.0f, 640.0f, 0.0f, 480.0f}));
         result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
         if (result.error) return 94;
         if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::Layout)) return 95;
 
+        const auto resizedRevision = pipelineState.publishedFrame().revision;
+        const auto resizedHit = pipelineState.publishedFrame().content.hitTest;
         pipelineState.enqueueIntent(arrange::core::InputIntent::pointer("pointer hit test", 3));
         result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
         if (result.error) return 97;
-        if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::HitTest)) return 98;
+        if (result.ran || pipelineState.publishedFrame().revision != resizedRevision || pipelineState.publishedFrame().content.hitTest != resizedHit) return 98;
         return 0;
     }
 }
 
 int main() {
-#define RUN_SMOKE(name) do { if (const auto result = name(); result != 0) return result; } while (false)
+#define RUN_SMOKE(name) do { if (const auto result = name(); result != 0) { std::cerr << #name << " failed: " << result << '\n'; return result; } } while (false)
     RUN_SMOKE(verifyTypedLayoutTreePipeline);
     RUN_SMOKE(verifyTypedDirtyPrecision);
     RUN_SMOKE(verifyEventPropIsNotCoreEventSlot);

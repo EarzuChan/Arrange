@@ -1,4 +1,4 @@
-﻿#include <arrange/juce/ArrangeRuntime.h>
+#include <arrange/juce/ArrangeRuntime.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 
@@ -10,7 +10,13 @@ namespace arrange::juce {
     ArrangeRuntime::ArrangeRuntime(arrange::core::SceneFramePipeline pipeline)
         : pipelineState_(std::move(pipeline)) {}
 
+    bool ArrangeRuntime::consumeReloadRequest() noexcept {
+        return std::exchange(reloadRequested_, false);
+    }
+
     void ArrangeRuntime::reset() {
+        suspended_ = false;
+        reloadRequested_ = false;
         composition_.reset();
         pipelineState_.reset();
         frame_.reset();
@@ -106,12 +112,11 @@ namespace arrange::juce {
     }
 
     bool ArrangeRuntime::hasPendingFrameWork() const noexcept {
-        return frame_.hasPendingFrameWork(frameWorkState());
+        return reloadRequested_ || composition_.hasPendingDiagnostics() ||
+            (!suspended_ && frame_.hasPendingFrameWork(frameWorkState()));
     }
 
-    int ArrangeRuntime::desiredTimerFrequencyHz() const noexcept {
-        return frame_.desiredTimerFrequencyHz(frameWorkState());
-    }
+
 
     bool ArrangeRuntime::captureCompositionTransactions() {
         if (!composition_.hasScriptHost()) return false;
@@ -135,6 +140,7 @@ namespace arrange::juce {
         while (!events_.empty()) {
             auto event = std::move(events_.front());
             events_.pop_front();
+            if (!pipelineState_.scene().hasEventSlot(event.slot)) continue;
 
             CompositionInvokeResult invoked;
             switch (event.kind) {
@@ -161,19 +167,19 @@ namespace arrange::juce {
 
     RuntimePipelineRunResult ArrangeRuntime::runPipeline(
         arrange::core::NodeId root,
-        arrange::core::Constraints constraints) {
+        arrange::core::Constraints constraints,
+        const arrange::core::FrameFinalizer& finalize) {
         (void)captureCompositionTransactions();
         const auto hasPending = pipelineState_.hasPendingTransactions() || pipelineState_.hasPendingIntents();
         if (!hasPending && !frame_.framePipelineRunRequested()) return {};
 
-        const auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested());
+        const auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested(), finalize);
         if (result.error) {
-            pipelineState_.clearPendingTransactions();
             frame_.clearFramePipelineRunRequest();
             return {true, *result.error};
         }
 
-        composition_.flushRetiredEventSlots();
+        composition_.publishScene(pipelineState_.scene());
         frame_.clearFramePipelineRunRequest();
         return {true, std::nullopt};
     }
@@ -181,8 +187,10 @@ namespace arrange::juce {
     RuntimeFramePumpResult ArrangeRuntime::pumpFrame(
         arrange::core::NodeId root,
         arrange::core::Constraints constraints,
-        double nowMillis) {
+        double nowMillis,
+        const arrange::core::FrameFinalizer& finalize) {
         RuntimeFramePumpResult result;
+        if (suspended_) return result;
         auto plan = frame_.planTick(frameWorkState());
 
         if (plan.runEvents) {
@@ -215,7 +223,7 @@ namespace arrange::juce {
             return result;
         }
 
-        const auto pipeline = runPipeline(root, constraints);
+        const auto pipeline = runPipeline(root, constraints, finalize);
         if (pipeline.error) {
             result.changed = true;
             result.pipelineRan = true;
@@ -228,20 +236,6 @@ namespace arrange::juce {
         result.changed = result.changed || pipeline.changed;
         result.pipelineRan = pipeline.changed;
         return result;
-    }
-
-    void ArrangeRuntime::publishOverlayDrawOps(
-        std::vector<arrange::core::DrawOp> ops,
-        std::optional<arrange::core::NodeId> focusedInputNode,
-        float focusedInputViewportX) {
-        pipelineState_.setOverlayDrawOps(std::move(ops), focusedInputNode, focusedInputViewportX);
-    }
-
-    void ArrangeRuntime::publishDiagnosticsDrawOps(
-        std::vector<arrange::core::DrawOp> errorOps,
-        std::vector<arrange::core::DrawOp> badgeOps,
-        std::vector<arrange::core::DrawOp> toastOps) {
-        pipelineState_.setDiagnosticsDrawOps(std::move(errorOps), std::move(badgeOps), std::move(toastOps));
     }
 
 #if ARRANGE_WITH_QUICKJS_NG

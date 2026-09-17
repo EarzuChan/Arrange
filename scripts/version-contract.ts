@@ -81,22 +81,13 @@ export function syncArrangeVersionContract(): void {
     const cliManifestPath = resolve(repoRoot, "cli/package.json")
     const cliManifest = readJson(cliManifestPath)
     cliManifest.version = contract.cliVersion
+    cliManifest.compatibility = contract.cliCompatibility
     writeJson(cliManifestPath, cliManifest)
 
     const runtimeVersionPath = resolve(repoRoot, "packages/runtime/src/version.ts")
     writeFileSync(runtimeVersionPath, [
         `export const ARRANGE_PACKAGE_VERSION = ${JSON.stringify(contract.frameworkVersion)}`,
         `export const ARRANGE_PROTOCOL_VERSION = ${contract.frameworkInternalProtocolCode}`,
-        "",
-    ].join("\n"))
-
-    const cliConstantsPath = resolve(repoRoot, "cli/src/constants.ts")
-    writeFileSync(cliConstantsPath, [
-        `export const CLI_VERSION = ${JSON.stringify(contract.cliVersion)}`,
-        `export const CLI_COMPATIBILITY = ${contract.cliCompatibility}`,
-        `export const DEFAULT_FRAMEWORK_VERSION = ${JSON.stringify(contract.frameworkVersion)}`,
-        `export const DEFAULT_DEV_HOST = "127.0.0.1"`,
-        `export const DEFAULT_DEV_PORT = 9178`,
         "",
     ].join("\n"))
 
@@ -142,12 +133,10 @@ export function assertArrangeVersionContract(): void {
     assertFileContains(resolve(repoRoot, "packages/runtime/src/version.ts"), `ARRANGE_PROTOCOL_VERSION = ${contract.frameworkInternalProtocolCode}`)
     assertFileContains(resolve(repoRoot, "native/arrange_core/include/arrange/core/Version.h"), `RuntimeVersion = ${contract.frameworkInternalProtocolCode}u`)
     assertFileContains(resolve(repoRoot, "native/arrange_core/include/arrange/core/Version.h"), `PackageVersion = ${JSON.stringify(contract.frameworkVersion)}`)
-    assertFileContains(resolve(repoRoot, "cli/src/constants.ts"), `CLI_VERSION = ${JSON.stringify(contract.cliVersion)}`)
-    assertFileContains(resolve(repoRoot, "cli/src/constants.ts"), `CLI_COMPATIBILITY = ${contract.cliCompatibility}`)
-    assertFileContains(resolve(repoRoot, "cli/src/constants.ts"), `DEFAULT_FRAMEWORK_VERSION = ${JSON.stringify(contract.frameworkVersion)}`)
 
     const cliManifest = readJson(resolve(repoRoot, "cli/package.json"))
     assertEqual(cliManifest.version, contract.cliVersion, "cli/package.json version diverges from arrange.version.json")
+    assertEqual(cliManifest.compatibility, contract.cliCompatibility, "cli/package.json compatibility diverges from arrange.version.json")
 
     const frameworkManifest = readJson(resolve(repoRoot, "packages/framework/package.json"))
     const arrange = frameworkManifest.arrange

@@ -1,3 +1,4 @@
+export const ARRANGE_PROPS: unique symbol = Symbol('arrangeProps')
 export const FRAGMENT: unique symbol = Symbol(__DEV__ ? `Fragment` : ``)
 export const TELEPORT: unique symbol = Symbol(__DEV__ ? `Teleport` : ``)
 export const SUSPENSE: unique symbol = Symbol(__DEV__ ? `Suspense` : ``)
@@ -44,6 +45,7 @@ export const CREATE_SLOTS: unique symbol = Symbol(__DEV__ ? `createSlots` : ``)
 export const TO_DISPLAY_STRING: unique symbol = Symbol(
   __DEV__ ? `toDisplayString` : ``,
 )
+export const ARRANGE_VALUE: unique symbol = Symbol('arrangeValue')
 export const MERGE_PROPS: unique symbol = Symbol(__DEV__ ? `mergeProps` : ``)
 export const NORMALIZE_CLASS: unique symbol = Symbol(
   __DEV__ ? `normalizeClass` : ``,
@@ -84,6 +86,7 @@ export const IS_MEMO_SAME: unique symbol = Symbol(__DEV__ ? `isMemoSame` : ``)
 // Name mapping for runtime helpers that need to be imported from 'vue' in
 // generated code. Make sure these are correctly exported in the runtime!
 export const helperNameMap: Record<symbol, string> = {
+  [ARRANGE_PROPS]: `arrangeProps`,
   [FRAGMENT]: `Fragment`,
   [TELEPORT]: `Teleport`,
   [SUSPENSE]: `Suspense`,
@@ -107,6 +110,7 @@ export const helperNameMap: Record<symbol, string> = {
   [CREATE_SLOTS]: `createSlots`,
   [TO_DISPLAY_STRING]: `toDisplayString`,
   [MERGE_PROPS]: `mergeProps`,
+  [ARRANGE_VALUE]: `arrangeValue`,
   [NORMALIZE_CLASS]: `normalizeClass`,
   [NORMALIZE_STYLE]: `normalizeStyle`,
   [NORMALIZE_PROPS]: `normalizeProps`,

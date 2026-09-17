@@ -1,4 +1,5 @@
-﻿import {
+import {arrangeValue, isValueExpression, type ValueExpression} from './valueBinding.ts'
+import {
   EMPTY_ARR,
   PatchFlags,
   ShapeFlags,
@@ -10,8 +11,6 @@
   isObject,
   isOn,
   isString,
-  normalizeClass,
-  normalizeStyle,
 } from '@arrange/vue-shared'
 import {
   type ClassComponent,
@@ -175,6 +174,8 @@ export interface VNode<
 
   type: VNodeTypes
   props: (VNodeProps & ExtraProps) | null
+  valueSources: Record<string, ValueExpression> | null
+  textSource: ValueExpression | null
   key: PropertyKey | null
   ref: VNodeNormalizedRef | null
   /**
@@ -463,11 +464,15 @@ function createBaseVNode(
   isBlockNode = false,
   needFullChildrenNormalization = false,
 ): VNode {
+  const textSource = isValueExpression(children) ? children : null
+  if (textSource) children = ''
   const vnode = {
     __v_isVNode: true,
     __v_skip: true,
     type,
     props,
+    valueSources: null,
+    textSource,
     key: props && normalizeKey(props),
     ref: props && normalizeRef(props),
     scopeId: currentScopeId,
@@ -506,6 +511,8 @@ function createBaseVNode(
       ? ShapeFlags.TEXT_CHILDREN
       : ShapeFlags.ARRAY_CHILDREN
   }
+
+  if (textSource) vnode.shapeFlag |= ShapeFlags.TEXT_CHILDREN
 
   // validate key
   if (__DEV__ && vnode.key !== vnode.key) {
@@ -589,23 +596,8 @@ function _createVNode(
     type = convertLegacyComponent(type, currentRenderingInstance)
   }
 
-  // class & style normalization.
-  if (props) {
-    // for reactive or proxy objects, we need to clone it to enable mutation.
-    props = guardReactiveProps(props)!
-    let { class: klass, style } = props
-    if (klass && !isString(klass)) {
-      props.class = normalizeClass(klass)
-    }
-    if (isObject(style)) {
-      // reactive state objects need to be cloned since they are likely to be
-      // mutated
-      if (isProxy(style) && !isArray(style)) {
-        style = extend({}, style)
-      }
-      props.style = normalizeStyle(style)
-    }
-  }
+  // Native props keep their original values; only clone reactive input records.
+  if (props) props = guardReactiveProps(props)!
 
   // encode the vnode type information into a bitmap
   const shapeFlag = isString(type)
@@ -666,6 +658,8 @@ export function cloneVNode<T, U>(
     __v_skip: true,
     type: vnode.type,
     props: mergedProps,
+    valueSources: vnode.valueSources && Object.fromEntries(Object.entries(vnode.valueSources).filter(([key]) => !extraProps || !(key in extraProps))),
+    textSource: vnode.textSource,
     key: mergedProps && normalizeKey(mergedProps),
     ref:
       extraProps && extraProps.ref
@@ -753,7 +747,7 @@ function deepCloneVNode(vnode: VNode): VNode {
 /**
  * @private
  */
-export function createTextVNode(text: string = ' ', flag: number = 0): VNode {
+export function createTextVNode(text: string | ValueExpression = ' ', flag: number = 0): VNode {
   return createVNode(Text, null, text, flag)
 }
 
@@ -875,15 +869,17 @@ export function mergeProps(...args: (Data & VNodeProps)[]): Data {
   for (let i = 0; i < args.length; i++) {
     const toMerge = args[i]
     for (const key in toMerge) {
-      if (key === 'class') {
-        if (ret.class !== toMerge.class) {
-          ret.class = normalizeClass([ret.class, toMerge.class])
-        }
-      } else if (key === 'style') {
-        ret.style = normalizeStyle([ret.style, toMerge.style])
-      } else if (isOn(key)) {
+      if (isOn(key)) {
         const existing = ret[key]
         const incoming = toMerge[key]
+        if (isValueExpression(existing) || isValueExpression(incoming)) {
+          ret[key] = arrangeValue(() => {
+            const left = isValueExpression(existing) ? existing.read() : existing
+            const right = isValueExpression(incoming) ? incoming.read() : incoming
+            return left && right && left !== right ? [left, right].flat() : right ?? left
+          })
+          continue
+        }
         if (
           incoming &&
           existing !== incoming &&

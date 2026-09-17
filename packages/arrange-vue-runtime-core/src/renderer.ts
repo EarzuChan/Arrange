@@ -1,3 +1,4 @@
+import {ValueBinding, isValueExpression, textBindingKey, type ValueExpression} from './valueBinding.ts'
 ﻿import {
   Comment,
   Fragment,
@@ -374,6 +375,54 @@ function baseCreateRenderer(
     insertStaticContent: hostInsertStaticContent,
   } = options
 
+  const valueBindings = new WeakMap<VNode, Map<string | symbol, ValueBinding>>()
+
+  const prepareValueBindings = (previous: VNode | null, vnode: VNode, owner: ComponentInternalInstance | null, namespace: ElementNamespace) => {
+    const retained = previous ? valueBindings.get(previous) : undefined
+    const next = new Map<string | symbol, ValueBinding>()
+    const sources = {...vnode.valueSources}
+    const raw = vnode.props
+    if (raw) {
+        vnode.props = {...raw}
+        for (const key of Object.keys(raw)) {
+            if (isValueExpression(raw[key])) sources[key] = raw[key]
+        }
+    }
+    vnode.valueSources = Object.keys(sources).length ? sources : null
+    const expressions: [string | symbol, ValueExpression][] = Object.entries(sources)
+    if (vnode.textSource) expressions.push([textBindingKey, vnode.textSource])
+    for (const [key, expression] of expressions) {
+        const assign = (value: unknown) => {
+            if (key === textBindingKey) vnode.children = String(value ?? '')
+            else (vnode.props ??= {})[key as string] = value
+        }
+        const write = (value: unknown, old: unknown) => {
+            const previousProps = {...vnode.props}
+            assign(value)
+            if (!valueBindings.has(vnode)) return
+            if (key === textBindingKey) {
+                if (vnode.el) {
+                    if (vnode.type === Text) hostSetText(vnode.el, vnode.children as string)
+                    else hostSetElementText(vnode.el, vnode.children as string)
+                }
+            } else if (vnode.component) {
+                updateProps(vnode.component, vnode.props, previousProps, false)
+            } else if (vnode.el && vnode.shapeFlag & ShapeFlags.ELEMENT) {
+                hostPatchProp(vnode.el, key as string, old, value, namespace, owner)
+            }
+        }
+        let binding = retained?.get(key)
+        if (binding) {
+            assign(binding.currentValue())
+            binding.refresh(expression, write)
+        } else binding = new ValueBinding(expression, owner, write)
+        next.set(key, binding)
+    }
+    retained?.forEach((binding, key) => { if (!next.has(key)) binding.stop() })
+    if (previous) valueBindings.delete(previous)
+    if (next.size) valueBindings.set(vnode, next)
+  }
+
   // Note: functions inside this closure should use `const xxx = () => {}`
   // style in order to prevent being inlined by minifiers.
   const patch: PatchFn = (
@@ -391,12 +440,16 @@ function baseCreateRenderer(
       return
     }
 
+    // 协调过程读取宿主账本不属于结构依赖；嵌套 render/value effect 自行启用追踪。
+    pauseTracking()
+    try {
     // patching & not same type, unmount old tree
     if (n1 && !isSameVNodeType(n1, n2)) {
       anchor = getNextHostNode(n1)
       unmount(n1, parentComponent, parentSuspense, true)
       n1 = null
     }
+    prepareValueBindings(n1, n2, parentComponent, namespace)
 
     if (n2.patchFlag === PatchFlags.BAIL) {
       optimized = false
@@ -492,6 +545,9 @@ function baseCreateRenderer(
       setRef(ref, n1 && n1.ref, parentSuspense, n2 || n1, !n2)
     } else if (ref == null && n1 && n1.ref != null) {
       setRef(n1.ref, null, parentSuspense, n1, true)
+    }
+    } finally {
+        resetTracking()
     }
   }
 
@@ -697,21 +753,9 @@ function baseCreateRenderer(
     // props
     if (props) {
       for (const key in props) {
-        if (key !== 'value' && !isReservedProp(key)) {
+        if (!isReservedProp(key)) {
           hostPatchProp(el, key, null, props[key], namespace, parentComponent)
         }
-      }
-      /**
-       * Special case for setting value on DOM elements:
-       * - it can be order-sensitive (e.g. should be set *after* min/max, #2325, #4024)
-       * - it needs to be forced (#1471)
-       * #2353 proposes adding another renderer option to configure this, but
-       * the properties affects are so finite it is worth special casing it
-       * here to reduce the complexity. (Special casing it also should not
-       * affect non-DOM renderers)
-       */
-      if ('value' in props) {
-        hostPatchProp(el, 'value', null, props.value, namespace)
       }
       if ((vnodeHook = props.onVnodeBeforeMount)) {
         invokeVNodeHook(vnodeHook, parentComponent, vnode)
@@ -909,26 +953,7 @@ function baseCreateRenderer(
         // element props contain dynamic keys, full diff needed
         patchProps(el, oldProps, newProps, parentComponent, namespace)
       } else {
-        // class
-        // this flag is matched when the element has dynamic class bindings.
-        if (patchFlag & PatchFlags.CLASS) {
-          if (oldProps.class !== newProps.class) {
-            hostPatchProp(el, 'class', null, newProps.class, namespace)
-          }
-        }
-
-        // style
-        // this flag is matched when the element has dynamic style bindings
-        if (patchFlag & PatchFlags.STYLE) {
-          hostPatchProp(el, 'style', oldProps.style, newProps.style, namespace)
-        }
-
-        // props
-        // This flag is matched when the element has dynamic prop/attr bindings
-        // other than class and style. The keys of dynamic prop/attrs are saved for
-        // faster iteration.
-        // Note dynamic keys like :[foo]="bar" will cause this optimization to
-        // bail out and go through a full diff because we need to unset the old key
+        // Dynamic native input keys; value equality is handled uniformly.
         if (patchFlag & PatchFlags.PROPS) {
           // if the flag is present then dynamicProps must be non-null
           const propsToUpdate = n2.dynamicProps!
@@ -936,8 +961,7 @@ function baseCreateRenderer(
             const key = propsToUpdate[i]
             const prev = oldProps[key]
             const next = newProps[key]
-            // #1471 force patch value
-            if (next !== prev || key === 'value') {
+            if (next !== prev) {
               hostPatchProp(el, key, prev, next, namespace, parentComponent)
             }
           }
@@ -1036,13 +1060,9 @@ function baseCreateRenderer(
         if (isReservedProp(key)) continue
         const next = newProps[key]
         const prev = oldProps[key]
-        // defer patching value
-        if (next !== prev && key !== 'value') {
+        if (next !== prev) {
           hostPatchProp(el, key, prev, next, namespace, parentComponent)
         }
-      }
-      if ('value' in newProps) {
-        hostPatchProp(el, 'value', oldProps.value, newProps.value, namespace)
       }
     }
   }
@@ -1274,33 +1294,12 @@ function baseCreateRenderer(
 
   const updateComponent = (n1: VNode, n2: VNode, optimized: boolean) => {
     const instance = (n2.component = n1.component)!
-    if (shouldUpdateComponent(n1, n2, optimized)) {
-      if (
-        __FEATURE_SUSPENSE__ &&
-        instance.asyncDep &&
-        !instance.asyncResolved
-      ) {
-        // async & still pending - just update props and slots
-        // since the component's reactive effect for render isn't set-up yet
-        if (__DEV__) {
-          pushWarningContext(n2)
-        }
-        updateComponentPreRender(instance, n2, optimized)
-        if (__DEV__) {
-          popWarningContext()
-        }
-        return
-      } else {
-        // normal update
-        instance.next = n2
-        // instance.update is the reactive effect.
-        instance.update()
-      }
-    } else {
-      // no update needed. just copy over properties
-      n2.el = n1.el
-      instance.vnode = n2
-    }
+    const structureChanged = shouldUpdateComponent(n1, n2, optimized)
+    n2.el = n1.el
+    // props 先进入反应式对象，实际订阅决定结构 effect 或值 binding 是否执行。
+    updateComponentPreRender(instance, n2, optimized)
+    if (__FEATURE_SUSPENSE__ && instance.asyncDep && !instance.asyncResolved) return
+    if (structureChanged || instance.effect.dirty) instance.update()
   }
 
   const setupRenderEffect: SetupRenderEffectFn = (
@@ -2158,6 +2157,9 @@ function baseCreateRenderer(
       return
     }
 
+    valueBindings.get(vnode)?.forEach(binding => binding.stop())
+    valueBindings.delete(vnode)
+
     const shouldInvokeDirs = shapeFlag & ShapeFlags.ELEMENT && dirs
     const shouldInvokeVnodeHook = !isAsyncWrapper(vnode)
 
@@ -2616,4 +2618,3 @@ function resolveAsyncComponentPlaceholder(anchorVnode: VNode) {
 
   return null
 }
-

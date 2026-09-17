@@ -16,6 +16,7 @@ import {
   type TemplateTextChildNode,
   type VNodeCall,
   createArrayExpression,
+  createFunctionExpression,
   createCallExpression,
   createObjectExpression,
   createObjectProperty,
@@ -35,6 +36,8 @@ import {
 import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
   GUARD_REACTIVE_PROPS,
+  ARRANGE_VALUE,
+  ARRANGE_PROPS,
   KEEP_ALIVE,
   MERGE_PROPS,
   NORMALIZE_CLASS,
@@ -194,7 +197,9 @@ export const transformElement: NodeTransform = (node, context) => {
         // pass directly if the only child is a text node
         // (plain / interpolation / expression)
         if (hasDynamicTextChild || type === NodeTypes.TEXT) {
-          vnodeChildren = child as TemplateTextChildNode
+          vnodeChildren = hasDynamicTextChild && !context.ssr
+            ? createCallExpression(context.helper(ARRANGE_VALUE), [createFunctionExpression(undefined, child, true)])
+            : child as TemplateTextChildNode
         } else {
           vnodeChildren = node.children
         }
@@ -746,78 +751,20 @@ export function buildProps(
     patchFlag |= PatchFlags.NEED_PATCH
   }
 
-  // pre-normalize props, SSR is skipped for now
-  if (!context.inSSR && propsExpression) {
-    switch (propsExpression.type) {
-      case NodeTypes.JS_OBJECT_EXPRESSION:
-        // means that there is no v-bind,
-        // but still need to deal with dynamic key binding
-        let classKeyIndex = -1
-        let styleKeyIndex = -1
-        let hasDynamicKey = false
+  if (!ssr && propsExpression && hasDynamicKeys) {
+    propsExpression = createCallExpression(context.helper(ARRANGE_PROPS), [createFunctionExpression(undefined, propsExpression, true)])
+  }
 
-        for (let i = 0; i < propsExpression.properties.length; i++) {
-          const key = propsExpression.properties[i].key
-          if (isStaticExp(key)) {
-            if (key.content === 'class') {
-              classKeyIndex = i
-            } else if (key.content === 'style') {
-              styleKeyIndex = i
-            }
-          } else if (!key.isHandlerKey) {
-            hasDynamicKey = true
-          }
-        }
-
-        const classProp = propsExpression.properties[classKeyIndex]
-        const styleProp = propsExpression.properties[styleKeyIndex]
-
-        // no dynamic key
-        if (!hasDynamicKey) {
-          if (classProp && !isStaticExp(classProp.value)) {
-            classProp.value = createCallExpression(
-              context.helper(NORMALIZE_CLASS),
-              [classProp.value],
-            )
-          }
-          if (
-            styleProp &&
-            // the static style is compiled into an object,
-            // so use `hasStyleBinding` to ensure that it is a dynamic style binding
-            (hasStyleBinding ||
-              (styleProp.value.type === NodeTypes.SIMPLE_EXPRESSION &&
-                styleProp.value.content.trim()[0] === `[`) ||
-              // v-bind:style and style both exist,
-              // v-bind:style with static literal object
-              styleProp.value.type === NodeTypes.JS_ARRAY_EXPRESSION)
-          ) {
-            styleProp.value = createCallExpression(
-              context.helper(NORMALIZE_STYLE),
-              [styleProp.value],
-            )
-          }
-        } else {
-          // dynamic key binding, wrap with `normalizeProps`
-          propsExpression = createCallExpression(
-            context.helper(NORMALIZE_PROPS),
-            [propsExpression],
-          )
-        }
-        break
-      case NodeTypes.JS_CALL_EXPRESSION:
-        // mergeProps call, do nothing
-        break
-      default:
-        // single v-bind
-        propsExpression = createCallExpression(
-          context.helper(NORMALIZE_PROPS),
-          [
-            createCallExpression(context.helper(GUARD_REACTIVE_PROPS), [
-              propsExpression,
-            ]),
-          ],
-        )
-        break
+  if (!ssr && propsExpression?.type === NodeTypes.JS_OBJECT_EXPRESSION) {
+    for (const property of propsExpression.properties) {
+      if (property.key.type !== NodeTypes.SIMPLE_EXPRESSION || !property.key.isStatic) continue
+      const name = property.key.content
+      if (isReservedProp(name) || name === 'class' || name === 'style') continue
+      if (dynamicPropNames.includes(name) || isOn(name)) {
+        property.value = createCallExpression(context.helper(ARRANGE_VALUE), [
+          createFunctionExpression(undefined, property.value, true),
+        ])
+      }
     }
   }
 
@@ -935,4 +882,3 @@ function stringifyDynamicPropNames(props: string[]): string {
 function isComponentTag(tag: string) {
   return tag === 'component' || tag === 'Component'
 }
-

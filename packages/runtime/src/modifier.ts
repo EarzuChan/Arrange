@@ -5,6 +5,7 @@ export type ModifierValue = Readonly<Record<string, unknown>>
 
 export type ModifierElement = Readonly<{
     type: string
+    key?: string
     value: ModifierValue
 }>
 
@@ -27,6 +28,14 @@ export class Modifier {
 
     then(other: Modifier | null | undefined): Modifier {
         return new Modifier([...this.elements, ...toModifier(other).elements])
+    }
+
+    // 为最后一层提供协调身份；不是 native slot 的运行时 handle。
+    keyed(key: string): Modifier {
+        if (!key || this.elements.length === 0) throw new TypeError("Modifier.keyed requires a nonempty key and an element")
+        const elements = [...this.elements]
+        elements[elements.length - 1] = Object.freeze({...elements[elements.length - 1], key})
+        return new Modifier(elements)
     }
 
     if(condition: boolean, ifModifier: Modifier, elseModifier: Modifier = m): Modifier {

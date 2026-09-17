@@ -7,9 +7,10 @@ import {
   NodeTypes,
   createCallExpression,
   createCompoundExpression,
+  createFunctionExpression,
 } from '../ast.ts'
 import { isText } from '../utils.ts'
-import { CREATE_TEXT } from '../runtimeHelpers.ts'
+import { CREATE_TEXT, ARRANGE_VALUE } from '../runtimeHelpers.ts'
 import { PatchFlagNames, PatchFlags } from '@arrange/vue-shared'
 import { getConstantType } from './cacheStatic.ts'
 
@@ -98,6 +99,7 @@ export const transformText: NodeTransform = (node, context) => {
             !context.ssr &&
             getConstantType(child, context) === ConstantTypes.NOT_CONSTANT
           ) {
+            callArgs[0] = createCallExpression(context.helper(ARRANGE_VALUE), [createFunctionExpression(undefined, child, true)])
             callArgs.push(
               PatchFlags.TEXT +
                 (__DEV__ ? ` /* ${PatchFlagNames[PatchFlags.TEXT]} */` : ``),

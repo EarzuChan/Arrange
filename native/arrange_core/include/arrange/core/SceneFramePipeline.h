@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Geometry.h"
+#include "HitTest.h"
+#include <memory>
 #include "Invalidation.h"
 #include "Layout.h"
 #include "MutationTransaction.h"
@@ -45,6 +47,7 @@ namespace arrange::core {
     };
 
     struct PublishedFrameContent {
+        std::shared_ptr<const HitTestSnapshot> hitTest = std::make_shared<const HitTestSnapshot>();
         std::vector<DrawOp> drawOps;
         std::vector<DrawOp> overlayDrawOps;
         std::vector<DrawOp> diagnosticsErrorDrawOps;
@@ -57,14 +60,21 @@ namespace arrange::core {
 
     struct FrameChangeSet {
         bool diagnosticsDrawOpsChanged = false;
-        bool hasDiagnosticsRepaintBounds = false;
-        Rect diagnosticsRepaintBounds;
         bool overlayDrawOpsChanged = false;
-        bool hasOverlayRepaintBounds = false;
-        Rect overlayRepaintBounds;
+    };
+
+    struct FrameExecutionCounters {
+        std::uint64_t submissions = 0;
+        std::uint64_t failedSubmissions = 0;
+        std::uint64_t measures = 0;
+        std::uint64_t placements = 0;
+        std::uint64_t paintBuilds = 0;
+        std::uint64_t hitBuilds = 0;
+        std::uint64_t publications = 0;
     };
 
     struct PublishedFrame {
+        std::uint64_t revision = 0;
         PublishedFrameContent content;
         FrameChangeSet changes;
         DirtySnapshot dirty;
@@ -82,6 +92,8 @@ namespace arrange::core {
         std::vector<PhaseExecution> phases;
     };
 
+    using FrameFinalizer = std::function<void(const NativeScene&, PublishedFrame&)>;
+
     class SceneFramePipeline {
     public:
         explicit SceneFramePipeline(LayoutEngine layoutEngine = LayoutEngine());
@@ -98,9 +110,17 @@ namespace arrange::core {
             Constraints constraints,
             const MutationTransaction* transaction,
             bool framePipelineRequested,
-            PublishedFrame& publishedFrame);
+            PublishedFrame& publishedFrame,
+            const FrameFinalizer& finalize = {});
+
+        // Diagnostics/interaction can publish against retained geometry without replaying JS.
+        bool publishRetained(const NativeScene& scene, PublishedFrame& publishedFrame, const FrameFinalizer& finalize);
+
+        const FrameExecutionCounters& counters() const noexcept { return counters_; }
 
     private:
+        FrameExecutionCounters counters_;
+        void finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate);
         static void recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason);
 
         LayoutEngine layout_;

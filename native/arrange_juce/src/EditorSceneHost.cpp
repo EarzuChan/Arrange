@@ -37,17 +37,18 @@ namespace arrange::juce {
               interaction_(textLayoutService_) {}
 
         void configure(const EditorConfig& config) {
+            pendingReload_ = ReloadKind::None;
             config_ = config;
             diagnostics_.configure(config_.diagnostics);
             applyPackageLoadOutcome(packageSource_.configure(config_));
         }
 
-        void reload() { applyPackageLoadOutcome(packageSource_.reload()); }
+        void reload() { pendingReload_ = ReloadKind::Configured; }
 
-        void reloadFromDevServer() { applyPackageLoadOutcome(packageSource_.reloadFromDevServer()); }
+        void reloadFromDevServer() { pendingReload_ = ReloadKind::DevServer; }
 
         void manualReload(bool toggleLive) {
-            applyPackageLoadOutcome(packageSource_.manualReload(toggleLive));
+            pendingReload_ = toggleLive ? ReloadKind::ToggleLive : ReloadKind::Manual;
         }
 
         bool triggerManualDiagnosticError() {
@@ -73,41 +74,40 @@ namespace arrange::juce {
                 chrome_.diagnosticsTextContext(packageSource_, diagnostics_));
         }
 
-        void repaintDirty(::juce::Component& owner, bool fullIfNoBounds) {
-            repaint_.repaintDirty(owner, runtime_, diagnostics_, rootNodeId, session_.loaded(), fullIfNoBounds);
+        void repaintDirty(::juce::Component& owner) {
+            repaint_.repaintDirty(owner, runtime_.publishedFrame());
         }
 
         bool consumeDevReloadRequested() { return packageSource_.consumeDevReloadRequested(); }
 
-        EditorTimerDemand timerDemand() const {
-            return {wantsTimer(), desiredTimerFrequencyHz(), wantsFrameClock()};
+        bool wantsVBlank() const {
+            return pendingReload_ != ReloadKind::None || wantsReloadPolling() ||
+                diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork();
         }
 
         bool pumpFrame(double nowMillis) {
-            const auto frameChanged = framePump_.pumpFrame(
+            const auto scriptReload = runtime_.consumeReloadRequest();
+            if (scriptReload && pendingReload_ == ReloadKind::None) pendingReload_ = ReloadKind::Configured;
+            const auto reloadKind = std::exchange(pendingReload_, ReloadKind::None);
+            switch (reloadKind) {
+            case ReloadKind::None: break;
+            case ReloadKind::Configured: applyPackageLoadOutcome(packageSource_.reload()); break;
+            case ReloadKind::DevServer: applyPackageLoadOutcome(packageSource_.reloadFromDevServer()); break;
+            case ReloadKind::Manual: applyPackageLoadOutcome(packageSource_.manualReload(false)); break;
+            case ReloadKind::ToggleLive: applyPackageLoadOutcome(packageSource_.manualReload(true)); break;
+            }
+            return framePump_.pumpFrame(
                 runtime_,
                 session_,
                 diagnostics_,
                 interaction_,
+                paint_,
                 rootNodeId,
                 config_.app.distPath(),
                 lastPaintBounds_,
                 config_.diagnostics.errorScreen,
                 chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_),
                 nowMillis);
-            const auto resourcesChanged = paint_.prepareResources(runtime_, diagnostics_);
-            const auto diagnosticsChanged = diagnostics_.prepareFrame(
-                lastPaintBounds_,
-                config_.diagnostics.errorScreen,
-                chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_));
-            if (diagnosticsChanged) {
-                runtime_.publishDiagnosticsDrawOps(
-                    diagnostics_.errorOpsSnapshot(),
-                    diagnostics_.badgeOpsSnapshot(),
-                    diagnostics_.toastOpsSnapshot());
-                runtime_.enqueueIntent(arrange::core::InputIntent::diagnostics("diagnostics frame prepared"));
-            }
-            return frameChanged || diagnosticsChanged || resourcesChanged;
         }
 
         std::string windowTitle(std::string_view baseTitle) const {
@@ -121,16 +121,7 @@ namespace arrange::juce {
 
         void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
             lastPaintBounds_ = bounds;
-            paint_.paint(
-                g,
-                bounds,
-                runtime_,
-                diagnostics_,
-                interaction_,
-                rootNodeId,
-                session_.loaded(),
-                config_.diagnostics.errorScreen,
-                chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_));
+            paint_.paint(g, runtime_.publishedFrame());
         }
 
         void pointerDown(const ::juce::MouseEvent& event) {
@@ -157,7 +148,7 @@ namespace arrange::juce {
         void pointerUp(const ::juce::MouseEvent& event) {
             if (diagnostics_.hasError()) {
                 if (diagnostics_.errorRetryAvailable()) {
-                    applyPackageLoadOutcome(packageSource_.reload());
+                    reload();
                 }
                 return;
             }
@@ -268,23 +259,7 @@ namespace arrange::juce {
         }
 
     private:
-        bool wantsDevTimer() const { return packageSource_.wantsDevTimer(); }
-
-        bool hasPendingFrameWork() const { return runtime_.hasPendingFrameWork(); }
-
-        bool wantsTimer() const {
-            return wantsDevTimer()
-                   || diagnostics_.hasActiveToasts()
-                   || wantsFrameClock();
-        }
-
-        bool wantsFrameClock() const {
-            return runtime_.hasPendingAnimationFrame() || hasPendingFrameWork();
-        }
-
-        int desiredTimerFrequencyHz() const {
-            return wantsFrameClock() ? runtime_.desiredTimerFrequencyHz() : 20;
-        }
+        bool wantsReloadPolling() const { return packageSource_.wantsReloadPolling(); }
 
         TextInputCallbacks inputCallbacks() { return inputState_.callbacks(runtime_); }
 
@@ -298,6 +273,8 @@ namespace arrange::juce {
                 paint_);
         }
 
+        enum class ReloadKind { None, Configured, DevServer, Manual, ToggleLive };
+        ReloadKind pendingReload_ = ReloadKind::None;
         EditorConfig config_;
         JuceTextMeasurer textMeasurer_;
         arrange::core::TextLayoutService textLayoutService_;
@@ -331,12 +308,12 @@ namespace arrange::juce {
     bool EditorSceneHost::pushManualDiagnosticToast() { return impl_->pushManualDiagnosticToast(); }
     bool EditorSceneHost::copyDiagnosticsToClipboard() { return impl_->copyDiagnosticsToClipboard(); }
 
-    void EditorSceneHost::repaintDirty(::juce::Component& owner, bool fullIfNoBounds) {
-        impl_->repaintDirty(owner, fullIfNoBounds);
+    void EditorSceneHost::repaintDirty(::juce::Component& owner) {
+        impl_->repaintDirty(owner);
     }
 
     bool EditorSceneHost::consumeDevReloadRequested() { return impl_->consumeDevReloadRequested(); }
-    EditorTimerDemand EditorSceneHost::timerDemand() const { return impl_->timerDemand(); }
+    bool EditorSceneHost::wantsVBlank() const { return impl_->wantsVBlank(); }
     bool EditorSceneHost::pumpFrame(double nowMillis) { return impl_->pumpFrame(nowMillis); }
     std::string EditorSceneHost::windowTitle(std::string_view baseTitle) const { return impl_->windowTitle(baseTitle); }
 

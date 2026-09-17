@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <functional>
+#include <unordered_set>
 
 namespace arrange::core {
     using NodeId = std::uint32_t;
@@ -20,14 +21,19 @@ namespace arrange::core {
         Custom = 100,
     };
 
+    enum class EventSlotOwner { Node, Modifier };
+
     struct EventSlotId {
         NodeId node = 0;
         EventSlotKind kind = EventSlotKind::None;
         std::string path;
+        EventSlotOwner owner = EventSlotOwner::Node;
+        std::uint64_t resource = 0;
+        std::uint64_t generation = 0;
 
         [[nodiscard]] bool valid() const noexcept { return node != 0 && kind != EventSlotKind::None; }
         [[nodiscard]] bool operator==(const EventSlotId& other) const noexcept {
-            return node == other.node && kind == other.kind && path == other.path;
+            return node == other.node && kind == other.kind && path == other.path && owner == other.owner && resource == other.resource && generation == other.generation;
         }
     };
 
@@ -36,9 +42,14 @@ namespace arrange::core {
             auto result = std::hash<NodeId>{}(slot.node);
             result ^= std::hash<std::uint32_t>{}(static_cast<std::uint32_t>(slot.kind)) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
             result ^= std::hash<std::string>{}(slot.path) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
+            result ^= std::hash<std::uint64_t>{}(slot.resource) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
+            result ^= std::hash<std::uint64_t>{}(slot.generation) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
+            result ^= std::hash<int>{}(static_cast<int>(slot.owner));
             return result;
         }
     };
+
+    using EventSlotSet = std::unordered_set<EventSlotId, EventSlotIdHash>;
 
     [[nodiscard]] std::string eventSlotKindName(EventSlotKind kind);
     [[nodiscard]] EventSlotKind eventSlotKindFromName(std::string_view name) noexcept;

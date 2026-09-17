@@ -1,4 +1,4 @@
-import type {Modifier} from "./modifier.ts"
+import type {Modifier, ModifierElement} from "./modifier.ts"
 import type {ColorValue} from "./primitives.ts"
 import {ARRANGE_PROTOCOL_VERSION} from "./version.ts"
 
@@ -48,19 +48,22 @@ export type NativePropValue =
     | ArrangementProp
     | ResourceRef
 
+export type NativeBindingHandle = Readonly<{identity: bigint; generation: bigint}>
+
+export type NativeModifierHandle = NativeBindingHandle & Readonly<{key: string}>
+
 export type NativeTransactionTarget = {
+    registerBinding: (id: NodeId, input: string) => NativeBindingHandle
+    updateBinding: (handle: NativeBindingHandle, value: NativePropValue | Modifier | ModifierElement | null) => void
+    releaseBinding: (handle: NativeBindingHandle) => void
+    modifierInstances?: (id: NodeId) => readonly NativeModifierHandle[]
+    registerModifierBinding?: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle
     runtimeVersion?: number
-    beginTransaction?: () => void
-    endTransaction?: () => void
-    createNode?: (id: NodeId, type: string) => void
-    deleteNode?: (id: NodeId) => void
-    insertChild?: (parent: NodeId, child: NodeId, index: number) => void
-    removeChild?: (parent: NodeId, child: NodeId) => void
-    setText?: (id: NodeId, text: string) => void
-    setProp?: (id: NodeId, key: string, value: NativePropValue) => void
-    setModifier?: (id: NodeId, modifier: Modifier) => void
-    invalidate?: (id: NodeId, flag: string, reason?: string) => void
-    unmount?: () => void
+    createNode: (id: NodeId, type: string) => void
+    deleteNode: (id: NodeId) => void
+    insertChild: (parent: NodeId, child: NodeId, index: number) => void
+    removeChild: (parent: NodeId, child: NodeId) => void
+    unmount: () => void
     reload?: (payload: NativeReloadPayload) => void
     diagnosticsLog?: (level: string, payload: NativeDiagnosticPayload) => void
     diagnosticsToast?: (payload: NativeDiagnosticPayload) => void

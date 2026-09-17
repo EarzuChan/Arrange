@@ -66,7 +66,7 @@ writeFileSync(configPath, [
     "",
 ].join("\n"))
 
-const child = spawn(process.execPath, ["--experimental-transform-types", viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort", "--config", configPath], {
+const child = spawn(process.execPath, ["--import", "tsx", viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort", "--config", configPath], {
     cwd: uiRoot,
     detached: false,
     stdio: ["ignore", "pipe", "pipe"],

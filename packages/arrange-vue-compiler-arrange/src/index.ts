@@ -1,78 +1,50 @@
-﻿import {
-  type CodegenResult,
-  type CompilerOptions,
-  type DirectiveTransform,
-  type NodeTransform,
-  type ParserOptions,
-  type RootNode,
-  baseCompile,
-  baseParse,
-  noopDirectiveTransform,
+import {
+    baseCompile,
+    baseParse,
+    NodeTypes,
+    type CodegenResult,
+    type CompilerOptions,
+    type NodeTransform,
+    type ParserOptions,
+    type RootNode,
 } from '@arrange/vue-compiler-core'
-import { parserOptions } from './parserOptions.ts'
-import { transformStyle } from './transforms/transformStyle.ts'
-import { transformVHtml } from './transforms/vHtml.ts'
-import { transformVText } from './transforms/vText.ts'
-import { transformModel } from './transforms/vModel.ts'
-import { transformOn } from './transforms/vOn.ts'
-import { transformShow } from './transforms/vShow.ts'
-import { transformTransition } from './transforms/Transition.ts'
-import { stringifyStatic } from './transforms/stringifyStatic.ts'
-import { ignoreSideEffectTags } from './transforms/ignoreSideEffectTags.ts'
-import { validateHtmlNesting } from './transforms/validateHtmlNesting.ts'
-import { extend } from '@arrange/vue-shared'
+import {parserOptions} from './parserOptions.ts'
 
-export { parserOptions }
+export {parserOptions}
 
-export const DOMNodeTransforms: NodeTransform[] = [
-  transformStyle,
-  ...(__DEV__ ? [transformTransition, validateHtmlNesting] : []),
-]
-
-export const DOMDirectiveTransforms: Record<string, DirectiveTransform> = {
-  cloak: noopDirectiveTransform,
-  html: transformVHtml,
-  text: transformVText,
-  model: transformModel, // override compiler-core
-  on: transformOn, // override compiler-core
-  show: transformShow,
+// 原生宿主不接受浏览器语义；在源码位置报错，不能静默丢弃。
+const validateNativeTemplate: NodeTransform = (node, context) => {
+    if (node.type !== NodeTypes.ELEMENT) return
+    const fail = (message: string, loc = node.loc) => {
+        context.onError(Object.assign(new SyntaxError(message), {code: 'ARRANGE_TEMPLATE', loc}))
+    }
+    if (/^[a-z]/.test(node.tag) && !['template', 'slot', 'component'].includes(node.tag)) {
+        fail(`Arrange 不支持 <${node.tag}>；请使用原生元素或组件`)
+    }
+    for (const prop of node.props) {
+        const name = prop.type === NodeTypes.ATTRIBUTE ? prop.name
+            : prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic ? prop.arg.content : null
+        if (name === 'class' || name === 'style') fail(`Arrange 不支持 ${name}，请使用 Modifier`, prop.loc)
+        if (prop.type !== NodeTypes.DIRECTIVE) continue
+        if (['html', 'text', 'show', 'cloak'].includes(prop.name)) fail(`Arrange 不支持 v-${prop.name}`, prop.loc)
+        if (prop.name === 'on' && prop.modifiers.length) fail('Arrange 事件不支持浏览器修饰符', prop.loc)
+        if (prop.name === 'bind' && prop.modifiers.some(modifier => modifier.content !== 'camel')) fail('Arrange v-bind 仅支持 .camel 修饰符', prop.loc)
+    }
 }
 
-export function compile(
-  src: string | RootNode,
-  options: CompilerOptions = {},
-): CodegenResult {
-  return baseCompile(
-    src,
-    extend({}, parserOptions, options, {
-      nodeTransforms: [
-        // ignore <script> and <tag>
-        // this is not put inside DOMNodeTransforms because that list is used
-        // by compiler-ssr to generate vnode fallback branches
-        ignoreSideEffectTags,
-        ...DOMNodeTransforms,
-        ...(options.nodeTransforms || []),
-      ],
-      directiveTransforms: extend(
-        {},
-        DOMDirectiveTransforms,
-        options.directiveTransforms || {},
-      ),
-      transformHoist: __BROWSER__ ? null : stringifyStatic,
-    }),
-  )
+export function compile(src: string | RootNode, options: CompilerOptions = {}): CodegenResult {
+    return baseCompile(src, {
+        ...parserOptions,
+        ...options,
+        nodeTransforms: [validateNativeTemplate, ...(options.nodeTransforms ?? [])],
+        // 原生 v-model 使用 core 生成的 modelValue 和 onUpdate:modelValue。
+        // 不引入 DOM 指令、事件监听器或 HTML 字符串静态化。
+        transformHoist: null,
+    })
 }
 
 export function parse(template: string, options: ParserOptions = {}): RootNode {
-  return baseParse(template, extend({}, parserOptions, options))
+    return baseParse(template, {...parserOptions, ...options})
 }
 
-export * from './runtimeHelpers.ts'
-export { transformStyle } from './transforms/transformStyle.ts'
-export {
-  createDOMCompilerError,
-  DOMErrorCodes,
-  DOMErrorMessages,
-} from './errors.ts'
 export * from '@arrange/vue-compiler-core'
-

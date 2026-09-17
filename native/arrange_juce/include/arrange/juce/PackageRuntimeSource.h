@@ -52,7 +52,7 @@ namespace arrange::juce {
         PackageLoadOutcome manualReload(bool toggleLive);
 
         bool consumeDevReloadRequested();
-        bool wantsDevTimer() const;
+        bool wantsReloadPolling() const;
 
         const EditorConfig& config() const noexcept { return config_; }
         PackageSource activeSource() const noexcept { return activeSource_; }

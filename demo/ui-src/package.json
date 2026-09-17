@@ -3,11 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "arrange dev",
-    "build": "arrange build --outDir ../../build/demo-ui-dist --emptyOutDir"
+    "dev": "tsx ./node_modules/vite/bin/vite.js",
+    "build": "tsx ./node_modules/vite/bin/vite.js build --outDir ../../build/demo-ui-dist --emptyOutDir"
   },
   "dependencies": {
     "@arrange/framework": "0.0.0-m.2.2"
+  },
+  "devDependencies": {
+    "tsx": "4.22.3",
+    "vite": "8.0.11"
   },
   "version": "0.0.0-m.2.2",
   "engines": {

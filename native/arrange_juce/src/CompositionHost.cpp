@@ -29,6 +29,14 @@ namespace arrange::juce {
 #endif
     }
 
+    bool CompositionHost::hasPendingDiagnostics() const noexcept {
+#if ARRANGE_WITH_QUICKJS_NG
+        return scriptHost_ && scriptHost_->hasPendingDiagnostics();
+#else
+        return false;
+#endif
+    }
+
     bool CompositionHost::hasPendingAnimationFrame() const noexcept {
 #if ARRANGE_WITH_QUICKJS_NG
         return scriptHost_ && scriptHost_->hasPendingAnimationFrame();
@@ -98,9 +106,9 @@ namespace arrange::juce {
         return fromScriptEventResult(eventDispatcher_.invokeScroll(scriptHost_.get(), slot, nowMillis, result));
     }
 
-    void CompositionHost::flushRetiredEventSlots() {
+    void CompositionHost::publishScene(const arrange::core::NativeScene& scene) {
 #if ARRANGE_WITH_QUICKJS_NG
-        if (scriptHost_) scriptHost_->flushRetiredEventSlots();
+        if (scriptHost_) scriptHost_->publishScene(scene);
 #endif
     }
 

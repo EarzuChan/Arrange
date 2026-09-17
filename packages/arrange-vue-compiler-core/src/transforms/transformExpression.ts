@@ -1,4 +1,5 @@
-﻿// - Parse expressions in templates into compound expressions so that each
+import {slotAlias} from './slotAliases.ts'
+// - Parse expressions in templates into compound expressions so that each
 //   identifier gets more accurate source-map locations.
 //
 // - Prefix identifiers with `_ctx.` or `$xxx` (for known binding types) so that
@@ -243,6 +244,11 @@ export function processExpression(
   }
 
   if (ast === null || (!ast && isSimpleIdentifier(rawExp))) {
+    const alias = !asParams && slotAlias(context, rawExp)
+    if (alias) {
+      node.content = alias
+      return node
+    }
     const isScopeVarReference = context.identifiers[rawExp]
     const isAllowedGlobal = isGloballyAllowed(rawExp)
     const isLiteral = isLiteralWhitelisted(rawExp)
@@ -311,14 +317,15 @@ export function processExpression(
         return
       }
 
+      const alias = isReferenced && slotAlias(context, node.name, knownIds[node.name])
       const needPrefix = isReferenced && canPrefix(node)
-      if (needPrefix && !isLocal) {
+      if (alias || (needPrefix && !isLocal)) {
         if (isStaticProperty(parent!) && parent.shorthand) {
           // property shorthand like { foo }, we need to add the key since
           // we rewrite the value
           ;(node as QualifiedId).prefix = `${node.name}: `
         }
-        node.name = rewriteIdentifier(node.name, parent, node)
+        node.name = alias || rewriteIdentifier(node.name, parent, node)
         ids.push(node as QualifiedId)
       } else {
         // The identifier is considered constant unless it's pointing to a

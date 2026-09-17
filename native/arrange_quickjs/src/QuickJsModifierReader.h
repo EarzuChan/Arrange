@@ -17,13 +17,15 @@ namespace arrange::quickjs {
         QuickJsModifierReader(JSContext* context, QuickJsEventRegistry& events, arrange::core::MutationTransaction* transaction)
             : context_(context), reader_(context), events_(events), transaction_(transaction) {}
 
-        [[nodiscard]] arrange::core::CompiledModifier read(arrange::core::NodeId id, JSValueConst modifier);
+        [[nodiscard]] arrange::core::ModifierDescriptors read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput = nullptr);
         [[nodiscard]] bool failed() const noexcept { return failed_; }
 
     private:
         [[nodiscard]] JSValue throwTypeError(const char* message);
         [[nodiscard]] JSValue throwUnknownModifier(std::string_view type);
         [[nodiscard]] JSValueConst payloadFor(JSValueConst element, ScopedValue& value, std::string_view type);
+        [[nodiscard]] float numberField(JSValueConst object, const char* key, float fallback = 0.0f) const;
+        [[nodiscard]] bool boolField(JSValueConst object, const char* key, bool fallback) const;
         [[nodiscard]] float requiredNumberField(JSValueConst object, const char* key, std::string_view owner);
         [[nodiscard]] std::string requiredStringField(JSValueConst object, const char* key, std::string_view owner);
         [[nodiscard]] arrange::core::ModifierPadding readPadding(JSValueConst value);

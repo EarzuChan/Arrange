@@ -4,7 +4,6 @@ import {resolve} from "node:path"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
 import {DEV_BUNDLE_PATH} from "../../packages/vite-plugin/src/constraints.ts"
 import {buildDevBundle} from "../../packages/vite-plugin/src/dev-bundle.ts"
-import {normalizeViteArgs} from "../../cli/src/vite.ts"
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -113,19 +112,11 @@ test("vite plugin does not emit Arrange reload for dependency updates", () => {
     assert.deepEqual(sent, [])
 })
 
-test("vite plugin warns for DOM tags, class/style, and SFC style blocks", () => {
+test("vite plugin rejects DOM tags, class/style and SFC styles instead of ignoring them", () => {
     const plugin = arrange()
-    const warnings: string[] = []
-    const context = {
-        warn(warning: {message: string}) {
-            warnings.push(warning.message)
-        }
+    for (const source of ['<template><div /></template>', '<template><Text class="x" /></template>', '<template><Text /></template><style>.x{}</style>']) {
+        assert.throws(() => plugin.transform.call({warn() {}}, source, 'App.vue'), /Arrange.*不支持/)
     }
-    plugin.transform.call(context, '<template><div class="x" style="color:red">bad</div></template><style>.x{}</style>', 'App.vue')
-    assert.equal(warnings.length, 3)
-    assert.match(warnings[0], /DOM\/HTML/)
-    assert.match(warnings[1], /class\/style/)
-    assert.match(warnings[2], /SFC <style>/)
 })
 
 test("vite plugin accepts Arrange component template without warnings", () => {
@@ -137,15 +128,4 @@ test("vite plugin accepts Arrange component template without warnings", () => {
         }
     }, '<template><Column><Text text="ok" /><Input placeholder="ok" /></Column></template>', 'App.vue')
     assert.deepEqual(warnings, [])
-})
-
-test("arrange CLI injects Arrange Vite config by default", () => {
-    const devArgs = normalizeViteArgs("dev")
-    assert.deepEqual(devArgs.slice(0, 5), ["--host", "127.0.0.1", "--port", "9178", "--strictPort"])
-    assert.ok(devArgs.includes("--config"))
-
-    const buildArgs = normalizeViteArgs("build", ["--outDir", "dist"])
-    assert.equal(buildArgs[0], "build")
-    assert.ok(buildArgs.includes("--config"))
-    assert.ok(buildArgs.includes("--outDir"))
 })

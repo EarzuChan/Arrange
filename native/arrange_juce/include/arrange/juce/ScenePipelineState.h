@@ -25,25 +25,23 @@ namespace arrange::juce {
         [[nodiscard]] arrange::core::SceneFramePipelineResult run(
             arrange::core::NodeId root,
             arrange::core::Constraints constraints,
-            bool framePipelineRequested);
+            bool framePipelineRequested,
+            const arrange::core::FrameFinalizer& finalize = {});
 
         [[nodiscard]] arrange::core::NativeScene& scene() noexcept { return scene_; }
         [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept { return scene_; }
         [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept { return publishedFrame_; }
-        void setOverlayDrawOps(
-            std::vector<arrange::core::DrawOp> ops,
-            std::optional<arrange::core::NodeId> focusedInputNode,
-            float focusedInputViewportX);
-        void setDiagnosticsDrawOps(
-            std::vector<arrange::core::DrawOp> errorOps,
-            std::vector<arrange::core::DrawOp> badgeOps,
-            std::vector<arrange::core::DrawOp> toastOps);
+        const arrange::core::FrameExecutionCounters& counters() const noexcept { return pipeline_.counters(); }
+        bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
+            return pipeline_.publishRetained(scene_, publishedFrame_, finalize);
+        }
 
     private:
         arrange::core::NativeScene scene_;
         arrange::core::SceneFramePipeline pipeline_;
         arrange::core::InputIntentQueue pendingIntents_;
         arrange::core::MutationTransactionQueue pendingTransactions_;
+        std::optional<arrange::core::MutationTransaction> failedTransaction_;
         arrange::core::PublishedFrame publishedFrame_;
     };
 } // namespace arrange::juce

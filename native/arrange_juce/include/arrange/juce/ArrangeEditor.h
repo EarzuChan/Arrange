@@ -72,12 +72,12 @@ namespace arrange::juce {
         void afterReload(ArrangeEditor& editor) const;
         void afterResize(ArrangeEditor& editor) const;
         void afterPointerDown(ArrangeEditor& editor) const;
-        void afterTimerRelevantChange(ArrangeEditor& editor) const;
-        void afterTitleAndTimerRelevantChange(ArrangeEditor& editor) const;
-        void timerTick(ArrangeEditor& editor, double nowMillis) const;
+        void afterFrameRelevantChange(ArrangeEditor& editor) const;
+        void afterTitleAndFrameRelevantChange(ArrangeEditor& editor) const;
+        void vblankTick(ArrangeEditor& editor, double nowMillis) const;
     };
 
-    class ArrangeEditor final : public ::juce::AudioProcessorEditor, public ::juce::TextInputTarget, private ::juce::Timer {
+    class ArrangeEditor final : public ::juce::AudioProcessorEditor, public ::juce::TextInputTarget {
     public:
         explicit ArrangeEditor(::juce::AudioProcessor& processor);
         ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig config);
@@ -110,9 +110,8 @@ namespace arrange::juce {
     private:
         friend class EditorShellDriver;
 
-        void timerCallback() override;
         void updateWindowTitle();
-        void updateTimerState();
+        void updateFrameClockState();
         void requestFrameClockResyncAsync();
 
         EditorConfig config_;

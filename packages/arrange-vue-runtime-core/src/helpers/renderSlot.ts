@@ -1,4 +1,5 @@
-﻿import type { Data } from '../component.ts'
+import {isValueExpression} from '../valueBinding.ts'
+import type { Data } from '../component.ts'
 import type { RawSlots, Slots } from '../componentSlots.ts'
 import {
   type ContextualRenderFn,
@@ -72,7 +73,11 @@ export function renderSlot(
     ;(slot as ContextualRenderFn)._d = false
   }
   openBlock()
-  const validSlotContent = slot && ensureValidVNode(slot(props))
+  const slotProps = Object.defineProperties({}, Object.fromEntries(Object.keys(props).map(key => [key, {
+    enumerable: true,
+    get: () => isValueExpression(props[key]) ? props[key].read() : props[key],
+  }])))
+  const validSlotContent = slot && ensureValidVNode(slot(slotProps))
   const slotKey =
     props.key ||
     // slot content array of a dynamic conditional slot may have a branch

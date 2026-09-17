@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, rememberScrollState} from "../../packages/runtime/src/index.ts"
+import {ARRANGE_RUNTIME_VERSION, Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, rememberScrollState} from "../../packages/runtime/src/index.ts"
 import type {NativeTransactionTarget} from "../../packages/runtime/src/index.ts"
 
 type NativeCall = readonly [string, ...unknown[]]
@@ -9,19 +9,25 @@ type RecordingNative = NativeTransactionTarget & {calls: NativeCall[]}
 
 function recordingNative(): RecordingNative {
     const calls: NativeCall[] = []
+    const bindings = new Map<bigint, {id: number; input: string}>()
+    let nextBinding = 1n
     return {
         calls,
-        runtimeVersion: 1,
-        beginTransaction: () => calls.push(["beginTransaction"]),
-        endTransaction: () => calls.push(["endTransaction"]),
+        registerBinding(id, input) {
+            const handle = {identity: nextBinding++, generation: 1n}
+            bindings.set(handle.identity, {id, input})
+            return handle
+        },
+        updateBinding(handle, value) {
+            const target = bindings.get(handle.identity)!
+            calls.push(target.input === "modifier" ? ["setModifier", target.id, value] : target.input === "text" ? ["setText", target.id, value] : ["setProp", target.id, target.input, value])
+        },
+        releaseBinding(handle) { bindings.delete(handle.identity) },
+        runtimeVersion: ARRANGE_RUNTIME_VERSION,
         createNode: (id, type) => calls.push(["createNode", id, type]),
         deleteNode: (id) => calls.push(["deleteNode", id]),
         insertChild: (parent, child, index) => calls.push(["insertChild", parent, child, index]),
         removeChild: (parent, child) => calls.push(["removeChild", parent, child]),
-        setText: (id, text) => calls.push(["setText", id, text]),
-        setProp: (id, key, value) => calls.push(["setProp", id, key, value]),
-        setModifier: (id, modifier) => calls.push(["setModifier", id, modifier]),
-        invalidate: (id, flag, reason) => calls.push(["invalidate", id, flag, reason]),
         unmount: () => calls.push(["unmount"]),
         diagnosticsLog: (level, payload) => calls.push(["diagnosticsLog", level, payload]),
         diagnosticsToast: (payload) => calls.push(["diagnosticsToast", payload]),
@@ -48,12 +54,11 @@ test("Vue renderer drives native transaction API on mount", () => {
         },
     }).mount(native)
 
-    assert.deepEqual(native.calls[0], ["beginTransaction"])
-    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 1 && call[2] === "Column"))
-    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 2 && call[2] === "Text"))
-    assert.ok(native.calls.some((call) => call[0] === "setText" && call[1] === 2 && call[2] === "Hello"))
-    assert.ok(native.calls.some((call) => call[0] === "setModifier" && call[1] === 1))
-    assert.deepEqual(native.calls.at(-1), ["endTransaction"])
+    assert.deepEqual(native.calls[0], ["createNode", 1, "Root"])
+    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 2 && call[2] === "Column"))
+    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 3 && call[2] === "Text"))
+    assert.ok(native.calls.some((call) => call[0] === "setText" && call[1] === 3 && call[2] === "Hello"))
+    assert.ok(native.calls.some((call) => call[0] === "setModifier" && call[1] === 2))
 })
 
 test("Vue renderer commits reactive text through native setText", async () => {
@@ -65,7 +70,7 @@ test("Vue renderer commits reactive text through native setText", async () => {
     label.value = "Beta"
     await flushArrangeCommit()
 
-    assert.deepEqual(native.calls, [["beginTransaction"], ["setText", 1, "Beta"], ["endTransaction"]])
+    assert.deepEqual(native.calls, [["setText", 2, "Beta"]])
 })
 
 test("ScrollState native object snapshots trigger modifier updates without JSON", async () => {
@@ -82,12 +87,12 @@ test("ScrollState native object snapshots trigger modifier updates without JSON"
     await flushArrangeCommit()
 
     assert.ok(native.calls.some((call) => call[0] === "setText" && call[2] === "scroll 12"))
-    assert.ok(native.calls.some((call) => call[0] === "setModifier" && call[1] === 1))
+    assert.ok(native.calls.some((call) => call[0] === "setModifier" && call[1] === 2))
 })
 
 test("Vue renderer rejects incompatible native runtime version", () => {
     const app = createApp({setup: () => () => vueH(Text, {text: "versioned"})})
-    assert.throws(() => app.mount({runtimeVersion: 999}), /runtime\/native version mismatch/)
+    assert.throws(() => app.mount({...recordingNative(), runtimeVersion: 999}), /runtime\/native version mismatch/)
 })
 
 test("diagnostics TS API forwards to native diagnostics functions", () => {

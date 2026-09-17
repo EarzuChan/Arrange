@@ -14,13 +14,11 @@ export const parseCache = _parseCache as Map<string, SFCParseResult>
 
 // error messages
 import {
-  DOMErrorMessages,
   errorMessages as coreErrorMessages,
 } from '@arrange/vue-compiler-arrange'
 
 export const errorMessages: Record<number, string> = {
   ...coreErrorMessages,
-  ...DOMErrorMessages,
 }
 
 // Utilities
@@ -87,4 +85,3 @@ export type {
  * ignoring the option instead of breaking.
  */
 export const shouldTransformRef = () => false
-

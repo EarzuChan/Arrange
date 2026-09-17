@@ -8,8 +8,8 @@
     "demo/ui-src"
   ],
   "scripts": {
-    "test": "node --experimental-transform-types --test tests/**/*.test.ts",
-    "test:runtime": "node --experimental-transform-types --test tests/runtime/*.test.ts",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "test:runtime": "node --import tsx --test tests/runtime/*.test.ts",
     "test:native": "node scripts/test-native.ts",
     "test:quickjs": "node scripts/test-quickjs-app.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -17,15 +17,16 @@
     "build:demo-ui": "node scripts/build-demo-ui.ts",
     "build:demo": "node scripts/build-demo.ts",
     "verify:demo-dev": "node scripts/verify-demo-dev-endpoint.ts",
-    "sync:version": "node --experimental-transform-types scripts/sync-version.ts",
-    "verify:version": "node --experimental-transform-types scripts/verify-version.ts",
-    "verify:native-fetchcontent": "node --experimental-transform-types scripts/verify-native-fetchcontent.ts",
-    "pack:package": "node --experimental-transform-types scripts/pack-npm-package.ts",
-    "verify:npm-package": "node --experimental-transform-types scripts/verify-npm-package.ts",
-    "verify:npm-registry-package": "node --experimental-transform-types scripts/verify-npm-registry-package.ts"
+    "sync:version": "node --import tsx scripts/sync-version.ts",
+    "verify:version": "node --import tsx scripts/verify-version.ts",
+    "verify:native-fetchcontent": "node --import tsx scripts/verify-native-fetchcontent.ts",
+    "pack:package": "node --import tsx scripts/pack-npm-package.ts",
+    "verify:npm-package": "node --import tsx scripts/verify-npm-package.ts",
+    "verify:npm-registry-package": "node --import tsx scripts/verify-npm-registry-package.ts"
   },
   "devDependencies": {
     "@types/node": "^24.12.4",
+    "tsx": "4.22.3",
     "typescript": "^5.9.0",
     "vite": "8.0.11"
   },

@@ -25,7 +25,7 @@ namespace arrange::juce {
         runtime.enqueueIntent(arrange::core::InputIntent::pointer("native pointer down"));
         interaction.pointerDown(
             runtime.scene().tree(),
-            root,
+            *runtime.publishedFrame().content.hitTest,
             static_cast<float>(event.x),
             static_cast<float>(event.y),
             inputCallbacks);
@@ -64,7 +64,7 @@ namespace arrange::juce {
 
         const auto result = interaction.pointerUp(
             runtime.scene().tree(),
-            root,
+            *runtime.publishedFrame().content.hitTest,
             static_cast<float>(event.x),
             static_cast<float>(event.y));
         if (!result.clickTriggered || !result.eventSlot.valid()) {
@@ -94,7 +94,8 @@ namespace arrange::juce {
             static_cast<float>(event.x),
             static_cast<float>(event.y),
             wheel.deltaX,
-            wheel.deltaY);
+            wheel.deltaY,
+            runtime.publishedFrame().revision);
         const auto& result = wheelResult.scroll;
         if (!result.consumed) {
             return false;

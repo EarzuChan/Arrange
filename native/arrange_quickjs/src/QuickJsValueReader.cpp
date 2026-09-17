@@ -4,6 +4,7 @@
 
 #include <utility>
 #include <vector>
+#include <cmath>
 
 namespace arrange::quickjs {
     ScopedValue::~ScopedValue() {
@@ -62,11 +63,25 @@ namespace arrange::quickjs {
     }
 
     arrange::core::PropValue QuickJsValueReader::propValue(JSValueConst value, int depth) const {
-        if (depth > 8 || JS_IsUndefined(value) || JS_IsNull(value) || JS_IsFunction(context_, value)) return arrange::core::PropValue::nullValue();
+        if (JS_IsUndefined(value) || JS_IsNull(value)) return arrange::core::PropValue::nullValue();
+        if (depth > 8) {
+            JS_ThrowTypeError(context_, "Arrange input object exceeds nesting limit");
+            return arrange::core::PropValue::nullValue();
+        }
         if (JS_IsBool(value)) return arrange::core::PropValue::booleanValue(JS_ToBool(context_, value) != 0);
-        if (JS_IsNumber(value)) return arrange::core::PropValue::numberValue(toDouble(value));
+        if (JS_IsNumber(value)) {
+            const auto number = toDouble(value);
+            if (!std::isfinite(number)) {
+                JS_ThrowTypeError(context_, "Arrange numeric input must be finite");
+                return arrange::core::PropValue::nullValue();
+            }
+            return arrange::core::PropValue::numberValue(number);
+        }
         if (JS_IsString(value)) return arrange::core::PropValue::stringValue(toString(value));
-        if (!JS_IsObject(value) || JS_IsArray(value)) return arrange::core::PropValue::nullValue();
+        if (!JS_IsObject(value) || JS_IsArray(value) || JS_IsFunction(context_, value)) {
+            JS_ThrowTypeError(context_, "Arrange input has unsupported value type");
+            return arrange::core::PropValue::nullValue();
+        }
 
         JSPropertyEnum* props = nullptr;
         std::uint32_t count = 0;

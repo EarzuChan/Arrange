@@ -258,7 +258,7 @@ namespace arrange::juce {
                 const auto transform = ::juce::AffineTransform::translation(-pivotX, -pivotY)
                                        .scaled(op.scaleX, op.scaleY)
                                        .rotated(radians)
-                                       .translated(pivotX, pivotY);
+                                       .translated(pivotX + op.translationX, pivotY + op.translationY);
                 g.addTransform(transform);
                 break;
             }

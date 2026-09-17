@@ -1,4 +1,4 @@
-﻿#include <arrange/quickjs/QuickJsScriptHost.h>
+#include <arrange/quickjs/QuickJsScriptHost.h>
 
 #if ARRANGE_WITH_QUICKJS_NG
 
@@ -28,6 +28,11 @@ namespace arrange::quickjs {
         void reset() {
             if (runtime.context != nullptr) {
                 runtime.events.reset(nullptr);
+                for (auto& [promise, reason] : runtime.unhandledRejections) {
+                    JS_FreeValue(runtime.context, promise);
+                    JS_FreeValue(runtime.context, reason);
+                }
+                runtime.unhandledRejections.clear();
                 for (auto& [_, callback] : runtime.animationFrameCallbacks) JS_FreeValue(runtime.context, callback);
                 runtime.animationFrameCallbacks.clear();
                 JS_FreeContext(runtime.context);
@@ -41,14 +46,19 @@ namespace arrange::quickjs {
             runtime.rootNodeId = 0;
             runtime.nextAnimationFrameHandle = 1;
             runtime.frameTimeMillis = 0.0;
+            runtime.publishedModifiers.clear();
+            runtime.rejectedBindingUpdates = 0;
+            runtime.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
             runtime.pendingTransactions = nullptr;
             runtime.nodeTypes.clear();
+            runtime.nodeGenerations.clear();
+            runtime.hostBindings.clear();
+            runtime.bindings.clear();
+            runtime.modifierBindings.clear();
+            runtime.eventBindings.clear();
             runtime.childrenByNode.clear();
             runtime.parentByNode.clear();
             runtime.moduleLoader.clear();
-            runtime.reloadRequested = false;
-            runtime.reloadRequest = {};
-            runtime.nativeError.clear();
             runtime.diagnosticEvents.clear();
             runtime.diagnosticActions.clear();
         }
@@ -60,6 +70,18 @@ namespace arrange::quickjs {
             runtime.runtime = JS_NewRuntime();
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
             runtime.context = JS_NewContext(runtime.runtime);
+            JS_SetHostPromiseRejectionTracker(runtime.runtime, [](JSContext* context, JSValueConst promise, JSValueConst reason, bool handled, void* opaque) {
+                auto& state = *static_cast<QuickJsRuntimeContext*>(opaque);
+                if (handled) {
+                    std::erase_if(state.unhandledRejections, [&](const auto& entry) {
+                        if (!JS_IsStrictEqual(context, promise, entry.first)) return false;
+                        JS_FreeValue(context, entry.first);
+                        JS_FreeValue(context, entry.second);
+                        return true;
+                    });
+                }
+                else state.unhandledRejections.emplace_back(JS_DupValue(context, promise), JS_DupValue(context, reason));
+            }, &runtime);
             runtime.events.reset(runtime.context);
             JS_SetContextOpaque(runtime.context, &runtime);
             QuickJsNativeApi::install(runtime.context, runtime);
@@ -67,9 +89,15 @@ namespace arrange::quickjs {
 
         DrainJobsResult drainJobs() {
             JSContext* jobContext = nullptr;
-            int jobResult = 0;
-            while ((jobResult = JS_ExecutePendingJob(runtime.runtime, &jobContext)) > 0) {}
-            if (jobResult < 0) return {false, quickJsExceptionText(jobContext != nullptr ? jobContext : runtime.context)};
+            while (JS_IsJobPending(runtime.runtime)) {
+                if (runtime.remainingFrameJobs == 0) return {false, "Arrange JavaScript work did not stabilize within the frame job limit"};
+                --runtime.remainingFrameJobs;
+                if (JS_ExecutePendingJob(runtime.runtime, &jobContext) < 0) return {false, quickJsExceptionText(jobContext != nullptr ? jobContext : runtime.context)};
+            }
+            if (!runtime.unhandledRejections.empty()) {
+                JS_Throw(runtime.context, JS_DupValue(runtime.context, runtime.unhandledRejections.front().second));
+                return {false, quickJsExceptionText(runtime.context)};
+            }
             return {};
         }
     };
@@ -81,8 +109,33 @@ namespace arrange::quickjs {
         return impl_ ? impl_->runtime.events.size() : 0;
     }
 
-    void QuickJsScriptHost::flushRetiredEventSlots() {
-        if (impl_) impl_->runtime.events.flushRetired();
+    std::size_t QuickJsScriptHost::bindingCount() const noexcept { return impl_ ? impl_->runtime.bindings.size() : 0; }
+    std::size_t QuickJsScriptHost::modifierInstanceCount() const noexcept { return impl_ ? impl_->runtime.publishedModifiers.size() : 0; }
+    std::uint64_t QuickJsScriptHost::rejectedBindingUpdates() const noexcept { return impl_ ? impl_->runtime.rejectedBindingUpdates : 0; }
+
+    void QuickJsScriptHost::publishScene(const arrange::core::NativeScene& scene) {
+        if (!impl_) return;
+        auto& state = impl_->runtime;
+        state.events.publish(scene.activeEventSlots());
+        state.publishedModifiers.clear();
+        for (const auto& [id, generation] : state.nodeGenerations) {
+            if (!scene.contains(id) || scene.node(id).generation != generation) continue;
+            std::size_t position = 0;
+            for (const auto& instance : scene.node(id).modifier.elements()) {
+                state.publishedModifiers.emplace(instance.handle.identity, QuickJsRuntimeContext::PublishedModifier{
+                    {id, generation}, instance.handle, instance.descriptor, position++});
+            }
+        }
+        std::erase_if(state.bindings, [&](const auto& entry) {
+            const auto* target = std::get_if<arrange::core::ModifierInputTarget>(&entry.second.target);
+            if (!target) return false;
+            const auto found = state.publishedModifiers.find(target->modifier.identity);
+            return found == state.publishedModifiers.end() || found->second.handle != target->modifier;
+        });
+    }
+
+    bool QuickJsScriptHost::hasPendingDiagnostics() const noexcept {
+        return !impl_->runtime.diagnosticEvents.empty() || !impl_->runtime.diagnosticActions.empty();
     }
 
     std::vector<QuickJsDiagnosticEventInput> QuickJsScriptHost::takeDiagnosticEvents() {
@@ -108,7 +161,11 @@ namespace arrange::quickjs {
     }
 
     void QuickJsScriptHost::setFrameTimeMillis(double nowMillis) noexcept {
-        if (impl_) impl_->runtime.frameTimeMillis = std::max(0.0, nowMillis);
+        if (!impl_) return;
+        auto& runtime = impl_->runtime;
+        const auto timestamp = std::max(0.0, nowMillis);
+        if (timestamp != runtime.frameTimeMillis) runtime.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
+        runtime.frameTimeMillis = timestamp;
     }
 
     bool QuickJsScriptHost::hasPendingAnimationFrame() const noexcept {
@@ -118,7 +175,6 @@ namespace arrange::quickjs {
     CallbackInvokeResult QuickJsScriptHost::pumpAnimationFrame(double nowMillis) {
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         setFrameTimeMillis(nowMillis);
-        pendingTransactions_.clear();
         if (impl_->runtime.animationFrameCallbacks.empty()) {
             const auto drained = impl_->drainJobs();
             return {drained.ok, drained.error};
@@ -147,18 +203,12 @@ namespace arrange::quickjs {
 
     ScriptExecutionResult QuickJsScriptHost::executeModule(const std::filesystem::path& modulePath, std::string_view source) {
         pendingTransactions_.clear();
-        reloadRequested_ = false;
-        reloadRequest_ = {};
         const auto normalizedModulePath = std::filesystem::absolute(modulePath).lexically_normal();
         impl_->initialise(this, normalizedModulePath);
         ScopedValue result(impl_->runtime.context, JS_Eval(impl_->runtime.context, source.data(), source.size(), normalizedModulePath.generic_string().c_str(), JS_EVAL_TYPE_MODULE));
         if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
-        reloadRequested_ = impl_->runtime.reloadRequested;
-        reloadRequest_ = impl_->runtime.reloadRequest;
         const auto& pending = pendingTransactions_.pending();
         if (!pending || !pending->hasTreeMutations()) return {false, "Arrange app did not mount. Expected createApp(App).mount() to commit native mutations."};
         return {true, {}};
@@ -171,7 +221,6 @@ namespace arrange::quickjs {
         if (JS_IsUndefined(callbackValue)) return {false, "Arrange event slot is not registered in QuickJS"};
 
         ScopedValue callback(impl_->runtime.context, JS_DupValue(impl_->runtime.context, callbackValue));
-        pendingTransactions_.clear();
         JSValueConst* argv = nullptr;
         int argc = 0;
         JSValue argument = JS_UNDEFINED;
@@ -183,10 +232,8 @@ namespace arrange::quickjs {
         ScopedValue result(impl_->runtime.context, JS_Call(impl_->runtime.context, callback.get(), JS_UNDEFINED, argc, argv));
         if (options.hasStringArgument) JS_FreeValue(impl_->runtime.context, argument);
         if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
         return {true, {}};
     }
 
@@ -203,14 +250,11 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(impl_->runtime.context, argument.get(), "contentSize", JS_NewFloat64(impl_->runtime.context, scroll.contentSize));
         JS_SetPropertyStr(impl_->runtime.context, argument.get(), "isScrollInProgress", JS_NewBool(impl_->runtime.context, false));
         ScopedValue callback(impl_->runtime.context, JS_DupValue(impl_->runtime.context, callbackValue));
-        pendingTransactions_.clear();
         JSValueConst argv[1] = {argument.get()};
         ScopedValue result(impl_->runtime.context, JS_Call(impl_->runtime.context, callback.get(), JS_UNDEFINED, 1, argv));
         if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
-        if (!impl_->runtime.nativeError.empty()) return {false, impl_->runtime.nativeError};
         return {true, {}};
     }
 } // namespace arrange::quickjs
