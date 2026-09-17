@@ -12,7 +12,7 @@ import {parserOptions} from './parserOptions.ts'
 
 export {parserOptions}
 
-// 原生宿主不接受浏览器语义；在源码位置报错，不能静默丢弃。
+// 原生宿主不接受浏览器语义；在源码位置报错，不能静默丢弃
 const validateNativeTemplate: NodeTransform = (node, context) => {
     if (node.type !== NodeTypes.ELEMENT) return
     const fail = (message: string, loc = node.loc) => {
@@ -37,8 +37,8 @@ export function compile(src: string | RootNode, options: CompilerOptions = {}): 
         ...parserOptions,
         ...options,
         nodeTransforms: [validateNativeTemplate, ...(options.nodeTransforms ?? [])],
-        // 原生 v-model 使用 core 生成的 modelValue 和 onUpdate:modelValue。
-        // 不引入 DOM 指令、事件监听器或 HTML 字符串静态化。
+        // 原生 v-model 使用 core 生成的 modelValue 和 onUpdate:modelValue
+        // 不引入 DOM 指令、事件监听器或 HTML 字符串静态化
         transformHoist: null,
     })
 }

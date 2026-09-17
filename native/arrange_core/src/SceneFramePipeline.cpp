@@ -69,7 +69,7 @@ namespace arrange::core {
         const FrameFinalizer& finalize, double timeMillis) {
         SceneFramePipelineResult result;
         result.ran = true;
-        // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame。
+        // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame
         auto candidateScene = scene;
         counters_.candidateNodesCopied += scene.tree().size();
         auto candidateFrame = publishedFrame;
@@ -155,7 +155,7 @@ namespace arrange::core {
         catch (const std::exception& exception) {
             ++counters_.failedSubmissions;
             result.error = exception.what();
-            // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何。
+            // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何
         }
         return result;
     }

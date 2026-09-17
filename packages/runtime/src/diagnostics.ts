@@ -5,24 +5,7 @@ declare global {
 }
 
 export type LogLevelName = "trace" | "debug" | "info" | "warn" | "error"
-export type DiagnosticCategoryName =
-    | "app"
-    | "host.live"
-    | "host.dist"
-    | "host.hmr"
-    | "runtime.script"
-    | "runtime.transaction"
-    | "pipeline.frame"
-    | "pipeline.layout"
-    | "pipeline.paint"
-    | "input.pointer"
-    | "input.key"
-    | "input.ime"
-    | "input.scroll"
-    | "resource.package"
-    | "resource.image"
-    | "resource.icon"
-    | "diagnostics"
+export type DiagnosticCategoryName = "app" | "host.live" | "host.dist" | "host.hmr" | "runtime.script" | "runtime.transaction" | "pipeline.frame" | "pipeline.layout" | "pipeline.paint" | "input.pointer" | "input.key" | "input.ime" | "input.scroll" | "resource.package" | "resource.image" | "resource.icon" | "diagnostics"
 
 export type DiagnosticPayload = Readonly<{
     category?: DiagnosticCategoryName
@@ -39,9 +22,8 @@ function native(): NativeTransactionTarget | undefined {
 }
 
 function assertLogLevel(level: LogLevelName): LogLevelName {
-    if (level !== "trace" && level !== "debug" && level !== "info" && level !== "warn" && level !== "error") {
-        throw new TypeError(`Arrange diagnostics log level is unsupported: ${String(level)}`)
-    }
+    if (level !== "trace" && level !== "debug" && level !== "info" && level !== "warn" && level !== "error") throw new TypeError(`Arrange diagnostics log level is unsupported: ${String(level)}`)
+
     return level
 }
 
@@ -65,6 +47,7 @@ function assertCategory(category: DiagnosticCategoryName): DiagnosticCategoryNam
         case "resource.icon":
         case "diagnostics":
             return category
+
         default:
             throw new TypeError(`Arrange diagnostics category is unsupported: ${String(category)}`)
     }
@@ -72,7 +55,9 @@ function assertCategory(category: DiagnosticCategoryName): DiagnosticCategoryNam
 
 function normalizePayload(messageOrPayload: string | DiagnosticPayload, detail?: string): DiagnosticPayload {
     const payload: DiagnosticPayload = typeof messageOrPayload === "string" ? {message: messageOrPayload, detail} : messageOrPayload
+
     if (payload.category) assertCategory(payload.category)
+
     return payload
 }
 
@@ -114,5 +99,5 @@ export const diagnostics = Object.freeze({
     },
     setToastsEnabled(enabled: boolean): void {
         native()?.diagnosticsSetToastsEnabled?.(enabled)
-    },
+    }
 })

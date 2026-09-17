@@ -1,35 +1,38 @@
 <template>
     <Column :vertical-arrangement="Arrangement.spacedBy(6)" :modifier="m.width(330).padding(8).background(0xff202633)">
-        <Text text="Animation gallery" :text-style="{ fontSize: 17, color: 0xffeeeeee }" />
+        <Text text="动画の画廊" :text-style="{ fontSize: 17, color: 0xffeeeeee }" />
+
         <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
-            <Text text="Run / reverse" :text-style="{ color: 0xffffffff }"
-                :modifier="m.padding(6).background(0xff374866).clickable(() => run('all'))" />
-            <Text text="Stats" :text-style="{ color: 0xffffffff }"
-                :modifier="m.padding(6).background(0xff374866).clickable(() => run('stats'))" />
+            <Text text="耍起嘛" :text-style="{ color: 0xffffffff }" :modifier="m.padding(6).background(0xff374866).clickable(() => run('all'))" />
+            <Text text="统计" :text-style="{ color: 0xffffffff }" :modifier="m.padding(6).background(0xff374866).clickable(() => run('stats'))" />
         </Row>
+
         <Row :horizontal-arrangement="Arrangement.spacedBy(8)">
             <Box :modifier="m.width(72).height(24).background(color)" />
             <Box :modifier="m.size(dimensions.width, dimensions.height).offset(position).background(0xffc18ff0)" />
         </Row>
+
         <ValueSurface :tone="groupColor" :offset="groupOffset" v-slot="{ tone: surfaceColor, offset: surfaceOffset }">
             <Box :modifier="m.size(72, 12).offset({ x: surfaceOffset }).background(surfaceColor)" />
         </ValueSurface>
+
         <Column :modifier="m.animateContentSize(spec).background(0xff303b4d).padding(6)">
             <Text :text="label" :text-style="{ color: 0xffdddddd, fontSize: 12 }" />
-            <Text v-if="expanded" text="Sibling placement follows the animated height"
-                :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="m.height(28)" />
+            <Text v-if="expanded" text="Sibling placement follows the animated height" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="m.height(28)" />
         </Column>
+
         <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16 }"
             :exit-to="{ alpha: 0, translationX: 16 }">
             <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
-                <Text text="Visibility content" :text-style="{ color: 0xffeeeeee }" />
-                <Input model-value="Focus then hide" :modifier="m.size(130, 24).background(0xff151922)" />
+                <Text text="可视的啊一个内容" :text-style="{ color: 0xffeeeeee }" />
+                <Input model-value="编辑我，如果我彻底离场会被重置" :modifier="m.size(130, 24).background(0xff151922)" />
             </Row>
         </AnimatedVisibility>
+
         <Crossfade :target-state="page" :animation-spec="spec" v-slot="{ state }">
-            <Text :text="`Page ${state}`" :text-style="{ color: 0xffeeeeee }"
-                :modifier="m.padding(5).background(state === 'A' ? 0xff315a72 : 0xff6c395e)" />
+            <Text :text="`页面啊一个 ${state}`" :text-style="{ color: 0xffeeeeee }" :modifier="m.padding(5).background(state === 'A' ? 0xff315a72 : 0xff6c395e)" />
         </Crossfade>
+
         <Text :text="status" :text-style="{ fontSize: 10, color: 0xffaabbcc }" />
     </Column>
 </template>
@@ -53,36 +56,65 @@ const dimensions = animatedSizeAsRef(sizeTarget, { animationSpec: spec })
 const transition = createTransition(expanded, { animationSpec: spec })
 const groupColor = transition.animatedColor('group-color', state => state ? 0xffe9b949 : 0xff5798ef)
 const groupOffset = transition.animatedDp('group-offset', state => state ? 24 : 0)
-const label = computed(() => expanded.value ? 'Expanded content — native animated size' : 'Compact content')
+const label = computed(() => expanded.value ? '展开的啊一个内容。野兽先辈恶臭114514' : '紧绷の内容')
 const status = ref('Animate, reverse, hide, restore, switch pages')
 let baseline
 
 function run(command) {
-    if (command === 'baseline') baseline = { ...getArrangeExecutionStats(), animations: animationStats.activeAnimations }
-    else if (command === 'color') colorTarget.value = colorTarget.value === 0xff41b883 ? 0xffe66b8b : 0xff41b883
-    else if (command === 'move') positionTarget.value = { x: positionTarget.value.x ? 0 : 28, y: 0 }
-    else if (command === 'size') sizeTarget.value = { width: sizeTarget.value.width === 72 ? 130 : 72, height: 24 }
-    else if (command === 'expand') expanded.value = !expanded.value
-    else if (command === 'visibility') visible.value = !visible.value
-    else if (command === 'page') page.value = page.value === 'A' ? 'B' : 'A'
-    else if (command === 'all') {
-        run('color')
-        run('move')
-        run('size')
-        run('expand')
-        run('visibility')
-        run('page')
-    }
-    else if (command === 'validate-color') {
-        if (getArrangeExecutionStats().structureRuns !== baseline.structureRuns) throw new Error('Color animation recomposed structure')
-    } else if (command === 'validate-settled') {
-        if (animationStats.activeAnimations !== 0) throw new Error('Gallery animations retained frame demand after settling')
-    } else if (command === 'stats') {
-        const stats = getArrangeExecutionStats()
-        status.value = `Structure ${stats.structureRuns} / values ${stats.valueEvaluations} / parameters ${modifierStats.parameterEvaluations} / chains ${modifierAllocationStats.chains}`
+    switch (command) {
+        case 'baseline':
+            baseline = { ...getArrangeExecutionStats(), animations: animationStats.activeAnimations }
+            break
+
+        case 'color':
+            colorTarget.value = colorTarget.value === 0xff41b883 ? 0xffe66b8b : 0xff41b883
+            break
+
+        case 'move':
+            positionTarget.value = { x: positionTarget.value.x ? 0 : 28, y: 0 }
+            break
+
+        case 'size':
+            sizeTarget.value = { width: sizeTarget.value.width === 72 ? 130 : 72, height: 24 }
+            break
+
+        case 'expand':
+            expanded.value = !expanded.value
+            break
+
+        case 'visibility':
+            visible.value = !visible.value
+            break
+
+        case 'page':
+            page.value = page.value === 'A' ? 'B' : 'A'
+            break
+
+        case 'all':
+            run('color')
+            run('move')
+            run('size')
+            run('expand')
+            run('visibility')
+            run('page')
+            break
+
+        case 'validate-color':
+            if (getArrangeExecutionStats().structureRuns !== baseline.structureRuns) throw new Error('Color animation recomposed structure')
+            break
+
+        case 'validate-settled':
+            if (animationStats.activeAnimations !== 0) throw new Error('Gallery animations retained frame demand after settling')
+            break
+
+        case 'stats': {
+            const stats = getArrangeExecutionStats()
+            status.value = `Structure ${stats.structureRuns} / values ${stats.valueEvaluations} / parameters ${modifierStats.parameterEvaluations} / chains ${modifierAllocationStats.chains}`
+            break
+        }
     }
 }
 
-// 命令Prop也驱动这个实际组件从本地集成夹具
+// 命令Prop也驱动这个实际组件从本地集成夹♂具（意味深）
 watch(() => props.command, command => run(command), { flush: 'sync' })
 </script>

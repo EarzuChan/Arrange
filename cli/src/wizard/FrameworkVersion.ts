@@ -1,5 +1,5 @@
 import {confirm, isCancel, log, select, spinner} from "@clack/prompts"
-import {cliCompatibility} from "../CliMetadata.ts"
+import {cliCompatibility, frameworkPackageName} from "../CliMetadata.ts"
 import {type FrameworkRegistryClient, normalizeRegistryUrl} from "../framework/FrameworkRegistryClient.ts"
 import {assertFrameworkCompatible, addIncompatibilityIfPresenceFor, type FrameworkVersionSelectionCandidate, type FrameworkVersionCandidate} from "../framework/FrameworkMamba.ts"
 import {PromptCancelled, requiredText, validateSemver} from "../util/PromptUtils.ts"
@@ -26,7 +26,7 @@ export async function selectFrameworkVersion(registryClient: FrameworkRegistryCl
         if (customCandidate === false) throw new PromptCancelled()
 
         const useCustomVersion = await confirm({
-            message: `Use @arrange/framework@${customCandidate.version}? Select no to type your version once again.`,
+            message: `Use ${frameworkPackageName}@${customCandidate.version}? Select no to type your version once again.`,
             initialValue: true,
         })
         if (isCancel(useCustomVersion)) throw new PromptCancelled()
@@ -131,7 +131,7 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 else if (action === retryValue) continue
                 else if (action === enterAnotherVersionValue) break
 
-                log.warn(`Using unverified @arrange/framework@${version}. Later sync/install may fail if this version does not exist or is incompatible.`)
+                log.warn(`Using unverified ${frameworkPackageName}@${version}. Later sync/install may fail if this version does not exist or is incompatible.`)
                 return {
                     version,
                     cliCompatibility: cliCompatibility, // TIPS：强行认为它以兼容

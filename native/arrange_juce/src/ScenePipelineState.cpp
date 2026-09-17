@@ -88,8 +88,8 @@ namespace arrange::juce {
         auto transaction = hasPending
                                ? pendingTransactions_.take()
                                : std::optional<arrange::core::MutationTransaction>{};
-        // JS 账本已推进；失败的提交不能丢失，否则后续写入会引用未创建的目标。
-        // 暂停到下一次实际工作请求再重试，避免故障提交自己驱动无限空转。
+        // JS 账本已推进；失败的提交不能丢失，否则后续写入会引用未创建的目标
+        // 暂停到下一次实际工作请求再重试，避免故障提交自己驱动无限空转
         if (failedTransaction_) {
             if (transaction) failedTransaction_->append(std::move(*transaction));
             transaction = std::move(failedTransaction_);

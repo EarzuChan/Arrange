@@ -1,3 +1,4 @@
+import {defaultFetchUrl} from "../CliMetadata.ts"
 import {resolve} from "node:path"
 import {TextFile} from "../managed/ManagedFile.ts"
 import {TextCluster} from "../managed/TextCluster.ts"
@@ -5,7 +6,6 @@ import {TextRegion} from "../managed/TextRegion.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 
 const quote = (value: string): string => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/;/g, "\\;")}"`
-const defaultFetchUrl = "https://github.com/EarzuChan/Arrange.git"
 
 export const fetchContentRepositoryRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.fetch-content-repository"

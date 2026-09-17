@@ -24,7 +24,7 @@ namespace arrange::juce {
     EditorFrameClock::~EditorFrameClock() = default;
 
     void EditorFrameClock::sync(::juce::Component& owner, bool running, VBlankTickCallback onVBlankTick) {
-        // 无 peer 时保留待执行工作；不制造 timer 视觉帧。
+        // 无 peer 时保留待执行工作；不制造 timer 视觉帧
         if (!running || owner.getPeer() == nullptr) {
             stop();
             return;

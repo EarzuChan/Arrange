@@ -28,7 +28,7 @@ namespace arrange::quickjs {
         arrange::core::EventSlotOwner owner,
         JSValueConst callbackValue,
         arrange::core::MutationTransaction* transaction) {
-        // 资源不可变。新闭包获得新 token，旧画面不会提前调用替换后的闭包。
+        // 资源不可变。新闭包获得新 token，旧画面不会提前调用替换后的闭包
         const arrange::core::EventSlotId slot{node, kind, {}, owner, arrange::core::allocateRuntimeIdentity(), 1};
         eventSlots_.emplace(slot, JS_DupValue(context_, callbackValue));
         if (transaction) transaction->operations.emplace_back(arrange::core::RegisterEventSlot{slot});
@@ -92,7 +92,7 @@ namespace arrange::quickjs {
     }
 
     void QuickJsEventRegistry::publish(const arrange::core::EventSlotSet& active) {
-        // 只有成功发布的场景决定可调用资源及释放边界。
+        // 只有成功发布的场景决定可调用资源及释放边界
         publishedEventSlots_ = active;
         for (auto it = eventSlots_.begin(); it != eventSlots_.end();) {
             if (active.contains(it->first)) { ++it; continue; }

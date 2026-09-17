@@ -49,7 +49,7 @@ export class Wrapper {
         }
 
         for (const group of outside.values()) {
-            // 子级自身缺端不影响父级定位；只有实际跨越本元素边界才阻断本元素。
+            // 子级自身缺端不影响父级定位；只有实际跨越本元素边界才阻断本元素
             for (let i = 0; i + 1 < group.length; i++) {
                 const [a, b] = [group[i], group[i + 1]]
                 if (a.edge !== "begin" || b.edge !== "end") continue

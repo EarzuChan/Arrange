@@ -12,13 +12,18 @@ export interface ConfigTarget {
     readonly region?: TextRegion | JsonRegion
     readonly snapshot: FileSnapshot
 }
+
 export interface FatalIssue {readonly path: string, readonly cause: string, readonly message: string}
+
 export interface ResolvableIssue {readonly target: ConfigTarget, readonly cause: "missing" | "damaged", readonly message: string}
+
 export interface IdleResult {readonly target: ConfigTarget, readonly expected?: unknown, readonly actual?: unknown}
+
 export type ApplicableUpdate = {readonly target: ConfigTarget, readonly cause: "outdated"} & (
     {readonly kind: "text", readonly span: TextSpan, readonly expected: string, readonly actual: string} |
     {readonly kind: "json", readonly jsonPath: JsonPath, readonly expected: JsonExpected, readonly actual: JsonExpected}
 )
+
 export interface ConfigScanReport {
     readonly scope: ConfigScope
     readonly fatal: FatalIssue[]
@@ -26,4 +31,5 @@ export interface ConfigScanReport {
     readonly idle: IdleResult[]
     readonly applicable: ApplicableUpdate[]
 }
+
 export function targetLabel(target: ConfigTarget): string { return `${target.path}${target.region ? ` / ${target.region.id}` : target.cluster ? ` / ${target.cluster.id}` : ""}` }

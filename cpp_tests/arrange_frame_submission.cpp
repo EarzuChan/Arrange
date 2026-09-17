@@ -132,7 +132,7 @@ namespace {
         int frames = 0;
         const auto tick = [&](double timestamp) {
             ++frames;
-            // 同帧重入源不会重复采样动画。
+            // 同帧重入源不会重复采样动画
             source.pulse(timestamp + 0.1);
             check(runtime.pumpFrame(1, {0, 400, 0, 300}, timestamp).ok, "manual VBlank frame failed");
         };

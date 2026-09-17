@@ -147,7 +147,7 @@ namespace arrange::juce {
         ::juce::Logger::writeToLog(::juce::String(line));
         if (config_.logFile.empty()) return;
 
-        // 同步 file sink 只能用于安全线程和低频诊断路径；禁止在 audio thread、paint、pointer move、逐帧 layout/paint 中依赖同步文件 I/O。
+        // 同步 file sink 只能用于安全线程和低频诊断路径；禁止在 audio thread、paint、pointer move、逐帧 layout/paint 中依赖同步文件 I/O
         const auto file = ::juce::File(::juce::String(config_.logFile));
         const auto parent = file.getParentDirectory();
         if (parent.exists() || parent.createDirectory()) {

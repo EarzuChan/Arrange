@@ -26,7 +26,7 @@ export function rememberInteractionState(): InteractionState {
     return reactive({hovered: false, pressed: false, focused: false, enabled: true})
 }
 
-// FocusRequester / useFocusManager 将来会在 JS 请求 focus、native focus session、IME/caret、pipeline 与测试闭环齐全后再正规添加回来；当前故意不公开孤儿 API。
+// FocusRequester / useFocusManager 将来会在 JS 请求 focus、native focus session、IME/caret、pipeline 与测试闭环齐全后再正规添加回来；当前故意不公开孤儿 API
 
 export function rememberScrollState(args: {initial?: number} = {}): ScrollState {
     let state: ScrollState

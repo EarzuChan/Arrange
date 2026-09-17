@@ -37,7 +37,7 @@ export class Modifier {
         return new Modifier([...this.elements, ...toModifier(other).elements])
     }
 
-    // 为最后一层提供协调身份；不是 native slot 的运行时 handle。
+    // 为最后一层提供协调身份；不是 native slot 的运行时 handle
     keyed(key: string): Modifier {
         if (!key || this.elements.length === 0) throw new TypeError("Modifier.keyed requires a nonempty key and an element")
         const elements = [...this.elements]
@@ -89,7 +89,7 @@ export class Modifier {
     }
     hoverable(args: Record<string, unknown> = {}): Modifier { return this.#add("hoverable", {enabled: true, ...args}) }
     focusable(arg: boolean | Record<string, unknown> = true): Modifier { return this.#add("focusable", typeof arg === "boolean" ? {enabled: arg} : {enabled: true, ...arg}) }
-    // pointerInput 将来会在 native typed pointer event slot、派发、释放与测试齐全后再正规添加回来；当前故意不公开半支持 API。
+    // pointerInput 将来会在 native typed pointer event slot、派发、释放与测试齐全后再正规添加回来；当前故意不公开半支持 API
     verticalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("verticalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
     horizontalScroll(state: ScrollStateLike, args: Record<string, unknown> = {}): Modifier { return this.#add("horizontalScroll", {state: scrollStateSnapshot(state), enabled: true, ...args}) }
 

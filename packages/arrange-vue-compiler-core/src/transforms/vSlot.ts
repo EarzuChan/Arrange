@@ -69,7 +69,7 @@ export const trackSlotScopes: NodeTransform = (node, context) => {
         const parsed = parseExpression(`(${pattern}) => 0`, {plugins: context.expressionPlugins}) as ArrowFunctionExpression
         const names = parsed.params.flatMap(parameter => extractIdentifiers(parameter).map(identifier => identifier.name))
         const parameter = slotParameterName(context)
-        // 参数解构在实际消费者读取时执行，普通 TS helper 仍然获得普通值。
+        // 参数解构在实际消费者读取时执行，普通 TS helper 仍然获得普通值
         leaveAliases = enterSlotAliases(context, Object.fromEntries(names.map(name => [name, `((${pattern}) => ${name})(${parameter})`])))
         vSlot.exp = createSimpleExpression(parameter, false, slotProps.loc)
       }

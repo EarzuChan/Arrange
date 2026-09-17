@@ -1,13 +1,10 @@
+import {defaultNodeRegistryUrl, frameworkPackageName} from "../CliMetadata.ts"
 import type {FrameworkMetadata, FrameworkVersionCandidate} from "./FrameworkMamba.ts"
-
-export const defaultNodeRegistryUrl = "https://registry.npmjs.org"
 
 export function normalizeRegistryUrl(registryUrl?: string): string { // CHECK：是否带派
     const raw = registryUrl?.trim() || defaultNodeRegistryUrl
     return raw.replace(/\/+$/, "")
 }
-
-export const frameworkPackageName = "@arrange/framework"
 
 interface FrameworkPackument {
     readonly "dist-tags"?: Record<string, string>
@@ -27,7 +24,7 @@ export class FrameworkRegistryClient {
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
         // 原 fetchManifest 逻辑
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/@arrange%2fframework/${encodeURIComponent(version)}`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
+        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
 
         if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName}@${version} from ${registry}: HTTP ${response.status}`)
 
@@ -44,7 +41,7 @@ export class FrameworkRegistryClient {
     // TIPS：对于所有版本
     async fetchCandidates(recentLimit = 5, registryUrl?: string): Promise<FrameworkVersionCandidate[]> {
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/@arrange%2fframework`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
+        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}`, {headers: {Accept: "application/json"}, signal: AbortSignal.timeout(15000)})
 
         if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName} packument from ${registry}: HTTP ${response.status}`)
 

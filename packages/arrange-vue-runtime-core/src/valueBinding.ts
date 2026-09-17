@@ -15,7 +15,7 @@ export interface ValueExpression<T = unknown> {
     readonly read: () => T
 }
 
-// 编译器把普通模板表达式延后；用户的 Ref 本身不携带用途或阶段。
+// 编译器把普通模板表达式延后；用户的 Ref 本身不携带用途或阶段
 export function arrangeValue<T>(read: () => T): ValueExpression<T> {
     return {[valueExpression]: true, read}
 }
@@ -24,8 +24,8 @@ export function isValueExpression(value: unknown): value is ValueExpression {
     return !!value && typeof value === 'object' && valueExpression in value
 }
 
-// spread 的键集合与 key/ref 属于结构，普通字段仍在值域读取。
-// shape computed 复用相等结果，值变化只会唤醒实际字段消费者。
+// spread 的键集合与 key/ref 属于结构，普通字段仍在值域读取
+// shape computed 复用相等结果，值变化只会唤醒实际字段消费者
 export function arrangeProps(read: () => Record<string, unknown> | null | undefined): Record<string, unknown> {
     const values = computed(() => ({...read()}))
     const shape = computed((previous?: {keys: string[]; reserved: unknown[]}) => {
@@ -77,7 +77,7 @@ export class ValueBinding {
         this.job = () => {
             if (!this.stopped) callWithErrorHandling(() => this.effect.runIfDirty(), owner, ErrorCodes.COMPONENT_UPDATE)
         }
-        // 同一组件结构先处理，已删除分支的绑定在执行前被停止。
+        // 同一组件结构先处理，已删除分支的绑定在执行前被停止
         this.job.id = owner ? owner.uid + 0.5 : Infinity
         this.job.i = owner ?? undefined
         arrangeExecutionStats.activeValueBindings++
@@ -93,7 +93,7 @@ export class ValueBinding {
     refresh(expression: ValueExpression, write: (value: unknown, previous: unknown) => void): void {
         this.read = expression.read
         this.write = write
-        // keyed 移动后闭包可能捕获新 item/index，即使 Ref 没变也必须重订阅。
+        // keyed 移动后闭包可能捕获新 item/index，即使 Ref 没变也必须重订阅
         callWithErrorHandling(() => this.effect.run(), this.job.i, ErrorCodes.COMPONENT_UPDATE)
     }
 

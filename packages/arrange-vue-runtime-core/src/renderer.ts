@@ -440,7 +440,7 @@ function baseCreateRenderer(
       return
     }
 
-    // 协调过程读取宿主账本不属于结构依赖；嵌套 render/value effect 自行启用追踪。
+    // 协调过程读取宿主账本不属于结构依赖；嵌套 render/value effect 自行启用追踪
     pauseTracking()
     try {
     // patching & not same type, unmount old tree
@@ -1296,7 +1296,7 @@ function baseCreateRenderer(
     const instance = (n2.component = n1.component)!
     const structureChanged = shouldUpdateComponent(n1, n2, optimized)
     n2.el = n1.el
-    // props 先进入反应式对象，实际订阅决定结构 effect 或值 binding 是否执行。
+    // props 先进入反应式对象，实际订阅决定结构 effect 或值 binding 是否执行
     updateComponentPreRender(instance, n2, optimized)
     if (__FEATURE_SUSPENSE__ && instance.asyncDep && !instance.asyncResolved) return
     if (structureChanged || instance.effect.dirty) instance.update()

@@ -1,3 +1,4 @@
+import {frameworkPackageName} from "../CliMetadata.ts"
 import {resolve} from "node:path"
 import {TextFile, JsonFile} from "../managed/ManagedFile.ts"
 import {TextCluster} from "../managed/TextCluster.ts"
@@ -51,7 +52,7 @@ export const packageNameRegion: JsonRegion = new class extends JsonRegion {
 export const frameworkDependencyRegion: JsonRegion = new class extends JsonRegion {
     readonly id = "node.framework-dependency"
     readonly managedItemId = "framework.version"
-    protected readonly path = ["dependencies", "@arrange/framework"]
+    protected readonly path = ["dependencies", frameworkPackageName]
 
     protected override makeValue(state: ProjectState): string {
         return state.project.framework.version

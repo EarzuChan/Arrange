@@ -136,8 +136,8 @@ namespace arrange::core {
 
     ModifierReconcileResult ModifierChain::reconcile(const ModifierDescriptors& descriptors) {
         validateModifierDescriptors(descriptors);
-        // 有 key 的元素允许移动；无 key 的元素按类型及相对次序协调。
-        // 使用前缀直通和线性查找，避免给每个高频值更新分配 O(n*m) DP 表。
+        // 有 key 的元素允许移动；无 key 的元素按类型及相对次序协调
+        // 使用前缀直通和线性查找，避免给每个高频值更新分配 O(n*m) DP 表
         std::unordered_map<std::string, std::size_t> keyed;
         for (std::size_t i = 0; i < elements_.size(); ++i) if (!elements_[i].descriptor.key.empty()) keyed.emplace(elements_[i].descriptor.key, i);
         std::vector<bool> used(elements_.size(), false);
@@ -164,7 +164,7 @@ namespace arrange::core {
                 next.push_back(std::move(instance));
             }
             else {
-                // identity 在进程生命周期内不复用；generation 保留在协议中供显式代际校验。
+                // identity 在进程生命周期内不复用；generation 保留在协议中供显式代际校验
                 next.push_back({{allocateRuntimeIdentity(), 1}, descriptor, {}, {}, {}, {}});
                 result.dirty |= kMeasure;
             }

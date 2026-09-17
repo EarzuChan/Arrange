@@ -32,7 +32,7 @@ export function enterSlotAliases(context: TransformContext, aliases: Record<stri
     }
 }
 
-// processExpression 的参数产物仅由前缀化标识符与原始标点组成。
+// processExpression 的参数产物仅由前缀化标识符与原始标点组成
 export function parameterSource(expression: ExpressionNode): string {
     if (expression.type === NodeTypes.SIMPLE_EXPRESSION) return expression.content
     return expression.children.map(child => {

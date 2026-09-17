@@ -5,7 +5,7 @@ import {type CheckResult} from "./CheckResult.ts"
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | {[key: string]: JsonValue}
 export type JsonPath = readonly (string | number)[]
-// undefined 专指字段不存在，与 JSON null 区分。
+// undefined 专指字段不存在，与 JSON null 区分
 export type JsonExpected = JsonValue | undefined
 
 export function readJsonPath(json: JsonValue, path: JsonPath): JsonExpected {

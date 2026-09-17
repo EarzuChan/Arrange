@@ -337,7 +337,7 @@ namespace arrange::quickjs {
             (void)throwTypeError("Arrange Modifier input must preserve its instance kind");
             return {};
         }
-        // 整条描述通过校验之后才登记回调，失败的描述不会留下半条注册记录。
+        // 整条描述通过校验之后才登记回调，失败的描述不会留下半条注册记录
         std::vector<arrange::core::EventSlotId> retained;
         for (auto& pending : callbacks) {
             const auto slot = instanceInput

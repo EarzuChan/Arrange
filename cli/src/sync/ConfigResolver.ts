@@ -10,7 +10,7 @@ import type {SyncWizard} from "../wizard/Sync.ts"
 export type ResolveChoice = "create" | "wrap" | "marker" | "edit" | "abort"
 type TextElement = TextCluster | TextRegion
 
-// THINKING：这个Resolve的实现有点化简——把所有的情形先混为一谈，再分类产出方——而不是干干净净的先产出方再看类型。虽然说能跑。。。
+// THINKING：这个Resolve的实现有点化简——把所有的情形先混为一谈，再分类产出方——而不是干干净净的先产出方再看类型。虽然说能跑。。
 
 export class ConfigResolver {
     private readonly writer = new ConfigWriter()

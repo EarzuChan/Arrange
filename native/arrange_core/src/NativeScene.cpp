@@ -12,7 +12,7 @@ namespace arrange::core {
     }
 
     void NativeScene::apply(const MutationTransaction& transaction) {
-        // 直接调用 apply 也具有失败原子性；帧流水线在自己的候选 scene 上调用同一实现。
+        // 直接调用 apply 也具有失败原子性；帧流水线在自己的候选 scene 上调用同一实现
         auto candidate = *this;
         candidate.applyUncommitted(transaction);
         *this = std::move(candidate);
