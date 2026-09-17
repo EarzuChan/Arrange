@@ -1,13 +1,12 @@
 import {confirm, isCancel, log, select, spinner} from "@clack/prompts"
 import {cliCompatibility} from "../CliMetadata.ts"
-import {FrameworkRegistryClient, normalizeRegistryUrl} from "../framework/FrameworkRegistryClient.ts"
+import {type FrameworkRegistryClient, normalizeRegistryUrl} from "../framework/FrameworkRegistryClient.ts"
 import {assertFrameworkCompatible, addIncompatibilityIfPresenceFor, type FrameworkVersionSelectionCandidate, type FrameworkVersionCandidate} from "../framework/FrameworkMamba.ts"
 import {PromptCancelled, requiredText, validateSemver} from "../util/PromptUtils.ts"
 import {formatTimestampToDate} from "../util/Utils.ts"
 
 export interface FrameworkVersionWizardInput {
     readonly registryUrl?: string
-    readonly registryClient?: FrameworkRegistryClient
 }
 
 const customVersionValue = "custom"
@@ -17,8 +16,7 @@ const skipVerificationValue = "skip-verification"
 const cancelValue = "cancel"
 
 // TIPS：本方法执行版本选择
-export async function selectFrameworkVersion(input: FrameworkVersionWizardInput = {}): Promise<string> {
-    const registryClient = input.registryClient ?? new FrameworkRegistryClient()
+export async function selectFrameworkVersion(registryClient: FrameworkRegistryClient, input: FrameworkVersionWizardInput = {}): Promise<string> {
     const registryUrl = normalizeRegistryUrl(input.registryUrl)
 
     const tryLoadCandidatesResult = await tryLoadRegistryCandidates(registryClient, registryUrl)

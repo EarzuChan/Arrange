@@ -1,5 +1,6 @@
-import {serviceHub} from "../ServiceHub.ts"
-import {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
+import type {ProjectStateStore} from "../project/ProjectStateStore.ts"
+import {SyncWizard} from "../wizard/Sync.ts"
+import type {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
 import {assertFrameworkCompatible} from "../framework/FrameworkMamba.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 import {errorMessage} from "../util/Utils.ts"
@@ -21,20 +22,19 @@ export interface SyncResult {
     readonly report?: ConfigScanReport
 }
 
-async function checkCompatibility(state: ProjectState): Promise<void> {
-    const candidate = await new FrameworkRegistryClient().fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
-
-    if (candidate.version !== state.project.framework.version) throw new Error("registry 返回的 Framework 版本与配置不符")
-    assertFrameworkCompatible(candidate)
-}
-
 export class SyncService {
-    get projectStateStore() { return serviceHub.projectStateStore }
-    get syncWizard() { return serviceHub.syncWizard }
+    private readonly configScanner = new ConfigScanner()
+    private readonly configApplier = new ConfigApplier()
+    private readonly syncWizard: SyncWizard = new SyncWizard()
+    private readonly configResolver: ConfigResolver = new ConfigResolver(this.syncWizard)
 
-    readonly configScanner = new ConfigScanner()
-    readonly configApplier = new ConfigApplier()
-    readonly configResolver = new ConfigResolver()
+    constructor(private readonly projectStateStore: ProjectStateStore, private readonly registryClient: FrameworkRegistryClient) {}
+
+    private async checkCompatibility(state: ProjectState): Promise<void> {
+        const candidate = await this.registryClient.fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
+        if (candidate.version !== state.project.framework.version) throw new Error("registry 返回的 Framework 版本与配置不符")
+        assertFrameworkCompatible(candidate)
+    }
 
     async run(options: SyncRunOptions, rootDir: string): Promise<SyncResult> {
         if (options.configOnly && options.setupOnly) throw new Error("--config 与 --setup 互斥")
@@ -71,7 +71,7 @@ export class SyncService {
                 report.fatal.push(...loadedStuff.errors.map(error => ({...error, cause: "config-invalid"})))
 
                 try {
-                    await checkCompatibility(state)
+                    await this.checkCompatibility(state)
                 } catch (error) {
                     report.fatal.push({path: "arrange.project.yaml", cause: "framework-incompatible", message: errorMessage(error)})
                 }

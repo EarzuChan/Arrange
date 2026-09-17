@@ -1,9 +1,10 @@
-import {managedItems} from "../managed/ManagedDefinitions.ts"
+import {managedItems} from "../managed/ManageItems.ts"
 import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "@clack/prompts"
 import {resolve} from "node:path"
 import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
 import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
 import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../util/PromptUtils.ts"
+import type {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
 import {selectFrameworkVersion} from "./FrameworkVersion.ts"
 
 export interface CreateWizardInput {
@@ -14,7 +15,7 @@ export interface CreateWizardInput {
 const projectNamePattern = /^[A-Za-z][A-Za-z0-9_]*$/
 
 // THINK：以后能不能让每一项的Ctrl+C变为“上一步”
-export async function runCreateWizard(input: CreateWizardInput = {}): Promise<false | CreateProjectRequest> {
+export async function runCreateWizard(registryClient: FrameworkRegistryClient, input: CreateWizardInput = {}): Promise<false | CreateProjectRequest> {
     try {
         intro("Create Arrange project")
 
@@ -27,7 +28,7 @@ export async function runCreateWizard(input: CreateWizardInput = {}): Promise<fa
                 placeholder: "e.g 1.0.0",
                 validate: validateSemver,
             }),
-            frameworkVersion: () => selectFrameworkVersion({registryUrl: input.nodeRegistryUrl}),
+            frameworkVersion: () => selectFrameworkVersion(registryClient, {registryUrl: input.nodeRegistryUrl}),
             vendorName: () => requiredText("Vendor name", {
                 placeholder: "Your name or company"
             }),

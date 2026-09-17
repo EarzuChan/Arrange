@@ -1,5 +1,4 @@
 import type { Command } from "commander"
-import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface BuildCommandOptions {
     flavor?: "debug" | "release" | string
@@ -10,7 +9,7 @@ export interface BuildCommandOptions {
     clean?: boolean
 }
 
-export function registerBuildCommand(program: Command, services: ServiceHub): void {
+export function registerBuildCommand(program: Command): void {
     program
         .command("build")
         .description("Build Arrange project artifacts")
@@ -22,7 +21,6 @@ export function registerBuildCommand(program: Command, services: ServiceHub): vo
         .option("--clean", "Clean before building")
         .action(async (options: BuildCommandOptions) => {
             void options
-            void services
             // TODO：BuildService 编排 UI/native build，并按需调用 Packer
         })
 }

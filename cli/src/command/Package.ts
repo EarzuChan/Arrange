@@ -1,5 +1,4 @@
 import type { Command } from "commander"
-import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface PackageCommandOptions {
     flavor?: "debug" | "release" | string
@@ -7,7 +6,7 @@ export interface PackageCommandOptions {
     clean?: boolean
 }
 
-export function registerPackageCommand(program: Command, services: ServiceHub): void {
+export function registerPackageCommand(program: Command): void {
     program
         .command("package")
         .description("Package built Arrange artifacts")
@@ -16,7 +15,6 @@ export function registerPackageCommand(program: Command, services: ServiceHub): 
         .option("--clean", "Clean package output before packaging")
         .action(async (options: PackageCommandOptions) => {
             void options
-            void services
             // TODO：Packer 根据已构建工件生成发布产物
         })
 }

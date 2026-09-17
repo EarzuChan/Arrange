@@ -2,43 +2,42 @@ import {resolve} from "node:path"
 import {TextFile} from "../managed/ManagedFile.ts"
 import {TextCluster} from "../managed/TextCluster.ts"
 import {TextRegion} from "../managed/TextRegion.ts"
-import {managedItemIds} from "../managed/ManagedItem.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 
 const quote = (value: string): string => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/;/g, "\\;")}"`
 const defaultFetchUrl = "https://github.com/EarzuChan/Arrange.git"
 
-export class FetchContentRepositoryRegion extends TextRegion {
+export const fetchContentRepositoryRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.fetch-content-repository"
-    readonly managedItemId = managedItemIds.fetchContentRepository
+    readonly managedItemId = "cmake.fetch-content-repository"
 
     protected override makeInner(state: ProjectState): string {
         const url = state.project.framework.cmakeFetchContentUrl ?? defaultFetchUrl
         return `    GIT_REPOSITORY ${quote(url)}\n`
     }
-}
+}()
 
-export class FrameworkVersionRegion extends TextRegion {
+export const frameworkVersionRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.framework-version"
-    readonly managedItemId = managedItemIds.frameworkVersion
+    readonly managedItemId = "framework.version"
 
     protected override makeInner(state: ProjectState): string {
         return `    GIT_TAG ${quote(`v${state.project.framework.version}`)}\n`
     }
-}
+}()
 
-export class PluginVersionRegion extends TextRegion {
+export const pluginVersionRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.plugin-version"
-    readonly managedItemId = managedItemIds.pluginVersion
+    readonly managedItemId = "cmake.plugin-version"
 
     protected override makeInner(state: ProjectState): string {
         return `    VERSION ${quote(state.project.project.version)}\n`
     }
-}
+}()
 
-export class PluginIdentityRegion extends TextRegion {
+export const pluginIdentityRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.plugin-identity"
-    readonly managedItemId = managedItemIds.pluginIdentity
+    readonly managedItemId = "cmake.plugin-identity"
 
     protected override makeInner(state: ProjectState): string {
         const project = state.project.project
@@ -47,49 +46,43 @@ export class PluginIdentityRegion extends TextRegion {
     PLUGIN_CODE ${project.pluginCode}
 `
     }
-}
+}()
 
-export class PluginFormatsRegion extends TextRegion {
+export const pluginFormatsRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.plugin-formats"
-    readonly managedItemId = managedItemIds.pluginFormats
+    readonly managedItemId = "cmake.plugin-formats"
 
     protected override makeInner(state: ProjectState): string {
         const formats = state.project.project.products.map(product => product === "standalone" ? "Standalone" : "VST3")
         return `    FORMATS ${formats.join(" ")}\n`
     }
-}
+}()
 
-export class ProductNameRegion extends TextRegion {
+export const productNameRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.product-name"
-    readonly managedItemId = managedItemIds.projectName
+    readonly managedItemId = "project.name"
 
     protected override makeInner(state: ProjectState): string {
         return `    PRODUCT_NAME ${quote(state.project.project.name)}\n`
     }
-}
+}()
 
-export class FetchContentCluster extends TextCluster {
+export const fetchContentCluster: TextCluster = new class extends TextCluster {
     readonly id = "cmake.fetch-content"
-    readonly repositoryRegion = new FetchContentRepositoryRegion()
-    readonly versionRegion = new FrameworkVersionRegion()
-    readonly regions = [this.repositoryRegion, this.versionRegion]
+    readonly regions = [fetchContentRepositoryRegion, frameworkVersionRegion] as const
 
     protected override makeInner(state: ProjectState): string {
         return `include(FetchContent)
 FetchContent_Declare(arrange
-${this.repositoryRegion.make(state)}${this.versionRegion.make(state)})
+${fetchContentRepositoryRegion.make(state)}${frameworkVersionRegion.make(state)})
 FetchContent_MakeAvailable(arrange)
 `
     }
-}
+}()
 
-export class JucePluginCluster extends TextCluster {
+export const jucePluginCluster: TextCluster = new class extends TextCluster {
     readonly id = "cmake.juce-plugin"
-    readonly versionRegion = new PluginVersionRegion()
-    readonly identityRegion = new PluginIdentityRegion()
-    readonly formatsRegion = new PluginFormatsRegion()
-    readonly productNameRegion = new ProductNameRegion()
-    readonly regions = [this.versionRegion, this.identityRegion, this.formatsRegion, this.productNameRegion]
+    readonly regions = [pluginVersionRegion, pluginIdentityRegion, pluginFormatsRegion, productNameRegion] as const
 
     protected override makeInner(state: ProjectState): string {
         const regions = this.regions.map(region => region.make(state)).join("")
@@ -105,14 +98,12 @@ ${regions}    IS_SYNTH ${isSynth}
 )
 `
     }
-}
+}()
 
-export class CmakeListsFile extends TextFile {
+export const cmakeListsFile: TextFile = new class extends TextFile {
     readonly id = "cmake-lists"
     readonly scope = "Native"
-    readonly fetchContentCluster = new FetchContentCluster()
-    readonly jucePluginCluster = new JucePluginCluster()
-    readonly clusters = [this.fetchContentCluster, this.jucePluginCluster]
+    readonly clusters = [fetchContentCluster, jucePluginCluster] as const
 
     override path(state: ProjectState): string {
         return resolve(state.rootDir, state.project.native.directory, "CMakeLists.txt")
@@ -120,8 +111,8 @@ export class CmakeListsFile extends TextFile {
 
     override make(state: ProjectState): string {
         const name = state.project.project.name
-        const fetchContent = this.fetchContentCluster.make(state)
-        const plugin = this.jucePluginCluster.make(state)
+        const fetchContent = fetchContentCluster.make(state)
+        const plugin = jucePluginCluster.make(state)
         return `cmake_minimum_required(VERSION 3.24)
 project(${name} LANGUAGES C CXX)
 
@@ -144,14 +135,4 @@ target_link_libraries(${name} PRIVATE
 )
 `
     }
-}
-
-export const cmakeListsFile = new CmakeListsFile()
-export const fetchContentCluster = cmakeListsFile.fetchContentCluster
-export const jucePluginCluster = cmakeListsFile.jucePluginCluster
-export const fetchContentRepositoryRegion = fetchContentCluster.repositoryRegion
-export const frameworkVersionRegion = fetchContentCluster.versionRegion
-export const pluginVersionRegion = jucePluginCluster.versionRegion
-export const pluginIdentityRegion = jucePluginCluster.identityRegion
-export const pluginFormatsRegion = jucePluginCluster.formatsRegion
-export const productNameRegion = jucePluginCluster.productNameRegion
+}()

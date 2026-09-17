@@ -1,9 +1,9 @@
 import {Command, Option} from "commander"
-import type {ServiceHub} from "../ServiceHub.ts"
+import type {SyncService} from "../sync/SyncService.ts"
 
 export interface SyncCommandOptions {scan?: boolean, config?: boolean, setup?: boolean, ui?: boolean, native?: boolean}
 
-export function registerSyncCommand(program: Command, services: ServiceHub): void {
+export function registerSyncCommand(program: Command, syncService: SyncService): void {
     program.command("sync")
         .description("同步工程文件与开发准备状态")
         .option("--scan", "只扫描；有 Fatal 或 Resolvable 时返回非零状态")
@@ -12,7 +12,8 @@ export function registerSyncCommand(program: Command, services: ServiceHub): voi
         .addOption(new Option("--ui", "仅 UI 范围").conflicts("native"))
         .addOption(new Option("--native", "仅 native 范围").conflicts("ui"))
         .action(async (options: SyncCommandOptions) => {
-            const result = await services.syncService.run({scanOnly: options.scan, configOnly: options.config, setupOnly: options.setup, uiOnly: options.ui, nativeOnly: options.native}, process.cwd())
+            const result = await syncService.run({scanOnly: options.scan, configOnly: options.config, setupOnly: options.setup, uiOnly: options.ui, nativeOnly: options.native}, process.cwd())
+
             if (result.status !== "completed") process.exitCode = 1
         })
 }

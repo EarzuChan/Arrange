@@ -1,40 +1,42 @@
+import {managedItems, projectName, frameworkVersion, fetchContentRepository, pluginVersion, pluginFormats} from "../src/managed/ManageItems.ts"
 import assert from "node:assert/strict"
-import {afterEach, beforeEach, mock, test} from "node:test"
+import {test} from "node:test"
 import {readFile, readdir, rm, mkdir} from "node:fs/promises"
 import {join} from "node:path"
 import {fixture, write, TestSyncWizard} from "./fixture.ts"
 import {ProjectStateStore} from "../src/project/ProjectStateStore.ts"
 import type {ProjectState} from "../src/project/ProjectState.ts"
-import {managedFiles, managedItems} from "../src/managed/ManagedDefinitions.ts"
-import {managedItemIds} from "../src/managed/ManagedItem.ts"
-import {ConfigScanner} from "../src/sync/ConfigScanner.ts"
+import {managedFiles, ConfigScanner} from "../src/sync/ConfigScanner.ts"
 import {ConfigApplier} from "../src/sync/ConfigApplier.ts"
 import {ConfigWriter} from "../src/sync/ConfigWriter.ts"
 import {SyncService} from "../src/sync/SyncService.ts"
-import {serviceHub} from "../src/ServiceHub.ts"
 import {FrameworkRegistryClient} from "../src/framework/FrameworkRegistryClient.ts"
 import {cliCompatibility} from "../src/CliMetadata.ts"
-import {registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion} from "../src/node-js/NodeJsFiles.ts"
-import {cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion} from "../src/cmake/CmakeTextStuffs.ts"
+import {registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion} from "../src/node-js/NodeJsStuffs.ts"
+import {cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion} from "../src/cmake/CmakeStuffs.ts"
 import {TextFile, JsonFile} from "../src/managed/ManagedFile.ts"
 import {TextCluster} from "../src/managed/TextCluster.ts"
 import {TextRegion} from "../src/managed/TextRegion.ts"
 import {JsonRegion} from "../src/managed/JsonRegion.ts"
-import type {FileSnapshot} from "../src/util/FileUtils.ts"
+import {readSnapshot, type FileSnapshot} from "../src/util/FileUtils.ts"
 
 const store = new ProjectStateStore()
 const scanner = new ConfigScanner()
-beforeEach(() => {
-    mock.method(FrameworkRegistryClient.prototype, "fetchCandidateByVersion", async (version: string) => ({version, cliCompatibility, markedLatest: false, publishedAt: null}))
-})
-afterEach(() => mock.restoreAll())
+class TestRegistryClient extends FrameworkRegistryClient {
+    override async fetchCandidateByVersion(version: string) {
+        return {version, cliCompatibility, markedLatest: false, publishedAt: null}
+    }
+}
 
-function run(syncWizard: TestSyncWizard): SyncService {
-    mock.method(serviceHub.syncWizard, "report", syncWizard.report.bind(syncWizard))
-    mock.method(serviceHub.syncWizard, "choose", syncWizard.choose.bind(syncWizard))
-    mock.method(serviceHub.syncWizard, "edit", syncWizard.edit.bind(syncWizard))
-    mock.method(serviceHub.syncWizard, "message", syncWizard.message.bind(syncWizard))
-    return serviceHub.syncService
+function run(syncWizard: TestSyncWizard, registry: FrameworkRegistryClient = new TestRegistryClient(), projectStore: ProjectStateStore = new ProjectStateStore()): SyncService {
+    const service = new SyncService(projectStore, registry)
+    // 仅替换本实例的交互方法，保留 SyncService 与 Resolver 共享的内部 wizard
+    const wizard = service["syncWizard"]
+    wizard.report = syncWizard.report.bind(syncWizard)
+    wizard.choose = syncWizard.choose.bind(syncWizard)
+    wizard.edit = syncWizard.edit.bind(syncWizard)
+    wizard.message = syncWizard.message.bind(syncWizard)
+    return service
 }
 
 async function noJournal(root: string) { await assert.rejects(readdir(join(root, ".arrange")), {code: "ENOENT"}) }
@@ -102,7 +104,7 @@ test("每轮 Resolve 只处理一项，文件创建后重扫，最终 Apply 后�
 
 test("文本精确更新多个 Region，保留 Wrapper、自定义内容和关闭的 Region", async t => {
     const state = await fixture(t)
-    state.project["managed-items"] = [managedItemIds.pluginVersion, managedItemIds.pluginFormats]
+    state.project["managed-items"] = [pluginVersion.id, pluginFormats.id]
     state.project.project.version = "2.3.4"
     state.project.project.products = ["vst3"]
     const path = cmakeListsFile.path(state)
@@ -165,7 +167,7 @@ test("只托管 FetchContent 仓库地址时，版本的文本与 JSON 均不更
     const state = await fixture(t)
     const cmakeBefore = await readFile(cmakeListsFile.path(state), "utf8")
     const packageBefore = await readFile(packageJsonFile.path(state), "utf8")
-    state.project["managed-items"] = [managedItemIds.fetchContentRepository]
+    state.project["managed-items"] = [fetchContentRepository.id]
     state.project.framework.cmakeFetchContentUrl = "https://example.com/Arrange.git"
     state.project.framework.version = "0.0.0-m.2.3"
     await store.save(state)
@@ -181,7 +183,7 @@ test("只托管 Framework 版本时更新两端，保留未托管仓库地址", 
     const state = await fixture(t)
     const cmakeBefore = await readFile(cmakeListsFile.path(state), "utf8")
     const packageBefore = JSON.parse(await readFile(packageJsonFile.path(state), "utf8"))
-    state.project["managed-items"] = [managedItemIds.frameworkVersion]
+    state.project["managed-items"] = [frameworkVersion.id]
     state.project.framework.cmakeFetchContentUrl = "https://example.com/Arrange.git"
     state.project.framework.version = "0.0.0-m.2.3"
     await store.save(state)
@@ -196,7 +198,7 @@ test("只托管 Framework 版本时更新两端，保留未托管仓库地址", 
 for (const scope of ["UI", "Native"] as const) {
     test(`跨范围 ManagedItem 在 ${scope} 同步时只更新所选分支，不改变共同开关`, async t => {
         const state = await fixture(t)
-        state.project["managed-items"] = [managedItemIds.projectName, managedItemIds.frameworkVersion]
+        state.project["managed-items"] = [projectName.id, frameworkVersion.id]
         state.project.project.name = "RenamedPlugin"
         state.project.framework.version = "0.0.0-m.2.3"
         await store.save(state)
@@ -219,7 +221,7 @@ for (const scope of ["UI", "Native"] as const) {
 
 test("关闭共同开关：创建时生成裸文本和 JSON 初值，同步忽略两端即使有损坏 Wrapper", async t => {
     const state = await fixture(t, false)
-    state.project["managed-items"] = [managedItemIds.pluginVersion]
+    state.project["managed-items"] = [pluginVersion.id]
     const generated = cmakeListsFile.make(state)
     assert.ok(generated.includes('PRODUCT_NAME "TestPlugin"\n'))
     assert.ok(generated.includes('GIT_TAG "v0.0.0-m.2.2"\n'))
@@ -241,7 +243,7 @@ test("关闭共同开关：创建时生成裸文本和 JSON 初值，同步忽�
 
 test("共同名称的一端缺文件时另一端仍报告过期，取消恢复不能提前更新另一端", async t => {
     const state = await fixture(t)
-    state.project["managed-items"] = [managedItemIds.projectName]
+    state.project["managed-items"] = [projectName.id]
     state.project.project.name = "RenamedPlugin"
     await store.save(state)
     await rm(cmakeListsFile.path(state))
@@ -336,12 +338,6 @@ test("扫描后文件或 YAML 被外部修改，Apply 拒绝且不覆写", async
 
 test("多文件写入中断保留原文、目标及进度，能区分已写、未写、冲突", async t => {
     const state = await fixture(t)
-    state.project.project.name = "Changed"
-    state.project.project.version = "2.0.0"
-    const report = await scanner.scan(state, "Global")
-    class FailingApplier extends ConfigApplier {
-        override readonly writer = new FailingWriter()
-    }
     class FailingWriter extends ConfigWriter {
         calls = 0
         protected override async replaceFile(before: FileSnapshot, after: string, id: string): Promise<void> {
@@ -349,15 +345,16 @@ test("多文件写入中断保留原文、目标及进度，能区分已写、�
             return super.replaceFile(before, after, id)
         }
     }
-    const applier = new FailingApplier()
-    await assert.rejects(applier.apply(state.rootDir, report), /模拟磁盘错误/)
+    const writer = new FailingWriter()
+    const changes = await Promise.all([cmakeListsFile.path(state), packageJsonFile.path(state)].map(async path => ({before: await readSnapshot(path), after: "目标内容"})))
+    await assert.rejects(writer.write(state.rootDir, changes), /模拟磁盘错误/)
     const dir = join(state.rootDir, ".arrange", "transactions")
     const journalPath = join(dir, (await readdir(dir))[0])
-    const recovered = await applier.writer.inspectJournal(journalPath)
+    const recovered = await writer.inspectJournal(journalPath)
     assert.equal(recovered.journal.status, "failed")
     assert.deepEqual(recovered.states, ["expected", "original"])
     await write(recovered.journal.files[1].path, "用户又改了")
-    assert.deepEqual((await applier.writer.inspectJournal(journalPath)).states, ["expected", "conflict"])
+    assert.deepEqual((await writer.inspectJournal(journalPath)).states, ["expected", "conflict"])
     const files = await readdir(state.rootDir, {recursive: true})
     assert.equal(files.some(path => path.endsWith(".tmp")), false)
 })
@@ -429,11 +426,12 @@ test("同一 ManagedItem 跨文本和 JSON，一支缺失不阻止另一支扫�
 test("兼容性失败为 Fatal；SETUP 未实现不能伪装成功", async t => {
     const state = await fixture(t)
     const ui = new TestSyncWizard()
-    const registryFailure = t.mock.method(FrameworkRegistryClient.prototype, "fetchCandidateByVersion", async () => {throw new Error("不兼容")})
-    const service = run(ui)
+    class FailingRegistryClient extends TestRegistryClient {
+        override async fetchCandidateByVersion(): Promise<never> { throw new Error("不兼容") }
+    }
+    const service = run(ui, new FailingRegistryClient())
     assert.equal((await service.run({configOnly: true}, state.rootDir)).status, "blocked")
     assert.equal(ui.reports[0].fatal[0].cause, "framework-incompatible")
-    registryFailure.mock.restore()
     assert.equal((await run(new TestSyncWizard()).run({}, state.rootDir)).status, "setup-unavailable")
     await assert.rejects(run(new TestSyncWizard()).run({configOnly: true, setupOnly: true}, state.rootDir), /互斥/)
 })
@@ -494,4 +492,54 @@ test("文件创建确认期间出现同名文件，拒绝覆盖", async t => {
     assert.equal((await run(ui).run({configOnly: true}, state.rootDir)).status, "failed")
     assert.equal(await readFile(path, "utf8"), "用户新建\n")
     await noJournal(state.rootDir)
+})
+
+test("两套同步服务并发执行，各自使用自己的存储、registry 与交互", async t => {
+    const first = await fixture(t)
+    const second = await fixture(t)
+    first.project.framework.nodeRegistryUrl = "https://first.invalid"
+    second.project.framework.nodeRegistryUrl = "https://second.invalid"
+    await store.save(first)
+    await store.save(second)
+    await rm(packageJsonFile.path(first))
+    await rm(packageJsonFile.path(second))
+
+    class RecordingStore extends ProjectStateStore {
+        readonly roots: string[] = []
+        override async deepLoad(rootDir: string) {
+            this.roots.push(rootDir)
+            return super.deepLoad(rootDir)
+        }
+    }
+    class RecordingRegistry extends TestRegistryClient {
+        readonly urls: (string | undefined)[] = []
+        override async fetchCandidateByVersion(version: string, registryUrl?: string) {
+            this.urls.push(registryUrl)
+            return super.fetchCandidateByVersion(version)
+        }
+    }
+    const firstStore = new RecordingStore()
+    const secondStore = new RecordingStore()
+    const firstRegistry = new RecordingRegistry()
+    const secondRegistry = new RecordingRegistry()
+    const firstWizard = new TestSyncWizard()
+    const secondWizard = new TestSyncWizard()
+    firstWizard.onChoose = async () => "create"
+    secondWizard.onChoose = async () => "abort"
+    const firstService = run(firstWizard, firstRegistry, firstStore)
+    const secondService = run(secondWizard, secondRegistry, secondStore)
+
+    const results = await Promise.all([firstService.run({configOnly: true}, first.rootDir), secondService.run({configOnly: true}, second.rootDir)])
+    assert.deepEqual(results.map(result => result.status), ["completed", "aborted"])
+    assert.deepEqual(firstStore.roots, [first.rootDir, first.rootDir])
+    assert.deepEqual(secondStore.roots, [second.rootDir])
+    assert.deepEqual(firstRegistry.urls, ["https://first.invalid", "https://first.invalid"])
+    assert.deepEqual(secondRegistry.urls, ["https://second.invalid"])
+    assert.equal(firstWizard.choices, 1)
+    assert.equal(secondWizard.choices, 1)
+    assert.equal(firstWizard.reports.length, 2)
+    assert.equal(secondWizard.reports.length, 1)
+    assert.equal(await readFile(packageJsonFile.path(first), "utf8"), packageJsonFile.make(first))
+    await assert.rejects(readFile(packageJsonFile.path(second)), {code: "ENOENT"})
+    await noJournal(second.rootDir)
 })

@@ -1,12 +1,11 @@
 import type { Command } from "commander"
-import type { ServiceHub } from "../ServiceHub.ts"
 
 export interface AdoptCommandOptions {
     registry?: string
     fetchContent?: string
 }
 
-export function registerAdoptCommand(program: Command, services: ServiceHub): void {
+export function registerAdoptCommand(program: Command): void {
     program
         .command("adopt")
         .description("Adopt an existing project into Arrange")
@@ -14,7 +13,6 @@ export function registerAdoptCommand(program: Command, services: ServiceHub): vo
         .option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: AdoptCommandOptions) => {
             void options
-            void services
             // TODO：调用 AdoptWizard 等
             // adopt 的 raw 工程识别、托管选择、二次确认必须在专项流程中完成
         })

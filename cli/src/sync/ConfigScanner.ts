@@ -1,11 +1,15 @@
+import {cmakeListsFile} from "../cmake/CmakeStuffs.ts"
+import {npmrcFile, packageJsonFile} from "../node-js/NodeJsStuffs.ts"
 import type {ProjectState} from "../project/ProjectState.ts"
 import type {ManagedFile, ConfigScope} from "../managed/ManagedFile.ts"
-import type {ManagedItem} from "../managed/ManagedItem.ts"
+import type {ManagedItem} from "../managed/ManageItems.ts"
 import type {CheckResult, Located} from "../managed/CheckResult.ts"
 import type {JsonExpected, JsonPath} from "../managed/JsonRegion.ts"
-import {managedFiles, managedItems} from "../managed/ManagedDefinitions.ts"
+import {managedItems} from "../managed/ManageItems.ts"
 import {errorMessage} from "../util/Utils.ts"
 import type {ConfigScanReport, ConfigTarget} from "./ConfigScanReport.ts"
+
+export const managedFiles: readonly ManagedFile[] = [packageJsonFile, npmrcFile, cmakeListsFile]
 
 export class ConfigScanner {
     readonly files: readonly ManagedFile[] = managedFiles

@@ -1,10 +1,11 @@
+import {registry} from "../src/managed/ManageItems.ts"
 import assert from "node:assert/strict"
 import {test} from "node:test"
 import {Wrapper} from "../src/managed/Wrapper.ts"
 import {TextRegion} from "../src/managed/TextRegion.ts"
 import {JsonRegion, readJsonPath, setJsonPath, type JsonValue, type JsonExpected} from "../src/managed/JsonRegion.ts"
-import {registryRegion, registryCluster} from "../src/node-js/NodeJsFiles.ts"
-import {managedItemIds} from "../src/managed/ManagedItem.ts"
+import {registryRegion, registryCluster} from "../src/node-js/NodeJsStuffs.ts"
+
 import {projectDefinitionSchema} from "../src/project/ProjectState.ts"
 import {stateFor} from "./fixture.ts"
 
@@ -66,7 +67,7 @@ for (const value of [undefined, null, "", "https://registry.example"]) {
 test("受管正文逐字符比较，不 trim，不解析语义", () => {
     const region = new class extends TextRegion {
         readonly id = "test"
-        readonly managedItemId = managedItemIds.registry
+        readonly managedItemId = registry.id
         protected override makeInner(): string { return "value\n" }
     }()
     assert.equal(region.check(state, region.wrapper.make("value\n")).kind, "Idle")
@@ -86,7 +87,7 @@ for (const [label, expected, json, kind, cause] of [
     test(`JSON 矩阵：${label}`, () => {
         const region = new class extends JsonRegion {
             readonly id = "test"
-            readonly managedItemId = managedItemIds.registry
+            readonly managedItemId = registry.id
             protected readonly path = ["dependencies", "test"]
             protected override makeValue(): JsonExpected { return expected }
         }()
@@ -100,7 +101,7 @@ for (const [label, expected, json, kind, cause] of [
 test("JSON 值比较尊重对象成员、数组顺序，更新保持兄弟字段和原型安全", () => {
     const region = new class extends JsonRegion {
         readonly id = "test"
-        readonly managedItemId = managedItemIds.registry
+        readonly managedItemId = registry.id
         protected readonly path = ["value"]
         protected override makeValue(): JsonValue { return {a: 1, b: [2, 3]} }
     }()
@@ -124,7 +125,7 @@ test("非法配置不能生成期望，null 不被误作空字符串", () => {
     }
     const region = new class extends TextRegion {
         readonly id = "invalid"
-        readonly managedItemId = managedItemIds.registry
+        readonly managedItemId = registry.id
         protected override makeInner(): string { throw new Error("坏配置") }
     }()
     assert.equal(region.check(state, "").kind, "Fatal")

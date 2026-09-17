@@ -1,8 +1,8 @@
 import type {Command} from "commander"
 import {relative} from "node:path"
-import type {ServiceHub} from "../ServiceHub.ts"
+import type {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
 import {createInitialProjectState} from "../project/CreateProject.ts"
-import {projectFileNames} from "../project/ProjectStateStore.ts"
+import type {ProjectStateStore} from "../project/ProjectStateStore.ts"
 import {runCreateWizard} from "../wizard/Create.ts"
 
 export interface CreateCommandOptions {
@@ -10,14 +10,14 @@ export interface CreateCommandOptions {
     fetchContent?: string
 }
 
-export function registerCreateCommand(program: Command, services: ServiceHub): void {
+export function registerCreateCommand(program: Command, store: ProjectStateStore, registry: FrameworkRegistryClient): void {
     program
         .command("create")
         .description("Create a new Arrange project")
         .option("--registry <url>", "Framework npm registry URL")
         .option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: CreateCommandOptions) => {
-            const request = await runCreateWizard({
+            const request = await runCreateWizard(registry, {
                 nodeRegistryUrl: options.registry,
                 cmakeFetchContentUrl: options.fetchContent,
             })
@@ -26,7 +26,7 @@ export function registerCreateCommand(program: Command, services: ServiceHub): v
 
             const state = createInitialProjectState(request)
             // TODO：调用生成器生成文件
-            await services.projectStateStore.save(state)
+            await store.save(state)
 
             console.log(`Project created:\n  root: ${state.rootDir}\n`)
 

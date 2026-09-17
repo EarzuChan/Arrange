@@ -5,7 +5,7 @@ import type {TextCluster} from "../managed/TextCluster.ts"
 import type {TextRegion} from "../managed/TextRegion.ts"
 import {ConfigWriter} from "./ConfigWriter.ts"
 import type {ConfigTarget, ConfigScanReport, ResolvableIssue} from "./ConfigScanReport.ts"
-import {serviceHub} from "../ServiceHub.ts"
+import type {SyncWizard} from "../wizard/Sync.ts"
 
 export type ResolveChoice = "create" | "wrap" | "marker" | "edit" | "abort"
 type TextElement = TextCluster | TextRegion
@@ -13,8 +13,9 @@ type TextElement = TextCluster | TextRegion
 // THINKING：这个Resolve的实现有点化简——把所有的情形先混为一谈，再分类产出方——而不是干干净净的先产出方再看类型。虽然说能跑。。。
 
 export class ConfigResolver {
-    get syncWizard() { return serviceHub.syncWizard }
-    readonly writer = new ConfigWriter()
+    private readonly writer = new ConfigWriter()
+
+    constructor(private readonly syncWizard: SyncWizard) {}
 
     async resolve(state: ProjectState, report: ConfigScanReport, guards: readonly FileSnapshot[]): Promise<"abort" | "rescan" | "ready-to-apply"> {
         if (report.fatal.length) return "abort"

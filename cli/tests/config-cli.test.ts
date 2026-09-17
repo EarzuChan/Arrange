@@ -9,8 +9,8 @@ import {join} from "node:path"
 import {readFile, readdir, rm} from "node:fs/promises"
 import {fixture, write} from "./fixture.ts"
 import {ProjectStateStore} from "../src/project/ProjectStateStore.ts"
-import {managedFiles} from "../src/managed/ManagedDefinitions.ts"
-import {cmakeListsFile} from "../src/cmake/CmakeTextStuffs.ts"
+import {managedFiles} from "../src/sync/ConfigScanner.ts"
+import {cmakeListsFile} from "../src/cmake/CmakeStuffs.ts"
 import {cliCompatibility} from "../src/CliMetadata.ts"
 
 const exec = promisify(execFile)

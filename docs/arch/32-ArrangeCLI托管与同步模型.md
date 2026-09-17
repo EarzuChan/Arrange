@@ -29,13 +29,15 @@ interface ManagedItem {
 
 物理父级与 ManagedItem 直接关联同一份 Region 定义；Region 不保存所属 File 或 Cluster。定义或描述符可以按固定参数特化，绑定关系仍是确定的；本次参与拓扑由 State 和操作范围推导。
 
+具体 ManagedItem 在 `ManageItems.ts` 中分别以命名 `export const` 对象声明，自持 id、label 与跨文本/JSON 的 regions 数组；同文件定义 ManagedItem 类型及 managedItems 列表。物理定义分别位于 `CmakeStuffs.ts` 与 `NodeJsStuffs.ts`，不反向导入逻辑定义；Region 保留稳定的 managedItemId，扫描时校验逻辑归属一致性。物理文件入口列表由 ConfigScanner 维护。
+
 ## ManagedItem 与 expect
 
 管理开关只到 ManagedItem，保存在 `project.managed-items`。Region 没有独立开关或覆盖项；确需独立管理的语义应拆成不同 ManagedItem。命令范围过滤不改变 ManagedItem 开关。
 
 ManagedItem 的开关决定是否托管，其对应配置值经各 Region 自己的生成规则形成 expect。同一 ManagedItem 的多个 Region 可以生成不同格式的内容，不要求文本与 JSON 表达相同。
 
-`project.name` 共同管理 CMake `PRODUCT_NAME` 和 package.json `name`，后者生成小写；`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [ManagedDefinitions.ts](../../cli/src/managed/ManagedDefinitions.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
+`project.name` 共同管理 CMake `PRODUCT_NAME` 和 package.json `name`，后者生成小写；`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [ManageItems.ts](../../cli/src/managed/ManageItems.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
 
 | ManagedItem | 对应配置 | CONFIG 中的期望 |
 |---|---|---|
@@ -54,7 +56,7 @@ ManagedItem 关闭时，创建仍按需生成一次性普通内容，文本 Regi
 
 所有 `check` 都结合期待与实情判断，只读和计算；各级的期待、实际输入和结果不同，具体判定见下文扫描矩阵。File 从 State 确定文件路径，读取后委派子级；Cluster 和 Region 在父级提供的内容中检查自身。
 
-具体定义继承抽象基类，公共检查、定位和包装规则由基类实现。TextRegion/TextCluster 通过受保护的 `makeInner` 生成正文；JsonRegion 通过 `makeValue` 生成值，由公共 `make` 将 null 统一为字段不存在。File 子类实现 `path`，TextFile 实现 `make`，JsonFile 实现 `makeContent` 提供初始对象，再由基类委派 Region 填入字段。固定身份由具体类字段声明，父级自行创建并持有子定义，ManagedItem 关联其中同一份 Region；业务生成逻辑写在方法中，定义实例不保存工程状态。
+具体定义继承抽象基类，公共检查、定位和包装规则由基类实现。TextRegion/TextCluster 通过受保护的 `makeInner` 生成正文；JsonRegion 通过 `makeValue` 生成值，由公共 `make` 将 null 统一为字段不存在。File 子类实现 `path`，TextFile 实现 `make`，JsonFile 实现 `makeContent` 提供初始对象，再由基类委派 Region 填入字段。具体 File、Cluster、Region 均以 `export const xxx = new class extends ... {}()` 声明唯一实例，固定身份由字段声明。物理父级通过数组引用子定义，不在内部创建子实例；ManagedItem 关联同一份 Region；业务生成逻辑写在方法中，定义实例不保存工程状态。
 
 | 定义 | check | locate | make(state) |
 |---|---|---|---|
