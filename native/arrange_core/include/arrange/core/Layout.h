@@ -21,6 +21,7 @@ namespace arrange::core {
         LayoutEngine();
         explicit LayoutEngine(const TextLayoutService& textLayoutService);
 
+        const TextLayoutService& textLayoutService() const noexcept { return *textLayoutService_; }
         const LayoutWorkCounters& counters() const noexcept { return counters_; }
         void resetCounters() noexcept { counters_ = {}; }
         void layout(LayoutTree& tree, NodeId root, Constraints constraints);

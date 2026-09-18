@@ -244,7 +244,7 @@ int main() {
             SceneFramePipeline schemaPipeline;
             PublishedFrame schemaFrame;
             frame(schemaHost, schemaScene, schemaPipeline, schemaFrame);
-            check(schemaHost.eventSlotCount() == 0 && schemaFrame.content.drawOps.size() == 1, "参数拒绝后不能残留回调或污染下一次有效提交");
+            check(schemaHost.eventSlotCount() == 0 && exportDrawOps(schemaFrame.content.scenePaint).size() == 1, "参数拒绝后不能残留回调或污染下一次有效提交");
         }
         {
             QuickJsScriptHost host;
@@ -317,7 +317,7 @@ int main() {
         const auto outerHit = HitTester().hitTestClickable(scene.tree(), 1, {5, 5});
         const auto innerHit = HitTester().hitTestClickable(scene.tree(), 1, {65, 15});
         check(outerHit.hit && innerHit.hit && outerHit.eventSlot != innerHit.eventSlot && outerHit.modifier != innerHit.modifier, "QuickJS descriptors collapsed interaction instances");
-        check(published.content.drawOps.size() == 4 && published.content.drawOps[2].rect == Rect{10, 10, 80, 60}, "QuickJS path lost ordered paint geometry");
+        check(exportDrawOps(published.content.scenePaint).size() == 4 && exportDrawOps(published.content.scenePaint)[2].rect == Rect{10, 10, 80, 60}, "QuickJS path lost ordered paint geometry");
         check(host.invokeEventSlot(outerHit.eventSlot).ok, "outer callback could not execute");
         frame(host, scene, pipeline, published);
         check(scene.node(1).text == "outer", "wrong outer callback ran");

@@ -139,6 +139,7 @@ namespace arrange::core {
     };
 
     struct PaintLayerFragment;
+    struct PaintFragment;
 
     struct ModifierInstance {
         ModifierHandle handle;
@@ -148,6 +149,7 @@ namespace arrange::core {
         Point childOffset;
         Rect bounds;
         std::shared_ptr<const PaintLayerFragment> paintCache;
+        std::shared_ptr<const PaintFragment> fragmentCache;
         SizeAnimation sizeAnimation;
     };
 

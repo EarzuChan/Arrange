@@ -13,6 +13,8 @@ namespace arrange::core {
 
     struct PaintFragment;
     struct HitFragment;
+    struct TextLayout;
+    struct DrawOp;
 
     struct ArrangeNode {
         NodeId id = 0;
@@ -30,7 +32,15 @@ namespace arrange::core {
         Constraints measuredConstraints;
         bool measurementValid = false;
         bool placementValid = false;
+        std::shared_ptr<const TextLayout> textLayout;
+        std::shared_ptr<const TextLayout> placeholderLayout;
+        std::shared_ptr<const TextLayout> paintedTextLayout;
         std::shared_ptr<const PaintFragment> paintCache;
+        std::shared_ptr<const PaintFragment> contentFragment;
+        std::shared_ptr<const std::vector<DrawOp>> paintContent;
+        std::uint64_t contentRevision = 1;
+        std::uint64_t paintedContentRevision = 0;
+        Size paintedContentSize;
         std::shared_ptr<const HitFragment> hitCache;
 
     };

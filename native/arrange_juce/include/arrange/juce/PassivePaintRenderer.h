@@ -20,18 +20,26 @@ namespace arrange::juce {
 
     class PassivePaintRenderer final {
     public:
+        explicit PassivePaintRenderer(const arrange::core::TextLayoutService& service) : textLayoutService_(service) {}
         void setPackageDir(const std::filesystem::path& packageDir);
         void clearResources();
-        void prepareResources(const arrange::core::PublishedFrameContent& content);
+        void prepareResources(arrange::core::PublishedFrameContent& content);
 
         void paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame);
+        void setCullingEnabled(bool enabled) noexcept { drawOpsPainter_.setCullingEnabled(enabled); }
+        PaintReplayCounters replayCounters() const noexcept { return drawOpsPainter_.counters(); }
+        double paintMillis() const noexcept { return paintMillis_; }
+        double preparationMillis() const noexcept { return preparationMillis_; }
         std::uint64_t fullViewportPaints() const noexcept { return fullViewportPaints_; }
         const std::string& lastFullPaintReason() const noexcept { return lastFullPaintReason_; }
 
     private:
 
+        const arrange::core::TextLayoutService& textLayoutService_;
         std::uint64_t fullViewportPaints_ = 0;
         std::string lastFullPaintReason_;
+        double paintMillis_ = 0;
+        double preparationMillis_ = 0;
         JuceDrawOpsPainter drawOpsPainter_;
         ImageResourceCache imageResources_;
     };

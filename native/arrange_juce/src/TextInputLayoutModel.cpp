@@ -10,58 +10,19 @@
 #include <utility>
 
 namespace arrange::juce {
-    namespace {
-        bool nodeBoolProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase, bool fallback) { const auto* value = arrange::core::propValue(node, camelCase, kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase}); return value == nullptr ? fallback : value->boolOr(fallback); }
-
-        float nodeNumberProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase, float fallback) { const auto* value = arrange::core::propValue(node, camelCase, kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase}); return value == nullptr ? fallback : value->numberOr(fallback); }
-    } // namespace
-
     TextInputLayoutModel::TextInputLayoutModel(arrange::core::TextLayoutService& textLayoutService) noexcept
         : textLayoutService_(textLayoutService) {}
 
     bool TextInputLayoutModel::allowsLineBreak(const arrange::core::ArrangeNode& node) {
-        if (!nodeBoolProp(node, "singleLine", "single-line", true)) return true;
-        if (nodeNumberProp(node, "minLines", "min-lines", 1.0f) > 1.0f) return true;
-        if (nodeNumberProp(node, "maxLines", "max-lines", 1.0f) > 1.0f) return true;
-        return false;
+        return arrange::core::TextInputOverlayBuilder::allowsLineBreak(node);
     }
 
     TextInputLayoutModel::Metrics TextInputLayoutModel::metrics(const arrange::core::ArrangeNode& node, float viewportX) const {
-        Metrics metrics;
-        metrics.rect = ::juce::Rectangle<float>(node.contentBounds.x, node.contentBounds.y, node.contentBounds.width, node.contentBounds.height);
-        const auto style = arrange::core::objectProp(node, "textStyle", "text-style");
-        metrics.fontSize = style.number("fontSize", 14.0f);
-        metrics.singleLine = !allowsLineBreak(node);
-        metrics.textLeft = metrics.rect.getX() + 8.0f;
-        metrics.textWidth = std::max(0.0f, metrics.rect.getWidth() - 16.0f);
-        metrics.lineHeight = std::max(metrics.fontSize, style.number("lineHeight", metrics.fontSize));
-        metrics.textTop = metrics.singleLine
-                              ? metrics.rect.getY() + std::max(0.0f, (metrics.rect.getHeight() - metrics.lineHeight) * 0.5f)
-                              : metrics.rect.getY() + 4.0f;
-        metrics.textHeight = metrics.singleLine ? std::min(metrics.rect.getHeight(), metrics.lineHeight) : std::max(0.0f, metrics.rect.getHeight() - 8.0f);
-        metrics.viewportX = metrics.singleLine ? viewportX : 0.0f;
-        return metrics;
+        return arrange::core::TextInputOverlayBuilder::metrics(node, viewportX);
     }
 
     TextInputLayoutModel::Layout TextInputLayoutModel::layout(const arrange::core::ArrangeNode& node, const std::string& text, float viewportX) const {
-        Layout layout;
-        layout.metrics = metrics(node, viewportX);
-        layout.text = textLayoutService_.layout(
-            text,
-            {layout.metrics.fontSize, layout.metrics.lineHeight},
-            {layout.metrics.singleLine ? 1 : 0, layout.metrics.singleLine ? 0.0f : layout.metrics.textWidth, layout.metrics.singleLine});
-        return layout;
-    }
-
-    const arrange::core::TextLineLayout& TextInputLayoutModel::lineForByteIndex(const Layout& layout, std::size_t index) const {
-        const auto clamped = std::min(index, layout.text.text.size());
-        for (const auto& line : layout.text.lines) { if (clamped >= line.start && clamped <= line.end) return line; }
-        return layout.text.lines.back();
-    }
-
-    float TextInputLayoutModel::xForByteIndex(const Layout& layout, const std::string& text, std::size_t index) const {
-        if (layout.metrics.singleLine) { return layout.metrics.textLeft - layout.metrics.viewportX + juceTextXForByteIndex(text, index, layout.metrics.fontSize); }
-        return layout.metrics.textLeft - layout.metrics.viewportX + textLayoutService_.xForByteIndex(layout.text, index);
+        return arrange::core::TextInputOverlayBuilder::layout(node, text, viewportX, textLayoutService_);
     }
 
     std::size_t TextInputLayoutModel::textIndexAtPoint(
@@ -71,9 +32,8 @@ namespace arrange::juce {
         float x,
         float y) const {
         const auto layout = this->layout(node, text, viewportX);
-        if (layout.metrics.singleLine) { return juceByteIndexAtSingleLineX(text, x - layout.metrics.textLeft + layout.metrics.viewportX, layout.metrics.fontSize); }
         return textLayoutService_.byteIndexAtPoint(
-            layout.text,
+            *layout.text,
             {x - layout.metrics.textLeft + layout.metrics.viewportX, y - layout.metrics.textTop});
     }
 
@@ -87,20 +47,8 @@ namespace arrange::juce {
         end = std::min(end, text.size());
         if (end < start) std::swap(start, end);
 
-        if (layout.metrics.singleLine) {
-            const auto originX = layout.metrics.textLeft - layout.metrics.viewportX;
-            const auto xStart = originX + juceTextXForByteIndex(text, start, layout.metrics.fontSize);
-            const auto xEnd = originX + juceTextXForByteIndex(text, end, layout.metrics.fontSize);
-            bounds.add(::juce::Rectangle<int>(
-                static_cast<int>(std::round(xStart)),
-                static_cast<int>(std::round(layout.metrics.textTop)),
-                std::max(1, static_cast<int>(std::round(xEnd - xStart))),
-                static_cast<int>(std::round(layout.metrics.lineHeight))));
-            return bounds;
-        }
-
         if (start == end) {
-            const auto rect = textLayoutService_.caretRect(layout.text, start, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop});
+            const auto rect = textLayoutService_.caretRect(*layout.text, start, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop});
             bounds.add(::juce::Rectangle<int>(
                 static_cast<int>(std::round(rect.x)),
                 static_cast<int>(std::round(rect.y)),
@@ -109,7 +57,7 @@ namespace arrange::juce {
             return bounds;
         }
 
-        for (const auto& rect : textLayoutService_.boundsForRange(layout.text, start, end, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop})) {
+        for (const auto& rect : textLayoutService_.boundsForRange(*layout.text, start, end, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop})) {
             bounds.add(::juce::Rectangle<int>(
                 static_cast<int>(std::round(rect.x)),
                 static_cast<int>(std::round(rect.y)),
@@ -123,8 +71,9 @@ namespace arrange::juce {
         const auto metrics = this->metrics(node, viewportX);
         if (!metrics.singleLine) return 0.0f;
 
-        const auto textWidth = juceTextWidth(text, metrics.fontSize);
-        const auto caretX = juceTextXForByteIndex(text, cursorIndex, metrics.fontSize);
+        const auto prepared = layout(node, text, viewportX);
+        const auto textWidth = prepared.text->width;
+        const auto caretX = textLayoutService_.xForByteIndex(*prepared.text, cursorIndex);
         const auto margin = 3.0f;
         if (caretX - viewportX > metrics.textWidth - margin) viewportX = caretX - metrics.textWidth + margin;
         if (caretX - viewportX < margin) viewportX = caretX - margin;

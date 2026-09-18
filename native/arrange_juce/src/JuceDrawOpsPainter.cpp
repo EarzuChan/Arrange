@@ -3,6 +3,9 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/juce/ImageResourceCache.h>
+#include <arrange/juce/JuceTextServices.h>
+#include <stdexcept>
+#include <chrono>
 
 #include <algorithm>
 #include <cmath>
@@ -56,10 +59,10 @@ namespace arrange::juce {
             return {x, y, width, height};
         }
 
-        void drawImageOp(::juce::Graphics& g, const ::juce::Image& image, ::juce::Rectangle<float> rect, const arrange::core::DrawOp& op) {
+        void drawImageOp(::juce::Graphics& g, const ::juce::Image& image, ::juce::Rectangle<float> rect, const arrange::core::DrawOp& op, float alpha) {
             const auto fillAlphaWithTint = op.hasTint;
-            if (fillAlphaWithTint) { g.setColour(::juce::Colour(op.color)); }
-            else { g.setOpacity(static_cast<float>((op.color >> 24u) & 0xffu) / 255.0f); }
+            if (fillAlphaWithTint) { g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha)); }
+            else { g.setOpacity(static_cast<float>((op.color >> 24u) & 0xffu) / 255.0f * alpha); }
 
             if (op.contentScale == "FillWidth" || op.contentScale == "FillHeight") {
                 g.saveState();
@@ -76,124 +79,93 @@ namespace arrange::juce {
         }
 
 
-        ::juce::Justification textLayoutJustification(const std::string& align) {
-            if (align == "center" || align == "Center") return ::juce::Justification::horizontallyCentred | ::juce::Justification::top;
-            if (align == "right" || align == "end" || align == "End") return ::juce::Justification::topRight;
-            return ::juce::Justification::topLeft;
-        }
-
-        class JuceTextLayoutEngine {
-        public:
-            void drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float horizontalViewportOffset = 0.0f) const {
-                const auto area = ::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height);
-                if (area.isEmpty() || op.text.empty()) return;
-
-                g.saveState();
-                if (op.inputText) {
-                    g.reduceClipRegion(area.toNearestInt());
-                }
-                const auto font = ::juce::Font(::juce::FontOptions(op.fontSize));
-                const auto colour = ::juce::Colour(op.color);
-                const auto lineHeight = op.lineHeight > 0.0f ? op.lineHeight : font.getHeight();
-                if (op.maxLines == 1) { drawSingleLine(g, op.text, area, font, colour, op.textAlign, op.overflow, horizontalViewportOffset, lineHeight); }
-                else { drawLayout(g, op.text, area, font, colour, op.textAlign, op.maxLines, lineHeight); }
-                g.restoreState();
-            }
-
-        private:
-            void drawSingleLine(
-                ::juce::Graphics& g,
-                const std::string& text,
-                ::juce::Rectangle<float> area,
-                const ::juce::Font& font,
-                ::juce::Colour colour,
-                const std::string& align,
-                const std::string& overflow,
-                float horizontalViewportOffset,
-                float lineHeight) const {
-                ::juce::GlyphArrangement glyphs;
-                const auto juceText = ::juce::String::fromUTF8(text.data(), static_cast<int>(text.size()));
-                const auto baseline = area.getY() + std::max(0.0f, (lineHeight - font.getHeight()) * 0.5f) + font.getAscent();
-                const auto textX = area.getX() - std::max(0.0f, horizontalViewportOffset);
-                if (overflow == "ellipsis" && horizontalViewportOffset <= 0.0f) { glyphs.addCurtailedLineOfText(font, juceText, textX, baseline, area.getWidth(), true); }
-                else { glyphs.addLineOfText(font, juceText, textX, baseline); }
-
-                if (horizontalViewportOffset <= 0.0f && glyphs.getNumGlyphs() > 0) {
-                    const auto bounds = glyphs.getBoundingBox(0, glyphs.getNumGlyphs(), true);
-                    float dx = 0.0f;
-                    if (align == "center" || align == "Center") dx = area.getX() + (area.getWidth() - bounds.getWidth()) * 0.5f - bounds.getX();
-                    if (align == "right" || align == "end" || align == "End") dx = area.getRight() - bounds.getRight();
-                    if (std::fabs(dx) > 0.0001f) glyphs.moveRangeOfGlyphs(0, glyphs.getNumGlyphs(), dx, 0.0f);
-                }
-
-                g.setColour(colour);
-                glyphs.draw(g);
-            }
-
-            void drawLayout(
-                ::juce::Graphics& g,
-                const std::string& text,
-                ::juce::Rectangle<float> area,
-                const ::juce::Font& font,
-                ::juce::Colour colour,
-                const std::string& align,
-                int maxLines,
-                float lineHeight) const {
-                ::juce::AttributedString attributed;
-                attributed.append(::juce::String::fromUTF8(text.data(), static_cast<int>(text.size())), font, colour);
-                attributed.setJustification(textLayoutJustification(align));
-                attributed.setWordWrap(::juce::AttributedString::byWord);
-                attributed.setLineSpacing(std::max(0.0f, lineHeight - font.getHeight()));
-
-                ::juce::TextLayout layout;
-                const auto maxHeight = maxLines > 0 ? std::min(area.getHeight(), lineHeight * static_cast<float>(maxLines)) : area.getHeight();
-                layout.createLayout(attributed, std::max(1.0f, area.getWidth()), std::max(1.0f, maxHeight));
-                layout.draw(g, area);
-            }
-        };
     } // namespace
 
-    void JuceDrawOpsPainter::drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float horizontalViewportOffset) const { JuceTextLayoutEngine{}.drawText(g, op, horizontalViewportOffset); }
+    void JuceDrawOpsPainter::drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float horizontalViewportOffset, float alpha) const {
+        if (!op.textLayout) throw std::logic_error("发布的文字缺少排版资源");
+        const auto* resource = dynamic_cast<const JuceTextResource*>(op.textLayout->resource.get());
+        if (!resource) throw std::logic_error("发布的文字不是 JUCE 绘制资源");
+        ::juce::Graphics::ScopedSaveState scope(g);
+        if (op.inputText || op.overflow == "clip" || op.overflow == "ellipsis") g.reduceClipRegion(::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height).getSmallestIntegerContainer());
+        g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
+        const auto started = std::chrono::steady_clock::now();
+        resource->replay(g, *op.textLayout, op.rect, op.textAlign, horizontalViewportOffset);
+        if (!resource->runs.empty()) ++counters_.textSubmissions;
+        counters_.glyphSubmitMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(
-        ::juce::Graphics& g,
-        const std::vector<arrange::core::DrawOp>& ops,
-        const ImageResourceCache& imageResources,
-        std::optional<arrange::core::NodeId> focusedInputNode,
-        float focusedInputViewportX) const {
+    bool JuceDrawOpsPainter::invisible(::juce::Graphics& graphics, arrange::core::PaintBounds bounds) const {
+        if (!cullingEnabled_ || !bounds.known) return false;
+        if (bounds.empty) return true;
+        const auto& r = bounds.rect;
+        if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.width) || !std::isfinite(r.height)) return false;
+        // 超出整数裁剪接口的范围时保留绘制，避免转换溢出造成漏画
+        if (std::max({std::abs(r.x), std::abs(r.y), std::abs(r.x + r.width), std::abs(r.y + r.height)}) > 100000000.0f) return false;
+        return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
+    }
+
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX) const {
         g.saveState();
-        int graphicsStateDepth = 1;
-        const auto restoreGraphicsState = [&]() {
-            while (graphicsStateDepth > 0) {
-                g.restoreState();
-                --graphicsStateDepth;
-            }
-        };
+        int depth = 1;
+        try { replayOps(g, ops, resources, focused, viewportX, 1, depth); }
+        catch (...) { while (depth-- > 0) g.restoreState(); throw; }
+        while (depth-- > 0) g.restoreState();
+        return {};
+    }
 
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX) const {
+        replayFragment(g, root, resources, focused, viewportX, 1);
+        return {};
+    }
+
+    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX, float alpha) const {
+        if (!placed.fragment) return;
+        ++counters_.fragmentsVisited;
+        ::juce::Graphics::ScopedSaveState scope(g);
+        g.addTransform(::juce::AffineTransform::translation(placed.offset.x, placed.offset.y));
+        const auto& fragment = *placed.fragment;
+        if (invisible(g, fragment.bounds)) { ++counters_.fragmentsSkipped; return; }
+        g.saveState();
+        int depth = 1;
+        try {
+            if (fragment.layer) replayOps(g, fragment.layer->before, resources, focused, viewportX, alpha, depth);
+            const auto contentAlpha = alpha * (fragment.layer ? fragment.layer->contentAlpha : 1.0f);
+            if (fragment.content) replayOps(g, *fragment.content, resources, focused, viewportX, contentAlpha, depth);
+            for (const auto& child : fragment.children) replayFragment(g, child, resources, focused, viewportX, contentAlpha);
+            if (fragment.layer) replayOps(g, fragment.layer->after, resources, focused, viewportX, alpha, depth);
+        }
+        catch (...) { while (depth-- > 0) g.restoreState(); throw; }
+        while (depth-- > 0) g.restoreState();
+    }
+
+    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, const ImageResourceCache& imageResources, std::optional<arrange::core::NodeId> focusedInputNode, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
         for (const auto& op : ops) {
+            ++counters_.opsVisited;
+            const auto state = op.type == arrange::core::DrawOpType::PushClip || op.type == arrange::core::DrawOpType::PopClip || op.type == arrange::core::DrawOpType::PushTransform || op.type == arrange::core::DrawOpType::PopTransform;
+            if (!state && invisible(g, arrange::core::drawOpBounds(op))) { ++counters_.opsSkipped; continue; }
             const auto rect = ::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height);
             switch (op.type) {
             case arrange::core::DrawOpType::FillRect:
-                g.setColour(::juce::Colour(op.color));
+                g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 if (op.shape == arrange::core::DrawShapeType::Circle) { g.fillEllipse(rect); }
                 else if (op.shape == arrange::core::DrawShapeType::Rounded) { g.fillRoundedRectangle(rect, op.cornerRadius); }
                 else { g.fillRect(rect); }
                 break;
             case arrange::core::DrawOpType::StrokeRect:
-                g.setColour(::juce::Colour(op.color));
+                g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 if (op.shape == arrange::core::DrawShapeType::Circle) { g.drawEllipse(rect, op.strokeWidth); }
                 else if (op.shape == arrange::core::DrawShapeType::Rounded) { g.drawRoundedRectangle(rect, op.cornerRadius, op.strokeWidth); }
                 else { g.drawRect(rect, op.strokeWidth); }
                 break;
             case arrange::core::DrawOpType::DrawText:
-                drawText(g, op, op.inputText && focusedInputNode && op.nodeId == *focusedInputNode ? focusedInputViewportX : 0.0f);
+                drawText(g, op, op.inputText && focusedInputNode && op.nodeId == *focusedInputNode ? focusedInputViewportX : 0.0f, alpha);
                 break;
             case arrange::core::DrawOpType::DrawImage:
-                if (const auto image = imageResources.find(op.resource); image.isValid()) { drawImageOp(g, image, rect, op); }
+                if (const auto image = imageResources.find(op.resource); image.isValid()) { drawImageOp(g, image, rect, op, alpha); }
                 else {
                     g.setColour(::juce::Colour(0xff151922));
                     g.fillRect(rect);
-                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f));
+                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f * alpha));
                     g.drawRect(rect, 1.0f);
                     g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 1.0f);
                 }
@@ -208,19 +180,19 @@ namespace arrange::juce {
                         icon->replaceColour(::juce::Colour(0xff000000), ::juce::Colour(op.color));
                         icon->replaceColour(::juce::Colour(0xffffffff), ::juce::Colour(op.color));
                     }
-                    icon->drawWithin(g, rect, ::juce::RectanglePlacement::stretchToFit, 1.0f);
+                    icon->drawWithin(g, rect, ::juce::RectanglePlacement::stretchToFit, alpha);
                 }
                 else {
                     g.setColour(::juce::Colour(0xff151922));
                     g.fillRect(rect);
-                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f));
+                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f * alpha));
                     g.drawRect(rect, 1.0f);
                     g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 1.0f);
                 }
                 break;
             }
             case arrange::core::DrawOpType::DrawLine:
-                g.setColour(::juce::Colour(op.color));
+                g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 g.drawLine(
                     rect.getX(),
                     rect.getY(),
@@ -271,8 +243,7 @@ namespace arrange::juce {
             }
         }
 
-        restoreGraphicsState();
-        return {};
+
     }
 } // namespace arrange::juce
 

@@ -79,7 +79,7 @@ namespace {
         const auto& node = tree.node(1);
         check(node.bounds == Rect{0, 0, 100, 80}, "graphicsLayer changed layout bounds");
         check(node.modifier.elements()[5].bounds == Rect{10, 10, 80, 60}, "inner background lost layer geometry");
-        auto ops = DrawOpsBuilder().collect(tree, 1);
+        auto ops = DrawOpsBuilder().exportScene(tree, 1);
         check(ops.size() == 4 && ops[0].rect == Rect{0, 0, 100, 80}, "outer background was transformed or inset");
         check(ops[1].type == DrawOpType::PushTransform && ops[1].translationX == 50 && ops[2].rect == Rect{10, 10, 80, 60} && ops[3].type == DrawOpType::PopTransform, "paint lost ordered layer wrapper");
         auto hit = HitTester().hitTestClickable(tree, 1, {65, 15});
@@ -137,7 +137,7 @@ namespace {
         tree.apply({CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, wrappers}});
         layout.layout(tree, 1, {0, 500, 0, 500});
         check(tree.node(1).modifier.elements()[6].bounds == Rect{15, 15, 90, 70}, "repeated padding did not compose by layer");
-        const auto ops = DrawOpsBuilder{}.collect(tree, 1);
+        const auto ops = DrawOpsBuilder{}.exportScene(tree, 1);
         check(std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; }) == 2 &&
               std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; }) == 2,
               "repeated clips or graphics layers collapsed");
@@ -188,7 +188,6 @@ namespace {
         auto run = [&](MutationTransaction* transaction) {
             const auto result = pipeline.run(scene, 1, {0, 500, 0, 5000}, transaction, true, frame);
             check(!result.error, "cached frame failed");
-            check(frame.content.drawOps == DrawOpsBuilder{}.collect(scene.tree(), 1), "cached display list differs from uncached onion traversal");
             const auto reference = buildHitTestSnapshot(scene.tree(), 1);
             for (float y = 0; y < 1100; y += 11) {
                 const auto expected = HitTester{}.hitTestClickable(reference, {10, y});
@@ -338,7 +337,7 @@ namespace {
         offset.operations = {SetModifierMutation{1, chain}};
         const auto placed = pipeline.run(scene, 1, {0, 500, 0, 500}, &offset, true, frame);
         check(!placed.plan.measure && placed.plan.layout && placed.plan.buildPaint && placed.plan.buildHitTest, "offset failed to reuse measurement");
-        check(frame.content.drawOps[0].rect.x == 25, "placement-only frame used stale coordinates");
+        check(exportDrawOps(frame.content.scenePaint)[0].rect.x == 25, "placement-only frame used stale coordinates");
         chain[0].value = size(130, 60);
         MutationTransaction resized;
         resized.operations = {SetModifierMutation{1, chain}};

@@ -16,6 +16,15 @@ namespace arrange::juce {
 
     class ImageResourceCache;
 
+    struct PaintReplayCounters {
+        std::uint64_t fragmentsVisited = 0;
+        std::uint64_t fragmentsSkipped = 0;
+        std::uint64_t opsVisited = 0;
+        std::uint64_t opsSkipped = 0;
+        std::uint64_t textSubmissions = 0;
+        double glyphSubmitMillis = 0;
+    };
+
     class JuceDrawOpsPainter final {
     public:
         struct PaintResult {
@@ -29,7 +38,18 @@ namespace arrange::juce {
             std::optional<arrange::core::NodeId> focusedInputNode = std::nullopt,
             float focusedInputViewportX = 0.0f) const;
 
-        void drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float horizontalViewportOffset = 0.0f) const;
+        PaintResult paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focusedInputNode = {}, float viewportX = 0) const;
+        void setCullingEnabled(bool enabled) noexcept { cullingEnabled_ = enabled; }
+        PaintReplayCounters counters() const noexcept { return counters_; }
+        void resetCounters() const noexcept { counters_ = {}; }
+
+    private:
+        bool invisible(::juce::Graphics& graphics, arrange::core::PaintBounds bounds) const;
+        void replayFragment(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& placed, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focusedInputNode, float viewportX, float alpha) const;
+        void replayOps(::juce::Graphics& graphics, const std::vector<arrange::core::DrawOp>& ops, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focusedInputNode, float viewportX, float alpha, int& depth) const;
+        void drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float viewportX, float alpha) const;
+        bool cullingEnabled_ = true;
+        mutable PaintReplayCounters counters_;
     };
 
 #endif

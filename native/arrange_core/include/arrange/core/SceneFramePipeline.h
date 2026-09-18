@@ -48,7 +48,7 @@ namespace arrange::core {
 
     struct PublishedFrameContent {
         std::shared_ptr<const HitTestSnapshot> hitTest = std::make_shared<const HitTestSnapshot>();
-        std::vector<DrawOp> drawOps;
+        PlacedPaintFragment scenePaint;
         std::vector<DrawOp> overlayDrawOps;
         std::vector<DrawOp> diagnosticsErrorDrawOps;
         std::vector<DrawOp> diagnosticsBadgeDrawOps;
@@ -81,9 +81,7 @@ namespace arrange::core {
         double paintBuildMillis = 0;
         double hitBuildMillis = 0;
         std::uint64_t fullLayouts = 0;
-        std::uint64_t fullDisplayListBuilds = 0;
         std::string lastFullLayoutReason;
-        std::string lastFullDisplayListReason;
     };
 
     struct PublishedFrame {

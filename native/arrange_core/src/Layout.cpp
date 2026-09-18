@@ -229,26 +229,28 @@ namespace arrange::core {
             const auto lineHeight = std::max(fontSize, textStyle.number("lineHeight", fontSize * 1.2f));
             const auto maxLines = textMaxLines(node);
             const auto maxWidth = constraints.maxWidth < InfiniteConstraint ? constraints.maxWidth : 0.0f;
-            const auto measured = textLayoutService_->measure(node.text, {fontSize, lineHeight}, {maxLines, maxWidth, false});
-            content.width = measured.width;
-            content.height = measured.height;
-            node.baseline = lineHeight * 0.8f;
+            node.textLayout = textLayoutService_->layout(node.text, {fontSize, lineHeight}, {maxLines, maxWidth, maxLines == 1, stringProp(node, "overflow", "clip") == "ellipsis"}, node.textLayout);
+            content.width = node.textLayout->width;
+            content.height = node.textLayout->height;
+            node.baseline = node.textLayout->baseline;
             break;
         }
         case NodeType::Input: {
             const auto textStyle = textStyleProp(node);
             auto fontSize = textStyle.number("fontSize", 14.0f);
             if (!(fontSize > 0.0f)) fontSize = 14.0f;
-            const auto lineHeight = std::max(fontSize, textStyle.number("lineHeight", fontSize * 1.2f));
+            const auto lineHeight = std::max(fontSize, textStyle.number("lineHeight", fontSize));
             const auto text = inputTextProp(node);
-            const auto singleLine = boolProp(node, "singleLine", true);
+            const auto singleLine = boolProp(node, "singleLine", true) && textMinLines(node) <= 1 && textMaxLines(node) <= 1;
             const auto minLines = singleLine ? 1 : textMinLines(node);
             const auto maxLines = singleLine ? 1 : textMaxLines(node);
             const auto textMaxWidth = !singleLine && constraints.maxWidth < InfiniteConstraint ? std::max(0.0f, constraints.maxWidth - 16.0f) : 0.0f;
-            const auto measured = textLayoutService_->layout(text, {fontSize, lineHeight}, {maxLines, textMaxWidth, singleLine});
-            const auto lineCount = std::max(minLines, static_cast<int>(std::max<std::size_t>(1, measured.lines.size())));
+            node.textLayout = textLayoutService_->layout(text, {fontSize, lineHeight}, {singleLine ? 1 : 0, textMaxWidth, singleLine}, node.textLayout);
+            const auto& measured = *node.textLayout;
+            auto visibleHeight = measured.height;
+            if (maxLines > 0 && measured.lines.size() > static_cast<std::size_t>(maxLines)) visibleHeight = measured.lines[static_cast<std::size_t>(maxLines)].y;
             content.width = std::max(120.0f, measured.width + 16.0f);
-            content.height = std::max(28.0f, lineHeight * static_cast<float>(lineCount) + 8.0f);
+            content.height = std::max(28.0f, std::max(visibleHeight, lineHeight * static_cast<float>(minLines)) + 8.0f);
             break;
         }
         case NodeType::Spacer:

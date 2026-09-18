@@ -25,7 +25,7 @@ namespace {
         if (!condition) throw std::runtime_error(message);
     }
 
-    class FailingTextMeasurer final : public TextMeasurer {
+    class FailingTextMeasurer final : public ApproximateTextMeasurer {
     public:
         bool failing = false;
         float advance(std::string_view, char32_t, const TextStyle&) const override {
@@ -160,7 +160,7 @@ namespace {
         arrange::juce::RuntimeSessionState session;
         arrange::juce::DiagnosticsState diagnostics;
         arrange::juce::InteractionStateOwner interaction(text);
-        arrange::juce::PassivePaintRenderer paint;
+        arrange::juce::PassivePaintRenderer paint(text);
         arrange::juce::FramePumpDriver driver;
         session.resize(400, 300, runtime);
         session.markLoaded();

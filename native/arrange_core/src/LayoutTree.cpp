@@ -136,6 +136,7 @@ namespace arrange::core {
             if (node.text == value.string) return 0;
             const auto mask = hostInputInvalidation(input, nullptr, value);
             node.text = value.string;
+            ++node.contentRevision;
             markInputDirty(id, mask);
             return mask;
         }
@@ -145,6 +146,7 @@ namespace arrange::core {
         if (previous == node.props.end() && value.isNull()) return 0;
         const auto mask = hostInputInvalidation(input, previous == node.props.end() ? nullptr : &previous->second, value);
         if (mask != 0) {
+            ++node.contentRevision;
             if (value.isNull()) node.props.erase(name);
             else node.props[name] = value;
             markInputDirty(id, mask);

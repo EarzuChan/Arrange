@@ -28,7 +28,7 @@ namespace {
 
     bool treeContainsBackgroundColor(const arrange::core::LayoutTree& tree, arrange::core::NodeId root, std::uint32_t color) {
         arrange::core::DrawOpsBuilder paint;
-        for (const auto& op : paint.collect(tree, root)) {
+        for (const auto& op : paint.exportScene(tree, root)) {
             if (op.type == arrange::core::DrawOpType::FillRect && op.color == color) return true;
         }
         return false;

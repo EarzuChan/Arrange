@@ -15,6 +15,13 @@
 
 namespace arrange::juce {
     namespace {
+        void replacePreparedOps(std::vector<arrange::core::DrawOp>& target, std::vector<arrange::core::DrawOp> source) {
+            for (std::size_t index = 0; index < std::min(target.size(), source.size()); ++index) {
+                if (source[index].type == arrange::core::DrawOpType::DrawText && target[index].type == arrange::core::DrawOpType::DrawText) source[index].textLayout = target[index].textLayout;
+            }
+            target = std::move(source);
+        }
+
 #if ARRANGE_WITH_QUICKJS_NG
         [[nodiscard]] LogLevel toJuceLogLevel(arrange::quickjs::QuickJsDiagnosticLevel level) noexcept {
             switch (level) {
@@ -87,13 +94,13 @@ namespace arrange::juce {
             }
             candidateInteraction->synchronizePublishedInput(scene.tree(), session.interactive(diagnostics));
             candidateInteraction->updateFocusedInputViewport(scene.tree(), session.interactive(diagnostics));
-            frame.content.overlayDrawOps = candidateInteraction->buildFocusedInputOps(scene.tree(), session.interactive(diagnostics));
+            replacePreparedOps(frame.content.overlayDrawOps, candidateInteraction->buildFocusedInputOps(scene.tree(), session.interactive(diagnostics)));
             frame.content.focusedInputNode = candidateInteraction->focusedNode();
             frame.content.focusedInputViewportX = candidateInteraction->viewportX();
             (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
-            frame.content.diagnosticsErrorDrawOps = diagnostics.errorOpsSnapshot();
-            frame.content.diagnosticsBadgeDrawOps = diagnostics.badgeOpsSnapshot();
-            frame.content.diagnosticsToastDrawOps = diagnostics.toastOpsSnapshot();
+            replacePreparedOps(frame.content.diagnosticsErrorDrawOps, diagnostics.errorOpsSnapshot());
+            replacePreparedOps(frame.content.diagnosticsBadgeDrawOps, diagnostics.badgeOpsSnapshot());
+            replacePreparedOps(frame.content.diagnosticsToastDrawOps, diagnostics.toastOpsSnapshot());
             frame.content.errorFrame = diagnostics.hasError() ? std::optional<std::string>(diagnostics.error()->summary) : std::nullopt;
             paint.prepareResources(frame.content);
         };
@@ -117,9 +124,10 @@ namespace arrange::juce {
             (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
             (void)runtime.publishRetained([&](const auto&, auto& retained) {
                 retained.content.errorFrame = frame.error;
-                retained.content.diagnosticsErrorDrawOps = diagnostics.errorOpsSnapshot();
-                retained.content.diagnosticsBadgeDrawOps = diagnostics.badgeOpsSnapshot();
-                retained.content.diagnosticsToastDrawOps = diagnostics.toastOpsSnapshot();
+                replacePreparedOps(retained.content.diagnosticsErrorDrawOps, diagnostics.errorOpsSnapshot());
+                replacePreparedOps(retained.content.diagnosticsBadgeDrawOps, diagnostics.badgeOpsSnapshot());
+                replacePreparedOps(retained.content.diagnosticsToastDrawOps, diagnostics.toastOpsSnapshot());
+                paint.prepareResources(retained.content);
             });
         }
         else {

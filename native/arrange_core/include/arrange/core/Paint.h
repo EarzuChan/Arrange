@@ -42,6 +42,7 @@ namespace arrange::core {
         float cornerRadius = 0.0f;
         int maxLines = 0;
         std::string text;
+        std::shared_ptr<const TextLayout> textLayout;
         std::string textAlign;
         std::string overflow;
         std::string resource;
@@ -65,20 +66,36 @@ namespace arrange::core {
     struct PaintLayerFragment {
         ModifierValue value;
         Rect bounds;
-        float alpha = 1;
         float contentAlpha = 1;
         std::vector<DrawOp> before;
         std::vector<DrawOp> after;
     };
 
-    // Immutable shared fragments survive candidate-scene copies without duplicating
-    // every ancestor's flattened subtree. Only publication flattens the rope.
-    struct PaintFragment {
-        float alpha = 1;
-        std::vector<std::shared_ptr<const PaintLayerFragment>> layers;
-        std::vector<DrawOp> content;
-        std::vector<std::shared_ptr<const PaintFragment>> children;
+    struct PaintBounds {
+        Rect rect;
+        bool known = true;
+        bool empty = true;
     };
+
+    struct PaintFragment;
+    struct PlacedPaintFragment {
+        std::shared_ptr<const PaintFragment> fragment;
+        Point offset;
+        bool operator==(const PlacedPaintFragment&) const = default;
+    };
+
+    // 每个片段是完整的绘制状态作用域，位置属于引用边，稳定命令使用局部坐标
+    struct PaintFragment {
+        std::shared_ptr<const PaintLayerFragment> layer;
+        std::shared_ptr<const std::vector<DrawOp>> content;
+        std::vector<PlacedPaintFragment> children;
+        PaintBounds bounds;
+        bool hasExternalResources = false;
+    };
+
+    PaintBounds drawOpBounds(const DrawOp& op);
+    std::vector<DrawOp> exportDrawOps(const PlacedPaintFragment& root);
+    void visitPaintOps(const PaintFragment& fragment, const std::function<void(const std::vector<DrawOp>&)>& visitor, bool resourcesOnly = false);
 
     struct PaintWorkCounters {
         std::uint64_t nodesBuilt = 0;
@@ -86,20 +103,26 @@ namespace arrange::core {
         std::uint64_t layersBuilt = 0;
         std::uint64_t layerCacheHits = 0;
         std::uint64_t emittedOps = 0;
+        std::uint64_t contentBuilds = 0;
+        std::uint64_t contentReuses = 0;
+        std::uint64_t fragmentsBuilt = 0;
+        std::uint64_t fragmentsReused = 0;
     };
 
     class DrawOpsBuilder {
     public:
-        std::vector<DrawOp> collect(const LayoutTree& tree, NodeId root) const;
-        std::vector<DrawOp> collectCached(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
+        explicit DrawOpsBuilder(const TextLayoutService& service = defaultTextLayoutService()) : textLayoutService_(service) {}
+        static void prepareText(DrawOp& op, const TextLayoutService& service);
+        std::vector<DrawOp> exportScene(const LayoutTree& tree, NodeId root) const;
+        PlacedPaintFragment build(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
         std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const;
         static std::string textStyleProp(const ArrangeNode& node);
 
     private:
+        const TextLayoutService& textLayoutService_;
         void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
-        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha, bool includeChildren = true) const;
-        std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, float alpha, PaintWorkCounters& counters) const;
-        void collectNode(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float inheritedAlpha = 1.0f) const;
+        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const;
+        std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const;
     };
 
     struct TextInputOverlayRange {
@@ -128,7 +151,6 @@ namespace arrange::core {
             const TextInputOverlayState& state,
             const TextLayoutService& textLayoutService) const;
 
-    private:
         struct Metrics {
             Rect rect;
             float textLeft = 0.0f;
@@ -143,13 +165,11 @@ namespace arrange::core {
 
         struct Layout {
             Metrics metrics;
-            TextLayout text;
+            std::shared_ptr<const TextLayout> text;
         };
 
         static Metrics metrics(const ArrangeNode& node, float viewportX);
         static Layout layout(const ArrangeNode& node, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
-        static float xForByteIndex(const Layout& layout, const std::string& text, std::size_t index, const TextLayoutService& textLayoutService);
         static std::vector<Rect> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService);
-        static const TextLineLayout& lineForByteIndex(const Layout& layout, std::size_t index);
     };
 } // namespace arrange::core

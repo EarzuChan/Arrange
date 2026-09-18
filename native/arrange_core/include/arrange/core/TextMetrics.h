@@ -79,39 +79,4 @@ namespace arrange::core {
         return fontSize * (isWideCodepoint(codepoint) ? 1.0f : 0.6f);
     }
 
-    inline float measureUtf8Line(std::string_view text, float fontSize) noexcept {
-        float width = 0.0f;
-        for (std::size_t index = 0; index < text.size();) {
-            const auto codepoint = decodeUtf8Codepoint(text, index);
-            if (codepoint == U'\n') break;
-            width += textCodepointAdvance(codepoint, fontSize);
-        }
-        return width;
-    }
-
-    inline int textLineCount(std::string_view text) noexcept {
-        if (text.empty()) return 1;
-        int lines = 1;
-        for (char ch : text) { if (ch == '\n') ++lines; }
-        return lines;
-    }
-
-    inline float longestVisibleLineWidth(std::string_view text, int maxLines, float fontSize) noexcept {
-        float currentLineWidth = 0.0f;
-        float longestLineWidth = 0.0f;
-        int lineIndex = 1;
-        for (std::size_t index = 0; index < text.size();) {
-            const auto codepoint = decodeUtf8Codepoint(text, index);
-            if (codepoint == U'\n') {
-                longestLineWidth = std::max(longestLineWidth, currentLineWidth);
-                currentLineWidth = 0.0f;
-                ++lineIndex;
-                if (maxLines > 0 && lineIndex > maxLines) break;
-                continue;
-            }
-            currentLineWidth += textCodepointAdvance(codepoint, fontSize);
-        }
-        if (maxLines == 0 || lineIndex <= maxLines) { longestLineWidth = std::max(longestLineWidth, currentLineWidth); }
-        return longestLineWidth;
-    }
 } // namespace arrange::core

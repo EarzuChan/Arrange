@@ -287,7 +287,7 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
         return makeNode(type)
     },
     createStorageContainer: () => makeNode('Storage'),
-    createText: makeTextNode,
+    createText: makeTextNode, // 恶劣的
     createComment: () => makeNode("Anchor", "anchor"),
     setText: setNodeText,
     setElementText(node, text) {

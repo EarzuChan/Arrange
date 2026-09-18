@@ -19,15 +19,23 @@ namespace arrange::juce {
     int charIndexForByteIndex(const std::string& text, std::size_t byteIndex);
     int totalUtf8Chars(const std::string& text);
 
-    float juceTextWidth(std::string_view utf8Text, float fontSize);
-    float juceTextXForByteIndex(const std::string& text, std::size_t index, float fontSize);
-    std::size_t juceByteIndexAtSingleLineX(const std::string& text, float x, float fontSize);
+    class JuceTextResource final : public arrange::core::TextDrawResource {
+    public:
+        struct Run {
+            ::juce::Font font{::juce::FontOptions{}};
+            std::vector<std::uint16_t> glyphs;
+            std::vector<::juce::Point<float>> positions;
+            std::size_t line = 0;
+        };
+
+        std::vector<Run> runs;
+        std::size_t estimatedBytes() const noexcept override;
+        void replay(::juce::Graphics& graphics, const arrange::core::TextLayout& layout, arrange::core::Rect area, const std::string& alignment, float viewportX) const;
+    };
 
     class JuceTextMeasurer final : public arrange::core::TextMeasurer {
     public:
-        float advance(std::string_view utf8Cluster, char32_t codepoint, const arrange::core::TextStyle& style) const override;
-        float lineWidth(std::string_view utf8Text, const arrange::core::TextStyle& style) const override;
-        std::optional<arrange::core::Size> measure(std::string_view utf8Text, arrange::core::TextStyle style, arrange::core::TextLayoutOptions options) const override;
+        arrange::core::TextLayout createLayout(std::string_view utf8Text, arrange::core::TextStyle style, arrange::core::TextLayoutOptions options) const override;
     };
 
 #endif

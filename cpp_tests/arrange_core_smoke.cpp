@@ -147,7 +147,7 @@ namespace {
         if (!near(tree.node(2).bounds.x, 0.0f) || !near(tree.node(2).bounds.y, 0.0f)) return 6;
         if (!near(tree.node(3).bounds.y, 40.0f)) return 7;
 
-        const auto ops = arrange::core::DrawOpsBuilder{}.collect(tree, 1);
+        const auto ops = arrange::core::DrawOpsBuilder{}.exportScene(tree, 1);
         bool sawRoot = false;
         bool sawBlue = false;
         bool sawText = false;
@@ -307,7 +307,7 @@ namespace {
         if (!phaseRan(published.phases, arrange::core::FramePhase::ApplyMutations)) return 23;
         if (!phaseRan(published.phases, arrange::core::FramePhase::Measure)) return 24;
         if (!phaseRan(published.phases, arrange::core::FramePhase::BuildPaint)) return 25;
-        if (published.content.drawOps.empty()) return 26;
+        if (exportDrawOps(published.content.scenePaint).empty()) return 26;
 
         arrange::core::MutationTransaction eventOnly;
         eventOnly.operations.emplace_back(arrange::core::RegisterEventSlot{arrange::core::makeEventSlotId(3, arrange::core::EventSlotKind::Click, "updated")});
@@ -372,7 +372,7 @@ namespace {
         return 0;
     }
 
-    class ExactTextMeasurer final : public arrange::core::TextMeasurer {
+    class ExactTextMeasurer final : public arrange::core::ApproximateTextMeasurer {
     public:
         float advance(std::string_view, char32_t, const arrange::core::TextStyle& style) const override {
             return style.fontSize * 0.5f;
@@ -383,8 +383,8 @@ namespace {
         ExactTextMeasurer measurer;
         arrange::core::TextLayoutService service(measurer);
         const auto layout = service.layout("abcd\nef", {10.0f, 12.0f}, {0, 0.0f, false});
-        if (layout.lines.size() != 2 || !near(layout.width, 20.0f) || !near(layout.height, 24.0f)) return 61;
-        const auto caret = service.caretRect(layout, 2, {4.0f, 5.0f});
+        if (layout->lines.size() != 2 || !near(layout->width, 20.0f) || !near(layout->height, 24.0f)) return 61;
+        const auto caret = service.caretRect(*layout, 2, {4.0f, 5.0f});
         if (!near(caret.x, 14.0f) || !near(caret.y, 5.0f)) return 62;
 
         arrange::core::ArrangeNode inputNode;
@@ -420,7 +420,7 @@ namespace {
             InsertChildMutation{1, 2, 0},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 80.0f, 0.0f, 40.0f});
-        const auto unclipped = DrawOpsBuilder{}.collect(tree, 1);
+        const auto unclipped = DrawOpsBuilder{}.exportScene(tree, 1);
         for (const auto& op : unclipped) {
             if (op.type == DrawOpType::PushClip) return 111;
         }
@@ -429,7 +429,7 @@ namespace {
             SetModifierMutation{1, verticalScroll(80.0f, 40.0f, 0.0f, makeEventSlotId(1, EventSlotKind::VerticalScroll))},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 80.0f, 0.0f, 40.0f});
-        const auto scrollOps = DrawOpsBuilder{}.collect(tree, 1);
+        const auto scrollOps = DrawOpsBuilder{}.exportScene(tree, 1);
         bool sawClip = false;
         for (const auto& op : scrollOps) {
             if (op.type == DrawOpType::PushClip && near(op.rect.width, 80.0f) && near(op.rect.height, 40.0f)) sawClip = true;
@@ -444,7 +444,7 @@ namespace {
             SetModifierMutation{1, size(40.0f, 12.0f)},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
-        const auto visibleOps = DrawOpsBuilder{}.collect(tree, 1);
+        const auto visibleOps = DrawOpsBuilder{}.exportScene(tree, 1);
         for (const auto& op : visibleOps) {
             if (op.type == DrawOpType::PushClip) return 113;
         }
@@ -452,7 +452,7 @@ namespace {
             SetPropMutation{1, "overflow", PropValue::stringValue("clip")},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
-        const auto clipOps = DrawOpsBuilder{}.collect(tree, 1);
+        const auto clipOps = DrawOpsBuilder{}.exportScene(tree, 1);
         sawClip = false;
         for (const auto& op : clipOps) {
             if (op.type == DrawOpType::PushClip) sawClip = true;
@@ -467,7 +467,7 @@ namespace {
             SetModifierMutation{1, size(24.0f, 24.0f)},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 24.0f, 0.0f, 24.0f});
-        const auto iconOps = DrawOpsBuilder{}.collect(tree, 1);
+        const auto iconOps = DrawOpsBuilder{}.exportScene(tree, 1);
         bool sawResourceObjectIcon = false;
         for (const auto& op : iconOps) {
             if (op.type == DrawOpType::DrawIcon && op.resource == "icons/play.svg") sawResourceObjectIcon = true;

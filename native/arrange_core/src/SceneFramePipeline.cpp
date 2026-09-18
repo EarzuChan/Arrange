@@ -5,7 +5,7 @@
 #include <utility>
 
 namespace arrange::core {
-    SceneFramePipeline::SceneFramePipeline(LayoutEngine layoutEngine) : layout_(std::move(layoutEngine)) {}
+    SceneFramePipeline::SceneFramePipeline(LayoutEngine layoutEngine) : layout_(std::move(layoutEngine)), drawOpsBuilder_(layout_.textLayoutService()) {}
 
     FramePlan SceneFramePipeline::planFrame(
         const NativeScene& scene,
@@ -88,7 +88,7 @@ namespace arrange::core {
             result.invalidation = candidateScene.takeInvalidation();
             if (result.plan.fullFallback) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::NativeState, "fallback", result.plan.fallbackReason);
             if (!tree.contains(root)) {
-                candidateFrame.content.drawOps.clear();
+                candidateFrame.content.scenePaint = {};
                 candidateFrame.content.overlayDrawOps.clear();
                 candidateFrame.content.focusedInputNode.reset();
             }
@@ -121,13 +121,11 @@ namespace arrange::core {
                 recordPhase(result.phases, FramePhase::Layout, result.plan.layout, result.plan.layout ? "placed root subtree" : "retained placement");
                 if (result.plan.buildPaint) {
                     const auto started = std::chrono::steady_clock::now();
-                    candidateFrame.content.drawOps = drawOpsBuilder_.collectCached(tree, root, counters_.paintWork);
-                    ++counters_.fullDisplayListBuilds;
-                    counters_.lastFullDisplayListReason = "flatten shared fragments into the publication display list";
+                    candidateFrame.content.scenePaint = drawOpsBuilder_.build(tree, root, counters_.paintWork);
                     ++counters_.paintBuilds;
                     counters_.paintBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
                 }
-                recordPhase(result.phases, FramePhase::BuildPaint, result.plan.buildPaint, result.plan.buildPaint ? "built DrawOps" : "retained DrawOps");
+                recordPhase(result.phases, FramePhase::BuildPaint, result.plan.buildPaint, result.plan.buildPaint ? "构建共享绘制片段" : "复用已发布绘制片段");
             }
             if (result.plan.buildHitTest || !tree.contains(root)) {
                 const auto started = std::chrono::steady_clock::now();

@@ -60,7 +60,9 @@ int main(int argc, char** argv) {
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         auto initialSubmission = host->takePendingTransaction();
         check(initialSubmission.has_value(), "SFC mount did not submit a scene");
-        arrange::juce::ArrangeRuntime runtime;
+        arrange::juce::JuceTextMeasurer measurer;
+        TextLayoutService textService(measurer);
+        arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{textService}}};
         runtime.setScriptHost(std::move(host));
         runtime.enqueue(std::move(*initialSubmission));
         double timestamp = 0;
@@ -124,8 +126,6 @@ int main(int argc, char** argv) {
         command("baseline");
         command("color");
         command("validate");
-        arrange::juce::JuceTextMeasurer measurer;
-        TextLayoutService textService(measurer);
         arrange::juce::InteractionStateOwner interaction(textService);
         const auto galleryBaselineBindings = runtime.scene().bindingCount();
         const auto galleryBaselineCallbacks = runtime.scene().eventSlotCount();
@@ -153,12 +153,14 @@ int main(int argc, char** argv) {
         command("gallery");
         command("gallery:baseline");
         const auto colorBaseline = runtime.frameCounters();
+        const auto colorLayouts = textService.counters().layoutsCreated;
         command("gallery:color");
         for (int i = 0; i < 24; ++i) {
             const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
             if (!sample.ok) throw std::runtime_error(sample.error);
         }
         command("gallery:validate-color");
+        check(textService.counters().layoutsCreated == colorLayouts, "真实 Gallery 的纯颜色动画重新排版");
         check(runtime.frameCounters().measures == colorBaseline.measures && runtime.frameCounters().placements == colorBaseline.placements, "real gallery color animation ran geometry phases");
         check(runtime.frameCounters().paintBuilds > colorBaseline.paintBuilds + 10, "real gallery did not publish intermediate animation samples");
         check(runtime.frameCounters().paintWork.layersBuilt - colorBaseline.paintWork.layersBuilt <= 24, "gallery color rebuilt unrelated Modifier layers");
@@ -194,6 +196,26 @@ int main(int argc, char** argv) {
         command("showcase");
         const auto firstTrack = findText(runtime.scene(), "001  音轨 1");
         const auto trackHandles = handles(runtime.scene().node(firstTrack));
+        auto scrollNode = firstTrack;
+        while (!ScrollDispatcher::hasVerticalScroll(runtime.scene().node(scrollNode))) {
+            const auto parent = runtime.scene().tree().parentOf(scrollNode);
+            check(parent.has_value(), "真实 80 项列表缺少滚动实例");
+            scrollNode = *parent;
+        }
+        const auto trackResource = runtime.scene().node(firstTrack).textLayout;
+        const auto trackFragment = runtime.scene().node(firstTrack).paintCache;
+        const auto layoutsBeforeScroll = textService.counters().layoutsCreated;
+        const auto workBeforeScroll = runtime.frameCounters();
+        const auto viewport = runtime.scene().node(scrollNode).bounds;
+        for (const auto delta : {-12.0f, 12.0f}) {
+            const auto scroll = ScrollDispatcher{}.verticalWheel(runtime.scene().tree(), 1, {viewport.x + 5, viewport.y + 5}, delta);
+            check(scroll.consumed && scroll.eventSlot.valid(), "真实列表没有消费滚动并关联回调");
+            runtime.enqueueScrollSnapshotEvent(scroll.eventSlot, scroll);
+            const auto moved = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(moved.ok, "真实列表滚动发布失败");
+            check(runtime.scene().node(firstTrack).textLayout == trackResource && runtime.scene().node(firstTrack).paintCache == trackFragment, "真实列表滚动重建了稳定文本或片段");
+        }
+        check(textService.counters().layoutsCreated == layoutsBeforeScroll && runtime.frameCounters().measures == workBeforeScroll.measures, "真实列表纯滚动产生排版或测量");
         command("showcase:reverse");
         check(findText(runtime.scene(), "001  音轨 1") == firstTrack && handles(runtime.scene().node(firstTrack)) == trackHandles, "真实列表重排丢失节点或 Modifier 身份");
 
@@ -208,6 +230,19 @@ int main(int argc, char** argv) {
         findText(runtime.scene(), "详情已就绪 2");
         command("showcase:list");
 
+        arrange::juce::PassivePaintRenderer performancePaint(textService);
+        ::juce::Image surface(::juce::Image::ARGB, 520, 380, true);
+        const auto replay = [&] {
+            ::juce::Graphics graphics(surface);
+            performancePaint.paint(graphics, runtime.publishedFrame());
+        };
+        replay();
+        const auto stableLayouts = textService.counters().layoutsCreated;
+        for (int index = 0; index < 8; ++index) replay();
+        check(textService.counters().layoutsCreated == stableLayouts, "真实 Showcase 的重复 paint 重新排版");
+        const auto textBefore = textService.counters();
+        const auto replayBefore = performancePaint.replayCounters();
+        const auto paintMillisBefore = performancePaint.paintMillis();
         std::vector<double> durations;
         durations.reserve(240);
         arrange::test::AllocationStats nativeAllocations;
@@ -226,6 +261,7 @@ int main(int argc, char** argv) {
                 const auto frame = runtime.pumpFrame(1, constraints, timestamp += 16);
                 if (!frame.ok) throw std::runtime_error(frame.error);
             }
+            replay();
             const auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
             const auto allocations = arrange::test::endAllocationProbe();
             nativeAllocations.count += allocations.count;
@@ -241,6 +277,10 @@ int main(int argc, char** argv) {
         std::sort(durations.begin(), durations.end());
         std::cout << "M23_PERF {\"frames\":" << durations.size() << ",\"mean_ms\":" << std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size() << ",\"p95_ms\":" << durations[durations.size() * 95 / 100] << ",\"max_ms\":" << durations.back() << ",\"cpp_new_count\":" << nativeAllocations.count << ",\"cpp_new_bytes\":" << nativeAllocations.bytes << ",\"js_allocations\":" << memoryAfter.allocations - memoryBefore.allocations << ",\"js_allocated_bytes\":" << memoryAfter.allocatedBytes - memoryBefore.allocatedBytes << ",\"js_live_bytes\":" << memoryAfter.liveBytes << ",\"measure\":" << workAfter.measures - workBefore.measures << ",\"place\":" << workAfter.placements - workBefore.placements << ",\"paint\":" << workAfter.paintBuilds - workBefore.paintBuilds << ",\"hit\":" << workAfter.hitBuilds - workBefore.hitBuilds << ",\"copied_nodes\":" << workAfter.candidateNodesCopied - workBefore.candidateNodesCopied << "}\n";
 
+        const auto replayAfter = performancePaint.replayCounters();
+        const auto textAfter = textService.counters();
+        std::cout << "M23_PAINT {\"frames\":240,\"paint_ms\":" << performancePaint.paintMillis() - paintMillisBefore << ",\"glyph_ms\":" << replayAfter.glyphSubmitMillis - replayBefore.glyphSubmitMillis << ",\"layout_ms\":" << textAfter.layoutMillis - textBefore.layoutMillis << ",\"layouts\":" << textAfter.layoutsCreated - textBefore.layoutsCreated << ",\"text_submissions\":" << replayAfter.textSubmissions - replayBefore.textSubmissions << ",\"fragments_visited\":" << replayAfter.fragmentsVisited - replayBefore.fragmentsVisited << ",\"fragments_skipped\":" << replayAfter.fragmentsSkipped - replayBefore.fragmentsSkipped << ",\"ops_visited\":" << replayAfter.opsVisited - replayBefore.opsVisited << ",\"ops_skipped\":" << replayAfter.opsSkipped - replayBefore.opsSkipped << "}\n";
+
         command("showcase:async");
         command("showcase-remove");
         check(runtime.scene().bindingCount() == galleryBaselineBindings && runtime.scene().eventSlotCount() == galleryBaselineCallbacks, "整页删除后绑定和回调未回落");
@@ -253,7 +293,7 @@ int main(int argc, char** argv) {
                   << ", measure-ms=" << performance.measureMillis << ", paint-ms=" << performance.paintBuildMillis << '\n';
         arrange::juce::RuntimeSessionState session;
         arrange::juce::DiagnosticsState diagnostics;
-        arrange::juce::PassivePaintRenderer paint;
+        arrange::juce::PassivePaintRenderer paint(textService);
         arrange::juce::RuntimePackageBinder binder;
         arrange::juce::FramePumpDriver driver;
         session.resize(520, 380, runtime);
@@ -283,10 +323,13 @@ int main(int argc, char** argv) {
             outcome.intentKind = arrange::juce::PackageLoadOutcome::IntentKind::HmrReload;
             outcome.initialTransaction = nextHost->takePendingTransaction();
             outcome.scriptHost = std::move(nextHost);
+            std::weak_ptr<const PaintFragment> retiredPaint = runtime.publishedFrame().content.scenePaint.fragment;
             binder.apply(std::move(outcome), session, runtime, diagnostics, interaction, paint);
             runtime.enqueueStringEvent(oldSubmit, "text");
             check(driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16),
                   "HMR did not publish through the production host driver");
+            check(retiredPaint.expired(), "HMR 后旧发布片段仍被运行时持有");
+            replay();
             check(!diagnostics.hasError() && findText(runtime.scene(), "撅了啊 0 次") != 0, "stale HMR event reached fresh context");
             check(runtime.scene().bindingCount() == bindings && nextView->bindingCount() == bindings && nextView->eventSlotCount() == callbacks,
                   "HMR retained previous context bindings/callbacks");

@@ -34,7 +34,7 @@ namespace arrange::juce {
         Impl()
             : textLayoutService_(textMeasurer_),
               runtime_(arrange::core::SceneFramePipeline(arrange::core::LayoutEngine(textLayoutService_))),
-              interaction_(textLayoutService_) {}
+              interaction_(textLayoutService_), paint_(textLayoutService_) {}
 
         void configure(const EditorConfig& config) {
             pendingReload_ = ReloadKind::None;
