@@ -1,5 +1,5 @@
-import type {Modifier} from "./modifier.ts"
-import type {NativeBindingHandle, NativeMutation, NativeTransactionTarget, NodeId} from "./native.ts"
+import type { Modifier } from "./modifier.ts"
+import type { NativeBindingHandle, NativeMutation, NativeTransactionTarget, NodeId } from "./native.ts"
 
 export type ArrangeVNode = ArrangeElementVNode | string | number
 export type ArrangeChild = ArrangeVNode | null | undefined
@@ -28,6 +28,7 @@ export type ArrangeHostNode = Omit<ArrangeElementVNode, "children"> & {
     __arrangeNodeId?: NodeId
     __arrangeBindings: Map<string, NativeBindingHandle>
     __arrangeLastInputs: Map<string, unknown>
+    __arrangeSources: Map<string, string>
     __arrangeModifierBindings: Map<bigint, NativeBindingHandle>
 }
 
@@ -44,7 +45,7 @@ export type ArrangeContainer = {
 export type ArrangeRenderRoot =
     | ArrangeHostNode
     | (() => ArrangeHostNode)
-    | {render: () => ArrangeHostNode}
+    | { render: () => ArrangeHostNode }
 
 export type ModifierElement = {
     type: string
@@ -54,4 +55,4 @@ export type ModifierElement = {
 export type ArrangeRenderInput =
     | ArrangeVNode
     | (() => ArrangeVNode)
-    | {render: () => ArrangeVNode}
+    | { render: () => ArrangeVNode }

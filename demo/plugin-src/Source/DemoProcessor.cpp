@@ -18,15 +18,16 @@ juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
     arrange::juce::EditorConfig config;
 
     config.app.useDist();
-    config.width = 680;
-    config.height = 640;
-    config.window.title = "Arrange Demo";
+    config.width = 900;
+    config.height = 780;
+    config.window.title = "Arrange 原生画廊";
     config.window.resizable = true;
     config.window.useCornerResizer = true;
     config.window.minWidth = 420;
     config.window.minHeight = 300;
 #if !defined(NDEBUG)
-    config.app.useLive();
+    // 临时使用随包 UI，对比完整页面在 Debug 与 Release 下的交互开销
+    // config.app.useLive();
     config.diagnostics.badge = arrange::juce::DiagnosticVisibility::Always;
 #endif
 

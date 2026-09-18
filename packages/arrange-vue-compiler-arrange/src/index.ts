@@ -1,34 +1,34 @@
 import {
     baseCompile,
     baseParse,
-    NodeTypes,
     type CodegenResult,
     type CompilerOptions,
     type NodeTransform,
+    NodeTypes,
     type ParserOptions,
     type RootNode,
 } from '@arrange/vue-compiler-core'
-import {parserOptions} from './parserOptions.ts'
+import { acceptsHostInput, camelize, isHostTag, toHandlerKey } from '@arrange/vue-shared'
+import { parserOptions } from './parserOptions.ts'
 
-export {parserOptions}
+export { parserOptions }
 
-// 原生宿主不接受浏览器语义；在源码位置报错，不能静默丢弃
+// 只校验原厂宿主输入，用户组件自行定义 props 与事件
 const validateNativeTemplate: NodeTransform = (node, context) => {
     if (node.type !== NodeTypes.ELEMENT) return
     const fail = (message: string, loc = node.loc) => {
-        context.onError(Object.assign(new SyntaxError(message), {code: 'ARRANGE_TEMPLATE', loc}))
+        context.onError(Object.assign(new SyntaxError(message), { code: 'ARRANGE_TEMPLATE', loc }))
     }
-    if (/^[a-z]/.test(node.tag) && !['template', 'slot', 'component'].includes(node.tag)) {
-        fail(`Arrange 不支持 <${node.tag}>；请使用原生元素或组件`)
-    }
+    const host = isHostTag(node.tag) ? node.tag : null
     for (const prop of node.props) {
         const name = prop.type === NodeTypes.ATTRIBUTE ? prop.name
             : prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic ? prop.arg.content : null
-        if (name === 'class' || name === 'style') fail(`Arrange 不支持 ${name}，请使用 Modifier`, prop.loc)
+        if (host && name && !['key', 'ref', 'ref_for', 'ref_key'].includes(name) && !acceptsHostInput(host, name)) fail(`Arrange <${host}> 没有输入 ${name}，请检查组件 schema`, prop.loc)
         if (prop.type !== NodeTypes.DIRECTIVE) continue
-        if (['html', 'text', 'show', 'cloak'].includes(prop.name)) fail(`Arrange 不支持 v-${prop.name}`, prop.loc)
-        if (prop.name === 'on' && prop.modifiers.length) fail('Arrange 事件不支持浏览器修饰符', prop.loc)
-        if (prop.name === 'bind' && prop.modifiers.some(modifier => modifier.content !== 'camel')) fail('Arrange v-bind 仅支持 .camel 修饰符', prop.loc)
+        if (!['bind', 'on', 'model', 'if', 'else', 'else-if', 'for', 'slot', 'once', 'memo'].includes(prop.name)) fail(`Arrange 缺少 v-${prop.name} 的宿主转换`, prop.loc)
+        if (prop.modifiers.length && !(prop.name === 'bind' && prop.modifiers.every(modifier => modifier.content === 'camel'))) fail(`Arrange v-${prop.name} 没有匹配的修饰符转换`, prop.loc)
+        if (host && prop.name === 'model' && host !== 'Input') fail(`Arrange <${host}> 没有受控输入模型`, prop.loc)
+        if (host && prop.name === 'on' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic && !acceptsHostInput(host, toHandlerKey(camelize(prop.arg.content)))) fail(`Arrange <${host}> 没有事件 ${prop.arg.content}`, prop.loc)
     }
 }
 
@@ -38,13 +38,13 @@ export function compile(src: string | RootNode, options: CompilerOptions = {}): 
         ...options,
         nodeTransforms: [validateNativeTemplate, ...(options.nodeTransforms ?? [])],
         // 原生 v-model 使用 core 生成的 modelValue 和 onUpdate:modelValue
-        // 不引入 DOM 指令、事件监听器或 HTML 字符串静态化
+
         transformHoist: null,
     })
 }
 
 export function parse(template: string, options: ParserOptions = {}): RootNode {
-    return baseParse(template, {...parserOptions, ...options})
+    return baseParse(template, { ...parserOptions, ...options })
 }
 
 export * from '@arrange/vue-compiler-core'

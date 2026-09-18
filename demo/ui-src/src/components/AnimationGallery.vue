@@ -18,7 +18,7 @@
 
         <Column :modifier="m.animateContentSize(spec).background(0xff303b4d).padding(6)">
             <Text :text="label" :text-style="{ color: 0xffdddddd, fontSize: 12 }" />
-            <Text v-if="expanded" text="Sibling placement follows the animated height" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="m.height(28)" />
+            <Text v-if="expanded" text="相邻内容跟随动画高度放置" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="m.height(28)" />
         </Column>
 
         <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16 }"
@@ -57,7 +57,7 @@ const transition = createTransition(expanded, { animationSpec: spec })
 const groupColor = transition.animatedColor('group-color', state => state ? 0xffe9b949 : 0xff5798ef)
 const groupOffset = transition.animatedDp('group-offset', state => state ? 24 : 0)
 const label = computed(() => expanded.value ? '展开的啊一个内容。野兽先辈恶臭114514' : '紧绷の内容')
-const status = ref('Animate, reverse, hide, restore, switch pages')
+const status = ref('动画、反向、隐藏、恢复和切页')
 let baseline
 
 function run(command) {
@@ -100,16 +100,16 @@ function run(command) {
             break
 
         case 'validate-color':
-            if (getArrangeExecutionStats().structureRuns !== baseline.structureRuns) throw new Error('Color animation recomposed structure')
+            if (getArrangeExecutionStats().structureRuns !== baseline.structureRuns) throw new Error('颜色动画错误地重跑了结构')
             break
 
         case 'validate-settled':
-            if (animationStats.activeAnimations !== 0) throw new Error('Gallery animations retained frame demand after settling')
+            if (animationStats.activeAnimations !== 0) throw new Error('画廊动画结束后仍保留帧需求')
             break
 
         case 'stats': {
             const stats = getArrangeExecutionStats()
-            status.value = `Structure ${stats.structureRuns} / values ${stats.valueEvaluations} / parameters ${modifierStats.parameterEvaluations} / chains ${modifierAllocationStats.chains}`
+            status.value = `结构 ${stats.structureRuns} / 值 ${stats.valueEvaluations} / 参数 ${modifierStats.parameterEvaluations} / 链 ${modifierAllocationStats.chains}`
             break
         }
     }

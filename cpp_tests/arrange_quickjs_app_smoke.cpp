@@ -60,7 +60,7 @@ namespace {
     }
 
     bool hasInitialDemoVisuals(const arrange::core::LayoutTree& tree) {
-        return treeContainsBackgroundColor(tree, 1, 0xff000000u) &&
+        return treeContainsBackgroundColor(tree, 1, 0xff0e1722u) &&
             treeContainsBackgroundColor(tree, 1, 0xff3a7afeu) &&
             treeContainsBackgroundColor(tree, 1, 0xffffb020u);
     }
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
                 expectedText += argv[expectedEnd];
                 ++expectedEnd;
             }
-            if (expectedText.empty()) expectedText = "Clicks: " + std::to_string(repeatCount);
+            if (expectedText.empty()) expectedText = "撅了啊 " + std::to_string(repeatCount) + " 次";
             const auto slot = firstEventSlotInTree(tree, arrange::core::EventSlotKind::Click);
             if (!slot || !slot->valid()) return 23;
             for (int index = 0; index < repeatCount; ++index) {
@@ -343,7 +343,7 @@ int main(int argc, char** argv) {
                 expectedText += argv[expectedEnd];
                 ++expectedEnd;
             }
-            if (expectedText.empty()) expectedText = "Submitted: " + value;
+            if (expectedText.empty()) expectedText = "提交啊一个：" + value;
             const auto slot = firstInputSubmitEventSlot(tree);
             if (!slot || !slot->valid()) return 31;
             arrange::quickjs::CallbackInvokeOptions options;
@@ -391,4 +391,3 @@ int main(int argc, char** argv) {
     return 0;
 #endif
 }
-

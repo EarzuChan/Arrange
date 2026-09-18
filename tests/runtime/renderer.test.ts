@@ -1,21 +1,21 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {ARRANGE_RUNTIME_VERSION, Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, rememberScrollState} from "../../packages/runtime/src/index.ts"
-import type {NativeTransactionTarget} from "../../packages/runtime/src/index.ts"
+import { ARRANGE_RUNTIME_VERSION, Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, createScrollState } from "../../packages/runtime/src/index.ts"
+import type { NativeTransactionTarget } from "../../packages/runtime/src/index.ts"
 
 type NativeCall = readonly [string, ...unknown[]]
 
-type RecordingNative = NativeTransactionTarget & {calls: NativeCall[]}
+type RecordingNative = NativeTransactionTarget & { calls: NativeCall[] }
 
 function recordingNative(): RecordingNative {
     const calls: NativeCall[] = []
-    const bindings = new Map<bigint, {id: number; input: string}>()
+    const bindings = new Map<bigint, { id: number; input: string }>()
     let nextBinding = 1n
     return {
         calls,
         registerBinding(id, input) {
-            const handle = {identity: nextBinding++, generation: 1n}
-            bindings.set(handle.identity, {id, input})
+            const handle = { identity: nextBinding++, generation: 1n }
+            bindings.set(handle.identity, { id, input })
             return handle
         },
         updateBinding(handle, value) {
@@ -50,7 +50,7 @@ test("Vue renderer drives native transaction API on mount", () => {
     const native = recordingNative()
     createApp({
         setup() {
-            return () => vueH(Column, {modifier: m.padding(8)}, [vueH(Text, {text: "Hello"})])
+            return () => vueH(Column, { modifier: m.padding(8) }, [vueH(Text, { text: "Hello" })])
         },
     }).mount(native)
 
@@ -64,7 +64,7 @@ test("Vue renderer drives native transaction API on mount", () => {
 test("Vue renderer commits reactive text through native setText", async () => {
     const native = recordingNative()
     const label = ref("Alpha")
-    createApp({setup: () => () => vueH(Text, {text: label.value})}).mount(native)
+    createApp({ setup: () => () => vueH(Text, { text: label.value }) }).mount(native)
     native.calls.length = 0
 
     label.value = "Beta"
@@ -75,15 +75,15 @@ test("Vue renderer commits reactive text through native setText", async () => {
 
 test("ScrollState native object snapshots trigger modifier updates without JSON", async () => {
     const native = recordingNative()
-    const scrollState = rememberScrollState()
+    const scrollState = createScrollState()
     createApp({
         setup() {
-            return () => vueH(Column, {modifier: m.verticalScroll(scrollState)}, [vueH(Text, {text: `scroll ${scrollState.value}`})])
+            return () => vueH(Column, { modifier: m.verticalScroll(scrollState) }, [vueH(Text, { text: `scroll ${scrollState.value}` })])
         },
     }).mount(native)
     native.calls.length = 0
 
-    scrollState.__arrangeNativeScroll({value: 12, maxValue: 40, viewportSize: 80, contentSize: 120})
+    scrollState.__arrangeNativeScroll({ value: 12, maxValue: 40, viewportSize: 80, contentSize: 120 })
     await flushArrangeCommit()
 
     assert.ok(native.calls.some((call) => call[0] === "setText" && call[2] === "scroll 12"))
@@ -91,15 +91,15 @@ test("ScrollState native object snapshots trigger modifier updates without JSON"
 })
 
 test("Vue renderer rejects incompatible native runtime version", () => {
-    const app = createApp({setup: () => () => vueH(Text, {text: "versioned"})})
-    assert.throws(() => app.mount({...recordingNative(), runtimeVersion: 999}), /runtime\/native version mismatch/)
+    const app = createApp({ setup: () => () => vueH(Text, { text: "versioned" }) })
+    assert.throws(() => app.mount({ ...recordingNative(), runtimeVersion: 999 }), /脚本与原生协议版本不一致/)
 })
 
 test("diagnostics TS API forwards to native diagnostics functions", () => {
     const native = recordingNative()
     globalThis.__ARRANGE_NATIVE__ = native
     try {
-        logger.warn({category: "app", message: "warned", detail: "detail"})
+        logger.warn({ category: "app", message: "warned", detail: "detail" })
         diagnostics.toast("toast")
         diagnostics.setLogLevel("error")
         diagnostics.setCategoryEnabled("runtime.script", false)
@@ -122,7 +122,7 @@ test("diagnostics TS API rejects unsupported levels and categories before native
     try {
         assert.throws(() => diagnostics.setLogLevel("verbose" as never), /log level/)
         assert.throws(() => diagnostics.setCategoryEnabled("runtime.fake" as never, true), /category/)
-        assert.throws(() => logger.info({category: "runtime.fake" as never, message: "bad"}), /category/)
+        assert.throws(() => logger.info({ category: "runtime.fake" as never, message: "bad" }), /category/)
     } finally {
         delete globalThis.__ARRANGE_NATIVE__
     }
@@ -134,10 +134,10 @@ test("Icon without explicit tint reads LocalContentColor before native commit", 
     createApp({
         setup() {
             provideContentColor(0xffe8eaed)
-            return () => vueH(Column, null, [vueH(Icon, {source: "icons/play.svg"})])
+            return () => vueH(Column, null, [vueH(Icon, { source: "icons/play.svg" })])
         },
     }).mount(native)
 
-    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "source" && call[3] === "icons/play.svg"))
+    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "source" && (call[3] as {path?: string}).path === "icons/play.svg"))
     assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "tint" && call[3] === 0xffe8eaed))
 })

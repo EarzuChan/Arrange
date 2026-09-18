@@ -7,6 +7,9 @@
 #include "QuickJsValueReader.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <filesystem>
 #include <string_view>
 #include <utility>
@@ -18,9 +21,70 @@ namespace arrange::quickjs {
             bool ok = true;
             std::string error;
         };
+
+        struct alignas(std::max_align_t) AllocationHeader {
+            std::size_t size;
+        };
+
+        void* allocateScriptMemory(void* opaque, std::size_t size) {
+            if (size > std::numeric_limits<std::size_t>::max() - sizeof(AllocationHeader)) return nullptr;
+            auto* header = static_cast<AllocationHeader*>(std::malloc(sizeof(AllocationHeader) + size));
+            if (!header) return nullptr;
+            header->size = size;
+
+            auto& stats = *static_cast<ScriptMemoryStats*>(opaque);
+            ++stats.allocations;
+            stats.allocatedBytes += size;
+            stats.liveBytes += size;
+            stats.peakBytes = std::max(stats.peakBytes, stats.liveBytes);
+            return header + 1;
+        }
+
+        void freeScriptMemory(void* opaque, void* pointer) {
+            if (!pointer) return;
+            auto* header = static_cast<AllocationHeader*>(pointer) - 1;
+            static_cast<ScriptMemoryStats*>(opaque)->liveBytes -= header->size;
+            std::free(header);
+        }
+
+        void* resizeScriptMemory(void* opaque, void* pointer, std::size_t size) {
+            if (!pointer) return allocateScriptMemory(opaque, size);
+            if (!size) {
+                freeScriptMemory(opaque, pointer);
+                return nullptr;
+            }
+            if (size > std::numeric_limits<std::size_t>::max() - sizeof(AllocationHeader)) return nullptr;
+
+            auto* previous = static_cast<AllocationHeader*>(pointer) - 1;
+            const auto previousSize = previous->size;
+            auto* header = static_cast<AllocationHeader*>(std::realloc(previous, sizeof(AllocationHeader) + size));
+            if (!header) return nullptr;
+            header->size = size;
+
+            auto& stats = *static_cast<ScriptMemoryStats*>(opaque);
+            ++stats.allocations;
+            stats.allocatedBytes += size;
+            stats.liveBytes = stats.liveBytes - previousSize + size;
+            stats.peakBytes = std::max(stats.peakBytes, stats.liveBytes);
+            return header + 1;
+        }
+
+        const JSMallocFunctions kScriptAllocator{
+            [](void* opaque, std::size_t count, std::size_t size) -> void* {
+                if (size && count > std::numeric_limits<std::size_t>::max() / size) return nullptr;
+                auto* pointer = allocateScriptMemory(opaque, count * size);
+                if (pointer) std::memset(pointer, 0, count * size);
+                return pointer;
+            },
+            allocateScriptMemory,
+            freeScriptMemory,
+            resizeScriptMemory,
+            [](const void* pointer) -> std::size_t { return pointer ? (static_cast<const AllocationHeader*>(pointer) - 1)->size : 0; },
+        };
     }
 
     struct QuickJsScriptHost::Impl {
+        ScriptMemoryStats memory;
         QuickJsRuntimeContext runtime;
 
         ~Impl() { reset(); }
@@ -43,6 +107,7 @@ namespace arrange::quickjs {
                 JS_FreeRuntime(runtime.runtime);
                 runtime.runtime = nullptr;
             }
+            memory = {};
             runtime.rootNodeId = 0;
             runtime.nextAnimationFrameHandle = 1;
             runtime.frameTimeMillis = 0.0;
@@ -67,9 +132,13 @@ namespace arrange::quickjs {
             reset();
             runtime.pendingTransactions = &owner->pendingTransactions_;
             runtime.moduleLoader.setModuleRoot(entryPath);
-            runtime.runtime = JS_NewRuntime();
+            runtime.runtime = JS_NewRuntime2(&kScriptAllocator, &memory);
+            // 给宿主输入、布局与异常处理保留栈空间，先由引擎报告脚本栈溢出
+            if (!runtime.runtime) throw std::bad_alloc();
+            JS_SetMaxStackSize(runtime.runtime, 512 * 1024);
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
             runtime.context = JS_NewContext(runtime.runtime);
+            if (!runtime.context) throw std::bad_alloc();
             JS_SetHostPromiseRejectionTracker(runtime.runtime, [](JSContext* context, JSValueConst promise, JSValueConst reason, bool handled, void* opaque) {
                 auto& state = *static_cast<QuickJsRuntimeContext*>(opaque);
                 if (handled) {
@@ -112,6 +181,7 @@ namespace arrange::quickjs {
     std::size_t QuickJsScriptHost::bindingCount() const noexcept { return impl_ ? impl_->runtime.bindings.size() : 0; }
     std::size_t QuickJsScriptHost::modifierInstanceCount() const noexcept { return impl_ ? impl_->runtime.publishedModifiers.size() : 0; }
     std::uint64_t QuickJsScriptHost::rejectedBindingUpdates() const noexcept { return impl_ ? impl_->runtime.rejectedBindingUpdates : 0; }
+    ScriptMemoryStats QuickJsScriptHost::memoryStats() const noexcept { return impl_ ? impl_->memory : ScriptMemoryStats{}; }
 
     void QuickJsScriptHost::publishScene(const arrange::core::NativeScene& scene) {
         if (!impl_) return;

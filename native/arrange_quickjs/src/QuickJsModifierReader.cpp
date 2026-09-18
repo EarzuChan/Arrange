@@ -4,8 +4,58 @@
 
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 
 namespace arrange::quickjs {
+    namespace {
+        bool fieldsMatch(JSContext* context, JSValueConst object, std::initializer_list<std::string_view> fields, std::string_view owner) {
+            JSPropertyEnum* properties = nullptr;
+            std::uint32_t count = 0;
+            if (JS_GetOwnPropertyNames(context, &properties, &count, object, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return false;
+
+            bool valid = true;
+            for (std::uint32_t i = 0; i < count; ++i) {
+                const char* name = JS_AtomToCString(context, properties[i].atom);
+                if (name == nullptr) { valid = false; break; }
+                if (std::find(fields.begin(), fields.end(), name) == fields.end()) {
+                    JS_ThrowTypeError(context, "Arrange %.*s 不接受字段 '%s'", static_cast<int>(owner.size()), owner.data(), name);
+                    valid = false;
+                }
+                JS_FreeCString(context, name);
+                if (!valid) break;
+            }
+            JS_FreePropertyEnum(context, properties, count);
+            return valid;
+        }
+
+        bool modifierFieldsMatch(JSContext* context, JSValueConst value, std::string_view type) {
+            const auto check = [&](std::initializer_list<std::string_view> fields) { return fieldsMatch(context, value, fields, type); };
+            if (type == "padding") return check({"start", "top", "end", "bottom"});
+            if (type == "width" || type == "height" || type == "alpha" || type == "zIndex") return check({"value"});
+            if (type == "requiredWidth") return check({"width"});
+            if (type == "requiredHeight") return check({"height"});
+            if (type == "size" || type == "requiredSize") return check({"width", "height"});
+            if (type == "fillMaxWidth" || type == "fillMaxHeight" || type == "fillMaxSize") return check({"fraction"});
+            if (type == "widthIn" || type == "heightIn") return check({"min", "max"});
+            if (type == "sizeIn") return check({"minWidth", "maxWidth", "minHeight", "maxHeight"});
+            if (type == "defaultMinSize") return check({"minWidth", "minHeight"});
+            if (type == "verticalScroll" || type == "horizontalScroll") return check({"state", "enabled"});
+            if (type == "animateContentSize") return check({"animationSpec", "clip"});
+            if (type == "weight") return check({"weight", "fill"});
+            if (type == "align") return check({"alignment"});
+            if (type == "offset" || type == "absoluteOffset") return check({"x", "y"});
+            if (type == "graphicsLayer") return check({"translationX", "translationY", "scaleX", "scaleY", "rotationZ", "transformOrigin", "alpha", "clip"});
+            if (type == "background") return check({"color", "brush", "shape"});
+            if (type == "border") return check({"width", "color", "brush", "shape"});
+            if (type == "clip") return check({"shape"});
+            if (type == "clickable") return check({"enabled", "focusable", "onClick"});
+            if (type == "hoverable" || type == "focusable") return check({"enabled"});
+
+            JS_ThrowTypeError(context, "Arrange Modifier 类型 '%.*s' 未定义", static_cast<int>(type.size()), type.data());
+            return false;
+        }
+    }
+
     JSValue QuickJsModifierReader::throwTypeError(const char* message) {
         failed_ = true;
         JS_ThrowTypeError(context_, "%s", message);
@@ -14,20 +64,20 @@ namespace arrange::quickjs {
 
     JSValue QuickJsModifierReader::throwUnknownModifier(std::string_view type) {
         failed_ = true;
-        JS_ThrowTypeError(context_, "Arrange modifier type '%.*s' is not supported by native runtime", static_cast<int>(type.size()), type.data());
+        JS_ThrowTypeError(context_, "Arrange Modifier 类型 '%.*s' 未定义", static_cast<int>(type.size()), type.data());
         return JS_EXCEPTION;
     }
 
     JSValueConst QuickJsModifierReader::payloadFor(JSValueConst element, ScopedValue& value, std::string_view type) {
         if (!JS_IsObject(element) || JS_IsArray(element)) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange modifier element for '%.*s' must be an object", static_cast<int>(type.size()), type.data());
+            JS_ThrowTypeError(context_, "Arrange '%.*s' 的 Modifier 元素需要对象", static_cast<int>(type.size()), type.data());
             return JS_UNDEFINED;
         }
         value = ScopedValue(context_, JS_GetPropertyStr(context_, element, "value"));
         if (!JS_IsObject(value.get()) || JS_IsArray(value.get())) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange modifier '%.*s' requires object field 'value'", static_cast<int>(type.size()), type.data());
+            JS_ThrowTypeError(context_, "Arrange Modifier '%.*s' 的 value 需要对象", static_cast<int>(type.size()), type.data());
             return JS_UNDEFINED;
         }
         return value.get();
@@ -36,14 +86,14 @@ namespace arrange::quickjs {
     float QuickJsModifierReader::numberField(JSValueConst object, const char* key, float fallback) const {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
         if (JS_IsUndefined(value.get())) return fallback;
-        if (!JS_IsNumber(value.get())) { JS_ThrowTypeError(context_, "Arrange modifier field '%s' must be a number", key); return fallback; }
+        if (!JS_IsNumber(value.get())) { JS_ThrowTypeError(context_, "Arrange Modifier 字段 '%s' 需要数值", key); return fallback; }
         return static_cast<float>(reader_.toDouble(value.get()));
     }
 
     bool QuickJsModifierReader::boolField(JSValueConst object, const char* key, bool fallback) const {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
         if (JS_IsUndefined(value.get())) return fallback;
-        if (!JS_IsBool(value.get())) { JS_ThrowTypeError(context_, "Arrange modifier field '%s' must be a boolean", key); return fallback; }
+        if (!JS_IsBool(value.get())) { JS_ThrowTypeError(context_, "Arrange Modifier 字段 '%s' 需要布尔值", key); return fallback; }
         return reader_.toBool(value.get());
     }
 
@@ -51,12 +101,12 @@ namespace arrange::quickjs {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
         if (JS_IsUndefined(value.get()) || JS_IsNull(value.get())) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange %.*s requires numeric field '%s'", static_cast<int>(owner.size()), owner.data(), key);
+            JS_ThrowTypeError(context_, "Arrange %.*s 缺少数值字段 '%s'", static_cast<int>(owner.size()), owner.data(), key);
             return 0.0f;
         }
         if (!JS_IsNumber(value.get())) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange %.*s field '%s' must be a number", static_cast<int>(owner.size()), owner.data(), key);
+            JS_ThrowTypeError(context_, "Arrange %.*s 字段 '%s' 需要数值", static_cast<int>(owner.size()), owner.data(), key);
             return 0.0f;
         }
         return static_cast<float>(reader_.toDouble(value.get()));
@@ -66,12 +116,12 @@ namespace arrange::quickjs {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
         if (JS_IsUndefined(value.get()) || JS_IsNull(value.get())) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange %.*s requires string field '%s'", static_cast<int>(owner.size()), owner.data(), key);
+            JS_ThrowTypeError(context_, "Arrange %.*s 缺少字符串字段 '%s'", static_cast<int>(owner.size()), owner.data(), key);
             return {};
         }
         if (!JS_IsString(value.get())) {
             failed_ = true;
-            JS_ThrowTypeError(context_, "Arrange %.*s field '%s' must be a string", static_cast<int>(owner.size()), owner.data(), key);
+            JS_ThrowTypeError(context_, "Arrange %.*s 字段 '%s' 需要字符串", static_cast<int>(owner.size()), owner.data(), key);
             return {};
         }
         return reader_.toString(value.get());
@@ -92,26 +142,40 @@ namespace arrange::quickjs {
         if (name == "TopCenter") return {0.5f, 0.0f};
         if (name == "TopEnd") return {1.0f, 0.0f};
         if (name == "CenterStart") return {0.0f, 0.5f};
+        if (name == "Center") return {0.5f, 0.5f};
         if (name == "CenterEnd") return {1.0f, 0.5f};
         if (name == "BottomStart") return {0.0f, 1.0f};
         if (name == "BottomCenter") return {0.5f, 1.0f};
         if (name == "BottomEnd") return {1.0f, 1.0f};
         ScopedValue origin(context_, JS_GetPropertyStr(context_, value, "transformOrigin"));
-        if (JS_IsObject(origin.get())) {
+        if (JS_IsObject(origin.get()) && !JS_IsArray(origin.get())) {
+            if (!fieldsMatch(context_, origin.get(), {"x", "y"}, "transformOrigin")) return {};
             return {
                 numberField(origin.get(), "x", 0.5f),
                 numberField(origin.get(), "y", 0.5f),
             };
         }
+        if (!JS_IsUndefined(origin.get())) JS_ThrowTypeError(context_, "transformOrigin 需要有效的对齐名称或 { x, y }");
         return {0.5f, 0.5f};
     }
 
     std::uint32_t QuickJsModifierReader::colorOrBrush(JSValueConst object, const char* colorKey, const char* brushKey) const {
-        const auto color = reader_.colorField(object, colorKey, 0);
-        if (color != 0) return color;
+        ScopedValue color(context_, JS_GetPropertyStr(context_, object, colorKey));
         ScopedValue brush(context_, JS_GetPropertyStr(context_, object, brushKey));
+        if (!JS_IsUndefined(color.get())) {
+            if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "颜色输入不能同时提供 color 和 brush");
+            if (!JS_IsNumber(color.get())) JS_ThrowTypeError(context_, "color 需要数值颜色");
+            return reader_.toU32(color.get());
+        }
         if (JS_IsNumber(brush.get())) return reader_.toU32(brush.get());
-        if (JS_IsObject(brush.get())) return reader_.colorField(brush.get(), "color", 0);
+        if (JS_IsObject(brush.get()) && !JS_IsArray(brush.get())) {
+            if (!fieldsMatch(context_, brush.get(), {"type", "color"}, "brush")) return 0;
+            if (reader_.stringField(brush.get(), "type") != "solidColor") JS_ThrowTypeError(context_, "brush.type 需要 solidColor");
+            ScopedValue brushColor(context_, JS_GetPropertyStr(context_, brush.get(), "color"));
+            if (!JS_IsNumber(brushColor.get())) JS_ThrowTypeError(context_, "brush.color 需要数值颜色");
+            return reader_.toU32(brushColor.get());
+        }
+        if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "brush 需要数值颜色或 solidColor 对象");
         return 0;
     }
 
@@ -121,16 +185,14 @@ namespace arrange::quickjs {
         style.color = colorOrBrush(value, "color", "brush");
         style.strokeWidth = numberField(value, "width", 1.0f);
         ScopedValue shape(context_, JS_GetPropertyStr(context_, value, "shape"));
-        if (JS_IsObject(shape.get())) {
+        if (JS_IsObject(shape.get()) && !JS_IsArray(shape.get())) {
             style.shapeType = reader_.stringField(shape.get(), "type");
+            if (!fieldsMatch(context_, shape.get(), style.shapeType == "rounded" ? std::initializer_list<std::string_view>{"type", "radius"} : std::initializer_list<std::string_view>{"type"}, "shape")) return style;
+            if (style.shapeType.empty()) JS_ThrowTypeError(context_, "shape.type 不能为空");
             style.cornerRadius = style.shapeType == "rounded" ? numberField(shape.get(), "radius") : 0.0f;
         }
+        else if (!JS_IsUndefined(shape.get())) JS_ThrowTypeError(context_, "shape 需要形状对象");
         style.alpha = numberField(value, "value", 1.0f);
-        ScopedValue offset(context_, JS_GetPropertyStr(context_, value, "offset"));
-        style.shadowOffset = {
-            numberField(value, "offsetX", JS_IsObject(offset.get()) ? numberField(offset.get(), "x") : 0.0f),
-            numberField(value, "offsetY", JS_IsObject(offset.get()) ? numberField(offset.get(), "y") : 0.0f),
-        };
         return style;
     }
 
@@ -138,13 +200,13 @@ namespace arrange::quickjs {
         arrange::core::ModifierDescriptors result;
         failed_ = false;
         if (JS_IsUndefined(modifier) || JS_IsNull(modifier)) {
-            (void)throwTypeError("Arrange native setModifier requires a Modifier object, not null/undefined");
+            (void)throwTypeError("Arrange setModifier 需要 Modifier 对象");
             return result;
         }
         ScopedValue elements(context_, JS_GetPropertyStr(context_, modifier, "elements"));
         JSValueConst array = JS_IsArray(elements.get()) ? elements.get() : modifier;
         if (!JS_IsArray(array)) {
-            (void)throwTypeError("Arrange native setModifier requires Modifier.elements to be an array");
+            (void)throwTypeError("Arrange Modifier.elements 需要数组");
             return result;
         }
 
@@ -159,15 +221,17 @@ namespace arrange::quickjs {
         for (std::uint32_t i = 0; i < length; ++i) {
             ScopedValue element(context_, JS_GetPropertyUint32(context_, array, i));
             if (!JS_IsObject(element.get()) || JS_IsArray(element.get())) {
-                JS_ThrowTypeError(context_, "Arrange modifier element at index %u must be an object", i);
+                JS_ThrowTypeError(context_, "Arrange Modifier 第 %u 项需要对象", i);
                 return {};
             }
             const auto type = requiredStringField(element.get(), "type", "modifier element");
             if (failed_) return {};
+            if (!fieldsMatch(context_, element.get(), {"type", "key", "value"}, "Modifier 元素")) { failed_ = true; return {}; }
 
             ScopedValue value(context_, JS_UNDEFINED);
             JSValueConst payload = payloadFor(element.get(), value, type);
             if (failed_ || JS_IsUndefined(payload)) return {};
+            if (!modifierFieldsMatch(context_, payload, type)) { failed_ = true; return {}; }
 
             const auto key = reader_.stringField(element.get(), "key");
             if (type == "padding") {
@@ -226,7 +290,7 @@ namespace arrange::quickjs {
                 item.kind = type == "verticalScroll" ? arrange::core::LayoutModifierKind::VerticalScroll : arrange::core::LayoutModifierKind::HorizontalScroll;
                 ScopedValue state(context_, JS_GetPropertyStr(context_, payload, "state"));
                 if (!JS_IsObject(state.get())) {
-                    JS_ThrowTypeError(context_, "Arrange modifier '%.*s' requires object field 'state'", static_cast<int>(type.size()), type.data());
+                    JS_ThrowTypeError(context_, "Arrange Modifier '%.*s' 的 state 需要对象", static_cast<int>(type.size()), type.data());
                     return {};
                 }
                 item.scrollValue = numberField(state.get(), "value");
@@ -238,12 +302,14 @@ namespace arrange::quickjs {
             else if (type == "animateContentSize") {
                 arrange::core::AnimateContentSizeModifier item;
                 ScopedValue spec(context_, JS_GetPropertyStr(context_, payload, "animationSpec"));
-                if (!JS_IsObject(spec.get()) || JS_IsArray(spec.get())) { (void)throwTypeError("animateContentSize requires an animationSpec object"); return {}; }
+                if (!JS_IsObject(spec.get()) || JS_IsArray(spec.get())) { (void)throwTypeError("animateContentSize 需要 animationSpec 对象"); return {}; }
                 const auto kind = requiredStringField(spec.get(), "kind", "animationSpec");
+                const auto fields = kind == "tween" ? std::initializer_list<std::string_view>{"kind", "durationMillis", "delayMillis", "x1", "y1", "x2", "y2"} : kind == "spring" ? std::initializer_list<std::string_view>{"kind", "stiffness", "dampingRatio", "visibilityThreshold"} : std::initializer_list<std::string_view>{"kind", "delayMillis"};
+                if (!fieldsMatch(context_, spec.get(), fields, "animationSpec")) { failed_ = true; return {}; }
                 if (kind == "tween") item.animationSpec.kind = arrange::core::AnimationKind::Tween;
                 else if (kind == "spring") item.animationSpec.kind = arrange::core::AnimationKind::Spring;
                 else if (kind == "snap") item.animationSpec.kind = arrange::core::AnimationKind::Snap;
-                else { (void)throwTypeError("unknown animation spec"); return {}; }
+                else { (void)throwTypeError("动画规格类型未定义"); return {}; }
                 auto& input = item.animationSpec;
                 input.durationMillis = numberField(spec.get(), "durationMillis", 300);
                 input.delayMillis = numberField(spec.get(), "delayMillis", 0);
@@ -286,12 +352,10 @@ namespace arrange::quickjs {
             else if (type == "zIndex") {
                 result.push_back({arrange::core::ZIndexModifier{requiredNumberField(payload, "value", type)}, key});
             }
-            else if (type == "background" || type == "border" || type == "alpha" || type == "dropShadow" || type == "innerShadow") {
+            else if (type == "background" || type == "border" || type == "alpha") {
                 auto kind = arrange::core::PaintStyleKind::Background;
                 if (type == "border") kind = arrange::core::PaintStyleKind::Border;
                 else if (type == "alpha") kind = arrange::core::PaintStyleKind::Alpha;
-                else if (type == "dropShadow") kind = arrange::core::PaintStyleKind::DropShadow;
-                else if (type == "innerShadow") kind = arrange::core::PaintStyleKind::InnerShadow;
                 result.push_back({paintStyle(payload, kind), key});
             }
             else if (type == "clip") {
@@ -301,28 +365,13 @@ namespace arrange::quickjs {
                 arrange::core::InputModifierSemantics item;
                 item.enabled = boolField(payload, "enabled", true);
                 item.focusable = boolField(payload, "focusable", true);
-                if (type == "clickable") callbacks.push_back({result.size(), arrange::core::EventSlotKind::Click, ScopedValue(context_, JS_GetPropertyStr(context_, payload, "onClick"))});
+                if (type == "clickable") {
+                    ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "onClick"));
+                    if (!JS_IsFunction(context_, callback.get())) { (void)throwTypeError("clickable.onClick 需要函数"); return {}; }
+                    callbacks.push_back({result.size(), arrange::core::EventSlotKind::Click, std::move(callback)});
+                }
                 else item.kind = type == "hoverable" ? arrange::core::InputModifierKind::Hoverable : arrange::core::InputModifierKind::Focusable;
                 result.push_back({item, key});
-            }
-            else if (type == "wrapContentWidth" ||
-                     type == "wrapContentHeight" ||
-                     type == "wrapContentSize" ||
-                     type == "aspectRatio" ||
-                     type == "matchParentSize" ||
-                     type == "drawBehind" ||
-                     type == "drawWithContent" ||
-                     type == "drawWithCache" ||
-                     type == "focusRequester" ||
-                     type == "onFocusChanged" ||
-                     type == "focusProperties" ||
-                     type == "focusGroup" ||
-                     type == "scrollable" ||
-                     type == "pointerInput" ||
-                     type == "semantics" ||
-                     type == "testTag") {
-                (void)throwUnknownModifier(type);
-                return {};
             }
             else {
                 (void)throwUnknownModifier(type);
@@ -334,7 +383,7 @@ namespace arrange::quickjs {
         try { arrange::core::validateModifierDescriptors(result); }
         catch (const std::exception& error) { (void)throwTypeError(error.what()); return {}; }
         if (instanceInput && (result.size() != 1 || !arrange::core::sameModifierKind(*instanceInput, result.front().value))) {
-            (void)throwTypeError("Arrange Modifier input must preserve its instance kind");
+            (void)throwTypeError("Arrange Modifier 单实例更新不能改变实例类型");
             return {};
         }
         // 整条描述通过校验之后才登记回调，失败的描述不会留下半条注册记录

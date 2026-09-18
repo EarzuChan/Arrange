@@ -1,87 +1,87 @@
-﻿import { isFunction } from '@arrange/vue-shared'
-import { currentInstance, getCurrentInstance } from './component.ts'
+import { isFunction } from '@arrange/vue-shared'
 import { currentApp } from './apiCreateApp.ts'
+import { currentInstance, getCurrentInstance } from './component.ts'
 import { warn } from './warning.ts'
 
-interface InjectionConstraint<T> {}
+interface InjectionConstraint<T> { }
 
 export type InjectionKey<T> = symbol & InjectionConstraint<T>
 
 export function provide<T, K = InjectionKey<T> | string | number>(
-  key: K,
-  value: K extends InjectionKey<infer V> ? V : T,
+    key: K,
+    value: K extends InjectionKey<infer V> ? V : T,
 ): void {
-  if (__DEV__) {
-    if (!currentInstance || currentInstance.isMounted) {
-      warn(`provide() can only be used inside setup().`)
+    if (__DEV__) {
+        if (!currentInstance || currentInstance.isMounted) {
+            warn(`provide() can only be used inside setup().`)
+        }
     }
-  }
-  if (currentInstance) {
-    let provides = currentInstance.provides
-    // by default an instance inherits its parent's provides object
-    // but when it needs to provide values of its own, it creates its
-    // own provides object using parent provides object as prototype.
-    // this way in `inject` we can simply look up injections from direct
-    // parent and let the prototype chain do the work.
-    const parentProvides =
-      currentInstance.parent && currentInstance.parent.provides
-    if (parentProvides === provides) {
-      provides = currentInstance.provides = Object.create(parentProvides)
+    if (currentInstance) {
+        let provides = currentInstance.provides
+        // by default an instance inherits its parent's provides object
+        // but when it needs to provide values of its own, it creates its
+        // own provides object using parent provides object as prototype.
+        // this way in `inject` we can simply look up injections from direct
+        // parent and let the prototype chain do the work.
+        const parentProvides =
+            currentInstance.parent && currentInstance.parent.provides
+        if (parentProvides === provides) {
+            provides = currentInstance.provides = Object.create(parentProvides)
+        }
+        // TS doesn't allow symbol as index type
+        provides[key as string] = value
     }
-    // TS doesn't allow symbol as index type
-    provides[key as string] = value
-  }
 }
 
 export function inject<T>(key: InjectionKey<T> | string): T | undefined
 export function inject<T>(
-  key: InjectionKey<T> | string,
-  defaultValue: T,
-  treatDefaultAsFactory?: false,
+    key: InjectionKey<T> | string,
+    defaultValue: T,
+    treatDefaultAsFactory?: false,
 ): T
 export function inject<T>(
-  key: InjectionKey<T> | string,
-  defaultValue: T | (() => T),
-  treatDefaultAsFactory: true,
+    key: InjectionKey<T> | string,
+    defaultValue: T | (() => T),
+    treatDefaultAsFactory: true,
 ): T
 export function inject(
-  key: InjectionKey<any> | string,
-  defaultValue?: unknown,
-  treatDefaultAsFactory = false,
+    key: InjectionKey<any> | string,
+    defaultValue?: unknown,
+    treatDefaultAsFactory = false,
 ) {
-  // fallback to `currentRenderingInstance` so that this can be called in
-  // a functional component
-  const instance = getCurrentInstance()
+    // fallback to `currentRenderingInstance` so that this can be called in
+    // a functional component
+    const instance = getCurrentInstance()
 
-  // also support looking up from app-level provides w/ `app.runWithContext()`
-  if (instance || currentApp) {
-    // #2400
-    // to support `app.use` plugins,
-    // fallback to appContext's `provides` if the instance is at root
-    // #11488, in a nested createApp, prioritize using the provides from currentApp
-    // #13212, for custom elements we must get injected values from its appContext
-    // as it already inherits the provides object from the parent element
-    let provides = currentApp
-      ? currentApp._context.provides
-      : instance
-        ? instance.parent == null || instance.ce
-          ? instance.vnode.appContext && instance.vnode.appContext.provides
-          : instance.parent.provides
-        : undefined
+    // also support looking up from app-level provides w/ `app.runWithContext()`
+    if (instance || currentApp) {
+        // #2400
+        // to support `app.use` plugins,
+        // fallback to appContext's `provides` if the instance is at root
+        // #11488, in a nested createApp, prioritize using the provides from currentApp
 
-    if (provides && (key as string | symbol) in provides) {
-      // TS doesn't allow symbol as index type
-      return provides[key as string]
-    } else if (arguments.length > 1) {
-      return treatDefaultAsFactory && isFunction(defaultValue)
-        ? defaultValue.call(instance && instance.proxy)
-        : defaultValue
+        // as it already inherits the provides object from the parent element
+        let provides = currentApp
+            ? currentApp._context.provides
+            : instance
+                ? instance.parent == null
+                    ? instance.vnode.appContext && instance.vnode.appContext.provides
+                    : instance.parent.provides
+                : undefined
+
+        if (provides && (key as string | symbol) in provides) {
+            // TS doesn't allow symbol as index type
+            return provides[key as string]
+        } else if (arguments.length > 1) {
+            return treatDefaultAsFactory && isFunction(defaultValue)
+                ? defaultValue.call(instance && instance.proxy)
+                : defaultValue
+        } else if (__DEV__) {
+            warn(`injection "${String(key)}" not found.`)
+        }
     } else if (__DEV__) {
-      warn(`injection "${String(key)}" not found.`)
+        warn(`inject() can only be used inside setup() or functional components.`)
     }
-  } else if (__DEV__) {
-    warn(`inject() can only be used inside setup() or functional components.`)
-  }
 }
 
 /**
@@ -90,6 +90,5 @@ export function inject(
  * user. One example is `useRoute()` in `vue-router`.
  */
 export function hasInjectionContext(): boolean {
-  return !!(getCurrentInstance() || currentApp)
+    return !!(getCurrentInstance() || currentApp)
 }
-

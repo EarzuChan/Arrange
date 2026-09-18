@@ -10,8 +10,8 @@ export type ColorChannels = {
     alpha?: number
 }
 
-export type Shape = Readonly<Record<string, unknown>>
-export type Brush = Readonly<Record<string, unknown>>
+export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radius: number }>
+export type Brush = Readonly<{ type: "solidColor"; color: number }>
 export type PaddingValue = number | {start?: number; top?: number; end?: number; bottom?: number; horizontal?: number; vertical?: number}
 export type Padding = Readonly<{start: number; top: number; end: number; bottom: number}>
 
@@ -28,7 +28,7 @@ export function px(value: number): Px {
 }
 
 function numberUnit(value: number, name: string): number {
-    if (typeof value !== "number" || !Number.isFinite(value)) throw new TypeError(`${name}(...) expects a finite number`)
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new TypeError(`${name}(...) 需要有限数值`)
     return value
 }
 
@@ -41,11 +41,11 @@ export function Color(value: number | ColorChannels): ColorValue {
         const alpha = channel(value.alpha ?? 1, "alpha")
         return (((alpha * 255) & 0xff) << 24 | ((red * 255) & 0xff) << 16 | ((green * 255) & 0xff) << 8 | ((blue * 255) & 0xff)) >>> 0
     }
-    throw new TypeError("Color expects 0xAARRGGBB or { red, green, blue, alpha }.")
+    throw new TypeError("Color 需要 0xAARRGGBB 或 { red, green, blue, alpha }")
 }
 
 function channel(value: number, name: string): number {
-    if (typeof value !== "number" || value < 0 || value > 1) throw new RangeError(`Color channel ${name} must be in 0..1`)
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(`Color 通道 ${name} 必须在 0..1 之间`)
     return Math.round(value * 255) / 255
 }
 
@@ -56,20 +56,13 @@ export function colorToHex(color: number): string {
 export const RectangleShape = Object.freeze({type: "rectangle"})
 export const CircleShape = Object.freeze({type: "circle"})
 
-export function rounded(value: number | Record<string, number>): Shape {
-    return typeof value === "number" ? Object.freeze({type: "rounded", radius: value}) : Object.freeze({type: "rounded", radii: {...value}})
+export function rounded(radius: number): Shape {
+    if (!Number.isFinite(radius) || radius < 0) throw new RangeError("圆角半径必须是非负有限数值")
+    return Object.freeze({type: "rounded", radius})
 }
 
 export function solidColor(color: number): Brush {
     return Object.freeze({type: "solidColor", color})
-}
-
-export function linearGradient(args: Record<string, unknown>): Brush {
-    return Object.freeze({type: "linearGradient", ...args})
-}
-
-export function radialGradient(args: Record<string, unknown>): Brush {
-    return Object.freeze({type: "radialGradient", ...args})
 }
 
 export const Alignment = Object.freeze({
@@ -81,7 +74,16 @@ export const Alignment = Object.freeze({
     Top: "Top", CenterVertically: "CenterVertically", Bottom: "Bottom",
 })
 
-function spacedBy(space: number, alignment?: string) {
+export type BoxAlignment = typeof Alignment['TopStart' | 'TopCenter' | 'TopEnd' | 'CenterStart' | 'Center' | 'CenterEnd' | 'BottomStart' | 'BottomCenter' | 'BottomEnd']
+export type HorizontalAlignment = typeof Alignment['Start' | 'Center' | 'CenterHorizontally' | 'End']
+export type VerticalAlignment = typeof Alignment['Top' | 'Center' | 'CenterVertically' | 'Bottom']
+export type AlignmentValue = typeof Alignment[keyof typeof Alignment]
+export type ImageAlignment = Exclude<AlignmentValue, 'Baseline'>
+export type AxisAlignment = HorizontalAlignment | VerticalAlignment
+export type ArrangementName = 'Start' | 'Top' | 'Center' | 'End' | 'Bottom' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly'
+export type TextAlignment = 'left' | 'start' | 'Start' | 'center' | 'Center' | 'right' | 'end' | 'End'
+
+function spacedBy<A extends AxisAlignment = never>(space: number, alignment?: A) {
     return Object.freeze({kind: "spacedBy", space, alignment})
 }
 
@@ -99,6 +101,7 @@ export function PaddingValues(value: PaddingValue): Padding {
 
 export const IntrinsicSize = Object.freeze({Min: "IntrinsicSize.Min", Max: "IntrinsicSize.Max"})
 export const ContentScale = Object.freeze({Fit: "Fit", Crop: "Crop", FillBounds: "FillBounds", Inside: "Inside", None: "None", FillWidth: "FillWidth", FillHeight: "FillHeight"})
+export type ContentScaleValue = typeof ContentScale[keyof typeof ContentScale]
 export const Role = Object.freeze({Button: "Button", Checkbox: "Checkbox", Slider: "Slider", TextField: "TextField", Image: "Image"})
 export const Orientation = Object.freeze({Horizontal: "Horizontal", Vertical: "Vertical"})
 export const GridCells = Object.freeze({

@@ -10,7 +10,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./src/Entry.ts"
+      "import": "./src/index.ts"
     }
   }
 }
@@ -39,6 +39,8 @@ Vue SFC / template / render function
 
 `@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
 
+组件对象由 `defineComponent({ props, emits, setup, render, name, inheritAttrs, components, directives, slots })` 定义；`defineComponent(setup, options)` 保留函数形式。`defineOptions` 仅声明 `name`、`inheritAttrs`、`components`、`directives`，props/emits/slots/实例公开成员分别使用对应宏。配置边界与错误行为见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
+
 # C++ App source
 
 ```cpp
@@ -61,7 +63,7 @@ config.app.useLive("http://host:port");
 
 # 导出总表
 
-`@arrange/framework` 至少导出：
+下列为已接入正式宿主的主要 authoring 导出；完整类型从包入口读取：
 
 ```ts
 createApp
@@ -83,13 +85,10 @@ Text
 Input
 Image
 Icon
-Canvas
-FlowRow
-FlowColumn
-LazyColumn
-LazyRow
-LazyVerticalGrid
-LazyHorizontalGrid
+KeepAlive
+Suspense
+AnimatedVisibility
+Crossfade
 
 m
 Modifier
@@ -99,8 +98,6 @@ sp
 px
 Color
 solidColor
-linearGradient
-radialGradient
 rounded
 
 Alignment
@@ -112,8 +109,6 @@ Orientation
 GridCells
 GridItemSpan
 
-rememberInputState
-rememberCanvasController
 
 animatedNumberAsRef
 animatedDpAsRef
@@ -124,16 +119,8 @@ animatedRectAsRef
 animatedNumberArrayAsRef
 transition
 
-rememberInteractionState
-rememberFocusRequester
-useFocusManager
-rememberScrollState
-rememberLazyListState
-rememberLazyGridState
+createScrollState
 
-useParameter
-useHost
-useTransport
 
 logger
 diagnostics
@@ -157,69 +144,55 @@ px(value: number): Px
 
 Color(value: number): ArrangeColor
 Color(args: { red: number; green: number; blue: number; alpha?: number }): ArrangeColor
-Color.Unspecified: ArrangeColor
 
 solidColor(color: ArrangeColor): Brush
-linearGradient(args: LinearGradientArgs): Brush
-radialGradient(args: RadialGradientArgs): Brush
 rounded(radius: Dp): Shape
-rounded(args: { topStart?: Dp; topEnd?: Dp; bottomEnd?: Dp; bottomStart?: Dp }): Shape
 ```
 
-`Dp`、`Sp`、`Px` 在 TypeScript 层使用 branded number。运行时尽量保持 number，避免额外对象开销。
+`Dp`、`Sp`、`Px` 使用 number 别名。渐变与分角圆角属于后续设计，不提供空壳工厂。
 
 # Modifier API
 
 ```ts
 interface Modifier {
-    then(other?: Modifier): Modifier
-    if(condition: boolean, block: (m: Modifier) => Modifier): Modifier
-
-    width(value: Dp | IntrinsicSize): Modifier
-    height(value: Dp | IntrinsicSize): Modifier
-    size(value: Dp): Modifier
-    widthIn(args: ConstraintRange): Modifier
-    heightIn(args: ConstraintRange): Modifier
-    sizeIn(args: SizeConstraintRange): Modifier
-    requiredWidth(value: Dp): Modifier
-    requiredHeight(value: Dp): Modifier
-    requiredSize(value: Dp): Modifier
+    then(other: Modifier | null | undefined): Modifier
+    keyed(key: string): Modifier
+    if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier): Modifier
+    width(value: number): Modifier
+    height(value: number): Modifier
+    size(width: number, height?: number): Modifier
+    requiredWidth(width: number): Modifier
+    requiredHeight(height: number): Modifier
+    requiredSize(width: number, height?: number): Modifier
+    widthIn(args: { min?: number; max?: number }): Modifier
+    heightIn(args: { min?: number; max?: number }): Modifier
+    sizeIn(args: SizeRange): Modifier
+    defaultMinSize(args: Pick<SizeRange, "minWidth" | "minHeight">): Modifier
     fillMaxWidth(fraction?: number): Modifier
     fillMaxHeight(fraction?: number): Modifier
     fillMaxSize(fraction?: number): Modifier
-    wrapContentWidth(alignment?: Alignment.Horizontal, unbounded?: boolean): Modifier
-    wrapContentHeight(alignment?: Alignment.Vertical, unbounded?: boolean): Modifier
-    wrapContentSize(alignment?: Alignment, unbounded?: boolean): Modifier
-    aspectRatio(ratio: number, matchHeightConstraintsFirst?: boolean): Modifier
-
-    padding(value: Dp | PaddingValues): Modifier
-    offset(x: Dp, y?: Dp): Modifier
-    align(alignment: Alignment): Modifier
-    weight(value: number, fill?: boolean): Modifier
-    matchParentSize(): Modifier
+    padding(value: PaddingValue): Modifier
+    offset(args: { x?: number; y?: number }): Modifier
+    absoluteOffset(args: { x?: number; y?: number }): Modifier
+    align(alignment: string): Modifier
+    weight(weight: number, args?: { fill?: boolean }): Modifier
     zIndex(value: number): Modifier
-
-    background(color: ArrangeColor | Brush, shape?: Shape): Modifier
-    border(width: Dp, color: ArrangeColor | Brush, shape?: Shape): Modifier
+    background(brush: Brush | number, shape?: Shape): Modifier
+    border(args: BorderOptions): Modifier
+    border(width: number, brush: Brush | number, shape?: Shape): Modifier
     clip(shape: Shape): Modifier
-    shadow(args: ShadowArgs): Modifier
     alpha(value: number): Modifier
-    graphicsLayer(args: GraphicsLayerArgs): Modifier
-
-    drawBehind(block: DrawBlock): Modifier
-    drawWithContent(block: DrawWithContentBlock): Modifier
-    drawWithCache(block: DrawWithCacheBlock): Modifier
-
-    clickable(args: ClickableArgs | (() => void)): Modifier
-    hoverable(args?: HoverableArgs): Modifier
-    focusable(args?: FocusableArgs): Modifier
-    pointerInput(key: unknown, handler: PointerInputHandler): Modifier
-    verticalScroll(state?: ScrollState): Modifier
-    horizontalScroll(state?: ScrollState): Modifier
-
-    animateContentSize(spec?: AnimationSpec, args?: {clip?: boolean}): Modifier
+    graphicsLayer(args?: GraphicsLayerOptions): Modifier
+    clickable(arg: (() => void) | ClickableOptions): Modifier
+    hoverable(args?: EnabledOptions): Modifier
+    focusable(arg?: boolean | EnabledOptions): Modifier
+    verticalScroll(state: ScrollStateLike, args?: EnabledOptions): Modifier
+    horizontalScroll(state: ScrollStateLike, args?: EnabledOptions): Modifier
+    animateContentSize(animationSpec?: AnimationSpec, args?: { clip?: boolean }): Modifier
 }
 ```
+
+参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，ClickableOptions 包含 onClick、enabled、focusable，EnabledOptions 只包含 enabled。完整类型见包声明。阴影、渐变、自定义绘制、pointerInput 与程序化焦点为后续能力，目前不导出。
 
 Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 
@@ -230,8 +203,7 @@ Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 ```ts
 interface BoxProps {
     modifier?: Modifier
-    contentAlignment?: Alignment
-    propagateMinConstraints?: boolean
+    contentAlignment?: BoxAlignment
 }
 ```
 
@@ -240,14 +212,14 @@ interface BoxProps {
 ```ts
 interface RowProps {
     modifier?: Modifier
-    horizontalArrangement?: Arrangement.Horizontal
-    verticalAlignment?: Alignment.Vertical
+    horizontalArrangement?: HorizontalArrangementProp
+    verticalAlignment?: VerticalAlignment | 'Baseline'
 }
 
 interface ColumnProps {
     modifier?: Modifier
-    verticalArrangement?: Arrangement.Vertical
-    horizontalAlignment?: Alignment.Horizontal
+    verticalArrangement?: VerticalArrangementProp
+    horizontalAlignment?: HorizontalAlignment
 }
 ```
 
@@ -263,35 +235,30 @@ interface SpacerProps {
 
 ```ts
 interface TextProps {
-    text?: string
     modifier?: Modifier
-    color?: ArrangeColor
-    fontSize?: Sp
-    fontWeight?: FontWeight
-    textAlign?: TextAlign
+    text?: string
+    textStyle?: TextStyleProp
+    singleLine?: boolean
+    minLines?: number
     maxLines?: number
-    overflow?: TextOverflow
-    style?: TextStyle
+    textAlign?: TextAlignment
+    overflow?: 'clip' | 'ellipsis' | 'visible'
 }
 ```
 
 ## Input
 
 ```ts
-interface InputProps {
+interface InputProps extends Omit<TextProps, 'text' | 'textAlign' | 'overflow'> {
     modelValue?: string
-    state?: InputState
-    modifier?: Modifier
+    value?: string
     placeholder?: string
-    commitMode?: "change" | "blur" | "submit"
     enabled?: boolean
-    readOnly?: boolean
-    singleLine?: boolean
-    style?: TextStyle
-    onUpdateModelValue?: (value: string) => void
+    selectAllOnFocus?: boolean
+    'onUpdate:modelValue'?: (value: string) => void
     onChange?: (value: string) => void
     onSubmit?: (value: string) => void
-    onFocusChange?: (focused: boolean) => void
+    onBlur?: (value: string) => void
 }
 ```
 
@@ -299,15 +266,15 @@ interface InputProps {
 
 ```ts
 interface ImageProps {
-    source: string | ImageResource
+    source: ResourceRef
     modifier?: Modifier
-    contentScale?: ContentScale
-    alignment?: Alignment
+    contentScale?: ContentScaleValue
+    alignment?: ImageAlignment
     contentDescription?: string
 }
 
 interface IconProps {
-    source: string | IconResource
+    source: ResourceRef
     modifier?: Modifier
     tint?: ArrangeColor
     size?: Dp
@@ -315,9 +282,13 @@ interface IconProps {
 }
 ```
 
-`ImageResource` / `IconResource` 可由 Vite import、`new URL(..., import.meta.url)` 或 Arrange Vite 插件规范化产生。字符串资源路径按 UI package root 解析。Icon 初期只承诺 SVG 子集，且核心不内建官方图标包。行为见 [内建组件](12-内建组件.md) 与 [工具链与App发布包](14-工具链与App发布包.md)。
+`ResourceRef` 为字符串、`{path: string}` 或 `{url: string}`。资源来源显式写入 source 输入。字符串资源路径按 UI package root 解析。Icon 初期只承诺 SVG 子集，且核心不内建官方图标包。行为见 [内建组件](12-内建组件.md) 与 [工具链与App发布包](14-工具链与App发布包.md)。
 
-## Canvas
+## 后续能力的签名草案
+
+Canvas、Flow、Lazy、InputState、交互状态、焦点请求器及 Interop hooks 尚未形成完整的原生消费者，以下相关形态为后续设计，不属于当前可导入能力。只有所有权、提交、读取与退休链路俱全后才公开入口。
+
+### Canvas
 
 ```ts
 interface CanvasProps {
@@ -431,17 +402,12 @@ transition(...): Transition
 # 状态 helper
 
 ```ts
-rememberInteractionState(): InteractionState
-rememberFocusRequester(): FocusRequester
-useFocusManager(): FocusManager
-rememberScrollState(initial?: number): ScrollState
-rememberLazyListState(args?: LazyListStateArgs): LazyListState
-rememberLazyGridState(args?: LazyGridStateArgs): LazyGridState
-rememberInputState(initial?: string): InputState
-rememberCanvasController(): CanvasController
+createScrollState(args?: {initial?: number}): ScrollState
 ```
 
-# Interop hooks
+在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。其它状态 helper 属于后续设计，未以空壳函数导出。
+
+# Interop hooks（后续设计）
 
 ```ts
 useParameter(id: string): ParameterState
@@ -512,7 +478,3 @@ interface RuntimeHello {
 ```
 
 生产 native transaction 细节见 [LayoutTree与NativeTransaction](15-LayoutTree与NativeTransaction.md)。
-
-
-
-

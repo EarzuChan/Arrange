@@ -1,132 +1,61 @@
-﻿import type {
-  ArrayExpression,
-  Node,
-  ObjectExpression,
-  Statement,
-} from '@babel/types'
-import { type BindingMetadata, BindingTypes } from '@arrange/vue-compiler-arrange'
+import { type BindingMetadata, BindingTypes, unwrapTSNode } from '@arrange/vue-compiler-arrange'
+import { componentOptionNames, generateCodeFrame } from '@arrange/vue-shared'
+import type { Node, ObjectExpression, Statement } from '@babel/types'
+import type { ScriptCompileContext } from './context.ts'
 import { resolveObjectKey } from './utils.ts'
 
-/**
- * Analyze bindings in normal `<script>`
- * Note that `compileScriptSetup` already analyzes bindings as part of its
- * compilation process so this should only be used on single `<script>` SFCs.
- */
-export function analyzeScriptBindings(ast: Statement[]): BindingMetadata {
-  for (const node of ast) {
-    if (
-      node.type === 'ExportDefaultDeclaration' &&
-      node.declaration.type === 'ObjectExpression'
-    ) {
-      return analyzeBindingsFromOptions(node.declaration)
+// 普通 script 只分析正式 props 与 setup 返回的绑定
+export function analyzeScriptBindings(ast: Statement[], ctx: ScriptCompileContext): BindingMetadata {
+    for (const node of ast) {
+        if (node.type !== 'ExportDefaultDeclaration') continue
+        let declaration = unwrapTSNode(node.declaration)
+        if (declaration.type === 'CallExpression' && declaration.callee.type === 'Identifier' && declaration.callee.name === 'defineComponent' && declaration.arguments[0]) declaration = unwrapTSNode(declaration.arguments[0])
+        if (declaration.type !== 'ObjectExpression') continue
+
+        const bindings: BindingMetadata = {}
+        Object.defineProperty(bindings, '__isScriptSetup', { enumerable: false, value: false })
+
+        for (const property of declaration.properties) {
+            if (property.type === 'SpreadElement') continue
+            const key = resolveObjectKey(property.key, property.computed)
+            if (key !== undefined && !componentOptionNames.has(String(key))) {
+                const offset = ctx.descriptor.script!.loc.start.offset
+                throw new Error('Arrange 组件配置未定义：' + key + '\n' + ctx.filename + '\n' + generateCodeFrame(ctx.source, offset + property.start!, offset + property.end!))
+            }
+
+            if (key === 'props' && property.type === 'ObjectProperty') {
+                for (const name of getObjectOrArrayExpressionKeys(property.value)) bindings[name] = BindingTypes.PROPS
+            }
+
+            const setup = property.type === 'ObjectMethod' ? property : property.value
+            if (key !== 'setup' || (setup.type !== 'ObjectMethod' && setup.type !== 'FunctionExpression' && setup.type !== 'ArrowFunctionExpression')) continue
+            if (setup.body.type === 'ObjectExpression') {
+                for (const name of getObjectExpressionKeys(setup.body)) bindings[name] = BindingTypes.SETUP_MAYBE_REF
+            } else if (setup.body.type === 'BlockStatement') {
+                for (const statement of setup.body.body) {
+                    if (statement.type !== 'ReturnStatement' || statement.argument?.type !== 'ObjectExpression') continue
+                    for (const name of getObjectExpressionKeys(statement.argument)) bindings[name] = BindingTypes.SETUP_MAYBE_REF
+                }
+            }
+        }
+
+        return bindings
     }
-  }
-  return {}
-}
-
-function analyzeBindingsFromOptions(node: ObjectExpression): BindingMetadata {
-  const bindings: BindingMetadata = {}
-  // #3270, #3275
-  // mark non-script-setup so we don't resolve components/directives from these
-  Object.defineProperty(bindings, '__isScriptSetup', {
-    enumerable: false,
-    value: false,
-  })
-  for (const property of node.properties) {
-    if (
-      property.type === 'ObjectProperty' &&
-      !property.computed &&
-      property.key.type === 'Identifier'
-    ) {
-      // props
-      if (property.key.name === 'props') {
-        // props: ['foo']
-        // props: { foo: ... }
-        for (const key of getObjectOrArrayExpressionKeys(property.value)) {
-          bindings[key] = BindingTypes.PROPS
-        }
-      }
-
-      // inject
-      else if (property.key.name === 'inject') {
-        // inject: ['foo']
-        // inject: { foo: {} }
-        for (const key of getObjectOrArrayExpressionKeys(property.value)) {
-          bindings[key] = BindingTypes.OPTIONS
-        }
-      }
-
-      // computed & methods
-      else if (
-        property.value.type === 'ObjectExpression' &&
-        (property.key.name === 'computed' || property.key.name === 'methods')
-      ) {
-        // methods: { foo() {} }
-        // computed: { foo() {} }
-        for (const key of getObjectExpressionKeys(property.value)) {
-          bindings[key] = BindingTypes.OPTIONS
-        }
-      }
-    }
-
-    // setup & data
-    else if (
-      property.type === 'ObjectMethod' &&
-      property.key.type === 'Identifier' &&
-      (property.key.name === 'setup' || property.key.name === 'data')
-    ) {
-      for (const bodyItem of property.body.body) {
-        // setup() {
-        //   return {
-        //     foo: null
-        //   }
-        // }
-        if (
-          bodyItem.type === 'ReturnStatement' &&
-          bodyItem.argument &&
-          bodyItem.argument.type === 'ObjectExpression'
-        ) {
-          for (const key of getObjectExpressionKeys(bodyItem.argument)) {
-            bindings[key] =
-              property.key.name === 'setup'
-                ? BindingTypes.SETUP_MAYBE_REF
-                : BindingTypes.DATA
-          }
-        }
-      }
-    }
-  }
-
-  return bindings
+    return {}
 }
 
 function getObjectExpressionKeys(node: ObjectExpression): string[] {
-  const keys = []
-  for (const prop of node.properties) {
-    if (prop.type === 'SpreadElement') continue
-    const key = resolveObjectKey(prop.key, prop.computed)
-    if (key) keys.push(String(key))
-  }
-  return keys
-}
-
-function getArrayExpressionKeys(node: ArrayExpression): string[] {
-  const keys = []
-  for (const element of node.elements) {
-    if (element && element.type === 'StringLiteral') {
-      keys.push(element.value)
+    const keys: string[] = []
+    for (const prop of node.properties) {
+        if (prop.type === 'SpreadElement') continue
+        const key = resolveObjectKey(prop.key, prop.computed)
+        if (key !== undefined) keys.push(String(key))
     }
-  }
-  return keys
+    return keys
 }
 
 export function getObjectOrArrayExpressionKeys(value: Node): string[] {
-  if (value.type === 'ArrayExpression') {
-    return getArrayExpressionKeys(value)
-  }
-  if (value.type === 'ObjectExpression') {
-    return getObjectExpressionKeys(value)
-  }
-  return []
+    if (value.type === 'ObjectExpression') return getObjectExpressionKeys(value)
+    if (value.type === 'ArrayExpression') return value.elements.flatMap(element => element?.type === 'StringLiteral' ? [element.value] : [])
+    return []
 }
-

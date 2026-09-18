@@ -218,6 +218,67 @@ int main() {
         verifyModifierInstanceBindings();
         verifyCallbackPublication();
         {
+            QuickJsScriptHost schemaHost;
+            const auto schema = schemaHost.executeModule("modifier-schema.js", R"JS(
+                const n = globalThis.__ARRANGE_NATIVE__
+                n.createNode(1, 'Box')
+                const rejects = (element, field) => {
+                    try { n.setModifier(1, { elements: [element] }) }
+                    catch (error) {
+                        if (!String(error).includes(field)) throw new Error(`错误缺少字段定位：${field}`)
+                        return
+                    }
+                    throw new Error(`无效参数被接受：${field}`)
+                }
+                rejects({ type: 'graphicsLayer', value: { translation: 30 } }, 'translation')
+                rejects({ type: 'background', value: { brush: { type: 'solidColor', color: 1, extra: 2 } } }, 'extra')
+                rejects({ type: 'clip', value: { shape: { type: 'rounded', radius: 8, extra: 2 } } }, 'extra')
+                rejects({ type: 'graphicsLayer', value: { transformOrigin: 'Typo' } }, 'transformOrigin')
+                rejects({ type: 'clickable', value: { onClick: 42 } }, 'onClick')
+                rejects({ type: 'align', value: { alignment: 'Centre' } }, 'Centre')
+                n.setModifier(1, { elements: [{ type: 'background', value: { brush: { type: 'solidColor', color: 0xff123456 } } }] })
+            )JS");
+            if (!schema.ok) throw std::runtime_error(schema.error);
+
+            NativeScene schemaScene;
+            SceneFramePipeline schemaPipeline;
+            PublishedFrame schemaFrame;
+            frame(schemaHost, schemaScene, schemaPipeline, schemaFrame);
+            check(schemaHost.eventSlotCount() == 0 && schemaFrame.content.drawOps.size() == 1, "参数拒绝后不能残留回调或污染下一次有效提交");
+        }
+        {
+            QuickJsScriptHost host;
+            NativeScene scene;
+            SceneFramePipeline pipeline;
+            PublishedFrame published;
+            const auto loaded = host.executeModule("enum-schema.js", R"JS(
+                const n = globalThis.__ARRANGE_NATIVE__
+                n.createNode(1, 'Box')
+                n.createNode(2, 'Image')
+                n.insertChild(1, 2, 0)
+                n.createNode(3, 'Input')
+                n.insertChild(1, 3, 1)
+                const scale = n.registerBinding(2, 'contentScale')
+                n.updateBinding(scale, 'Fit')
+                n.setProp(3, 'onSubmit', value => n.updateBinding(scale, value))
+            )JS");
+            if (!loaded.ok) throw std::runtime_error(loaded.error);
+            frame(host, scene, pipeline, published);
+            const auto revision = published.revision;
+            const auto bindings = scene.bindingCount();
+
+            EventSlotId submit;
+            for (const auto& slot : scene.activeEventSlots()) if (slot.kind == EventSlotKind::InputSubmit) submit = slot;
+            const auto invalid = host.invokeEventSlot(submit, {true, "Crpo"});
+            if (invalid.ok || invalid.error.find("contentScale") == std::string::npos || invalid.error.find("Crpo") == std::string::npos || invalid.error.find("enum-schema.js") == std::string::npos) throw std::runtime_error("枚举错误必须包含字段、输入值和脚本来源：" + invalid.error);
+            check(scene.node(2).props.at("contentScale").string == "Fit" && published.revision == revision, "非法枚举污染了已发布状态");
+
+            const auto recovered = host.invokeEventSlot(submit, {true, "Crop"});
+            if (!recovered.ok) throw std::runtime_error(recovered.error);
+            frame(host, scene, pipeline, published);
+            check(scene.node(2).props.at("contentScale").string == "Crop" && scene.bindingCount() == bindings, "枚举拒绝后有效值应正常恢复且复用绑定");
+        }
+        {
             QuickJsScriptHost unstable;
             const auto result = unstable.executeModule("unstable-jobs.js", R"JS(
                 globalThis.__ARRANGE_NATIVE__.createNode(1, 'Box')

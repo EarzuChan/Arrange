@@ -66,7 +66,7 @@ namespace arrange::core {
         bool operator==(const ParentDataModifierSemantics&) const = default;
     };
 
-    enum class PaintStyleKind { Background, Border, Alpha, DropShadow, InnerShadow };
+    enum class PaintStyleKind { Background, Border, Alpha };
     struct PaintStyleSemantics {
         PaintStyleKind kind = PaintStyleKind::Background;
         std::uint32_t color = 0;
@@ -74,7 +74,6 @@ namespace arrange::core {
         std::string shapeType;
         float cornerRadius = 0.0f;
         float alpha = 1.0f;
-        Point shadowOffset;
         bool operator==(const PaintStyleSemantics&) const = default;
     };
 

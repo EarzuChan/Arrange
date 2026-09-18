@@ -1,88 +1,25 @@
-﻿import type { Node } from '@babel/types'
 import { unwrapTSNode } from '@arrange/vue-compiler-arrange'
+import { defineOptionsNames } from '@arrange/vue-shared'
+import type { Node } from '@babel/types'
 import type { ScriptCompileContext } from './context.ts'
-import { isCallOf } from './utils.ts'
-import { DEFINE_PROPS } from './defineProps.ts'
-import { DEFINE_EMITS } from './defineEmits.ts'
-import { DEFINE_EXPOSE } from './defineExpose.ts'
-import { DEFINE_SLOTS } from './defineSlots.ts'
+import { isCallOf, resolveObjectKey } from './utils.ts'
 
 export const DEFINE_OPTIONS = 'defineOptions'
 
-export function processDefineOptions(
-  ctx: ScriptCompileContext,
-  node: Node,
-): boolean {
-  if (!isCallOf(node, DEFINE_OPTIONS)) {
-    return false
-  }
-  if (ctx.hasDefineOptionsCall) {
-    ctx.error(`duplicate ${DEFINE_OPTIONS}() call`, node)
-  }
-  if (node.typeParameters) {
-    ctx.error(`${DEFINE_OPTIONS}() cannot accept type arguments`, node)
-  }
-  if (!node.arguments[0]) return true
+export function processDefineOptions(ctx: ScriptCompileContext, node: Node): boolean {
+    if (!isCallOf(node, DEFINE_OPTIONS)) return false
+    if (ctx.hasDefineOptionsCall) ctx.error('defineOptions() 不可重复调用', node)
+    if (node.typeParameters) ctx.error('defineOptions() 不接受类型参数', node)
+    ctx.hasDefineOptionsCall = true
+    if (!node.arguments[0]) return true
 
-  ctx.hasDefineOptionsCall = true
-  ctx.optionsRuntimeDecl = unwrapTSNode(node.arguments[0])
-
-  let propsOption = undefined
-  let emitsOption = undefined
-  let exposeOption = undefined
-  let slotsOption = undefined
-  if (ctx.optionsRuntimeDecl.type === 'ObjectExpression') {
+    ctx.optionsRuntimeDecl = unwrapTSNode(node.arguments[0])
+    if (ctx.optionsRuntimeDecl.type !== 'ObjectExpression') ctx.error('defineOptions() 需要可静态检查的配置对象', ctx.optionsRuntimeDecl)
     for (const prop of ctx.optionsRuntimeDecl.properties) {
-      if (
-        (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') &&
-        prop.key.type === 'Identifier'
-      ) {
-        switch (prop.key.name) {
-          case 'props':
-            propsOption = prop
-            break
-
-          case 'emits':
-            emitsOption = prop
-            break
-
-          case 'expose':
-            exposeOption = prop
-            break
-
-          case 'slots':
-            slotsOption = prop
-            break
-        }
-      }
+        if (prop.type === 'SpreadElement') ctx.error('defineOptions() 不接受动态展开，请显式声明配置字段', prop)
+        const key = resolveObjectKey(prop.key, prop.computed)
+        if (key === undefined || !defineOptionsNames.has(String(key))) ctx.error('defineOptions() 仅支持 name、inheritAttrs、components、directives，收到：' + (key ?? '动态键'), prop)
     }
-  }
 
-  if (propsOption) {
-    ctx.error(
-      `${DEFINE_OPTIONS}() cannot be used to declare props. Use ${DEFINE_PROPS}() instead.`,
-      propsOption,
-    )
-  }
-  if (emitsOption) {
-    ctx.error(
-      `${DEFINE_OPTIONS}() cannot be used to declare emits. Use ${DEFINE_EMITS}() instead.`,
-      emitsOption,
-    )
-  }
-  if (exposeOption) {
-    ctx.error(
-      `${DEFINE_OPTIONS}() cannot be used to declare expose. Use ${DEFINE_EXPOSE}() instead.`,
-      exposeOption,
-    )
-  }
-  if (slotsOption) {
-    ctx.error(
-      `${DEFINE_OPTIONS}() cannot be used to declare slots. Use ${DEFINE_SLOTS}() instead.`,
-      slotsOption,
-    )
-  }
-
-  return true
+    return true
 }
-

@@ -73,6 +73,13 @@ namespace arrange::quickjs {
         bool enabled = false;
     };
 
+    struct ScriptMemoryStats {
+        std::uint64_t allocations = 0;
+        std::uint64_t allocatedBytes = 0;
+        std::size_t liveBytes = 0;
+        std::size_t peakBytes = 0;
+    };
+
     class QuickJsScriptHost final : public ScriptHost {
     public:
         QuickJsScriptHost();
@@ -96,6 +103,7 @@ namespace arrange::quickjs {
         std::size_t bindingCount() const noexcept;
         std::size_t modifierInstanceCount() const noexcept;
         std::uint64_t rejectedBindingUpdates() const noexcept;
+        ScriptMemoryStats memoryStats() const noexcept;
         void publishScene(const arrange::core::NativeScene& scene);
 
     private:
@@ -106,4 +114,3 @@ namespace arrange::quickjs {
 
 #endif
 } // namespace arrange::quickjs
-

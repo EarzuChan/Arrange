@@ -1,5 +1,5 @@
 import type {Modifier, ModifierElement} from "./modifier.ts"
-import type {ColorValue} from "./primitives.ts"
+import type {ArrangementName, AxisAlignment, ColorValue, HorizontalAlignment, VerticalAlignment} from "./primitives.ts"
 import {ARRANGE_PROTOCOL_VERSION} from "./version.ts"
 
 export type NodeId = number
@@ -24,15 +24,16 @@ export type TextStyleProp = Readonly<{
     fontSize?: number
     lineHeight?: number
     color?: ColorValue
-    fontWeight?: string
-    fontFamily?: string
 }>
 
-export type ArrangementProp = string | Readonly<{
+export type ArrangementProp<A extends AxisAlignment = AxisAlignment, N extends ArrangementName = ArrangementName> = N | Readonly<{
     kind: "spacedBy"
     space: number
-    alignment?: string
+    alignment?: A
 }>
+
+export type HorizontalArrangementProp = ArrangementProp<HorizontalAlignment, Exclude<ArrangementName, 'Top' | 'Bottom'>>
+export type VerticalArrangementProp = ArrangementProp<VerticalAlignment, Exclude<ArrangementName, 'Start' | 'End'>>
 
 export type ResourceRef =
     | string

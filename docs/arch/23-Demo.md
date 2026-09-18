@@ -52,3 +52,5 @@ Demo 可以逐渐复杂；模板必须干净、克制、适合新项目复制。
 - Demo smoke 覆盖主链路。
 - Demo 暴露 authoring 体验问题，并反向修正 API。
 - Demo 的工程形态应保持用户样板，不依赖仓库内部特供消费路径。
+
+真实链路集成测试直接复用主 Demo 的 ShowcaseGallery、AnimationGallery 等 SFC。测试外壳只负责注入动作、观察资源和采样，不维护另一套页面行为；图形体验验收仍由主人运行 Standalone 或插件完成，见 [测试策略](22-测试策略.md)。

@@ -190,14 +190,13 @@ namespace arrange::core {
         if (const auto* style = std::get_if<PaintStyleSemantics>(&value)) {
             if (style->kind == PaintStyleKind::Alpha) { alpha *= style->alpha; content(); return; }
             if (geometryOnly) { content(); return; }
-            const auto overlay = style->kind == PaintStyleKind::Border || style->kind == PaintStyleKind::InnerShadow;
+            const auto overlay = style->kind == PaintStyleKind::Border;
             if (overlay) content();
             if (style->color != 0) {
                 DrawOp op;
                 op.type = overlay ? DrawOpType::StrokeRect : DrawOpType::FillRect;
                 op.nodeId = id;
                 op.rect = instance.bounds;
-                if (style->kind == PaintStyleKind::DropShadow) { op.rect.x += style->shadowOffset.x; op.rect.y += style->shadowOffset.y; }
                 op.color = withAlpha(style->color, alpha);
                 op.strokeWidth = style->strokeWidth;
                 op.shape = shapeType(*style);
@@ -318,6 +317,7 @@ namespace arrange::core {
             op.rect = contentRect;
             op.color = withAlpha(0xffffffffu, alpha * numericProp(node, "alpha", 1.0f));
             op.resource = resourceProp(node);
+            if (auto origin = objectProp(node, "source").string("origin"); !origin.empty()) op.resourceOrigin = std::move(origin);
             op.contentScale = textProp(node, "contentScale", "content-scale", "Fit");
             op.alignment = textProp(node, "alignment", "Center");
             ops.push_back(std::move(op));
@@ -330,6 +330,7 @@ namespace arrange::core {
             op.hasTint = !hasColorUnspecified(node, "tint");
             op.color = withAlpha(colorProp(node, "tint", 0xff000000u), alpha);
             op.resource = resourceProp(node);
+            if (auto origin = objectProp(node, "source").string("origin"); !origin.empty()) op.resourceOrigin = std::move(origin);
             op.resourceIsIcon = true;
             ops.push_back(std::move(op));
         }
@@ -500,5 +501,3 @@ namespace arrange::core {
         return ops;
     }
 } // namespace arrange::core
-
-

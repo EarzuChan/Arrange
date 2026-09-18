@@ -41,6 +41,7 @@ namespace arrange::juce {
             aggregate.changed = aggregate.changed || result.changed;
             if (result.error) {
                 aggregate.error = std::move(result.error);
+                if (op.resourceOrigin) aggregate.error->summary += "\n来源：" + *op.resourceOrigin;
                 return aggregate;
             }
         }

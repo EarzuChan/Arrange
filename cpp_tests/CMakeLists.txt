@@ -46,7 +46,7 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
     DEPENDS ${ARRANGE_VUE_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-vue-runtime-fixture.ts"
     COMMENT "Compile Arrange Vue runtime SFC fixture")
   add_custom_target(arrange_vue_fixture DEPENDS "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js")
-  add_executable(arrange_vue_runtime arrange_vue_runtime.cpp)
+  add_executable(arrange_vue_runtime arrange_vue_runtime.cpp AllocationProbe.cpp)
   target_link_libraries(arrange_vue_runtime PRIVATE Arrange::framework)
   add_dependencies(arrange_vue_runtime arrange_vue_fixture)
   add_test(NAME arrange_vue_runtime COMMAND arrange_vue_runtime "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js")
