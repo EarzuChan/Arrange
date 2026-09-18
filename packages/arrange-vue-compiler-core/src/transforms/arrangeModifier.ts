@@ -1,10 +1,10 @@
-import {parseExpression} from '@babel/parser'
-import type {Node} from '@babel/types'
-import {createArrayExpression, createCallExpression, createFunctionExpression, createSimpleExpression, type JSChildNode} from '../ast.ts'
-import type {TransformContext} from '../transform.ts'
-import {ARRANGE_MODIFIER} from '../runtimeHelpers.ts'
-import {processExpression} from './transformExpression.ts'
-import {BindingTypes} from '../options.ts'
+import { parseExpression } from '@babel/parser'
+import type { Node } from '@babel/types'
+import { createArrayExpression, createCallExpression, createFunctionExpression, createSimpleExpression, type JSChildNode } from '../ast.ts'
+import { BindingTypes } from '../options.ts'
+import { ARRANGE_MODIFIER } from '../runtimeHelpers.ts'
+import type { TransformContext } from '../transform.ts'
+import { processExpression } from './transformExpression.ts'
 
 const methods = new Set(['width', 'height', 'size', 'requiredWidth', 'requiredHeight', 'requiredSize', 'padding', 'offset', 'absoluteOffset', 'alpha', 'background', 'graphicsLayer', 'fillMaxWidth', 'fillMaxHeight', 'fillMaxSize', 'zIndex'])
 
@@ -16,7 +16,7 @@ export function splitArrangeModifier(value: JSChildNode, context: TransformConte
     const source = value.loc.source
     if (!roots?.length || !source) return
     let parsed: Node
-    try { parsed = parseExpression(source, {plugins: context.expressionPlugins}) } catch { return }
+    try { parsed = parseExpression(source, { plugins: context.expressionPlugins }) } catch { return }
     const pure = (node: Node): boolean => {
         switch (node.type) {
             case 'NumericLiteral': case 'BooleanLiteral': case 'StringLiteral': case 'NullLiteral': return true
@@ -28,12 +28,12 @@ export function splitArrangeModifier(value: JSChildNode, context: TransformConte
             default: return false
         }
     }
-    const segments: {method: string; args: Node[]}[] = []
+    const segments: { method: string; args: Node[] }[] = []
     let current: Node = parsed
     while (current.type === 'CallExpression' && current.callee.type === 'MemberExpression' && !current.callee.computed && current.callee.property.type === 'Identifier') {
         const method = current.callee.property.name
         if (!methods.has(method) || !current.arguments.every(pure)) return
-        segments.unshift({method, args: current.arguments})
+        segments.unshift({ method, args: current.arguments })
         current = current.callee.object
     }
     if (current.type !== 'Identifier' || !roots.includes(current.name) || segments.length < 2 || context.identifiers[current.name]) return

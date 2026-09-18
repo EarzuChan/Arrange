@@ -63,16 +63,44 @@ namespace arrange::core {
         }
 
         float crossAxisOffset(float parent, float child, const std::string& alignment, bool horizontal) {
-            if (alignment.empty()) return 0.0f;
-            if (alignment == "Center" || alignment == "CenterVertically" || alignment == "CenterHorizontally" ||
-                alignment == "TopCenter" || alignment == "BottomCenter" || alignment == "CenterStart" || alignment == "CenterEnd") {
-                if (horizontal && (alignment == "CenterVertically" || alignment == "Top" || alignment == "Bottom")) return 0.0f;
-                if (!horizontal && (alignment == "CenterHorizontally" || alignment == "Start" || alignment == "End")) return 0.0f;
-                return (parent - child) * 0.5f;
+            if (horizontal) {
+                if (alignment == "Center" || alignment == "CenterHorizontally" || alignment == "TopCenter" || alignment == "BottomCenter") return (parent - child) * 0.5f;
+                if (alignment == "End" || alignment == "TopEnd" || alignment == "CenterEnd" || alignment == "BottomEnd") return parent - child;
+            } else {
+                if (alignment == "Center" || alignment == "CenterVertically" || alignment == "CenterStart" || alignment == "CenterEnd") return (parent - child) * 0.5f;
+                if (alignment == "Bottom" || alignment == "BottomStart" || alignment == "BottomCenter" || alignment == "BottomEnd") return parent - child;
             }
-            if (horizontal) { if (alignment == "End" || alignment == "TopEnd" || alignment == "CenterEnd" || alignment == "BottomEnd") return parent - child; }
-            else { if (alignment == "Bottom" || alignment == "BottomStart" || alignment == "BottomCenter" || alignment == "BottomEnd") return parent - child; }
             return 0.0f;
+        }
+
+        struct MainAxisPlacement {
+            float offset = 0.0f;
+            float spacing = 0.0f;
+        };
+
+        MainAxisPlacement mainAxisPlacement(const LayoutTree& tree, const ArrangeNode& node, float size, bool horizontal) {
+            const auto* arrangement = horizontal ? propValue(node, "horizontalArrangement", "horizontal-arrangement") : propValue(node, "verticalArrangement", "vertical-arrangement");
+            MainAxisPlacement result;
+            result.spacing = spacedByValue(arrangement);
+            const auto count = node.children.size();
+            if (count == 0) return result;
+
+            float used = result.spacing * static_cast<float>(count - 1);
+            for (auto childId : node.children) used += horizontal ? tree.node(childId).bounds.width : tree.node(childId).bounds.height;
+            const auto remaining = std::max(0.0f, size - used);
+            const auto name = arrangement && arrangement->isString() ? arrangement->string : PropObject(arrangement).string("alignment");
+
+            if (name == "Center" || name == "CenterHorizontally" || name == "CenterVertically") result.offset = remaining * 0.5f;
+            else if (name == "End" || name == "Bottom") result.offset = remaining;
+            else if (name == "SpaceBetween" && count > 1) result.spacing = remaining / static_cast<float>(count - 1);
+            else if (name == "SpaceAround") {
+                result.spacing = remaining / static_cast<float>(count);
+                result.offset = result.spacing * 0.5f;
+            } else if (name == "SpaceEvenly") {
+                result.spacing = remaining / static_cast<float>(count + 1);
+                result.offset = result.spacing;
+            }
+            return result;
         }
 
         std::string nodeAlignmentProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
@@ -398,7 +426,7 @@ namespace arrange::core {
     void LayoutEngine::placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height) {
         auto& node = tree.node(id);
         if (node.type == NodeType::Row) {
-            const auto spacing = rowSpacing(node);
+            const auto arrangement = mainAxisPlacement(tree, node, width, true);
             const auto defaultAlign = nodeAlignmentProp(node, "verticalAlignment", "vertical-alignment", "Top");
             float baseline = -1.0f;
             for (auto childId : node.children) {
@@ -406,7 +434,7 @@ namespace arrange::core {
                 const auto alignment = alignModifier(child);
                 if (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline")) baseline = std::max(baseline, child.baseline);
             }
-            float cursor = x;
+            float cursor = x + arrangement.offset;
             for (auto childId : node.children) {
                 auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
@@ -414,21 +442,21 @@ namespace arrange::core {
                 const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline
                     : crossAxisOffset(height, child.bounds.height, alignment, false);
                 place(tree, childId, cursor, y + offset);
-                cursor += child.bounds.width + spacing;
+                cursor += child.bounds.width + arrangement.spacing;
             }
             return;
         }
 
         if (node.type == NodeType::Column) {
-            const auto spacing = columnSpacing(node);
+            const auto arrangement = mainAxisPlacement(tree, node, height, false);
             const auto defaultAlign = nodeAlignmentProp(node, "horizontalAlignment", "horizontal-alignment", "Start");
-            float cursor = y;
+            float cursor = y + arrangement.offset;
             for (auto childId : node.children) {
                 auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
                 const auto offset = crossAxisOffset(width, child.bounds.width, childAlign.empty() ? defaultAlign : childAlign, true);
                 place(tree, childId, x + offset, cursor);
-                cursor += child.bounds.height + spacing;
+                cursor += child.bounds.height + arrangement.spacing;
             }
             return;
         }

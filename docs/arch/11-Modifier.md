@@ -11,33 +11,13 @@ m.padding(dp(8)).background(red)
 
 # 生产事实源
 
-Modifier 生产语义必须来自 QuickJS 直接读取的稳定 TS Modifier object shape 与 native core 的唯一编译结果：
+Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型化输入。原生协调器维护每层实例的身份、绑定、阶段数据与退休；measure、place、paint、hit-test 消费同一条实例链。相等输入不触发无关阶段，事件回调替换只失效输入相关数据。
 
-```txt
-JS ModifierDescriptor[]
--> QuickJS ModifierReader 直接读取 JSValue
--> native ModifierSpec / ModifierCompiler
--> CompiledModifier cached on LayoutNode
--> Layout / Paint / HitTest / Input / Invalidation 读取同一份编译结果
-```
+显式 key 用于同类型元素的重排复用；无 key 元素按位置与类型协调。实例 handle 与数组下标分离，退休代际使旧绑定无法写入新实例。链条更新和单实例参数更新都进入同一原生提交。
 
-`modifierDebugJson` 只允许用于 diagnostics / devtools / 人工排查 / 测试快照，不得在参与布局、绘制、命中、滚动、输入、无障碍或 invalidation 中使用。
+TS 方法使用明确的参数类型；原生 reader 校验字段集合、类型及取值，不忽略未知字段。新增能力必须同时实现 TS 参数、JSValue 解码、原生语义、失效、生命周期和真实链路测试。源码定位与 authoring 契约见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
 
-`__arrangeModifier.N.*` 展开字段、`__arrangeClickableEnabled`、`__arrangeVerticalScrollValue`、`__arrangeZIndex`、`__arrangeLayer*` 等 JS 层派生 prop 不得进入生产语义。clickable / scroll / weight / align / zIndex / graphicsLayer 等语义只能由 native core 的 `ModifierCompiler` 编译进 `CompiledModifier`。
-
-`CompiledModifier` 必须保留 Modifier 的可执行顺序语义。Paint / Layout / HitTest 不能靠字符串补丁反推顺序，例如不能用 `style.type == "padding"` 之类的局部规则决定 background、border、clip 与 padding / size 的相对效果。至少 `padding().background()`、`background().padding()`、`size().background()`、`background().size()` 等顺序差异必须由结构化编译结果和测试保护。
-
-绘制语义收敛为 typed paint op。`ModifierCompiler` 负责把 `background`、`border`、`alpha`、`dropShadow`、`innerShadow`、`clip`、`padding` 等字符串 payload 编译成明确的 paint chain op；Paint 阶段不可靠自由字符串 `style.type == ...` 作为分派依据。
-
-`CompiledModifierDiff` 结构化地表达其变化来源。layout、paint、transform、parent data、zIndex、input、focus、scroll value、click event slot、scroll event slot 等变化应分别进入对应 dirty attribution。纯 event callback / event slot 替换不得触发无理由 measure / layout / paint。
-
-新增 Modifier 同时补：
-
-- TS typed descriptor / stable object shape。
-- QuickJS ModifierReader。
-- C++ 集中读取 / compile 到 `CompiledModifier`。
-- dirty schema。
-- no-debugJson / no-expanded-field 测试。
+下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影、自定义绘制、InteractionState、程序化焦点、pointerInput 等尚属后续能力。
 
 # 便捷组合
 
@@ -46,7 +26,7 @@ m.then(other: Modifier)
 m.if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier)
 ```
 
-`m.if` 是语法糖，作用等同条件分支拼接 Modifier。
+`m.if` 是 Earzu Chan 大人发明的语法糖，作用等同条件分支拼接 Modifier。
 # 阶段
 
 Modifier 可作用于：
@@ -213,18 +193,17 @@ m.graphicsLayer({
   translationY: dp(0),
   transformOrigin: TransformOrigin.Center,
   clip: false,
-  shape: rounded(dp(8)),
 })
 ```
 
-图层变换不改变测量尺寸。精确变换后命中测试后续单独设计。
+图层变换不改变测量尺寸；绘制与命中消费同一层变换及裁剪，命中通过逆变换转换坐标。当前 graphicsLayer.clip 使用矩形裁剪，形状裁剪由独立 m.clip(shape) 表达。
 
 # 输入与交互
 
 通用交互走 Modifier；交互视觉由响应式交互状态驱动。
 
 ```ts
-const interaction = rememberInteractionState()
+const interaction = createInteractionState()
 
 const modifier = computed(() =>
   m.background(interaction.hovered ? hoverBg : normalBg)
@@ -272,7 +251,7 @@ m.pointerInput((scope) => {
 # 滚动
 
 ```ts
-const state = rememberScrollState()
+const state = createScrollState()
 
 m.verticalScroll(state)
 m.horizontalScroll(state)
@@ -320,6 +299,3 @@ transition(...)
 `m.animateContentSize()` 复用同一 VBlankSource、JS Value Phase、SlotUpdateBatch 与 FramePlan。Canvas `frame` invalidation、meter / waveform 等 UI-thread 高频显示也复用同一底座。
 
 详见 [动画与Transition](28-动画与Transition.md)、[运行时](04-运行时.md) 与 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
-
-
-

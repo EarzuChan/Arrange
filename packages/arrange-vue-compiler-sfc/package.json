@@ -14,22 +14,15 @@
     "@babel/parser": "7.29.3",
     "estree-walker": "2.0.2",
     "magic-string": "0.30.21",
-    "postcss": "^8.5.14",
     "source-map-js": "1.2.1",
     "@arrange/vue-shared": "0.0.0-m.2.2",
     "@arrange/vue-compiler-core": "0.0.0-m.2.2",
-    "@arrange/vue-compiler-arrange": "0.0.0-m.2.2"
+    "@arrange/vue-compiler-arrange": "0.0.0-m.2.2",
+    "typescript": "^5.9.0"
   },
   "devDependencies": {
     "@babel/types": "7.29.0",
-    "hash-sum": "^2.0.0",
-    "lru-cache": "10.1.0",
-    "merge-source-map": "^1.1.0",
-    "minimatch": "~10.2.5",
-    "postcss-modules": "^6.0.1",
-    "postcss-selector-parser": "^7.1.1",
-    "pug": "^3.0.4",
-    "sass": "^1.99.0"
+    "lru-cache": "10.1.0"
   },
   "license": "MIT",
   "files": [

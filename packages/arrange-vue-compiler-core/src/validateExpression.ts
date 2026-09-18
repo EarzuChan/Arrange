@@ -1,65 +1,60 @@
 import type { SimpleExpressionNode } from './ast.ts'
-import type { TransformContext } from './transform.ts'
 import { ErrorCodes, createCompilerError } from './errors.ts'
+import type { TransformContext } from './transform.ts'
 
 // these keywords should not appear inside expressions, but operators like
 // 'typeof', 'instanceof', and 'in' are allowed
 const prohibitedKeywordRE = new RegExp(
-  '\\b' +
+    '\\b' +
     (
-      'arguments,await,break,case,catch,class,const,continue,debugger,default,' +
-      'delete,do,else,export,extends,finally,for,function,if,import,let,new,' +
-      'return,super,switch,throw,try,var,void,while,with,yield'
+        'arguments,await,break,case,catch,class,const,continue,debugger,default,' +
+        'delete,do,else,export,extends,finally,for,function,if,import,let,new,' +
+        'return,super,switch,throw,try,var,void,while,with,yield'
     )
-      .split(',')
-      .join('\\b|\\b') +
+        .split(',')
+        .join('\\b|\\b') +
     '\\b',
 )
 
 // strip strings in expressions
 const stripStringRE =
-  /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*\$\{|\}(?:[^`\\]|\\.)*`|`(?:[^`\\]|\\.)*`/g
+    /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*\$\{|\}(?:[^`\\]|\\.)*`|`(?:[^`\\]|\\.)*`/g
 
-/**
- * Validate a non-prefixed expression.
- * This is only called when using the in-browser runtime compiler since it
- * doesn't prefix expressions.
- */
 export function validateBrowserExpression(
-  node: SimpleExpressionNode,
-  context: TransformContext,
-  asParams = false,
-  asRawStatements = false,
+    node: SimpleExpressionNode,
+    context: TransformContext,
+    asParams = false,
+    asRawStatements = false,
 ): void {
-  const exp = node.content
+    const exp = node.content
 
-  // empty expressions are validated per-directive since some directives
-  // do allow empty expressions.
-  if (!exp.trim()) {
-    return
-  }
-
-  try {
-    new Function(
-      asRawStatements
-        ? ` ${exp} `
-        : `return ${asParams ? `(${exp}) => {}` : `(${exp})`}`,
-    )
-  } catch (e: any) {
-    let message = e.message
-    const keywordMatch = exp
-      .replace(stripStringRE, '')
-      .match(prohibitedKeywordRE)
-    if (keywordMatch) {
-      message = `avoid using JavaScript keyword as property name: "${keywordMatch[0]}"`
+    // empty expressions are validated per-directive since some directives
+    // do allow empty expressions.
+    if (!exp.trim()) {
+        return
     }
-    context.onError(
-      createCompilerError(
-        ErrorCodes.X_INVALID_EXPRESSION,
-        node.loc,
-        undefined,
-        message,
-      ),
-    )
-  }
+
+    try {
+        new Function(
+            asRawStatements
+                ? ` ${exp} `
+                : `return ${asParams ? `(${exp}) => {}` : `(${exp})`}`,
+        )
+    } catch (e: any) {
+        let message = e.message
+        const keywordMatch = exp
+            .replace(stripStringRE, '')
+            .match(prohibitedKeywordRE)
+        if (keywordMatch) {
+            message = `avoid using JavaScript keyword as property name: "${keywordMatch[0]}"`
+        }
+        context.onError(
+            createCompilerError(
+                ErrorCodes.X_INVALID_EXPRESSION,
+                node.loc,
+                undefined,
+                message,
+            ),
+        )
+    }
 }

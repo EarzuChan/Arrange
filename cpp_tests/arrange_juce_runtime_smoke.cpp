@@ -162,8 +162,8 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (!treeContainsText(runtime.scene().tree(), "撅: 13")) {
-        std::cerr << "counter text did not reach 撅: 13\n";
+    if (!treeContainsText(runtime.scene().tree(), "撅了啊 13 次")) {
+        std::cerr << "counter text did not reach 撅了啊 13 次\n";
         return 9;
     }
 
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
         return 14;
     }
 
-    if (!treeContainsText(runtime.scene().tree(), "Submitted: Runtime Smoke")) {
+    if (!treeContainsText(runtime.scene().tree(), "提交啊一个：Runtime Smoke")) {
         std::cerr << "input submit text did not sync through runtime event queue\n";
         return 15;
     }

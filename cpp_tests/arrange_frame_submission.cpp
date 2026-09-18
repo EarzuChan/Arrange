@@ -230,8 +230,10 @@ namespace {
         config.diagnostics.toasts = arrange::juce::DiagnosticVisibility::Hidden;
         const auto pixel = [&] {
             ::juce::Image image(::juce::Image::ARGB, 100, 100, true);
-            ::juce::Graphics graphics(image);
-            host.paint(graphics, {0, 0, 100, 100});
+            {
+                ::juce::Graphics graphics(image);
+                host.paint(graphics, {0, 0, 100, 100});
+            }
             return image.getPixelAt(50, 50).getARGB();
         };
         double timestamp = 0;

@@ -229,6 +229,70 @@ namespace {
         if (validateSetPropMutation(NodeType::Text, "testTag", PropValue::stringValue("tag"), error)) return 106;
         if (!validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg"))}), error)) return 107;
         if (validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg")), field("url", PropValue::stringValue("https://example.invalid/play.svg"))}), error)) return 108;
+
+        struct EnumCase { NodeType node; const char* key; const char* valid; const char* invalid; };
+        for (const auto& input : std::vector<EnumCase>{
+            {NodeType::Image, "contentScale", "FillWidth", "Crpo"},
+            {NodeType::Image, "alignment", "BottomEnd", "Baseline"},
+            {NodeType::Box, "contentAlignment", "CenterEnd", "Centre"},
+            {NodeType::Row, "verticalAlignment", "Baseline", "End"},
+            {NodeType::Column, "horizontalAlignment", "CenterHorizontally", "Bottom"},
+            {NodeType::Text, "textAlign", "center", "middel"},
+            {NodeType::Text, "overflow", "ellipsis", "elipsis"},
+            {NodeType::Row, "horizontalArrangement", "SpaceBetween", "Bottom"},
+            {NodeType::Column, "verticalArrangement", "Bottom", "End"},
+        }) {
+            if (!validateSetPropMutation(input.node, input.key, PropValue::stringValue(input.valid), error)) return 201;
+            if (validateSetPropMutation(input.node, input.key, PropValue::stringValue(input.invalid), error)) return 202;
+            if (error.find(input.key) == std::string::npos || error.find(input.invalid) == std::string::npos) return 203;
+            if (validateSetPropMutation(input.node, input.key, PropValue::numberValue(1), error)) return 204;
+            if (!validateSetPropMutation(input.node, input.key, PropValue{}, error)) return 205;
+        }
+
+        const auto spaced = [](const char* alignment) { return object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8)), field("alignment", PropValue::stringValue(alignment))}); };
+        if (!validateSetPropMutation(NodeType::Row, "horizontalArrangement", spaced("CenterHorizontally"), error)) return 206;
+        if (validateSetPropMutation(NodeType::Row, "horizontalArrangement", spaced("Top"), error) || error.find("horizontalArrangement.alignment") == std::string::npos) return 207;
+        if (!validateSetPropMutation(NodeType::Column, "verticalArrangement", spaced("Bottom"), error)) return 208;
+        if (validateSetPropMutation(NodeType::Column, "verticalArrangement", spaced("End"), error)) return 209;
+        if (validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontWeight", PropValue::stringValue("bold"))}), error)) return 210;
+        return 0;
+    }
+
+    int verifyAlignmentAndArrangement() {
+        using namespace arrange::core;
+        LayoutEngine layout;
+        LayoutTree box;
+        box.apply({CreateNodeMutation{1, NodeType::Box}, CreateNodeMutation{2, NodeType::Spacer}, InsertChildMutation{1, 2, 0}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}});
+        struct AlignmentCase { const char* name; float x; float y; };
+        for (const auto& alignment : std::vector<AlignmentCase>{{"TopStart", 0, 0}, {"TopCenter", 45, 0}, {"TopEnd", 90, 0}, {"CenterStart", 0, 45}, {"Center", 45, 45}, {"CenterEnd", 90, 45}, {"BottomStart", 0, 90}, {"BottomCenter", 45, 90}, {"BottomEnd", 90, 90}}) {
+            box.setHostInput(1, HostInput::ContentAlignment, PropValue::stringValue(alignment.name));
+            layout.layout(box, 1, {0, 100, 0, 100});
+            if (!near(box.node(2).bounds.x, alignment.x) || !near(box.node(2).bounds.y, alignment.y)) return 211;
+            box.clearDirty();
+        }
+
+        for (const bool horizontal : {true, false}) {
+            LayoutTree tree;
+            tree.apply({CreateNodeMutation{1, horizontal ? NodeType::Row : NodeType::Column}, CreateNodeMutation{2, NodeType::Spacer}, CreateNodeMutation{3, NodeType::Spacer}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}, SetModifierMutation{3, size(10, 10)}});
+            const auto input = horizontal ? HostInput::HorizontalArrangement : HostInput::VerticalArrangement;
+            struct PlacementCase { PropValue value; float first; float second; };
+            for (const auto& arrangement : std::vector<PlacementCase>{
+                {PropValue::stringValue(horizontal ? "Start" : "Top"), 0, 10},
+                {PropValue::stringValue("Center"), 40, 50},
+                {PropValue::stringValue(horizontal ? "End" : "Bottom"), 80, 90},
+                {PropValue::stringValue("SpaceBetween"), 0, 90},
+                {PropValue::stringValue("SpaceAround"), 20, 70},
+                {PropValue::stringValue("SpaceEvenly"), 80.0f / 3.0f, 190.0f / 3.0f},
+                {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue("Center"))}), 35, 55},
+                {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue(horizontal ? "End" : "Bottom"))}), 70, 90},
+            }) {
+                tree.setHostInput(1, input, arrangement.value);
+                layout.layout(tree, 1, {0, 100, 0, 100});
+                if (!near(horizontal ? tree.node(2).bounds.x : tree.node(2).bounds.y, arrangement.first)) return 212;
+                if (!near(horizontal ? tree.node(3).bounds.x : tree.node(3).bounds.y, arrangement.second)) return 213;
+                tree.clearDirty();
+            }
+        }
         return 0;
     }
 
@@ -514,6 +578,7 @@ int main() {
     RUN_SMOKE(verifyTypedDirtyPrecision);
     RUN_SMOKE(verifyEventPropIsNotCoreEventSlot);
     RUN_SMOKE(verifyPropSchema);
+    RUN_SMOKE(verifyAlignmentAndArrangement);
     RUN_SMOKE(verifyNativeSceneAndFramePipeline);
     RUN_SMOKE(verifyPointerScrollAndHitTest);
     RUN_SMOKE(verifyPropValueAndTextInput);

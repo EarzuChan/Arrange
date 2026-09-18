@@ -1,7 +1,7 @@
-import {existsSync, readdirSync, readFileSync, rmSync, statSync} from "node:fs"
-import {resolve} from "node:path"
-import {repoRoot} from "./common.ts"
-import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
+import { resolve } from "node:path"
+import { repoRoot } from "./common.ts"
+import { assertArrangeVersionContract, readArrangeVersionContract } from "./version-contract.ts"
 
 type PackageManifest = {
     name?: unknown
@@ -81,7 +81,7 @@ function assertExportTarget(pkgDir: string, pkgName: string, target: ExportTarge
 function assertNoDistDirectory(pkgDir: string, pkgName: string): void {
     const distPath = resolve(pkgDir, "dist")
     if (!existsSync(distPath)) return
-    rmSync(distPath, {recursive: true, force: true})
+    rmSync(distPath, { recursive: true, force: true })
     if (existsSync(distPath)) fail(`${pkgName} dist directory remains after removal`)
     console.log(`removed forbidden package dist: ${pkgName}`)
 }
@@ -153,11 +153,11 @@ function assertCliPackageContract(): void {
     if (manifest.version !== contract.cliVersion) fail(`@arrange/cli version must be ${contract.cliVersion}`)
     if (manifest.private === true) fail("@arrange/cli must be publishable")
     const bin = manifest.bin
-    if (!bin || typeof bin !== "object" || Array.isArray(bin) || (bin as Record<string, unknown>).arrange !== "./bin/arrange.cjs") {
-        fail("@arrange/cli must own arrange bin at ./bin/arrange.cjs")
+    if (!bin || typeof bin !== "object" || Array.isArray(bin) || (bin as Record<string, unknown>).arrange !== "./dist/Entry.js") {
+        fail("@arrange/cli 必须以 ./dist/Entry.js 提供 arrange 命令")
     }
-    if (!Array.isArray(manifest.files) || !manifest.files.includes("src") || !manifest.files.includes("bin")) {
-        fail("@arrange/cli must publish src and bin files")
+    if (!Array.isArray(manifest.files) || !manifest.files.includes("dist")) {
+        fail("@arrange/cli 必须发布编译后的 dist 目录")
     }
     const publishConfig = manifest.publishConfig
     if (!publishConfig || typeof publishConfig !== "object" || (publishConfig as Record<string, unknown>).access !== "public") {

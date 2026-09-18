@@ -181,25 +181,7 @@ export const toNumber = (val: any): any => {
   return isNaN(n) ? val : n
 }
 
-// for typeof global checks without @types/node
-declare var global: {}
-
-let _globalThis: any
-export const getGlobalThis = (): any => {
-  return (
-    _globalThis ||
-    (_globalThis =
-      typeof globalThis !== 'undefined'
-        ? globalThis
-        : typeof self !== 'undefined'
-          ? self
-          : typeof window !== 'undefined'
-            ? window
-            : typeof global !== 'undefined'
-              ? global
-              : {})
-  )
-}
+export const getGlobalThis = (): any => globalThis
 
 const identRE = /^[_$a-zA-Z\xA0-\uFFFF][_$a-zA-Z0-9\xA0-\uFFFF]*$/
 

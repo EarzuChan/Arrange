@@ -1,11 +1,11 @@
 #include <arrange/core/PropSchema.h>
 
 #include <arrange/core/PropValue.h>
+#include <arrange/core/Alignment.h>
 
 #include <algorithm>
 #include <cctype>
 #include <string_view>
-#include <unordered_set>
 
 namespace arrange::core {
     namespace {
@@ -37,23 +37,23 @@ namespace arrange::core {
             return value.isString() && isOneOf(value.string, allowed);
         }
 
-        bool isNodeTypeWithChildren(NodeType type) noexcept {
+        bool enumResult(bool valid, std::string_view key, const PropValue& value, std::string& error) {
+            if (!valid) error = std::string(key) + " 不支持枚举值：" + (value.isString() ? "'" + value.string + "'" : "值必须是字符串");
+            return valid;
+        }
+
+        bool supportsProp(NodeType type, std::string_view key) {
+            if (isOneOf(key, {"contentDescription", "label", "description", "role", "enabled"})) return true;
             switch (type) {
-            case NodeType::Box:
-            case NodeType::Row:
-            case NodeType::Column:
-            case NodeType::Canvas:
-            case NodeType::Root:
-        case NodeType::Unknown:
-                return true;
-            case NodeType::Spacer:
-            case NodeType::Text:
-            case NodeType::Input:
-            case NodeType::Image:
-            case NodeType::Icon:
-                return false;
+            case NodeType::Text: return isOneOf(key, {"text", "textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
+            case NodeType::Input: return isOneOf(key, {"modelValue", "value", "placeholder", "selectAllOnFocus", "textStyle", "singleLine", "minLines", "maxLines"});
+            case NodeType::Image: return isOneOf(key, {"source", "contentScale", "alignment", "alpha"});
+            case NodeType::Icon: return isOneOf(key, {"source", "size", "tint"});
+            case NodeType::Box: return key == "contentAlignment";
+            case NodeType::Row: return isOneOf(key, {"horizontalArrangement", "verticalAlignment"});
+            case NodeType::Column: return isOneOf(key, {"verticalArrangement", "horizontalAlignment"});
+            default: return false;
             }
-            return false;
         }
 
         bool validateTextStyle(const PropValue& value, std::string& error) {
@@ -73,14 +73,7 @@ namespace arrange::core {
                     }
                     continue;
                 }
-                if (key == "fontWeight" || key == "fontFamily") {
-                    if (!field.value.isString()) {
-                        error = "textStyle." + key + " must be a string";
-                        return false;
-                    }
-                    continue;
-                }
-                error = "textStyle contains unsupported field '" + field.key + "'";
+                error = "textStyle 不支持字段：'" + field.key + "'";
                 return false;
             }
             return true;
@@ -97,9 +90,9 @@ namespace arrange::core {
                 return nullptr;
             };
             if (value.isString()) {
-                if (isOneOf(value.string, {"Start", "Top", "Center", "End", "Bottom", "SpaceBetween", "SpaceAround", "SpaceEvenly"})) return true;
-                error = std::string(key) + " string value is not a supported Arrangement";
-                return false;
+                const bool horizontal = key == "horizontalArrangement";
+                const bool valid = isOneOf(value.string, {"Center", "SpaceBetween", "SpaceAround", "SpaceEvenly"}) || (horizontal ? isOneOf(value.string, {"Start", "End"}) : isOneOf(value.string, {"Top", "Bottom"}));
+                return enumResult(valid, key, value, error);
             }
             if (!value.isObject()) {
                 error = std::string(key) + " must be an Arrangement string or Arrangement.spacedBy object";
@@ -115,9 +108,9 @@ namespace arrange::core {
                 error = std::string(key) + ".space must be a number";
                 return false;
             }
-            if (const auto alignment = field("alignment"); alignment != nullptr && !alignment->isString() && !alignment->isNull()) {
-                error = std::string(key) + ".alignment must be a string when present";
-                return false;
+            if (const auto alignment = field("alignment"); alignment != nullptr && !alignment->isNull()) {
+                const bool valid = alignment->isString() && (key == "horizontalArrangement" ? isHorizontalAlignment(alignment->string) : isVerticalAlignment(alignment->string));
+                if (!enumResult(valid, std::string(key) + ".alignment", *alignment, error)) return false;
             }
             for (const auto& field : value.fields) {
                 const auto fieldKey = canonicalKey(field.key);
@@ -170,6 +163,13 @@ namespace arrange::core {
                     return false;
                 }
                 for (const auto& field : value.fields) {
+                    if (field.key == "origin") {
+                        if (!field.value.isNull() && !field.value.isString()) {
+                            error = std::string(key) + " 资源来源必须是字符串";
+                            return false;
+                        }
+                        continue;
+                    }
                     if (field.key != "path" && field.key != "url") {
                         error = std::string(key) + " ResourceRef contains unsupported field '" + field.key + "'";
                         return false;
@@ -182,17 +182,14 @@ namespace arrange::core {
         }
 
         bool validateImageIconCommon(std::string_view key, const PropValue& value, bool icon, std::string& error) {
-            if (key == "source" || key == "src") return validateResourceRef(value, key, error);
+            if (key == "source") return validateResourceRef(value, key, error);
             if (key == "size") {
                 if (value.isNumber()) return true;
                 error = "size must be a number";
                 return false;
             }
-            if (key == "contentScale" || key == "alignment") {
-                if (value.isString()) return true;
-                error = std::string(key) + " must be a string";
-                return false;
-            }
+            if (key == "contentScale") return enumResult(isStringEnum(value, {"Fit", "Crop", "FillBounds", "Inside", "None", "FillWidth", "FillHeight"}), key, value, error);
+            if (key == "alignment") return enumResult(value.isString() && isImageAlignment(value.string), key, value, error);
             if (key == "alpha") {
                 if (value.isNumber()) return true;
                 error = "alpha must be a number";
@@ -212,15 +209,12 @@ namespace arrange::core {
 
             if (key == "textStyle") return validateTextStyle(value, error);
             if (key == "horizontalArrangement" || key == "verticalArrangement") return validateArrangement(value, key, error);
-            if (key == "contentAlignment" || key == "horizontalAlignment" || key == "verticalAlignment" || key == "textAlign") {
-                if (value.isString()) return true;
-                error = std::string(key) + " must be a string";
-                return false;
-            }
+            if (key == "contentAlignment") return enumResult(value.isString() && isBoxAlignment(value.string), key, value, error);
+            if (key == "horizontalAlignment") return enumResult(value.isString() && isHorizontalAlignment(value.string), key, value, error);
+            if (key == "verticalAlignment") return enumResult(value.isString() && (isVerticalAlignment(value.string) || value.string == "Baseline"), key, value, error);
+            if (key == "textAlign") return enumResult(isStringEnum(value, {"left", "start", "Start", "center", "Center", "right", "end", "End"}), key, value, error);
             if (key == "overflow") {
-                if (isStringEnum(value, {"clip", "ellipsis", "visible"})) return true;
-                error = "overflow must be 'clip', 'ellipsis' or 'visible'";
-                return false;
+                return enumResult(isStringEnum(value, {"clip", "ellipsis", "visible"}), key, value, error);
             }
             if (key == "singleLine" || key == "selectAllOnFocus") {
                 if (value.isBoolean()) return true;
@@ -244,63 +238,16 @@ namespace arrange::core {
     bool validateSetPropMutation(NodeType nodeType, const std::string& rawKey, const PropValue& value, std::string& error) {
         error.clear();
         const auto key = canonicalKey(rawKey);
-        if (key == "testTag" || key == "semantics") {
-            error = rawKey + " is not supported in M1; 将来会以完整 semantics 通道添加回来";
+        if (!supportsProp(nodeType, key)) {
+            error = "Arrange 节点不支持输入：'" + rawKey + "'";
             return false;
         }
-        if (value.isNull()) {
-            const bool common = isOneOf(key, {"contentDescription", "label", "description", "role", "enabled"});
-            const bool text = isOneOf(key, {"textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
-            const bool input = nodeType == NodeType::Input && isOneOf(key, {"modelValue", "value", "placeholder", "selectAllOnFocus", "textStyle", "singleLine", "minLines", "maxLines"});
-            const bool image = (nodeType == NodeType::Image || nodeType == NodeType::Icon) && isOneOf(key, {"source", "size", "contentScale", "alignment", "alpha"});
-            const bool icon = nodeType == NodeType::Icon && key == "tint";
-            const bool container = isNodeTypeWithChildren(nodeType) && (text || isOneOf(key, {"text", "modelValue", "value", "placeholder", "selectAllOnFocus", "horizontalArrangement", "verticalArrangement", "contentAlignment", "horizontalAlignment", "verticalAlignment"}));
-            if (common || (nodeType == NodeType::Text && text) || input || image || icon || container) return true;
-            error = "Arrange cannot clear unsupported prop '" + rawKey + "'";
-            return false;
-        }
-        if (validateAccessibility(key, value, error)) return true;
-        if (!error.empty()) return false;
+        if (value.isNull()) return true;
 
-        switch (nodeType) {
-        case NodeType::Text:
-            if (isOneOf(key, {"text", "textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"})) {
-                return validateByKey(key, value, error);
-            }
-            break;
-        case NodeType::Input:
-            if (isOneOf(key, {"modelValue", "value", "placeholder", "selectAllOnFocus", "textStyle", "singleLine", "minLines", "maxLines"})) {
-                return validateByKey(key, value, error);
-            }
-            break;
-        case NodeType::Image:
-            if (validateImageIconCommon(key, value, false, error)) return true;
+        if (nodeType == NodeType::Image || nodeType == NodeType::Icon) {
+            if (validateImageIconCommon(key, value, nodeType == NodeType::Icon, error)) return true;
             if (!error.empty()) return false;
-            break;
-        case NodeType::Icon:
-            if (validateImageIconCommon(key, value, true, error)) return true;
-            if (!error.empty()) return false;
-            break;
-        case NodeType::Row:
-            if (isOneOf(key, {"horizontalArrangement", "verticalAlignment"})) return validateByKey(key, value, error);
-            break;
-        case NodeType::Column:
-            if (isOneOf(key, {"verticalArrangement", "horizontalAlignment"})) return validateByKey(key, value, error);
-            break;
-        case NodeType::Box:
-            if (key == "contentAlignment") return validateByKey(key, value, error);
-            break;
-        case NodeType::Spacer:
-        case NodeType::Canvas:
-        case NodeType::Root:
-        case NodeType::Unknown:
-            break;
         }
-
-        if (isNodeTypeWithChildren(nodeType) && validateByKey(key, value, error)) return true;
-        if (!error.empty()) return false;
-
-        error = "Arrange prop '" + rawKey + "' is not supported for this node type";
-        return false;
+        return validateByKey(key, value, error);
     }
 } // namespace arrange::core

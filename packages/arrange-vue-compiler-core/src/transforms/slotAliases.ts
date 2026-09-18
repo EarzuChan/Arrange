@@ -1,5 +1,5 @@
-import type {TransformContext} from '../transform.ts'
-import {NodeTypes, type ExpressionNode} from '../ast.ts'
+import { type ExpressionNode, NodeTypes } from '../ast.ts'
+import type { TransformContext } from '../transform.ts'
 
 interface SlotAlias { expression: string; depth: number }
 const scopes = new WeakMap<TransformContext, Map<string, SlotAlias>>()
@@ -22,7 +22,7 @@ export function enterSlotAliases(context: TransformContext, aliases: Record<stri
     const previous = new Map<string, SlotAlias | undefined>()
     for (const [name, expression] of Object.entries(aliases)) {
         previous.set(name, scope.get(name))
-        scope.set(name, {expression, depth: context.identifiers[name] ?? 0})
+        scope.set(name, { expression, depth: context.identifiers[name] ?? 0 })
     }
     return () => {
         for (const [name, alias] of previous) {

@@ -1,4 +1,4 @@
-import {compileScript, compileTemplate, parse} from "@arrange/vue-compiler-sfc"
+import { compileScript, compileTemplate, parse } from "@arrange/vue-compiler-sfc"
 
 const HMR_CLIENT_MARKER = "__ARRANGE_HMR_CLIENT__"
 const HOT_EXTENSIONS = new Set([".vue", ".ts", ".tsx", ".js", ".jsx"])
@@ -6,7 +6,7 @@ const HOT_EXTENSIONS = new Set([".vue", ".ts", ".tsx", ".js", ".jsx"])
 export type ArrangeSfcCompileResult = {
     code: string
     warnings: string[]
-    needsEsbuild: boolean
+    needsTranspile: boolean
 }
 
 export function normalizePath(id: unknown): string {
@@ -49,16 +49,6 @@ if (import.meta.hot) ${HMR_CLIENT_MARKER}(import.meta.hot)
 `
 }
 
-function hashId(filename: string, source: string): string {
-    let hash = 0x811c9dc5
-    const input = `${filename}\0${source}`
-    for (let index = 0; index < input.length; index++) {
-        hash ^= input.charCodeAt(index)
-        hash = Math.imul(hash, 0x01000193)
-    }
-    return (hash >>> 0).toString(16).padStart(8, "0")
-}
-
 function supportsTs(lang: string | undefined): boolean {
     return typeof lang === "string" && /tsx?|mts|cts/i.test(lang)
 }
@@ -74,33 +64,35 @@ function stripBom(code: string): string {
 export function compileArrangeSfc(code: string, id: string): ArrangeSfcCompileResult {
     const filename = normalizePath(id)
     const source = stripBom(code)
-    const descriptorResult = parse(source, {filename})
+    const describeError = (error: unknown) => {
+        const located = error as {message?: string; loc?: {start: {line: number; column: number}}}
+        const position = located.loc?.start
+        return `${filename}${position ? `:${position.line}:${position.column}` : ''}：${located.message ?? String(error)}`
+    }
+    const descriptorResult = parse(source, { filename })
     if (descriptorResult.errors.length) {
         throw new Error(
             descriptorResult.errors
-                .map((error) => error instanceof Error ? error.message : String(error))
+                .map(describeError)
                 .join("\n"),
         )
     }
 
     const descriptor = descriptorResult.descriptor
     const warnings: string[] = []
-    if (descriptor.styles.length > 0) throw new SyntaxError(`Arrange SFC ${filename} 不支持 <style>，请使用 Modifier`)
 
-    const shortId = hashId(filename, source)
-    const compilerOptions = {runtimeModuleName: "@arrange/framework"}
-    const needsEsbuild = supportsTs(descriptor.script?.lang) || supportsTs(descriptor.scriptSetup?.lang)
+    const compilerOptions = { runtimeModuleName: "@arrange/framework" }
+    const needsTranspile = supportsTs(descriptor.script?.lang) || supportsTs(descriptor.scriptSetup?.lang)
 
     if (descriptor.scriptSetup || descriptor.script) {
         const script = compileScript(descriptor, {
-            id: shortId,
             genDefaultAs: "_sfc_main",
             inlineTemplate: Boolean(descriptor.template),
-            templateOptions: {compilerOptions},
+            templateOptions: { compilerOptions },
             isProd: true,
         })
 
-        let output = script.content
+        let output = `${script.content}\n_sfc_main.__file = ${JSON.stringify(filename)}`
         if (!descriptor.template) {
             output += "\nexport default _sfc_main"
         } else if (!script.content.includes("export default")) {
@@ -109,30 +101,30 @@ export function compileArrangeSfc(code: string, id: string): ArrangeSfcCompileRe
         return {
             code: output,
             warnings,
-            needsEsbuild,
+            needsTranspile,
         }
     }
 
     if (!descriptor.template) {
-        throw new Error(`Arrange SFC ${filename} contains no <script> or <template> block.`)
+        throw new Error(`Arrange SFC ${filename} 必须包含 <script> 或 <template> 区块`)
     }
 
     const template = compileTemplate({
         source: descriptor.template.content,
+        ast: descriptor.template.ast,
         filename,
-        id: shortId,
         isProd: true,
         compilerOptions,
     })
     if (template.errors.length) {
         throw new Error(
             template.errors
-                .map((error) => error instanceof Error ? error.message : String(error))
+                .map(describeError)
                 .join("\n"),
         )
     }
 
     const codeBlock = replaceExportRender(template.code)
-    const output = `const _sfc_main = {}\n${codeBlock}\n_sfc_main.render = render\nexport default _sfc_main`
-    return {code: output, warnings, needsEsbuild}
+    const output = `const _sfc_main = {__file: ${JSON.stringify(filename)}}\n${codeBlock}\n_sfc_main.render = render\nexport default _sfc_main`
+    return { code: output, warnings, needsTranspile }
 }

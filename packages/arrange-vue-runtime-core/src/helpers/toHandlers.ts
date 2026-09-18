@@ -1,4 +1,4 @@
-﻿import { isObject, toHandlerKey } from '@arrange/vue-shared'
+import { isObject, toHandlerKey } from '@arrange/vue-shared'
 import { warn } from '../warning.ts'
 
 /**
@@ -6,21 +6,15 @@ import { warn } from '../warning.ts'
  * @private
  */
 export function toHandlers(
-  obj: Record<string, any>,
-  preserveCaseIfNecessary?: boolean,
+    obj: Record<string, any>,
 ): Record<string, any> {
-  const ret: Record<string, any> = {}
-  if (__DEV__ && !isObject(obj)) {
-    warn(`v-on with no argument expects an object value.`)
+    const ret: Record<string, any> = {}
+    if (__DEV__ && !isObject(obj)) {
+        warn(`v-on with no argument expects an object value.`)
+        return ret
+    }
+    for (const key in obj) {
+        ret[toHandlerKey(key)] = obj[key]
+    }
     return ret
-  }
-  for (const key in obj) {
-    ret[
-      preserveCaseIfNecessary && /[A-Z]/.test(key)
-        ? `on:${key}`
-        : toHandlerKey(key)
-    ] = obj[key]
-  }
-  return ret
 }
-

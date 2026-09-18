@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <string>
+#include <optional>
 #include <vector>
 #include <functional>
 #include "Geometry.h"
@@ -44,6 +45,7 @@ namespace arrange::core {
         std::string textAlign;
         std::string overflow;
         std::string resource;
+        std::optional<std::string> resourceOrigin;
         bool resourceIsIcon = false;
         std::string contentScale;
         std::string alignment;

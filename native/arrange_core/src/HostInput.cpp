@@ -58,7 +58,7 @@ namespace arrange::core {
         constexpr auto measure = dirtyMask(DirtyFlag::Layout) | placement;
         switch (input) {
         case HostInput::TextStyle:
-            if (sameField(before, after, "fontSize") && sameField(before, after, "lineHeight") && sameField(before, after, "fontFamily") && sameField(before, after, "fontWeight")) return paint;
+            if (sameField(before, after, "fontSize") && sameField(before, after, "lineHeight")) return paint;
             return measure;
         case HostInput::TextAlign:
         case HostInput::Overflow:

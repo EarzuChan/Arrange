@@ -1,16 +1,16 @@
-import {ErrorCodes, callWithAsyncErrorHandling, createRenderer} from "@arrange/vue-runtime-core"
-import type {App as VueApp, Component} from "@arrange/vue-runtime-core"
-import {Text} from "./components.ts"
-import {m, toModifier, modifierStats} from "./modifier.ts"
-import {ARRANGE_RUNTIME_VERSION} from "./native.ts"
-import type {NativeMutation, NativePropValue, NativeTransactionTarget, NodeId} from "./native.ts"
-import type {ArrangeContainer, ArrangeHostNode} from "./types.ts"
+import { ErrorCodes, arrangeResource, callWithAsyncErrorHandling, createRenderer } from "@arrange/vue-runtime-core"
+import type { App as VueApp, Component } from "@arrange/vue-runtime-core"
+import { m, toModifier, modifierStats } from "./modifier.ts"
+import { ARRANGE_RUNTIME_VERSION } from "./native.ts"
+import type { NativeMutation, NativePropValue, NativeTransactionTarget, NodeId } from "./native.ts"
+import type { ArrangeContainer, ArrangeHostNode } from "./types.ts"
+import { acceptsHostInput, canonicalHostInput, hostEventNames, isHostTag } from "@arrange/vue-shared"
 
 declare global {
     var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
 }
 
-const eventPropNames = new Set(["onUpdate:modelValue", "onUpdate:model-value", "onSubmit", "onChange", "onBlur"])
+const eventPropNames = hostEventNames
 
 function isNativePropValue(value: unknown): value is NativePropValue {
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true
@@ -26,7 +26,7 @@ function toNativePropValue(key: string, value: unknown): NativePropValue {
         }
     }
     if (isNativePropValue(value)) return value
-    throw new TypeError(`Arrange prop '${key}' cannot be sent to native: unsupported value type`)
+    throw new TypeError(`Arrange 输入 '${key}'：值类型不符合原生输入 schema`)
 }
 
 function makeNode(type: string, kind: ArrangeHostNode["kind"] = "element"): ArrangeHostNode {
@@ -34,9 +34,10 @@ function makeNode(type: string, kind: ArrangeHostNode["kind"] = "element"): Arra
         $$arrangeVNode: true,
         type,
         kind,
-        props: kind === "anchor" ? {} : {modifier: m},
+        props: kind === "anchor" ? {} : { modifier: m },
         __arrangeBindings: new Map(),
         __arrangeLastInputs: new Map(),
+        __arrangeSources: new Map(),
         __arrangeModifierBindings: new Map(),
         children: [],
     }
@@ -47,13 +48,13 @@ function hasNativeNode(node: ArrangeHostNode): boolean {
 }
 
 function makeTextNode(text: string): ArrangeHostNode {
-    const node = makeNode(Text, "text")
+    const node = makeNode("Text", "text")
     node.props.text = String(text)
     return node
 }
 
 function isHostNode(value: unknown): value is ArrangeHostNode {
-    return Boolean(value && typeof value === "object" && (value as {$$arrangeVNode?: unknown}).$$arrangeVNode)
+    return Boolean(value && typeof value === "object" && (value as { $$arrangeVNode?: unknown }).$$arrangeVNode)
 }
 
 function findContainer(node: ArrangeHostNode | ArrangeContainer | null | undefined): ArrangeContainer | null {
@@ -84,47 +85,53 @@ function modifierKind(type: string): string { return type === "absoluteOffset" ?
 
 function inputMutation(node: ArrangeHostNode, key: string, value: unknown): NativeMutation {
     const id = node.__arrangeNodeId
-    if (!id) throw new Error("Arrange binding target is missing native node id")
+    if (!id) throw new Error("Arrange 绑定目标缺少原生节点身份")
     const typed = key === "modifier" ? toModifier(value as never) : key === "text" ? String(value ?? "") : value == null ? null : toNativePropValue(key, value)
+    const source = node.__arrangeSources.get(key)
     return native => {
-        const previous = node.__arrangeLastInputs.get(key)
-        if (node.__arrangeLastInputs.has(key) && equalInput(previous, typed)) {
-            modifierStats.equalWritesSkipped++
-            return
-        }
-        if (key === "modifier") {
-            const next = typed as typeof m
-            const before = previous as typeof m | undefined
-            const sameShape = before && before.elements.length === next.elements.length && next.elements.every((item, index) =>
-                modifierKind(item.type) === modifierKind(before.elements[index].type) && item.key === before.elements[index].key)
-            const instances = sameShape ? native.modifierInstances?.(id) : undefined
-            if (instances && native.registerModifierBinding && instances.length === next.elements.length && instances.every((instance, index) =>
-                instance.key === (next.elements[index].key ?? "") && instance.kind === modifierKind(next.elements[index].type))) {
-                for (let index = 0; index < next.elements.length; index++) {
-                    if (equalInput(before!.elements[index], next.elements[index])) continue
-                    const instance = instances[index]
-                    let binding = node.__arrangeModifierBindings.get(instance.identity)
-                    if (!binding) {
-                        binding = native.registerModifierBinding(id, instance)
-                        node.__arrangeModifierBindings.set(instance.identity, binding)
-                    }
-                    native.updateBinding(binding, next.elements[index])
-                    modifierStats.instanceWrites++
-                }
-                node.__arrangeLastInputs.set(key, typed)
+        try {
+            const previous = node.__arrangeLastInputs.get(key)
+            if (node.__arrangeLastInputs.has(key) && equalInput(previous, typed)) {
+                modifierStats.equalWritesSkipped++
                 return
             }
-            for (const handle of node.__arrangeModifierBindings.values()) native.releaseBinding(handle)
-            node.__arrangeModifierBindings.clear()
-            modifierStats.chainWrites++
+            if (key === "modifier") {
+                const next = typed as typeof m
+                const before = previous as typeof m | undefined
+                const sameShape = before && before.elements.length === next.elements.length && next.elements.every((item, index) =>
+                    modifierKind(item.type) === modifierKind(before.elements[index].type) && item.key === before.elements[index].key)
+                const instances = sameShape ? native.modifierInstances?.(id) : undefined
+                if (instances && native.registerModifierBinding && instances.length === next.elements.length && instances.every((instance, index) =>
+                    instance.key === (next.elements[index].key ?? "") && instance.kind === modifierKind(next.elements[index].type))) {
+                    for (let index = 0; index < next.elements.length; index++) {
+                        if (equalInput(before!.elements[index], next.elements[index])) continue
+                        const instance = instances[index]
+                        let binding = node.__arrangeModifierBindings.get(instance.identity)
+                        if (!binding) {
+                            binding = native.registerModifierBinding(id, instance)
+                            node.__arrangeModifierBindings.set(instance.identity, binding)
+                        }
+                        native.updateBinding(binding, next.elements[index])
+                        modifierStats.instanceWrites++
+                    }
+                    node.__arrangeLastInputs.set(key, typed)
+                    return
+                }
+                for (const handle of node.__arrangeModifierBindings.values()) native.releaseBinding(handle)
+                node.__arrangeModifierBindings.clear()
+                modifierStats.chainWrites++
+            }
+            let handle = node.__arrangeBindings.get(key)
+            if (!handle) {
+                handle = native.registerBinding(id, key)
+                node.__arrangeBindings.set(key, handle)
+            }
+            native.updateBinding(handle, typed)
+            node.__arrangeLastInputs.set(key, typed)
+        } catch (error) {
+            if (error instanceof Error && source && !error.message.includes(source)) error.message += `\n来源：${source}`
+            throw error
         }
-        let handle = node.__arrangeBindings.get(key)
-        if (!handle) {
-            handle = native.registerBinding(id, key)
-            node.__arrangeBindings.set(key, handle)
-        }
-        native.updateBinding(handle, typed)
-        node.__arrangeLastInputs.set(key, typed)
     }
 }
 
@@ -144,7 +151,7 @@ function releaseSubtreeBindings(node: ArrangeHostNode): NativeMutation[] {
 function emitCreateSubtree(node: ArrangeHostNode | null | undefined, parentId: NodeId | null = null, index = 0, mutations: NativeMutation[] = []): NativeMutation[] {
     if (!node || !hasNativeNode(node)) return mutations
     const id = node.__arrangeNodeId
-    if (!id) throw new Error("Arrange host node is missing native node id")
+    if (!id) throw new Error("Arrange 宿主节点缺少原生身份")
     mutations.push((native) => native.createNode(id, String(node.type)))
     for (const [key, value] of Object.entries(node.props ?? {})) {
         if (key === "modifier") continue
@@ -160,7 +167,7 @@ function assertNativeRuntime(target: NativeTransactionTarget | null | undefined)
     const nativeVersion = target?.runtimeVersion
     if (nativeVersion == null) return
     if (nativeVersion !== ARRANGE_RUNTIME_VERSION) {
-        throw new Error(`Arrange runtime/native version mismatch: runtime=${ARRANGE_RUNTIME_VERSION}, native=${nativeVersion}`)
+        throw new Error(`Arrange 脚本与原生协议版本不一致： runtime=${ARRANGE_RUNTIME_VERSION}, native=${nativeVersion}`)
     }
 }
 
@@ -261,24 +268,31 @@ function setNodeText(node: ArrangeHostNode, text: string): void {
 }
 
 const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
-    patchProp(el, key, _previous, next, _namespace, owner) {
+    patchProp(el, key, _previous, next, owner, source) {
+        key = canonicalHostInput(key)
+
         if (eventPropNames.has(key) && next != null) {
             const callbacks = next
             next = (...args: unknown[]) => callWithAsyncErrorHandling(callbacks, owner ?? null, ErrorCodes.NATIVE_EVENT_HANDLER, args)
         }
-        if (key === "class" || key === "style") throw new TypeError(`Arrange 不支持 ${key}，请使用 Modifier`)
-        el.props[key] = key === "modifier" ? toModifier(next ?? m) : next
+        if (!isHostTag(el.type) || !acceptsHostInput(el.type, key)) throw new TypeError(`Arrange <${el.type}> 没有输入 ${key}，请检查组件 schema${source || owner?.type.__file ? `\n来源：${source ?? owner!.type.__file}` : ''}`)
+        if (source || owner?.type.__file) el.__arrangeSources.set(key, source ?? owner!.type.__file!)
+        el.props[key] = key === "modifier" ? toModifier(next ?? m) : key === 'source' ? arrangeResource(next, source ?? owner?.type.__file) : next
         if (el.__arrangeNodeId) enqueueNativeMutation(el, inputMutation(el, key, el.props[key]))
     },
     insert: insertHostNode,
     remove: removeHostNode,
-    createElement: type => makeNode(type),
+    createElement(type) {
+        if (!isHostTag(type)) throw new TypeError(`Arrange 缺少 <${type}> 的宿主 schema`)
+        return makeNode(type)
+    },
+    createStorageContainer: () => makeNode('Storage'),
     createText: makeTextNode,
     createComment: () => makeNode("Anchor", "anchor"),
     setText: setNodeText,
     setElementText(node, text) {
         for (const child of [...node.children]) removeHostNode(child)
-        if (node.type === Text) setNodeText(node, text)
+        if (node.type === "Text") setNodeText(node, text)
         else if (text !== "") insertHostNode(makeTextNode(text), node)
     },
     parentNode(node) {
@@ -292,13 +306,13 @@ const renderer = createRenderer<ArrangeHostNode, ArrangeHostNode>({
     },
 })
 
-export type ArrangeMountHandle = {tree: ArrangeHostNode | null; unmount: () => void}
-export type ArrangeApp = Omit<VueApp, "mount"> & {mount: (target?: NativeTransactionTarget) => unknown}
-type ArrangeVueAppBoundary = ArrangeApp & {unmount: () => void}
+export type ArrangeMountHandle = { tree: ArrangeHostNode | null; unmount: () => void }
+export type ArrangeApp = Omit<VueApp, "mount"> & { mount: (target?: NativeTransactionTarget) => unknown }
+type ArrangeVueAppBoundary = ArrangeApp & { unmount: () => void }
 
-function createArrangeVueApp(rootComponent: Component, rootProps: Record<string, unknown> | null): {app: ArrangeVueAppBoundary; vueApp: VueApp} {
+function createArrangeVueApp(rootComponent: Component, rootProps: Record<string, unknown> | null): { app: ArrangeVueAppBoundary; vueApp: VueApp } {
     const vueApp = renderer.createApp(rootComponent, rootProps)
-    return {app: vueApp as unknown as ArrangeVueAppBoundary, vueApp}
+    return { app: vueApp as unknown as ArrangeVueAppBoundary, vueApp }
 }
 
 function containerAsMountHost(container: ArrangeContainer): ArrangeHostNode {
@@ -306,7 +320,7 @@ function containerAsMountHost(container: ArrangeContainer): ArrangeHostNode {
 }
 
 export function createApp(rootComponent: Component, rootProps: Record<string, unknown> | null = null): ArrangeApp {
-    const {app, vueApp} = createArrangeVueApp(rootComponent, rootProps)
+    const { app, vueApp } = createArrangeVueApp(rootComponent, rootProps)
     const originalMount = vueApp.mount.bind(vueApp)
     const originalUnmount = app.unmount.bind(app)
     let container: ArrangeContainer | null = null
@@ -325,10 +339,10 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
     }
 
     app.mount = (target: NativeTransactionTarget = globalThis.__ARRANGE_NATIVE__!) => {
-        if (!target?.registerBinding || !target.updateBinding || !target.releaseBinding) throw new Error("Arrange native binding runtime is required")
+        if (!target?.registerBinding || !target.updateBinding || !target.releaseBinding) throw new Error("Arrange 缺少原生绑定运行时")
         assertNativeRuntime(target)
         for (const operation of ['createNode', 'deleteNode', 'insertChild', 'removeChild', 'unmount'] as const) {
-            if (typeof target[operation] !== 'function') throw new Error(`Arrange native runtime is missing ${operation}`)
+            if (typeof target[operation] !== 'function') throw new Error(`Arrange 原生运行时缺少 ${operation}`)
         }
         nativeTarget = target
         container = {
@@ -349,15 +363,15 @@ export function createApp(rootComponent: Component, rootProps: Record<string, un
 
         if (result && (typeof result === "object" || typeof result === "function")) {
             try {
-                Object.defineProperty(result, "tree", {configurable: true, get: () => currentTree(container)})
-                Object.defineProperty(result, "unmount", {configurable: true, value: () => app.unmount()})
+                Object.defineProperty(result, "tree", { configurable: true, get: () => currentTree(container) })
+                Object.defineProperty(result, "unmount", { configurable: true, value: () => app.unmount() })
                 return result
             } catch {
                 // Vue component public instances are proxies; if a host rejects augmentation,
                 // fall through to the Arrange mount handle used by tests/smoke.
             }
         }
-        return {tree: currentTree(container), unmount: () => app.unmount()} satisfies ArrangeMountHandle
+        return { tree: currentTree(container), unmount: () => app.unmount() } satisfies ArrangeMountHandle
     }
     return app
 }

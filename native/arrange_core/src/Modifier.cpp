@@ -1,4 +1,5 @@
 #include <arrange/core/Modifier.h>
+#include <arrange/core/Alignment.h>
 #include <arrange/core/SlotUpdate.h>
 
 #include <algorithm>
@@ -35,7 +36,7 @@ namespace arrange::core {
                 return names[static_cast<std::size_t>(input.kind)];
             }
             if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
-                constexpr std::string_view names[]{"background", "border", "alpha", "dropShadow", "innerShadow"};
+                constexpr std::string_view names[]{"background", "border", "alpha"};
                 return names[static_cast<std::size_t>(input.kind)];
             }
             if constexpr (std::is_same_v<T, InputModifierSemantics>) {
@@ -71,7 +72,7 @@ namespace arrange::core {
                 if (input.minHeight >= 0 && input.maxHeight >= 0 && input.minHeight > input.maxHeight) throw std::invalid_argument("Arrange Modifier minHeight exceeds maxHeight");
             }
             else if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
-                for (auto number : {input.strokeWidth, input.cornerRadius, input.alpha, input.shadowOffset.x, input.shadowOffset.y}) finite(number);
+                for (auto number : {input.strokeWidth, input.cornerRadius, input.alpha}) finite(number);
                 if (input.strokeWidth < 0 || input.cornerRadius < 0 || input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange invalid paint Modifier input");
                 if (!input.shapeType.empty() && input.shapeType != "rectangle" && input.shapeType != "rounded" && input.shapeType != "circle") throw std::invalid_argument("Arrange unknown Modifier shape");
             }
@@ -91,6 +92,7 @@ namespace arrange::core {
             else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
                 finite(input.weight);
                 if (input.weight < 0) throw std::invalid_argument("Arrange weight must be nonnegative");
+                if (input.kind == ParentDataKind::Align && !isImageAlignment(input.align) && input.align != "Baseline") throw std::invalid_argument("Arrange Modifier.align 不支持对齐值：'" + input.align + "'");
             }
         }, value);
     }

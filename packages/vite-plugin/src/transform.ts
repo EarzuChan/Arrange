@@ -1,6 +1,6 @@
-import {transformWithEsbuild} from "vite"
-import {compileArrangeSfc, injectHmrClient, isEntryModule, isVueModule, isVueQueryModule} from "./sfc.ts"
-import type {ArrangeTransformPlugin, ArrangeTransformPluginOptions, TransformThis} from "./types.ts"
+import { transformWithOxc } from "vite"
+import { compileArrangeSfc, injectHmrClient, isEntryModule, isVueModule, isVueQueryModule } from "./sfc.ts"
+import type { ArrangeTransformPlugin, ArrangeTransformPluginOptions, TransformThis } from "./types.ts"
 
 export function createArrangeTransformPlugin(options: ArrangeTransformPluginOptions): ArrangeTransformPlugin {
     return {
@@ -17,12 +17,12 @@ export function createArrangeTransformPlugin(options: ArrangeTransformPluginOpti
             if (!isVueModule(id)) return null
             if (String(id).includes("?")) return ""
 
-            const {code: transformed, warnings, needsEsbuild} = compileArrangeSfc(code, id)
-            for (const message of warnings) this.warn({id, message})
-            if (!needsEsbuild) return transformed
+            const { code: transformed, warnings, needsTranspile } = compileArrangeSfc(code, id)
+            for (const message of warnings) this.warn({ id, message })
+            if (!needsTranspile) return transformed
 
-            return transformWithEsbuild(transformed, id, {
-                loader: "ts",
+            return transformWithOxc(transformed, id, {
+                lang: "ts",
                 target: "es2022",
                 sourcemap: false,
             }).then((result) => result.code)

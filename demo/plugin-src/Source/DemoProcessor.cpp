@@ -18,9 +18,9 @@ juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
     arrange::juce::EditorConfig config;
 
     config.app.useDist();
-    config.width = 680;
-    config.height = 640;
-    config.window.title = "Arrange Demo";
+    config.width = 900;
+    config.height = 780;
+    config.window.title = "Arrange 原生画廊";
     config.window.resizable = true;
     config.window.useCornerResizer = true;
     config.window.minWidth = 420;

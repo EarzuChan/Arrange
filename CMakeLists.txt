@@ -16,6 +16,8 @@ endif()
 arrange_fetch_quickjs_ng()
 arrange_fetch_juce()
 
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 add_subdirectory(native/arrange_core)
 add_subdirectory(native/arrange_quickjs)
 add_subdirectory(native/arrange_juce)
@@ -23,6 +25,7 @@ add_subdirectory(native/arrange_juce)
 add_library(arrange_framework INTERFACE)
 add_library(Arrange::framework ALIAS arrange_framework)
 target_link_libraries(arrange_framework INTERFACE Arrange::juce)
+target_compile_options(arrange_framework INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 option(ARRANGE_BUILD_TESTS "Build Arrange C++ tests" ${ARRANGE_IS_TOP_LEVEL})
 if(ARRANGE_BUILD_TESTS)
