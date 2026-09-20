@@ -31,8 +31,7 @@ namespace arrange::core {
     };
 
     struct MinSizeMeasurePolicy { bool operator==(const MinSizeMeasurePolicy&) const = default; };
-    struct TextMeasurePolicy { bool operator==(const TextMeasurePolicy&) const = default; };
-    using MeasurePolicy = std::variant<BoxMeasurePolicy, RowMeasurePolicy, ColumnMeasurePolicy, MinSizeMeasurePolicy, TextMeasurePolicy>;
+    using MeasurePolicy = std::variant<BoxMeasurePolicy, RowMeasurePolicy, ColumnMeasurePolicy, MinSizeMeasurePolicy>;
 
     // 边界转换只发生在输入更新时，测量与放置直接消费类型化策略
     MeasurePolicy readMeasurePolicy(const PropValue& value);

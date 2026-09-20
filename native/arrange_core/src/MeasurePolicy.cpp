@@ -67,7 +67,6 @@ namespace arrange::core {
         }
         fields(value, {"kind"});
         if (kind == "MinSize") return MinSizeMeasurePolicy{};
-        if (kind == "Text") return TextMeasurePolicy{};
         throw std::invalid_argument("未知 MeasurePolicy：" + kind);
     }
 

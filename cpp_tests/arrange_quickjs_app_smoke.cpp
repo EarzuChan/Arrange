@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/Layout.h>
 #include <arrange/core/NativeScene.h>
@@ -22,7 +23,7 @@ namespace {
     bool treeContainsText(const arrange::core::LayoutTree& tree, const std::string& text) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            if (tree.node(id).text == text) return true;
+            if (test_support::textOf(tree.node(id)) == text) return true;
         }
         return false;
     }
@@ -54,8 +55,8 @@ namespace {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
             const auto& node = tree.node(id);
-            if (node.textPresentation != arrange::core::TextPresentation::Editable) continue;
-            if (const auto slot = node.eventSlots.find(arrange::core::EventSlotKind::InputSubmit); slot != node.eventSlots.end() && slot->second.valid()) return slot->second;
+            const auto slot = test_support::event(node, arrange::core::EventSlotKind::InputSubmit);
+            if (slot.valid()) return slot;
         }
         return std::nullopt;
     }
@@ -89,10 +90,10 @@ namespace {
 
     std::string strictModifierSmokeSource(std::string_view modifierExpression) {
         return std::string("const native = globalThis.__ARRANGE_NATIVE__;\n") +
-            "native.createNode(1, 'Box');\n" +
+            "native.createNode(1, 'LayoutNode');\n" +
             "if (!native.setModifier) throw new Error('native.setModifier missing');\n" +
             "native.setModifier(1, " + std::string(modifierExpression) + ");\n" +
-            "native.createNode(2, 'Box');\n" +
+            "native.createNode(2, 'LayoutNode');\n" +
             "native.setModifier(2, { elements: [] });\n" +
             "native.insertChild(1, 2, 0);\n";
     }
@@ -107,8 +108,8 @@ namespace {
             "native.diagnosticsSetCategoryEnabled('runtime.script', false);\n"
             "native.diagnosticsSetToastsEnabled(false);\n"
             "native.diagnosticsRequestReload({ path: 'src/App.sfa', timestamp: 12 });\n"
-            "native.createNode(1, 'Box');\n"
-            "native.createNode(2, 'Box');\n"
+            "native.createNode(1, 'LayoutNode');\n"
+            "native.createNode(2, 'LayoutNode');\n"
             "native.setModifier(2, { elements: [] });\n"
             "native.insertChild(1, 2, 0);\n";
         const auto result = host.executeModule("diagnostics-smoke.js", source);
@@ -151,7 +152,7 @@ namespace {
             const auto result = host.executeModule(
                 "diagnostics-invalid-level-smoke.js",
                 "const native = globalThis.__ARRANGE_NATIVE__;\n"
-                "native.createNode(1, 'Box');\n"
+                "native.createNode(1, 'LayoutNode');\n"
                 "native.setModifier(1, { elements: [] });\n"
                 "native.diagnosticsLog('verbose', { category: 'app', message: 'bad' });\n");
             if (result.ok || result.error.find("log level") == std::string::npos || !host.takeDiagnosticEvents().empty()) {
@@ -163,7 +164,7 @@ namespace {
             const auto result = host.executeModule(
                 "diagnostics-invalid-category-smoke.js",
                 "const native = globalThis.__ARRANGE_NATIVE__;\n"
-                "native.createNode(1, 'Box');\n"
+                "native.createNode(1, 'LayoutNode');\n"
                 "native.setModifier(1, { elements: [] });\n"
                 "native.diagnosticsSetCategoryEnabled('runtime.fake', true);\n");
             if (result.ok || result.error.find("category") == std::string::npos || !host.takeDiagnosticActions().empty()) {
@@ -249,6 +250,7 @@ int main(int argc, char** argv) {
     arrange::core::NativeScene scene;
     scene.apply(*lastMutations);
     host.publishScene(scene);
+    if (const auto result = host.completeRearrange(lastMutations->rearrange); !result.ok) throw std::runtime_error(result.error);
     auto& tree = scene.tree();
     arrange::core::LayoutEngine layout;
     layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
@@ -306,6 +308,7 @@ int main(int argc, char** argv) {
             if (!lastMutations) return 25;
             scene.apply(*lastMutations);
             host.publishScene(scene);
+    if (const auto result = host.completeRearrange(lastMutations->rearrange); !result.ok) throw std::runtime_error(result.error);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             if (!treeContainsText(tree, expectedText)) return 26;
             arg = expectedEnd;
@@ -332,6 +335,7 @@ int main(int argc, char** argv) {
             if (!lastMutations) return 29;
             scene.apply(*lastMutations);
             host.publishScene(scene);
+    if (const auto result = host.completeRearrange(lastMutations->rearrange); !result.ok) throw std::runtime_error(result.error);
             if (arrange::core::ScrollDispatcher::verticalScrollValue(tree.node(slot->node)) != scrollValue) return 30;
             arg += 2;
             continue;
@@ -360,6 +364,7 @@ int main(int argc, char** argv) {
             if (!lastMutations) return 33;
             scene.apply(*lastMutations);
             host.publishScene(scene);
+    if (const auto result = host.completeRearrange(lastMutations->rearrange); !result.ok) throw std::runtime_error(result.error);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             if (!treeContainsText(tree, expectedText)) return 34;
             arg = expectedEnd;
@@ -381,6 +386,7 @@ int main(int argc, char** argv) {
             scene.reset();
             scene.apply(*lastMutations);
             host.publishScene(scene);
+    if (const auto result = host.completeRearrange(lastMutations->rearrange); !result.ok) throw std::runtime_error(result.error);
             layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
             arg += 2;
             continue;

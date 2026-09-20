@@ -13,8 +13,8 @@ namespace arrange::core {
         void apply(const MutationTransaction& transaction);
 
         [[nodiscard]] bool contains(NodeId id) const noexcept { return tree_.contains(id); }
-        [[nodiscard]] const ArrangeNode& node(NodeId id) const { return tree_.node(id); }
-        [[nodiscard]] ArrangeNode& node(NodeId id) { return tree_.node(id); }
+        [[nodiscard]] const LayoutNode& node(NodeId id) const { return tree_.node(id); }
+        [[nodiscard]] LayoutNode& node(NodeId id) { return tree_.node(id); }
         [[nodiscard]] DirtySnapshot dirtySnapshot(std::uint32_t mask = 0xffffffffu) const noexcept {
             return tree_.dirtySnapshot(mask);
         }

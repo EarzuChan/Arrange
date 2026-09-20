@@ -1,128 +1,111 @@
-import { computed, type EffectScope, getCurrentScope, pauseTracking, ReactiveEffect, resetTracking } from '@arrange/vue-reactivity'
-import { isReservedProp, normalizeParameterObject } from '@arrange/vue-shared'
+import { getCurrentScope, pauseTracking, ReactiveEffect, resetTracking, type EffectScope } from '@arrange/vue-reactivity'
 import type { ArrangableInstance } from './arrangable.ts'
-import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
-import { queueJob, type SchedulerJob, SchedulerJobFlags } from './scheduler.ts'
-
-const measureNow = () => (performance as Performance & { measureNow?: () => number }).measureNow?.() ?? performance.now()
-
-const valueExpression = Symbol('Arrange value expression')
-
-export interface ValueExpression<T = unknown> {
-    readonly [valueExpression]: true
-    readonly read: () => T
-    readonly source?: string
-}
-
-// 编译器把普通模板表达式延后；用户的 Ref 本身不携带用途或阶段
-export function arrangeValue<T>(read: () => T, source?: string): ValueExpression<T> {
-    arrangeExecutionStats.valueDescriptions++
-    return { [valueExpression]: true, read, source }
-}
-
-export function isValueExpression(value: unknown): value is ValueExpression {
-    return !!value && typeof value === 'object' && valueExpression in value
-}
-
-// 对象绑定的键集合与 key 属于结构，普通字段仍在值域读取
-// shape computed 复用相等结果，值变化只会唤醒实际字段消费者
-export function arrangeProps(read: () => Record<string, unknown> | null | undefined, source?: string): Record<string, unknown> {
-    arrangeExecutionStats.dynamicParameterGroups++
-    const values = computed(() => {
-        try { return normalizeParameterObject(read()) } catch (error) {
-            if (error instanceof Error && source && !error.message.includes(source)) error.message += `\n来源：${source}`
-            throw error
-        }
-    })
-    const shape = computed((previous?: { keys: string[]; reserved: unknown[] }) => {
-        const value = values.value
-        const keys = Object.keys(value)
-        const reserved = keys.filter(isReservedProp).map(key => value[key])
-        if (previous && keys.length === previous.keys.length && keys.every((key, index) => key === previous.keys[index])
-            && reserved.length === previous.reserved.length && reserved.every((item, index) => Object.is(item, previous.reserved[index]))) return previous
-        return { keys, reserved }
-    })
-    const { keys, reserved } = shape.value
-    let reservedIndex = 0
-    return Object.fromEntries(keys.map(key => [key, isReservedProp(key) ? reserved[reservedIndex++] : arrangeValue(() => values.value[key], source)]))
-}
+import { queueJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
+import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 
 export class ValueBinding {
-    private read: () => unknown
     private effect: ReactiveEffect
-    private job: SchedulerJob
+    private readonly job: SchedulerJob
+    private readonly scope: EffectScope
     private stopped = false
     private initialized = false
     private value: unknown
-    private scope: EffectScope | undefined
-    private source?: string
+    private readonly update = { scope: () => this.owner.structure, dirty: () => this.dirty, run: () => this.refreshDirty() }
+    private readonly cleanup = () => this.stop()
 
-    constructor(
-        expression: ValueExpression,
-        owner: ArrangableInstance | null,
-        private write: (value: unknown, previous: unknown) => void,
-    ) {
-        this.read = expression.read
-        this.source = expression.source
-        this.scope = getCurrentScope() ?? owner?.scope
-        const evaluate = () => new ReactiveEffect(() => {
-            arrangeExecutionStats.valueEvaluations++
-            const started = measureNow()
-            let value: unknown
-            try { value = this.read() } catch (error) { throw this.annotate(error) } finally { arrangeExecutionStats.valueEvaluationMillis += measureNow() - started }
-            if (!this.initialized || !Object.is(value, this.value)) {
-                const previous = this.value
-                pauseTracking()
-                try {
-                    this.write(value, previous)
-                    this.value = value
-                    this.initialized = true
-                    arrangeExecutionStats.valueWrites++
-                } catch (error) { throw this.annotate(error) } finally { resetTracking() }
-            }
-        })
-        this.effect = this.scope ? this.scope.run(evaluate)! : evaluate()
+    get dirty(): boolean { return !this.stopped && !this.owner.isDeactivated && !this.owner.isUnmounted && this.effect.dirty }
+
+    constructor(private read: () => unknown, private readonly owner: ArrangableInstance, private readonly write: (value: unknown, previous: unknown) => void, private source?: string, private readonly invalidate?: () => void) {
+        this.scope = getCurrentScope() ?? owner.scope
         this.job = () => {
-            if (!this.stopped) callWithErrorHandling(() => this.effect.runIfDirty(), owner, ErrorCodes.ARRANGABLE_UPDATE)
+            if (!this.stopped && !owner.isDeactivated && !owner.isUnmounted) callWithErrorHandling(() => owner.composition.runValue(this.update), owner, ErrorCodes.ARRANGABLE_UPDATE)
         }
-        // 同一Arrangable结构先处理，已删除分支的绑定在执行前被停止
-        this.job.id = owner ? owner.uid + 0.5 : Infinity
-        this.job.i = owner ?? undefined
+        this.job.id = owner.uid
+        this.job.i = owner
+        this.effect = this.createEffect()
+        this.scope.cleanups.push(this.cleanup)
         arrangeExecutionStats.activeValueBindings++
-        this.effect.onStop = () => {
-            arrangeExecutionStats.activeValueBindings--
-            this.stopped = true
-            this.job.flags = (this.job.flags ?? 0) | SchedulerJobFlags.DISPOSED
-        }
-        this.effect.scheduler = () => queueJob(this.job)
+
         try { this.effect.run() } catch (error) {
             this.stop()
             throw error
         }
     }
 
-    refresh(expression: ValueExpression, write: (value: unknown, previous: unknown) => void): void {
-        const sameRead = this.read === expression.read
-        this.read = expression.read
-        this.source = expression.source
-        this.write = write
-        // keyed 移动后闭包可能捕获新 item/index，即使 Ref 没变也必须重订阅
-        callWithErrorHandling(() => sameRead ? this.effect.runIfDirty() : this.effect.run(), this.job.i, ErrorCodes.ARRANGABLE_UPDATE)
+    private createEffect(): ReactiveEffect {
+        const effect = this.scope.run(() => new ReactiveEffect(() => {
+            arrangeExecutionStats.valueEvaluations++
+            let value: unknown
+            try { value = this.read() } catch (error) { throw this.annotate(error) }
+            if (this.initialized && Object.is(value, this.value)) return
+
+            pauseTracking()
+            try {
+                this.write(value, this.value)
+                this.value = value
+                this.initialized = true
+                arrangeExecutionStats.valueWrites++
+            } finally {
+                resetTracking()
+            }
+        }))!
+        effect.scheduler = () => {
+            if (this.stopped || this.owner.isUnmounted || this.owner.composition.reverting) return
+            if (this.invalidate) this.invalidate()
+            else if (this.owner.composition.preparing) this.owner.composition.runValue(this.update)
+            else queueJob(this.job)
+        }
+        return effect
     }
 
-    currentValue(): unknown { return this.value }
+    refreshDirty(): void {
+        if (!this.stopped && this.effect.dirty) this.refresh(this.read, this.source)
+    }
+
+    refresh(read: () => unknown, source?: string): void {
+        if (this.stopped) return
+        const previous = { read: this.read, source: this.source, effect: this.effect, value: this.value, initialized: this.initialized }
+        this.read = read
+        this.source = source
+        const candidate = this.createEffect()
+        this.effect = candidate
+        if (this.owner.composition.preparing) {
+            this.owner.composition.onCommit(() => this.stopEffect(previous.effect))
+            this.owner.composition.onRollback(() => {
+                this.stopEffect(candidate)
+                this.read = previous.read
+                this.source = previous.source
+                this.effect = previous.effect
+                this.value = previous.value
+                this.initialized = previous.initialized
+            })
+        } else this.stopEffect(previous.effect)
+        candidate.run()
+    }
+
+    currentValue(): unknown {
+        return this.value
+    }
 
     private annotate(error: unknown): unknown {
         if (error instanceof Error && this.source && !error.message.includes(this.source)) error.message += `\n来源：${this.source}`
         return error
     }
 
+    private stopEffect(effect: ReactiveEffect): void {
+        effect.stop()
+        const index = this.scope.effects.indexOf(effect)
+        if (index >= 0) this.scope.effects.splice(index, 1)
+    }
+
     stop(): void {
-        this.effect.stop()
-        if (this.scope?.active) {
-            const index = this.scope.effects.indexOf(this.effect)
-            if (index >= 0) this.scope.effects.splice(index, 1)
-        }
+        if (this.stopped) return
+        this.stopped = true
+        this.job.flags = (this.job.flags ?? 0) | SchedulerJobFlags.DISPOSED
+        arrangeExecutionStats.activeValueBindings--
+        this.stopEffect(this.effect)
+        const index = this.scope.cleanups.indexOf(this.cleanup)
+        if (index >= 0) this.scope.cleanups.splice(index, 1)
     }
 }

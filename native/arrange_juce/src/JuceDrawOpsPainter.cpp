@@ -116,7 +116,7 @@ namespace arrange::juce {
         return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, std::optional<arrange::core::NodeId> focused, float viewportX) const {
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focused, float viewportX) const {
         g.saveState();
         int depth = 1;
         try { replayOps(g, ops, focused, viewportX, 1, depth); }
@@ -125,12 +125,12 @@ namespace arrange::juce {
         return {};
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, std::optional<arrange::core::NodeId> focused, float viewportX) const {
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focused, float viewportX) const {
         replayFragment(g, root, focused, viewportX, 1);
         return {};
     }
 
-    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, std::optional<arrange::core::NodeId> focused, float viewportX, float alpha) const {
+    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focused, float viewportX, float alpha) const {
         if (!placed.fragment) return;
         ++counters_.fragmentsVisited;
         ::juce::Graphics::ScopedSaveState scope(g);
@@ -150,7 +150,7 @@ namespace arrange::juce {
         while (depth-- > 0) g.restoreState();
     }
 
-    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, std::optional<arrange::core::NodeId> focusedInputNode, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
+    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
         for (const auto& op : ops) {
             ++counters_.opsVisited;
             const auto state = op.type == arrange::core::DrawOpType::PushClip || op.type == arrange::core::DrawOpType::PopClip || op.type == arrange::core::DrawOpType::PushTransform || op.type == arrange::core::DrawOpType::PopTransform;
@@ -170,7 +170,7 @@ namespace arrange::juce {
                 else { g.drawRect(rect, op.strokeWidth); }
                 break;
             case arrange::core::DrawOpType::DrawText:
-                drawText(g, op, op.inputText && focusedInputNode && op.nodeId == *focusedInputNode ? focusedInputViewportX : 0.0f, alpha);
+                if (!op.inputText || !focusedInputModifier.valid() || op.textField != focusedInputModifier) drawText(g, op, 0.0f, alpha);
                 break;
             case arrange::core::DrawOpType::DrawPainter: {
                 const auto* content = dynamic_cast<const JucePainterContent*>(op.painter.content.get());

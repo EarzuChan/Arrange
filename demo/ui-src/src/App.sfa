@@ -49,9 +49,9 @@
 <script>
 import { painter, tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, M, onMounted, onUnmounted, ref, createScrollState, sp} from "@arrange/framework"
 
-import CounterPanel from './arrangables/CounterPanel.sfa'
-import AnimationGallery from './arrangables/AnimationGallery.sfa'
-import ShowcaseGallery from './arrangables/ShowcaseGallery.sfa'
+import CounterPanel from './views/CounterPanel.sfa'
+import AnimationGallery from './views/AnimationGallery.sfa'
+import ShowcaseGallery from './views/ShowcaseGallery.sfa'
 
 const clicks = ref(0)
 const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})

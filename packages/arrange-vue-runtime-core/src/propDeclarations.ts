@@ -1,60 +1,12 @@
 import { EMPTY_OBJ, arrangeParameterName, hasOwn, isArray, isFunction, isObject } from '@arrange/vue-shared'
-import type { ArrangablePropsOptions, NormalizedProps, PropOptions } from './arrangableProps.ts'
+import type { ArrangablePropsOptions, NormalizedProps } from './arrangableProps.ts'
+import type { ArrangableDefinition } from './arrangable.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
 
-type ParameterPlan = { definition: object; positions: Map<string, number>; entries: readonly { name: string; declaration: PropOptions; position: number }[] }
-type ParameterValues = { plan: ParameterPlan; values: unknown[]; source?: string }
-const parameterValues = new WeakMap<object, ParameterValues>()
-const parameterPlans = new WeakMap<object, WeakMap<readonly string[], ParameterPlan>>()
+const declarationsCache = new WeakMap<object, NormalizedProps>()
 
-// 编译器给出固定参数位置，模块定义只在调用点首次连接时参与名称匹配
-export function arrangeParameters(definition: { props?: ArrangablePropsOptions }, names: readonly string[], values: unknown[], source?: string): Record<string, unknown> {
-    arrangeExecutionStats.fixedParameterGroups++
-    if (values.length !== names.length) throw new TypeError('编译参数的位置与值数量不一致')
-    let plans = parameterPlans.get(definition)
-    if (!plans) parameterPlans.set(definition, plans = new WeakMap())
-    let plan = plans.get(names)
-    if (!plan) {
-        const declarations = normalizeDeclaredProps(definition.props)
-        const positions = new Map<string, number>()
-        for (let index = 0; index < names.length; index++) {
-            const name = arrangeParameterName(names[index])
-            if (positions.has(name)) throw new TypeError(`重复参数：${name}${source ? `\n来源：${source}` : ''}`)
-            if (name !== 'key' && !hasOwn(declarations, name)) throw new TypeError(`Arrangable 未声明参数：${name}${source ? `\n来源：${source}` : ''}`)
-            positions.set(name, index)
-        }
-        plan = { definition, positions, entries: Object.entries(declarations).map(([name, declaration]) => ({ name, declaration, position: positions.get(name) ?? -1 })) }
-        plans.set(names, plan)
-        arrangeExecutionStats.parameterPlans++
-    }
-
-    const provided: Record<string, unknown> = Object.create(null)
-    for (const [name, position] of plan.positions) provided[name] = values[position]
-    parameterValues.set(provided, { plan, values, source })
-    return Object.freeze(provided)
-}
-
-export function copyParameters(raw: Record<string, unknown>): Record<string, unknown> {
-    const next = { ...raw }
-    const prepared = parameterValues.get(raw)
-    if (prepared) parameterValues.set(next, { plan: prepared.plan, values: prepared.values.slice(), source: prepared.source })
-    return next
-}
-
-export function assignParameter(raw: Record<string, unknown>, name: string, value: unknown): void {
-    raw[name] = value
-    const prepared = parameterValues.get(raw)
-    const position = prepared?.plan.positions.get(name)
-    if (position !== undefined) prepared!.values[position] = value
-}
-
-export function preparedParameters(raw: object | null, definition: object): ParameterValues | undefined {
-    const prepared = raw && parameterValues.get(raw)
-    return prepared && prepared.plan.definition === definition ? prepared : undefined
-}
-
-// 声明校验不依赖实例与渲染器，定义加载时即可完成
 export function normalizeDeclaredProps(raw: ArrangablePropsOptions | undefined): NormalizedProps {
+    if (raw && declarationsCache.has(raw)) return declarationsCache.get(raw)!
     const declarations: NormalizedProps = Object.create(null)
     if (raw != null && !isArray(raw) && !isObject(raw)) throw new TypeError('Arrangable 参数声明必须是对象或名称数组')
 
@@ -68,5 +20,41 @@ export function normalizeDeclaredProps(raw: ArrangablePropsOptions | undefined):
         const value = isArray(raw) ? null : raw![original]
         declarations[name] = isArray(value) || isFunction(value) ? { type: value } : { ...value }
     }
+    if (raw && Object.isFrozen(raw)) declarationsCache.set(raw, declarations)
     return declarations
+}
+
+export interface ParameterPlan {
+    readonly definition: ArrangableDefinition
+    readonly names: readonly string[]
+    readonly fields: readonly { readonly name: string; readonly position: number }[]
+}
+
+const parameterPlans = new WeakSet<object>()
+
+// 只预连接声明和位置，getter 与默认值工厂仍在实际调用的实例内求值
+export function prepareParameters(definition: ArrangableDefinition, names: readonly string[], slots: readonly string[] = [], source?: string): ParameterPlan {
+    const declarations = normalizeDeclaredProps(definition.props)
+    const positions = new Map<string, number>()
+    const fail = (message: string): never => { throw new TypeError(message + (source ? `\n来源：${source}` : '')) }
+    for (const [position, original] of names.entries()) {
+        arrangeExecutionStats.parameterNameChecks++
+        const name = arrangeParameterName(original)
+        if (!hasOwn(declarations, name)) fail(`Arrangable 未声明参数：${name}`)
+        if (positions.has(name)) fail(`重复参数：${name}`)
+        positions.set(name, position)
+    }
+    for (const slot of slots) if (!definition.slotNames.includes(slot)) fail(`Arrangable 未声明内容：${slot}`)
+    const fields = Object.entries(declarations).map(([name, declaration]) => {
+        const position = positions.get(name) ?? -1
+        if (position < 0 && declaration.required && !hasOwn(declaration, 'default')) fail(`缺少必需参数：${name}`)
+        return Object.freeze({ name, position })
+    })
+    const plan = Object.freeze({ definition, names: Object.freeze([...names]), fields: Object.freeze(fields) })
+    parameterPlans.add(plan)
+    return plan
+}
+
+export function checkParameterPlan(plan: ParameterPlan, definition: ArrangableDefinition): void {
+    if (!parameterPlans.has(plan) || plan.definition !== definition) throw new TypeError('参数位置计划不属于当前 Arrangable 定义')
 }

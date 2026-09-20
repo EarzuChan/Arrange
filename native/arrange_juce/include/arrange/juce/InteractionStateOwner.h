@@ -38,6 +38,7 @@ namespace arrange::juce {
 
         [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
         [[nodiscard]] float viewportX() const noexcept;
+        [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept { return input_.focusedModifier(); }
 
         void pointerDown(
             arrange::core::LayoutTree& tree,

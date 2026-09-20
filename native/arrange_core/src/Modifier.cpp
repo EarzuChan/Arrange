@@ -19,8 +19,20 @@ namespace arrange::core {
             if (!std::isfinite(value)) throw std::invalid_argument("Arrange Modifier input must be finite");
         }
 
-        std::uint32_t capabilities(const ModifierValue& value) {
+        void validateTextPresentation(const TextPresentation& input) {
+            finite(input.style.fontSize);
+            finite(input.style.lineHeight);
+            if (input.style.fontSize <= 0 || input.style.lineHeight < 0) throw std::invalid_argument("文本字号必须大于零，行高不能为负数");
+            if (input.minLines < 1 || input.maxLines < 0 || input.maxLines > 0 && input.maxLines < input.minLines) throw std::invalid_argument("文本行数范围无效");
+            if (input.singleLine && (input.minLines != 1 || input.maxLines > 1)) throw std::invalid_argument("单行文本不能要求多行范围");
+            if (input.textAlign != "Start" && input.textAlign != "Center" && input.textAlign != "End") throw std::invalid_argument("textAlign 文本对齐值无效：" + input.textAlign);
+            if (input.overflow != "clip" && input.overflow != "ellipsis" && input.overflow != "visible") throw std::invalid_argument("文本溢出模式无效");
+        }
+
+        std::uint32_t invalidationMask(const ModifierValue& value) {
             if (std::holds_alternative<LayoutModifierSemantics>(value) || std::holds_alternative<ParentDataModifierSemantics>(value) || std::holds_alternative<AnimateContentSizeModifier>(value)) return kMeasure;
+            if (std::holds_alternative<TextModifier>(value)) return kMeasure;
+            if (std::holds_alternative<TextFieldModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             if (std::holds_alternative<PaintModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::Resource);
             if (std::holds_alternative<OffsetModifier>(value)) return kPlace;
             if (std::holds_alternative<PaintStyleSemantics>(value)) return kPaint;
@@ -46,6 +58,8 @@ namespace arrange::core {
             }
             if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : "align";
             if constexpr (std::is_same_v<T, PaintModifier>) return "paint";
+            if constexpr (std::is_same_v<T, TextModifier>) return "text";
+            if constexpr (std::is_same_v<T, TextFieldModifier>) return "textField";
             if constexpr (std::is_same_v<T, ClipModifier>) return "clip";
             if constexpr (std::is_same_v<T, TransformModifierSemantics>) return "graphicsLayer";
             if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
@@ -96,6 +110,8 @@ namespace arrange::core {
                     if (size.width < 0 || size.height < 0) throw std::invalid_argument("Painter 固有尺寸不能为负数");
                 }
             }
+            else if constexpr (std::is_same_v<T, TextModifier>) validateTextPresentation(input);
+            else if constexpr (std::is_same_v<T, TextFieldModifier>) validateTextPresentation(input.presentation);
             else if constexpr (std::is_same_v<T, ClipModifier>) validateModifierValue(input.shape);
             else if constexpr (std::is_same_v<T, TransformModifierSemantics>) {
                 for (auto number : {input.translationX, input.translationY, input.scaleX, input.scaleY, input.rotationZ, input.transformOriginX, input.transformOriginY, input.alpha}) finite(number);
@@ -113,6 +129,24 @@ namespace arrange::core {
 
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after) {
         if (before == after) return 0;
+        if (const auto* a = textPresentation(before)) {
+            if (const auto* b = textPresentation(after); b && sameModifierKind(before, after)) {
+                auto previous = *a;
+                previous.color = b->color;
+                previous.textAlign = b->textAlign;
+                if (previous == *b) {
+                    auto dirty = a->color != b->color || a->textAlign != b->textAlign ? kPaint : 0u;
+                    if (modifierText(before) != modifierText(after)) dirty |= kMeasure;
+                    if (const auto* field = std::get_if<TextFieldModifier>(&before)) {
+                        const auto& next = std::get<TextFieldModifier>(after);
+                        if (field->value != next.value || field->placeholder != next.placeholder) dirty |= kMeasure;
+                        if (field->enabled != next.enabled) dirty |= kHit | dirtyMask(DirtyFlag::Focus);
+                        if (field->onValueChange != next.onValueChange || field->onSubmit != next.onSubmit || field->onChange != next.onChange || field->onBlur != next.onBlur) dirty |= dirtyMask(DirtyFlag::EventSlot);
+                    }
+                    return dirty;
+                }
+            }
+        }
         if (const auto* a = std::get_if<PaintModifier>(&before)) {
             if (const auto* b = std::get_if<PaintModifier>(&after)) {
                 const auto oldSize = a->painter.content ? a->painter.content->intrinsicSize : std::nullopt;
@@ -146,7 +180,7 @@ namespace arrange::core {
         if (const auto* a = std::get_if<InputModifierSemantics>(&before)) {
             if (const auto* b = std::get_if<InputModifierSemantics>(&after); b && a->kind == b->kind && a->enabled == b->enabled && a->focusable == b->focusable) return dirtyMask(DirtyFlag::EventSlot) | kHit;
         }
-        return capabilities(before) | capabilities(after);
+        return invalidationMask(before) | invalidationMask(after);
     }
 
     void validateModifierDescriptors(const ModifierDescriptors& descriptors) {
@@ -157,27 +191,43 @@ namespace arrange::core {
         }
     }
 
+    std::vector<std::size_t> matchModifierDescriptors(std::span<const ModifierDescriptor* const> previous, const ModifierDescriptors& next) {
+        // key 允许移动，无 key 按类型及相对次序匹配；FFI 回调和原生实例使用同一规则
+        std::unordered_map<std::string, std::size_t> keyed;
+        for (std::size_t i = 0; i < previous.size(); ++i) if (!previous[i]->key.empty()) keyed.emplace(previous[i]->key, i);
+        std::vector<bool> used(previous.size(), false);
+        std::vector<std::size_t> matches;
+        matches.reserve(next.size());
+        std::size_t cursor = 0;
+        for (const auto& descriptor : next) {
+            auto match = previous.size();
+            if (!descriptor.key.empty()) {
+                if (auto found = keyed.find(descriptor.key); found != keyed.end() && !used[found->second] && sameModifierKind(previous[found->second]->value, descriptor.value)) match = found->second;
+            }
+            else {
+                for (auto i = cursor; i < previous.size(); ++i) {
+                    if (!used[i] && previous[i]->key.empty() && sameModifierKind(previous[i]->value, descriptor.value)) { match = i; cursor = i + 1; break; }
+                }
+            }
+            if (match < previous.size()) used[match] = true;
+            matches.push_back(match);
+        }
+        return matches;
+    }
+
     ModifierReconcileResult ModifierChain::reconcile(const ModifierDescriptors& descriptors) {
         validateModifierDescriptors(descriptors);
-        // 有 key 的元素允许移动；无 key 的元素按类型及相对次序协调
-        // 使用前缀直通和线性查找，避免给每个高频值更新分配 O(n*m) DP 表
-        std::unordered_map<std::string, std::size_t> keyed;
-        for (std::size_t i = 0; i < elements_.size(); ++i) if (!elements_[i].descriptor.key.empty()) keyed.emplace(elements_[i].descriptor.key, i);
+        std::vector<const ModifierDescriptor*> previous;
+        previous.reserve(elements_.size());
+        for (const auto& instance : elements_) previous.push_back(&instance.descriptor);
+        const auto matches = matchModifierDescriptors(previous, descriptors);
         std::vector<bool> used(elements_.size(), false);
         std::vector<ModifierInstance> next;
         next.reserve(descriptors.size());
         ModifierReconcileResult result;
-        std::size_t cursor = 0;
-        for (const auto& descriptor : descriptors) {
-            auto match = elements_.size();
-            if (!descriptor.key.empty()) {
-                if (auto found = keyed.find(descriptor.key); found != keyed.end() && sameModifierKind(elements_[found->second].descriptor.value, descriptor.value)) match = found->second;
-            }
-            else {
-                for (auto i = cursor; i < elements_.size(); ++i) {
-                    if (!used[i] && elements_[i].descriptor.key.empty() && sameModifierKind(elements_[i].descriptor.value, descriptor.value)) { match = i; cursor = i + 1; break; }
-                }
-            }
+        for (std::size_t index = 0; index < descriptors.size(); ++index) {
+            const auto& descriptor = descriptors[index];
+            const auto match = matches[index];
             if (match < elements_.size()) {
                 used[match] = true;
                 auto instance = elements_[match];

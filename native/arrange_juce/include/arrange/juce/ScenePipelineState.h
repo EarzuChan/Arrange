@@ -43,7 +43,6 @@ namespace arrange::juce {
         arrange::core::SceneFramePipeline pipeline_;
         arrange::core::InputIntentQueue pendingIntents_;
         arrange::core::MutationTransactionQueue pendingTransactions_;
-        std::optional<arrange::core::MutationTransaction> failedTransaction_;
         arrange::core::PublishedFrame publishedFrame_;
     };
 } // namespace arrange::juce

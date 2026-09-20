@@ -35,7 +35,7 @@ namespace arrange::core {
     void LayoutTree::applyMutation(const TreeMutation& mutation) {
         if (const auto* op = getIf<CreateNodeMutation>(mutation)) {
             if (op->id == 0 || contains(op->id)) throw std::invalid_argument("Arrange createNode requires a fresh nonzero node id");
-            ArrangeNode node;
+            LayoutNode node;
             node.id = op->id;
             node.type = op->type;
             if (op->type == NodeType::Root) node.measurePolicy = BoxMeasurePolicy{"TopStart", true};
@@ -91,23 +91,6 @@ namespace arrange::core {
             return;
         }
 
-        if (const auto* op = getIf<SetEventSlotMutation>(mutation)) {
-            auto& node = require(op->id);
-            if (op->kind != EventSlotKind::None && op->slot.valid()) {
-                node.eventSlots[op->kind] = op->slot;
-                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, eventSlotKindName(op->kind), "event callback changed");
-            }
-            return;
-        }
-
-        if (const auto* op = getIf<ClearEventSlotMutation>(mutation)) {
-            auto& node = require(op->id);
-            if (op->kind != EventSlotKind::None && node.eventSlots.erase(op->kind) > 0) {
-                markDirtyAttributed(op->id, DirtyFlag::EventSlot, InvalidationSource::NativeMutation, eventSlotKindName(op->kind), "event callback removed");
-            }
-            return;
-        }
-
         if (const auto* op = getIf<SetModifierMutation>(mutation)) {
             setModifierChain(op->id, op->modifier);
             return;
@@ -140,7 +123,6 @@ namespace arrange::core {
         if (previous == node.props.end() && value.isNull()) return 0;
         const auto mask = hostInputInvalidation(input, previous == node.props.end() ? nullptr : &previous->second, value);
         if (mask != 0) {
-            ++node.contentRevision;
             if (value.isNull()) node.props.erase(name);
             else node.props[name] = value;
             markInputDirty(id, mask);
@@ -160,8 +142,8 @@ namespace arrange::core {
         return result.dirty;
     }
 
-    const ArrangeNode& LayoutTree::node(NodeId id) const { return require(id); }
-    ArrangeNode& LayoutTree::node(NodeId id) { return require(id); }
+    const LayoutNode& LayoutTree::node(NodeId id) const { return require(id); }
+    LayoutNode& LayoutTree::node(NodeId id) { return require(id); }
 
     DirtySnapshot LayoutTree::dirtySnapshot(std::uint32_t mask) const noexcept {
         DirtySnapshot snapshot;
@@ -358,13 +340,13 @@ namespace arrange::core {
         return it->second;
     }
 
-    ArrangeNode& LayoutTree::require(NodeId id) {
+    LayoutNode& LayoutTree::require(NodeId id) {
         const auto it = nodes_.find(id);
         if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
         return it->second;
     }
 
-    const ArrangeNode& LayoutTree::require(NodeId id) const {
+    const LayoutNode& LayoutTree::require(NodeId id) const {
         const auto it = nodes_.find(id);
         if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
         return it->second;

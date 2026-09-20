@@ -10,7 +10,11 @@
 
         <ShowcaseGallery v-if="showcase" :command="showcaseCommand" />
 
-        <DynamicArrangable v-if="asyncProbe" :is="asyncProbe" />
+        <Text v-if="asyncStatus === 'loading'" text="延迟加载提示" />
+
+        <Text v-else-if="asyncStatus === 'ready'" text="延迟加载完成" />
+
+        <Text v-else-if="asyncStatus === 'failed'" text="延迟加载超时" />
 
         <Image v-if="missingResource" :painter="missingPainter!" />
     </Column>
@@ -18,7 +22,7 @@
 
 
 <script>
-import { painter, ref, shallowRef, h, Text, type Arrangable, defineAsyncArrangable, getArrangeExecutionStats} from '@arrange/framework'
+import { painter, ref, shallowRef, onScopeDispose, defaultAnimationClock, getArrangeExecutionStats} from '@arrange/framework'
 import AnimationGallery from '../../../demo/ui-src/src/arrangables/AnimationGallery.sfa'
 import CounterPanel from '../../../demo/ui-src/src/arrangables/CounterPanel.sfa'
 import ShowcaseGallery from '../../../demo/ui-src/src/arrangables/ShowcaseGallery.sfa'
@@ -38,18 +42,45 @@ let commandSequence = 0
 let baseline: ReturnType<typeof getArrangeExecutionStats> | undefined
 let performanceBaseline: ReturnType<typeof getArrangeExecutionStats> | undefined
 let lifetimeBaseline: number | undefined
-const asyncProbe = shallowRef<Arrangable | null>(null)
+const asyncStatus = ref<'idle' | 'pending' | 'loading' | 'ready' | 'failed'>('idle')
+let asyncRequest = 0
+let asyncFrame: number | undefined
 let finishAsync: (() => void) | undefined
 
-function startAsyncProbe() {
-    asyncProbe.value = defineAsyncArrangable({
-        loader: () => new Promise<Arrangable>(resolve => { finishAsync = () => resolve({setup: () => () => h(Text, {text: '延迟加载完成'})}) }),
-        loadingArrangable: {setup: () => () => h(Text, {text: '延迟加载提示'})},
-        errorArrangable: {props: ['error'], setup: () => () => h(Text, {text: '延迟加载超时'})},
-        delay: 32,
-        timeout: 96,
-    })
+function cancelAsyncProbe() {
+    asyncRequest++
+    if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
+    asyncFrame = undefined
+    asyncStatus.value = 'idle'
 }
+
+function startAsyncProbe() {
+    cancelAsyncProbe()
+    const request = asyncRequest
+    const started = defaultAnimationClock.now()
+    asyncStatus.value = 'pending'
+    const pending = new Promise<void>(resolve => { finishAsync = resolve })
+    pending.then(() => {
+        if (request !== asyncRequest) return
+        if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
+        asyncFrame = undefined
+        asyncStatus.value = 'ready'
+    })
+    const sample = (time: number) => {
+        asyncFrame = undefined
+        if (request !== asyncRequest) return
+        if (time - started >= 96) {
+            asyncRequest++
+            asyncStatus.value = 'failed'
+            return
+        }
+        if (time - started >= 32) asyncStatus.value = 'loading'
+        asyncFrame = defaultAnimationClock.requestFrame(sample)
+    }
+    asyncFrame = defaultAnimationClock.requestFrame(sample)
+}
+
+onScopeDispose(cancelAsyncProbe)
 
 function tap() { clicks.value++ }
 function command(value: string) {
@@ -66,7 +97,7 @@ function command(value: string) {
     }
     else if (value === 'async-start') startAsyncProbe()
     else if (value === 'async-finish') finishAsync?.()
-    else if (value === 'async-remove') asyncProbe.value = null
+    else if (value === 'async-remove') cancelAsyncProbe()
     else if (value === 'showcase') showcase.value = true
     else if (value === 'showcase-remove') showcase.value = false
     else if (value.startsWith('showcase:')) showcaseCommand.value = `${value.slice(9)}:${++commandSequence}`

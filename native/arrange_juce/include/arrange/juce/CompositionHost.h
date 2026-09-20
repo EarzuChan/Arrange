@@ -3,7 +3,7 @@
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/NativeScene.h>
 #include <arrange/core/MutationTransaction.h>
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/juce/ScriptEventDispatcher.h>
 
@@ -44,17 +44,14 @@ namespace arrange::juce {
             const arrange::core::EventSlotId& slot,
             double nowMillis,
             const std::string& value);
-        [[nodiscard]] CompositionInvokeResult invokeNodeStringEvent(
-            const arrange::core::ArrangeNode& node,
-            arrange::core::EventSlotKind kind,
-            double nowMillis,
-            const std::string& value);
+
         [[nodiscard]] CompositionInvokeResult invokeScrollSnapshot(
             const arrange::core::EventSlotId& slot,
             double nowMillis,
             const arrange::core::ScrollResult& result);
 
         void publishScene(const arrange::core::NativeScene& scene);
+        CompositionInvokeResult completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error = {});
 #if ARRANGE_WITH_QUICKJS_NG
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();

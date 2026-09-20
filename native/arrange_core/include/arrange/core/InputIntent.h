@@ -3,7 +3,7 @@
 #include "EventSlot.h"
 #include "Geometry.h"
 #include "MutationTransaction.h"
-#include "Node.h"
+#include "LayoutNode.h"
 
 #include <optional>
 #include <string>

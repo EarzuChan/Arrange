@@ -1,0 +1,63 @@
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+[0/2] Re-checking globbed directories...
+[1/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\EventSlot.cpp.obj
+[2/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Mutation.cpp.obj
+[3/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Invalidation.cpp.obj
+[4/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\PropValue.cpp.obj
+[5/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\PropSchema.cpp.obj
+[6/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\InputIntent.cpp.obj
+[7/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\MutationTransaction.cpp.obj
+[8/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\SlotUpdate.cpp.obj
+[9/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\HostInput.cpp.obj
+[10/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\LayoutTree.cpp.obj
+[11/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\NativeScene.cpp.obj
+[12/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\ModifierGeometry.cpp.obj
+[13/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Modifier.cpp.obj
+[14/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Layout.cpp.obj
+[15/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\SceneFramePipeline.cpp.obj
+[16/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\MeasurePolicy.cpp.obj
+[17/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\HitTest.cpp.obj
+[18/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\PointerInputProcessor.cpp.obj
+[19/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Scroll.cpp.obj
+[20/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsEventRegistry.cpp.obj
+[21/57] Building CXX object _deps\arrange-build\native\arrange_core\CMakeFiles\arrange_core.dir\src\Paint.cpp.obj
+[22/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsModifierReader.cpp.obj
+[23/57] Linking CXX static library _deps\arrange-build\native\arrange_core\arrange_core.lib
+[24/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\ScenePipelineState.cpp.obj
+[25/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsNativeApi.cpp.obj
+[26/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsPainterResources.cpp.obj
+[27/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\ArrangeRuntime.cpp.obj
+[28/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsRuntimeContext.cpp.obj
+[29/57] Building CXX object _deps\arrange-build\native\arrange_quickjs\CMakeFiles\arrange_quickjs.dir\src\QuickJsScriptHost.cpp.obj
+[30/57] Linking CXX static library _deps\arrange-build\native\arrange_quickjs\arrange_quickjs.lib
+[31/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\CompositionHost.cpp.obj
+[32/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\EditorChromeModel.cpp.obj
+[33/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\DiagnosticsState.cpp.obj
+[34/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\DiagnosticsScene.cpp.obj
+[35/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\EditorDebugActions.cpp.obj
+[36/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\EditorSceneHost.cpp.obj
+[37/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\FramePumpDriver.cpp.obj
+[38/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\InteractionStateOwner.cpp.obj
+[39/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\TextInputOwner.cpp.obj
+[40/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\InputTextSession.cpp.obj
+[41/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\TextInputLayoutModel.cpp.obj
+[42/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\TextInputMutationSink.cpp.obj
+[43/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\PointerInputState.cpp.obj
+[44/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\JuceDrawOpsPainter.cpp.obj
+[45/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\JuceRepaintAdapter.cpp.obj
+[46/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\PackageRuntimeSource.cpp.obj
+[47/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\PassivePaintRenderer.cpp.obj
+[48/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\JucePointerInputAdapter.cpp.obj
+[49/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\ScriptEventDispatcher.cpp.obj
+[50/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\RuntimePackageBinder.cpp.obj
+[51/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\RuntimeSessionState.cpp.obj
+[52/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\RuntimePackageLoader.cpp.obj
+[53/57] Building CXX object _deps\arrange-build\native\arrange_juce\CMakeFiles\arrange_juce.dir\src\JuceTextInputAdapter.cpp.obj
+[54/57] Linking CXX static library _deps\arrange-build\native\arrange_juce\arrange_juce.lib
+[55/57] Linking CXX executable "ArrangeDemoPlugin_artefacts\Debug\Standalone\Arrange Demo.exe"
+[56/57] Linking CXX shared module "ArrangeDemoPlugin_artefacts\Debug\VST3\Arrange Demo.vst3\Contents\x86_64-win\Arrange Demo.vst3"
+removing moduleinfo.json
+creating E:/a_dev/proj/Arrange/build/demo-ninja-debug/ArrangeDemoPlugin_artefacts/Debug/VST3/Arrange Demo.vst3

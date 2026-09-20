@@ -21,19 +21,17 @@ namespace arrange::core {
         Custom = 100,
     };
 
-    enum class EventSlotOwner { Node, Modifier };
 
     struct EventSlotId {
         NodeId node = 0;
         EventSlotKind kind = EventSlotKind::None;
         std::string path;
-        EventSlotOwner owner = EventSlotOwner::Node;
         std::uint64_t resource = 0;
         std::uint64_t generation = 0;
 
         [[nodiscard]] bool valid() const noexcept { return node != 0 && kind != EventSlotKind::None; }
         [[nodiscard]] bool operator==(const EventSlotId& other) const noexcept {
-            return node == other.node && kind == other.kind && path == other.path && owner == other.owner && resource == other.resource && generation == other.generation;
+            return node == other.node && kind == other.kind && path == other.path && resource == other.resource && generation == other.generation;
         }
     };
 
@@ -44,7 +42,6 @@ namespace arrange::core {
             result ^= std::hash<std::string>{}(slot.path) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
             result ^= std::hash<std::uint64_t>{}(slot.resource) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
             result ^= std::hash<std::uint64_t>{}(slot.generation) + 0x9e3779b9u + (result << 6u) + (result >> 2u);
-            result ^= std::hash<int>{}(static_cast<int>(slot.owner));
             return result;
         }
     };

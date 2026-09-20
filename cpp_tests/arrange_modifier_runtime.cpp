@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/HitTest.h>
 #include <arrange/core/Layout.h>
 #include <arrange/core/ModifierGeometry.h>
@@ -263,17 +264,14 @@ namespace {
         check(layout.counters().measuredNodes == 1 && layout.counters().measureCacheHits == 2, "unchanged descendant constraints missed resize cache");
         LayoutModifierSemantics padding;
         padding.padding.top = 7;
-        tree.apply({CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{4, "textPresentation", arrange::core::PropValue::stringValue("display")}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{5, "textPresentation", arrange::core::PropValue::stringValue("display")}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
+        tree.apply({CreateNodeMutation{4, arrange::core::NodeType::Layout}, SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
             SetModifierMutation{1, {}}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Row")}, {"verticalAlignment", PropValue::stringValue("Baseline")}})},
-            SetTextMutation{4, "small"}, SetTextMutation{5, "large"}, SetModifierMutation{4, {{padding, {}}}},
+            SetModifierMutation{4, {{padding, {}}, {test_support::text("小字"), {}}}}, SetModifierMutation{5, {{test_support::text("大字", 0xff000000u, 30, 36), {}}}},
             InsertChildMutation{1, 4, 0}, InsertChildMutation{1, 5, 1}});
-        PropValue textStyle = PropValue::objectValue({{"fontSize", PropValue::numberValue(30)}, {"lineHeight", PropValue::numberValue(36)}});
-        tree.setHostInput(5, HostInput::TextStyle, textStyle);
         layout.layout(tree, 1, {0, 600, 0, 500}); tree.clearDirty();
         check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "row baselines ignored Modifier padding");
         const auto previousBaseline = tree.node(1).baseline;
-        textStyle = PropValue::objectValue({{"fontSize", PropValue::numberValue(40)}, {"lineHeight", PropValue::numberValue(48)}});
-        tree.setHostInput(5, HostInput::TextStyle, textStyle);
+        tree.setModifierChain(5, {{test_support::text("大字", 0xff000000u, 40, 48), {}}});
         layout.resetCounters(); layout.layout(tree, 1, {0, 600, 0, 500});
         check(tree.node(1).baseline > previousBaseline && layout.counters().measureCacheHits == 1, "baseline input failed to propagate while retaining sibling measurement");
         check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "baseline update left stale sibling placement");

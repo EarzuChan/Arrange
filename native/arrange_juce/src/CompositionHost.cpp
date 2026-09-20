@@ -90,20 +90,23 @@ namespace arrange::juce {
 #endif
     }
 
-    CompositionInvokeResult CompositionHost::invokeNodeStringEvent(
-        const arrange::core::ArrangeNode& node,
-        arrange::core::EventSlotKind kind,
-        double nowMillis,
-        const std::string& value) {
-        const auto slot = ScriptEventDispatcher::eventSlot(node, kind);
-        return invokeString(slot, nowMillis, value);
-    }
+
 
     CompositionInvokeResult CompositionHost::invokeScrollSnapshot(
         const arrange::core::EventSlotId& slot,
         double nowMillis,
         const arrange::core::ScrollResult& result) {
         return fromScriptEventResult(eventDispatcher_.invokeScroll(scriptHost_.get(), slot, nowMillis, result));
+    }
+
+    CompositionInvokeResult CompositionHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) {
+            const auto result = scriptHost_->completeRearrange(submission, error);
+            return {true, result.ok, result.error};
+        }
+#endif
+        return {false, true, {}};
     }
 
     void CompositionHost::publishScene(const arrange::core::NativeScene& scene) {

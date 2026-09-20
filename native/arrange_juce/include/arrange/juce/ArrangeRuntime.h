@@ -5,7 +5,7 @@
 #include <arrange/core/InputIntent.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/NativeScene.h>
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/core/Scroll.h>
@@ -79,10 +79,7 @@ namespace arrange::juce {
             const arrange::core::EventSlotId& slot,
             const arrange::core::ScrollResult& result);
         void enqueueStringEvent(const arrange::core::EventSlotId& slot, std::string value);
-        void enqueueNodeStringEvent(
-            const arrange::core::ArrangeNode& node,
-            arrange::core::EventSlotKind kind,
-            std::string value);
+
         [[nodiscard]] bool hasPendingEvents() const noexcept;
 
         [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;

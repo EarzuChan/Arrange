@@ -21,13 +21,13 @@ namespace arrange::juce {
 
         explicit TextInputLayoutModel(arrange::core::TextLayoutService& textLayoutService) noexcept;
 
-        static bool allowsLineBreak(const arrange::core::ArrangeNode& node);
+        static bool allowsLineBreak(const arrange::core::ModifierInstance& instance);
 
-        Metrics metrics(const arrange::core::ArrangeNode& node, float viewportX) const;
-        Layout layout(const arrange::core::ArrangeNode& node, const std::string& text, float viewportX) const;
-        std::size_t textIndexAtPoint(const arrange::core::ArrangeNode& node, const std::string& text, float viewportX, float x, float y) const;
+        Metrics metrics(const arrange::core::ModifierInstance& instance, float viewportX) const;
+        Layout layout(const arrange::core::ModifierInstance& instance, const std::string& text, float viewportX) const;
+        std::size_t textIndexAtPoint(const arrange::core::ModifierInstance& instance, const std::string& text, float viewportX, float x, float y) const;
         ::juce::RectangleList<int> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end) const;
-        float updatedViewportX(const arrange::core::ArrangeNode& node, const std::string& text, std::size_t cursorIndex, float viewportX) const;
+        float updatedViewportX(const arrange::core::ModifierInstance& instance, const std::string& text, std::size_t cursorIndex, float viewportX) const;
         [[nodiscard]] arrange::core::TextLayoutService& textLayoutService() const noexcept { return textLayoutService_; }
 
     private:

@@ -40,59 +40,28 @@ Reactive slot updates:
 
 # Native transaction API
 
-QuickJS host 暴露给 TS runtime 的生产入口应表达 native typed mutation，而不是 serialization protocol：
+QuickJS host 暴露给运行时的入口直接接收类型化操作与输入，不要求序列化：
 
 ```ts
-native.beginTransaction()
-native.createNode(id, type)
-native.deleteNode(id)
-native.insertChild(parent, child, index)
-native.removeChild(parent, child)
-native.setMeasurePolicy(id, policy)
-native.setModifier(id, modifierObject)
-native.updateEventSlot(id, slot, callback)
-native.invalidate(intent)
-native.endTransaction()
+native.beginRearrange()
+native.createNode(id, 'LayoutNode')
+native.insertChild(parent, id, index)
+const policyBinding = native.registerBinding(id, 'measurePolicy')
+native.updateBinding(policyBinding, policy)
+const chainBinding = native.registerBinding(id, 'modifier')
+native.updateBinding(chainBinding, modifier)
+native.submitRearrange(complete)
 ```
 
-具体命名可随实现调整，但职责不能变：
+`submitRearrange` 只提交候选并登记完成回执，不在调用栈内执行布局或发布。失败或取消经 `abortRearrange` 撤销边界内候选资源；回执关联独立提交身份，重载、取消和迟到完成不得误确认新事务。仅逻辑变化的空事务也必须保留回执。事务式逻辑生命规则见 [运行时](04-运行时.md)，Owner 执行时机见 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 
-- TS 不编码。
-- TS 不 stringify。
-- TS 不生成二进制 buffer。
-- TS 不生成 JSON payload。
-- QuickJS host 直接读 `JSValue`。
-- QuickJS host 构造 core typed mutation。
-- core 只消费 typed mutation。
+TS 不 stringify、不编码二进制或 JSON command buffer；QuickJS 直接读取 JSValue，原生只消费正式类型化值。事件回调通过 Modifier 字段进入，不提供节点直属 callback prop。
 
-`endTransaction()` 只表示 Composition Phase 提交界面变更意图。它不得在调用栈内直接执行 tree apply、measure、layout 或 repaint。提交后的 transaction 进入 `MutationTransaction` queue，由 [调度线程与帧阶段](26-调度线程与帧阶段.md) 定义的 SceneFramePipeline 按 FramePlan 统一消费。
+# 值绑定 API
 
-# Slot update API
+`registerBinding` 连接宿主正式输入或 Modifier 整链，`registerModifierBinding` 连接已发布的明确 Modifier handle；`updateBinding` 交付值，`releaseBinding` 退休绑定。绑定包含独立身份及代际，并关联 LayoutNode 身份/代际；Modifier 参数绑定还包含实例 handle，不能拿数组下标作为长期更新身份。
 
-QuickJS host 必须为 Reactive Slot Runtime 提供 typed slot update 入口。slot update 表达 UI value 对指定节点字段或 scene 字段的阶段化影响。
-
-概念形态：
-
-```ts
-native.beginSlotBatch()
-native.updateSlot(nodeId, slotKind, fieldPath, value, dirtyRole)
-native.retireSlotBinding(nodeId, slotKind, fieldPath)
-native.endSlotBatch()
-```
-
-slot update 必须携带足够的 typed 信息：
-
-```txt
-scene / node id
-slot kind
-field path
-value kind
-current typed value
-dirty role
-source / reason
-```
-
-slot update 不表达结构增删。结构变化必须使用 `MutationTransaction`。
+纯值更新可以不产生结构操作，但仍与结构及资源变更共享有序提交。所谓 SlotUpdateBatch 表示这批类型化值操作，不另建与 MutationTransaction 顺序隔离的第二套提交容器。getter 在 JS 值消费阶段执行，FFI 只接收通过校验的结果，不把任意 getter 传到绘制线程。
 
 # QuickJS native boundary
 
@@ -115,77 +84,24 @@ QuickJS native boundary 禁止：
 - command buffer / binary buffer 作为生产提交路径。
 - 为兼容旧测试保留第二套 production semantics。
 
-# MutationTransaction
+# MutationTransaction 与 SlotUpdate
 
-`MutationTransaction` 是 Composition Phase 与 SceneFramePipeline 的 typed 边界：
+结构、绑定、值及事件资源共享一个保留因果顺序的 operations 序列：
 
 ```cpp
-struct CreateNodeMutation;
-struct DeleteNodeMutation;
-struct InsertChildMutation;
-struct RemoveChildMutation;
-struct SetMeasurePolicyMutation;
-struct SetModifierMutation;
-struct NativeInvalidationMutation;
-
-using TreeMutation = std::variant<
-    CreateNodeMutation,
-    DeleteNodeMutation,
-    InsertChildMutation,
-    RemoveChildMutation,
-    SetMeasurePolicyMutation,
-    SetModifierMutation,
-    NativeInvalidationMutation
->;
+using SubmissionOperation = std::variant<TreeMutation, RegisterBinding, RetireBinding, SlotUpdate, RegisterEventSlot, RetireEventSlot>;
 
 struct MutationTransaction {
-    std::vector<TreeMutation> treeMutations;
-    std::vector<EventSlotUpdate> eventSlotUpdates;
-    std::vector<EventSlotId> retiredEventSlots;
+    std::vector<SubmissionOperation> operations;
+    std::shared_ptr<RearrangeSubmission> rearrange;
 };
 ```
 
-C++ SceneFramePipeline 原子消费 transaction，更新 `NativeScene` 或等价 scene state 后再执行 dirty resolution、measure / layout / place / DrawOps preparation。event slot update 与 tree mutation 必须处于同一 apply 边界，避免 native tree 命中旧 callback。
+不能先按类别拆分、再分别应用节点和事件，否则会打乱创建、绑定、更新、移除及退休的真实次序。`SlotUpdate` 通过 BindingHandle 指向既定受体，SlotValue 只容纳受支持的类型化输入；不存在任意字段路径写入或节点直属事件输入。事件资源只有被存续 Modifier 引用时才有调用资格。
 
-# SlotUpdateBatch
+SceneFramePipeline 在候选场景消费事务，再执行失效所需的测量、放置、绘制与命中准备，成功后发布并完成对应回执。失败保留已发布场景，向运行时报告候选失败，不自动重放已撤销候选。取消事务即使已被 Owner 取走，也不能应用或完成新上下文的回执。
 
-`SlotUpdateBatch` 是 JS Value Phase 与 SceneFramePipeline 的 typed 边界：
-
-```cpp
-enum class SlotKind {
-    Layout,
-    Draw,
-    Transform,
-    HitTest,
-    Event,
-    Resource,
-    Accessibility,
-};
-
-struct SlotUpdate {
-    NodeId nodeId;
-    SlotKind slotKind;
-    FieldPath fieldPath;
-    TypedSlotValue value;
-    DirtyRole dirtyRole;
-    DirtyReason reason;
-};
-
-struct SlotUpdateBatch {
-    std::vector<SlotUpdate> updates;
-    std::vector<SlotBindingId> retiredBindings;
-};
-```
-
-C++ SceneFramePipeline 消费 slot update，更新 LayoutNode、scene state 或对应 runtime state，并产生明确 dirty attribution。
-
-规则：
-
-- `Draw` / `Paint` slot 不得触发 measure / layout。
-- `Layout` slot 必须进入必要 layout dirty。
-- `Event` slot 不得触发无理由 measure / layout / paint。
-- `Resource` slot 影响 resource state 与相关 draw / layout dirty。
-- retired binding 必须在节点删除、Arrangable卸载、reload、HMR reload、错误恢复和 source 切换时同步清理。
+类型化输入的失效必须准确：仅颜色变化不失效测量，尺寸变化进入必要布局，事件替换不无故失效绘制或布局，Painter 内容和固有尺寸分别影响实际消费者。节点删除、调用退休、停用、重载和错误恢复均须清理失效绑定。原生阶段的工作量优化另见对应布局及失效母文档。
 
 # JSON 与诊断
 

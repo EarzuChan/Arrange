@@ -1,0 +1,5 @@
+旧运行时/AV/Foundation 权限/节点事件旁路扫描通过；仅保留 2 条编译结果的否定断言
+LayoutRearrangeNode 唯一构造调用检查通过：packages\runtime\src\arrangables.ts:23:        const node = new LayoutRearrangeNode(instance, host)
+11 份本轮文档的 101 个本地链接及代码围栏检查通过
+第 4–6 节与新退出清单共 94 项已按本轮证据标记；第二、三趴及整期验收未勾选
+git diff --check 通过

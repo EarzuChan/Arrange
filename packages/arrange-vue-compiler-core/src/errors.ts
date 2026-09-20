@@ -17,16 +17,9 @@ export function defaultOnWarn(msg: CompilerError): void {
     __DEV__ && console.warn(`[Arrange 警告] ${msg.message}`)
 }
 
-type InferCompilerError<T> = T extends ErrorCodes
-    ? CoreCompilerError
-    : CompilerError
+type InferCompilerError<T> = T extends ErrorCodes ? CoreCompilerError : CompilerError
 
-export function createCompilerError<T extends number>(
-    code: T,
-    loc?: SourceLocation,
-    messages?: { [code: number]: string },
-    additionalMessage?: string,
-): InferCompilerError<T> {
+export function createCompilerError<T extends number>(code: T, loc?: SourceLocation, messages?: { [code: number]: string }, additionalMessage?: string,): InferCompilerError<T> {
     const msg = (messages || errorMessages)[code] + (additionalMessage || '')
     const error = new SyntaxError(String(msg)) as InferCompilerError<T>
     error.code = code

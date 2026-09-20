@@ -1,8 +1,46 @@
 #include "QuickJsRuntimeContext.h"
+#include <stdexcept>
+#include <unordered_set>
 
 #if ARRANGE_WITH_QUICKJS_NG
 
 namespace arrange::quickjs {
+    void QuickJsRuntimeContext::beginRearrange() {
+        if (rearrangeCheckpoint) throw std::logic_error("重排候选不能重入");
+        if (!pendingTransactions) throw std::logic_error("重排缺少原生提交队列");
+        rearrangeCheckpoint = RearrangeCheckpoint{rootNodeId, pendingTransactions->pending(), bindings, publishedModifiers, modifierInputs, nodeTypes, nodeGenerations, hostBindings, modifierBindings, childrenByNode, parentByNode};
+        rearrangeSubmission = std::make_shared<arrange::core::RearrangeSubmission>(arrange::core::RearrangeSubmission{arrange::core::allocateRuntimeIdentity(), false});
+        events.beginCandidate();
+    }
+
+    void QuickJsRuntimeContext::abortRearrange() {
+        if (!rearrangeCheckpoint) return;
+        if (rearrangeSubmission) rearrangeSubmission->cancelled = true;
+        rearrangeSubmission.reset();
+        auto saved = std::move(*rearrangeCheckpoint);
+        rearrangeCheckpoint.reset();
+        rootNodeId = saved.root;
+        pendingTransactions->clear();
+        if (saved.pending) pendingTransactions->push(std::move(*saved.pending));
+        bindings = std::move(saved.savedBindings);
+        publishedModifiers = std::move(saved.savedPublishedModifiers);
+        modifierInputs = std::move(saved.savedModifierInputs);
+        nodeTypes = std::move(saved.savedNodeTypes);
+        nodeGenerations = std::move(saved.savedNodeGenerations);
+        hostBindings = std::move(saved.savedHostBindings);
+        modifierBindings = std::move(saved.savedModifierBindings);
+        childrenByNode = std::move(saved.savedChildrenByNode);
+        parentByNode = std::move(saved.savedParentByNode);
+        events.abortCandidate();
+    }
+
+    void QuickJsRuntimeContext::commitRearrange() {
+        rearrangeSubmission.reset();
+        rearrangeCheckpoint.reset();
+        events.commitCandidate();
+    }
+
+
     arrange::core::MutationTransaction* QuickJsRuntimeContext::currentTransaction() noexcept {
         return pendingTransactions == nullptr ? nullptr : &pendingTransactions->ensurePending();
     }
@@ -18,7 +56,36 @@ namespace arrange::quickjs {
         return handle;
     }
 
+    std::vector<const arrange::core::ModifierDescriptor*> QuickJsRuntimeContext::modifierInputDescriptors(arrange::core::NodeId id) const {
+        std::vector<const arrange::core::ModifierDescriptor*> result;
+        if (const auto found = modifierInputs.find(id); found != modifierInputs.end()) {
+            result.reserve(found->second.size());
+            for (const auto& input : found->second) result.push_back(&input.descriptor);
+        }
+        return result;
+    }
+
     void QuickJsRuntimeContext::updateBinding(arrange::core::BindingHandle handle, arrange::core::SlotValue value) {
+        const auto& target = bindings.at(handle.identity).target;
+        if (const auto* chain = std::get_if<arrange::core::ModifierChainTarget>(&target)) {
+            const auto& descriptors = std::get<arrange::core::ModifierDescriptors>(value);
+            const auto previous = modifierInputDescriptors(chain->node.id);
+            const auto matches = arrange::core::matchModifierDescriptors(previous, descriptors);
+            auto& inputs = modifierInputs[chain->node.id];
+            std::vector<PublishedModifier> next;
+            next.reserve(descriptors.size());
+            for (std::size_t index = 0; index < descriptors.size(); ++index) {
+                const auto match = matches[index];
+                const auto receiver = match < inputs.size() ? inputs[match].handle : arrange::core::ModifierHandle{};
+                next.push_back({chain->node, receiver, descriptors[index], index});
+            }
+            inputs = std::move(next);
+        }
+        else if (const auto* instance = std::get_if<arrange::core::ModifierInputTarget>(&target)) {
+            for (auto& input : modifierInputs.at(instance->node.id)) {
+                if (input.handle == instance->modifier) { input.descriptor.value = std::get<arrange::core::ModifierValue>(value); break; }
+            }
+        }
         if (auto* transaction = currentTransaction()) transaction->operations.emplace_back(arrange::core::SlotUpdate{handle, std::move(value)});
     }
 
@@ -30,12 +97,6 @@ namespace arrange::quickjs {
             if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
                 if (auto node = hostBindings.find(target.node.id); node != hostBindings.end()) {
                     auto input = node->second.find(target.input);
-                    if (input != node->second.end() && input->second == handle) node->second.erase(input);
-                }
-            }
-            else if constexpr (std::is_same_v<T, arrange::core::EventInputTarget>) {
-                if (auto node = eventBindings.find(target.node.id); node != eventBindings.end()) {
-                    auto input = node->second.find(target.kind);
                     if (input != node->second.end() && input->second == handle) node->second.erase(input);
                 }
             }
@@ -51,12 +112,6 @@ namespace arrange::quickjs {
         auto& handle = hostBindings[id][input];
         if (!handle.valid()) handle = registerBinding(arrange::core::HostInputTarget{{id, nodeGenerations.at(id)}, input});
         updateBinding(handle, std::move(value));
-    }
-
-    void QuickJsRuntimeContext::setEventInput(arrange::core::NodeId id, arrange::core::EventSlotKind kind, arrange::core::EventSlotId slot) {
-        auto& handle = eventBindings[id][kind];
-        if (!handle.valid()) handle = registerBinding(arrange::core::EventInputTarget{{id, nodeGenerations.at(id)}, kind});
-        updateBinding(handle, std::move(slot));
     }
 
     void QuickJsRuntimeContext::setModifierChain(arrange::core::NodeId id, arrange::core::ModifierDescriptors value) {
@@ -84,28 +139,34 @@ namespace arrange::quickjs {
         if (const auto parentIt = parentByNode.find(child); parentIt != parentByNode.end() && parentIt->second == parent) parentByNode.erase(parentIt);
     }
 
-    void QuickJsRuntimeContext::releaseNodeCallbacksRecursive(arrange::core::NodeId id) {
-        events.releaseNodeCallbacksRecursive(id, currentTransaction(), childrenByNode);
-        if (const auto it = parentByNode.find(id); it != parentByNode.end()) detachChild(it->second, id);
-        childrenByNode.erase(id);
-        parentByNode.erase(id);
-    }
-
-    void QuickJsRuntimeContext::releaseNodeTypesRecursive(arrange::core::NodeId id) {
-        const auto children = childrenByNode.find(id) == childrenByNode.end()
-                                  ? std::vector<arrange::core::NodeId>{}
-                                  : childrenByNode.at(id);
-        for (auto child : children) releaseNodeTypesRecursive(child);
-        std::vector<arrange::core::BindingHandle> retired;
-        for (const auto& [_, binding] : bindings) {
-            if (std::visit([&](const auto& target) { return target.node.id == id; }, binding.target)) retired.push_back(binding.handle);
+    void QuickJsRuntimeContext::retireSubtree(arrange::core::NodeId id) {
+        std::vector<arrange::core::NodeId> pending{id};
+        std::unordered_set<arrange::core::NodeId> retiredNodes;
+        while (!pending.empty()) {
+            const auto current = pending.back();
+            pending.pop_back();
+            if (!retiredNodes.insert(current).second) continue;
+            if (const auto children = childrenByNode.find(current); children != childrenByNode.end()) pending.insert(pending.end(), children->second.begin(), children->second.end());
         }
-        for (const auto handle : retired) retireBinding(handle);
-        hostBindings.erase(id);
-        modifierBindings.erase(id);
-        eventBindings.erase(id);
-        nodeGenerations.erase(id);
-        nodeTypes.erase(id);
+
+        std::vector<arrange::core::BindingHandle> retiredBindings;
+        for (const auto& [_, binding] : bindings) {
+            if (std::visit([&](const auto& target) { return retiredNodes.contains(target.node.id); }, binding.target)) retiredBindings.push_back(binding.handle);
+        }
+        for (const auto handle : retiredBindings) retireBinding(handle);
+
+        events.releaseNodes(retiredNodes, currentTransaction());
+        if (const auto parent = parentByNode.find(id); parent != parentByNode.end()) detachChild(parent->second, id);
+
+        for (const auto current : retiredNodes) {
+            hostBindings.erase(current);
+            modifierBindings.erase(current);
+            modifierInputs.erase(current);
+            nodeGenerations.erase(current);
+            nodeTypes.erase(current);
+            childrenByNode.erase(current);
+            parentByNode.erase(current);
+        }
     }
 
     void QuickJsRuntimeContext::recordDiagnostic(QuickJsDiagnosticEventInput event) {

@@ -114,6 +114,11 @@ namespace arrange::quickjs {
         void reset() {
             if (runtime.context != nullptr) {
                 runtime.painters.reset();
+                JS_FreeValue(runtime.context, runtime.rearrangeCompletion);
+                runtime.rearrangeCompletion = JS_UNDEFINED;
+                if (runtime.rearrangeSubmission) runtime.rearrangeSubmission->cancelled = true;
+                runtime.rearrangeSubmission.reset();
+                runtime.rearrangeCheckpoint.reset();
                 runtime.events.reset(nullptr);
                 for (auto& [promise, reason] : runtime.unhandledRejections) {
                     JS_FreeValue(runtime.context, promise);
@@ -135,6 +140,7 @@ namespace arrange::quickjs {
             runtime.nextAnimationFrameHandle = 1;
             runtime.frameTimeMillis = 0.0;
             runtime.publishedModifiers.clear();
+            runtime.modifierInputs.clear();
             runtime.rejectedBindingUpdates = 0;
             runtime.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
             runtime.pendingTransactions = nullptr;
@@ -143,7 +149,6 @@ namespace arrange::quickjs {
             runtime.hostBindings.clear();
             runtime.bindings.clear();
             runtime.modifierBindings.clear();
-            runtime.eventBindings.clear();
             runtime.childrenByNode.clear();
             runtime.parentByNode.clear();
             runtime.moduleLoader.clear();
@@ -209,17 +214,37 @@ namespace arrange::quickjs {
     std::uint64_t QuickJsScriptHost::rejectedBindingUpdates() const noexcept { return impl_ ? impl_->runtime.rejectedBindingUpdates : 0; }
     ScriptMemoryStats QuickJsScriptHost::memoryStats() const noexcept { return impl_ ? impl_->memory : ScriptMemoryStats{}; }
 
+    CallbackInvokeResult QuickJsScriptHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {
+        if (!impl_) return {true, {}};
+        auto& state = impl_->runtime;
+        if (!submission || submission->cancelled || submission != state.rearrangeSubmission || JS_IsUndefined(state.rearrangeCompletion)) return {true, {}};
+        const auto callback = state.rearrangeCompletion;
+        state.rearrangeCompletion = JS_UNDEFINED;
+        if (error.empty()) state.commitRearrange();
+        else state.abortRearrange();
+
+        auto argument = error.empty() ? JS_UNDEFINED : JS_NewStringLen(state.context, error.data(), error.size());
+        ScopedValue result(state.context, JS_Call(state.context, callback, JS_UNDEFINED, 1, &argument));
+        JS_FreeValue(state.context, argument);
+        JS_FreeValue(state.context, callback);
+        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        const auto drained = impl_->drainJobs();
+        return {drained.ok, drained.error};
+    }
+
     void QuickJsScriptHost::publishScene(const arrange::core::NativeScene& scene) {
         if (!impl_) return;
         auto& state = impl_->runtime;
         state.events.publish(scene.activeEventSlots());
         state.publishedModifiers.clear();
+        state.modifierInputs.clear();
         for (const auto& [id, generation] : state.nodeGenerations) {
             if (!scene.contains(id) || scene.node(id).generation != generation) continue;
             std::size_t position = 0;
             for (const auto& instance : scene.node(id).modifier.elements()) {
-                state.publishedModifiers.emplace(instance.handle.identity, QuickJsRuntimeContext::PublishedModifier{
-                    {id, generation}, instance.handle, instance.descriptor, position++});
+                const QuickJsRuntimeContext::PublishedModifier input{{id, generation}, instance.handle, instance.descriptor, position++};
+                state.publishedModifiers.emplace(instance.handle.identity, input);
+                state.modifierInputs[id].push_back(input);
             }
         }
         std::erase_if(state.bindings, [&](const auto& entry) {

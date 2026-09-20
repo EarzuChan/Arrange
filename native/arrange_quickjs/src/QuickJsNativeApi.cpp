@@ -15,14 +15,6 @@
 
 namespace arrange::quickjs {
     namespace {
-        arrange::core::EventSlotKind propEventSlotKind(std::string_view key) noexcept {
-            if (key == "onValueChange") return arrange::core::EventSlotKind::InputUpdate;
-            if (key == "onSubmit") return arrange::core::EventSlotKind::InputSubmit;
-            if (key == "onChange") return arrange::core::EventSlotKind::InputChange;
-            if (key == "onBlur") return arrange::core::EventSlotKind::InputBlur;
-            return arrange::core::EventSlotKind::None;
-        }
-
         QuickJsRuntimeContext* runtime(JSContext* context) {
             return static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(context));
         }
@@ -171,6 +163,30 @@ namespace arrange::quickjs {
         }
 
 
+        JSValue nativeBeginRearrange(JSContext* context, JSValueConst, int, JSValueConst*) {
+            auto* self = runtime(context);
+            try { self->beginRearrange(); }
+            catch (const std::exception& error) { return JS_ThrowInternalError(context, "%s", error.what()); }
+            return JS_UNDEFINED;
+        }
+
+        JSValue nativeSubmitRearrange(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (!self->rearrangeCheckpoint || !JS_IsUndefined(self->rearrangeCompletion)) return JS_ThrowTypeError(context, "没有可提交的重排候选");
+            if (argc != 1 || !JS_IsFunction(context, argv[0])) return JS_ThrowTypeError(context, "重排提交必须提供结果回调");
+            self->rearrangeCompletion = JS_DupValue(context, argv[0]);
+            self->pendingTransactions->ensurePending().rearrange = self->rearrangeSubmission;
+            return JS_UNDEFINED;
+        }
+
+        JSValue nativeAbortRearrange(JSContext* context, JSValueConst, int, JSValueConst*) {
+            auto* self = runtime(context);
+            self->abortRearrange();
+            JS_FreeValue(context, self->rearrangeCompletion);
+            self->rearrangeCompletion = JS_UNDEFINED;
+            return JS_UNDEFINED;
+        }
+
         JSValue nativeCreateNode(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
@@ -195,8 +211,7 @@ namespace arrange::quickjs {
             QuickJsValueReader reader(context);
             const auto id = readIndex(context, argv[0]);
             if (JS_HasException(context)) return JS_EXCEPTION;
-            self->releaseNodeTypesRecursive(id);
-            self->releaseNodeCallbacksRecursive(id);
+            self->retireSubtree(id);
             self->push(arrange::core::DeleteNodeMutation{id});
             return JS_UNDEFINED;
         }
@@ -229,17 +244,6 @@ namespace arrange::quickjs {
             return JS_UNDEFINED;
         }
 
-        JSValue nativeSetText(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr || argc < 2) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            const auto id = readIndex(context, argv[0]);
-            if (JS_HasException(context)) return JS_EXCEPTION;
-            if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
-            self->setHostInput(id, arrange::core::HostInput::Text, arrange::core::PropValue::stringValue(reader.toString(argv[1])));
-            return JS_UNDEFINED;
-        }
-
         JSValue nativeSetProp(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr || argc < 3) return JS_UNDEFINED;
@@ -248,14 +252,8 @@ namespace arrange::quickjs {
             if (JS_HasException(context)) return JS_EXCEPTION;
             if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
             const auto key = reader.toString(argv[1]);
-            const auto slotKind = propEventSlotKind(key);
-            if (slotKind != arrange::core::EventSlotKind::None) {
-                const auto slot = self->events.setNodeCallback(id, slotKind, argv[2], self->currentTransaction());
-                self->setEventInput(id, slotKind, slot);
-                return JS_UNDEFINED;
-            }
             if (JS_IsFunction(context, argv[2])) {
-                return JS_ThrowTypeError(context, "Arrange prop '%s' is a function. Event callbacks must use typed EventSlot registration.", key.c_str());
+                return JS_ThrowTypeError(context, "原生输入 %s 不接受函数，事件回调须通过正式 Modifier 字段注册", key.c_str());
             }
             auto value = reader.propValue(argv[2]);
             if (JS_HasException(context)) return JS_EXCEPTION;
@@ -277,7 +275,8 @@ namespace arrange::quickjs {
             if (JS_HasException(context)) return JS_EXCEPTION;
             if (!self->nodeGenerations.contains(id)) return JS_ThrowReferenceError(context, "Arrange node does not exist");
             QuickJsModifierReader modifierReader(context, self->events, self->currentTransaction());
-            auto modifier = modifierReader.read(id, argv[1]);
+            const auto previous = self->modifierInputDescriptors(id);
+            auto modifier = modifierReader.read(id, argv[1], nullptr, previous);
             if (modifierReader.failed() || JS_HasException(context)) {
                 return JS_EXCEPTION;
             }
@@ -370,11 +369,6 @@ namespace arrange::quickjs {
                 handle = self->registerBinding(arrange::core::ModifierChainTarget{node});
                 self->modifierBindings[id] = handle;
             }
-            else if (const auto kind = propEventSlotKind(name); kind != arrange::core::EventSlotKind::None) {
-                if (const auto previous = self->eventBindings[id].find(kind); previous != self->eventBindings[id].end()) self->retireBinding(previous->second);
-                handle = self->registerBinding(arrange::core::EventInputTarget{node, kind});
-                self->eventBindings[id][kind] = handle;
-            }
             else {
                 const auto input = arrange::core::hostInputFromName(name);
                 if (!input) return JS_ThrowTypeError(context, "Arrange unsupported binding input: %s", name.c_str());
@@ -403,32 +397,25 @@ namespace arrange::quickjs {
                     auto value = reader.propValue(argv[1]);
                     if (JS_HasException(context)) return JS_EXCEPTION;
                     std::string error;
-                    if (input.input == arrange::core::HostInput::Text) {
-                        if (!value.isString()) return JS_ThrowTypeError(context, "Arrange text binding requires string");
-                    }
-                    else if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
+                    if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
                     self->updateBinding(*handle, std::move(value));
                 }
                 else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
                     QuickJsModifierReader reader(context, self->events, self->currentTransaction());
-                    auto value = reader.read(input.node.id, argv[1]);
+                    const auto previous = self->modifierInputDescriptors(input.node.id);
+                    auto value = reader.read(input.node.id, argv[1], nullptr, previous);
                     if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
                     self->updateBinding(*handle, std::move(value));
                 }
-                else if constexpr (std::is_same_v<T, arrange::core::EventInputTarget>) {
-                    if (!JS_IsFunction(context, argv[1]) && !JS_IsNull(argv[1]) && !JS_IsUndefined(argv[1])) return JS_ThrowTypeError(context, "Arrange event binding requires callback or null");
-                    const auto value = self->events.setNodeCallback(input.node.id, input.kind, argv[1], self->currentTransaction());
-                    self->updateBinding(*handle, value);
-                }
                 else if constexpr (std::is_same_v<T, arrange::core::ModifierInputTarget>) {
-                    const auto instance = self->publishedModifiers.find(input.modifier.identity);
-                    if (instance == self->publishedModifiers.end()) return JS_ThrowReferenceError(context, "Arrange Modifier instance retired");
+                    auto& inputs = self->modifierInputs[input.node.id];
+                    const auto instance = std::find_if(inputs.begin(), inputs.end(), [&](const auto& value) { return value.handle == input.modifier; });
+                    if (instance == inputs.end()) return JS_ThrowReferenceError(context, "Modifier 实例已从当前候选退出");
                     ScopedValue array(context, JS_NewArray(context));
                     JS_SetPropertyUint32(context, array.get(), 0, JS_DupValue(context, argv[1]));
                     QuickJsModifierReader reader(context, self->events, self->currentTransaction());
-                    auto descriptors = reader.read(input.node.id, array.get(), &instance->second.descriptor.value);
+                    auto descriptors = reader.read(input.node.id, array.get(), &instance->descriptor.value);
                     if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
-                    instance->second.descriptor.value = descriptors.front().value;
                     self->updateBinding(*handle, std::move(descriptors.front().value));
                 }
                 return JS_UNDEFINED;
@@ -447,7 +434,7 @@ namespace arrange::quickjs {
         JSValue nativeUnmount(JSContext* context, JSValueConst, int, JSValueConst*) {
             auto* self = runtime(context);
             if (self == nullptr) return JS_UNDEFINED;
-            if (self->rootNodeId != 0) self->releaseNodeTypesRecursive(self->rootNodeId);
+            if (self->rootNodeId != 0) self->retireSubtree(self->rootNodeId);
             self->events.releaseAll(self->currentTransaction());
             if (self->rootNodeId != 0) self->push(arrange::core::DeleteNodeMutation{self->rootNodeId});
             self->childrenByNode.clear();
@@ -458,7 +445,6 @@ namespace arrange::quickjs {
             self->hostBindings.clear();
             self->bindings.clear();
             self->modifierBindings.clear();
-            self->eventBindings.clear();
             self->rootNodeId = 0;
             return JS_UNDEFINED;
         }
@@ -651,11 +637,13 @@ namespace arrange::quickjs {
         }
 
         const JSCFunctionListEntry nativeApiFunctions[] = {
+            JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange),
+            JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange),
+            JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange),
             JS_CFUNC_DEF("createNode", 2, nativeCreateNode),
             JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode),
             JS_CFUNC_DEF("insertChild", 3, nativeInsertChild),
             JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild),
-            JS_CFUNC_DEF("setText", 2, nativeSetText),
             JS_CFUNC_DEF("setProp", 3, nativeSetProp),
             JS_CFUNC_DEF("setModifier", 2, nativeSetModifier),
             JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding),

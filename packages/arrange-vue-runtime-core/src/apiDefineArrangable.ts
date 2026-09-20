@@ -1,36 +1,39 @@
-import { type IsKeyValues, extend, isFunction } from '@arrange/vue-shared'
-import type { SetupContext } from './arrangable.ts'
-import { type ArrangableOptions, type ArrangableOptionsBase, type RenderFunction, validateArrangableOptions } from './arrangableOptions.ts'
-import type { ArrangableObjectPropsOptions, ArrangablePropsOptions, ExtractDefaultPropTypes, ExtractPropTypes } from './arrangableProps.ts'
-import type { ArrangablePublicInstance, ArrangablePublicInstanceConstructor } from './arrangablePublicInstance.ts'
-import type { SlotsType } from './arrangableSlots.ts'
-import type { VNodeProps } from './vnode.ts'
+import type { ArrangableDefinition, SetupContext, StructureProgram } from './arrangable.ts'
+import type { ArrangableObjectPropsOptions, ExtractPropTypes } from './arrangableProps.ts'
+import { normalizeDeclaredProps } from './propDeclarations.ts'
 
-export type PublicProps = VNodeProps
-type ResolveProps<P> = Readonly<P extends ArrangablePropsOptions ? ExtractPropTypes<P> : P>
+export type DefineArrangable<P extends Record<string, unknown> = any> = ArrangableDefinition<P>
+const definitions = new WeakSet<object>()
 
-export type DefineArrangable<PropsOrPropOptions = {}, RawBindings = {}, Defaults = ExtractDefaultPropTypes<PropsOrPropOptions>, S extends SlotsType = {}, Props = ResolveProps<PropsOrPropOptions>> = ArrangablePublicInstanceConstructor<ArrangablePublicInstance<Props, RawBindings, PublicProps, Defaults, true, S>> & ArrangableOptionsBase<Props, RawBindings, S>
+export function defineArrangable<const P extends ArrangableObjectPropsOptions = {}, const S extends readonly string[] = readonly []>(options: {
+    name?: string
+    __name?: string
+    __file?: string
+    __hmrId?: string
+    props?: P
+    slotNames?: S
+    setup: (props: Readonly<ExtractPropTypes<P>>, context: SetupContext) => StructureProgram
+}): Omit<ArrangableDefinition<ExtractPropTypes<P>>, 'props' | 'slotNames'> & { readonly props: P; readonly slotNames: S } {
+    if (!options || typeof options !== 'object' || typeof options.setup !== 'function') throw new TypeError('Arrangable 定义必须提供 setup')
 
-export type DefineSetupFnArrangable<P extends Record<string, any>, S extends SlotsType = SlotsType> = new (props: P & PublicProps) => ArrangablePublicInstance<P, {}, PublicProps, {}, false, S>
+    const allowed = new Set(['name', '__name', '__file', '__hmrId', 'props', 'slotNames', 'setup'])
+    for (const key of Object.keys(options)) if (!allowed.has(key)) throw new TypeError(`Arrangable 定义不支持字段：${key}`)
+    normalizeDeclaredProps(options.props)
 
-export function defineArrangable<Props extends Record<string, any>, S extends SlotsType = {}>(setup: (props: Props, ctx: SetupContext<S>) => RenderFunction | Promise<RenderFunction>, options?: Pick<ArrangableOptions, 'name'> & { props?: (keyof NoInfer<Props>)[] | ArrangableObjectPropsOptions<Props>; slots?: S }): DefineSetupFnArrangable<Props, S>
+    const names = options.slotNames ?? []
+    if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !name)) throw new TypeError('内容声明必须是非空名称数组')
+    if (new Set(names).size !== names.length) throw new TypeError('内容声明名称重复')
 
-export function defineArrangable<
-    TypeProps,
-    RuntimePropsOptions extends ArrangableObjectPropsOptions = ArrangableObjectPropsOptions,
-    RuntimePropsKeys extends string = string,
-    SetupBindings = {},
-    S extends SlotsType = {},
-    const SlotNames extends readonly string[] = readonly [],
-    InferredProps = IsKeyValues<TypeProps> extends true ? TypeProps : string extends RuntimePropsKeys ? ArrangableObjectPropsOptions extends RuntimePropsOptions ? {} : ExtractPropTypes<RuntimePropsOptions> : { [Key in RuntimePropsKeys]?: any },
->(options: {
-    props?: (RuntimePropsOptions & ThisType<void>) | RuntimePropsKeys[]
-    __typeProps?: TypeProps
-    slotNames?: SlotNames
-} & ArrangableOptionsBase<Readonly<InferredProps>, SetupBindings, S> & ThisType<ArrangablePublicInstance<InferredProps, SetupBindings, {}, {}, false, S>>): DefineArrangable<InferredProps, SetupBindings, ExtractDefaultPropTypes<RuntimePropsOptions>, S> & { readonly slotNames: SlotNames }
+    const props = Object.fromEntries(Object.entries(options.props ?? {}).map(([name, value]) => {
+        if (Array.isArray(value)) return [name, Object.freeze([...value])]
+        if (value && typeof value === 'object') return [name, Object.freeze({ ...value, ...(Array.isArray(value.type) ? { type: Object.freeze([...value.type]) } : {}) })]
+        return [name, value]
+    }))
+    const definition = Object.freeze({ ...options, props: Object.freeze(props), slotNames: Object.freeze([...names]) }) as unknown as Omit<ArrangableDefinition<ExtractPropTypes<P>>, 'props' | 'slotNames'> & { readonly props: P; readonly slotNames: S }
+    definitions.add(definition)
+    return definition
+}
 
-export function defineArrangable(options: unknown, extraOptions?: object): any {
-    const arrangable = (isFunction(options) ? extend({ name: options.name }, extraOptions, { setup: options }) : options) as ArrangableOptions
-    validateArrangableOptions(arrangable)
-    return arrangable
+export function isArrangableDefinition(value: unknown): value is ArrangableDefinition {
+    return typeof value === 'object' && value !== null && definitions.has(value)
 }

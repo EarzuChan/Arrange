@@ -156,39 +156,34 @@ export class EffectScope {
     }
   }
 
-  stop(fromParent?: boolean): void {
-    if (this._active) {
-      this._active = false
-      let i, l
-      for (i = 0, l = this.effects.length; i < l; i++) {
-        this.effects[i].stop()
-      }
-      this.effects.length = 0
+    stop(fromParent?: boolean): void {
+        if (!this._active) return
 
-      for (i = 0, l = this.cleanups.length; i < l; i++) {
-        this.cleanups[i]()
-      }
-      this.cleanups.length = 0
+        this._active = false
+        const errors: unknown[] = []
 
-      if (this.scopes) {
-        for (i = 0, l = this.scopes.length; i < l; i++) {
-          this.scopes[i].stop(true)
+        const safely = (operation: () => void) => { try { operation() } catch (error) { errors.push(error) } }
+
+        // 清理可能主动移除 effect，使用快照保证每项恰好得到一次停止机会
+        const effects = this.effects.splice(0)
+        const cleanups = this.cleanups.splice(0)
+        const scopes = this.scopes?.splice(0) ?? []
+        for (const effect of effects) safely(() => effect.stop())
+        for (const cleanup of cleanups) safely(cleanup)
+        for (const scope of scopes) safely(() => scope.stop(true))
+
+        if (!this.detached && this.parent && !fromParent) {
+            const last = this.parent.scopes!.pop()
+            if (last && last !== this) {
+                this.parent.scopes![this.index!] = last
+                last.index = this.index!
+            }
         }
-        this.scopes.length = 0
-      }
 
-      // nested scope, dereference from parent to avoid memory leaks
-      if (!this.detached && this.parent && !fromParent) {
-        // optimized O(1) removal
-        const last = this.parent.scopes!.pop()
-        if (last && last !== this) {
-          this.parent.scopes![this.index!] = last
-          last.index = this.index!
-        }
-      }
-      this.parent = undefined
+        this.parent = undefined
+
+        if (errors.length) throw new AggregateError(errors, '反应式作用域停止时发生清理错误')
     }
-  }
 }
 
 /**

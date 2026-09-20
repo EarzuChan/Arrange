@@ -18,16 +18,8 @@ namespace arrange::juce {
 
     TextInputCallbacks TextInputMutationSink::callbacks(ArrangeRuntime& runtime) const {
         TextInputCallbacks result;
-        result.setModelValue = [&runtime](arrange::core::NodeId nodeId, std::string value) {
-            arrange::core::MutationTransaction transaction;
-            transaction.operations.emplace_back(arrange::core::SetPropMutation{nodeId, "value", arrange::core::PropValue::stringValue(std::move(value))});
-            enqueueMutation(runtime, std::move(transaction), "native text input editing state");
-        };
-        result.invokeStringEvent = [&runtime](
-            const arrange::core::ArrangeNode& node,
-            arrange::core::EventSlotKind kind,
-            const std::string& value) {
-            runtime.enqueueNodeStringEvent(node, kind, value);
+        result.invokeStringEvent = [&runtime](const arrange::core::EventSlotId& slot, const std::string& value) {
+            if (slot.valid()) runtime.enqueueStringEvent(slot, value);
         };
         result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag, std::string reason) {
             arrange::core::MutationTransaction transaction;

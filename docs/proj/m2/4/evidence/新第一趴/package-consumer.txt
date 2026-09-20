@@ -1,0 +1,128 @@
+
+> arrange@0.0.0-m.2.2 verify:npm-package E:\a_dev\proj\Arrange
+> node --import tsx scripts/verify-npm-package.ts
+
+npm notice
+npm notice 📦  @arrange/framework@0.0.0-m.2.2
+npm notice Tarball Contents
+npm notice 1.4kB package.json
+npm notice 34B src/index.ts
+npm notice 218B src/vite.ts
+npm notice Bundled Dependencies
+npm notice @arrange/vue-compiler-arrange
+npm notice @arrange/vue-compiler-core
+npm notice @arrange/vue-compiler-sfc
+npm notice @arrange/vue-reactivity
+npm notice @arrange/vue-runtime-core
+npm notice @arrange/vue-shared
+npm notice @arrange/runtime
+npm notice @arrange/vite-plugin
+npm notice Tarball Details
+npm notice name: @arrange/framework
+npm notice version: 0.0.0-m.2.2
+npm notice filename: arrange-framework-0.0.0-m.2.2.tgz
+npm notice package size: 155.9 kB
+npm notice unpacked size: 650.3 kB
+npm notice shasum: f40bc7853121bce6ce00ad4302ea48f154762667
+npm notice integrity: sha512-kSNImGJ7Yih8V[...]lGKmaiyc4dNNA==
+npm notice bundled deps: 8
+npm notice bundled files: 0
+npm notice own files: 129
+npm notice total files: 129
+npm notice
+arrange-framework-0.0.0-m.2.2.tgz
+
+> @arrange/cli@1.0.1 prepack
+> npm run build
+
+
+> @arrange/cli@1.0.1 build
+> tsc -p tsconfig.build.json
+
+npm notice
+npm notice 📦  @arrange/cli@1.0.1
+npm notice Tarball Contents
+npm notice 298B dist/building/BuildService.js
+npm notice 36B dist/building/NativeBuildService.js
+npm notice 32B dist/building/UiBuildService.js
+npm notice 451B dist/CliMetadata.js
+npm notice 4.4kB dist/cmake/CmakeStuffs.js
+npm notice 504B dist/command/adopt.js
+npm notice 685B dist/command/build.js
+npm notice 1.5kB dist/command/create.js
+npm notice 507B dist/command/dev.js
+npm notice 518B dist/command/package.js
+npm notice 927B dist/command/sync.js
+npm notice 1.1kB dist/Entry.js
+npm notice 689B dist/framework/FrameworkMamba.js
+npm notice 3.3kB dist/framework/FrameworkRegistryClient.js
+npm notice 11B dist/managed/CheckResult.js
+npm notice 2.9kB dist/managed/JsonRegion.js
+npm notice 2.1kB dist/managed/ManagedFile.js
+npm notice 1.4kB dist/managed/ManageItems.js
+npm notice 857B dist/managed/TextCluster.js
+npm notice 1.3kB dist/managed/TextRegion.js
+npm notice 3.0kB dist/managed/Wrapper.js
+npm notice 2.1kB dist/node-js/NodeJsStuffs.js
+npm notice 156B dist/packing/ArtifactLocator.js
+npm notice 329B dist/packing/Packer.js
+npm notice 776B dist/platform/DevSupervisor.js
+npm notice 925B dist/platform/Executor.js
+npm notice 334B dist/platform/MacPlatformService.js
+npm notice 33B dist/platform/PlatformService.js
+npm notice 11B dist/platform/ProcessSpec.js
+npm notice 347B dist/platform/WindowsPlatformService.js
+npm notice 1.5kB dist/project/CreateProject.js
+npm notice 2.7kB dist/project/ProjectState.js
+npm notice 2.9kB dist/project/ProjectStateStore.js
+npm notice 2.6kB dist/sync/ConfigApplier.js
+npm notice 6.5kB dist/sync/ConfigResolver.js
+npm notice 5.8kB dist/sync/ConfigScanner.js
+npm notice 158B dist/sync/ConfigScanReport.js
+npm notice 3.5kB dist/sync/ConfigWriter.js
+npm notice 4.2kB dist/sync/SyncService.js
+npm notice 580B dist/util/FileUtils.js
+npm notice 1.0kB dist/util/promptUtils.js
+npm notice 858B dist/util/utils.js
+npm notice 8.1kB dist/wizard/create.js
+npm notice 7.2kB dist/wizard/frameworkVersion.js
+npm notice 1.8kB dist/wizard/Sync.js
+npm notice 800B package.json
+npm notice Tarball Details
+npm notice name: @arrange/cli
+npm notice version: 1.0.1
+npm notice filename: arrange-cli-1.0.1.tgz
+npm notice package size: 22.8 kB
+npm notice unpacked size: 82.1 kB
+npm notice shasum: ec26d61f4be9b270ea1007abc30014c6d3a68c95
+npm notice integrity: sha512-fmFGmDNpotkpT[...]cVNg1DnNyrC8w==
+npm notice total files: 46
+npm notice
+arrange-cli-1.0.1.tgz
+packed @arrange/framework 0.0.0-m.2.2 and @arrange/cli 1.0.1 into E:\a_dev\proj\Arrange\artifacts\npm
+
+added 36 packages, and audited 45 packages in 2s
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (2 moderate, 1 high)
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+发布包 SFA 参数、内容与脚本类型检查通过
+
+> build
+> vite build --configLoader runner
+
+vite v8.0.11 building client environment for production...
+[2K
+transforming...✓ 69 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/app.js  135.92 kB │ gzip: 33.80 kB
+
+✓ built in 91ms
+Framework 0.0.0-m.2.2 发布包的真实 SFA 类型检查与 Vite 生产构建通过，CLI 1.0.1 仅验证安装

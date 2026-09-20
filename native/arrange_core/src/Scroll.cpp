@@ -11,7 +11,7 @@ namespace arrange::core {
             return value && value->enabled && value->kind == (vertical ? LayoutModifierKind::VerticalScroll : LayoutModifierKind::HorizontalScroll);
         }
 
-        const ModifierInstance* innerScroll(const ArrangeNode& node, bool vertical) {
+        const ModifierInstance* innerScroll(const LayoutNode& node, bool vertical) {
             const auto& chain = node.modifier.elements();
             for (auto it = chain.rbegin(); it != chain.rend(); ++it) if (isScroll(*it, vertical)) return &*it;
             return nullptr;
@@ -56,25 +56,25 @@ namespace arrange::core {
 
     ScrollResult ScrollDispatcher::verticalWheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, const PendingScrollValues* pending) const { return wheel(tree, root, point, delta, pixels, true, pending); }
     ScrollResult ScrollDispatcher::horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, const PendingScrollValues* pending) const { return wheel(tree, root, point, delta, pixels, false, pending); }
-    bool ScrollDispatcher::hasVerticalScroll(const ArrangeNode& node) { return innerScroll(node, true) != nullptr; }
-    bool ScrollDispatcher::hasHorizontalScroll(const ArrangeNode& node) { return innerScroll(node, false) != nullptr; }
-    float ScrollDispatcher::verticalScrollValue(const ArrangeNode& node) {
+    bool ScrollDispatcher::hasVerticalScroll(const LayoutNode& node) { return innerScroll(node, true) != nullptr; }
+    bool ScrollDispatcher::hasHorizontalScroll(const LayoutNode& node) { return innerScroll(node, false) != nullptr; }
+    float ScrollDispatcher::verticalScrollValue(const LayoutNode& node) {
         auto* instance = innerScroll(node, true);
         return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).scrollValue : 0;
     }
-    float ScrollDispatcher::horizontalScrollValue(const ArrangeNode& node) {
+    float ScrollDispatcher::horizontalScrollValue(const LayoutNode& node) {
         auto* instance = innerScroll(node, false);
         return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).scrollValue : 0;
     }
-    float ScrollDispatcher::verticalContentHeight(const LayoutTree&, const ArrangeNode& node) {
+    float ScrollDispatcher::verticalContentHeight(const LayoutTree&, const LayoutNode& node) {
         auto* instance = innerScroll(node, true);
         return instance ? instance->childMeasured.height : node.contentBounds.height;
     }
-    float ScrollDispatcher::horizontalContentWidth(const LayoutTree&, const ArrangeNode& node) {
+    float ScrollDispatcher::horizontalContentWidth(const LayoutTree&, const LayoutNode& node) {
         auto* instance = innerScroll(node, false);
         return instance ? instance->childMeasured.width : node.contentBounds.width;
     }
-    EventSlotId ScrollDispatcher::nativeScrollEventSlot(const ArrangeNode& node, EventSlotKind kind) {
+    EventSlotId ScrollDispatcher::nativeScrollEventSlot(const LayoutNode& node, EventSlotKind kind) {
         auto* instance = innerScroll(node, kind == EventSlotKind::VerticalScroll);
         return instance ? std::get<LayoutModifierSemantics>(instance->descriptor.value).eventSlot : EventSlotId{};
     }

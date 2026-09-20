@@ -1,0 +1,5 @@
+
+> arrange@0.0.0-m.2.2 verify:version E:\a_dev\proj\Arrange
+> node --import tsx scripts/verify-version.ts
+
+verified Arrange version contract framework=0.0.0-m.2.2 frameworkProtocol=4 cli=1.0.1 cliCompatibility=1

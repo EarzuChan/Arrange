@@ -3,12 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 namespace arrange::juce {
-    arrange::core::EventSlotId ScriptEventDispatcher::eventSlot(
-        const arrange::core::ArrangeNode& node,
-        arrange::core::EventSlotKind kind) {
-        if (const auto it = node.eventSlots.find(kind); it != node.eventSlots.end()) return it->second;
-        return {};
-    }
+
 
 #if ARRANGE_WITH_QUICKJS_NG
     ScriptEventInvokeResult ScriptEventDispatcher::invoke(

@@ -6,7 +6,7 @@
 #include "Invalidation.h"
 #include "Mutation.h"
 #include "HostInput.h"
-#include "Node.h"
+#include "LayoutNode.h"
 
 namespace arrange::core {
     struct DirtySnapshot {
@@ -20,8 +20,8 @@ namespace arrange::core {
     public:
         void apply(const std::vector<TreeMutation>& mutations);
         bool contains(NodeId id) const noexcept { return nodes_.find(id) != nodes_.end(); }
-        const ArrangeNode& node(NodeId id) const;
-        ArrangeNode& node(NodeId id);
+        const LayoutNode& node(NodeId id) const;
+        LayoutNode& node(NodeId id);
         [[nodiscard]] std::optional<NodeId> parentOf(NodeId id) const noexcept;
         std::size_t size() const noexcept { return nodes_.size(); }
         DirtySnapshot dirtySnapshot(std::uint32_t mask = 0xffffffffu) const noexcept;
@@ -63,10 +63,10 @@ namespace arrange::core {
         void eraseSubtree(NodeId id);
         void setParent(NodeId child, NodeId parent);
         void clearParent(NodeId child);
-        ArrangeNode& require(NodeId id);
-        const ArrangeNode& require(NodeId id) const;
+        LayoutNode& require(NodeId id);
+        const LayoutNode& require(NodeId id) const;
         bool isDescendant(NodeId ancestor, NodeId candidate, std::unordered_set<NodeId>& visited) const;
-        std::unordered_map<NodeId, ArrangeNode> nodes_;
+        std::unordered_map<NodeId, LayoutNode> nodes_;
         std::unordered_map<NodeId, NodeId> parentByNode_;
         InvalidationGraph invalidation_;
         double frameTimeMillis_ = 0;

@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/Modifier.h>
 #include <arrange/core/PropValue.h>
 #include <arrange/juce/ArrangeRuntime.h>
@@ -37,14 +38,14 @@ namespace {
             const auto id = pending.back();
             pending.pop_back();
             if (!scene.contains(id)) continue;
-            if (scene.node(id).text == value) return id;
+            if (test_support::textOf(scene.node(id)) == value) return id;
             const auto& children = scene.node(id).children;
             pending.insert(pending.end(), children.begin(), children.end());
         }
         throw std::runtime_error("未找到文本：" + value);
     }
 
-    std::vector<ModifierHandle> handles(const ArrangeNode& node) {
+    std::vector<ModifierHandle> handles(const LayoutNode& node) {
         std::vector<ModifierHandle> result;
         for (const auto& instance : node.modifier.elements()) result.push_back(instance.handle);
         return result;
@@ -83,6 +84,11 @@ int main(int argc, char** argv) {
             runtime.enqueueStringEvent(submit, value);
             const auto frame = runtime.pumpFrame(1, constraints, timestamp += 16);
             if (!frame.ok) throw std::runtime_error(std::string(value) + ": " + frame.error);
+            if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+                check(runtime.hasPendingFrameWork(), "等待旧提交期间产生的新命令没有保留帧需求");
+                const auto applied = runtime.pumpFrame(1, constraints, timestamp += 16);
+                if (!applied.ok) throw std::runtime_error(std::string(value) + " 后续提交：" + applied.error);
+            }
         };
         command("baseline");
         const auto baseline = runtime.frameCounters();
@@ -101,8 +107,8 @@ int main(int argc, char** argv) {
         check(stats.measures == baseline.measures && stats.placements == baseline.placements + 1, "Offset did not reuse measurement");
         check(runtime.publishedFrame().content.hitTest != hit, "Offset failed to rebuild hit geometry");
         command("validate");
-        const auto steadyBindings = runtime.scene().bindingCount();
         command("text");
+        const auto steadyBindings = runtime.scene().bindingCount();
         check(runtime.frameCounters().measures == baseline.measures + 1, "Text change skipped measurement");
         check(findText(runtime.scene(), "撅了啊 1 次") == counter, "文本变化错误替换了宿主节点");
         command("validate");
@@ -124,7 +130,7 @@ int main(int argc, char** argv) {
             command("remove");
             check(runtime.scene().bindingCount() < bindings && runtime.scene().eventSlotCount() < callbacks, "Branch removal retained native resources");
             command("restore");
-            check(runtime.scene().bindingCount() == bindings && hostView->eventSlotCount() == callbacks, "Branch restore leaked resources");
+            check(runtime.scene().bindingCount() == bindings && hostView->eventSlotCount() == callbacks, "分支恢复后的初始绑定或回调数量不正确");
         }
         command("baseline");
         command("color");
@@ -168,7 +174,7 @@ int main(int argc, char** argv) {
         check(runtime.frameCounters().paintBuilds > colorBaseline.paintBuilds + 10, "real gallery did not publish intermediate animation samples");
         check(runtime.frameCounters().paintWork.layersBuilt - colorBaseline.paintWork.layersBuilt <= 24, "gallery color rebuilt unrelated Modifier layers");
         NodeId focusedInput = 0;
-        for (NodeId id = 1; id < 1024; ++id) if (runtime.scene().contains(id) && runtime.scene().node(id).textPresentation == TextPresentation::Editable && stringProp(runtime.scene().node(id), "value", "") == "编辑我，如果我彻底离场会被重置") focusedInput = id;
+        for (NodeId id = 1; id < 1024; ++id) if (runtime.scene().contains(id) && test_support::editable(runtime.scene().node(id)) && test_support::textOf(runtime.scene().node(id)) == "编辑我，如果我彻底离场会被重置") focusedInput = id;
         check(focusedInput != 0, "gallery focus input is missing");
         auto inputTree = runtime.scene().tree();
         const auto inputBounds = inputTree.node(focusedInput).contentBounds;
@@ -193,6 +199,12 @@ int main(int argc, char** argv) {
         check(!runtime.hasPendingAnimationFrame() && runtime.scene().tree().activeAnimationCount() == 0, "gallery did not release animation frame demand");
         command("gallery:all");
         command("gallery-remove");
+        // 上一候选 apply 后才能提交整页退出，不能在等待回执时提前 dispose
+        if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+            check(runtime.hasPendingFrameWork(), "回执产生的退出候选没有唤醒宿主帧");
+            const auto removal = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(removal.ok && removal.pipelineRan, "下一帧没有提交整页退出");
+        }
         check(!runtime.hasPendingAnimationFrame(), "removing gallery retained animated scopes");
         check(runtime.scene().bindingCount() == galleryBaselineBindings && runtime.scene().eventSlotCount() == galleryBaselineCallbacks, "gallery removal leaked binding or callback resources");
 
@@ -205,7 +217,7 @@ int main(int argc, char** argv) {
             check(parent.has_value(), "真实 80 项列表缺少滚动实例");
             scrollNode = *parent;
         }
-        const auto trackResource = runtime.scene().node(firstTrack).textLayout;
+        const auto trackResource = test_support::textLayoutOf(runtime.scene().node(firstTrack));
         const auto trackFragment = runtime.scene().node(firstTrack).paintCache;
         const auto layoutsBeforeScroll = textService.counters().layoutsCreated;
         const auto workBeforeScroll = runtime.frameCounters();
@@ -216,20 +228,36 @@ int main(int argc, char** argv) {
             runtime.enqueueScrollSnapshotEvent(scroll.eventSlot, scroll);
             const auto moved = runtime.pumpFrame(1, constraints, timestamp += 16);
             check(moved.ok, "真实列表滚动发布失败");
-            check(runtime.scene().node(firstTrack).textLayout == trackResource && runtime.scene().node(firstTrack).paintCache == trackFragment, "真实列表滚动重建了稳定文本或片段");
+            check(test_support::textLayoutOf(runtime.scene().node(firstTrack)) == trackResource && runtime.scene().node(firstTrack).paintCache == trackFragment, "真实列表滚动重建了稳定文本或片段");
         }
         check(textService.counters().layoutsCreated == layoutsBeforeScroll && runtime.frameCounters().measures == workBeforeScroll.measures, "真实列表纯滚动产生排版或测量");
         command("showcase:reverse");
         check(findText(runtime.scene(), "001  音轨 1") == firstTrack && handles(runtime.scene().node(firstTrack)) == trackHandles, "真实列表重排丢失节点或 Modifier 身份");
 
         command("showcase:editor");
+        for (int index = 0; index < 40 && runtime.hasPendingFrameWork(); ++index) {
+            const auto frame = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(frame.ok, "保留页进入动画提交失败");
+        }
+        check(!runtime.hasPendingFrameWork(), "保留页进入后未稳定");
         const auto retainedCount = runtime.scene().bindingCount();
         command("showcase:list");
         command("showcase:editor");
+        for (int index = 0; index < 40 && runtime.hasPendingFrameWork(); ++index) {
+            const auto frame = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(frame.ok, "保留页恢复动画提交失败");
+        }
+        check(!runtime.hasPendingFrameWork(), "保留页恢复后未稳定");
         check(runtime.scene().bindingCount() == retainedCount, "KeepAlive 激活累计了原生绑定");
         command("showcase:async");
         findText(runtime.scene(), "详情正在等待，点击完成加载");
         command("showcase:resolve");
+        // 命令参数先提交，Promise 完成产生的新候选仍须获得下一次宿主帧
+        if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+            check(runtime.hasPendingFrameWork(), "Promise 完成后的候选丢失了帧需求");
+            const auto resolved = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(resolved.ok && resolved.pipelineRan, "Promise 完成后的候选未提交");
+        }
         findText(runtime.scene(), "详情已就绪 1");
         command("showcase:list");
 

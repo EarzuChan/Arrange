@@ -19,11 +19,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     struct TextInputCallbacks {
-        std::function<void(arrange::core::NodeId, std::string)> setModelValue;
-        std::function<void(
-            const arrange::core::ArrangeNode&,
-            arrange::core::EventSlotKind,
-            const std::string&)> invokeStringEvent;
+        std::function<void(const arrange::core::EventSlotId&, const std::string&)> invokeStringEvent;
         std::function<void(arrange::core::NodeId, arrange::core::DirtyFlag, std::string)> invalidateNativeState;
         std::function<void(arrange::core::NodeId, std::string)> enqueueKeyIntent;
         std::function<void(arrange::core::NodeId, std::string)> enqueueTextInputIntent;
@@ -38,12 +34,14 @@ namespace arrange::juce {
         void commitState(TextInputOwner&& candidate) noexcept {
             session_ = std::move(candidate.session_);
             focusedGeneration_ = candidate.focusedGeneration_;
+            focusedModifier_ = candidate.focusedModifier_;
             publishedModelValue_ = std::move(candidate.publishedModelValue_);
         }
         void cancelDrag() noexcept;
 
         [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
         [[nodiscard]] float viewportX() const noexcept;
+        [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept { return focusedModifier_; }
 
         void pointerDown(
             arrange::core::LayoutTree& tree,
@@ -111,10 +109,10 @@ namespace arrange::juce {
             bool runtimeReady) const;
 
     private:
-        [[nodiscard]] const arrange::core::ArrangeNode* activeInputNode(
+        [[nodiscard]] const arrange::core::LayoutNode* activeInputNode(
             const arrange::core::LayoutTree& tree,
             bool runtimeReady) const;
-        [[nodiscard]] arrange::core::ArrangeNode* activeInputNode(
+        [[nodiscard]] arrange::core::LayoutNode* activeInputNode(
             arrange::core::LayoutTree& tree,
             bool runtimeReady);
         [[nodiscard]] ::juce::RectangleList<int> textBoundsForByteRange(
@@ -122,15 +120,17 @@ namespace arrange::juce {
             bool runtimeReady,
             std::size_t start,
             std::size_t end) const;
-        [[nodiscard]] std::string normalizeInsertionText(const arrange::core::ArrangeNode& node, std::string text) const;
+        [[nodiscard]] std::string normalizeInsertionText(const arrange::core::LayoutNode& node, std::string text) const;
         [[nodiscard]] bool applyEdit(
-            arrange::core::ArrangeNode& node,
+            arrange::core::LayoutNode& node,
             const arrange::core::InputEditResult& edit,
             const TextInputCallbacks& callbacks);
 
         TextInputLayoutModel text_;
         InputTextSession session_;
         std::uint64_t focusedGeneration_ = 0;
+        arrange::core::ModifierHandle focusedModifier_;
+        const arrange::core::ModifierInstance& inputInstance(const arrange::core::LayoutNode& node) const;
         std::string publishedModelValue_;
     };
 

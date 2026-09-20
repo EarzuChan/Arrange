@@ -18,9 +18,7 @@ import {
 } from '@arrange/vue-compiler-arrange'
 import MagicString from 'magic-string'
 
-export const errorMessages: Record<number, string> = {
-    ...coreErrorMessages,
-}
+export const errorMessages: Record<number, string> = {...coreErrorMessages,}
 
 // Utilities
 export { parse as babelParse } from '@babel/parser'
@@ -30,29 +28,24 @@ export { MagicString }
 // relying on estree types
 import { walk as _walk } from 'estree-walker'
 export const walk = _walk as any
-export {
-    extractIdentifiers, generateCodeFrame, isInDestructureAssignment,
-    isStaticProperty, walkIdentifiers
-} from '@arrange/vue-compiler-core'
+export {extractIdentifiers, generateCodeFrame, isInDestructureAssignment, isStaticProperty, walkIdentifiers} from '@arrange/vue-compiler-core'
 
-// Internals for type resolution
+// 内部好康
+
 export { extractRuntimeProps } from './script/defineProps.ts'
+
 export { invalidateTypeCache, registerTS } from './script/resolveType.ts'
 
-// Types
-export type {
-    BindingMetadata, CompilerError, CompilerOptions
-} from '@arrange/vue-compiler-core'
+// 类型
+
+export type {BindingMetadata, CompilerError, CompilerOptions} from '@arrange/vue-compiler-core'
+
 export type { SFAScriptCompileOptions } from './compileScript.ts'
-export type {
-    SFATemplateCompileOptions,
-    SFATemplateCompileResults, TemplateCompiler
-} from './compileTemplate.ts'
-export type {
-    SFABlock, SFADescriptor, SFAParseOptions,
-    SFAParseResult, SFAScriptBlock, SFATemplateBlock
-} from './parse.ts'
+
+export type {SFATemplateCompileOptions, SFATemplateCompileResults, TemplateCompiler} from './compileTemplate.ts'
+
+export type {SFABlock, SFADescriptor, SFAParseOptions, SFAParseResult, SFAScriptBlock, SFATemplateBlock} from './parse.ts'
+
 export type { ScriptCompileContext } from './script/context.ts'
-export type {
-    SimpleTypeResolveContext, SimpleTypeResolveOptions, TypeResolveContext
-} from './script/resolveType.ts'
+
+export type {SimpleTypeResolveContext, SimpleTypeResolveOptions, TypeResolveContext} from './script/resolveType.ts'

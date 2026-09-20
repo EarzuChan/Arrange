@@ -4,7 +4,7 @@ import type { BoxAlignment, HorizontalAlignment, VerticalAlignment } from './pri
 export type BoxPolicyOptions = Readonly<{ contentAlignment?: BoxAlignment; propagateMinConstraints?: boolean }>
 export type RowPolicyOptions = Readonly<{ horizontalArrangement?: HorizontalArrangementProp; verticalAlignment?: VerticalAlignment | 'Baseline' }>
 export type ColumnPolicyOptions = Readonly<{ verticalArrangement?: VerticalArrangementProp; horizontalAlignment?: HorizontalAlignment }>
-export type MeasurePolicy = Readonly<({ kind: 'Box' } & BoxPolicyOptions) | ({ kind: 'Row' } & RowPolicyOptions) | ({ kind: 'Column' } & ColumnPolicyOptions) | { kind: 'MinSize' } | { kind: 'Text' }>
+export type MeasurePolicy = Readonly<({ kind: 'Box' } & BoxPolicyOptions) | ({ kind: 'Row' } & RowPolicyOptions) | ({ kind: 'Column' } & ColumnPolicyOptions) | { kind: 'MinSize' }>
 
 const policies = new WeakSet<object>()
 
@@ -35,4 +35,3 @@ function freezeArrangement<T extends HorizontalArrangementProp | VerticalArrange
 }
 
 export const MinSizeMeasurePolicy: MeasurePolicy = policy({ kind: 'MinSize' })
-export const TextMeasurePolicy: MeasurePolicy = policy({ kind: 'Text' })

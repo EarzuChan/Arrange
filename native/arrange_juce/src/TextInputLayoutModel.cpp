@@ -13,25 +13,25 @@ namespace arrange::juce {
     TextInputLayoutModel::TextInputLayoutModel(arrange::core::TextLayoutService& textLayoutService) noexcept
         : textLayoutService_(textLayoutService) {}
 
-    bool TextInputLayoutModel::allowsLineBreak(const arrange::core::ArrangeNode& node) {
-        return arrange::core::TextInputOverlayBuilder::allowsLineBreak(node);
+    bool TextInputLayoutModel::allowsLineBreak(const arrange::core::ModifierInstance& instance) {
+        return arrange::core::TextInputOverlayBuilder::allowsLineBreak(instance);
     }
 
-    TextInputLayoutModel::Metrics TextInputLayoutModel::metrics(const arrange::core::ArrangeNode& node, float viewportX) const {
-        return arrange::core::TextInputOverlayBuilder::metrics(node, viewportX);
+    TextInputLayoutModel::Metrics TextInputLayoutModel::metrics(const arrange::core::ModifierInstance& instance, float viewportX) const {
+        return arrange::core::TextInputOverlayBuilder::metrics(instance, viewportX);
     }
 
-    TextInputLayoutModel::Layout TextInputLayoutModel::layout(const arrange::core::ArrangeNode& node, const std::string& text, float viewportX) const {
-        return arrange::core::TextInputOverlayBuilder::layout(node, text, viewportX, textLayoutService_);
+    TextInputLayoutModel::Layout TextInputLayoutModel::layout(const arrange::core::ModifierInstance& instance, const std::string& text, float viewportX) const {
+        return arrange::core::TextInputOverlayBuilder::layout(instance, text, viewportX, textLayoutService_);
     }
 
     std::size_t TextInputLayoutModel::textIndexAtPoint(
-        const arrange::core::ArrangeNode& node,
+        const arrange::core::ModifierInstance& instance,
         const std::string& text,
         float viewportX,
         float x,
         float y) const {
-        const auto layout = this->layout(node, text, viewportX);
+        const auto layout = this->layout(instance, text, viewportX);
         return textLayoutService_.byteIndexAtPoint(
             *layout.text,
             {x - layout.metrics.textLeft + layout.metrics.viewportX, y - layout.metrics.textTop});
@@ -67,11 +67,11 @@ namespace arrange::juce {
         return bounds;
     }
 
-    float TextInputLayoutModel::updatedViewportX(const arrange::core::ArrangeNode& node, const std::string& text, std::size_t cursorIndex, float viewportX) const {
-        const auto metrics = this->metrics(node, viewportX);
+    float TextInputLayoutModel::updatedViewportX(const arrange::core::ModifierInstance& instance, const std::string& text, std::size_t cursorIndex, float viewportX) const {
+        const auto metrics = this->metrics(instance, viewportX);
         if (!metrics.singleLine) return 0.0f;
 
-        const auto prepared = layout(node, text, viewportX);
+        const auto prepared = layout(instance, text, viewportX);
         const auto textWidth = prepared.text->width;
         const auto caretX = textLayoutService_.xForByteIndex(*prepared.text, cursorIndex);
         const auto margin = 3.0f;

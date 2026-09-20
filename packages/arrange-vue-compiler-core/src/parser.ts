@@ -123,7 +123,6 @@ const tokenizer = new Tokenizer(stack, {
             props: [],
             children: [],
             loc: getLoc(start - 1, end),
-            codegenNode: undefined,
         }
     },
     onopentagend(end) {

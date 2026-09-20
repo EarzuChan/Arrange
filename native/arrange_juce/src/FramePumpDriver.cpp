@@ -96,6 +96,7 @@ namespace arrange::juce {
             candidateInteraction->updateFocusedInputViewport(scene.tree(), session.interactive(diagnostics));
             replacePreparedOps(frame.content.overlayDrawOps, candidateInteraction->buildFocusedInputOps(scene.tree(), session.interactive(diagnostics)));
             frame.content.focusedInputNode = candidateInteraction->focusedNode();
+            frame.content.focusedInputModifier = candidateInteraction->focusedModifier();
             frame.content.focusedInputViewportX = candidateInteraction->viewportX();
             (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
             replacePreparedOps(frame.content.diagnosticsErrorDrawOps, diagnostics.errorOpsSnapshot());

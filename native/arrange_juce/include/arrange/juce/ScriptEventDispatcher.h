@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/core/Scroll.h>
 
 #if ARRANGE_WITH_QUICKJS_NG
@@ -22,9 +22,7 @@ namespace arrange::juce {
 
     class ScriptEventDispatcher final {
     public:
-        static arrange::core::EventSlotId eventSlot(
-            const arrange::core::ArrangeNode& node,
-            arrange::core::EventSlotKind kind);
+
 
 #if ARRANGE_WITH_QUICKJS_NG
         ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis) const;

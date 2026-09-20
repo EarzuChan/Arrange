@@ -1,24 +1,13 @@
-import { isString } from '@arrange/vue-shared'
-import { currentInstance, getArrangableName, type ConcreteArrangable } from '../arrangable.ts'
-import type { ArrangableOptions } from '../arrangableOptions.ts'
-import { currentRenderingInstance } from '../arrangableRenderContext.ts'
-import type { VNodeTypes } from '../vnode.ts'
+import { currentInstance, type ArrangableDefinition } from '../arrangable.ts'
+import { isArrangableDefinition } from '../apiDefineArrangable.ts'
 
-export function resolveArrangable(name: string, maybeSelfReference = false): ConcreteArrangable {
-    const instance = currentRenderingInstance || currentInstance
-    if (!instance) throw new Error('Arrangable 名称只能在 setup 或结构执行中解析')
-
-    const own = instance.type
-    if (getArrangableName(own, false) === name) return own
-    const definition = (own as ArrangableOptions).arrangables?.[name] ?? instance.appContext.arrangables[name]
-    if (definition) return definition as ConcreteArrangable
-    if (maybeSelfReference) return own
-    throw new TypeError(`无法解析 Arrangable 定义：${name}`)
+export function resolveArrangable(name: string): ArrangableDefinition {
+    const definition = currentInstance?.appContext.definitions[name]
+    if (!definition) throw new TypeError(`未找到 Arrangable 定义：${name}`)
+    return definition
 }
 
-export const NULL_DYNAMIC_ARRANGABLE: unique symbol = Symbol('空动态调用')
-
-export function resolveDynamicArrangable(definition: unknown): VNodeTypes {
-    if (isString(definition)) return resolveArrangable(definition)
-    return (definition || NULL_DYNAMIC_ARRANGABLE) as VNodeTypes
+export function resolveDynamicArrangable(value: unknown): ArrangableDefinition {
+    if (!isArrangableDefinition(value)) throw new TypeError('动态目标必须是 Arrangable 定义')
+    return value
 }

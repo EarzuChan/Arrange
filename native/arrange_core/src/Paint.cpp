@@ -12,36 +12,36 @@
 
 namespace arrange::core {
     namespace {
-        std::string inputValue(const ArrangeNode& node) {
+        std::string inputValue(const LayoutNode& node) {
             if (const auto* value = propValue(node, "value")) return value->stringOr();
             return {};
         }
 
-        std::string inputPlaceholder(const ArrangeNode& node) {
+        std::string inputPlaceholder(const LayoutNode& node) {
             if (const auto* value = propValue(node, "placeholder")) return value->stringOr();
             return {};
         }
 
 
 
-        float numericProp(const ArrangeNode& node, const char* key, float fallback) { return numberProp(node, key, fallback); }
+        float numericProp(const LayoutNode& node, const char* key, float fallback) { return numberProp(node, key, fallback); }
 
-        std::string textProp(const ArrangeNode& node, const char* key, const char* fallback = "") { return stringProp(node, key, fallback); }
+        std::string textProp(const LayoutNode& node, const char* key, const char* fallback = "") { return stringProp(node, key, fallback); }
 
-        std::string textProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) { return stringProp(node, camelCase, kebabCase, fallback); }
+        std::string textProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) { return stringProp(node, camelCase, kebabCase, fallback); }
 
-        bool hasProp(const ArrangeNode& node, const char* key) { return node.props.find(key) != node.props.end(); }
+        bool hasProp(const LayoutNode& node, const char* key) { return node.props.find(key) != node.props.end(); }
 
-        bool hasColorUnspecified(const ArrangeNode& node, const char* key) {
+        bool hasColorUnspecified(const LayoutNode& node, const char* key) {
             const auto* value = propValue(node, key);
             return value != nullptr && value->isString() && value->string == "Color.Unspecified";
         }
 
-        float zIndexOf(const ArrangeNode& node) {
+        float zIndexOf(const LayoutNode& node) {
             return node.modifier.zIndex();
         }
 
-        std::vector<NodeId> childrenInPaintOrder(const LayoutTree& tree, const ArrangeNode& node) {
+        std::vector<NodeId> childrenInPaintOrder(const LayoutTree& tree, const LayoutNode& node) {
             auto children = node.children;
             std::stable_sort(children.begin(), children.end(), [&](NodeId left, NodeId right) { return zIndexOf(tree.node(left)) < zIndexOf(tree.node(right)); });
             return children;
@@ -174,24 +174,7 @@ namespace arrange::core {
         auto& node = tree.node(id);
         constexpr auto paintMask = dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Placement) | dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::Transform) | dirtyMask(DirtyFlag::Resource);
         if (node.paintCache && !(node.dirty & paintMask)) { ++counters.subtreeCacheHits; return node.paintCache; }
-        const Size size{node.contentBounds.width, node.contentBounds.height};
-        if (!node.paintContent || node.paintedContentRevision != node.contentRevision || node.paintedContentSize != size || node.paintedTextLayout != node.textLayout) {
-            auto ops = std::make_shared<std::vector<DrawOp>>();
-            collectContent(tree, id, *ops, 1);
-            for (auto& op : *ops) {
-                prepareText(op, textLayoutService_);
-                translateOp(op, {-node.contentBounds.x, -node.contentBounds.y});
-            }
-            counters.emittedOps += ops->size();
-            node.paintContent = std::move(ops);
-            node.paintedContentRevision = node.contentRevision;
-            node.paintedContentSize = size;
-            node.paintedTextLayout = node.textLayout;
-            ++counters.contentBuilds;
-        } else ++counters.contentReuses;
-
         PaintFragment content;
-        content.content = node.paintContent;
         for (auto childId : childrenInPaintOrder(tree, node)) {
             const auto& child = tree.node(childId);
             content.children.push_back({buildFragment(tree, childId, counters), {child.bounds.x - node.contentBounds.x, child.bounds.y - node.contentBounds.y}});
@@ -204,9 +187,10 @@ namespace arrange::core {
             if (auto* layout = std::get_if<LayoutModifierSemantics>(&value)) layout->scrollValue = 0;
             const Rect localBounds{0, 0, instance.bounds.width, instance.bounds.height};
             auto layer = instance.paintCache;
-            if (!layer || layer->value != value || layer->bounds != localBounds) {
+            if (!layer || layer->value != value || layer->bounds != localBounds || layer->textLayout != instance.textLayout) {
                 auto next = std::make_shared<PaintLayerFragment>();
                 next->value = value;
+                next->textLayout = instance.textLayout;
                 next->bounds = localBounds;
                 std::vector<DrawOp> ops;
                 std::size_t split = 0;
@@ -217,7 +201,11 @@ namespace arrange::core {
                 counters.emittedOps += ops.size();
                 instance.paintCache = layer = next;
                 ++counters.layersBuilt;
-            } else ++counters.layerCacheHits;
+                if (textPresentation(value)) ++counters.contentBuilds;
+            } else {
+                ++counters.layerCacheHits;
+                if (textPresentation(value)) ++counters.contentReuses;
+            }
             const PlacedPaintFragment child{current, {origin.x - instance.bounds.x, origin.y - instance.bounds.y}};
             if (instance.fragmentCache && instance.fragmentCache->layer == layer && instance.fragmentCache->children.size() == 1 && instance.fragmentCache->children.front() == child) {
                 current = instance.fragmentCache;
@@ -262,7 +250,7 @@ namespace arrange::core {
         return result;
     }
 
-    std::vector<DrawOp> DrawOpsBuilder::collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const {
+    std::vector<DrawOp> DrawOpsBuilder::collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content, ModifierHandle receiver) const {
         std::vector<DrawOp> ops;
         const auto path = nodePath(tree, target);
         if (path.empty()) return ops;
@@ -271,7 +259,14 @@ namespace arrange::core {
                 for (auto op : content) { op.color = withAlpha(op.color, alpha); ops.push_back(std::move(op)); }
                 return;
             }
-            collectModifier(tree, path[index], 0, ops, alpha, [&](float nextAlpha) { wrap(index + 1, nextAlpha); }, true);
+            auto stopAt = static_cast<std::size_t>(-1);
+            if (path[index] == target && receiver.valid()) {
+                const auto& chain = tree.node(target).modifier.elements();
+                const auto found = std::find_if(chain.begin(), chain.end(), [&](const auto& element) { return element.handle == receiver; });
+                if (found == chain.end()) return;
+                stopAt = static_cast<std::size_t>(found - chain.begin());
+            }
+            collectModifier(tree, path[index], 0, ops, alpha, [&](float nextAlpha) { wrap(index + 1, nextAlpha); }, true, stopAt);
         };
         wrap(0, 1.0f);
         return ops;
@@ -342,6 +337,28 @@ namespace arrange::core {
             pop(DrawOpType::PopTransform);
             return;
         }
+        if (const auto* text = textPresentation(value)) {
+            if (!geometryOnly) {
+                DrawOp op;
+                op.type = DrawOpType::DrawText;
+                op.nodeId = id;
+                op.rect = instance.bounds;
+                op.text = modifierText(value);
+                op.fontSize = text->style.fontSize;
+                op.lineHeight = text->style.lineHeight;
+                op.color = withAlpha(text->color, alpha);
+                op.textAlign = text->textAlign;
+                op.overflow = text->overflow;
+                op.maxLines = text->singleLine ? 1 : text->maxLines;
+                op.inputText = std::holds_alternative<TextFieldModifier>(value);
+                if (op.inputText) op.textField = instance.handle;
+                op.textLayout = instance.textLayout;
+                prepareText(op, textLayoutService_);
+                ops.push_back(std::move(op));
+            }
+            content();
+            return;
+        }
         if (const auto* paint = std::get_if<PaintModifier>(&value)) {
             if (!geometryOnly && paint->painter.content) {
                 DrawOp op;
@@ -367,48 +384,35 @@ namespace arrange::core {
         content();
     }
 
-    std::string DrawOpsBuilder::textStyleProp(const ArrangeNode& node) { return stringProp(node, "textStyle", "text-style", ""); }
-
-    bool TextInputOverlayBuilder::allowsLineBreak(const ArrangeNode& node) {
-        if (!boolProp(node, "singleLine", true)) return true;
-        if (numberProp(node, "minLines", 1.0f) > 1.0f) return true;
-        if (numberProp(node, "maxLines", 1.0f) > 1.0f) return true;
-        return false;
+    bool TextInputOverlayBuilder::allowsLineBreak(const ModifierInstance& instance) {
+        return !std::get<TextFieldModifier>(instance.descriptor.value).presentation.singleLine;
     }
 
-    TextInputOverlayBuilder::Metrics TextInputOverlayBuilder::metrics(const ArrangeNode& node, float viewportX) {
+    TextInputOverlayBuilder::Metrics TextInputOverlayBuilder::metrics(const ModifierInstance& instance, float viewportX) {
+        const auto& input = std::get<TextFieldModifier>(instance.descriptor.value).presentation;
         Metrics result;
-        result.rect = node.contentBounds;
-        const auto style = objectProp(node, "textStyle", "text-style");
-        result.fontSize = style.number("fontSize", 14.0f);
-        result.singleLine = !allowsLineBreak(node);
+        result.rect = instance.bounds;
+        result.fontSize = input.style.fontSize;
+        result.singleLine = !allowsLineBreak(instance);
         result.textLeft = result.rect.x;
         result.textWidth = std::max(0.0f, result.rect.width);
-        result.lineHeight = std::max(result.fontSize, style.number("lineHeight", result.fontSize));
-        result.textTop = result.singleLine
-                             ? result.rect.y + std::max(0.0f, (result.rect.height - result.lineHeight) * 0.5f)
-                             : result.rect.y;
-        result.textHeight = result.singleLine ? std::min(result.rect.height, result.lineHeight) : std::max(0.0f, result.rect.height);
+        result.lineHeight = instance.textLayout ? instance.textLayout->lineHeight : std::max(input.style.lineHeight, input.style.fontSize);
+        result.textTop = result.rect.y;
+        result.textHeight = std::max(0.0f, result.rect.height);
         result.viewportX = result.singleLine ? viewportX : 0.0f;
         return result;
     }
 
-    Rect TextInputOverlayBuilder::textRect(const ArrangeNode& node, float viewportX) {
-        const auto result = metrics(node, viewportX);
+    Rect TextInputOverlayBuilder::textRect(const ModifierInstance& instance, float viewportX) {
+        const auto result = metrics(instance, viewportX);
         return {result.textLeft, result.textTop, result.textWidth, result.textHeight};
     }
 
-    TextInputOverlayBuilder::Layout TextInputOverlayBuilder::layout(
-        const ArrangeNode& node,
-        const std::string& text,
-        float viewportX,
-        const TextLayoutService& textLayoutService) {
+    TextInputOverlayBuilder::Layout TextInputOverlayBuilder::layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService) {
         Layout result;
-        result.metrics = metrics(node, viewportX);
-        result.text = textLayoutService.layout(
-            text,
-            {result.metrics.fontSize, result.metrics.lineHeight},
-            {result.metrics.singleLine ? 1 : 0, result.metrics.singleLine ? 0.0f : result.metrics.textWidth, result.metrics.singleLine}, node.textLayout);
+        result.metrics = metrics(instance, viewportX);
+        const auto& input = std::get<TextFieldModifier>(instance.descriptor.value).presentation;
+        result.text = textLayoutService.layout(text, input.style, {result.metrics.singleLine ? 1 : input.maxLines, result.metrics.singleLine ? 0.0f : result.metrics.textWidth, result.metrics.singleLine}, instance.textLayout);
         return result;
     }
 
@@ -444,24 +448,17 @@ namespace arrange::core {
     }
 
     std::vector<DrawOp> TextInputOverlayBuilder::build(
-        const ArrangeNode& node,
+        NodeId node,
+        const ModifierInstance& instance,
         const TextInputOverlayState& state,
         const TextLayoutService& textLayoutService) const {
         std::vector<DrawOp> ops;
-        const auto inputLayout = layout(node, state.text, state.viewportX, textLayoutService);
+        const auto inputLayout = layout(instance, state.text, state.viewportX, textLayoutService);
         const auto& overlayMetrics = inputLayout.metrics;
-
-        DrawOp focusRing;
-        focusRing.type = DrawOpType::StrokeRect;
-        focusRing.nodeId = node.id;
-        focusRing.rect = overlayMetrics.rect;
-        focusRing.color = 0xff7aa2ffu;
-        focusRing.strokeWidth = 1.0f;
-        ops.push_back(std::move(focusRing));
 
         DrawOp pushClip;
         pushClip.type = DrawOpType::PushClip;
-        pushClip.nodeId = node.id;
+        pushClip.nodeId = node;
         pushClip.rect = {overlayMetrics.textLeft, overlayMetrics.textTop, overlayMetrics.textWidth, overlayMetrics.textHeight};
         ops.push_back(std::move(pushClip));
 
@@ -471,19 +468,37 @@ namespace arrange::core {
             for (const auto& area : textBoundsForByteRange(inputLayout, state.text, start, end, textLayoutService)) {
                 DrawOp selection;
                 selection.type = DrawOpType::FillRect;
-                selection.nodeId = node.id;
+                selection.nodeId = node;
                 selection.rect = area;
                 selection.color = 0x663a7afeu;
                 ops.push_back(std::move(selection));
             }
         }
 
+        const auto& field = std::get<TextFieldModifier>(instance.descriptor.value);
+        const auto& input = field.presentation;
+        DrawOp text;
+        text.type = DrawOpType::DrawText;
+        text.nodeId = node;
+        text.rect = instance.bounds;
+        text.rect.x -= state.viewportX;
+        text.rect.width += state.viewportX;
+        text.text = state.text.empty() ? field.placeholder : state.text;
+        text.color = input.color;
+        text.fontSize = input.style.fontSize;
+        text.lineHeight = input.style.lineHeight;
+        text.maxLines = input.singleLine ? 1 : input.maxLines;
+        text.overflow = "clip";
+        text.textAlign = "Start";
+        text.textLayout = state.text.empty() ? instance.textLayout : inputLayout.text;
+        ops.push_back(std::move(text));
+
         for (const auto& range : state.temporaryUnderlines) {
             for (const auto& area : textBoundsForByteRange(inputLayout, state.text, range.start, range.end, textLayoutService)) {
                 const auto underlineY = area.y + area.height - 2.0f;
                 DrawOp underline;
                 underline.type = DrawOpType::DrawLine;
-                underline.nodeId = node.id;
+                underline.nodeId = node;
                 underline.rect = {area.x, underlineY, 0.0f, 0.0f};
                 underline.lineEnd = {area.x + area.width, underlineY};
                 underline.color = 0xff7aa2ffu;
@@ -495,16 +510,16 @@ namespace arrange::core {
         const auto cursor = textLayoutService.caretRect(*inputLayout.text, state.cursorIndex, {overlayMetrics.textLeft - overlayMetrics.viewportX, overlayMetrics.textTop});
         DrawOp caret;
         caret.type = DrawOpType::DrawLine;
-        caret.nodeId = node.id;
+        caret.nodeId = node;
         caret.rect = {cursor.x, cursor.y, 0.0f, 0.0f};
         caret.lineEnd = {cursor.x, cursor.y + cursor.height};
-        caret.color = 0xffe8eaedu;
+        caret.color = input.color;
         caret.strokeWidth = 1.0f;
         ops.push_back(std::move(caret));
 
         DrawOp popClip;
         popClip.type = DrawOpType::PopClip;
-        popClip.nodeId = node.id;
+        popClip.nodeId = node;
         ops.push_back(std::move(popClip));
         return ops;
     }

@@ -1,17 +1,8 @@
+import type { TransformContext } from './transform.ts'
 import type { ParserPlugin } from '@babel/parser'
-import type {
-    ElementNode,
-    Namespace,
-    Namespaces,
-    ParentNode,
-    TemplateChildNode,
-} from './ast.ts'
+import type {ElementNode, Namespace, Namespaces, ParentNode, TemplateChildNode,} from './ast.ts'
 import type { CompilerError } from './errors.ts'
-import type {
-    DirectiveTransform,
-    NodeTransform,
-    TransformContext,
-} from './transform.ts'
+
 
 export interface ErrorHandlingOptions {
     onWarn?: (warning: CompilerError) => void
@@ -163,98 +154,16 @@ interface SharedTransformCodegenOptions {
     filename?: string
 }
 
-export interface TransformOptions
-    extends
-    SharedTransformCodegenOptions,
-    ErrorHandlingOptions {
-    arrangeTypecheck?: boolean
-    /**
-     * An array of node transforms to be applied to every AST node.
-     */
-    nodeTransforms?: NodeTransform[]
-
-    /**
-     * If the pairing runtime provides additional built-in elements, use this to
-     * mark them as built-in so the compiler will generate arrangable vnodes
-     * for them.
-     */
-    isBuiltInArrangable?: (tag: string) => symbol | void
-    /**
-     * Transform expressions like {{ foo }} to `_ctx.foo`.
-     * If this option is false, the generated code will be wrapped in a
-     * `with (this) { ... }` block.
-     * - This is force-enabled in module mode, since modules are by default strict
-     * and cannot use `with`
-     * @default mode === 'module'
-     */
-    prefixIdentifiers?: boolean
-    /**
-     * Cache static VNodes and props objects to `_hoisted_x` constants
-     * @default false
-     */
-    hoistStatic?: boolean
-    /**
-     * A list of parser plugins to enable for `@babel/parser`, which is used to
-     * parse expressions in bindings and interpolations.
-     * https://babeljs.io/docs/en/next/babel-parser#plugins
-     */
-    expressionPlugins?: ParserPlugin[]
-    /**
-     * SFA scoped styles ID
-     */
-
-    /**
-     * Indicates this SFA template has used :slotted in its styles
-     * Defaults to `true` for backwards compatibility - SFA tooling should set it
-     * to `false` if no `:slotted` usage is detected in `<style>`
-     */
-
-    /**
-     * Whether to compile the template assuming it needs to handle HMR.
-     * Some edge cases may need to generate different code for HMR to work
-     * correctly, e.g. #6938, #7138
-     */
-    hmr?: boolean
-}
-
-export interface CodegenOptions extends SharedTransformCodegenOptions {
-    /**
-     * - `module` mode will generate ES module import statements for helpers
-     * and export the render function as the default export.
-     * - `function` mode will generate a single `const { helpers... } = Vue`
-     * statement and return the render function. It expects `Vue` to be globally
-     * available (or passed by wrapping the code with an IIFE). It is meant to be
-     * used with `new Function(code)()` to generate a render function at runtime.
-     * @default 'function'
-     */
+export interface CompilerOptions extends ParserOptions {
+    inline?: boolean
     mode?: 'module' | 'function'
-    /**
-     * Generate source map?
-     * @default false
-     */
-    sourceMap?: boolean
-    /**
-     * SFA scoped styles ID
-     */
-
-    /**
-     * Option to optimize helper import bindings via variable assignment
-     * (only used for webpack code-split)
-     * @default false
-     */
-    optimizeImports?: boolean
-    /**
-     * Customize where to import runtime helpers from.
-     * @default 'vue'
-     */
+    isTS?: boolean
+    bindingMetadata?: BindingMetadata
     runtimeModuleName?: string
-
-    /**
-     * Customize the global variable name of `Vue` to get helpers from
-     * in function mode
-     * @default 'Vue'
-     */
-    runtimeGlobalName?: string
+    sourceMap?: boolean
+    filename?: string
+    hoistStatic?: boolean
+    hmr?: boolean
+    arrangeTypecheck?: boolean
 }
-
-export type CompilerOptions = ParserOptions & Omit<TransformOptions, 'nodeTransforms'> & CodegenOptions
+export type CodegenOptions = CompilerOptions

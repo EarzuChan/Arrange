@@ -2,15 +2,7 @@ import {ARRANGE_VUE_DEFINES, DEV_BUNDLE_PATH, PUBLIC_PLUGIN_NAME} from "./constr
 import {buildDevBundle} from "./dev-bundle.ts"
 import {createArrangeTransformPlugin} from "./transform.ts"
 import {invalidateSfaTypeDependency, isHotSourceFile, normalizePath} from "./sfa.ts"
-import type {
-    ArrangeDevServer,
-    ArrangeViteConfig,
-    ArrangeVitePlugin,
-    ArrangeVitePluginOptions,
-    ConfigEnv,
-    HotUpdateContext,
-    HotUpdateModule,
-} from "./types.ts"
+import type {ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule,} from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
     const entry = options.entry ?? "src/main.ts"

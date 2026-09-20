@@ -1,83 +1,12 @@
-import {
-    PatchFlagNames,
-    type PatchFlags,
-    isArray,
-    isString,
-    isSymbol,
-} from '@arrange/vue-shared'
+import { parseExpression } from '@babel/parser'
+import type { Expression } from '@babel/types'
 import { SourceMapGenerator } from 'source-map-js'
-import {
-    type ArrayExpression,
-    type AssignmentExpression,
-    type CacheExpression,
-    type CallExpression,
-    type CommentNode,
-    type CompoundExpressionNode,
-    type ConditionalExpression,
-    type ExpressionNode,
-    type FunctionExpression,
-    type IfStatement,
-    type InterpolationNode,
-    type JSChildNode,
-    NodeTypes,
-    type ObjectExpression,
-    type Position,
-    type ReturnStatement,
-    type RootNode,
-    type SSRCodegenNode,
-    type SequenceExpression,
-    type SimpleExpressionNode,
-    type TemplateChildNode,
-    type TemplateLiteral,
-    type TextNode,
-    type VNodeCall,
-    getVNodeBlockHelper,
-    getVNodeHelper,
-    locStub,
-} from './ast.ts'
-import type { CodegenOptions } from './options.ts'
-import {
-    CREATE_COMMENT,
-    CREATE_ELEMENT_VNODE,
-
-
-    CREATE_VNODE,
-    OPEN_BLOCK,
-    RESOLVE_ARRANGABLE,
-
-    SET_BLOCK_TRACKING,
-
-    WITH_CTX,
-
-    helperNameMap
-} from './runtimeHelpers.ts'
-import type { ImportItem } from './transform.ts'
-import {
-    advancePositionWithMutation,
-    assert,
-    isSimpleIdentifier,
-    toValidAssetId,
-} from './utils.ts'
-
-/**
- * The `SourceMapGenerator` type from `source-map-js` is a bit incomplete as it
- * misses `toJSON()`. We also need to add types for internal properties which we
- * need to access for better performance.
- *
- * Since TS 5.3, dts generation starts to strangely include broken triple slash
- * references for source-map-js, so we are inlining all source map related types
- * here to to workaround that.
- */
-export interface CodegenSourceMapGenerator {
-    setSourceContent(sourceFile: string, sourceContent: string): void
-    // SourceMapGenerator has this method but the types do not include it
-    toJSON(): RawSourceMap
-    _sources: Set<string>
-    _names: Set<string>
-    _mappings: {
-        add(mapping: MappingItem): void
-    }
-}
+import { camelize } from '@arrange/vue-shared'
+import { NodeTypes, createSimpleExpression, type RootNode, type TemplateChildNode, type ElementNode, type DirectiveNode, type ExpressionNode, type SimpleExpressionNode, type SourceLocation } from './ast.ts'
+import { BindingTypes, type CompilerOptions } from './options.ts'
+import { processExpression, stringifyExpression } from './transforms/transformExpression.ts'
+import type { TransformContext } from './transform.ts'
+import { helperNameMap } from './runtimeHelpers.ts'
 
 export interface RawSourceMap {
     file?: string
@@ -88,955 +17,255 @@ export interface RawSourceMap {
     sourcesContent?: string[]
     mappings: string
 }
+export interface CodegenResult { code: string; preamble: string; ast: RootNode; map?: RawSourceMap }
 
-interface MappingItem {
-    source: string
-    generatedLine: number
-    generatedColumn: number
-    originalLine: number
-    originalColumn: number
-    name: string | null
-}
+export function generate(ast: RootNode, options: CompilerOptions = {}): CodegenResult {
+    const helpers = new Set<string>()
+    const setup: string[] = []
+    const bindings = options.bindingMetadata ?? {}
+    const filename = options.filename ?? '模板.sfa'
 
-const PURE_ANNOTATION = `/*@__PURE__*/`
+    const map = new SourceMapGenerator({ file: filename })
+    map.setSourceContent(filename, ast.source)
 
-const aliasHelper = (s: symbol) => `${helperNameMap[s]}: _${helperNameMap[s]}`
+    let position = 0
+    const locations: SourceLocation[] = []
 
-type CodegenNode = TemplateChildNode | JSChildNode | SSRCodegenNode
+    const helper = (name: string) => { helpers.add(name); return `_${name}` }
 
-export interface CodegenResult {
-    code: string
-    preamble: string
-    ast: RootNode
-    map?: RawSourceMap
-}
+    const context: TransformContext = {
+        inline: options.inline ?? true,
+        isTS: options.isTS ?? true,
+        prefixIdentifiers: true,
+        bindingMetadata: bindings,
+        identifiers: Object.create(null),
+        expressionPlugins: options.expressionPlugins ?? ['typescript'],
+        onError: options.onError ?? (error => { throw error }),
+        helperString(symbol) { ast.helpers.add(symbol); return helper(helperNameMap[symbol]) },
+    }
 
-enum NewlineType {
-    Start = 0,
-    End = -1,
-    None = -2,
-    Unknown = -3,
-}
+    const expression = (node: ExpressionNode | undefined): string => {
+        if (!node) return 'undefined'
 
-export interface CodegenContext extends Omit<
-    Required<CodegenOptions>,
-    'bindingMetadata' | 'inline'
-> {
-    source: string
-    code: string
-    line: number
-    column: number
-    offset: number
-    indentLevel: number
-    pure: boolean
-    map?: CodegenSourceMapGenerator
-    helper(key: symbol): string
-    push(code: string, newlineIndex?: number, node?: CodegenNode): void
-    indent(): void
-    deindent(withoutNewLine?: boolean): void
-    newline(): void
-}
+        return node.type === NodeTypes.SIMPLE_EXPRESSION ? stringifyExpression(processExpression({ ...node }, context)) : stringifyExpression(node)
+    }
 
-function createCodegenContext(
-    ast: RootNode,
-    {
-        mode = 'function',
-        prefixIdentifiers = mode === 'module',
-        sourceMap = false,
-        filename = `template.vue.html`,
-        optimizeImports = false,
-        runtimeGlobalName = `Vue`,
-        runtimeModuleName = `vue`,
-        isTS = false,
-    }: CodegenOptions,
-): CodegenContext {
-    const context: CodegenContext = {
-        mode,
-        prefixIdentifiers,
-        sourceMap,
-        filename,
-        optimizeImports,
-        runtimeGlobalName,
-        runtimeModuleName,
-        isTS,
-        source: ast.source,
-        code: ``,
-        column: 1,
-        line: 1,
-        offset: 0,
-        indentLevel: 0,
-        pure: false,
-        map: undefined,
-        helper(key) {
-            return `_${helperNameMap[key]}`
-        },
-        push(code, newlineIndex = NewlineType.None, node) {
-            context.code += code
-            if ((context.map)) {
-                if (node) {
-                    let name
-                    if (node.type === NodeTypes.SIMPLE_EXPRESSION && !node.isStatic) {
-                        const content = node.content.replace(/^_ctx\./, '')
-                        if (content !== node.content && isSimpleIdentifier(content)) {
-                            name = content
-                        }
-                    }
-                    if (node.loc.source) {
-                        addMapping(node.loc.start, name)
-                    }
+    const modifierGetter = (node: ExpressionNode | undefined, identity: number): string | undefined => {
+        if (options.arrangeTypecheck || node?.type !== NodeTypes.SIMPLE_EXPRESSION) return
+        let current: Expression
+        try { current = parseExpression(node.content, { plugins: ['typescript'] }) } catch { return }
+        const segments: { method: string; args: string[] }[] = []
+        const methods = new Set(['padding', 'width', 'height', 'size', 'requiredWidth', 'requiredHeight', 'requiredSize', 'fillMaxWidth', 'fillMaxHeight', 'fillMaxSize', 'widthIn', 'heightIn', 'sizeIn', 'defaultMinSize', 'offset', 'absoluteOffset', 'align', 'weight', 'zIndex', 'background', 'border', 'clip', 'alpha', 'graphicsLayer', 'clickable', 'hoverable', 'focusable', 'verticalScroll', 'horizontalScroll', 'animateContentSize', 'paint', 'text', 'textField'])
+        while (current.type === 'CallExpression' && current.callee.type === 'MemberExpression' && !current.callee.computed && current.callee.property.type === 'Identifier' && methods.has(current.callee.property.name)) {
+            if (current.arguments.some(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder')) return
+            const args = current.arguments.map(argument => expression(createSimpleExpression(node.content.slice(argument.start!, argument.end!), false, node.loc)))
+            segments.unshift({ method: current.callee.property.name, args })
+            current = current.callee.object as Expression
+        }
+        if (!segments.length || current.type !== 'Identifier' || !bindings.__arrangeModifierRoots?.includes(current.name)) return
+        const name = `__modifier${identity}`
+        const invocation = `${helper('arrangeModifier')}(${current.name}, [${segments.map(segment => `[${JSON.stringify(segment.method)}, () => [${segment.args.join(', ')}]]`).join(', ')}], ${JSON.stringify(`${filename}:${node.loc.start.line}:${node.loc.start.column}`)})`
+        if (Object.values(context.identifiers).some(count => count > 0)) return invocation
+        setup.push(`const ${name} = ${invocation}`)
+        return name
+    }
+
+    const directive = (node: ElementNode, name: string) => node.props.find(prop => prop.type === NodeTypes.DIRECTIVE && prop.name === name) as DirectiveNode | undefined
+
+    const location = (loc: SourceLocation) => JSON.stringify(`${filename}:${loc.start.line}:${loc.start.column}`)
+
+    const key = (node: ElementNode): string => {
+        for (const prop of node.props) {
+            if (prop.type === NodeTypes.ATTRIBUTE && prop.name === 'key') return JSON.stringify(prop.value?.content ?? true)
+            if (prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.content === 'key') return expression(prop.exp)
+        }
+
+        return 'undefined'
+    }
+
+    const emit = (text: string, loc: SourceLocation): string => {
+        const index = locations.push(loc) - 1
+        return `\u0000${index}\u0000${text}`
+    }
+
+    const children = (nodes: TemplateChildNode[]): string => {
+        const lines: string[] = []
+
+        for (let index = 0; index < nodes.length; index++) {
+            const node = nodes[index]
+            if (node.type !== NodeTypes.ELEMENT) continue
+
+            const conditional = directive(node, 'if')
+            if (conditional) {
+                const id = position++
+                const branches = [{ node, condition: conditional.exp }]
+                while (index + 1 < nodes.length) {
+                    const next = nodes[index + 1]
+                    if (next.type === NodeTypes.COMMENT) { index++; continue }
+                    if (next.type !== NodeTypes.ELEMENT) break
+
+                    const condition = directive(next, 'else-if')
+                    if (!condition && !directive(next, 'else')) break
+
+                    branches.push({ node: next, condition: condition?.exp })
+                    index++
+
+                    if (!condition) break
                 }
-                if (newlineIndex === NewlineType.Unknown) {
-                    // multiple newlines, full iteration
-                    advancePositionWithMutation(context, code)
-                } else {
-                    // fast paths
-                    context.offset += code.length
-                    if (newlineIndex === NewlineType.None) {
-                        // no newlines; fast path to avoid newline detection
-                        if (__TEST__ && code.includes('\n')) {
-                            throw new Error(
-                                `CodegenContext.push() called newlineIndex: none, but contains` +
-                                `newlines: ${code.replace(/\n/g, '\\n')}`,
-                            )
-                        }
-                        context.column += code.length
-                    } else {
-                        // single newline at known index
-                        if (newlineIndex === NewlineType.End) {
-                            newlineIndex = code.length - 1
-                        }
-                        if (
-                            __TEST__ &&
-                            (code.charAt(newlineIndex) !== '\n' ||
-                                code.slice(0, newlineIndex).includes('\n') ||
-                                code.slice(newlineIndex + 1).includes('\n'))
-                        ) {
-                            throw new Error(
-                                `CodegenContext.push() called with newlineIndex: ${newlineIndex} ` +
-                                `but does not conform: ${code.replace(/\n/g, '\\n')}`,
-                            )
-                        }
-                        context.line++
-                        context.column = code.length - newlineIndex
-                    }
+                const body = branches.map((branch, branchIndex) => `${branchIndex ? 'else ' : ''}${branch.condition ? `if (${expression(branch.condition)}) ` : ''}{\n${element(branch.node, true)}\n}`).join(' ')
+                lines.push(emit(`${helper('arrangeScope')}(${id}, () => {\n${body}\n}, undefined, ${location(node.loc)})`, node.loc))
+            } else {
+                if (directive(node, 'else-if') || directive(node, 'else')) throw new SyntaxError('v-else 必须紧邻对应条件分支')
+
+                lines.push(element(node))
+            }
+        }
+        return lines.join('\n')
+    }
+    const element = (node: ElementNode, skipIf = false, skipFor = false): string => {
+        const loop = !skipFor && directive(node, 'for')
+
+        if (loop) {
+            const parsed = loop.forParseResult
+            if (!parsed) throw new SyntaxError('v-for 缺少有效的条目与集合表达式')
+            const id = position++
+            const source = expression(parsed.source)
+            const aliases = [parsed.value, parsed.key, parsed.index].map((value, index) => value?.type === NodeTypes.SIMPLE_EXPRESSION ? value.content : `__item${id}_${index}`)
+            for (const alias of aliases) for (const name of alias.match(/[A-Za-z_$][\w$]*/g) ?? []) context.identifiers[name] = (context.identifiers[name] ?? 0) + 1
+            const identity = key(node)
+            const body = element(node, skipIf, true)
+            for (const alias of aliases) for (const name of alias.match(/[A-Za-z_$][\w$]*/g) ?? []) context.identifiers[name]--
+            return `${helper('arrangeScope')}(${id}, () => ${helper('arrangeList')}(${id}, ${source}, (${aliases.join(', ')}) => ${identity}, (${aliases.join(', ')}) => {\n${body}\n}), undefined, ${location(node.loc)})`
+        }
+
+        const id = position++
+        if (node.tag === 'Template') return `${helper('arrangeScope')}(${id}, () => {\n${children(node.children)}\n}, ${key(node)}, ${location(node.loc)})`
+        if (node.tag === 'Slot') {
+            const named = node.props.find(prop => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'name')
+            const name = named?.type === NodeTypes.ATTRIBUTE ? named.value?.content ?? 'default' : 'default'
+            setup.push(`const __content${id} = ${helper('useSlots')}()[${JSON.stringify(name)}]`)
+            return `${helper('invokeContent')}(${id}, __content${id})`
+        }
+
+        const binding = bindings[node.tag]
+        const definition = binding ? expression(createSimpleExpression(node.tag)) : options.arrangeTypecheck ? `__Arrange.${node.tag}` : `${helper('resolveArrangable')}(${JSON.stringify(node.tag)})`
+        const parameters: string[] = []
+        const fixedParameters: string[] = []
+        const parameterNames: string[] = []
+        const checkParameters: string[] = []
+        let dynamicShape = false
+        const constants: string[] = []
+        const sources: string[] = []
+
+        for (const prop of node.props) {
+            if (prop.type === NodeTypes.ATTRIBUTE) {
+                if (prop.name === 'key') continue
+
+                const name = camelize(prop.name)
+                const value = emit(JSON.stringify(prop.value?.content ?? true), prop.loc)
+                parameters.push(`[${JSON.stringify(name)}, () => ${value}]`)
+                fixedParameters.push(`${JSON.stringify(name)}: () => ${value}`)
+                parameterNames.push(name)
+                checkParameters.push(`${JSON.stringify(name)}: () => ${value}`)
+                constants.push(name)
+                sources.push(`${JSON.stringify(name)}: ${location(prop.loc)}`)
+            } else if (prop.name === 'bind') {
+                if (prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.content === 'key') continue
+
+                if (!prop.arg) {
+                    dynamicShape = true
+                    parameters.push(`...${helper('parameterObject')}(${position++}, () => (${expression(prop.exp)}))`)
+                    checkParameters.push(`...__arrangeGetters(${definition}, ${expression(prop.exp)})`)
+                    continue
                 }
-                if (node && node.loc !== locStub && node.loc.source) {
-                    addMapping(node.loc.end)
+                const staticName = prop.arg.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic
+                const name = staticName ? JSON.stringify(camelize((prop.arg as SimpleExpressionNode).content)) : `${helper('arrangeParameterName')}(${expression(prop.arg)})`
+                const value = emit(expression(prop.exp), prop.exp?.loc ?? prop.loc)
+                const getter = staticName && (prop.arg as SimpleExpressionNode).content === 'modifier' ? modifierGetter(prop.exp, position++) : undefined
+                const read = getter ?? `() => (${value})`
+                parameters.push(`[${name}, ${read}]`)
+                checkParameters.push(`${staticName ? name : `[${name}]`}: ${read}`)
+
+                if (staticName) fixedParameters.push(`${name}: ${read}`)
+                else dynamicShape = true
+
+                if (staticName) {
+                    parameterNames.push(camelize((prop.arg as SimpleExpressionNode).content))
+                    sources.push(`${name}: ${location(prop.loc)}`)
+                    if (prop.exp?.type === NodeTypes.SIMPLE_EXPRESSION && (/^(?:true|false|null|undefined|-?\d+(?:\.\d+)?|"[^"\\]*"|'[^'\\]*'|`[^`$]*`)$/s.test(prop.exp.content.trim()) || bindings[prop.exp.content] === BindingTypes.LITERAL_CONST)) constants.push(camelize((prop.arg as SimpleExpressionNode).content))
                 }
             }
-        },
-        indent() {
-            newline(++context.indentLevel)
-        },
-        deindent(withoutNewLine = false) {
-            if (withoutNewLine) {
-                --context.indentLevel
-            } else {
-                newline(--context.indentLevel)
-            }
-        },
-        newline() {
-            newline(context.indentLevel)
-        },
+        }
+
+        const slots: string[] = []
+        const slotNames: string[] = []
+        const defaultChildren: TemplateChildNode[] = []
+
+        for (const child of node.children) {
+            const slot = child.type === NodeTypes.ELEMENT && directive(child, 'slot')
+
+            if (slot && child.type === NodeTypes.ELEMENT) {
+                const name = slot.arg?.type === NodeTypes.SIMPLE_EXPRESSION ? slot.arg.content : 'default'
+                slots.push(`${JSON.stringify(name)}: () => {\n${children(child.children)}\n}`)
+                slotNames.push(name)
+            } else defaultChildren.push(child)
+        }
+
+        if (defaultChildren.some(child => child.type === NodeTypes.ELEMENT)) {
+            slots.push(`default: () => {\n${children(defaultChildren)}\n}`)
+            slotNames.push('default')
+        }
+
+        let inputs = dynamicShape ? `${helper('parameterInputs')}([${parameters.join(', ')}], ${location(node.loc)})` : `{${fixedParameters.join(', ')}}`
+        let contents = `{${slots.join(', ')}}`
+
+        if (!options.arrangeTypecheck && !dynamicShape && !Object.values(context.identifiers).some(count => count > 0)) {
+            setup.push(`const __inputs${id} = Object.freeze(${inputs})`)
+            setup.push(`const __contents${id} = Object.freeze(${contents})`)
+            inputs = `__inputs${id}`
+            contents = `__contents${id}`
+        }
+
+        if (options.arrangeTypecheck) {
+            if (dynamicShape) inputs = `{${checkParameters.join(', ')}}`
+            inputs = `__arrangeCheck(${definition}, ${inputs}, ${node.loc.start.line}, ${node.loc.start.column})`
+            contents = `__arrangeCheckSlots(${definition}, ${contents}, ${node.loc.start.line}, ${node.loc.start.column})`
+        }
+
+        let plan = ''
+        if (!options.arrangeTypecheck && !dynamicShape && (!binding || binding === BindingTypes.SETUP_CONST)) {
+            const names = Object.keys(Object.fromEntries(parameterNames.map(name => [name, true])))
+            setup.push(`const __parameters${id} = ${helper('prepareParameters')}(${definition}, ${JSON.stringify(names)}, ${JSON.stringify(slotNames)}, ${location(node.loc)})`)
+            plan = `parameters: __parameters${id}, `
+        }
+
+        return emit(`${helper('callArrangable')}(${id}, ${definition}, ${inputs}, ${contents}, { ${plan}key: ${key(node)}, constants: ${JSON.stringify(constants)}, source: ${location(node.loc)}, sources: {${sources.join(', ')}} })`, node.loc)
     }
 
-    function newline(n: number) {
-        context.push('\n' + `  `.repeat(n), NewlineType.Start)
-    }
+    const body = children(ast.children)
+    const marked = setup.length ? `(() => {\n${setup.join('\n')}\nreturn () => {\n${body}\n}\n})()` : `() => {\n${body}\n}`
+    const preamble = `import { ${[...helpers].map(name => `${name} as _${name}`).join(', ')} } from ${JSON.stringify(options.runtimeModuleName ?? '@arrange/framework')}\n`
+    let code = ''
+    let line = 1
+    let column = 0
+    let offset = 0
 
-    function addMapping(loc: Position, name: string | null = null) {
-        // we use the private property to directly add the mapping
-        // because the addMapping() implementation in source-map-js has a bunch of
-        // unnecessary arg and validation checks that are pure overhead in our case.
-        const { _names, _mappings } = context.map!
-        if (name !== null && !_names.has(name)) _names.add(name)
-        _mappings.add({
-            originalLine: loc.line,
-            originalColumn: loc.column - 1, // source-map column is 0 based
-            generatedLine: context.line,
-            generatedColumn: context.column - 1,
-            source: filename,
-            name,
-        })
-    }
-
-    if ((sourceMap)) {
-
-        context.map =
-            new SourceMapGenerator() as unknown as CodegenSourceMapGenerator
-        context.map.setSourceContent(filename, context.source)
-        context.map._sources.add(filename)
-    }
-
-    return context
-}
-
-export function generate(
-    ast: RootNode,
-    options: CodegenOptions & {
-        onContextCreated?: (context: CodegenContext) => void
-    } = {},
-): CodegenResult {
-    const context = createCodegenContext(ast, options)
-    if (options.onContextCreated) options.onContextCreated(context)
-    const {
-        mode,
-        push,
-        prefixIdentifiers,
-        indent,
-        deindent,
-        newline,
-    } = context
-
-    const helpers = Array.from(ast.helpers)
-    const hasHelpers = helpers.length > 0
-    const useWithBlock = !prefixIdentifiers && mode !== 'module'
-
-    const isSetupInlined = (!!options.inline)
-
-    // preambles
-    // in setup() inline mode, the preamble is generated in a sub context
-    // and returned separately.
-    const preambleContext = isSetupInlined
-        ? createCodegenContext(ast, options)
-        : context
-    if ((mode === 'module')) {
-        genModulePreamble(ast, preambleContext, isSetupInlined)
-    } else {
-        genFunctionPreamble(ast, preambleContext)
-    }
-    // enter render function
-    const functionName = (`render`)
-    const args = (['_ctx', '_cache'])
-    if ((options.bindingMetadata) && !options.inline) {
-        // binding optimization args
-        args.push('$props', '$setup')
-    }
-    const signature =
-        (options.isTS)
-            ? args.map(arg => `${arg}: any`).join(',')
-            : args.join(', ')
-
-    if (isSetupInlined) {
-        push(`(${signature}) => {`)
-    } else {
-        push(`function ${functionName}(${signature}) {`)
-    }
-    indent()
-
-    if (useWithBlock) {
-        push(`with (_ctx) {`)
-        indent()
-        // function mode const declarations should be inside with block
-        // also they should be renamed to avoid collision with user properties
-        if (hasHelpers) {
-            push(
-                `const { ${helpers.map(aliasHelper).join(', ')} } = _Vue\n`,
-                NewlineType.End,
-            )
-            newline()
+    const append = (text: string) => {
+        code += text
+        for (const character of text) {
+            if (character === '\n') { line++; column = 0 }
+            else column++
         }
     }
 
-    // generate asset resolution statements
-    if (ast.arrangables.length) {
-        genAssets(ast.arrangables, 'arrangable', context)
-        if (ast.temps > 0) {
-            newline()
-        }
+    for (const marker of marked.matchAll(/\u0000(\d+)\u0000/g)) {
+        append(marked.slice(offset, marker.index))
+        const loc = locations[Number(marker[1])]
+        map.addMapping({ generated: { line, column }, original: { line: loc.start.line, column: loc.start.column - 1 }, source: filename })
+        offset = marker.index! + marker[0].length
     }
 
-    if (ast.temps > 0) {
-        push(`let `)
-        for (let i = 0; i < ast.temps; i++) {
-            push(`${i > 0 ? `, ` : ``}_temp${i}`)
-        }
-    }
-    if (ast.arrangables.length || ast.temps) {
-        push(`\n`, NewlineType.Start)
-        newline()
-    }
-
-    // generate the VNode tree expression
-    {
-        push(`return `)
-    }
-    if (ast.codegenNode) {
-        genNode(ast.codegenNode, context)
-    } else {
-        push(`null`)
-    }
-
-    if (useWithBlock) {
-        deindent()
-        push(`}`)
-    }
-
-    deindent()
-    push(`}`)
-
-    return {
-        ast,
-        code: context.code,
-        preamble: isSetupInlined ? preambleContext.code : ``,
-        map: context.map ? context.map.toJSON() : undefined,
-    }
-}
-
-function genFunctionPreamble(ast: RootNode, context: CodegenContext) {
-    const {
-
-        prefixIdentifiers,
-        push,
-        newline,
-        runtimeModuleName,
-        runtimeGlobalName,
-    } = context
-    const VueBinding =
-        (runtimeGlobalName)
-    // Generate const declaration for helpers
-    // In prefix mode, we place the const declaration at top so it's done
-    // only once; But if we not prefixing, we place the declaration inside the
-    // with block so it doesn't incur the `in` check cost for every helper access.
-    const helpers = Array.from(ast.helpers)
-    if (helpers.length > 0) {
-        if ((prefixIdentifiers)) {
-            push(
-                `const { ${helpers.map(aliasHelper).join(', ')} } = ${VueBinding}\n`,
-                NewlineType.End,
-            )
-        } else {
-            // "with" mode.
-            // save Vue in a separate variable to avoid collision
-            push(`const _Vue = ${VueBinding}\n`, NewlineType.End)
-            // in "with" mode, helpers are declared inside the with block to avoid
-            // has check cost, but hoists are lifted out of the function - we need
-            // to provide the helper here.
-            if (ast.hoists.length) {
-                const staticHelpers = [
-                    CREATE_VNODE,
-                    CREATE_ELEMENT_VNODE,
-                    CREATE_COMMENT,
-
-                ]
-                    .filter(helper => helpers.includes(helper))
-                    .map(aliasHelper)
-                    .join(', ')
-                push(`const { ${staticHelpers} } = _Vue\n`, NewlineType.End)
-            }
-        }
-    }
-
-    genHoists(ast.hoists, context)
-    newline()
-    push(`return `)
-}
-
-function genModulePreamble(
-    ast: RootNode,
-    context: CodegenContext,
-    inline?: boolean,
-) {
-    const {
-        push,
-        newline,
-        optimizeImports,
-        runtimeModuleName,
-    } = context
-
-    // generate import statements for helpers
-    if (ast.helpers.size) {
-        const helpers = Array.from(ast.helpers)
-        if (optimizeImports) {
-            // when bundled with webpack with code-split, calling an import binding
-            // as a function leads to it being wrapped with `Object(a.b)` or `(0,a.b)`,
-            // incurring both payload size increase and potential perf overhead.
-            // therefore we assign the imports to variables (which is a constant ~50b
-            // cost per-arrangable instead of scaling with template size)
-            push(
-                `
-import { ${helpers
-                    .map(s => helperNameMap[s])
-                    .join(', ')} } from ${JSON.stringify(runtimeModuleName)}\n`,
-                NewlineType.End,
-            )
-            push(
-                `\n// Binding optimization for webpack code-split\nconst ${helpers
-                    .map(s => `_${helperNameMap[s]} = ${helperNameMap[s]}`)
-                    .join(', ')}\n`,
-                NewlineType.End,
-            )
-        } else {
-            push(
-                `
-import { ${helpers
-                    .map(s => `${helperNameMap[s]} as _${helperNameMap[s]}`)
-                    .join(', ')} } from ${JSON.stringify(runtimeModuleName)}\n`,
-                NewlineType.End,
-            )
-        }
-    }
-
-    if (ast.imports.length) {
-        genImports(ast.imports, context)
-        newline()
-    }
-
-    genHoists(ast.hoists, context)
-    newline()
-
-    if (!inline) {
-        push(`export `)
-    }
-}
-
-function genAssets(
-    assets: string[],
-    type: 'arrangable',
-    { helper, push, newline, isTS }: CodegenContext,
-) {
-    const resolver = helper(RESOLVE_ARRANGABLE)
-    for (let i = 0; i < assets.length; i++) {
-        let id = assets[i]
-        // potential arrangable implicit self-reference inferred from SFA filename
-        const maybeSelfReference = id.endsWith('__self')
-        if (maybeSelfReference) {
-            id = id.slice(0, -6)
-        }
-        push(
-            `const ${toValidAssetId(id, type)} = ${resolver}(${JSON.stringify(id)}${maybeSelfReference ? `, true` : ``
-            })${isTS ? `!` : ``}`,
-        )
-        if (i < assets.length - 1) {
-            newline()
-        }
-    }
-}
-
-function genHoists(hoists: (JSChildNode | null)[], context: CodegenContext) {
-    if (!hoists.length) {
-        return
-    }
-    context.pure = true
-    const { push, newline } = context
-    newline()
-
-    for (let i = 0; i < hoists.length; i++) {
-        const exp = hoists[i]
-        if (exp) {
-            push(`const _hoisted_${i + 1} = `)
-            genNode(exp, context)
-            newline()
-        }
-    }
-
-    context.pure = false
-}
-
-function genImports(importsOptions: ImportItem[], context: CodegenContext) {
-    if (!importsOptions.length) {
-        return
-    }
-    importsOptions.forEach(imports => {
-        context.push(`import `)
-        genNode(imports.exp, context)
-        context.push(` from '${imports.path}'`)
-        context.newline()
-    })
-}
-
-function isText(n: string | CodegenNode) {
-    return (
-        isString(n) ||
-        n.type === NodeTypes.SIMPLE_EXPRESSION ||
-        n.type === NodeTypes.TEXT ||
-        n.type === NodeTypes.INTERPOLATION ||
-        n.type === NodeTypes.COMPOUND_EXPRESSION
-    )
-}
-
-function genNodeListAsArray(
-    nodes: (string | CodegenNode | TemplateChildNode[])[],
-    context: CodegenContext,
-) {
-    const multilines =
-        nodes.length > 3 ||
-        ((nodes.some(n => isArray(n) || !isText(n))))
-    context.push(`[`)
-    multilines && context.indent()
-    genNodeList(nodes, context, multilines)
-    multilines && context.deindent()
-    context.push(`]`)
-}
-
-function genNodeList(
-    nodes: (string | symbol | CodegenNode | TemplateChildNode[])[],
-    context: CodegenContext,
-    multilines: boolean = false,
-    comma: boolean = true,
-) {
-    const { push, newline } = context
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i]
-        if (isString(node)) {
-            push(node, NewlineType.Unknown)
-        } else if (isArray(node)) {
-            genNodeListAsArray(node, context)
-        } else {
-            genNode(node, context)
-        }
-        if (i < nodes.length - 1) {
-            if (multilines) {
-                comma && push(',')
-                newline()
-            } else {
-                comma && push(', ')
-            }
-        }
-    }
-}
-
-function genNode(node: CodegenNode | symbol | string, context: CodegenContext) {
-    if (isString(node)) {
-        context.push(node, NewlineType.Unknown)
-        return
-    }
-    if (isSymbol(node)) {
-        context.push(context.helper(node))
-        return
-    }
-    switch (node.type) {
-        case NodeTypes.ELEMENT:
-        case NodeTypes.IF:
-        case NodeTypes.FOR:
-            __DEV__ &&
-                assert(
-                    node.codegenNode != null,
-                    `Codegen node is missing for element/if/for node. ` +
-                    `Apply appropriate transforms first.`,
-                )
-            genNode(node.codegenNode!, context)
-            break
-        case NodeTypes.TEXT:
-            genText(node, context)
-            break
-        case NodeTypes.SIMPLE_EXPRESSION:
-            genExpression(node, context)
-            break
-        case NodeTypes.INTERPOLATION:
-            throw new SyntaxError('模板内容不接受插值，请使用 Text 的 text 参数')
-        case NodeTypes.COMPOUND_EXPRESSION:
-            genCompoundExpression(node, context)
-            break
-        case NodeTypes.COMMENT:
-            genComment(node, context)
-            break
-        case NodeTypes.VNODE_CALL:
-            genVNodeCall(node, context)
-            break
-
-        case NodeTypes.JS_CALL_EXPRESSION:
-            genCallExpression(node, context)
-            break
-        case NodeTypes.JS_OBJECT_EXPRESSION:
-            genObjectExpression(node, context)
-            break
-        case NodeTypes.JS_ARRAY_EXPRESSION:
-            genArrayExpression(node, context)
-            break
-        case NodeTypes.JS_FUNCTION_EXPRESSION:
-            genFunctionExpression(node, context)
-            break
-        case NodeTypes.JS_CONDITIONAL_EXPRESSION:
-            genConditionalExpression(node, context)
-            break
-        case NodeTypes.JS_CACHE_EXPRESSION:
-            genCacheExpression(node, context)
-            break
-        case NodeTypes.JS_BLOCK_STATEMENT:
-            genNodeList(node.body, context, true, false)
-            break
-
-        case NodeTypes.JS_TEMPLATE_LITERAL:
-            (genTemplateLiteral(node, context))
-            break
-        case NodeTypes.JS_IF_STATEMENT:
-            (genIfStatement(node, context))
-            break
-        case NodeTypes.JS_ASSIGNMENT_EXPRESSION:
-            (genAssignmentExpression(node, context))
-            break
-        case NodeTypes.JS_SEQUENCE_EXPRESSION:
-            (genSequenceExpression(node, context))
-            break
-        case NodeTypes.JS_RETURN_STATEMENT:
-            (genReturnStatement(node, context))
-            break
-
-        /* v8 ignore start */
-        case NodeTypes.IF_BRANCH:
-            // noop
-            break
-        default:
-            if (__DEV__) {
-                assert(false, `unhandled codegen node type: ${(node as any).type}`)
-                // make sure we exhaust all possible types
-                const exhaustiveCheck: never = node
-                return exhaustiveCheck
-            }
-        /* v8 ignore stop */
-    }
-}
-
-function genText(
-    node: TextNode | SimpleExpressionNode,
-    context: CodegenContext,
-) {
-    context.push(JSON.stringify(node.content), NewlineType.Unknown, node)
-}
-
-function genExpression(node: SimpleExpressionNode, context: CodegenContext) {
-    const { content, isStatic } = node
-    context.push(
-        isStatic ? JSON.stringify(content) : content,
-        NewlineType.Unknown,
-        node,
-    )
-}
-
-
-function genCompoundExpression(
-    node: CompoundExpressionNode,
-    context: CodegenContext,
-) {
-    for (let i = 0; i < node.children!.length; i++) {
-        const child = node.children![i]
-        if (isString(child)) {
-            context.push(child, NewlineType.Unknown)
-        } else {
-            genNode(child, context)
-        }
-    }
-}
-
-function genExpressionAsPropertyKey(
-    node: ExpressionNode,
-    context: CodegenContext,
-) {
-    const { push } = context
-    if (node.type === NodeTypes.COMPOUND_EXPRESSION) {
-        push(`[`)
-        genCompoundExpression(node, context)
-        push(`]`)
-    } else if (node.isStatic) {
-        // only quote keys if necessary
-        const text = isSimpleIdentifier(node.content)
-            ? node.content
-            : JSON.stringify(node.content)
-        push(text, NewlineType.None, node)
-    } else {
-        push(`[${node.content}]`, NewlineType.Unknown, node)
-    }
-}
-
-function genComment(node: CommentNode, context: CodegenContext) {
-    const { push, helper, pure } = context
-    if (pure) {
-        push(PURE_ANNOTATION)
-    }
-    push(
-        `${helper(CREATE_COMMENT)}(${JSON.stringify(node.content)})`,
-        NewlineType.Unknown,
-        node,
-    )
-}
-
-function genVNodeCall(node: VNodeCall, context: CodegenContext) {
-    const { push, helper, pure } = context
-    const {
-        tag,
-        props,
-        children,
-        patchFlag,
-        dynamicProps,
-
-        isBlock,
-        disableTracking,
-        isArrangable,
-    } = node
-
-    // add dev annotations to patch flags
-    let patchFlagString
-    if (patchFlag) {
-        if (__DEV__) {
-            if (patchFlag < 0) {
-                // special flags (negative and mutually exclusive)
-                patchFlagString = patchFlag + ` /* ${PatchFlagNames[patchFlag]} */`
-            } else {
-                // bitwise flags
-                const flagNames = Object.keys(PatchFlagNames)
-                    .map(Number)
-                    .filter(n => n > 0 && patchFlag & n)
-                    .map(n => PatchFlagNames[n as PatchFlags])
-                    .join(`, `)
-                patchFlagString = patchFlag + ` /* ${flagNames} */`
-            }
-        } else {
-            patchFlagString = String(patchFlag)
-        }
-    }
-    if (isBlock) {
-        push(`(${helper(OPEN_BLOCK)}(${disableTracking ? `true` : ``}), `)
-    }
-    if (pure) {
-        push(PURE_ANNOTATION)
-    }
-    const callHelper: symbol = isBlock
-        ? getVNodeBlockHelper(isArrangable)
-        : getVNodeHelper(isArrangable)
-    push(helper(callHelper) + `(`, NewlineType.None, node)
-    genNodeList(
-        genNullableArgs([tag, props, children, patchFlagString, dynamicProps]),
-        context,
-    )
-    push(`)`)
-    if (isBlock) {
-        push(`)`)
-    }
-}
-
-function genNullableArgs(args: any[]): CallExpression['arguments'] {
-    let i = args.length
-    while (i--) {
-        if (args[i] != null) break
-    }
-    return args.slice(0, i + 1).map(arg => arg || `null`)
-}
-
-// JavaScript
-function genCallExpression(node: CallExpression, context: CodegenContext) {
-    const { push, helper, pure } = context
-    const callee = isString(node.callee) ? node.callee : helper(node.callee)
-    if (pure) {
-        push(PURE_ANNOTATION)
-    }
-    push(callee + `(`, NewlineType.None, node)
-    genNodeList(node.arguments, context)
-    push(`)`)
-}
-
-function genObjectExpression(node: ObjectExpression, context: CodegenContext) {
-    const { push, indent, deindent, newline } = context
-    const { properties } = node
-    if (!properties.length) {
-        push(`{}`, NewlineType.None, node)
-        return
-    }
-    const multilines =
-        properties.length > 1 ||
-        ((properties.some(p => p.value.type !== NodeTypes.SIMPLE_EXPRESSION)))
-    push(multilines ? `{` : `{ `)
-    multilines && indent()
-    for (let i = 0; i < properties.length; i++) {
-        const { key, value } = properties[i]
-        // key
-        genExpressionAsPropertyKey(key, context)
-        push(`: `)
-        // value
-        genNode(value, context)
-        if (i < properties.length - 1) {
-            // will only reach this if it's multilines
-            push(`,`)
-            newline()
-        }
-    }
-    multilines && deindent()
-    push(multilines ? `}` : ` }`)
-}
-
-function genArrayExpression(node: ArrayExpression, context: CodegenContext) {
-    genNodeListAsArray(node.elements as CodegenNode[], context)
-}
-
-function genFunctionExpression(
-    node: FunctionExpression,
-    context: CodegenContext,
-) {
-    const { push, indent, deindent } = context
-    const { params, returns, body, newline, isSlot } = node
-    if (isSlot) {
-        // wrap slot functions with owner context
-        push(`_${helperNameMap[WITH_CTX]}(`)
-    }
-    push(`(`, NewlineType.None, node)
-    if (isArray(params)) {
-        genNodeList(params, context)
-    } else if (params) {
-        genNode(params, context)
-    }
-    push(`) => `)
-    if (newline || body) {
-        push(`{`)
-        indent()
-    }
-    if (returns) {
-        if (newline) {
-            push(`return `)
-        }
-        if (isArray(returns)) {
-            genNodeListAsArray(returns, context)
-        } else {
-            genNode(returns, context)
-        }
-    } else if (body) {
-        genNode(body, context)
-    }
-    if (newline || body) {
-        deindent()
-        push(`}`)
-    }
-    if (isSlot) {
-
-        push(`)`)
-    }
-}
-
-function genConditionalExpression(
-    node: ConditionalExpression,
-    context: CodegenContext,
-) {
-    const { test, consequent, alternate, newline: needNewline } = node
-    const { push, indent, deindent, newline } = context
-    if (test.type === NodeTypes.SIMPLE_EXPRESSION) {
-        const needsParens = !isSimpleIdentifier(test.content)
-        needsParens && push(`(`)
-        genExpression(test, context)
-        needsParens && push(`)`)
-    } else {
-        push(`(`)
-        genNode(test, context)
-        push(`)`)
-    }
-    needNewline && indent()
-    context.indentLevel++
-    needNewline || push(` `)
-    push(`? `)
-    genNode(consequent, context)
-    context.indentLevel--
-    needNewline && newline()
-    needNewline || push(` `)
-    push(`: `)
-    const isNested = alternate.type === NodeTypes.JS_CONDITIONAL_EXPRESSION
-    if (!isNested) {
-        context.indentLevel++
-    }
-    genNode(alternate, context)
-    if (!isNested) {
-        context.indentLevel--
-    }
-    needNewline && deindent(true /* without newline */)
-}
-
-function genCacheExpression(node: CacheExpression, context: CodegenContext) {
-    const { push, helper, indent, deindent, newline } = context
-    const { needPauseTracking, needArraySpread } = node
-    if (needArraySpread) {
-        push(`[...(`)
-    }
-    push(`_cache[${node.index}] || (`)
-    if (needPauseTracking) {
-        indent()
-        push(`${helper(SET_BLOCK_TRACKING)}(-1`)
-        push(`),`)
-        newline()
-        push(`(`)
-    }
-    push(`_cache[${node.index}] = `)
-    genNode(node.value, context)
-    if (needPauseTracking) {
-        push(`).cacheIndex = ${node.index},`)
-        newline()
-        push(`${helper(SET_BLOCK_TRACKING)}(1),`)
-        newline()
-        push(`_cache[${node.index}]`)
-        deindent()
-    }
-    push(`)`)
-    if (needArraySpread) {
-        push(`)]`)
-    }
-}
-
-function genTemplateLiteral(node: TemplateLiteral, context: CodegenContext) {
-    const { push, indent, deindent } = context
-    push('`')
-    const l = node.elements.length
-    const multilines = l > 3
-    for (let i = 0; i < l; i++) {
-        const e = node.elements[i]
-        if (isString(e)) {
-            push(e.replace(/(`|\$|\\)/g, '\\$1'), NewlineType.Unknown)
-        } else {
-            push('${')
-            if (multilines) indent()
-            genNode(e, context)
-            if (multilines) deindent()
-            push('}')
-        }
-    }
-    push('`')
-}
-
-function genIfStatement(node: IfStatement, context: CodegenContext) {
-    const { push, indent, deindent } = context
-    const { test, consequent, alternate } = node
-    push(`if (`)
-    genNode(test, context)
-    push(`) {`)
-    indent()
-    genNode(consequent, context)
-    deindent()
-    push(`}`)
-    if (alternate) {
-        push(` else `)
-        if (alternate.type === NodeTypes.JS_IF_STATEMENT) {
-            genIfStatement(alternate, context)
-        } else {
-            push(`{`)
-            indent()
-            genNode(alternate, context)
-            deindent()
-            push(`}`)
-        }
-    }
-}
-
-function genAssignmentExpression(
-    node: AssignmentExpression,
-    context: CodegenContext,
-) {
-    genNode(node.left, context)
-    context.push(` = `)
-    genNode(node.right, context)
-}
-
-function genSequenceExpression(
-    node: SequenceExpression,
-    context: CodegenContext,
-) {
-    context.push(`(`)
-    genNodeList(node.expressions, context)
-    context.push(`)`)
-}
-
-function genReturnStatement(
-    { returns }: ReturnStatement,
-    context: CodegenContext,
-) {
-    context.push(`return `)
-    if (isArray(returns)) {
-        genNodeListAsArray(returns, context)
-    } else {
-        genNode(returns, context)
-    }
+    append(marked.slice(offset))
+    ast.transformed = true
+    return { ast, code, preamble, map: JSON.parse(map.toString()) }
 }

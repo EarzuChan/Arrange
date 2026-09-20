@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/core/Paint.h>
 #include <arrange/juce/ErrorScreenModel.h>
 
@@ -33,18 +33,18 @@ namespace arrange::juce {
         PaintResult paint(
             ::juce::Graphics& g,
             const std::vector<arrange::core::DrawOp>& ops,
-            std::optional<arrange::core::NodeId> focusedInputNode = std::nullopt,
+            arrange::core::ModifierHandle focusedInputModifier = {},
             float focusedInputViewportX = 0.0f) const;
 
-        PaintResult paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, std::optional<arrange::core::NodeId> focusedInputNode = {}, float viewportX = 0) const;
+        PaintResult paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focusedInputModifier = {}, float viewportX = 0) const;
         void setCullingEnabled(bool enabled) noexcept { cullingEnabled_ = enabled; }
         PaintReplayCounters counters() const noexcept { return counters_; }
         void resetCounters() const noexcept { counters_ = {}; }
 
     private:
         bool invisible(::juce::Graphics& graphics, arrange::core::PaintBounds bounds) const;
-        void replayFragment(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& placed, std::optional<arrange::core::NodeId> focusedInputNode, float viewportX, float alpha) const;
-        void replayOps(::juce::Graphics& graphics, const std::vector<arrange::core::DrawOp>& ops, std::optional<arrange::core::NodeId> focusedInputNode, float viewportX, float alpha, int& depth) const;
+        void replayFragment(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focusedInputModifier, float viewportX, float alpha) const;
+        void replayOps(::juce::Graphics& graphics, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier, float viewportX, float alpha, int& depth) const;
         void drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float viewportX, float alpha) const;
         bool cullingEnabled_ = true;
         mutable PaintReplayCounters counters_;

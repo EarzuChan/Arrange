@@ -444,7 +444,7 @@ export function compileScript(
             }
             returned = code
         } else {
-            returned = `() => null`
+            returned = `() => {}`
         }
 
     ctx.s.appendRight(endOffset, `\nreturn ${returned}\n}\n\n`)
@@ -454,7 +454,7 @@ export function compileScript(
         ? `const ${options.genDefaultAs} =`
         : `export default`
 
-    let runtimeOptions = `\n    slotNames: ${JSON.stringify(slotNames)},`
+    let runtimeOptions = `\n    __file: ${JSON.stringify(filename)},\n    slotNames: ${JSON.stringify(slotNames)},`
     if (filename && filename !== DEFAULT_FILENAME) {
         const match = filename.match(/([^/\\]+)\.\w+$/)
         if (match) {
@@ -756,23 +756,21 @@ function isStaticNode(node: Node): boolean {
     return false
 }
 
-export function mergeSourceMaps(
-    scriptMap: RawSourceMap,
-    templateMap: RawSourceMap,
-    templateLineOffset: number,
-): RawSourceMap {
+export function mergeSourceMaps(scriptMap: RawSourceMap, templateMap: RawSourceMap, templateLineOffset: number,): RawSourceMap {
     const generator = new SourceMapGenerator()
     const addMapping = (map: RawSourceMap, lineOffset = 0) => {
-        const consumer = new SourceMapConsumer(map)
-            ; (consumer as any).sources.forEach((sourceFile: string) => {
-                ; (generator as any)._sources.add(sourceFile)
+        const consumer = new SourceMapConsumer(map);
+
+        (consumer as any).sources.forEach((sourceFile: string) => {
+                (generator as any)._sources.add(sourceFile)
+
                 const sourceContent = consumer.sourceContentFor(sourceFile)
-                if (sourceContent != null) {
-                    generator.setSourceContent(sourceFile, sourceContent)
-                }
-            })
+                if (sourceContent != null) generator.setSourceContent(sourceFile, sourceContent)
+        })
+
         consumer.eachMapping(m => {
             if (m.originalLine == null) return
+
             generator.addMapping({
                 generated: {
                     line: m.generatedLine + lineOffset,
@@ -789,8 +787,10 @@ export function mergeSourceMaps(
     }
 
     addMapping(scriptMap)
-    addMapping(templateMap, templateLineOffset)
-        ; (generator as any)._sourceRoot = scriptMap.sourceRoot
-        ; (generator as any)._file = scriptMap.file
+    addMapping(templateMap, templateLineOffset);
+
+    (generator as any)._sourceRoot = scriptMap.sourceRoot;
+    (generator as any)._file = scriptMap.file
+
     return (generator as any).toJSON()
 }

@@ -1,42 +1,11 @@
-/**
- * This Tokenizer is adapted from htmlparser2 under the MIT License listed at
- * https://github.com/fb55/htmlparser2/blob/master/LICENSE
-
-Copyright 2010, 2011, Chris Winberry <chris@winberry.net>. All rights reserved.
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to
-deal in the Software without restriction, including without limitation the
-rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-sell copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-IN THE SOFTWARE.
- */
+// HtmlParser2。遵循 MIT 许可证（详见 https://github.com/fb55/htmlparser2/blob/master/LICENSE），版权所有：2010-2011，Chris Winberry <chris@winberry.net>。保留所有权利
 
 import type { ElementNode, Position } from './ast.ts'
 import { ErrorCodes } from './errors.ts'
 
-import {
-    DecodingMode,
-    EntityDecoder,
-    fromCodePoint,
-    htmlDecodeTree,
-} from 'entities/decode'
+import {DecodingMode, EntityDecoder, fromCodePoint, htmlDecodeTree,} from 'entities/decode'
 
-export enum ParseMode {
-    BASE,
-    HTML,
-    SFA,
-}
+export enum ParseMode {BASE, HTML, SFA,}
 
 export enum CharCodes {
     Tab = 0x9, // "\t"

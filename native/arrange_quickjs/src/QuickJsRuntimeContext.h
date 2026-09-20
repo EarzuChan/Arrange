@@ -40,6 +40,8 @@ namespace arrange::quickjs {
             std::size_t position = 0;
         };
         std::unordered_map<std::uint64_t, PublishedModifier> publishedModifiers;
+        // 已接收的类型化输入，提交期间包含候选；不创建 Modifier 实例或预测原生 handle
+        std::unordered_map<arrange::core::NodeId, std::vector<PublishedModifier>> modifierInputs;
         std::uint64_t rejectedBindingUpdates = 0;
         QuickJsModuleLoader moduleLoader;
         arrange::core::PainterLoader painterLoader;
@@ -49,24 +51,42 @@ namespace arrange::quickjs {
         std::unordered_map<arrange::core::NodeId, std::uint64_t> nodeGenerations;
         std::unordered_map<arrange::core::NodeId, std::unordered_map<arrange::core::HostInput, arrange::core::BindingHandle>> hostBindings;
         std::unordered_map<arrange::core::NodeId, arrange::core::BindingHandle> modifierBindings;
-        std::unordered_map<arrange::core::NodeId, std::unordered_map<arrange::core::EventSlotKind, arrange::core::BindingHandle>> eventBindings;
         std::unordered_map<arrange::core::NodeId, std::vector<arrange::core::NodeId>> childrenByNode;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeId> parentByNode;
         std::vector<QuickJsDiagnosticEventInput> diagnosticEvents;
         std::vector<QuickJsDiagnosticAction> diagnosticActions;
+
+        struct RearrangeCheckpoint {
+            arrange::core::NodeId root;
+            std::optional<arrange::core::MutationTransaction> pending;
+            decltype(bindings) savedBindings;
+            decltype(publishedModifiers) savedPublishedModifiers;
+            decltype(modifierInputs) savedModifierInputs;
+            decltype(nodeTypes) savedNodeTypes;
+            decltype(nodeGenerations) savedNodeGenerations;
+            decltype(hostBindings) savedHostBindings;
+            decltype(modifierBindings) savedModifierBindings;
+            decltype(childrenByNode) savedChildrenByNode;
+            decltype(parentByNode) savedParentByNode;
+        };
+        std::optional<RearrangeCheckpoint> rearrangeCheckpoint;
+        std::shared_ptr<arrange::core::RearrangeSubmission> rearrangeSubmission;
+        JSValue rearrangeCompletion = JS_UNDEFINED;
+        void beginRearrange();
+        void abortRearrange();
+        void commitRearrange();
 
         arrange::core::MutationTransaction* currentTransaction() noexcept;
         void push(arrange::core::TreeMutation mutation);
         arrange::core::BindingHandle registerBinding(arrange::core::BindingTarget target);
         void updateBinding(arrange::core::BindingHandle handle, arrange::core::SlotValue value);
         void retireBinding(arrange::core::BindingHandle handle);
+        std::vector<const arrange::core::ModifierDescriptor*> modifierInputDescriptors(arrange::core::NodeId id) const;
         void setHostInput(arrange::core::NodeId id, arrange::core::HostInput input, arrange::core::PropValue value);
-        void setEventInput(arrange::core::NodeId id, arrange::core::EventSlotKind kind, arrange::core::EventSlotId slot);
         void setModifierChain(arrange::core::NodeId id, arrange::core::ModifierDescriptors value);
         void attachChild(arrange::core::NodeId parent, arrange::core::NodeId child, std::uint32_t index);
         void detachChild(arrange::core::NodeId parent, arrange::core::NodeId child);
-        void releaseNodeCallbacksRecursive(arrange::core::NodeId id);
-        void releaseNodeTypesRecursive(arrange::core::NodeId id);
+        void retireSubtree(arrange::core::NodeId id);
         void recordDiagnostic(QuickJsDiagnosticEventInput event);
         void recordDiagnosticAction(QuickJsDiagnosticAction action);
     };

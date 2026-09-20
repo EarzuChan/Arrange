@@ -7,36 +7,17 @@
 #include <arrange/juce/JuceTextServices.h>
 
 #include <algorithm>
+#include <stdexcept>
+#include <utility>
 
 namespace arrange::juce {
-    namespace {
-        const arrange::core::PropValue* nodeProp(
-            const arrange::core::ArrangeNode& node,
-            const char* camelCase,
-            const char* kebabCase = nullptr) {
-            return arrange::core::propValue(
-                node,
-                camelCase,
-                kebabCase == nullptr ? std::string_view{} : std::string_view{kebabCase});
-        }
-
-        std::string inputModelValue(const arrange::core::ArrangeNode& node) {
-            if (const auto* value = nodeProp(node, "value")) return value->stringOr();
-            return {};
-        }
-
-        bool boolProp(const arrange::core::ArrangeNode& node, const char* camelCase, const char* kebabCase = nullptr, bool fallback = false) {
-            const auto* value = nodeProp(node, camelCase, kebabCase);
-            return value == nullptr ? fallback : value->boolOr(fallback);
-        }
-    } // namespace
-
     TextInputOwner::TextInputOwner(arrange::core::TextLayoutService& textLayoutService) noexcept
         : text_(textLayoutService) {}
 
     void TextInputOwner::reset() {
         session_.reset();
         focusedGeneration_ = 0;
+        focusedModifier_ = {};
         publishedModelValue_.clear();
     }
 
@@ -52,6 +33,50 @@ namespace arrange::juce {
         return session_.viewportX();
     }
 
+    const arrange::core::ModifierInstance& TextInputOwner::inputInstance(const arrange::core::LayoutNode& node) const {
+        const auto* instance = node.modifier.find(focusedModifier_);
+        if (!instance || !std::holds_alternative<arrange::core::TextFieldModifier>(instance->descriptor.value)) throw std::logic_error("文本编辑受体已退休");
+        return *instance;
+    }
+
+    const arrange::core::LayoutNode* TextInputOwner::activeInputNode(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+        if (!runtimeReady || !session_.focusedNode() || !tree.contains(*session_.focusedNode())) return nullptr;
+        const auto& node = tree.node(*session_.focusedNode());
+        if (node.generation != focusedGeneration_ || !arrange::core::nodeInteractionEnabled(tree, node.id)) return nullptr;
+        const auto* instance = node.modifier.find(focusedModifier_);
+        const auto* field = instance ? std::get_if<arrange::core::TextFieldModifier>(&instance->descriptor.value) : nullptr;
+        return field && field->enabled ? &node : nullptr;
+    }
+
+    arrange::core::LayoutNode* TextInputOwner::activeInputNode(arrange::core::LayoutTree& tree, bool runtimeReady) {
+        const auto* node = std::as_const(*this).activeInputNode(tree, runtimeReady);
+        return node ? &tree.node(node->id) : nullptr;
+    }
+
+    void TextInputOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks) {
+        const auto* instance = hit.hit && tree.contains(hit.node) ? tree.node(hit.node).modifier.find(hit.modifier) : nullptr;
+        const auto* field = instance ? std::get_if<arrange::core::TextFieldModifier>(&instance->descriptor.value) : nullptr;
+        if (!field || !field->enabled || !arrange::core::nodeInteractionEnabled(tree, hit.node)) {
+            finishFocusedInput(tree, false, callbacks);
+            return;
+        }
+        const auto same = activeInputNode(tree, true) && session_.focusedNode() == hit.node && focusedModifier_ == hit.modifier;
+        if (!same) {
+            finishFocusedInput(tree, false, callbacks);
+            session_.focusedNode() = hit.node;
+            focusedGeneration_ = tree.node(hit.node).generation;
+            focusedModifier_ = hit.modifier;
+            publishedModelValue_ = field->value;
+            session_.state().begin(field->value, field->selectAllOnFocus);
+        }
+        const auto point = arrange::core::rootToNodeContent(tree, hit.node, {x, y}, hit.modifier);
+        const auto cursor = text_.textIndexAtPoint(*instance, session_.state().text(), session_.viewportX(), point.x, point.y);
+        if (same || !field->selectAllOnFocus) session_.state().moveCursorTo(cursor);
+        session_.dragAnchor() = cursor;
+        updateFocusedInputViewport(tree, true);
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(hit.node, arrange::core::DirtyFlag::Paint, "文本输入焦点改变");
+    }
+
     bool TextInputOwner::pointerDrag(
         arrange::core::LayoutTree& tree,
         bool runtimeReady,
@@ -62,10 +87,10 @@ namespace arrange::juce {
         auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return false;
 
-        const auto point = arrange::core::rootToNodeContent(tree, node->id, {x, y});
+        const auto point = arrange::core::rootToNodeContent(tree, node->id, {x, y}, focusedModifier_);
         session_.state().selectRange(
             *session_.dragAnchor(),
-            text_.textIndexAtPoint(*node, session_.state().text(), session_.viewportX(), point.x, point.y));
+            text_.textIndexAtPoint(inputInstance(*node), session_.state().text(), session_.viewportX(), point.x, point.y));
         updateFocusedInputViewport(tree, runtimeReady);
         if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
         return true;
@@ -163,9 +188,9 @@ namespace arrange::juce {
         ::juce::Point<int> point) const {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return 0;
-        const auto local = arrange::core::rootToNodeContent(tree, node->id, {static_cast<float>(point.x), static_cast<float>(point.y)});
+        const auto local = arrange::core::rootToNodeContent(tree, node->id, {static_cast<float>(point.x), static_cast<float>(point.y)}, focusedModifier_);
         const auto byteIndex = text_.textIndexAtPoint(
-            *node,
+            inputInstance(*node),
             session_.state().text(),
             session_.viewportX(),
             local.x,
@@ -253,7 +278,7 @@ namespace arrange::juce {
             edit = shiftDown ? session_.state().extendSelectionEnd() : session_.state().moveEnd();
         }
         else if (key == ::juce::KeyPress::returnKey) {
-            edit = TextInputLayoutModel::allowsLineBreak(*node) && !commandDown
+            edit = TextInputLayoutModel::allowsLineBreak(inputInstance(*node)) && !commandDown
                        ? session_.state().insertLineBreak()
                        : session_.state().submit();
         }
@@ -271,13 +296,13 @@ namespace arrange::juce {
         auto* node = activeInputNode(tree, true);
         if (node != nullptr) {
             if (submit && callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputSubmit, session_.state().text());
+                callbacks.invokeStringEvent(arrange::core::modifierEventSlot(inputInstance(*node).descriptor.value, arrange::core::EventSlotKind::InputSubmit), session_.state().text());
             }
             if (session_.state().changedSinceBegin() && callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputChange, session_.state().text());
+                callbacks.invokeStringEvent(arrange::core::modifierEventSlot(inputInstance(*node).descriptor.value, arrange::core::EventSlotKind::InputChange), session_.state().text());
             }
             if (callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(*node, arrange::core::EventSlotKind::InputBlur, session_.state().text());
+                callbacks.invokeStringEvent(arrange::core::modifierEventSlot(inputInstance(*node).descriptor.value, arrange::core::EventSlotKind::InputBlur), session_.state().text());
             }
             if (callbacks.invalidateNativeState) {
                 callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input focus cleared");
@@ -285,17 +310,17 @@ namespace arrange::juce {
         }
         session_.reset();
         focusedGeneration_ = 0;
+        focusedModifier_ = {};
         publishedModelValue_.clear();
     }
 
     void TextInputOwner::synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (!node) { reset(); return; }
-        const auto value = inputModelValue(*node);
+        const auto value = std::get<arrange::core::TextFieldModifier>(inputInstance(*node).descriptor.value).value;
         if (value == publishedModelValue_) return;
         publishedModelValue_ = value;
-        // Acknowledging an edit preserves its caret, selection and undo history.
-        // An external replacement resets history and clamps selection to UTF-8 boundaries.
+        // 编辑回执保留光标、选区和撤销记录，外部替换重新对齐 UTF-8 边界
         if (value != session_.state().text()) {
             session_.state().replaceExternal(value);
             session_.temporaryUnderlines().clear();
@@ -312,7 +337,7 @@ namespace arrange::juce {
             return;
         }
         session_.viewportX() = text_.updatedViewportX(
-            *node,
+            inputInstance(*node),
             session_.state().text(),
             session_.state().cursorIndex(),
             session_.viewportX());
@@ -335,7 +360,7 @@ namespace arrange::juce {
                 byteIndexForCharIndex(state.text, range.getEnd()),
             });
         }
-        return arrange::core::DrawOpsBuilder{}.collectOverlay(tree, node->id, arrange::core::TextInputOverlayBuilder{}.build(*node, state, text_.textLayoutService()));
+        return arrange::core::DrawOpsBuilder{}.collectOverlay(tree, node->id, arrange::core::TextInputOverlayBuilder{}.build(node->id, inputInstance(*node), state, text_.textLayoutService()), focusedModifier_);
     }
 
     ::juce::RectangleList<int> TextInputOwner::textBoundsForByteRange(
@@ -346,17 +371,17 @@ namespace arrange::juce {
         const auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return {};
         const auto& text = session_.state().text();
-        const auto localBounds = text_.textBoundsForByteRange(text_.layout(*node, text, session_.viewportX()), text, start, end);
+        const auto localBounds = text_.textBoundsForByteRange(text_.layout(inputInstance(*node), text, session_.viewportX()), text, start, end);
         ::juce::RectangleList<int> bounds;
         for (const auto local : localBounds) {
-            const auto root = arrange::core::nodeContentRectToRoot(tree, node->id, {static_cast<float>(local.getX()), static_cast<float>(local.getY()), static_cast<float>(local.getWidth()), static_cast<float>(local.getHeight())});
+            const auto root = arrange::core::nodeContentRectToRoot(tree, node->id, {static_cast<float>(local.getX()), static_cast<float>(local.getY()), static_cast<float>(local.getWidth()), static_cast<float>(local.getHeight())}, focusedModifier_);
             bounds.add(::juce::Rectangle<float>(root.x, root.y, root.width, root.height).getSmallestIntegerContainer());
         }
         return bounds;
     }
 
-    std::string TextInputOwner::normalizeInsertionText(const arrange::core::ArrangeNode& node, std::string text) const {
-        if (TextInputLayoutModel::allowsLineBreak(node)) return text;
+    std::string TextInputOwner::normalizeInsertionText(const arrange::core::LayoutNode& node, std::string text) const {
+        if (TextInputLayoutModel::allowsLineBreak(inputInstance(node))) return text;
         for (auto& ch : text) {
             if (ch == '\r' || ch == '\n') ch = ' ';
         }
@@ -364,27 +389,25 @@ namespace arrange::juce {
     }
 
     bool TextInputOwner::applyEdit(
-        arrange::core::ArrangeNode& node,
+        arrange::core::LayoutNode& node,
         const arrange::core::InputEditResult& edit,
         const TextInputCallbacks& callbacks) {
         if (!edit.consumed) return false;
         session_.temporaryUnderlines().clear();
-        session_.viewportX() = text_.updatedViewportX(node, session_.state().text(), session_.state().cursorIndex(), session_.viewportX());
+        session_.viewportX() = text_.updatedViewportX(inputInstance(node), session_.state().text(), session_.state().cursorIndex(), session_.viewportX());
         if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node.id, arrange::core::DirtyFlag::Paint, "input edit changed");
 
         if (edit.submitRequested) {
             if (callbacks.invokeStringEvent) {
-                callbacks.invokeStringEvent(node, arrange::core::EventSlotKind::InputSubmit, session_.state().text());
+                callbacks.invokeStringEvent(arrange::core::modifierEventSlot(inputInstance(node).descriptor.value, arrange::core::EventSlotKind::InputSubmit), session_.state().text());
             }
             return true;
         }
 
         if (edit.textChanged) {
-            if (callbacks.setModelValue) callbacks.setModelValue(node.id, session_.state().text());
             if (callbacks.invokeStringEvent) {
                 callbacks.invokeStringEvent(
-                    node,
-                    arrange::core::EventSlotKind::InputUpdate,
+                    arrange::core::modifierEventSlot(inputInstance(node).descriptor.value, arrange::core::EventSlotKind::InputUpdate),
                     session_.state().text());
             }
         }

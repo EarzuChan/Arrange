@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/juce/DiagnosticEvent.h>
 
 #include <filesystem>

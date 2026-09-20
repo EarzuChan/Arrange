@@ -2,6 +2,8 @@ import { reactive } from "@arrange/vue-reactivity"
 
 type ScrollSnapshot = Partial<Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "isScrollInProgress">>
 
+// TODO：对了，以后视口变化也要弄自动滚动“修复”
+
 export type ScrollState = {
     value: number
     maxValue: number
@@ -16,6 +18,7 @@ export type ScrollState = {
 
 export function createScrollState(args: { initial?: number } = {}): ScrollState {
     let state: ScrollState
+
     state = reactive({
         value: args.initial ?? 0,
         maxValue: 0,
@@ -24,13 +27,11 @@ export function createScrollState(args: { initial?: number } = {}): ScrollState 
         isScrollInProgress: false,
         canScrollBackward: false,
         canScrollForward: false,
-        scrollTo(value: number) {
-            applyScrollSnapshot(state, { value })
-        },
-        __arrangeNativeScroll(payload: ScrollSnapshot) {
-            applyScrollSnapshot(state, payload)
-        },
+        // 函数也包进reactive？
+        scrollTo(value: number) { applyScrollSnapshot(state, { value }) },
+        __arrangeNativeScroll(payload: ScrollSnapshot) { applyScrollSnapshot(state, payload) },
     })
+
     applyScrollSnapshot(state, state)
     return state
 }
@@ -40,8 +41,10 @@ function applyScrollSnapshot(state: ScrollState, snapshot: ScrollSnapshot = {}):
     if (typeof snapshot.maxValue === "number") state.maxValue = snapshot.maxValue
     if (typeof snapshot.viewportSize === "number") state.viewportSize = snapshot.viewportSize
     if (typeof snapshot.contentSize === "number") state.contentSize = snapshot.contentSize
+
     state.canScrollBackward = state.value > 0
     state.canScrollForward = state.value < state.maxValue
     state.isScrollInProgress = Boolean(snapshot.isScrollInProgress ?? false)
+
     return state
 }

@@ -3,17 +3,39 @@
 #if ARRANGE_WITH_QUICKJS_NG
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace arrange::quickjs {
     void QuickJsEventRegistry::reset(JSContext* context) {
+        commitCandidate();
         if (context_ != nullptr) {
             for (auto& [_, callback] : eventSlots_) JS_FreeValue(context_, callback);
         }
         eventSlots_.clear();
         retiredEventSlots_.clear();
         publishedEventSlots_.clear();
-        nodeEventSlots_.clear();
         context_ = context;
+    }
+
+    void QuickJsEventRegistry::beginCandidate() {
+        if (checkpoint_) throw std::logic_error("事件注册已有未完成候选");
+        checkpoint_ = CandidateCheckpoint{eventSlots_, retiredEventSlots_, publishedEventSlots_};
+        for (auto& [_, callback] : checkpoint_->callbacks) callback = JS_DupValue(context_, callback);
+    }
+
+    void QuickJsEventRegistry::commitCandidate() {
+        if (!checkpoint_) return;
+        for (auto& [_, callback] : checkpoint_->callbacks) JS_FreeValue(context_, callback);
+        checkpoint_.reset();
+    }
+
+    void QuickJsEventRegistry::abortCandidate() {
+        if (!checkpoint_) return;
+        for (auto& [_, callback] : eventSlots_) JS_FreeValue(context_, callback);
+        eventSlots_ = std::move(checkpoint_->callbacks);
+        retiredEventSlots_ = std::move(checkpoint_->retired);
+        publishedEventSlots_ = std::move(checkpoint_->published);
+        checkpoint_.reset();
     }
 
     JSValueConst QuickJsEventRegistry::callback(const arrange::core::EventSlotId& slot) const noexcept {
@@ -25,32 +47,12 @@ namespace arrange::quickjs {
     arrange::core::EventSlotId QuickJsEventRegistry::retain(
         arrange::core::NodeId node,
         arrange::core::EventSlotKind kind,
-        arrange::core::EventSlotOwner owner,
         JSValueConst callbackValue,
         arrange::core::MutationTransaction* transaction) {
         // 资源不可变。新闭包获得新 token，旧画面不会提前调用替换后的闭包
-        const arrange::core::EventSlotId slot{node, kind, {}, owner, arrange::core::allocateRuntimeIdentity(), 1};
+        const arrange::core::EventSlotId slot{node, kind, {}, arrange::core::allocateRuntimeIdentity(), 1};
         eventSlots_.emplace(slot, JS_DupValue(context_, callbackValue));
         if (transaction) transaction->operations.emplace_back(arrange::core::RegisterEventSlot{slot});
-        return slot;
-    }
-
-    arrange::core::EventSlotId QuickJsEventRegistry::setNodeCallback(
-        arrange::core::NodeId node,
-        arrange::core::EventSlotKind kind,
-        JSValueConst callbackValue,
-        arrange::core::MutationTransaction* transaction) {
-        const auto key = arrange::core::makeEventSlotId(node, kind);
-        if (const auto previous = nodeEventSlots_.find(key); previous != nodeEventSlots_.end()) {
-            const auto callback = eventSlots_.find(previous->second);
-            if (callback != eventSlots_.end() && JS_IsFunction(context_, callbackValue) &&
-                !retiredEventSlots_.contains(previous->second) && JS_IsStrictEqual(context_, callback->second, callbackValue)) return previous->second;
-            release(previous->second, transaction);
-            nodeEventSlots_.erase(previous);
-        }
-        if (!JS_IsFunction(context_, callbackValue)) return {};
-        const auto slot = retain(node, kind, arrange::core::EventSlotOwner::Node, callbackValue, transaction);
-        nodeEventSlots_.emplace(key, slot);
         return slot;
     }
 
@@ -70,15 +72,8 @@ namespace arrange::quickjs {
         retiredEventSlots_.insert(slot);
     }
 
-    void QuickJsEventRegistry::releaseNodeCallbacksRecursive(
-        arrange::core::NodeId id,
-        arrange::core::MutationTransaction* transaction,
-        const std::unordered_map<arrange::core::NodeId, std::vector<arrange::core::NodeId>>& childrenByNode) {
-        if (const auto it = childrenByNode.find(id); it != childrenByNode.end()) {
-            const auto children = it->second;
-            for (const auto child : children) releaseNodeCallbacksRecursive(child, transaction, childrenByNode);
-        }
-        for (const auto& [slot, _] : eventSlots_) if (slot.node == id) releaseWithoutTreeWalk(slot, transaction);
+    void QuickJsEventRegistry::releaseNodes(const std::unordered_set<arrange::core::NodeId>& nodes, arrange::core::MutationTransaction* transaction) {
+        for (const auto& [slot, _] : eventSlots_) if (nodes.contains(slot.node)) releaseWithoutTreeWalk(slot, transaction);
     }
 
     void QuickJsEventRegistry::releaseAll(arrange::core::MutationTransaction* transaction) {
@@ -99,21 +94,7 @@ namespace arrange::quickjs {
             JS_FreeValue(context_, it->second);
             it = eventSlots_.erase(it);
         }
-        std::erase_if(nodeEventSlots_, [&](const auto& entry) { return !active.contains(entry.second); });
         retiredEventSlots_.clear();
-    }
-
-    arrange::core::EventSlotId QuickJsEventRegistry::retainModifierCallback(
-        arrange::core::NodeId node,
-        arrange::core::EventSlotKind kind,
-        JSValueConst callbackValue,
-        const std::vector<arrange::core::EventSlotId>& retained,
-        arrange::core::MutationTransaction* transaction) {
-        if (!JS_IsFunction(context_, callbackValue)) return {};
-        for (const auto& [slot, callback] : eventSlots_) {
-            if (slot.node == node && slot.kind == kind && slot.owner == arrange::core::EventSlotOwner::Modifier && !retiredEventSlots_.contains(slot) && std::find(retained.begin(), retained.end(), slot) == retained.end() && JS_IsStrictEqual(context_, callback, callbackValue)) return slot;
-        }
-        return retain(node, kind, arrange::core::EventSlotOwner::Modifier, callbackValue, transaction);
     }
 
     arrange::core::EventSlotId QuickJsEventRegistry::updateModifierCallback(
@@ -122,7 +103,7 @@ namespace arrange::quickjs {
         if (const auto found = eventSlots_.find(previous); found != eventSlots_.end() &&
             !retiredEventSlots_.contains(previous) && JS_IsStrictEqual(context_, found->second, callbackValue)) return previous;
         const auto next = JS_IsFunction(context_, callbackValue)
-            ? retain(node, kind, arrange::core::EventSlotOwner::Modifier, callbackValue, transaction)
+            ? retain(node, kind, callbackValue, transaction)
             : arrange::core::EventSlotId{};
         if (previous.valid()) release(previous, transaction);
         return next;
@@ -133,7 +114,7 @@ namespace arrange::quickjs {
         const std::vector<arrange::core::EventSlotId>& retained,
         arrange::core::MutationTransaction* transaction) {
         for (const auto& [slot, _] : eventSlots_) {
-            if (slot.node == node && slot.owner == arrange::core::EventSlotOwner::Modifier && !retiredEventSlots_.contains(slot) && std::find(retained.begin(), retained.end(), slot) == retained.end()) release(slot, transaction);
+            if (slot.node == node && !retiredEventSlots_.contains(slot) && std::find(retained.begin(), retained.end(), slot) == retained.end()) release(slot, transaction);
         }
     }
 }

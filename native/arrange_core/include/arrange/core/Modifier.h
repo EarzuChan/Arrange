@@ -4,9 +4,11 @@
 #include "Animation.h"
 #include "Geometry.h"
 #include "Painter.h"
+#include "TextLayoutService.h"
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -132,11 +134,40 @@ namespace arrange::core {
         bool operator==(const PaintModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier>;
+    struct TextPresentation {
+        TextStyle style;
+        std::uint32_t color = 0xff000000u;
+        bool singleLine = false;
+        int minLines = 1;
+        int maxLines = 0;
+        std::string textAlign = "Start";
+        std::string overflow = "clip";
+        bool operator==(const TextPresentation&) const = default;
+    };
+
+    struct TextModifier : TextPresentation {
+        std::string text;
+        bool operator==(const TextModifier&) const = default;
+    };
+
+    struct TextFieldModifier {
+        TextPresentation presentation;
+        std::string value;
+        std::string placeholder;
+        bool enabled = true;
+        bool selectAllOnFocus = false;
+        EventSlotId onValueChange;
+        EventSlotId onSubmit;
+        EventSlotId onChange;
+        EventSlotId onBlur;
+        bool operator==(const TextFieldModifier&) const = default;
+    };
+
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;
-        // 可选协调 key；key 与数组下标均不是更新目标的运行时身份。
+        // 可选协调 key；key 与数组下标均不是更新目标的运行时身份
         std::string key;
         bool operator==(const ModifierDescriptor&) const = default;
     };
@@ -162,6 +193,7 @@ namespace arrange::core {
         std::shared_ptr<const PaintLayerFragment> paintCache;
         std::shared_ptr<const PaintFragment> fragmentCache;
         SizeAnimation sizeAnimation;
+        std::shared_ptr<const TextLayout> textLayout;
     };
 
     struct ModifierReconcileResult {
@@ -184,14 +216,36 @@ namespace arrange::core {
         std::vector<ModifierInstance> elements_;
     };
 
-    inline EventSlotId modifierEventSlot(const ModifierValue& value) {
-        if (const auto* input = std::get_if<InputModifierSemantics>(&value)) return input->eventSlot;
-        if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value)) return layout->eventSlot;
-        return {};
+    inline const TextPresentation* textPresentation(const ModifierValue& value) {
+        if (const auto* text = std::get_if<TextModifier>(&value)) return text;
+        if (const auto* field = std::get_if<TextFieldModifier>(&value)) return &field->presentation;
+        return nullptr;
+    }
+
+    inline const std::string& modifierText(const ModifierValue& value) {
+        if (const auto* text = std::get_if<TextModifier>(&value)) return text->text;
+        const auto& field = std::get<TextFieldModifier>(value);
+        return field.value.empty() ? field.placeholder : field.value;
+    }
+
+    inline EventSlotId modifierEventSlot(const ModifierValue& value, EventSlotKind kind = EventSlotKind::None) {
+        if (const auto* field = std::get_if<TextFieldModifier>(&value)) {
+            if (kind == EventSlotKind::InputUpdate) return field->onValueChange;
+            if (kind == EventSlotKind::InputSubmit) return field->onSubmit;
+            if (kind == EventSlotKind::InputChange) return field->onChange;
+            if (kind == EventSlotKind::InputBlur) return field->onBlur;
+            return {};
+        }
+        EventSlotId slot;
+        if (const auto* input = std::get_if<InputModifierSemantics>(&value)) slot = input->eventSlot;
+        if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value)) slot = layout->eventSlot;
+        return kind == EventSlotKind::None || slot.kind == kind ? slot : EventSlotId{};
     }
 
     std::string_view modifierKindName(const ModifierValue& value);
     bool sameModifierKind(const ModifierValue& left, const ModifierValue& right);
+    // 每个结果是对应旧描述的位置，未匹配时为 previous.size()
+    std::vector<std::size_t> matchModifierDescriptors(std::span<const ModifierDescriptor* const> previous, const ModifierDescriptors& next);
     void validateModifierDescriptors(const ModifierDescriptors& descriptors);
     void validateModifierValue(const ModifierValue& value);
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after);

@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include <arrange/core/InputEditing.h>
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_gui_basics/juce_gui_basics.h>

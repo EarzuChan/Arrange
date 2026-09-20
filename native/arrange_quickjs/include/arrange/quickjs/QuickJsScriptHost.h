@@ -107,6 +107,7 @@ namespace arrange::quickjs {
         std::uint64_t rejectedBindingUpdates() const noexcept;
         ScriptMemoryStats memoryStats() const noexcept;
         void publishScene(const arrange::core::NativeScene& scene);
+        CallbackInvokeResult completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error = {});
 
     private:
         struct Impl;

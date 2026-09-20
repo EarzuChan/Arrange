@@ -20,20 +20,23 @@ namespace arrange::core {
         return tree.contains(node);
     }
 
-    Point rootToNodeContent(const LayoutTree& tree, NodeId node, Point point) {
+    Point rootToNodeContent(const LayoutTree& tree, NodeId node, Point point, ModifierHandle receiver) {
         for (const auto id : nodePath(tree, node)) {
             for (const auto& instance : tree.node(id).modifier.elements()) {
+                if (id == node && receiver.valid() && instance.handle == receiver) return point;
                 if (const auto* layer = std::get_if<TransformModifierSemantics>(&instance.descriptor.value)) point = inverseLayerPoint(point, instance.bounds, *layer);
             }
         }
         return point;
     }
 
-    Point nodeContentToRoot(const LayoutTree& tree, NodeId node, Point point) {
+    Point nodeContentToRoot(const LayoutTree& tree, NodeId node, Point point, ModifierHandle receiver) {
         const auto path = nodePath(tree, node);
         for (auto id = path.rbegin(); id != path.rend(); ++id) {
             const auto& elements = tree.node(*id).modifier.elements();
-            for (auto instance = elements.rbegin(); instance != elements.rend(); ++instance) {
+            auto end = elements.end();
+            if (*id == node && receiver.valid()) end = std::find_if(elements.begin(), elements.end(), [&](const auto& item) { return item.handle == receiver; });
+            for (auto instance = std::make_reverse_iterator(end); instance != elements.rend(); ++instance) {
                 const auto* layer = std::get_if<TransformModifierSemantics>(&instance->descriptor.value);
                 if (!layer) continue;
                 const auto pivotX = instance->bounds.x + instance->bounds.width * layer->transformOriginX;
@@ -47,12 +50,12 @@ namespace arrange::core {
         return point;
     }
 
-    Rect nodeContentRectToRoot(const LayoutTree& tree, NodeId node, Rect rect) {
+    Rect nodeContentRectToRoot(const LayoutTree& tree, NodeId node, Rect rect, ModifierHandle receiver) {
         const Point corners[]{{rect.x, rect.y}, {rect.x + rect.width, rect.y}, {rect.x, rect.y + rect.height}, {rect.x + rect.width, rect.y + rect.height}};
-        auto minimum = nodeContentToRoot(tree, node, corners[0]);
+        auto minimum = nodeContentToRoot(tree, node, corners[0], receiver);
         auto maximum = minimum;
         for (const auto corner : corners) {
-            const auto point = nodeContentToRoot(tree, node, corner);
+            const auto point = nodeContentToRoot(tree, node, corner, receiver);
             minimum.x = std::min(minimum.x, point.x);
             minimum.y = std::min(minimum.y, point.y);
             maximum.x = std::max(maximum.x, point.x);

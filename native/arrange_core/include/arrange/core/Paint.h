@@ -49,6 +49,7 @@ namespace arrange::core {
         std::string alignment;
         bool hasTint = false;
         bool inputText = false;
+        ModifierHandle textField;
         Point lineEnd;
         float translationX = 0.0f;
         float translationY = 0.0f;
@@ -61,6 +62,7 @@ namespace arrange::core {
     };
 
     struct PaintLayerFragment {
+        std::shared_ptr<const TextLayout> textLayout;
         ModifierValue value;
         Rect bounds;
         float contentAlpha = 1;
@@ -110,13 +112,11 @@ namespace arrange::core {
         static void prepareText(DrawOp& op, const TextLayoutService& service);
         std::vector<DrawOp> exportScene(const LayoutTree& tree, NodeId root) const;
         PlacedPaintFragment build(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
-        std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content) const;
-        static std::string textStyleProp(const ArrangeNode& node);
+        std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content, ModifierHandle receiver = {}) const;
 
     private:
         const TextLayoutService& textLayoutService_;
         void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
-        void collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const;
         std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const;
     };
 
@@ -138,11 +138,12 @@ namespace arrange::core {
 
     class TextInputOverlayBuilder final {
     public:
-        static bool allowsLineBreak(const ArrangeNode& node);
-        static Rect textRect(const ArrangeNode& node, float viewportX);
+        static bool allowsLineBreak(const ModifierInstance& instance);
+        static Rect textRect(const ModifierInstance& instance, float viewportX);
 
         std::vector<DrawOp> build(
-            const ArrangeNode& node,
+            NodeId node,
+            const ModifierInstance& instance,
             const TextInputOverlayState& state,
             const TextLayoutService& textLayoutService) const;
 
@@ -163,8 +164,8 @@ namespace arrange::core {
             std::shared_ptr<const TextLayout> text;
         };
 
-        static Metrics metrics(const ArrangeNode& node, float viewportX);
-        static Layout layout(const ArrangeNode& node, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
+        static Metrics metrics(const ModifierInstance& instance, float viewportX);
+        static Layout layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
         static std::vector<Rect> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService);
     };
 } // namespace arrange::core

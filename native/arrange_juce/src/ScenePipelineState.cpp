@@ -12,7 +12,6 @@ namespace arrange::juce {
         frameTimeMillis_ = 0;
         pendingIntents_.clear();
         pendingTransactions_.clear();
-        failedTransaction_.reset();
         publishedFrame_ = {};
     }
 
@@ -34,7 +33,6 @@ namespace arrange::juce {
 
     void ScenePipelineState::clearPendingTransactions() noexcept {
         pendingTransactions_.clear();
-        failedTransaction_.reset();
     }
 
     arrange::core::SceneFramePipelineResult ScenePipelineState::run(
@@ -43,7 +41,7 @@ namespace arrange::juce {
         bool framePipelineRequested,
         const arrange::core::FrameFinalizer& finalize) {
         for (auto& intent : pendingIntents_.take()) {
-            if (intent.transaction) pendingTransactions_.push(std::move(*intent.transaction));
+            if (intent.transaction && (!intent.transaction->rearrange || !intent.transaction->rearrange->cancelled)) pendingTransactions_.push(std::move(*intent.transaction));
             if (intent.kind == arrange::core::InputIntentKind::DiagnosticsEvent) {
                 scene_.tree().recordSceneInvalidation(
                     arrange::core::DirtyFlag::Accessibility,
@@ -88,15 +86,10 @@ namespace arrange::juce {
         auto transaction = hasPending
                                ? pendingTransactions_.take()
                                : std::optional<arrange::core::MutationTransaction>{};
-        // JS 账本已推进；失败的提交不能丢失，否则后续写入会引用未创建的目标
-        // 暂停到下一次实际工作请求再重试，避免故障提交自己驱动无限空转
-        if (failedTransaction_) {
-            if (transaction) failedTransaction_->append(std::move(*transaction));
-            transaction = std::move(failedTransaction_);
-            failedTransaction_.reset();
-        }
+        if (transaction && transaction->rearrange && transaction->rearrange->cancelled) transaction.reset();
+        // 失败候选由提交回执撤销，已提交的 JS 账本与 scene 都保持不变
         auto result = pipeline_.run(scene_, root, constraints, transaction ? &*transaction : nullptr, framePipelineRequested, publishedFrame_, finalize, frameTimeMillis_);
-        if (result.error) failedTransaction_ = std::move(transaction);
+        if (transaction) result.rearrange = transaction->rearrange;
         return result;
     }
 

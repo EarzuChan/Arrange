@@ -86,14 +86,6 @@ namespace arrange::juce {
         events_.push_back(std::move(event));
     }
 
-    void ArrangeRuntime::enqueueNodeStringEvent(
-        const arrange::core::ArrangeNode& node,
-        arrange::core::EventSlotKind kind,
-        std::string value) {
-        const auto slot = ScriptEventDispatcher::eventSlot(node, kind);
-        enqueueStringEvent(slot, std::move(value));
-    }
-
     bool ArrangeRuntime::hasPendingEvents() const noexcept {
         return !events_.empty();
     }
@@ -174,13 +166,17 @@ namespace arrange::juce {
         if (!hasPending && !frame_.framePipelineRunRequested()) return {};
 
         const auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested(), finalize);
+        frame_.clearFramePipelineRunRequest();
         if (result.error) {
-            frame_.clearFramePipelineRunRequest();
-            return {true, *result.error};
+            const auto completed = composition_.completeRearrange(result.rearrange, *result.error);
+            (void)captureCompositionTransactions();
+            return {true, completed.ok ? *result.error : *result.error + "\n撤销回调失败：" + completed.error};
         }
 
         composition_.publishScene(pipelineState_.scene());
-        frame_.clearFramePipelineRunRequest();
+        const auto completed = composition_.completeRearrange(result.rearrange);
+        (void)captureCompositionTransactions();
+        if (!completed.ok) return {true, completed.error};
         return {true, std::nullopt};
     }
 

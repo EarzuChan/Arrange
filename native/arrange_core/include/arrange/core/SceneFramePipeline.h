@@ -54,6 +54,7 @@ namespace arrange::core {
         std::vector<DrawOp> diagnosticsBadgeDrawOps;
         std::vector<DrawOp> diagnosticsToastDrawOps;
         std::optional<NodeId> focusedInputNode;
+        ModifierHandle focusedInputModifier;
         float focusedInputViewportX = 0.0f;
         std::optional<std::string> errorFrame;
     };
@@ -96,6 +97,7 @@ namespace arrange::core {
     };
 
     struct SceneFramePipelineResult {
+        std::shared_ptr<RearrangeSubmission> rearrange;
         bool ran = false;
         std::optional<std::string> error;
         FramePlan plan;

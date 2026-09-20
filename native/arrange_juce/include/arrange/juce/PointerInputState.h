@@ -2,7 +2,7 @@
 
 #include <arrange/core/Geometry.h>
 #include <arrange/core/HitTest.h>
-#include <arrange/core/Node.h>
+#include <arrange/core/LayoutNode.h>
 #include <arrange/core/PointerInputProcessor.h>
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>

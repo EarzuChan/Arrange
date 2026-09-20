@@ -1,283 +1,118 @@
-import { isArray } from '@arrange/vue-shared'
 import { type ArrangableInstance, getArrangableName } from './arrangable.ts'
-import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling.ts'
+import { ErrorCodes, callWithErrorHandling } from './errorHandling.ts'
 
 export enum SchedulerJobFlags {
     QUEUED = 1 << 0,
     PRE = 1 << 1,
-    /**
-     * Indicates whether the effect is allowed to recursively trigger itself
-     * when managed by the scheduler.
-     *
-     * By default, a job cannot trigger itself because some built-in method calls,
-     * e.g. Array.prototype.push actually performs reads as well (#1740) which
-     * can lead to confusing infinite loops.
-     * The allowed cases are arrangable update functions and watch callbacks.
-     * Arrangable update functions may update child arrangable props, which in turn
-     * trigger flush: "pre" watch callbacks that mutates state that the parent
-     * relies on (#1801). Watch callbacks doesn't track its dependencies so if it
-     * triggers itself again, it's likely intentional and it is the user's
-     * responsibility to perform recursive state mutation that eventually
-     * stabilizes (#1727).
-     */
     ALLOW_RECURSE = 1 << 2,
     DISPOSED = 1 << 3,
 }
 
-export interface SchedulerJob extends Function {
+export interface SchedulerJob {
+    (): void
     id?: number
-    /**
-     * flags can technically be undefined, but it can still be used in bitwise
-     * operations just like 0.
-     */
     flags?: SchedulerJobFlags
-    /**
-     * Attached by renderer.ts when setting up a arrangable's render effect
-     * Used to obtain arrangable information when reporting max recursive updates.
-     */
     i?: ArrangableInstance
 }
 
-export type SchedulerJobs = SchedulerJob | SchedulerJob[]
-
 const queue: SchedulerJob[] = []
+const rearrangeQueue = new Set<SchedulerJob>()
+const postQueue = new Set<SchedulerJob>()
 let flushIndex = -1
-
-const pendingPostFlushCbs: SchedulerJob[] = []
-let activePostFlushCbs: SchedulerJob[] | null = null
-let postFlushIndex = 0
-
-const resolvedPromise = /*@__PURE__*/ Promise.resolve() as Promise<any>
+const resolvedPromise = Promise.resolve()
 let currentFlushPromise: Promise<void> | null = null
 
-const RECURSION_LIMIT = 100
-type CountMap = Map<SchedulerJob, number> & { total?: number }
-
 export function nextTick(): Promise<void>
-export function nextTick<T, R>(
-    this: T,
-    fn: (this: T) => R | Promise<R>,
-): Promise<R>
-export function nextTick<T, R>(
-    this: T,
-    fn?: (this: T) => R | Promise<R>,
-): Promise<void | R> {
-    const p = currentFlushPromise || resolvedPromise
-    return fn ? p.then(this ? fn.bind(this) : fn) : p
+export function nextTick<T, R>(this: T, fn: (this: T) => R | Promise<R>): Promise<R>
+export function nextTick<T, R>(this: T, fn?: (this: T) => R | Promise<R>): Promise<void | R> {
+    const pending = currentFlushPromise ?? resolvedPromise
+    return fn ? pending.then(this ? fn.bind(this) : fn) : pending
 }
 
-// Use binary-search to find a suitable position in the queue. The queue needs
-// to be sorted in increasing order of the job ids. This ensures that:
-// 1. Arrangables are updated from parent to child. As the parent is always
-//    created before the child it will always have a smaller id.
-// 2. If a arrangable is unmounted during a parent arrangable's update, its update
-//    can be skipped.
-// A pre watcher will have the same id as its arrangable's update job. The
-// watcher should be inserted immediately before the update job. This allows
-// watchers to be skipped if the arrangable is unmounted by the parent update.
-function findInsertionIndex(id: number) {
+const getId = (job: SchedulerJob): number => job.id ?? (job.flags! & SchedulerJobFlags.PRE ? -1 : Infinity)
+
+// 只在未执行范围内插入，同一所属实例的前置 watcher 先于其消费者收集任务
+function findInsertionIndex(id: number): number {
     let start = flushIndex + 1
     let end = queue.length
-
     while (start < end) {
         const middle = (start + end) >>> 1
-        const middleJob = queue[middle]
-        const middleJobId = getId(middleJob)
-        if (
-            middleJobId < id ||
-            (middleJobId === id && middleJob.flags! & SchedulerJobFlags.PRE)
-        ) {
-            start = middle + 1
-        } else {
-            end = middle
-        }
+        const job = queue[middle]
+        if (getId(job) < id || getId(job) === id && job.flags! & SchedulerJobFlags.PRE) start = middle + 1
+        else end = middle
     }
-
     return start
 }
 
+function queueFlush(): void {
+    currentFlushPromise ??= resolvedPromise.then(flushJobs)
+}
+
 export function queueJob(job: SchedulerJob): void {
-    if (!(job.flags! & SchedulerJobFlags.QUEUED)) {
-        const jobId = getId(job)
-        const lastJob = queue[queue.length - 1]
-        if (
-            !lastJob ||
-            // fast path when the job id is larger than the tail
-            (!(job.flags! & SchedulerJobFlags.PRE) && jobId >= getId(lastJob))
-        ) {
-            queue.push(job)
-        } else {
-            queue.splice(findInsertionIndex(jobId), 0, job)
-        }
-
-        job.flags! |= SchedulerJobFlags.QUEUED
-
-        queueFlush()
-    }
-}
-
-function queueFlush() {
-    if (!currentFlushPromise) {
-        currentFlushPromise = resolvedPromise.then(flushJobs)
-    }
-}
-
-export function queuePostFlushCb(cb: SchedulerJobs): void {
-    if (!isArray(cb)) {
-        if (activePostFlushCbs && cb.id === -1) {
-            activePostFlushCbs.splice(postFlushIndex + 1, 0, cb)
-        } else if (!(cb.flags! & SchedulerJobFlags.QUEUED)) {
-            pendingPostFlushCbs.push(cb)
-            cb.flags! |= SchedulerJobFlags.QUEUED
-        }
-    } else {
-        // if cb is an array, it is a arrangable lifecycle hook which can only be
-        // triggered by a job, which is already deduped in the main queue, so
-        // we can skip duplicate check here to improve perf
-        pendingPostFlushCbs.push(...cb)
-    }
+    if (job.flags! & (SchedulerJobFlags.QUEUED | SchedulerJobFlags.DISPOSED)) return
+    const last = queue[queue.length - 1]
+    if (!last || !(job.flags! & SchedulerJobFlags.PRE) && getId(job) >= getId(last)) queue.push(job)
+    else queue.splice(findInsertionIndex(getId(job)), 0, job)
+    job.flags! |= SchedulerJobFlags.QUEUED
     queueFlush()
 }
 
-export function flushPreFlushCbs(
-    instance?: ArrangableInstance,
-    seen?: CountMap,
-    // skip the current job
-    i: number = flushIndex + 1,
-): void {
-    seen = seen || new Map()
-    for (; i < queue.length; i++) {
-        const cb = queue[i]
-        if (cb && cb.flags! & SchedulerJobFlags.PRE) {
-            if (instance && cb.id !== instance.uid) {
-                continue
-            }
-            if (checkRecursiveUpdates(seen!, cb)) {
-                continue
-            }
-            queue.splice(i, 1)
-            i--
-            if (cb.flags! & SchedulerJobFlags.ALLOW_RECURSE) {
-                cb.flags! &= ~SchedulerJobFlags.QUEUED
-            }
-            cb()
-            if (!(cb.flags! & SchedulerJobFlags.ALLOW_RECURSE)) {
-                cb.flags! &= ~SchedulerJobFlags.QUEUED
-            }
-        }
-    }
+// 收齐本批结构和值失效后才准备候选，不能逐消费者提前 apply
+export function queueRearrangeJob(job: SchedulerJob): void {
+    if (job.flags! & SchedulerJobFlags.DISPOSED) return
+    rearrangeQueue.add(job)
+    queueFlush()
 }
 
-export function flushPostFlushCbs(seen?: CountMap): void {
-    if (pendingPostFlushCbs.length) {
-        const deduped = [...new Set(pendingPostFlushCbs)].sort(
-            (a, b) => getId(a) - getId(b),
-        )
-        pendingPostFlushCbs.length = 0
-
-        // #1947 already has active queue, nested flushPostFlushCbs call
-        if (activePostFlushCbs) {
-            activePostFlushCbs.push(...deduped)
-            return
-        }
-
-        activePostFlushCbs = deduped
-        seen = seen || new Map()
-
-        for (
-            postFlushIndex = 0;
-            postFlushIndex < activePostFlushCbs.length;
-            postFlushIndex++
-        ) {
-            const cb = activePostFlushCbs[postFlushIndex]
-            if (checkRecursiveUpdates(seen!, cb)) {
-                continue
-            }
-            if (cb.flags! & SchedulerJobFlags.ALLOW_RECURSE) {
-                cb.flags! &= ~SchedulerJobFlags.QUEUED
-            }
-            if (!(cb.flags! & SchedulerJobFlags.DISPOSED)) cb()
-            cb.flags! &= ~SchedulerJobFlags.QUEUED
-        }
-        activePostFlushCbs = null
-        postFlushIndex = 0
-    }
+export function queuePostFlushCb(job: SchedulerJob): void {
+    if (job.flags! & (SchedulerJobFlags.QUEUED | SchedulerJobFlags.DISPOSED)) return
+    postQueue.add(job)
+    job.flags! |= SchedulerJobFlags.QUEUED
+    queueFlush()
 }
 
-const getId = (job: SchedulerJob): number =>
-    job.id == null ? (job.flags! & SchedulerJobFlags.PRE ? -1 : Infinity) : job.id
-
-function flushJobs(seen?: CountMap) {
-    seen = seen || new Map()
-
-    // conditional usage of checkRecursiveUpdate must be determined out of
-    // try ... catch block since Rollup by default de-optimizes treeshaking
-    // inside try-catch. This can leave all warning code unshaked. Although
-    // they would get eventually shaken by a minifier like terser, some minifiers
-    // would fail to do that (e.g. https://github.com/evanw/esbuild/issues/1610)
-    const check = (job: SchedulerJob) => checkRecursiveUpdates(seen!, job)
+function flushJobs(): void {
+    const executions = new Map<SchedulerJob, number>()
+    let total = 0
+    const execute = (job: SchedulerJob) => {
+        if (job.flags! & SchedulerJobFlags.DISPOSED) return
+        const count = (executions.get(job) ?? 0) + 1
+        executions.set(job, count)
+        if (++total > 10000 || count > 100) {
+            const name = job.i && getArrangableName(job.i.type)
+            throw new Error(`响应式任务反复失效，超过调度执行上限${name ? `：${name}` : ''}`)
+        }
+        if (job.flags! & SchedulerJobFlags.ALLOW_RECURSE) job.flags! &= ~SchedulerJobFlags.QUEUED
+        try { callWithErrorHandling(job, job.i, job.i ? ErrorCodes.ARRANGABLE_UPDATE : ErrorCodes.SCHEDULER) } finally {
+            job.flags! &= ~SchedulerJobFlags.QUEUED
+        }
+    }
 
     try {
-        for (flushIndex = 0; flushIndex < queue.length; flushIndex++) {
-            const job = queue[flushIndex]
-            if (job && !(job.flags! & SchedulerJobFlags.DISPOSED)) {
-                if (check(job)) {
-                    continue
-                }
-                if (job.flags! & SchedulerJobFlags.ALLOW_RECURSE) {
-                    job.flags! &= ~SchedulerJobFlags.QUEUED
-                }
-                callWithErrorHandling(
-                    job,
-                    job.i,
-                    job.i ? ErrorCodes.ARRANGABLE_UPDATE : ErrorCodes.SCHEDULER,
-                )
-                if (!(job.flags! & SchedulerJobFlags.ALLOW_RECURSE)) {
-                    job.flags! &= ~SchedulerJobFlags.QUEUED
-                }
+        do {
+            for (flushIndex = 0; flushIndex < queue.length; flushIndex++) execute(queue[flushIndex])
+            queue.length = 0
+            flushIndex = -1
+
+            while (rearrangeQueue.size) {
+                const job = rearrangeQueue.values().next().value!
+                rearrangeQueue.delete(job)
+                execute(job)
             }
-        }
+            // 重排期间新加入的普通任务先处理，后置 watcher 不越过尚未收集的工作
+            if (queue.length) continue
+            for (const job of [...postQueue].sort((left, right) => getId(left) - getId(right))) {
+                postQueue.delete(job)
+                execute(job)
+            }
+        } while (queue.length || rearrangeQueue.size || postQueue.size)
     } finally {
-        // If there was an error we still need to clear the QUEUED flags
-        for (; flushIndex < queue.length; flushIndex++) {
-            const job = queue[flushIndex]
-            if (job) {
-                job.flags! &= ~SchedulerJobFlags.QUEUED
-            }
-        }
-
-        flushIndex = -1
+        for (const job of queue) job.flags! &= ~SchedulerJobFlags.QUEUED
+        for (const job of postQueue) job.flags! &= ~SchedulerJobFlags.QUEUED
         queue.length = 0
-
-        flushPostFlushCbs(seen)
-
+        rearrangeQueue.clear()
+        postQueue.clear()
+        flushIndex = -1
         currentFlushPromise = null
-        // If new jobs have been added to either queue, keep flushing
-        if (queue.length || pendingPostFlushCbs.length) {
-            flushJobs(seen)
-        }
     }
-}
-
-function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {
-    seen.total = (seen.total ?? 0) + 1
-    if (seen.total > 10000) throw new Error('Arrange JavaScript work did not stabilize within the scheduler job limit')
-    const count = seen.get(fn) || 0
-    if (count > RECURSION_LIMIT) {
-        const instance = fn.i
-        const arrangableName = instance && getArrangableName(instance.type)
-        handleError(
-            `Maximum recursive updates exceeded${arrangableName ? ` in arrangable <${arrangableName}>` : ``
-            }. ` +
-            `This means you have a reactive effect that is mutating its own ` +
-            `dependencies and thus recursively triggering itself. Possible sources ` +
-            `include arrangable template, render function, updated hook or ` +
-            `watcher source function.`,
-            null,
-            ErrorCodes.APP_ERROR_HANDLER,
-        )
-        return true
-    }
-    seen.set(fn, count + 1)
-    return false
 }

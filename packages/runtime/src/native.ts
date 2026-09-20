@@ -55,13 +55,16 @@ export type NativeBindingHandle = Readonly<{identity: bigint; generation: bigint
 export type NativeModifierHandle = NativeBindingHandle & Readonly<{key: string; kind: string}>
 
 export type NativeTransactionTarget = {
+    beginRearrange: () => void
+    submitRearrange: (complete: (error?: string) => void) => void
+    abortRearrange: () => void
     acquirePainter?: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
     releasePainter?: (handle: NativeBindingHandle) => void
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
     updateBinding: (handle: NativeBindingHandle, value: NativePropValue | Modifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void
-    modifierInstances?: (id: NodeId) => readonly NativeModifierHandle[]
-    registerModifierBinding?: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle
+    modifierInstances: (id: NodeId) => readonly NativeModifierHandle[]
+    registerModifierBinding: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle
     runtimeVersion?: number
     createNode: (id: NodeId, type: string) => void
     deleteNode: (id: NodeId) => void

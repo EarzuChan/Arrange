@@ -8,6 +8,10 @@
     ".": {
       "arrange-ts": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./internal": {
+      "arrange-ts": "./src/internal.ts",
+      "import": "./src/internal.ts"
     }
   },
   "sideEffects": false,

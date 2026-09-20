@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Node.h"
+#include "LayoutNode.h"
 
 #include <optional>
 #include <string>

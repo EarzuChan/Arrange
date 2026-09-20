@@ -5,6 +5,7 @@
 #include "SlotUpdate.h"
 
 #include <optional>
+#include <memory>
 #include <vector>
 
 namespace arrange::core {
@@ -14,9 +15,15 @@ namespace arrange::core {
         TreeMutation, RegisterBinding, RetireBinding, SlotUpdate,
         RegisterEventSlot, RetireEventSlot>;
 
+    struct RearrangeSubmission {
+        std::uint64_t identity = 0;
+        bool cancelled = false;
+    };
+
     struct MutationTransaction {
-        // 结构、绑定和值共享因果顺序；合批只能串接，不能按操作类别重排。
+        // 结构、绑定和值共享因果顺序；合批只能串接，不能按操作类别重排
         std::vector<SubmissionOperation> operations;
+        std::shared_ptr<RearrangeSubmission> rearrange;
 
         [[nodiscard]] bool hasTreeMutations() const noexcept;
         [[nodiscard]] bool hasEventSlotChanges() const noexcept;

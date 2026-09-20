@@ -14,9 +14,8 @@ import {
     currentInstance,
     setCurrentInstance
 } from './arrangable.ts'
-import type { ArrangablePublicInstance } from './arrangablePublicInstance.ts'
 import { callWithAsyncErrorHandling } from './errorHandling.ts'
-import { queuePostRenderEffect } from './renderer.ts'
+import { queuePostFlushCb } from './scheduler.ts'
 import { type SchedulerJob, SchedulerJobFlags, queueJob } from './scheduler.ts'
 import { warn } from './warning.ts'
 
@@ -178,7 +177,7 @@ function doWatch(
     let isPre = false
     if (flush === 'post') {
         baseWatchOptions.scheduler = job => {
-            queuePostRenderEffect(job)
+            queuePostFlushCb(job)
         }
     } else if (flush !== 'sync') {
         // default: 'pre'
@@ -210,38 +209,4 @@ function doWatch(
     const watchHandle = baseWatch(source, cb, baseWatchOptions)
 
     return watchHandle
-}
-
-// this.$watch
-export function instanceWatch(
-    this: ArrangableInstance,
-    source: string | Function,
-    value: WatchCallback,
-    options?: WatchOptions,
-): WatchHandle {
-    const publicThis = this.proxy
-    const getter = isString(source)
-        ? source.includes('.')
-            ? createPathGetter(publicThis!, source)
-            : () => publicThis![source as keyof typeof publicThis]
-        : source.bind(publicThis, publicThis)
-    const cb = value
-    const reset = setCurrentInstance(this)
-    const res = doWatch(getter, cb.bind(publicThis), options)
-    reset()
-    return res
-}
-
-export function createPathGetter(
-    ctx: ArrangablePublicInstance,
-    path: string,
-): () => WatchSource | WatchSource[] | WatchEffect | object {
-    const segments = path.split('.')
-    return (): WatchSource | WatchSource[] | WatchEffect | object => {
-        let cur = ctx
-        for (let i = 0; i < segments.length && cur; i++) {
-            cur = cur[segments[i] as keyof typeof cur]
-        }
-        return cur
-    }
 }

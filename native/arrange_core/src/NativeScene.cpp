@@ -12,6 +12,7 @@ namespace arrange::core {
     }
 
     void NativeScene::apply(const MutationTransaction& transaction) {
+        if (transaction.rearrange && transaction.rearrange->cancelled) return;
         // 直接调用 apply 也具有失败原子性；帧流水线在自己的候选 scene 上调用同一实现
         auto candidate = *this;
         candidate.applyUncommitted(transaction);
@@ -51,19 +52,6 @@ namespace arrange::core {
                 if (!typed) throw std::invalid_argument("Arrange Modifier chain binding payload type mismatch");
                 return tree_.setModifierChain(input.node.id, *typed);
             }
-            else {
-                const auto* typed = std::get_if<EventSlotId>(&value);
-                if (!typed) throw std::invalid_argument("Arrange event binding payload type mismatch");
-                if (typed->valid() && (typed->node != input.node.id || typed->kind != input.kind)) throw std::invalid_argument("Arrange event binding target mismatch");
-                auto& events = tree_.node(input.node.id).eventSlots;
-                const auto previous = events.find(input.kind);
-                if (previous != events.end() && previous->second == *typed) return 0;
-                if (!typed->valid() && previous == events.end()) return 0;
-                if (typed->valid()) events[input.kind] = *typed;
-                else events.erase(input.kind);
-                tree_.markInputDirty(input.node.id, dirtyMask(DirtyFlag::EventSlot));
-                return dirtyMask(DirtyFlag::EventSlot);
-            }
         }, target);
     }
 
@@ -79,7 +67,6 @@ namespace arrange::core {
                 if (!targetIsLive(registration->target)) { ++slotCounters_.rejected; continue; }
                 if (bindings_.contains(registration->handle.identity)) throw std::invalid_argument("Arrange duplicate binding registration");
                 if (const auto* host = std::get_if<HostInputTarget>(&registration->target)) (void)hostInputName(host->input);
-                if (const auto* event = std::get_if<EventInputTarget>(&registration->target); event && event->kind == EventSlotKind::None) throw std::invalid_argument("Arrange invalid event binding kind");
                 bindings_.emplace(registration->handle.identity, *registration);
                 ++slotCounters_.registrations;
             }
@@ -106,12 +93,11 @@ namespace arrange::core {
                 activeEventSlots_.erase(std::get<RetireEventSlot>(operation).slot);
             }
         }
-        // Callback resources belong to live instances, including direct instance-input updates.
+        // 回调资源仅属于存续 Modifier 实例，精确参数更新也遵守同一退休规则
         std::erase_if(activeEventSlots_, [&](const auto& slot) {
-            if (slot.owner != EventSlotOwner::Modifier) return false;
             if (!tree_.contains(slot.node)) return true;
             for (const auto& instance : tree_.node(slot.node).modifier.elements()) {
-                if (modifierEventSlot(instance.descriptor.value) == slot) return false;
+                if (modifierEventSlot(instance.descriptor.value, slot.kind) == slot) return false;
             }
             return true;
         });

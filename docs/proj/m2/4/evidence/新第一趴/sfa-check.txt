@@ -1,0 +1,5 @@
+
+> arrange@0.0.0-m.2.2 typecheck:sfa E:\a_dev\proj\Arrange
+> node --import tsx scripts/typecheck-sfa.ts
+
+SFA 脚本与模板类型检查通过

@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/juce/ScenePipelineState.h>
 #include <arrange/juce/EditorSceneHost.h>
 #include <arrange/juce/ArrangeEditor.h>
@@ -57,10 +58,10 @@ namespace {
         LayoutModifierSemantics padding;
         padding.kind = LayoutModifierKind::Padding;
         padding.padding.start = padding.padding.top = padding.padding.end = padding.padding.bottom = 10;
-        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("editable")},
-            SetModifierMutation{1, {{fixedSize(400, 200), {}}, {outer, {}}, {ClipModifier{}, {}}}},
-            SetModifierMutation{2, {{fixedSize(220, 60), {}}, {padding, {}}, {inner, {}}, {ClipModifier{}, {}}}},
-            SetPropMutation{2, "value", PropValue::stringValue("abcdef")}, InsertChildMutation{1, 2, 0}});
+        auto field = test_support::textField("abcdef");
+        field.onValueChange = makeEventSlotId(2, EventSlotKind::InputUpdate, "编辑");
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{fixedSize(400, 200), {}}, {outer, {}}, {ClipModifier{}, {}}}},
+            SetModifierMutation{2, {{fixedSize(220, 60), {}}, {padding, {}}, {inner, {}}, {ClipModifier{}, {}}, {field, "编辑"}}}, InsertChildMutation{1, 2, 0}});
         LayoutEngine(text).layout(tree, 1, {0, 500, 0, 400});
         const auto content = tree.node(2).contentBounds;
         const auto point = nodeContentToRoot(tree, 2, {content.x + 1, content.y + 1});
@@ -77,7 +78,23 @@ namespace {
         const auto transforms = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; });
         const auto clips = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; });
         check(transforms == 2 && clips >= 2, "Caret overlay escaped ancestor onion geometry");
-        tree.setHostInput(2, HostInput::Value, PropValue::stringValue("新"));
+        const auto receiver = test_support::editable(tree.node(2))->handle;
+
+        std::vector<std::pair<EventSlotId, std::string>> edits;
+        arrange::juce::TextInputCallbacks callbacks;
+        callbacks.invokeStringEvent = [&](const EventSlotId& slot, const std::string& value) { edits.emplace_back(slot, value); };
+        check(input.setHighlightedRegion(tree, true, {1, 3}, callbacks), "编辑受体未接受选区");
+        check(input.highlightedRegion(tree, true) == ::juce::Range<int>(1, 3), "选区没有按字符索引保存");
+        ::juce::Array<::juce::Range<int>> underlines;
+        underlines.add({1, 3});
+        check(input.setTemporaryUnderlining(tree, true, underlines, callbacks), "编辑受体未接受 IME 临时下划线");
+        const auto compositionOps = input.buildFocusedInputOps(tree, true);
+        check(compositionOps.size() > overlay.size(), "选区及 IME 下划线没有产生绘制操作");
+        check(input.insertTextAtCaret(tree, true, ::juce::String::fromUTF8("中"), callbacks), "IME 提交未替换当前选区");
+        check(edits.size() == 1 && edits[0].first == field.onValueChange && edits[0].second == "a中def", "IME 回调未使用 TextField Modifier 的字段或字符边界错误");
+        check(input.caretPosition(tree, true) == 2 && test_support::textOf(tree.node(2)) == "abcdef", "IME 编辑越过回调直接修改了已发布模型");
+
+        tree.setModifierInput(2, receiver, test_support::textField("新"));
         input.synchronizePublishedInput(tree, true);
         input.updateFocusedInputViewport(tree, true);
         check(input.totalNumChars(tree, true) == 1 && input.textInRange(tree, true, {0, 1}).toStdString() == "新",
@@ -85,7 +102,22 @@ namespace {
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(false));
         check(!HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point).hit && !input.isTextInputActive(tree, true), "Disabled ancestor retained input interest");
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(true));
-        tree.apply({DeleteNodeMutation{2}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("editable")}, InsertChildMutation{1, 2, 0}});
+
+        const auto generation = tree.node(2).generation;
+        tree.setModifierChain(2, {{fixedSize(220, 60)}, {padding}, {inner}, {ClipModifier{}}, {field, "替换编辑"}});
+        check(tree.node(2).generation == generation && test_support::editable(tree.node(2))->handle != receiver, "编辑受体替换测试没有保留节点并更换 Modifier 身份");
+        check(!input.isTextInputActive(tree, true), "旧编辑会话转移到了新 Modifier");
+        check(!input.setHighlightedRegion(tree, true, {0, 1}, callbacks), "迟到选区修改命中了新受体");
+        check(!input.setTemporaryUnderlining(tree, true, underlines, callbacks), "迟到 IME 下划线命中了新受体");
+        check(!input.insertTextAtCaret(tree, true, ::juce::String::fromUTF8("迟到"), callbacks) && edits.size() == 1, "迟到 IME 提交触发了新受体回调");
+        input.synchronizePublishedInput(tree, true);
+        check(!input.focusedNode(), "退休 Modifier 的焦点没有清理");
+        LayoutEngine(text).layout(tree, 1, {0, 500, 0, 400});
+        const auto replacementHit = HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point);
+        input.pointerDown(tree, replacementHit, point.x, point.y, {});
+        check(input.isTextInputActive(tree, true) && input.focusedModifier() == replacementHit.modifier, "新 Modifier 未能建立独立编辑会话");
+
+        tree.apply({DeleteNodeMutation{2}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}});
         check(!input.isTextInputActive(tree, true), "Focus transferred to a reused node id");
         input.updateFocusedInputViewport(tree, true);
         check(!input.focusedNode(), "Retired focus was not cleared");
@@ -115,10 +147,10 @@ namespace {
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         const auto loaded = host->executeModule("vblank-execution.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(1, 'textPresentation'), 'display'))
+            n.createNode(1, 'LayoutNode')
             let ticks = 0
             const sample = () => {
-                n.setText(1, String(++ticks))
+                n.setModifier(1, {elements: [{type: 'text', value: {text: String(++ticks)}}]})
                 requestAnimationFrame(sample)
             }
             requestAnimationFrame(sample)
@@ -138,19 +170,19 @@ namespace {
         };
         driver.start(tick);
         source.pulse(100);
-        check(frames == 1 && runtime.scene().node(1).text == "1", "first VBlank did not sample exactly once");
+        check(frames == 1 && test_support::textOf(runtime.scene().node(1)) == "1", "first VBlank did not sample exactly once");
         source.pulse(100);
         source.pulse(99);
         source.pulse(std::numeric_limits<double>::quiet_NaN());
         check(frames == 1, "duplicate or invalid VBlank produced a frame");
         source.pulse(116);
-        check(frames == 2 && runtime.scene().node(1).text == "2", "animation rescheduled into the same VBlank");
+        check(frames == 2 && test_support::textOf(runtime.scene().node(1)) == "2", "animation rescheduled into the same VBlank");
         driver.stop();
         source.pulse(132);
         check(frames == 2, "stopped VBlank source kept executing");
         driver.start(tick);
         source.pulse(148);
-        check(frames == 3 && runtime.scene().node(1).text == "3", "VBlank source did not resume pending animation");
+        check(frames == 3 && test_support::textOf(runtime.scene().node(1)) == "3", "VBlank source did not resume pending animation");
     }
 
     void verifyHostResourceFailureAndPassivePaint() {
@@ -274,8 +306,8 @@ namespace {
         check(!state.run(1, constraints, true).error, "initial finalization frame failed");
         const auto previous = state.publishedFrame();
         MutationTransaction candidate;
-        candidate.operations = {CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")}, InsertChildMutation{1, 2, 0}};
-        state.enqueue(std::move(candidate));
+        candidate.operations = {CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}};
+        state.enqueue(candidate);
         const auto failed = state.run(1, constraints, true, [&](const auto& scene, auto& frame) {
             check(scene.contains(2) && !state.scene().contains(2), "finalizer did not receive isolated candidate scene");
             check(frame.content.hitTest != previous.content.hitTest, "finalizer ran before hit construction");
@@ -287,6 +319,7 @@ namespace {
         check(state.publishRetained([](const auto&, auto& frame) { frame.content.errorFrame = "failed"; }), "retained error did not publish");
         check(!state.scene().contains(2) && state.publishedFrame().content.hitTest == previous.content.hitTest,
               "error publication replayed failed structure");
+        state.enqueue(std::move(candidate));
         check(!state.run(1, constraints, true, [](const auto&, auto& frame) {
             frame.content.errorFrame.reset();
             DrawOp transform;
@@ -304,7 +337,7 @@ namespace {
         check(state.counters().publications == state.publishedFrame().revision, "publication counter diverged from revisions");
     }
 
-    void verifyFailedSubmissionReplay() {
+    void verifyFailedSubmissionRollback() {
         FailingTextMeasurer measurer;
         TextLayoutService text(measurer);
         arrange::juce::ScenePipelineState state{SceneFramePipeline{LayoutEngine{text}}};
@@ -318,12 +351,11 @@ namespace {
         const BindingHandle content{allocateRuntimeIdentity(), 1};
         MutationTransaction create;
         create.operations = {
-            CreateNodeMutation{2, arrange::core::NodeType::Layout, child.generation}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")},
-            RegisterBinding{content, HostInputTarget{child, HostInput::Text}},
-            SlotUpdate{content, PropValue::stringValue("first")},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout, child.generation}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{content, ModifierChainTarget{child}},
+            SlotUpdate{content, ModifierDescriptors{{test_support::text("first"), {}}}},
             InsertChildMutation{1, 2, 0},
         };
-        state.enqueue(std::move(create));
+        state.enqueue(create);
         measurer.failing = true;
         check(state.run(1, constraints, true).error.has_value(), "measurement fault did not fail the frame");
         check(!state.scene().contains(2) && state.publishedFrame().revision == previousFrame.revision &&
@@ -332,17 +364,18 @@ namespace {
         check(!state.hasPendingTransactions() && !state.hasPendingIntents(), "failed submission spins without new work");
         measurer.failing = false;
         MutationTransaction later;
-        later.operations = {SlotUpdate{content, PropValue::stringValue("latest")}};
+        later = create;
+        later.operations.emplace_back(SlotUpdate{content, ModifierDescriptors{{test_support::text("latest"), {}}}});
         state.enqueue(std::move(later));
         check(!state.run(1, constraints, true).error, "retry did not recover");
-        check(state.scene().contains(2) && state.scene().node(2).text == "latest" && state.scene().bindingCount() == 1,
-              "retry lost creation or reordered the later input");
+        check(state.scene().contains(2) && test_support::textOf(state.scene().node(2)) == "latest" && state.scene().bindingCount() == 1,
+              "重新提交完整候选未恢复结构与最终值");
         check(state.scene().slotCounters().rejected == 0, "retry rejected a valid write to the created node");
         check(state.publishedFrame().revision == previousFrame.revision + 1, "failed frame was counted as a publication");
 
         measurer.failing = true;
         MutationTransaction failure;
-        failure.operations = {SlotUpdate{content, PropValue::stringValue("unpublished")}};
+        failure.operations = {SlotUpdate{content, ModifierDescriptors{{test_support::text("unpublished"), {}}}}};
         state.enqueue(std::move(failure));
         check(state.run(1, constraints, true).error.has_value(), "second fault did not fail");
         state.reset();
@@ -361,11 +394,11 @@ int main() {
         verifyInputGeometryAndRetirement();
         verifyWheelAccumulation();
         verifyManualVBlankExecution();
-        verifyFailedSubmissionReplay();
+        verifyFailedSubmissionRollback();
         verifyFinalPublication();
         verifyHostResourceFailureAndPassivePaint();
         verifyReloadAtFrameBoundary();
-        std::cout << "Frame submissions: failed measurement, ordered replay and reset passed\n";
+        std::cout << "Frame submissions: failed measurement, 候选撤销、显式重新提交与上下文重置通过\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

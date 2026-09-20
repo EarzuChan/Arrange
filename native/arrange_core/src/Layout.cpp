@@ -16,24 +16,6 @@ namespace arrange::core {
         float clamp(float value, float min, float max) noexcept { return std::max(min, std::min(max, value)); }
         float safeMax(float value, float fallback) noexcept { return value > 0.0f ? value : fallback; }
 
-        std::string inputTextProp(const ArrangeNode& node) {
-            if (const auto* value = propValue(node, "value")) return value->stringOr();
-            if (const auto* value = propValue(node, "placeholder")) return value->stringOr();
-            return {};
-        }
-
-        PropObject textStyleProp(const ArrangeNode& node) { return objectProp(node, "textStyle", "text-style"); }
-
-        int textMaxLines(const ArrangeNode& node) {
-            const auto value = intProp(node, "maxLines", 0);
-            return value > 0 ? value : 0;
-        }
-
-        int textMinLines(const ArrangeNode& node) {
-            const auto value = intProp(node, "minLines", 1);
-            return value > 0 ? value : 1;
-        }
-
         Constraints shrink(Constraints constraints, float dx, float dy) {
             return {
                 std::max(0.0f, constraints.minWidth - dx),
@@ -71,7 +53,7 @@ namespace arrange::core {
             float spacing = 0.0f;
         };
 
-        MainAxisPlacement mainAxisPlacement(const LayoutTree& tree, const ArrangeNode& node, float size, bool horizontal, const AxisArrangement& arrangement) {
+        MainAxisPlacement mainAxisPlacement(const LayoutTree& tree, const LayoutNode& node, float size, bool horizontal, const AxisArrangement& arrangement) {
             MainAxisPlacement result;
             result.spacing = arrangement.spacing;
             const auto count = node.children.size();
@@ -95,11 +77,11 @@ namespace arrange::core {
             return result;
         }
 
-        std::string nodeAlignmentProp(const ArrangeNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
+        std::string nodeAlignmentProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
             return stringProp(node, camelCase, kebabCase, fallback);
         }
 
-        std::string alignModifier(const ArrangeNode& node) { return node.modifier.parentData().align; }
+        std::string alignModifier(const LayoutNode& node) { return node.modifier.parentData().align; }
     } // namespace
 
     LayoutEngine::LayoutEngine() : textLayoutService_(&defaultTextLayoutService()) {}
@@ -191,6 +173,14 @@ namespace arrange::core {
             inner.minWidth = std::max(inner.minWidth, std::min(size.width, inner.maxWidth));
             inner.minHeight = std::max(inner.minHeight, std::min(size.height, inner.maxHeight));
         }
+        const auto* text = textPresentation(instance.descriptor.value);
+        if (text) {
+            const auto editable = std::holds_alternative<TextFieldModifier>(instance.descriptor.value);
+            const auto width = editable && text->singleLine ? 0.0f : constraints.maxWidth;
+            instance.textLayout = textLayoutService_->layout(modifierText(instance.descriptor.value), text->style, {text->singleLine ? 1 : text->maxLines, width, text->singleLine, text->overflow == "ellipsis"}, instance.textLayout);
+            inner.minWidth = std::max(inner.minWidth, std::min(instance.textLayout->width, inner.maxWidth));
+            inner.minHeight = std::max(inner.minHeight, std::min(std::max(instance.textLayout->height, instance.textLayout->lineHeight * text->minLines), inner.maxHeight));
+        }
         instance.childMeasured = measureWithModifier(tree, id, index + 1, inner);
         auto measured = instance.childMeasured;
         if (padding) {
@@ -202,6 +192,7 @@ namespace arrange::core {
             measured.height = clamp(measured.height, constraints.minHeight, constraints.maxHeight);
         }
         if (required) instance.childOffset = {(measured.width - instance.childMeasured.width) * 0.5f, (measured.height - instance.childMeasured.height) * 0.5f};
+        if (text) node.baseline = instance.textLayout->baseline;
         if (node.baseline >= 0) node.baseline += instance.childOffset.y;
         if (const auto* animation = std::get_if<AnimateContentSizeModifier>(&instance.descriptor.value)) {
             if (instance.sizeAnimation.initialized && (instance.sizeAnimation.running || instance.sizeAnimation.target != measured || instance.sizeAnimation.spec != animation->animationSpec)) ++counters_.animationSamples;

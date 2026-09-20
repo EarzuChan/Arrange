@@ -10,17 +10,14 @@ import {
 } from '@arrange/vue-shared'
 import {
     type SetupContext,
-    createSetupContext,
     getCurrentInstance,
 } from './arrangable.ts'
-import type { ArrangableOptionsBase } from './arrangableOptions.ts'
 import type {
     ArrangableObjectPropsOptions,
     ArrangablePropsOptions,
     ExtractPropTypes,
     PropOptions,
 } from './arrangableProps.ts'
-import type { SlotsType, StrictUnwrapSlotsType } from './arrangableSlots.ts'
 import { warn } from './warning.ts'
 
 // overload 1: runtime props w/ array
@@ -77,7 +74,7 @@ function getContext(calledFunctionName: string): SetupContext {
     if (__DEV__ && !i) {
         warn(`${calledFunctionName}() called without active instance.`)
     }
-    return i.setupContext || (i.setupContext = createSetupContext(i))
+    return i.setupContext
 }
 
 /**

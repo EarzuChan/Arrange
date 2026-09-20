@@ -1,4 +1,4 @@
-import { painter, Alignment, Arrangement, Column, ContentScale, Image, Input, Text, arrangeValue, createApp, createScrollState, defineArrangable, h, M, ref, type PropType, type BoxProps, type ColumnProps, type ImageProps, type InputProps, type RowProps, type TextProps } from '@arrange/framework'
+import { painter, Alignment, Arrangement, Column, ContentScale, Image, Input, Text, createApp, createScrollState, defineArrangable, callArrangable, M, ref, type PropType, type ArrangableProps, type BoxProps, type ColumnProps, type ImageProps, type InputProps, type RowProps, type TextProps } from '@arrange/framework'
 
 const text = ref('原生输入')
 const inputProps = { value: '初始内容', onSubmit: (value: string) => { text.value = value } } satisfies InputProps
@@ -43,7 +43,7 @@ defineArrangable({ mixins: [] })
 // @ts-expect-error createApp 同样拒绝 Options API
 createApp({ methods: { act() {} } })
 // @ts-expect-error 应用不再提供无效的 mixin 方法
-createApp({ setup: () => () => h(Text, { text: '正式Arrangable' }) }).mixin({})
+createApp(defineArrangable({ setup: () => () => callArrangable(0, Text, { text: () => '正式 Arrangable' }) })).mixin({})
 
 const TypedArrangable = defineArrangable({
     props: { title: { type: String, required: true }, count: { type: Number, default: 2 }, onChange: Function as PropType<(value: number) => void> },
@@ -55,22 +55,16 @@ const TypedArrangable = defineArrangable({
         props.onChange?.('错误')
         // @ts-expect-error props 保持只读
         props.count = 3
-        return { selected: ref(true) }
-    },
-    render() {
-        this.selected.valueOf()
-        this.count.toFixed()
-        // @ts-expect-error setup 返回值不能丢失类型
-        this.selected.toFixed()
-        return h(Text, { text: this.title })
+        const selected = ref(true)
+        return () => callArrangable(0, Text, { text: () => selected.value ? props.title : '' })
     },
 })
 
-const typedProps: InstanceType<typeof TypedArrangable>['$props'] = { title: '默认 count 可省略', onChange: value => value.toFixed() }
+const typedProps: ArrangableProps<typeof TypedArrangable> = { title: '默认 count 可省略', onChange: value => value.toFixed() }
 // @ts-expect-error 必填 props 不可省略
-const missingTitle: InstanceType<typeof TypedArrangable>['$props'] = {}
+const missingTitle: ArrangableProps<typeof TypedArrangable> = {}
 // @ts-expect-error props 类型不可被实例构造类型放宽
-const wrongCount: InstanceType<typeof TypedArrangable>['$props'] = { title: '标题', count: '错误' }
+const wrongCount: ArrangableProps<typeof TypedArrangable> = { title: '标题', count: '错误' }
 
 // @ts-expect-error 字体大小必须是数值
 const invalidText: TextProps = { textStyle: { fontSize: '大' } }
@@ -88,13 +82,25 @@ M.clickable({ onClick: 1 })
 M.widthIn({ minWidth: 20 })
 
 export const ManualPage = defineArrangable({
-    setup() {
+    setup(_props, { call }) {
         const scroll = createScrollState()
 
-        return () => h(Column, { modifier: M.height(300).verticalScroll(scroll) }, { default: () => [
-            h(Input, inputProps),
-            h(Text, { ...textProps, text: arrangeValue(() => text.value) }),
-            h(Image, imageProps),
-        ] })
+        return () => call(0, Column, { modifier: () => M.height(300).verticalScroll(scroll) }, { default: () => {
+            call(0, Input, { value: () => inputProps.value, onSubmit: () => inputProps.onSubmit })
+            call(1, Text, { textStyle: () => textProps.textStyle, text: () => text.value })
+            call(2, Image, { painter: () => imageProps.painter })
+        } })
     },
 })
+
+callArrangable(0, TypedArrangable, { title: () => '默认 count 可省略' })
+// @ts-expect-error 内部参数必须提供 getter
+callArrangable(0, TypedArrangable, { title: '错误' })
+// @ts-expect-error 内部调用仍校验必需参数
+callArrangable(0, TypedArrangable, {})
+// @ts-expect-error 内部调用不接受未声明参数
+callArrangable(0, TypedArrangable, { title: () => '标题', unknown: () => 1 })
+// @ts-expect-error 文本 Modifier 的样式保持正式类型
+M.text('正文', { textStyle: { fontSize: '错误' } })
+// @ts-expect-error 编辑 Modifier 的回调接收字符串
+M.textField('正文', { onValueChange: (value: number) => {} })

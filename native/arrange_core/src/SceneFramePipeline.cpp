@@ -91,6 +91,7 @@ namespace arrange::core {
                 candidateFrame.content.scenePaint = {};
                 candidateFrame.content.overlayDrawOps.clear();
                 candidateFrame.content.focusedInputNode.reset();
+                candidateFrame.content.focusedInputModifier = {};
             }
             else {
                 if (result.plan.measure) {
@@ -162,7 +163,7 @@ namespace arrange::core {
         const auto& before = previous.content;
         const auto& after = candidate.content;
         candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps ||
-            before.focusedInputNode != after.focusedInputNode || before.focusedInputViewportX != after.focusedInputViewportX;
+            before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
         candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps ||
             before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps ||
             before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;

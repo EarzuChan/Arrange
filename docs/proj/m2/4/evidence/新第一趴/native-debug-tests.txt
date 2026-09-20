@@ -1,0 +1,25 @@
+Test project E:/a_dev/proj/Arrange/build/m23-final-debug
+      Start  1: arrange_core_smoke
+ 1/10 Test  #1: arrange_core_smoke ...............   Passed    0.04 sec
+      Start  2: arrange_m24_contract
+ 2/10 Test  #2: arrange_m24_contract .............   Passed    0.50 sec
+      Start  3: arrange_quickjs_app_smoke
+ 3/10 Test  #3: arrange_quickjs_app_smoke ........   Passed    1.30 sec
+      Start  4: arrange_juce_runtime_smoke
+ 4/10 Test  #4: arrange_juce_runtime_smoke .......   Passed    1.90 sec
+      Start  5: arrange_modifier_runtime
+ 5/10 Test  #5: arrange_modifier_runtime .........   Passed    0.08 sec
+      Start  6: arrange_quickjs_modifier
+ 6/10 Test  #6: arrange_quickjs_modifier .........   Passed    0.08 sec
+      Start  7: arrange_slot_runtime
+ 7/10 Test  #7: arrange_slot_runtime .............   Passed    0.02 sec
+      Start  8: arrange_frame_submission
+ 8/10 Test  #8: arrange_frame_submission .........   Passed    1.51 sec
+      Start  9: arrange_vue_runtime
+ 9/10 Test  #9: arrange_vue_runtime ..............   Passed   13.06 sec
+      Start 10: arrange_retained_paint
+10/10 Test #10: arrange_retained_paint ...........   Passed   12.17 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Total Test time (real) =  30.67 sec

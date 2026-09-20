@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace arrange::core {
-    struct ArrangeNode;
+    struct LayoutNode;
 
     enum class PropValueKind {
         Null,
@@ -69,14 +69,14 @@ namespace arrange::core {
     };
 
     std::string kebabCase(std::string_view key);
-    const PropValue* propValue(const ArrangeNode& node, std::string_view camelCase, std::string_view kebabCase = {});
-    bool hasProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebabCase = {});
-    PropObject objectProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebabCase = {});
+    const PropValue* propValue(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
+    bool hasProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
+    PropObject objectProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
 
-    std::string stringProp(const ArrangeNode& node, std::string_view key, std::string_view fallback = {});
-    std::string stringProp(const ArrangeNode& node, std::string_view camelCase, std::string_view kebabCase, std::string_view fallback);
-    float numberProp(const ArrangeNode& node, std::string_view key, float fallback = 0.0f);
-    int intProp(const ArrangeNode& node, std::string_view key, int fallback = 0);
-    bool boolProp(const ArrangeNode& node, std::string_view key, bool fallback = false);
-    std::uint32_t colorProp(const ArrangeNode& node, std::string_view key, std::uint32_t fallback = 0);
+    std::string stringProp(const LayoutNode& node, std::string_view key, std::string_view fallback = {});
+    std::string stringProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase, std::string_view fallback);
+    float numberProp(const LayoutNode& node, std::string_view key, float fallback = 0.0f);
+    int intProp(const LayoutNode& node, std::string_view key, int fallback = 0);
+    bool boolProp(const LayoutNode& node, std::string_view key, bool fallback = false);
+    std::uint32_t colorProp(const LayoutNode& node, std::string_view key, std::uint32_t fallback = 0);
 } // namespace arrange::core

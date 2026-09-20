@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/PointerInputProcessor.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/LayoutTree.h>
@@ -26,6 +27,7 @@ namespace {
         arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
+            if (kind == arrange::core::EventSlotKind::Click && test_support::textOf(tree.node(id)) != "撅了啊 0 次") continue;
             for (const auto& instance : tree.node(id).modifier.elements()) {
                 arrange::core::EventSlotId slot;
                 if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
@@ -39,7 +41,7 @@ namespace {
     bool treeContainsText(const arrange::core::LayoutTree& tree, const std::string& text) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            if (tree.node(id).text == text) return true;
+            if (test_support::textOf(tree.node(id)) == text) return true;
         }
         return false;
     }
@@ -49,8 +51,7 @@ namespace {
         arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            if (tree.node(id).textPresentation != arrange::core::TextPresentation::Editable) continue;
-            if (tree.node(id).eventSlots.contains(kind)) return id;
+            if (test_support::event(tree.node(id), kind).valid()) return id;
         }
         return std::nullopt;
     }
@@ -66,22 +67,15 @@ namespace {
     }
 
     bool verifyScriptEventDispatcherRequiresTypedSlotContract() {
-        arrange::core::ArrangeNode inputNode;
+        arrange::core::LayoutNode inputNode;
         inputNode.id = 42;
         inputNode.type = arrange::core::NodeType::Layout;
-        inputNode.textPresentation = arrange::core::TextPresentation::Editable;
-
-        const auto missingSubmit = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputSubmit);
-        if (missingSubmit.valid()) return false;
-
-        inputNode.eventSlots[arrange::core::EventSlotKind::InputSubmit] = arrange::core::makeEventSlotId(42, arrange::core::EventSlotKind::InputSubmit);
-        const auto generatedSubmit = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputSubmit);
-        if (!generatedSubmit.valid() || generatedSubmit.node != 42 || generatedSubmit.kind != arrange::core::EventSlotKind::InputSubmit) return false;
-
-        inputNode.eventSlots.erase(arrange::core::EventSlotKind::InputSubmit);
-        inputNode.eventSlots[arrange::core::EventSlotKind::InputUpdate] = arrange::core::makeEventSlotId(42, arrange::core::EventSlotKind::InputUpdate);
-        const auto update = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputUpdate);
-        return update.valid() && update.node == 42 && update.kind == arrange::core::EventSlotKind::InputUpdate;
+        if (test_support::event(inputNode, arrange::core::EventSlotKind::InputSubmit).valid()) return false;
+        auto field = test_support::textField("测试");
+        field.onSubmit = arrange::core::makeEventSlotId(42, arrange::core::EventSlotKind::InputSubmit);
+        inputNode.modifier.reconcile({{field, {}}});
+        const auto slot = test_support::event(inputNode, arrange::core::EventSlotKind::InputSubmit);
+        return slot.valid() && slot.node == 42 && !test_support::event(inputNode, arrange::core::EventSlotKind::InputUpdate).valid();
     }
 } // namespace
 
@@ -154,6 +148,12 @@ int main(int argc, char** argv) {
         }
     }
 
+    // 动画与事件可在已有候选等待 apply 时失效，回执后的候选由下一次宿主帧消费
+    if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+        if (!runtime.hasPendingFrameWork()) return 22;
+        const auto frame = runtime.pumpFrame(1, constraints, 224.0);
+        if (!frame.ok || !frame.pipelineRan) return 23;
+    }
     if (!treeContainsText(runtime.scene().tree(), "撅了啊 13 次")) {
         std::cerr << "counter text did not reach 撅了啊 13 次\n";
         return 9;
@@ -173,6 +173,10 @@ int main(int argc, char** argv) {
         std::cerr << "scroll snapshot frame failed: " << scrollFrame.error << "\n";
         return 10;
     }
+    if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+        const auto applied = runtime.pumpFrame(1, constraints, 256.0);
+        if (!applied.ok || !applied.pipelineRan) return 24;
+    }
 
     if (arrange::core::ScrollDispatcher::verticalScrollValue(runtime.scene().tree().node(scrollSlot->node)) != 17.0f) {
         std::cerr << "scroll value did not sync through compiled modifier\n";
@@ -184,7 +188,7 @@ int main(int argc, char** argv) {
         std::cerr << "input submit node not found\n";
         return 12;
     }
-    const auto inputSubmitSlot = arrange::juce::ScriptEventDispatcher::eventSlot(
+    const auto inputSubmitSlot = test_support::event(
         runtime.scene().tree().node(*inputNode),
         arrange::core::EventSlotKind::InputSubmit);
     if (!inputSubmitSlot.valid()) {
@@ -192,10 +196,14 @@ int main(int argc, char** argv) {
         return 13;
     }
     runtime.enqueueStringEvent(inputSubmitSlot, "Runtime Smoke");
-    const auto inputFrame = runtime.pumpFrame(1, constraints, 256.0);
+    const auto inputFrame = runtime.pumpFrame(1, constraints, 272.0);
     if (!inputFrame.ok) {
         std::cerr << "input submit frame failed: " << inputFrame.error << "\n";
         return 14;
+    }
+    if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+        const auto applied = runtime.pumpFrame(1, constraints, 288.0);
+        if (!applied.ok || !applied.pipelineRan) return 25;
     }
 
     if (!treeContainsText(runtime.scene().tree(), "提交啊一个：Runtime Smoke")) {

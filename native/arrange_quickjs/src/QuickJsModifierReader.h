@@ -17,7 +17,7 @@ namespace arrange::quickjs {
         QuickJsModifierReader(JSContext* context, QuickJsEventRegistry& events, arrange::core::MutationTransaction* transaction)
             : context_(context), reader_(context), events_(events), transaction_(transaction) {}
 
-        [[nodiscard]] arrange::core::ModifierDescriptors read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput = nullptr);
+        [[nodiscard]] arrange::core::ModifierDescriptors read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput = nullptr, std::span<const arrange::core::ModifierDescriptor* const> previous = {});
         [[nodiscard]] bool failed() const noexcept { return failed_; }
 
     private:

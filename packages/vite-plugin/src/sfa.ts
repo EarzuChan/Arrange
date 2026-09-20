@@ -86,7 +86,7 @@ export function compileArrangeSfa(code: string, id: string): ArrangeSfaCompileRe
             isProd: true,
         })
 
-        let output = `${script.content}\n_sfa_main.__file = ${JSON.stringify(filename)}`
+        let output = script.content
         if (!descriptor.template) {
             output += "\nexport default _sfa_main"
         } else if (!script.content.includes("export default")) {

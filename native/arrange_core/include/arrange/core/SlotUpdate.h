@@ -21,12 +21,11 @@ namespace arrange::core {
         bool operator==(const BindingHandle&) const = default;
     };
 
-    struct HostInputTarget { NodeHandle node; HostInput input = HostInput::Text; };
+    struct HostInputTarget { NodeHandle node; HostInput input = HostInput::MeasurePolicy; };
     struct ModifierInputTarget { NodeHandle node; ModifierHandle modifier; };
     struct ModifierChainTarget { NodeHandle node; };
-    struct EventInputTarget { NodeHandle node; EventSlotKind kind = EventSlotKind::None; };
-    using BindingTarget = std::variant<HostInputTarget, ModifierInputTarget, ModifierChainTarget, EventInputTarget>;
-    using SlotValue = std::variant<PropValue, ModifierValue, ModifierDescriptors, EventSlotId>;
+    using BindingTarget = std::variant<HostInputTarget, ModifierInputTarget, ModifierChainTarget>;
+    using SlotValue = std::variant<PropValue, ModifierValue, ModifierDescriptors>;
 
     struct RegisterBinding { BindingHandle handle; BindingTarget target; };
     struct RetireBinding { BindingHandle handle; };

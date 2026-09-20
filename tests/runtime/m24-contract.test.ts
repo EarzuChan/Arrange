@@ -7,11 +7,12 @@ import { checkSfaProject } from '../../packages/vite-plugin/src/typecheck.ts'
 import { compile } from '../../packages/arrange-vue-compiler-arrange/src/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import * as runtime from '../../packages/runtime/src/index.ts'
+import { recordingNative } from './recordingNative.ts'
 
 function evaluateSfa(source: string, imports: Record<string, unknown> = {}) {
     const { code } = compileArrangeSfa(source, '契约.sfa')
     const output = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
-    const exports: { default?: runtime.Arrangable } = {}
+    const exports: { default?: runtime.ArrangableDefinition } = {}
     new Function('require', 'exports', output)((name: string) => imports[name] ?? runtime, exports)
     return exports.default!
 }
@@ -19,26 +20,26 @@ function evaluateSfa(source: string, imports: Record<string, unknown> = {}) {
 test('模板内容和指令只接受正式语法，空白不改变结构', () => {
     for (const source of ['<Row>正文</Row>', '<Text>{{ title }}</Text>', '<Xxx :value />', '<Xxx @submit="go" />', '<Input v-model="value" />', '<Box ref="box" />', '<Box v-pre />', '<Box v-once />', '<Box v-memo="[]" />', '<keep-alive />', '<Xxx :someValue="a" :some-value="b" />']) assert.throws(() => compile(source), SyntaxError)
     const options = { mode: 'module' as const, prefixIdentifiers: true }
-    assert.equal(compile('<Row><Spacer/> <Spacer/></Row>', options).code, compile('<Row>\n    <Spacer/>\n    <Spacer/>\n</Row>', options).code)
-    assert.match(compile('<Xxx enabled />', options).code, /enabled: true/)
-    assert.match(compile('<Xxx enabled="" />', options).code, /enabled: ""/)
+    assert.equal(compile('<Row><Spacer/> <Spacer/></Row>', options).code.replace(/模板.sfa:\d+:\d+/g, '位置'), compile('<Row>\n    <Spacer/>\n    <Spacer/>\n</Row>', options).code.replace(/模板.sfa:\d+:\d+/g, '位置'))
+    assert.match(compile('<Xxx enabled />', options).code, /"enabled": \(\) => true/)
+    assert.match(compile('<Xxx enabled="" />', options).code, /"enabled": \(\) => ""/)
 })
 
 test('SFA 只接受无属性的 TS setup，原样 Ref 与普通绑定明确分开', () => {
     for (const attributes of ['setup', 'lang="ts"', 'lang="js"']) assert.throws(() => compileArrangeSfa(`<script ${attributes}>const x = 1</script>`, '失败.sfa'), /不接受属性/)
     assert.throws(() => compileArrangeSfa('<script>const a = 1</script><script>const b = 2</script>', '失败.sfa'))
     const result = compileArrangeSfa('<template><Editor :raw="<state>" :plain="state" /></template><script>import { ref } from "@arrange/framework"; const state = ref(1)</script>', '状态.sfa')
-    assert.match(result.code, /return state\n/)
-    assert.match(result.code, /return state.value/)
+    assert.match(result.code, /\(state\)/)
+    assert.match(result.code, /state.value/)
     const definition = evaluateSfa('<script>import type { Ref } from "@arrange/framework"; defineProps<{ state: Ref<number>; count: number; enabled?: boolean }>()</script>')
     assert.deepEqual((definition as { props: unknown }).props, { state: { type: Object, required: true, refKind: 'writable' }, count: { type: Number, required: true }, enabled: { type: Boolean, required: false } })
 })
 
 test('参数对象按同一 camelize 规则拒绝重复，不合并回调', () => {
-    assert.throws(() => runtime.mergeProps({ someValue: 1 }, { 'some-value': 2 }), /重复参数/)
-    assert.throws(() => runtime.mergeProps({ onSubmit() {} }, { onSubmit() {} }), /重复参数/)
+    assert.throws(() => runtime.parameterInputs([['someValue', () => 1], ['some-value', () => 2]]), /重复参数/)
+    assert.throws(() => runtime.parameterInputs([['onSubmit', () => () => {}], ['onSubmit', () => () => {}]]), /重复参数/)
     assert.throws(() => runtime.arrangeParameterName(undefined), /非空字符串/)
-    assert.deepEqual({ ...runtime.mergeProps({ 'some-value': 1 }) }, { someValue: 1 })
+    assert.equal(runtime.parameterInputs([['some-value', () => 1]]).someValue(), 1)
 })
 
 test('真实 SFA 命令行类型检查保留脚本和跨文件参数契约', () => {
@@ -59,45 +60,79 @@ test('真实 SFA 命令行类型检查保留脚本和跨文件参数契约', () 
     }
 })
 
-function recordingNative() {
-    const nodes = new Map<number, { type: string; inputs: Map<string, unknown> }>()
-    const bindings = new Map<bigint, { id: number; input: string }>()
-    let identity = 1n
-    const target: runtime.NativeTransactionTarget = {
-        createNode(id, type) { nodes.set(id, { type, inputs: new Map() }) },
-        deleteNode(id) { nodes.delete(id) },
-        insertChild() {},
-        removeChild() {},
-        unmount() { nodes.clear(); bindings.clear() },
-        registerBinding(id, input) {
-            const handle = { identity: identity++, generation: 1n }
-            bindings.set(handle.identity, { id, input })
-            return handle
-        },
-        updateBinding(handle, value) {
-            const binding = bindings.get(handle.identity)!
-            nodes.get(binding.id)!.inputs.set(binding.input, value)
-        },
-        releaseBinding(handle) { bindings.delete(handle.identity) },
-    }
-    return { nodes, target }
-}
-
 test('内建 Arrangable 各自声明参数，不给 Spacer 和文本补充通用输入', () => {
     for (const [definition, props] of [[runtime.Spacer, { enabled: true }], [runtime.Text, { contentDescription: '误传' }], [runtime.Row, { role: '误传' }]] as const) {
-        assert.throws(() => runtime.createApp({ setup: () => () => runtime.h(definition, props) }).mount(recordingNative().target), /未声明参数/)
+        assert.throws(() => runtime.createApp(definition, props).mount(recordingNative().target), /未声明参数/)
     }
 })
 
-
-
-
-
-test('手写结构也不能通过裸值或文本子内容绕过 Text 参数', () => {
-    assert.throws(() => runtime.createVNode('Text', null, '正文'), /不能通过字符串/)
-    assert.throws(() => runtime.createVNode('Box', null, { default: () => '正文' }), /不能通过字符串/)
-    assert.throws(() => runtime.createApp({ setup: () => () => '正文' }).mount(recordingNative().target), /text 参数/)
+test('对象参数类型检查保留字段类型、必需性与未声明字段', () => {
+    const directory = mkdtempSync(resolve('tmp-refs/sfa-object-typecheck-'))
+    try {
+        writeFileSync(join(directory, 'Target.sfa'), '<script>defineProps<{ count: number }>()</script>')
+        writeFileSync(join(directory, 'Good.sfa'), '<template><Target v-bind="values" /></template><script>import Target from "./Target.sfa"; const values = { count: 1 }</script>')
+        assert.deepEqual(checkSfaProject(resolve('tsconfig.json'), [join(directory, 'Good.sfa')]), [])
+        writeFileSync(join(directory, 'Bad.sfa'), '<template>\n<Target v-bind="wrong" />\n<Target v-bind="missing" />\n<Target v-bind="extra" />\n</template><script>import Target from "./Target.sfa"; const wrong = { count: "错误" }; const missing = {}; const extra = { count: 1, unknown: true }</script>')
+        const diagnostics = checkSfaProject(resolve('tsconfig.json'), [join(directory, 'Bad.sfa')])
+        for (const line of [2, 3, 4]) assert.ok(diagnostics.some(item => item.line === line), JSON.stringify(diagnostics))
+    } finally {
+        rmSync(directory, { recursive: true })
+    }
 })
+
+test('声明位置计划保留列表闭包与默认时机，固定调用减少名称解析', async () => {
+    const run = async (attributes: string) => {
+        const rows = runtime.ref([{ id: '甲', value: 0 }, { id: '乙', value: 1 }])
+        const Page = evaluateSfa(`<template><Text v-for="row in rows" :key="row.id" ${attributes} /></template><script>import { rows } from "harness"</script>`, { harness: { rows } })
+        const native = recordingNative()
+        const app = runtime.createApp(Page)
+        app.mount(native.target)
+        const identities = native.textNodes().map(node => node.id)
+        const before = runtime.getArrangeExecutionStats()
+        for (let index = 1; index <= 12; index++) {
+            rows.value = [{ id: '乙', value: index + 1 }, { id: '甲', value: index }]
+            await runtime.nextTick()
+        }
+        assert.deepEqual(native.textNodes(), [{ id: identities[1], text: '13' }, { id: identities[0], text: '12' }])
+        const after = runtime.getArrangeExecutionStats()
+        app.unmount()
+        return { names: after.parameterNameChecks - before.parameterNameChecks, positions: after.parameterPositionReads - before.parameterPositionReads }
+    }
+    const fixed = await run(':text="String(row.value)"')
+    const dynamic = await run('v-bind="{ text: String(row.value) }"')
+    assert.ok(fixed.names < dynamic.names, JSON.stringify({ fixed, dynamic }))
+    assert.ok(fixed.positions > 0)
+    console.log('列表固定声明位置与动态对象对比：' + JSON.stringify({ fixed, dynamic }))
+
+    let defaults = 0
+    let constants = 0
+    const revision = runtime.ref(0)
+    const Probe = runtime.defineArrangable({ props: { text: String, fallback: { default: () => { defaults++; return {} } } }, setup: () => () => {} })
+    const parameters = runtime.prepareParameters(Probe, ['text'])
+    assert.equal(defaults, 0)
+    const app = runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => {
+        revision.value
+        call(0, Probe, { text: () => { constants++; return '固定' } }, {}, { parameters, constants: ['text'] })
+    } }))
+    app.mount(recordingNative().target)
+    for (let index = 0; index < 4; index++) {
+        revision.value++
+        await runtime.nextTick()
+    }
+    assert.equal(defaults, 1)
+    assert.equal(constants, 1)
+    app.unmount()
+})
+
+
+test('手写结构不能返回文本或节点数组，也不能使用未声明定义', () => {
+    for (const result of ['正文', []]) {
+        const definition = runtime.defineArrangable({ setup: () => (() => result) as () => void })
+        assert.throws(() => runtime.createApp(definition).mount(recordingNative().target), /不能返回/)
+    }
+    assert.throws(() => runtime.createApp({ setup: () => () => {} } as unknown as runtime.ArrangableDefinition), /Arrangable 定义/)
+})
+
 
 test('SFA Slot 声明约束内容名称，多次调用拥有独立实例和结构订阅', async () => {
     const Consumer = evaluateSfa('<template><Slot /><Slot /></template>')
@@ -108,40 +143,40 @@ test('SFA Slot 声明约束内容名称，多次调用拥有独立实例和结�
     let parentRuns = 0
     let contentRuns = 0
     const Probe = runtime.defineArrangable({
-        setup() {
+        setup(_props, { call }) {
             const identity = ++created
             runtime.onUnmounted(() => { disposed++ })
-            return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => `${identity}：${label.value}`) })
+            return () => call(0, runtime.Text, { text: () => `${identity}：${label.value}` })
         },
     })
     const native = recordingNative()
-    const app = runtime.createApp({
-        setup: () => () => {
+    const app = runtime.createApp(runtime.defineArrangable({
+        setup: (_props, { call }) => () => {
             parentRuns++
-            return runtime.h(Consumer, null, { default: () => {
+            call(0, Consumer, {}, { default: () => {
                 contentRuns++
-                return visible.value ? [runtime.h(Probe)] : []
+                if (visible.value) call(0, Probe, {})
             } })
         },
-    })
+    }))
     app.mount(native.target)
     assert.equal(created, 2)
     assert.equal(parentRuns, 1)
     assert.equal(contentRuns, 2)
-    assert.equal([...native.nodes.values()].filter(node => node.inputs.get('textPresentation') === 'display').length, 2)
+    assert.equal(native.textNodes().length, 2)
 
     label.value = '更新文字'
     await runtime.nextTick()
     assert.equal(contentRuns, 2)
     assert.equal(parentRuns, 1)
-    assert.deepEqual([...native.nodes.values()].filter(node => node.inputs.get('textPresentation') === 'display').map(node => node.inputs.get('text')), ['1：更新文字', '2：更新文字'])
+    assert.deepEqual(native.textNodes().map(node => node.text), ['1：更新文字', '2：更新文字'])
 
     visible.value = false
     await runtime.nextTick()
     assert.equal(contentRuns, 4)
     assert.equal(parentRuns, 1)
     assert.equal(disposed, 2)
-    assert.equal([...native.nodes.values()].filter(node => node.inputs.get('textPresentation') === 'display').length, 0)
+    assert.equal(native.textNodes().length, 0)
 
     app.unmount()
     visible.value = true
@@ -150,15 +185,15 @@ test('SFA Slot 声明约束内容名称，多次调用拥有独立实例和结�
     assert.equal(contentRuns, 4)
     assert.equal(created, 2)
 
-    assert.throws(() => runtime.createApp({ setup: () => () => runtime.h(Consumer, null, { header: () => [] }) }).mount(recordingNative().target), /未声明内容入口：header/)
+    assert.throws(() => runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => call(0, Consumer, {}, { header: () => {} }) })).mount(recordingNative().target), /未声明内容：header/)
     const Empty = evaluateSfa('<template></template>')
-    assert.throws(() => runtime.createApp({ setup: () => () => runtime.h(Empty, null, { default: () => [] }) }).mount(recordingNative().target), /未声明内容入口：default/)
+    assert.throws(() => runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => call(0, Empty, {}, { default: () => {} }) })).mount(recordingNative().target), /未声明内容：default/)
 })
 
 
 test('原样 Ref 标记保留泛型、比较与类型断言的 TS 边界', () => {
     const compileBinding = (expression: string) => compileArrangeSfa('<template><Editor :state="' + expression + '" /></template><script>const state = 1; const other = 2; const factory = &lt;T,&gt;(value: T) =&gt; value</script>'.replaceAll('&lt;', '<').replaceAll('&gt;', '>'), '边界.sfa').code
-    assert.match(compileBinding('<state>'), /\[state\]/)
+    assert.match(compileBinding('<state>'), /\(state\)/)
     assert.match(compileBinding('<factory<number>(state)>'), /factory<number>\(state\)/)
     assert.match(compileBinding('<state > other ? state : other>'), /state > other/)
     assert.doesNotThrow(() => compileBinding('state < other'))
@@ -188,13 +223,13 @@ test('深层 Arrangable 挂载和退休不依赖递归调用栈，生命周期�
     const native = recordingNative()
     const events: string[] = []
     const depth = 1800
-    let definition: runtime.Arrangable = runtime.Text
+    let definition: runtime.ArrangableDefinition = runtime.Text
     for (let level = 0; level < depth; level++) {
-        const child: runtime.Arrangable = definition
-        definition = runtime.defineArrangable({ setup() {
+        const child: runtime.ArrangableDefinition = definition
+        definition = runtime.defineArrangable({ setup(_props, { call }) {
             runtime.onMounted(() => events.push('挂载' + level))
             runtime.onUnmounted(() => events.push('卸载' + level))
-            return () => runtime.h(child)
+            return () => call(0, child, {})
         } })
     }
     const before = runtime.getArrangeExecutionStats().activeValueBindings
@@ -215,12 +250,12 @@ test('挂载后续分支失败时取消成功通知并退休已创建的作用�
     const events: string[] = []
     const native = recordingNative()
     const before = runtime.getArrangeExecutionStats().activeValueBindings
-    const Good = runtime.defineArrangable({ setup() {
+    const Good = runtime.defineArrangable({ setup(_props, { call }) {
         runtime.onMounted(() => events.push('不应挂载成功'))
         runtime.onScopeDispose(() => events.push('清理'))
-        return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => '先创建的内容') })
+        return () => call(0, runtime.Text, { text: () => '先创建的内容' })
     } })
-    const app = runtime.createApp({ setup: () => () => [runtime.h(Good), runtime.h(runtime.Spacer, { unknown: 1 })] })
+    const app = runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => { call(0, Good, {}); call(1, runtime.Spacer, { unknown: () => 1 } as never) } }))
     assert.throws(() => app.mount(native.target), /未声明参数/)
     await runtime.nextTick()
     assert.deepEqual(events, ['清理'])
@@ -229,17 +264,17 @@ test('挂载后续分支失败时取消成功通知并退休已创建的作用�
 })
 
 
-test('固定声明按参数位置读取，动态调用同样校验且默认值按实例求值', async () => {
+test('固定参数和对象参数纯值更新均不重排，默认值工厂按实例求值', async () => {
     const run = async (binding: string) => {
         let defaults = 0
         const Probe = runtime.defineArrangable({
             props: { amount: { type: Number, required: true }, label: { type: String, default: () => { defaults++; return '值' } } },
-            setup: props => () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => props.label + props.amount) }),
+            setup: (props, { call }) => () => call(0, runtime.Text, { text: () => props.label + props.amount }),
         })
         const Wrapper = evaluateSfa('<template><Probe ' + binding + ' /></template><script>defineProps<{ amount: number }>()</script>')
         const amount = runtime.ref(0)
         const native = recordingNative()
-        const app = runtime.createApp({ setup: () => () => runtime.h(Wrapper, { amount: runtime.arrangeValue(() => amount.value) }) })
+        const app = runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => call(0, Wrapper, { amount: () => amount.value }) }))
         app.arrangable('Probe', Probe)
         app.mount(native.target)
         const baseline = runtime.getArrangeExecutionStats()
@@ -249,18 +284,18 @@ test('固定声明按参数位置读取，动态调用同样校验且默认值�
         }
         const after = runtime.getArrangeExecutionStats()
         assert.equal(defaults, 1)
-        assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '值40'))
+        assert.ok(native.textNodes().some(node => node.text === '值40'))
         app.unmount()
-        return { names: after.parameterNameChecks - baseline.parameterNameChecks, positions: after.parameterPositionReads - baseline.parameterPositionReads, structure: after.structureRuns - baseline.structureRuns }
+        return { names: after.parameterNameChecks - baseline.parameterNameChecks, evaluations: after.valueEvaluations - baseline.valueEvaluations, structure: after.structureRuns - baseline.structureRuns }
     }
     const fixed = await run(':amount="amount"')
     const dynamic = await run('v-bind="{ amount }"')
     assert.equal(fixed.structure, 0)
     assert.equal(dynamic.structure, 0)
-    assert.equal(fixed.positions, 80)
-    assert.equal(dynamic.positions, 0)
-    assert.equal(dynamic.names - fixed.names, 40)
-    console.log('参数位置对比：' + JSON.stringify({ fixed, dynamic }))
+    assert.equal(fixed.names, 0)
+    assert.equal(dynamic.names, 0)
+    assert.ok(dynamic.evaluations > fixed.evaluations)
+    console.log('固定参数与对象表达式求值对比：' + JSON.stringify({ fixed, dynamic }))
 })
 
 
@@ -278,19 +313,19 @@ test('真实 SFA 原样 Ref 保留身份，切换本体退订旧值，只读状�
     const before = runtime.getArrangeExecutionStats()
     first.value = 2
     await runtime.nextTick()
-    assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '2'))
+    assert.ok(native.textNodes().some(node => node.text === '2'))
     assert.equal(runtime.getArrangeExecutionStats().structureRuns, before.structureRuns)
 
     selected.value = true
     await runtime.nextTick()
-    assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '10'))
+    assert.ok(native.textNodes().some(node => node.text === '10'))
     const switched = runtime.getArrangeExecutionStats()
     first.value = 3
     await runtime.nextTick()
     assert.equal(runtime.getArrangeExecutionStats().valueEvaluations, switched.valueEvaluations)
     second.value = 11
     await runtime.nextTick()
-    assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '11'))
+    assert.ok(native.textNodes().some(node => node.text === '11'))
     assert.equal(runtime.getArrangeExecutionStats().structureRuns, before.structureRuns)
     app.unmount()
 
@@ -306,11 +341,11 @@ test('真实 SFA 原样 Ref 保留身份，切换本体退订旧值，只读状�
 
 
 test('深层实际 LayoutNode 账本按任务栈创建和退休', () => {
-    let definition: runtime.Arrangable = runtime.Text
+    let definition: runtime.ArrangableDefinition = runtime.Text
     const depth = 1200
     for (let level = 0; level < depth; level++) {
-        const child: runtime.Arrangable = definition
-        definition = runtime.defineArrangable({ setup: () => () => runtime.h(runtime.Box, null, { default: () => [runtime.h(child)] }) })
+        const child: runtime.ArrangableDefinition = definition
+        definition = runtime.defineArrangable({ setup: (_props, { call }) => () => call(0, runtime.Box, {}, { default: () => call(0, child, {}) }) })
     }
     const native = recordingNative()
     const before = runtime.getArrangeExecutionStats().activeValueBindings
@@ -343,13 +378,13 @@ test('同一参数组同时改变时校验完整新值，无关表达式保留�
     let otherReads = 0
     const snapshots: string[] = []
     const Receiver = runtime.defineArrangable({
-        props: { lower: { type: Number, validator: (value, props) => Number(value) < Number(props.upper) }, upper: Number, other: String },
-        setup(props) {
+        props: { lower: { type: Number, validator: (value: unknown, props: Record<string, unknown>) => Number(value) < Number(props.upper) }, upper: Number, other: String },
+        setup(props, { call }) {
             runtime.watch(() => [props.lower, props.upper], values => snapshots.push(values.join('/')))
-            return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => props.lower + '/' + props.upper) })
+            return () => call(0, runtime.Text, { text: () => props.lower + '/' + props.upper })
         },
     })
-    const app = runtime.createApp({ setup: () => () => runtime.h(Receiver, { lower: runtime.arrangeValue(() => lower.value), upper: runtime.arrangeValue(() => upper.value), other: runtime.arrangeValue(() => { otherReads++; return other.value }) }) })
+    const app = runtime.createApp(runtime.defineArrangable({ setup: (_props, { call }) => () => call(0, Receiver, { lower: () => lower.value, upper: () => upper.value, other: () => { otherReads++; return other.value } }) }))
     const native = recordingNative()
     app.mount(native.target)
     lower.value = 10
@@ -357,7 +392,7 @@ test('同一参数组同时改变时校验完整新值，无关表达式保留�
     await runtime.nextTick()
     assert.deepEqual(snapshots, ['10/20'])
     assert.equal(otherReads, 1)
-    assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '10/20'))
+    assert.ok(native.textNodes().some(node => node.text === '10/20'))
     app.unmount()
 })
 
@@ -376,17 +411,17 @@ test('稳定参数与内容描述跨外层重排复用，动态调用保持同�
         }
         amount.value = 2
         await runtime.nextTick()
-        assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '2'))
+        assert.ok(native.textNodes().some(node => node.text === '2'))
         const after = runtime.getArrangeExecutionStats()
         app.unmount()
-        return { descriptions: after.valueDescriptions - before.valueDescriptions, fixedGroups: after.fixedParameterGroups - before.fixedParameterGroups, dynamicGroups: after.dynamicParameterGroups - before.dynamicParameterGroups, evaluations: after.valueEvaluations - before.valueEvaluations }
+        return { evaluations: after.valueEvaluations - before.valueEvaluations, structure: after.structureRuns - before.structureRuns, names: after.parameterNameChecks - before.parameterNameChecks }
     }
     const fixed = await run(':text="String(amount)"')
     const dynamic = await run('v-bind="{ text: String(amount) }"')
-    assert.equal(fixed.dynamicGroups, 0)
-    assert.ok(dynamic.descriptions > fixed.descriptions)
-    assert.ok(dynamic.dynamicGroups > 0)
-    console.log('描述分配与求值对比：' + JSON.stringify({ fixed, dynamic }))
+    assert.equal(dynamic.structure, fixed.structure)
+    assert.equal(dynamic.names, fixed.names)
+    assert.ok(dynamic.evaluations > fixed.evaluations)
+    console.log('局部条件与参数求值对比：' + JSON.stringify({ fixed, dynamic }))
 })
 
 
@@ -454,13 +489,13 @@ test('跨文件 Ref 转导出保留身份，循环转导出产生定位诊断', 
 test('错误处理器接收挂载失败后不产生成功生命周期，后续应用仍可挂载', () => {
     for (const phase of ['初始化', '重排', '值求值']) {
         const events: string[] = []
-        const Broken = runtime.defineArrangable({ setup() {
+        const Broken = runtime.defineArrangable({ setup(_props, { call }) {
             runtime.onMounted(() => events.push('不应成功'))
             runtime.onScopeDispose(() => events.push('已清理'))
             if (phase === '初始化') throw new Error(phase)
             return () => {
                 if (phase === '重排') throw new Error(phase)
-                return runtime.h(runtime.Text, { text: runtime.arrangeValue(() => { throw new Error(phase) }) })
+                call(0, runtime.Text, { text: () => { throw new Error(phase) } })
             }
         } })
         const app = runtime.createApp(Broken)
@@ -471,7 +506,7 @@ test('错误处理器接收挂载失败后不产生成功生命周期，后续�
         const healthy = runtime.createApp(runtime.Text, { text: '恢复' })
         const native = recordingNative()
         healthy.mount(native.target)
-        assert.ok([...native.nodes.values()].some(node => node.inputs.get('text') === '恢复'))
+        assert.ok(native.textNodes().some(node => node.text === '恢复'))
         healthy.unmount()
     }
 })

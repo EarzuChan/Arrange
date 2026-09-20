@@ -211,7 +211,7 @@ export function processExpression(
             // const bindings exposed from setup can be skipped for patching but
             // cannot be hoisted to module scope
             if (isConst(bindingMetadata[rawExp])) {
-                node.constType = ConstantTypes.CAN_SKIP_PATCH
+                node.constType = ConstantTypes.CAN_REUSE_VALUE
             }
             node.content = rewriteIdentifier(rawExp)
         } else if (!isScopeVarReference) {

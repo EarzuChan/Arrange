@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/SceneFramePipeline.h>
 
 #include <iostream>
@@ -25,8 +26,7 @@ namespace {
         const auto chain = binding();
         MutationTransaction mount;
         mount.operations.emplace_back(CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation});
-        mount.operations.emplace_back(arrange::core::SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
-        mount.operations.emplace_back(arrange::core::SetPropMutation{node.id, "textPresentation", arrange::core::PropValue::stringValue("display")});
+        mount.operations.emplace_back(SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
         mount.operations.emplace_back(RegisterBinding{chain, ModifierChainTarget{node}});
         mount.operations.emplace_back(SlotUpdate{chain, box(0xff112233)});
         check(!pipeline.run(scene, 1, {0, 500, 0, 500}, &mount, true, frame).error, "create/register/update in one frame failed");
@@ -37,7 +37,7 @@ namespace {
         MutationTransaction registerInputs;
         registerInputs.operations.emplace_back(RegisterBinding{paint, ModifierInputTarget{node, paintHandle}});
         registerInputs.operations.emplace_back(RegisterBinding{offset, ModifierInputTarget{node, offsetHandle}});
-        registerInputs.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::TextStyle}});
+        registerInputs.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::ContentDescription}});
         scene.apply(registerInputs);
         MutationTransaction paintUpdate;
         paintUpdate.operations.emplace_back(SlotUpdate{paint, ModifierValue{color(0xffabcdef)}});
@@ -76,8 +76,7 @@ namespace {
         MutationTransaction deleted;
         deleted.operations.emplace_back(DeleteNodeMutation{1});
         deleted.operations.emplace_back(CreateNodeMutation{1, arrange::core::NodeType::Layout, allocateRuntimeIdentity()});
-        deleted.operations.emplace_back(arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
-        deleted.operations.emplace_back(arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")});
+        deleted.operations.emplace_back(SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
         deleted.operations.emplace_back(SlotUpdate{chain, box(0xff000000)});
         scene.apply(deleted);
         check(scene.bindingCount() == 0 && scene.node(1).modifier.elements().empty(), "old node generation reached recreated node");
@@ -92,27 +91,26 @@ namespace {
         const auto text = binding();
         MutationTransaction initial;
         initial.operations = {
-            CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation}, arrange::core::SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{node.id, "textPresentation", arrange::core::PropValue::stringValue("display")},
-            RegisterBinding{text, HostInputTarget{node, HostInput::Text}},
-            SlotUpdate{text, PropValue::stringValue("initial")},
+            CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation}, SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{text, ModifierChainTarget{node}},
+            SlotUpdate{text, ModifierDescriptors{{test_support::text("initial"), {}}}},
         };
         scene.apply(initial);
 
         MutationTransaction write;
-        write.operations = {SlotUpdate{text, PropValue::stringValue("before retirement")}};
+        write.operations = {SlotUpdate{text, ModifierDescriptors{{test_support::text("before retirement"), {}}}}};
         MutationTransaction retire;
-        retire.operations = {RetireBinding{text}, SlotUpdate{text, PropValue::stringValue("late")}};
+        retire.operations = {RetireBinding{text}, SlotUpdate{text, ModifierDescriptors{{test_support::text("late"), {}}}}};
         MutationTransactionQueue queue;
         queue.push(std::move(write));
         queue.push(std::move(retire));
         scene.apply(*queue.take());
-        check(scene.node(1).text == "before retirement" && scene.bindingCount() == 0,
+        check(test_support::textOf(scene.node(1)) == "before retirement" && scene.bindingCount() == 0,
               "merging submissions reordered a write after retirement");
         check(scene.slotCounters().rejected == 1, "late update was not rejected");
 
         const auto next = binding();
         MutationTransaction rebind;
-        rebind.operations = {RegisterBinding{next, HostInputTarget{node, HostInput::Text}}};
+        rebind.operations = {RegisterBinding{next, ModifierChainTarget{node}}};
         scene.apply(rebind);
         MutationTransaction invalidThenDelete;
         invalidThenDelete.operations = {
@@ -129,58 +127,53 @@ namespace {
         MutationTransaction replace;
         replace.operations = {
             DeleteNodeMutation{1},
-            CreateNodeMutation{1, arrange::core::NodeType::Layout, recreated.generation}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")},
-            RegisterBinding{replacement, HostInputTarget{recreated, HostInput::Text}},
-            SlotUpdate{next, PropValue::stringValue("stale")},
-            SlotUpdate{replacement, PropValue::stringValue("replacement")},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout, recreated.generation}, SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{replacement, ModifierChainTarget{recreated}},
+            SlotUpdate{next, ModifierDescriptors{{test_support::text("stale"), {}}}},
+            SlotUpdate{replacement, ModifierDescriptors{{test_support::text("replacement"), {}}}},
         };
         scene.apply(replace);
-        check(scene.node(1).text == "replacement" && scene.bindingCount() == 1,
+        check(test_support::textOf(scene.node(1)) == "replacement" && scene.bindingCount() == 1,
               "ordered recreation retained the old binding");
     }
 
-    void verifyHostInputsAndAtomicApply() {
+    void verifyTextModifierAndAtomicApply() {
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame frame;
         const NodeHandle node{1, allocateRuntimeIdentity()};
-        const auto text = binding(), style = binding();
+        const auto chain = binding();
         MutationTransaction mount;
-        mount.operations.emplace_back(CreateNodeMutation{1, arrange::core::NodeType::Layout, node.generation});
-        mount.operations.emplace_back(arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
-        mount.operations.emplace_back(arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")});
-        mount.operations.emplace_back(RegisterBinding{text, HostInputTarget{node, HostInput::Text}});
-        mount.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::TextStyle}});
-        mount.operations.emplace_back(SlotUpdate{text, PropValue::stringValue("Reactive slots")});
-        mount.operations.emplace_back(SlotUpdate{style, PropValue::objectValue({{"fontSize", PropValue::numberValue(16)}, {"color", PropValue::numberValue(0xff112233)}})});
-        check(!pipeline.run(scene, 1, {0, 500, 0, 500}, &mount, true, frame).error, "host bindings mount failed");
+        mount.operations = {CreateNodeMutation{node.id, NodeType::Layout, node.generation}, RegisterBinding{chain, ModifierChainTarget{node}}, SlotUpdate{chain, ModifierDescriptors{{test_support::text("反应式文本", 0xff112233), {}}}}};
+        check(!pipeline.run(scene, 1, {0, 500, 0, 500}, &mount, true, frame).error, "文本 Modifier 挂载失败");
+        const auto text = binding();
+        MutationTransaction registerText;
+        registerText.operations = {RegisterBinding{text, ModifierInputTarget{node, scene.node(1).modifier.elements()[0].handle}}};
+        scene.apply(registerText);
         MutationTransaction recolor;
-        recolor.operations.emplace_back(SlotUpdate{style, PropValue::objectValue({{"color", PropValue::numberValue(0xff445566)}, {"fontSize", PropValue::numberValue(16)}})});
+        recolor.operations = {SlotUpdate{text, ModifierValue{test_support::text("反应式文本", 0xff445566)}}};
         const auto result = pipeline.run(scene, 1, {0, 500, 0, 500}, &recolor, true, frame);
-        check(result.plan.buildPaint && !result.plan.measure, "textStyle color change remeasured text");
+        check(result.plan.buildPaint && !result.plan.measure, "文字颜色变化不应重新测量");
         const auto paintBuilds = pipeline.counters().paintBuilds;
         const auto unchanged = pipeline.run(scene, 1, {0, 500, 0, 500}, &recolor, true, frame);
-        check(!unchanged.plan.publishFrame && pipeline.counters().paintBuilds == paintBuilds && scene.slotCounters().unchanged > 0, "equal typed value rebuilt frame");
+        check(!unchanged.plan.publishFrame && pipeline.counters().paintBuilds == paintBuilds && scene.slotCounters().unchanged > 0, "相等文本值不应重建帧");
         MutationTransaction invalid;
-        invalid.operations.emplace_back(CreateNodeMutation{2, arrange::core::NodeType::Layout});
-        invalid.operations.emplace_back(arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})});
-        invalid.operations.emplace_back(InsertChildMutation{2, 2, 0});
+        invalid.operations = {CreateNodeMutation{2, NodeType::Layout}, InsertChildMutation{2, 2, 0}};
         bool failed = false;
         try { scene.apply(invalid); } catch (const std::exception&) { failed = true; }
-        check(failed && !scene.contains(2), "NativeScene::apply retained partial structure on error");
+        check(failed && !scene.contains(2), "失败应用不得留下半成品结构");
         MutationTransaction retire;
-        retire.operations.emplace_back(RetireBinding{text});
-        retire.operations.emplace_back(SlotUpdate{text, PropValue::stringValue("late")});
+        retire.operations = {RetireBinding{text}, SlotUpdate{text, ModifierValue{test_support::text("迟到文字")}}};
         scene.apply(retire);
-        check(scene.node(1).text == "Reactive slots" && scene.bindingCount() == 1, "retired host binding accepted late update");
+        check(test_support::textOf(scene.node(1)) == "反应式文本" && scene.bindingCount() == 1, "退休文本绑定接受了迟到更新");
     }
+
 }
 
 int main() {
     try {
         verifyOrderedSubmissions();
         verifyBindingsAndFailureBoundary();
-        verifyHostInputsAndAtomicApply();
+        verifyTextModifierAndAtomicApply();
         std::cout << "Typed slots: lifecycle, phases, equality and atomic failure checks passed\n";
         return 0;
     } catch (const std::exception& error) {

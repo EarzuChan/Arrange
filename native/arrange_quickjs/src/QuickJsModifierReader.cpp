@@ -31,6 +31,8 @@ namespace arrange::quickjs {
 
         bool modifierFieldsMatch(JSContext* context, JSValueConst value, std::string_view type) {
             const auto check = [&](std::initializer_list<std::string_view> fields) { return fieldsMatch(context, value, fields, type); };
+            if (type == "text") return check({"text", "textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
+            if (type == "textField") return check({"value", "textStyle", "singleLine", "minLines", "maxLines", "placeholder", "enabled", "selectAllOnFocus", "onValueChange", "onSubmit", "onChange", "onBlur"});
             if (type == "paint") return check({"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"});
             if (type == "padding") return check({"start", "top", "end", "bottom"});
             if (type == "width" || type == "height" || type == "alpha" || type == "zIndex") return check({"value"});
@@ -198,7 +200,7 @@ namespace arrange::quickjs {
         return style;
     }
 
-    arrange::core::ModifierDescriptors QuickJsModifierReader::read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput) {
+    arrange::core::ModifierDescriptors QuickJsModifierReader::read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput, std::span<const arrange::core::ModifierDescriptor* const> previous) {
         arrange::core::ModifierDescriptors result;
         failed_ = false;
         if (JS_IsUndefined(modifier) || JS_IsNull(modifier)) {
@@ -322,6 +324,57 @@ namespace arrange::quickjs {
                 item.clip = boolField(payload, "clip", true);
                 result.push_back({item, key});
             }
+            else if (type == "text" || type == "textField") {
+                arrange::core::TextModifier text;
+                const auto editable = type == "textField";
+                text.text = requiredStringField(payload, editable ? "value" : "text", type);
+                const auto minLines = numberField(payload, "minLines", 1);
+                const auto maxLines = numberField(payload, "maxLines", 0);
+                if (!std::isfinite(minLines) || !std::isfinite(maxLines) || std::floor(minLines) != minLines || std::floor(maxLines) != maxLines || minLines < 1 || maxLines < 0 || minLines > 1000000 || maxLines > 1000000) {
+                    (void)throwTypeError("文本行数必须是有效整数");
+                    return {};
+                }
+                text.minLines = static_cast<int>(minLines);
+                text.maxLines = static_cast<int>(maxLines);
+                text.singleLine = boolField(payload, "singleLine", editable && text.minLines == 1 && text.maxLines <= 1);
+                const auto align = reader_.stringField(payload, "textAlign");
+                if (!align.empty()) text.textAlign = align == "left" || align == "start" ? "Start" : align == "right" || align == "end" ? "End" : align == "center" ? "Center" : align;
+                const auto overflow = reader_.stringField(payload, "overflow");
+                if (!overflow.empty()) text.overflow = overflow;
+
+                ScopedValue style(context_, JS_GetPropertyStr(context_, payload, "textStyle"));
+                if (!JS_IsUndefined(style.get())) {
+                    if (!JS_IsObject(style.get()) || JS_IsArray(style.get()) || !fieldsMatch(context_, style.get(), {"fontSize", "lineHeight", "color"}, "textStyle")) {
+                        (void)throwTypeError("textStyle 需要正式文本样式对象");
+                        return {};
+                    }
+                    text.style.fontSize = numberField(style.get(), "fontSize", 14);
+                    text.style.lineHeight = numberField(style.get(), "lineHeight", 0);
+                    ScopedValue color(context_, JS_GetPropertyStr(context_, style.get(), "color"));
+                    if (!JS_IsUndefined(color.get())) {
+                        const auto number = reader_.toDouble(color.get());
+                        if (!JS_IsNumber(color.get()) || !std::isfinite(number) || number < 0 || number > 4294967295.0 || std::floor(number) != number) {
+                            (void)throwTypeError("文字颜色必须是 uint32 颜色值");
+                            return {};
+                        }
+                        text.color = static_cast<std::uint32_t>(number);
+                    }
+                }
+                if (editable) {
+                    arrange::core::TextFieldModifier field;
+                    field.value = text.text;
+                    field.placeholder = reader_.stringField(payload, "placeholder");
+                    field.presentation = std::move(text);
+                    field.enabled = boolField(payload, "enabled", true);
+                    field.selectAllOnFocus = boolField(payload, "selectAllOnFocus", false);
+                    using Kind = arrange::core::EventSlotKind;
+                    for (const auto& [name, kind] : {std::pair{"onValueChange", Kind::InputUpdate}, {"onSubmit", Kind::InputSubmit}, {"onChange", Kind::InputChange}, {"onBlur", Kind::InputBlur}}) {
+                        callbacks.push_back({result.size(), kind, ScopedValue(context_, JS_GetPropertyStr(context_, payload, name))});
+                    }
+                    result.push_back({std::move(field), key});
+                }
+                else result.push_back({std::move(text), key});
+            }
             else if (type == "paint") {
                 arrange::core::PaintModifier item;
                 ScopedValue painter(context_, JS_GetPropertyStr(context_, payload, "painter"));
@@ -411,13 +464,22 @@ namespace arrange::quickjs {
             return {};
         }
         // 整条描述通过校验之后才登记回调，失败的描述不会留下半条注册记录
+        const auto matches = arrange::core::matchModifierDescriptors(previous, result);
         std::vector<arrange::core::EventSlotId> retained;
         for (auto& pending : callbacks) {
-            const auto slot = instanceInput
-                ? events_.updateModifierCallback(id, pending.kind, pending.callback.get(), arrange::core::modifierEventSlot(*instanceInput), transaction_)
-                : events_.retainModifierCallback(id, pending.kind, pending.callback.get(), retained, transaction_);
+            const auto match = matches[pending.index];
+            const auto* prior = instanceInput ? instanceInput : match < previous.size() ? &previous[match]->value : nullptr;
+            const auto oldSlot = prior ? arrange::core::modifierEventSlot(*prior, pending.kind) : arrange::core::EventSlotId{};
+            const auto slot = events_.updateModifierCallback(id, pending.kind, pending.callback.get(), oldSlot, transaction_);
             auto& input = result[pending.index].value;
             if (auto* scroll = std::get_if<arrange::core::LayoutModifierSemantics>(&input)) scroll->eventSlot = slot;
+            else if (auto* field = std::get_if<arrange::core::TextFieldModifier>(&input)) {
+                using Kind = arrange::core::EventSlotKind;
+                if (pending.kind == Kind::InputUpdate) field->onValueChange = slot;
+                else if (pending.kind == Kind::InputSubmit) field->onSubmit = slot;
+                else if (pending.kind == Kind::InputChange) field->onChange = slot;
+                else if (pending.kind == Kind::InputBlur) field->onBlur = slot;
+            }
             else std::get<arrange::core::InputModifierSemantics>(input).eventSlot = slot;
             if (slot.valid()) retained.push_back(slot);
         }

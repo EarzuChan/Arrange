@@ -1,12 +1,12 @@
 import { computed } from "@arrange/vue-reactivity"
-import { arrangeValue } from "@arrange/vue-runtime-core"
 import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation.ts"
 import { PaddingValues } from "./primitives.ts"
 import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts"
 import type { ScrollState } from "./state.ts"
 import { painterSnapshot } from './painter.ts'
 import type { Painter } from './painter.ts'
-import type { ContentScaleValue, ImageAlignment } from './primitives.ts'
+import type { ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
+import type { TextStyleProp } from './native.ts'
 
 export type ModifierValue = Readonly<Record<string, unknown>>
 
@@ -22,6 +22,8 @@ export type BorderOptions = { width: number; brush: Brush | number; shape?: Shap
 export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
+export type TextOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
+export type TextFieldOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; placeholder?: string; enabled?: boolean; selectAllOnFocus?: boolean; onValueChange?: (value: string) => void; onSubmit?: (value: string) => void; onChange?: (value: string) => void; onBlur?: (value: string) => void }>
 export type GraphicsLayerOptions = {
     translationX?: number
     translationY?: number
@@ -89,6 +91,8 @@ export class Modifier {
     zIndex(value: number): Modifier { return this.#add("zIndex", { value }) }
     background(brush: Brush | number, shape?: Shape): Modifier { return this.#add("background", { brush, shape }) }
     paint(painter: Painter, options: PaintOptions = {}): Modifier { return this.#add('paint', { painter: painterSnapshot(painter), ...options }) }
+    text(text: string, options: TextOptions = {}): Modifier { return this.#add('text', { text, ...options, textStyle: options.textStyle && Object.freeze({ ...options.textStyle }) }) }
+    textField(value: string, options: TextFieldOptions = {}): Modifier { return this.#add('textField', { value, ...options, textStyle: options.textStyle && Object.freeze({ ...options.textStyle }) }) }
     border(args: BorderOptions): Modifier
     border(width: number, brush: Brush | number, shape?: Shape): Modifier
     border(widthOrArgs: number | BorderOptions, brush?: Brush | number, shape?: Shape): Modifier {
@@ -149,7 +153,7 @@ export function arrangeModifier(root: Modifier, segments: readonly (readonly [st
         modifierStats.parameterEvaluations++
         return invoke(root, method, read())
     }))
-    return arrangeValue(() => {
+    return () => {
         if (!valid()) {
             let result = root
             for (const [method, read] of segments) result = invoke(result, method, read())
@@ -157,5 +161,5 @@ export function arrangeModifier(root: Modifier, segments: readonly (readonly [st
         }
         modifierStats.chainsAssembled++
         return new Modifier(parameters.flatMap(parameter => parameter.value.elements))
-    }, source)
+    }
 }

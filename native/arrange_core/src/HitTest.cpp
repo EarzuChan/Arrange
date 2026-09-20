@@ -19,6 +19,7 @@ namespace arrange::core {
                     snapshot.constraints.push_back({instance, constraint});
                     constraint = snapshot.constraints.size();
                 }
+                if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) snapshot.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle}, constraint});
                 if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) {
                     snapshot.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle}, constraint});
                 }
@@ -75,6 +76,7 @@ namespace arrange::core {
                         local.constraints.push_back({std::move(geometry), constraint});
                         constraint = local.constraints.size();
                     }
+                    if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) local.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle}, constraint});
                     if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled)
                         local.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle}, constraint});
                 }

@@ -6,8 +6,9 @@ import { SourceMapConsumer } from 'source-map-js'
 export type SfaDiagnostic = Readonly<{ file: string; line: number; column: number; message: string; code: string }>
 
 const declarations = `import * as __Arrange from '@arrange/framework'
-type __Parameters<D> = D extends abstract new (...args: any[]) => { $props: infer P } ? P : never
-type __Values<D> = { [K in keyof __Parameters<D>]: K extends 'key' ? __Parameters<D>[K] : __Parameters<D>[K] | ReturnType<typeof __Arrange.arrangeValue<__Parameters<D>[K]>> }
+type __Parameters<D> = D extends __Arrange.ArrangableDefinition ? __Arrange.ArrangableProps<D> : never
+type __Values<D> = { [K in keyof __Parameters<D>]: () => __Parameters<D>[K] }
+declare function __arrangeGetters<D, P>(definition: D, parameters: P & Record<Exclude<keyof P, keyof __Parameters<D>>, never>): { [K in keyof P]: () => P[K] }
 declare function __arrangeCheck<D>(definition: D, parameters: __Values<D>, line: number, column: number): __Values<D>
 type __ContentNames<D> = D extends { readonly slotNames: readonly (infer N)[] } ? N : never
 declare function __arrangeCheckSlots<D, S>(definition: D, contents: S & Record<Exclude<keyof S, __ContentNames<D> | '_'>, never>, line: number, column: number): S

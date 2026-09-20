@@ -1,9 +1,11 @@
-import { isRef, isReadonly, shallowReactive, shallowReadonly } from '@arrange/vue-reactivity'
-import { EMPTY_OBJ, type IfAny, arrangeParameterName, camelize, normalizeParameterObject, hasOwn, isArray, isFunction, isObject } from '@arrange/vue-shared'
-import type { AppContext } from './apiCreateApp.ts'
-import { type ArrangableInstance, type ConcreteArrangable, type Data, setCurrentInstance } from './arrangable.ts'
-import { normalizeDeclaredProps, preparedParameters } from './propDeclarations.ts'
+import { batchUpdates, isRef, isReadonly, shallowReadonly, shallowRef, pauseTracking, resetTracking, type ShallowRef } from '@arrange/vue-reactivity'
+import { type IfAny, hasOwn, isArray } from '@arrange/vue-shared'
+import type { ArrangableInstance, CallMetadata, Data } from './arrangable.ts'
+import { checkParameterPlan, normalizeDeclaredProps, prepareParameters } from './propDeclarations.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
+import { ValueBinding } from './valueBinding.ts'
+import { queueJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
+import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 
 export type ArrangablePropsOptions<P = Data> =
     | ArrangableObjectPropsOptions<P>
@@ -127,67 +129,146 @@ export type ExtractDefaultPropTypes<O> = O extends object ? { [K in keyof Pick<O
 export type NormalizedProps = Record<string, PropOptions>
 export type NormalizedPropsOptions = [NormalizedProps, string[]] | []
 
-export function initProps(instance: ArrangableInstance, rawProps: Data | null, _isStateful: number): void {
-    instance.propsDefaults = Object.create(null)
-    instance.props = shallowReactive(resolveProps(instance, rawProps))
-}
+export type PropGetter<T> = () => T
+export type PropInputs<P> = { readonly [K in keyof P]: PropGetter<P[K]> }
 
-export function updateProps(instance: ArrangableInstance, rawProps: Data | null, _rawPrevProps: Data | null, _optimized: boolean): void {
-    // 先完整校验，再更新对业务可见的参数，避免错误调用污染旧状态
-    const next = resolveProps(instance, rawProps)
-    for (const key of Object.keys(instance.props)) if (!hasOwn(next, key)) delete instance.props[key]
-    for (const key of Object.keys(next)) instance.props[key] = next[key]
-}
+export class PropStore {
+    readonly values: Data = Object.create(null)
+    private readonly cells = new Map<string, ShallowRef<unknown>>()
+    private readonly bindings = new Map<string, ValueBinding>()
+    private readonly defaults = new Map<string, unknown>()
+    private readonly pending = new Map<string, unknown>()
+    private absent = new Set<string>()
+    private readonly job: SchedulerJob
+    private readonly refreshDirty = () => {
+        this.preserve()
+        for (const binding of this.bindings.values()) binding.refreshDirty()
+        this.publishValues()
+    }
+    private readonly updateTask = { scope: () => this.owner.structure, dirty: () => !this.owner.isUnmounted && !this.owner.isDeactivated && [...this.bindings.values()].some(binding => binding.dirty), run: this.refreshDirty }
+    private readonly declarations: NormalizedProps
+    private constants = new Set<string>()
+    private inputs: PropInputs<Data> | undefined
+    private sources: Readonly<Record<string, string | undefined>> = {}
 
-function resolveProps(instance: ArrangableInstance, raw: Data | null): Data {
-    const declarations = instance.propsOptions[0] ?? EMPTY_OBJ
-    const prepared = preparedParameters(raw, instance.type)
-    const provided = prepared ? hasOwn(raw!, 'key') ? { ...raw } : raw! : raw == null ? Object.create(null) : normalizeParameterObject(raw)
-    if (hasOwn(provided, 'key')) delete provided.key
-    if (!prepared) {
-        for (const name of Object.keys(provided)) {
-            arrangeExecutionStats.parameterNameChecks++
-            if (!hasOwn(declarations, name)) {
-                const source = instance.vnode.valueSources?.[name]?.source ?? instance.type.__file
-                throw new TypeError(`Arrangable ${instance.type.name ?? instance.type.__name ?? ''} 未声明参数：${name}${source ? `\n来源：${source}` : ''}`)
+    constructor(private readonly owner: ArrangableInstance) {
+        this.declarations = normalizeDeclaredProps(owner.type.props)
+        this.job = () => {
+            if (!owner.isUnmounted && !owner.isDeactivated) callWithErrorHandling(() => owner.composition.runValue(this.updateTask), owner, ErrorCodes.ARRANGABLE_UPDATE)
+        }
+        this.job.id = owner.uid
+        this.job.i = owner
+        for (const name of Object.keys(this.declarations)) {
+            const cell = shallowRef<unknown>()
+            this.cells.set(name, cell)
+            Object.defineProperty(this.values, name, { enumerable: true, get: () => cell.value })
+        }
+        Object.freeze(this.values)
+    }
+
+    private preserve(): void {
+        this.owner.composition.preserve(this, () => {
+            const inputs = this.inputs
+            const values = new Map([...this.cells].map(([name, cell]) => [name, cell.value]))
+            const defaults = new Map(this.defaults)
+            const constants = this.constants
+            const sources = this.sources
+            const absent = this.absent
+            return () => {
+                this.inputs = inputs
+                this.pending.clear()
+                this.defaults.clear()
+                for (const [name, value] of defaults) this.defaults.set(name, value)
+                this.constants = constants
+                this.sources = sources
+                this.absent = absent
+                batchUpdates(() => {
+                    for (const [name, value] of values) this.cells.get(name)!.value = value
+                })
             }
+        })
+    }
+
+    private publishValues(): void {
+        if (!this.pending.size) return
+        const values = Object.fromEntries([...this.cells].map(([name, cell]) => [name, this.pending.has(name) ? this.pending.get(name) : cell.value]))
+        for (const [name, declaration] of Object.entries(this.declarations)) {
+            try { validateProp(name, values[name], declaration, values, this.absent.has(name)) } catch (error) {
+                const source = this.source(name)
+                if (error instanceof Error && source) error.message += `\n来源：${source}`
+                throw error
+            }
+        }
+        const pending = [...this.pending]
+        this.pending.clear()
+        batchUpdates(() => {
+            for (const [name, value] of pending) this.cells.get(name)!.value = value
+        })
+    }
+
+    private invalidate = (): void => {
+        if (this.owner.composition.reverting) return
+        if (this.owner.composition.preparing) this.owner.composition.runValue(this.updateTask)
+        else queueJob(this.job)
+    }
+
+    source(name: string): string | undefined {
+        return this.sources[name] ?? this.owner.source ?? this.owner.type.__file
+    }
+
+    update(inputs: Record<string, PropGetter<unknown>>, metadata: CallMetadata = {}): void {
+        if (metadata.parameters) checkParameterPlan(metadata.parameters, this.owner.type)
+        if (inputs === this.inputs && Object.isFrozen(inputs)) {
+            this.refreshDirty()
+            return
+        }
+        const plan = metadata.parameters ?? prepareParameters(this.owner.type, Object.keys(inputs), [], metadata.source)
+        const entries = Object.entries(inputs)
+        if (entries.length !== plan.names.length) throw new TypeError('参数组与声明位置计划不一致')
+        const getters = entries.map(([name, getter], index) => {
+            if (name !== plan.names[index]) throw new TypeError(`参数组与声明位置计划不一致：${name}`)
+            if (typeof getter !== 'function') throw new TypeError(`内部参数 ${name} 必须提供求值函数`)
+            return getter
+        })
+
+        this.preserve()
+        this.inputs = inputs
+        this.sources = metadata.sources ?? {}
+        this.absent = new Set(plan.fields.filter(field => field.position < 0).map(field => field.name))
+        const nextConstants = new Set(metadata.constants ?? [])
+        pauseTracking()
+        try {
+            for (const { name, position } of plan.fields) {
+                const declaration = this.declarations[name]
+                if (this.constants.has(name) && nextConstants.has(name)) continue
+                const read = () => {
+                    if (position >= 0) arrangeExecutionStats.parameterPositionReads++
+                    let value = position < 0 ? undefined : getters[position]()
+                    if (value === undefined && hasOwn(declaration, 'default')) {
+                        if (!this.defaults.has(name)) {
+                            const factory = declaration.default
+                            this.defaults.set(name, typeof factory === 'function' && declaration.type !== Function && !declaration.skipFactory ? factory(this.values) : factory)
+                        }
+                        value = this.defaults.get(name)
+                    }
+                    return value
+                }
+                const existing = this.bindings.get(name)
+                if (existing) existing.refresh(read, this.source(name))
+                else this.bindings.set(name, new ValueBinding(read, this.owner, value => { this.pending.set(name, value) }, this.source(name), this.invalidate))
+            }
+            this.constants = nextConstants
+            this.publishValues()
+        } finally {
+            resetTracking()
         }
     }
 
-    const resolved: Data = Object.create(null)
-    const entries = prepared?.plan.entries ?? Object.entries(declarations).map(([name, declaration]) => ({ name, declaration, position: -1 }))
-    for (const { name: key, declaration, position } of entries) {
-        let value = prepared ? prepared.values[position] : provided[key]
-        const absent = prepared ? position < 0 : !hasOwn(provided, key)
-        if (prepared) arrangeExecutionStats.parameterPositionReads++
-        if (value === undefined && hasOwn(declaration, 'default')) {
-            if (!hasOwn(instance.propsDefaults, key)) {
-                const factory = declaration.default
-                if (isFunction(factory) && declaration.type !== Function && !declaration.skipFactory) {
-                    const restore = setCurrentInstance(instance)
-                    const defaultInputs = prepared ? Object.fromEntries(Object.entries(provided).filter(([name]) => name !== 'key')) : provided
-                    try { instance.propsDefaults[key] = factory.call(null, defaultInputs) } finally { restore() }
-                } else instance.propsDefaults[key] = factory
-            }
-            value = instance.propsDefaults[key]
-        }
-        try { validateProp(key, value, declaration, provided, absent) } catch (error) {
-            const source = instance.vnode.valueSources?.[key]?.source ?? prepared?.source
-            if (error instanceof Error && source && !error.message.includes(source)) error.message += `\n来源：${source}`
-            throw error
-        }
-        resolved[key] = value
+    stop(): void {
+        this.job.flags = (this.job.flags ?? 0) | SchedulerJobFlags.DISPOSED
+        for (const binding of this.bindings.values()) binding.stop()
+        this.bindings.clear()
     }
-    return resolved
-}
-
-export function normalizePropsOptions(definition: ConcreteArrangable, context: AppContext): NormalizedPropsOptions {
-    const cached = context.propsCache.get(definition)
-    if (cached) return cached
-    const declarations = normalizeDeclaredProps(definition.props)
-    const normalized: NormalizedPropsOptions = [declarations, []]
-    context.propsCache.set(definition, normalized)
-    return normalized
 }
 
 function validateProp(name: string, value: unknown, declaration: PropOptions, props: Data, absent: boolean): void {

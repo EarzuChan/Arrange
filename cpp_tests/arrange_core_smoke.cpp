@@ -1,3 +1,4 @@
+#include "TextFixtures.h"
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/HitTest.h>
 #include <arrange/core/InputEditing.h>
@@ -38,7 +39,7 @@ namespace {
         return std::fabs(actual - expected) <= epsilon;
     }
 
-    bool hasDirty(const arrange::core::ArrangeNode& node, arrange::core::DirtyFlag flag) {
+    bool hasDirty(const arrange::core::LayoutNode& node, arrange::core::DirtyFlag flag) {
         return (node.dirty & arrange::core::dirtyMask(flag)) != 0;
     }
 
@@ -97,14 +98,19 @@ namespace {
     arrange::core::MutationTransaction initialTreeTransaction() {
         using namespace arrange::core;
         MutationTransaction transaction;
+        auto title = background(220, 32, 0xff3a7afeu);
+        title.push_back({test_support::text("Hello typed transaction", 0xffe8eaedu, 20), {}});
+        auto fieldModifier = background(160, 28, 0xff151922u);
+        auto editor = test_support::textField("Gain", "Search preset", 0xffffffffu);
+        editor.selectAllOnFocus = true;
+        editor.onSubmit = makeEventSlotId(6, EventSlotKind::InputSubmit);
+        fieldModifier.push_back({editor, {}});
         transaction.operations = {
             CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
             SetModifierMutation{1, background(320.0f, 180.0f, 0xff000000u)},
-            SetPropMutation{1, "measurePolicy", object({field("kind", PropValue::stringValue("Column")), field("verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))}))})},
-            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")},
-            SetTextMutation{2, "Hello typed transaction"},
-            SetPropMutation{2, "textStyle", object({field("fontSize", PropValue::numberValue(20.0)), field("color", PropValue::numberValue(0xffe8eaedu))})},
-            SetModifierMutation{2, background(220.0f, 32.0f, 0xff3a7afeu)},
+            arrange::core::SetPropMutation{1, "measurePolicy", object({field("kind", PropValue::stringValue("Column")), field("verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))}))})},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+            SetModifierMutation{2, title},
             InsertChildMutation{1, 2, 0},
             CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{3, clickableBox(80.0f, 40.0f, makeEventSlotId(3, EventSlotKind::Click))},
@@ -115,13 +121,8 @@ namespace {
             CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{5, background(100.0f, 80.0f, 0xffffb020u)},
             InsertChildMutation{4, 5, 0},
-            CreateNodeMutation{6, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{6, "textPresentation", arrange::core::PropValue::stringValue("editable")},
-            SetPropMutation{6, "value", PropValue::stringValue("Gain")},
-            SetPropMutation{6, "placeholder", PropValue::stringValue("Search preset")},
-            SetPropMutation{6, "selectAllOnFocus", PropValue::booleanValue(true)},
-            SetEventSlotMutation{6, EventSlotKind::InputSubmit, makeEventSlotId(6, EventSlotKind::InputSubmit)},
-            SetPropMutation{6, "textStyle", object({field("fontSize", PropValue::numberValue(16.0)), field("color", PropValue::numberValue(0xffffffffu))})},
-            SetModifierMutation{6, background(160.0f, 28.0f, 0xff151922u)},
+            CreateNodeMutation{6, arrange::core::NodeType::Layout}, SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+            SetModifierMutation{6, fieldModifier},
             InsertChildMutation{1, 6, 3},
         };
         transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(3, EventSlotKind::Click)});
@@ -137,8 +138,8 @@ namespace {
             if (const auto* mutation = std::get_if<arrange::core::TreeMutation>(&operation)) tree.applyMutation(*mutation);
         }
         if (!tree.contains(1) || tree.node(1).children.size() != 4) return 1;
-        if (tree.node(2).text != "Hello typed transaction") return 2;
-        if (tree.node(6).props.at("value").stringOr() != "Gain") return 3;
+        if (test_support::textOf(tree.node(2)) != "Hello typed transaction") return 2;
+        if (test_support::textOf(tree.node(6)) != "Gain") return 3;
         if (!hasDirty(tree.node(1), arrange::core::DirtyFlag::Structure)) return 4;
 
         arrange::core::LayoutEngine layout;
@@ -200,8 +201,7 @@ namespace {
     int verifyEventPropIsNotCoreEventSlot() {
         arrange::core::LayoutTree tree;
         tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("editable")},
-        });
+            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, });
         tree.clearDirty();
         (void)tree.takeInvalidation();
 
@@ -214,25 +214,16 @@ namespace {
         }
         const auto snapshot = tree.invalidationSnapshot();
         if (snapshot.affects(arrange::core::DirtyFlag::EventSlot)) return 18;
-        if (!tree.node(1).eventSlots.empty()) return 19;
         return 0;
     }
 
     int verifyPropSchema() {
         using namespace arrange::core;
         std::string error;
-        if (!validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::numberValue(12)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
+        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::numberValue(12)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
         if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::stringValue("12"))}), error)) return 102;
         for (const auto* key : {"unknownProp", "tint", "source", "testTag", "verticalArrangement"}) {
             if (validateSetPropMutation(NodeType::Layout, key, PropValue::stringValue("非法输入"), error)) return 103;
-        }
-        struct EnumCase { const char* key; const char* valid; const char* invalid; };
-        for (const auto& input : std::vector<EnumCase>{{"textAlign", "center", "middel"}, {"overflow", "ellipsis", "elipsis"}}) {
-            if (!validateSetPropMutation(NodeType::Layout, input.key, PropValue::stringValue(input.valid), error)) return 201;
-            if (validateSetPropMutation(NodeType::Layout, input.key, PropValue::stringValue(input.invalid), error)) return 202;
-            if (error.find(input.key) == std::string::npos || error.find(input.invalid) == std::string::npos) return 203;
-            if (validateSetPropMutation(NodeType::Layout, input.key, PropValue::numberValue(1), error)) return 204;
-            if (!validateSetPropMutation(NodeType::Layout, input.key, PropValue{}, error)) return 205;
         }
         struct PolicyCase { const char* kind; const char* key; const char* valid; const char* invalid; };
         for (const auto& input : std::vector<PolicyCase>{{"Box", "contentAlignment", "CenterEnd", "Centre"}, {"Row", "verticalAlignment", "Baseline", "End"}, {"Column", "horizontalAlignment", "CenterHorizontally", "Bottom"}, {"Row", "horizontalArrangement", "SpaceBetween", "Bottom"}, {"Column", "verticalArrangement", "Bottom", "End"}}) {
@@ -379,20 +370,16 @@ namespace {
         const auto caret = service.caretRect(*layout, 2, {4.0f, 5.0f});
         if (!near(caret.x, 14.0f) || !near(caret.y, 5.0f)) return 62;
 
-        arrange::core::ArrangeNode inputNode;
-        inputNode.id = 9;
-        inputNode.type = arrange::core::NodeType::Layout;
-        inputNode.textPresentation = arrange::core::TextPresentation::Editable;
-        inputNode.measurePolicy = arrange::core::TextMeasurePolicy{};
-        inputNode.bounds = {0.0f, 0.0f, 120.0f, 28.0f};
-        inputNode.props["value"] = arrange::core::PropValue::stringValue("abcd");
+        arrange::core::ModifierInstance input;
+        input.descriptor.value = test_support::textField("abcd");
+        input.bounds = {0, 0, 120, 28};
         arrange::core::TextInputOverlayState state;
         state.text = "abcd";
         state.cursorIndex = 2;
         state.selectionStart = 1;
         state.selectionEnd = 3;
         state.temporaryUnderlines.push_back({0, 1});
-        const auto ops = arrange::core::TextInputOverlayBuilder{}.build(inputNode, state, service);
+        const auto ops = arrange::core::TextInputOverlayBuilder{}.build(9, input, state, service);
         bool sawCaret = false;
         bool sawSelection = false;
         for (const auto& op : ops) {
@@ -432,10 +419,7 @@ namespace {
 
         tree = {};
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")},
-            SetTextMutation{1, "overflow text"},
-            SetPropMutation{1, "overflow", PropValue::stringValue("visible")},
-            SetModifierMutation{1, size(40.0f, 12.0f)},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, [&] { auto chain = size(40, 12); auto text = test_support::text("overflow text"); text.overflow = "visible"; chain.push_back({text, {}}); return chain; }()},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
         const auto visibleOps = DrawOpsBuilder{}.exportScene(tree, 1);
@@ -443,13 +427,13 @@ namespace {
             if (op.type == DrawOpType::PushClip) return 113;
         }
         tree.apply(std::vector<TreeMutation>{
-            SetPropMutation{1, "overflow", PropValue::stringValue("clip")},
+            SetModifierMutation{1, [&] { auto chain = size(40, 12); chain.push_back({test_support::text("overflow text"), {}}); return chain; }()},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
         const auto clipOps = DrawOpsBuilder{}.exportScene(tree, 1);
         sawClip = false;
         for (const auto& op : clipOps) {
-            if (op.type == DrawOpType::PushClip) sawClip = true;
+            if (op.type == DrawOpType::DrawText && op.overflow == "clip") sawClip = true;
         }
         if (!sawClip) return 114;
 

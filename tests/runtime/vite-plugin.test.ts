@@ -39,7 +39,9 @@ test("vite plugin can build the native dev app.js bundle on demand", { timeout: 
         },
     }, "src/main.ts")
     assert.match(code, /__ARRANGE_NATIVE__/)
-    assert.match(code, /createApp/)
+    assert.match(code, /beginRearrange/)
+    assert.match(code, /submitRearrange/)
+    assert.doesNotMatch(code, /createVNode|arrangeValue|defineFoundationArrangable/)
 })
 
 test("vite plugin injects Arrange HMR client into the configured entry", async () => {
