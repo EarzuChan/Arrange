@@ -1,34 +1,28 @@
-// 编译器和宿主适配共用的输入词汇；值校验与失效归属原生类型化输入
-const common = ['modifier', 'enabled', 'contentDescription', 'label', 'description', 'role'] as const
-const text = ['text', 'textStyle', 'singleLine', 'minLines', 'maxLines', 'textAlign', 'overflow'] as const
+import { camelize } from './general.ts'
 
-export const hostSchema = {
-    Box: [...common, 'contentAlignment'],
-    Row: [...common, 'horizontalArrangement', 'verticalAlignment'],
-    Column: [...common, 'verticalArrangement', 'horizontalAlignment'],
-    Spacer: common,
-    Text: [...common, ...text],
-    Input: [...common, 'textStyle', 'singleLine', 'minLines', 'maxLines', 'modelValue', 'value', 'placeholder', 'selectAllOnFocus', 'onUpdate:modelValue', 'onUpdate:model-value', 'onSubmit', 'onChange', 'onBlur'],
-    Image: [...common, 'source', 'contentScale', 'alignment', 'alpha'],
-    Icon: [...common, 'source', 'size', 'tint'],
-} as const
-
-export type HostTag = keyof typeof hostSchema
-
-export function isHostTag(tag: string): tag is HostTag {
-    return Object.prototype.hasOwnProperty.call(hostSchema, tag)
+export function arrangeParameterName(value: unknown): string {
+    if (typeof value !== 'string' || !value) throw new TypeError('参数名称必须是非空字符串')
+    return camelize(value)
 }
 
-export function canonicalHostInput(name: string): string {
-    return name.replace(/-([a-z])/g, (_, char: string) => char.toUpperCase())
+// 对象绑定在字段组装前统一校验名称，不能经由 spread 静默丢失非法输入
+export function normalizeParameterObject(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('参数对象必须是非空对象')
+    const result: Record<string, unknown> = Object.create(null)
+    for (const original of Reflect.ownKeys(value)) {
+        if (!Object.prototype.propertyIsEnumerable.call(value, original)) continue
+        const name = arrangeParameterName(original)
+        if (Object.prototype.hasOwnProperty.call(result, name)) throw new TypeError(`重复参数：${name}`)
+        result[name] = (value as Record<string, unknown>)[name === original ? name : original as string]
+    }
+    return result
 }
 
-export function acceptsHostInput(tag: HostTag, name: string): boolean {
-    return (hostSchema[tag] as readonly string[]).includes(canonicalHostInput(name))
-}
+// 内部 LayoutNode 输入，不参与按 FA 名称解析参数
+export const layoutNodeInputs = new Set(['modifier', 'measurePolicy', 'enabled', 'contentDescription', 'label', 'description', 'role'])
 
-export const hostEventNames = new Set(['onUpdate:modelValue', 'onUpdate:model-value', 'onSubmit', 'onChange', 'onBlur'])
+export const canonicalHostInput = arrangeParameterName
 
-// 组件配置由编译器与运行时共用，内部标记也必须有明确消费者
-export const componentOptionNames = new Set(['setup', 'render', 'props', 'emits', 'slots', 'name', 'inheritAttrs', 'components', 'directives', '__name', '__file', '__hmrId', '__asyncLoader', '__asyncResolved', '__isKeepAlive'])
-export const defineOptionsNames = new Set(['name', 'inheritAttrs', 'components', 'directives'])
+
+// Arrangable配置由编译器与运行时共用，内部标记也必须有明确消费者
+export const arrangableOptionNames = new Set(['setup', 'render', 'props', 'slots', 'slotNames', 'name', 'arrangables', '__name', '__file', '__hmrId', '__asyncLoader', '__asyncResolved'])

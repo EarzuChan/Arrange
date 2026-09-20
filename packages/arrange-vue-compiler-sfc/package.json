@@ -1,7 +1,7 @@
 {
   "name": "@arrange/vue-compiler-sfc",
   "version": "0.0.0-m.2.2",
-  "description": "Arrange-specialized Vue SFC compiler",
+  "description": "Arrange SFA 模板与 TS setup 编译器",
   "private": true,
   "type": "module",
   "exports": {

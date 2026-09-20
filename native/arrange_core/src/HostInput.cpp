@@ -6,23 +6,13 @@
 
 namespace arrange::core {
     namespace {
-        constexpr std::array<std::string_view, 27> kNames{
-            "text", "textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow",
-            "modelValue", "value", "placeholder", "selectAllOnFocus",
-            "horizontalArrangement", "verticalArrangement", "contentAlignment", "horizontalAlignment", "verticalAlignment",
-            "source", "size", "contentScale", "alignment", "alpha", "tint",
+        constexpr std::array<std::string_view, 6> kNames{
+            "measurePolicy",
             "contentDescription", "label", "description", "role", "enabled",
         };
-        bool sameField(const PropValue* before, const PropValue& after, std::string_view key) {
-            const auto* a = before ? before->field(key) : nullptr;
-            const auto* b = after.field(key);
-            if (!a || !b) return a == b;
-            return samePropValue(*a, *b);
-        }
     }
 
     std::optional<HostInput> hostInputFromName(std::string_view name) {
-        if (name == "src") name = "source";
         for (std::size_t i = 0; i < kNames.size(); ++i) if (kNames[i] == name || kebabCase(kNames[i]) == name) return static_cast<HostInput>(i);
         return std::nullopt;
     }
@@ -57,20 +47,6 @@ namespace arrange::core {
         constexpr auto placement = dirtyMask(DirtyFlag::Placement) | paint | dirtyMask(DirtyFlag::HitTest);
         constexpr auto measure = dirtyMask(DirtyFlag::Layout) | placement;
         switch (input) {
-        case HostInput::TextStyle:
-            if (sameField(before, after, "fontSize") && sameField(before, after, "lineHeight")) return paint;
-            return measure;
-        case HostInput::TextAlign:
-        case HostInput::Overflow:
-        case HostInput::ContentScale:
-        case HostInput::Alignment:
-        case HostInput::Alpha:
-        case HostInput::Tint: return paint;
-        case HostInput::ContentAlignment:
-        case HostInput::HorizontalAlignment:
-        case HostInput::VerticalAlignment: return placement;
-        case HostInput::SelectAllOnFocus: return dirtyMask(DirtyFlag::Focus);
-        case HostInput::Source: return dirtyMask(DirtyFlag::Resource) | paint;
         case HostInput::ContentDescription:
         case HostInput::Label:
         case HostInput::Description:

@@ -6,7 +6,7 @@
 
 动画是 UI value 随 `VBlankSource` 推进的阶段化变化。动画过程值进入 JS Value Phase 与 Reactive Slot Runtime，形成 typed slot update，再由 FramePlan 与 SceneFramePipeline 消费。
 
-动画过程值变化不得默认触发 component render、VNode diff 或 generic prop patch。结构变化仍属于 Composition Phase；动画只改变已经绑定到 layout、draw、transform、hit-test、event 或 resource slot 的 UI value。
+动画过程值变化不得默认触发结构重排。结构变化仍属于 Composition Phase；动画只改变已经绑定到 layout、draw、transform、hit-test、event 或 resource slot 的 UI value。
 
 # 帧语义
 
@@ -38,7 +38,7 @@ animatedSizeAsRef(...)
 animatedRectAsRef(...)
 ```
 
-这些 API 返回 `Ref`，以保留 Arrange Vue authoring 心智。但该 `Ref` 被绑定到 UI slot 后，过程值更新进入 JS Value Phase 与 SlotUpdateBatch，不走普通 component render 链路。
+这些 API 返回 `Ref`，以保留 Arrange Vue authoring 心智。但该 `Ref` 被绑定到 UI slot 后，过程值更新进入 JS Value Phase 与 SlotUpdateBatch，不走普通 arrangable render 链路。
 
 值类型规则：
 
@@ -61,7 +61,7 @@ Transition 需要支持：
 - child animated value 注册与退休。
 - label / diagnostics name。
 - 同一 VBlankTick 内批量推进。
-- component unmount、branch remove、reload、HMR 与 QuickJS context reset 时取消并退休 binding。
+- arrangable unmount、branch remove、reload、HMR 与 QuickJS context reset 时取消并退休 binding。
 
 # Animation Spec
 
@@ -90,7 +90,7 @@ AnimatedVisibility
 
 `animateContentSize` 属于 Modifier 能力，改变布局相关 slot，必须进入必要 layout dirty，不得默认 full layout。
 
-`Crossfade` 表达内容切换时的 alpha / draw transition。结构进入 Composition Phase，过程 alpha 进入 JS Value Phase 与 draw slot update。
+`Crossfade` 显式接收 is（Arrangable 定义）、props（目标参数）及 targetState（切换身份），表达内容切换时的 alpha / draw transition。退出层保存自己的定义和参数，切换或反向动画不能拿新参数执行旧页面。Crossfade 不使用带参 Slot。结构进入 Composition Phase，过程 alpha 进入 JS Value Phase 与 draw slot update。
 
 `AnimatedVisibility` 表达 visible target 与 enter / exit 过程。可见性结构边界、event slot、hit-test 与 focus 语义必须明确；退出动画期间不得留下可交互的幽灵节点。
 
@@ -98,9 +98,9 @@ AnimatedVisibility
 
 动画 binding 必须随宿主语义退休：
 
-- component unmount。
+- arrangable unmount。
 - `v-if` 分支删除。
-- dynamic component 替换。
+- dynamic arrangable 替换。
 - Transition child value 删除。
 - HMR reload。
 - manual reload。
@@ -114,8 +114,8 @@ AnimatedVisibility
 
 动画诊断至少能观察：
 
-- component render count。
-- VNode diff / patch count。
+- arrangable render count。
+- 重排作用域执行次数与节点结构操作次数。
 - JS Value Phase time。
 - SlotUpdateBatch size。
 - dirty role count。
@@ -123,7 +123,7 @@ AnimatedVisibility
 
 测试必须覆盖：
 
-- animated draw slot tick 不触发 component render / VNode diff。
+- animated draw slot tick 不触发结构重排。
 - paint-only 动画不触发布局。
 - layout 动画进入必要 layout dirty。
 - Transition 多 child value 同一 VBlankTick 批量推进。
@@ -134,7 +134,7 @@ AnimatedVisibility
 
 - 不用 Promise、microtask 或 JS timer 模拟动画帧。
 - 不引入 production animation timer fallback。
-- 不让动画 tick 默认穿越普通 component render / VNode diff。
+- 不让动画 tick 默认穿越结构重排。
 - 不把动画过程值直接塞进 generic prop patch。
 - 不在 paint 中推进动画。
 

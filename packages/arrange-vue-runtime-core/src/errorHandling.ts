@@ -1,6 +1,6 @@
 import { pauseTracking, resetTracking, WatchErrorCodes } from '@arrange/vue-reactivity'
 import { EMPTY_OBJ, isArray, isFunction, isPromise } from '@arrange/vue-shared'
-import type { ComponentInternalInstance } from './component.ts'
+import type { ArrangableInstance } from './arrangable.ts'
 import { LifecycleHooks } from './enums.ts'
 import type { VNode } from './vnode.ts'
 import { popWarningContext, pushWarningContext, warn } from './warning.ts'
@@ -17,57 +17,49 @@ export enum ErrorCodes {
     // WATCH_CALLBACK,
     // WATCH_CLEANUP,
     NATIVE_EVENT_HANDLER = 5,
-    COMPONENT_EVENT_HANDLER,
-    VNODE_HOOK,
-    DIRECTIVE_HOOK,
     TRANSITION_HOOK,
     APP_ERROR_HANDLER,
     APP_WARN_HANDLER,
-    FUNCTION_REF,
-    ASYNC_COMPONENT_LOADER,
+    ASYNC_ARRANGABLE_LOADER,
     SCHEDULER,
-    COMPONENT_UPDATE,
+    ARRANGABLE_UPDATE,
     APP_UNMOUNT_CLEANUP,
 }
 
 export const ErrorTypeStrings: Record<ErrorTypes, string> = {
-    [LifecycleHooks.BEFORE_CREATE]: 'beforeCreate hook',
-    [LifecycleHooks.CREATED]: 'created hook',
-    [LifecycleHooks.BEFORE_MOUNT]: 'beforeMount hook',
-    [LifecycleHooks.MOUNTED]: 'mounted hook',
-    [LifecycleHooks.BEFORE_UPDATE]: 'beforeUpdate hook',
+    [LifecycleHooks.BEFORE_CREATE]: 'beforeCreate 生命周期回调',
+    [LifecycleHooks.CREATED]: 'created 生命周期回调',
+    [LifecycleHooks.BEFORE_MOUNT]: 'beforeMount 生命周期回调',
+    [LifecycleHooks.MOUNTED]: 'mounted 生命周期回调',
+    [LifecycleHooks.BEFORE_UPDATE]: 'beforeUpdate 生命周期回调',
     [LifecycleHooks.UPDATED]: 'updated',
-    [LifecycleHooks.BEFORE_UNMOUNT]: 'beforeUnmount hook',
-    [LifecycleHooks.UNMOUNTED]: 'unmounted hook',
-    [LifecycleHooks.ACTIVATED]: 'activated hook',
-    [LifecycleHooks.DEACTIVATED]: 'deactivated hook',
-    [LifecycleHooks.ERROR_CAPTURED]: 'errorCaptured hook',
-    [LifecycleHooks.RENDER_TRACKED]: 'renderTracked hook',
-    [LifecycleHooks.RENDER_TRIGGERED]: 'renderTriggered hook',
-    [ErrorCodes.SETUP_FUNCTION]: 'setup function',
-    [ErrorCodes.RENDER_FUNCTION]: 'render function',
-    [WatchErrorCodes.WATCH_GETTER]: 'watcher getter',
-    [WatchErrorCodes.WATCH_CALLBACK]: 'watcher callback',
-    [WatchErrorCodes.WATCH_CLEANUP]: 'watcher cleanup function',
-    [ErrorCodes.NATIVE_EVENT_HANDLER]: 'native event handler',
-    [ErrorCodes.COMPONENT_EVENT_HANDLER]: 'component event handler',
-    [ErrorCodes.VNODE_HOOK]: 'vnode hook',
-    [ErrorCodes.DIRECTIVE_HOOK]: 'directive hook',
-    [ErrorCodes.TRANSITION_HOOK]: 'transition hook',
-    [ErrorCodes.APP_ERROR_HANDLER]: 'app errorHandler',
-    [ErrorCodes.APP_WARN_HANDLER]: 'app warnHandler',
-    [ErrorCodes.FUNCTION_REF]: 'ref function',
-    [ErrorCodes.ASYNC_COMPONENT_LOADER]: 'async component loader',
-    [ErrorCodes.SCHEDULER]: 'scheduler flush',
-    [ErrorCodes.COMPONENT_UPDATE]: 'component update',
-    [ErrorCodes.APP_UNMOUNT_CLEANUP]: 'app unmount cleanup function',
+    [LifecycleHooks.BEFORE_UNMOUNT]: 'beforeUnmount 生命周期回调',
+    [LifecycleHooks.UNMOUNTED]: 'unmounted 生命周期回调',
+    [LifecycleHooks.ACTIVATED]: 'activated 生命周期回调',
+    [LifecycleHooks.DEACTIVATED]: 'deactivated 生命周期回调',
+    [LifecycleHooks.ERROR_CAPTURED]: 'errorCaptured 生命周期回调',
+    [LifecycleHooks.RENDER_TRACKED]: 'renderTracked 生命周期回调',
+    [LifecycleHooks.RENDER_TRIGGERED]: 'renderTriggered 生命周期回调',
+    [ErrorCodes.SETUP_FUNCTION]: '初始化函数',
+    [ErrorCodes.RENDER_FUNCTION]: '重排函数',
+    [WatchErrorCodes.WATCH_GETTER]: '观察取值',
+    [WatchErrorCodes.WATCH_CALLBACK]: '观察回调',
+    [WatchErrorCodes.WATCH_CLEANUP]: '观察清理函数',
+    [ErrorCodes.NATIVE_EVENT_HANDLER]: '原生事件回调',
+    [ErrorCodes.TRANSITION_HOOK]: '过渡回调',
+    [ErrorCodes.APP_ERROR_HANDLER]: '应用错误处理器',
+    [ErrorCodes.APP_WARN_HANDLER]: '应用警告处理器',
+    [ErrorCodes.ASYNC_ARRANGABLE_LOADER]: '异步 Arrangable 加载器',
+    [ErrorCodes.SCHEDULER]: '调度执行',
+    [ErrorCodes.ARRANGABLE_UPDATE]: 'Arrangable 更新',
+    [ErrorCodes.APP_UNMOUNT_CLEANUP]: '应用卸载清理',
 }
 
 export type ErrorTypes = LifecycleHooks | ErrorCodes | WatchErrorCodes
 
 export function callWithErrorHandling(
     fn: Function,
-    instance: ComponentInternalInstance | null | undefined,
+    instance: ArrangableInstance | null | undefined,
     type: ErrorTypes,
     args?: unknown[],
 ): any {
@@ -80,7 +72,7 @@ export function callWithErrorHandling(
 
 export function callWithAsyncErrorHandling(
     fn: Function | Function[],
-    instance: ComponentInternalInstance | null,
+    instance: ArrangableInstance | null,
     type: ErrorTypes,
     args?: unknown[],
 ): any {
@@ -102,14 +94,14 @@ export function callWithAsyncErrorHandling(
         return values
     } else if (__DEV__) {
         warn(
-            `Invalid value type passed to callWithAsyncErrorHandling(): ${typeof fn}`,
+            `异步错误处理入口收到无效值类型： ${typeof fn}`,
         )
     }
 }
 
 export function handleError(
     err: unknown,
-    instance: ComponentInternalInstance | null | undefined,
+    instance: ArrangableInstance | null | undefined,
     type: ErrorTypes,
     throwInDev = true,
 ): void {
@@ -123,7 +115,7 @@ export function handleError(
         // in production the hook receives only the error code
         const errorInfo = __DEV__
             ? ErrorTypeStrings[type]
-            : `https://vuejs.org/error-reference/#runtime-${type}`
+            : `Arrange 执行错误 ${type}`
         while (cur) {
             const errorCapturedHooks = cur.ec
             if (errorCapturedHooks) {
@@ -164,7 +156,7 @@ function logError(
         if (contextVNode) {
             pushWarningContext(contextVNode)
         }
-        warn(`Unhandled error${info ? ` during execution of ${info}` : ``}`)
+        warn(`未处理的执行错误${info ? `：${info}` : ``}`)
         if (contextVNode) {
             popWarningContext()
         }

@@ -43,7 +43,7 @@ export type HotUpdateContext = {
 
 export type TransformWarning = {id: string; message: string}
 
-export type TransformThis = {warn: (warning: TransformWarning) => void}
+export type TransformThis = {warn: (warning: TransformWarning) => void; addWatchFile?: (file: string) => void}
 
 export type ConfigEnv = {command?: string; mode?: string}
 
@@ -74,7 +74,7 @@ export type ArrangeTransformPlugin = {
     name: string
     enforce: "pre"
     load: (id: string) => string | null
-    transform: (this: TransformThis, code: string, id: string) => string | Promise<string | null> | null
+    transform: (this: TransformThis, code: string, id: string) => string | Promise<{ code: string; map?: object | null } | null> | null
 }
 
 export type ArrangeVitePlugin = ArrangeTransformPlugin & {

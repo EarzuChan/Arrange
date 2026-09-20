@@ -32,7 +32,7 @@ import * as process from 'process'
 import type TS from 'typescript'
 import TypeScript from 'typescript'
 import { createCache } from '../cache.ts'
-import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript.ts'
+import type { ImportBinding, SFAScriptCompileOptions } from '../compileScript.ts'
 import { parse } from '../parse.ts'
 import { type ScriptCompileContext, resolveParserPlugins } from './context.ts'
 import {
@@ -47,7 +47,7 @@ import {
 
 export type SimpleTypeResolveOptions = Partial<
     Pick<
-        SFCScriptCompileOptions,
+        SFAScriptCompileOptions,
         'globalTypeFiles' | 'fs' | 'babelParserPlugins' | 'isProd'
     >
 >
@@ -55,7 +55,7 @@ export type SimpleTypeResolveOptions = Partial<
 /**
  * TypeResolveContext is compatible with ScriptCompileContext
  * but also allows a simpler version of it with minimal required properties
- * when resolveType needs to be used in a non-SFC context, e.g. in a babel
+ * when resolveType needs to be used in a non-SFA context, e.g. in a babel
  * plugin. The simplest context can be just:
  * ```ts
  * const ctx: SimpleTypeResolveContext = {
@@ -84,8 +84,6 @@ export type SimpleTypeResolveContext = Pick<
     | 'propsRuntimeDefaults'
     | 'propsDestructuredBindings'
 
-    // emits
-    | 'emitsTypeDecl'
 
 > &
     Partial<
@@ -745,6 +743,67 @@ type ReferenceTypes =
     | TSImportType
     | TSTypeQuery
 
+const refModules = new Set(['@arrange/framework', '@arrange/runtime', '@arrange/vue-runtime-core', '@arrange/vue-reactivity'])
+const writableRefNames = new Set(['Ref', 'ShallowRef', 'WritableComputedRef'])
+
+type RefContract = 'writable' | 'readonly' | undefined
+type RefTypeArgument = { node: Node; scope: TypeScope; parameters: Map<string, RefTypeArgument> }
+
+export function inferRefContract(ctx: TypeResolveContext, node: Node | undefined, scope: TypeScope, seen = new Set<Node>(), imports = new Set<string>(), parameters = new Map<string, RefTypeArgument>()): RefContract {
+    if (!node || seen.has(node)) return
+    seen.add(node)
+    if (node.type === 'TSTypeAliasDeclaration' || node.type === 'TSParenthesizedType') return inferRefContract(ctx, node.typeAnnotation, scope, seen, imports, parameters)
+    if (node.type === 'TSIntersectionType' || node.type === 'TSUnionType') {
+        const kinds = node.types.map(type => inferRefContract(ctx, type, scope, new Set(seen), new Set(imports), parameters))
+        if (node.type === 'TSUnionType') return kinds.every(Boolean) ? kinds.includes('readonly') ? 'readonly' : 'writable' : undefined
+        return kinds.includes('writable') ? 'writable' : kinds.includes('readonly') ? 'readonly' : undefined
+    }
+    if (node.type !== 'TSTypeReference') return
+
+    const reference = getReferenceName(node)
+    const root = typeof reference === 'string' ? reference : reference[0]
+    const argument = parameters.get(root)
+    if (argument && typeof reference === 'string') return inferRefContract(ctx, argument.node, argument.scope, seen, imports, argument.parameters)
+
+    const follow = (resolved: ScopeTypeNode | undefined, targetScope: TypeScope): RefContract => {
+        const argumentsMap = new Map(parameters)
+        if (resolved?.type === 'TSTypeAliasDeclaration' && resolved.typeParameters) {
+            for (let index = 0; index < resolved.typeParameters.params.length; index++) {
+                const parameter = resolved.typeParameters.params[index]
+                const supplied = node.typeParameters?.params[index]
+                const value = supplied ?? parameter.default
+                if (value) argumentsMap.set(parameter.name, { node: value, scope: supplied ? scope : targetScope, parameters: new Map(supplied ? parameters : argumentsMap) })
+            }
+        }
+        return inferRefContract(ctx, resolved, resolved?._ownerScope ?? targetScope, seen, imports, argumentsMap)
+    }
+
+    const binding = scope.imports[root]
+    if (binding) {
+        const name = binding.imported === '*' && Array.isArray(reference) ? reference[1] : binding.imported
+        if (refModules.has(binding.source)) {
+            if (writableRefNames.has(name)) return 'writable'
+            if (name === 'ComputedRef') return 'readonly'
+            return
+        }
+        const identity = scope.filename + ':' + root
+        if (imports.has(identity)) return ctx.error('类型转导出存在循环，无法确定 Ref 契约', node, scope)
+        imports.add(identity)
+        const importedScope = importSourceToScope(ctx, node, scope, binding.source)
+        const exported = importedScope.exportedTypes[name]
+        if (importedScope.imports[name]) {
+            const referenceNode: TSTypeReference = { type: 'TSTypeReference', typeName: { type: 'Identifier', name }, typeParameters: node.typeParameters }
+            return inferRefContract(ctx, referenceNode, importedScope, seen, imports, parameters)
+        }
+        return follow(exported, importedScope)
+    }
+    if (reference === 'Readonly' && !scope.types.Readonly) {
+        const inner = inferRefContract(ctx, node.typeParameters?.params[0], scope, seen, imports, parameters)
+        return inner ? 'readonly' : undefined
+    }
+    return follow(resolveTypeReference(ctx, node, scope), scope)
+}
+
 function resolveTypeReference(
     ctx: TypeResolveContext,
     node: ReferenceTypes & {
@@ -895,7 +954,7 @@ export function registerTS(_loadTS: () => typeof TS): void {
     }
 }
 
-type FS = NonNullable<SFCScriptCompileOptions['fs']>
+type FS = NonNullable<SFAScriptCompileOptions['fs']>
 
 function resolveFS(ctx: TypeResolveContext): FS | undefined {
     if (ctx.fs) {
@@ -910,13 +969,13 @@ function resolveFS(ctx: TypeResolveContext): FS | undefined {
     }
     return (ctx.fs = {
         fileExists(file) {
-            if (file.endsWith('.vue.ts') && !file.endsWith('.d.vue.ts')) {
+            if (file.endsWith('.sfa.ts') && !file.endsWith('.d.sfa.ts')) {
                 file = file.replace(/\.ts$/, '')
             }
             return fs.fileExists(file)
         },
         readFile(file) {
-            if (file.endsWith('.vue.ts') && !file.endsWith('.d.vue.ts')) {
+            if (file.endsWith('.sfa.ts') && !file.endsWith('.d.sfa.ts')) {
                 file = file.replace(/\.ts$/, '')
             }
             return fs.readFile(file)
@@ -1140,7 +1199,7 @@ function resolveWithTS(
 
     if (res.resolvedModule) {
         let filename = res.resolvedModule.resolvedFileName
-        if (filename.endsWith('.vue.ts') && !filename.endsWith('.d.vue.ts')) {
+        if (filename.endsWith('.sfa.ts') && !filename.endsWith('.d.sfa.ts')) {
             filename = filename.replace(/\.ts$/, '')
         }
         return fs.realpath ? fs.realpath(filename) : filename
@@ -1221,7 +1280,7 @@ function parseFile(
     filename: string,
     content: string,
     fs: FS,
-    parserPlugins?: SFCScriptCompileOptions['babelParserPlugins'],
+    parserPlugins?: SFAScriptCompileOptions['babelParserPlugins'],
 ): Statement[] {
     const ext = extname(filename)
     if (
@@ -1253,35 +1312,11 @@ function parseFile(
         }).program.body
     }
 
-    if (ext === '.vue') {
-        const {
-            descriptor: { script, scriptSetup },
-        } = parse(content)
-        if (!script && !scriptSetup) {
-            return []
-        }
-
-        // ensure the correct offset with original source
-        const scriptOffset = script ? script.loc.start.offset : Infinity
-        const scriptSetupOffset = scriptSetup
-            ? scriptSetup.loc.start.offset
-            : Infinity
-        const firstBlock = scriptOffset < scriptSetupOffset ? script : scriptSetup
-        const secondBlock = scriptOffset < scriptSetupOffset ? scriptSetup : script
-
-        let scriptContent =
-            ' '.repeat(Math.min(scriptOffset, scriptSetupOffset)) +
-            firstBlock!.content
-        if (secondBlock) {
-            scriptContent +=
-                ' '.repeat(secondBlock.loc.start.offset - script!.loc.end.offset) +
-                secondBlock.content
-        }
-        const lang = script?.lang || scriptSetup?.lang
-        return babelParse(scriptContent, {
-            plugins: resolveParserPlugins(lang!, parserPlugins),
-            sourceType: 'module',
-        }).program.body
+    if (ext === '.sfa') {
+        const { descriptor: { script } } = parse(content)
+        if (!script) return []
+        const scriptContent = ' '.repeat(script.loc.start.offset) + script.content
+        return babelParse(scriptContent, { plugins: resolveParserPlugins('ts', parserPlugins), sourceType: 'module' }).program.body
     }
     return []
 }
@@ -1291,12 +1326,7 @@ function ctxToScope(ctx: TypeResolveContext): TypeScope {
         return ctx.scope
     }
 
-    const body =
-        'ast' in ctx
-            ? ctx.ast
-            : ctx.scriptAst
-                ? [...ctx.scriptAst.body, ...ctx.scriptSetupAst!.body]
-                : ctx.scriptSetupAst!.body
+    const body = 'ast' in ctx ? ctx.ast : ctx.scriptAst!.body
 
     const scope = new TypeScope(
         ctx.filename,
@@ -1862,8 +1892,9 @@ export function inferRuntimeType(
                             // (e.g. consumed as built artifacts in another package). #14729
                             case 'Ref':
                             case 'ShallowRef':
-                            case 'ComputedRef':
                             case 'WritableComputedRef':
+                                return ['Object']
+                            case 'ComputedRef':
                                 return ['Object']
                             case 'MaybeRef':
                             case 'MaybeRefOrGetter': {
@@ -2093,7 +2124,7 @@ function inferEnumType(node: TSEnumDeclaration): string[] {
 
 /**
  * support for the `ExtractPropTypes` helper - it's non-exhaustive, mostly
- * tailored towards popular component libs like element-plus and antd-vue.
+ * tailored towards popular arrangable libs like element-plus and antd-vue.
  */
 function resolveExtractPropTypes(
     { props }: ResolvedElements,

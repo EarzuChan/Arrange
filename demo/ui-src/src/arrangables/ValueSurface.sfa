@@ -1,0 +1,11 @@
+<template>
+    <Box :modifier="M.offset({ x: offset }).background(tone)">
+        <Slot />
+    </Box>
+</template>
+
+<script>
+import { M } from '@arrange/framework'
+
+defineProps<{ tone: number; offset: number }>()
+</script>

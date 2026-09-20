@@ -25,7 +25,7 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 ui/
   package.json
   src/main.ts
-  src/App.vue
+  src/App.sfa
 ```
 
 ## 运行时 ui 目录
@@ -63,12 +63,12 @@ config.app.useLive("http://host:port");
 
 ```ts
 import { createApp } from "@arrange/framework"
-import App from "./App.vue"
+import App from "./App.sfa"
 
 createApp(App).mount()
 ```
 
-正式 authoring 路径为 SFC / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
+正式 authoring 路径为 SFA / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
 
 # 路径约定
 

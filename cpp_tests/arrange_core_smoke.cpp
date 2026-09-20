@@ -98,25 +98,25 @@ namespace {
         using namespace arrange::core;
         MutationTransaction transaction;
         transaction.operations = {
-            CreateNodeMutation{1, NodeType::Column},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
             SetModifierMutation{1, background(320.0f, 180.0f, 0xff000000u)},
-            SetPropMutation{1, "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))})},
-            CreateNodeMutation{2, NodeType::Text},
+            SetPropMutation{1, "measurePolicy", object({field("kind", PropValue::stringValue("Column")), field("verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))}))})},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")},
             SetTextMutation{2, "Hello typed transaction"},
             SetPropMutation{2, "textStyle", object({field("fontSize", PropValue::numberValue(20.0)), field("color", PropValue::numberValue(0xffe8eaedu))})},
             SetModifierMutation{2, background(220.0f, 32.0f, 0xff3a7afeu)},
             InsertChildMutation{1, 2, 0},
-            CreateNodeMutation{3, NodeType::Box},
+            CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{3, clickableBox(80.0f, 40.0f, makeEventSlotId(3, EventSlotKind::Click))},
             InsertChildMutation{1, 3, 1},
-            CreateNodeMutation{4, NodeType::Column},
+            CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
             SetModifierMutation{4, verticalScroll(100.0f, 40.0f, 0.0f, makeEventSlotId(4, EventSlotKind::VerticalScroll))},
             InsertChildMutation{1, 4, 2},
-            CreateNodeMutation{5, NodeType::Box},
+            CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{5, background(100.0f, 80.0f, 0xffffb020u)},
             InsertChildMutation{4, 5, 0},
-            CreateNodeMutation{6, NodeType::Input},
-            SetPropMutation{6, "modelValue", PropValue::stringValue("Gain")},
+            CreateNodeMutation{6, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{6, "textPresentation", arrange::core::PropValue::stringValue("editable")},
+            SetPropMutation{6, "value", PropValue::stringValue("Gain")},
             SetPropMutation{6, "placeholder", PropValue::stringValue("Search preset")},
             SetPropMutation{6, "selectAllOnFocus", PropValue::booleanValue(true)},
             SetEventSlotMutation{6, EventSlotKind::InputSubmit, makeEventSlotId(6, EventSlotKind::InputSubmit)},
@@ -138,7 +138,7 @@ namespace {
         }
         if (!tree.contains(1) || tree.node(1).children.size() != 4) return 1;
         if (tree.node(2).text != "Hello typed transaction") return 2;
-        if (tree.node(6).props.at("modelValue").stringOr() != "Gain") return 3;
+        if (tree.node(6).props.at("value").stringOr() != "Gain") return 3;
         if (!hasDirty(tree.node(1), arrange::core::DirtyFlag::Structure)) return 4;
 
         arrange::core::LayoutEngine layout;
@@ -200,7 +200,7 @@ namespace {
     int verifyEventPropIsNotCoreEventSlot() {
         arrange::core::LayoutTree tree;
         tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Input},
+            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("editable")},
         });
         tree.clearDirty();
         (void)tree.takeInvalidation();
@@ -221,40 +221,32 @@ namespace {
     int verifyPropSchema() {
         using namespace arrange::core;
         std::string error;
-        if (!validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontSize", PropValue::numberValue(12.0)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
-        if (validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontSize", PropValue::stringValue("12"))}), error)) return 102;
-        if (validateSetPropMutation(NodeType::Column, "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy"))}), error)) return 103;
-        if (validateSetPropMutation(NodeType::Text, "unknownProp", PropValue::stringValue("bad"), error)) return 104;
-        if (validateSetPropMutation(NodeType::Image, "tint", PropValue::numberValue(0xff000000u), error)) return 105;
-        if (validateSetPropMutation(NodeType::Text, "testTag", PropValue::stringValue("tag"), error)) return 106;
-        if (!validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg"))}), error)) return 107;
-        if (validateSetPropMutation(NodeType::Icon, "source", object({field("path", PropValue::stringValue("icons/play.svg")), field("url", PropValue::stringValue("https://example.invalid/play.svg"))}), error)) return 108;
-
-        struct EnumCase { NodeType node; const char* key; const char* valid; const char* invalid; };
-        for (const auto& input : std::vector<EnumCase>{
-            {NodeType::Image, "contentScale", "FillWidth", "Crpo"},
-            {NodeType::Image, "alignment", "BottomEnd", "Baseline"},
-            {NodeType::Box, "contentAlignment", "CenterEnd", "Centre"},
-            {NodeType::Row, "verticalAlignment", "Baseline", "End"},
-            {NodeType::Column, "horizontalAlignment", "CenterHorizontally", "Bottom"},
-            {NodeType::Text, "textAlign", "center", "middel"},
-            {NodeType::Text, "overflow", "ellipsis", "elipsis"},
-            {NodeType::Row, "horizontalArrangement", "SpaceBetween", "Bottom"},
-            {NodeType::Column, "verticalArrangement", "Bottom", "End"},
-        }) {
-            if (!validateSetPropMutation(input.node, input.key, PropValue::stringValue(input.valid), error)) return 201;
-            if (validateSetPropMutation(input.node, input.key, PropValue::stringValue(input.invalid), error)) return 202;
-            if (error.find(input.key) == std::string::npos || error.find(input.invalid) == std::string::npos) return 203;
-            if (validateSetPropMutation(input.node, input.key, PropValue::numberValue(1), error)) return 204;
-            if (!validateSetPropMutation(input.node, input.key, PropValue{}, error)) return 205;
+        if (!validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::numberValue(12)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
+        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::stringValue("12"))}), error)) return 102;
+        for (const auto* key : {"unknownProp", "tint", "source", "testTag", "verticalArrangement"}) {
+            if (validateSetPropMutation(NodeType::Layout, key, PropValue::stringValue("非法输入"), error)) return 103;
         }
-
-        const auto spaced = [](const char* alignment) { return object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8)), field("alignment", PropValue::stringValue(alignment))}); };
-        if (!validateSetPropMutation(NodeType::Row, "horizontalArrangement", spaced("CenterHorizontally"), error)) return 206;
-        if (validateSetPropMutation(NodeType::Row, "horizontalArrangement", spaced("Top"), error) || error.find("horizontalArrangement.alignment") == std::string::npos) return 207;
-        if (!validateSetPropMutation(NodeType::Column, "verticalArrangement", spaced("Bottom"), error)) return 208;
-        if (validateSetPropMutation(NodeType::Column, "verticalArrangement", spaced("End"), error)) return 209;
-        if (validateSetPropMutation(NodeType::Text, "textStyle", object({field("fontWeight", PropValue::stringValue("bold"))}), error)) return 210;
+        struct EnumCase { const char* key; const char* valid; const char* invalid; };
+        for (const auto& input : std::vector<EnumCase>{{"textAlign", "center", "middel"}, {"overflow", "ellipsis", "elipsis"}}) {
+            if (!validateSetPropMutation(NodeType::Layout, input.key, PropValue::stringValue(input.valid), error)) return 201;
+            if (validateSetPropMutation(NodeType::Layout, input.key, PropValue::stringValue(input.invalid), error)) return 202;
+            if (error.find(input.key) == std::string::npos || error.find(input.invalid) == std::string::npos) return 203;
+            if (validateSetPropMutation(NodeType::Layout, input.key, PropValue::numberValue(1), error)) return 204;
+            if (!validateSetPropMutation(NodeType::Layout, input.key, PropValue{}, error)) return 205;
+        }
+        struct PolicyCase { const char* kind; const char* key; const char* valid; const char* invalid; };
+        for (const auto& input : std::vector<PolicyCase>{{"Box", "contentAlignment", "CenterEnd", "Centre"}, {"Row", "verticalAlignment", "Baseline", "End"}, {"Column", "horizontalAlignment", "CenterHorizontally", "Bottom"}, {"Row", "horizontalArrangement", "SpaceBetween", "Bottom"}, {"Column", "verticalArrangement", "Bottom", "End"}}) {
+            const auto policy = [&](const char* value) { return object({field("kind", PropValue::stringValue(input.kind)), field(input.key, PropValue::stringValue(value))}); };
+            if (!validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(input.valid), error)) return 206;
+            if (validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(input.invalid), error)) return 207;
+        }
+        for (const auto* kind : {"Row", "Column"}) {
+            const auto horizontal = std::string(kind) == "Row";
+            const auto policy = [&](const char* alignment) { return object({field("kind", PropValue::stringValue(kind)), field(horizontal ? "horizontalArrangement" : "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8)), field("alignment", PropValue::stringValue(alignment))}))}); };
+            if (!validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "CenterHorizontally" : "Bottom"), error)) return 208;
+            if (validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "Top" : "End"), error)) return 209;
+        }
+        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontWeight", PropValue::stringValue("bold"))}), error)) return 210;
         return 0;
     }
 
@@ -262,10 +254,10 @@ namespace {
         using namespace arrange::core;
         LayoutEngine layout;
         LayoutTree box;
-        box.apply({CreateNodeMutation{1, NodeType::Box}, CreateNodeMutation{2, NodeType::Spacer}, InsertChildMutation{1, 2, 0}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}});
+        box.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}});
         struct AlignmentCase { const char* name; float x; float y; };
         for (const auto& alignment : std::vector<AlignmentCase>{{"TopStart", 0, 0}, {"TopCenter", 45, 0}, {"TopEnd", 90, 0}, {"CenterStart", 0, 45}, {"Center", 45, 45}, {"CenterEnd", 90, 45}, {"BottomStart", 0, 90}, {"BottomCenter", 45, 90}, {"BottomEnd", 90, 90}}) {
-            box.setHostInput(1, HostInput::ContentAlignment, PropValue::stringValue(alignment.name));
+            box.setHostInput(1, HostInput::MeasurePolicy, object({field("kind", PropValue::stringValue("Box")), field("contentAlignment", PropValue::stringValue(alignment.name))}));
             layout.layout(box, 1, {0, 100, 0, 100});
             if (!near(box.node(2).bounds.x, alignment.x) || !near(box.node(2).bounds.y, alignment.y)) return 211;
             box.clearDirty();
@@ -273,8 +265,8 @@ namespace {
 
         for (const bool horizontal : {true, false}) {
             LayoutTree tree;
-            tree.apply({CreateNodeMutation{1, horizontal ? NodeType::Row : NodeType::Column}, CreateNodeMutation{2, NodeType::Spacer}, CreateNodeMutation{3, NodeType::Spacer}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}, SetModifierMutation{3, size(10, 10)}});
-            const auto input = horizontal ? HostInput::HorizontalArrangement : HostInput::VerticalArrangement;
+            tree.apply({CreateNodeMutation{1, NodeType::Layout}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}, SetModifierMutation{3, size(10, 10)}});
+            const auto* input = horizontal ? "horizontalArrangement" : "verticalArrangement";
             struct PlacementCase { PropValue value; float first; float second; };
             for (const auto& arrangement : std::vector<PlacementCase>{
                 {PropValue::stringValue(horizontal ? "Start" : "Top"), 0, 10},
@@ -286,7 +278,7 @@ namespace {
                 {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue("Center"))}), 35, 55},
                 {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue(horizontal ? "End" : "Bottom"))}), 70, 90},
             }) {
-                tree.setHostInput(1, input, arrangement.value);
+                tree.setHostInput(1, HostInput::MeasurePolicy, object({field("kind", PropValue::stringValue(horizontal ? "Row" : "Column")), field(input, arrangement.value)}));
                 layout.layout(tree, 1, {0, 100, 0, 100});
                 if (!near(horizontal ? tree.node(2).bounds.x : tree.node(2).bounds.y, arrangement.first)) return 212;
                 if (!near(horizontal ? tree.node(3).bounds.x : tree.node(3).bounds.y, arrangement.second)) return 213;
@@ -389,9 +381,11 @@ namespace {
 
         arrange::core::ArrangeNode inputNode;
         inputNode.id = 9;
-        inputNode.type = arrange::core::NodeType::Input;
+        inputNode.type = arrange::core::NodeType::Layout;
+        inputNode.textPresentation = arrange::core::TextPresentation::Editable;
+        inputNode.measurePolicy = arrange::core::TextMeasurePolicy{};
         inputNode.bounds = {0.0f, 0.0f, 120.0f, 28.0f};
-        inputNode.props["modelValue"] = arrange::core::PropValue::stringValue("abcd");
+        inputNode.props["value"] = arrange::core::PropValue::stringValue("abcd");
         arrange::core::TextInputOverlayState state;
         state.text = "abcd";
         state.cursorIndex = 2;
@@ -413,9 +407,9 @@ namespace {
         using namespace arrange::core;
         LayoutTree tree;
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, NodeType::Box},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{1, size(80.0f, 40.0f)},
-            CreateNodeMutation{2, NodeType::Box},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{2, background(120.0f, 20.0f, 0xffabcdefu)},
             InsertChildMutation{1, 2, 0},
         });
@@ -438,7 +432,7 @@ namespace {
 
         tree = {};
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, NodeType::Text},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")},
             SetTextMutation{1, "overflow text"},
             SetPropMutation{1, "overflow", PropValue::stringValue("visible")},
             SetModifierMutation{1, size(40.0f, 12.0f)},
@@ -460,17 +454,22 @@ namespace {
         if (!sawClip) return 114;
 
         tree = {};
+        auto content = std::make_shared<PainterContent>();
+        content->intrinsicSize = Size{24, 24};
+        PaintModifier paint;
+        paint.painter = {1, 1, 1, content};
+        paint.tint = 0xff000000u;
+        auto painted = size(24, 24);
+        painted.push_back({paint, {}});
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, NodeType::Icon},
-            SetPropMutation{1, "source", object({field("path", PropValue::stringValue("icons/play.svg"))})},
-            SetPropMutation{1, "tint", PropValue::numberValue(0xff000000u)},
-            SetModifierMutation{1, size(24.0f, 24.0f)},
+            CreateNodeMutation{1, NodeType::Layout},
+            SetModifierMutation{1, painted},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 24.0f, 0.0f, 24.0f});
         const auto iconOps = DrawOpsBuilder{}.exportScene(tree, 1);
         bool sawResourceObjectIcon = false;
         for (const auto& op : iconOps) {
-            if (op.type == DrawOpType::DrawIcon && op.resource == "icons/play.svg") sawResourceObjectIcon = true;
+            if (op.type == DrawOpType::DrawPainter && op.painter.content == content && op.hasTint && op.color == 0xff000000u) sawResourceObjectIcon = true;
         }
         if (!sawResourceObjectIcon) return 115;
         return 0;
@@ -532,8 +531,8 @@ namespace {
         const auto endpoint = arrange::parseDevServerUrl("http://127.0.0.1:9178");
         if (!endpoint.ok || endpoint.host != "127.0.0.1" || endpoint.port != 9178) return 81;
         if (arrange::devBundleHttpUrl("http://127.0.0.1:9178") != "http://127.0.0.1:9178/@arrange/app.js") return 82;
-        const auto reload = arrange::parseViteHmrReloadMessage(R"({"type":"custom","event":"arrange:reload","data":{"path":"src/App.vue","timestamp":1}})");
-        if (!reload || reload->path != "src/App.vue" || reload->payloadJson.find("timestamp") == std::string::npos) return 83;
+        const auto reload = arrange::parseViteHmrReloadMessage(R"({"type":"custom","event":"arrange:reload","data":{"path":"src/App.sfa","timestamp":1}})");
+        if (!reload || reload->path != "src/App.sfa" || reload->payloadJson.find("timestamp") == std::string::npos) return 83;
 
         arrange::juce::FramePlanner planner;
         if (planner.planTick({}).hasTickWork) return 84;

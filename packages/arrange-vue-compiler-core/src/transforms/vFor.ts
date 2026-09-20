@@ -30,7 +30,6 @@ import {
 import { ErrorCodes, createCompilerError } from '../errors.ts'
 import {
     FRAGMENT,
-    IS_MEMO_SAME,
     OPEN_BLOCK,
     RENDER_LIST,
 } from '../runtimeHelpers.ts'
@@ -60,7 +59,6 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                 forNode.source,
             ]) as ForRenderListExpression
             const isTemplate = isTemplateNode(node)
-            const memo = findDir(node, 'memo')
             const keyProp = findProp(node, `key`, false, true)
             const isDirKey = keyProp && keyProp.type === NodeTypes.DIRECTIVE
             let keyExp =
@@ -71,28 +69,10 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                         : undefined
                     : keyProp.exp)
 
-            if (memo && keyExp && isDirKey) {
-                {
-                    keyProp.exp = keyExp = processExpression(
-                        keyExp as SimpleExpressionNode,
-                        context,
-                    )
-                }
-            }
             const keyProperty =
                 keyProp && keyExp ? createObjectProperty(`key`, keyExp) : null
 
             if ((isTemplate)) {
-                // #2085 / #5288 process :key and v-memo expressions need to be
-                // processed on `<template v-for>`. In this case the node is discarded
-                // and never traversed so its binding expressions won't be processed
-                // by the normal transforms.
-                if (memo) {
-                    memo.exp = processExpression(
-                        memo.exp! as SimpleExpressionNode,
-                        context,
-                    )
-                }
                 if (keyProperty && keyProp!.type !== NodeTypes.ATTRIBUTE) {
                     keyProperty.value = processExpression(
                         keyProperty.value as SimpleExpressionNode,
@@ -117,10 +97,9 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                 renderExp,
                 fragmentFlag,
                 undefined,
-                undefined,
                 true /* isBlock */,
                 !isStableFragment /* disableTracking */,
-                false /* isComponent */,
+                false /* isArrangable */,
                 node.loc,
             ) as ForCodegenNode
 
@@ -176,10 +155,9 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                         node.children,
                         PatchFlags.STABLE_FRAGMENT,
                         undefined,
-                        undefined,
                         true,
                         undefined,
-                        false /* isComponent */,
+                        false /* isArrangable */,
                     )
                 } else {
                     // Normal element v-for. Directly use the child's codegenNode
@@ -194,51 +172,24 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                             // switch from block to vnode
                             removeHelper(OPEN_BLOCK)
                             removeHelper(
-                                getVNodeBlockHelper(childBlock.isComponent),
+                                getVNodeBlockHelper(childBlock.isArrangable),
                             )
                         } else {
                             // switch from vnode to block
                             removeHelper(
-                                getVNodeHelper(childBlock.isComponent),
+                                getVNodeHelper(childBlock.isArrangable),
                             )
                         }
                     }
                     childBlock.isBlock = !isStableFragment
                     if (childBlock.isBlock) {
                         helper(OPEN_BLOCK)
-                        helper(getVNodeBlockHelper(childBlock.isComponent))
+                        helper(getVNodeBlockHelper(childBlock.isArrangable))
                     } else {
-                        helper(getVNodeHelper(childBlock.isComponent))
+                        helper(getVNodeHelper(childBlock.isArrangable))
                     }
                 }
 
-                if (memo) {
-                    const loop = createFunctionExpression(
-                        createForLoopParams(forNode.parseResult, [
-                            createSimpleExpression(`_cached`),
-                        ]),
-                    )
-                    loop.body = createBlockStatement([
-                        createCompoundExpression([`const _memo = (`, memo.exp!, `)`]),
-                        createCompoundExpression([
-                            `if (_cached && _cached.el`,
-                            ...(keyExp ? [` && _cached.key === `, keyExp] : []),
-                            ` && ${context.helperString(
-                                IS_MEMO_SAME,
-                            )}(_cached, _memo)) return _cached`,
-                        ]),
-                        createCompoundExpression([`const _item = `, childBlock as any]),
-                        createSimpleExpression(`_item.memo = _memo`),
-                        createSimpleExpression(`return _item`),
-                    ])
-                    renderExp.arguments.push(
-                        loop as ForIteratorExpression,
-                        createSimpleExpression(`_cache`),
-                        createSimpleExpression(String(context.cached.length)),
-                    )
-                    // increment cache count
-                    context.cached.push(null)
-                } else {
                     renderExp.arguments.push(
                         createFunctionExpression(
                             createForLoopParams(forNode.parseResult),
@@ -246,7 +197,6 @@ export const transformFor: NodeTransform = createStructuralDirectiveTransform(
                             true /* force newline */,
                         ) as ForIteratorExpression,
                     )
-                }
             }
         })
     },
@@ -377,9 +327,8 @@ export function finalizeForParseResult(
 
 export function createForLoopParams(
     { value, key, index }: ForParseResult,
-    memoArgs: ExpressionNode[] = [],
 ): ExpressionNode[] {
-    return createParamsList([value, key, index, ...memoArgs])
+    return createParamsList([value, key, index])
 }
 
 function createParamsList(

@@ -1,7 +1,7 @@
 import {
-    type ComponentInternalInstance,
+    type ArrangableInstance,
     getCurrentInstance,
-} from '../component.ts'
+} from '../arrangable.ts'
 import { warn } from '../warning.ts'
 
 export function useId(): string {
@@ -10,7 +10,7 @@ export function useId(): string {
         return (i.appContext.config.idPrefix || 'v') + '-' + i.ids[0] + i.ids[1]++
     } else if (__DEV__) {
         warn(
-            `useId() is called when there is no active component ` +
+            `useId() is called when there is no active arrangable ` +
             `instance to be associated with.`,
         )
     }
@@ -19,9 +19,9 @@ export function useId(): string {
 
 /**
  * There are 3 types of async boundaries:
- * - async components
- * - components with async setup()
+ * - async arrangables
+ * - arrangables with async setup()
  */
-export function markAsyncBoundary(instance: ComponentInternalInstance): void {
+export function markAsyncBoundary(instance: ArrangableInstance): void {
     instance.ids = [instance.ids[0] + instance.ids[2]++ + '-', 0, 0]
 }

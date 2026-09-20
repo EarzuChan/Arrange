@@ -1,5 +1,5 @@
 import { transformWithOxc } from "vite"
-import { compileArrangeSfc, injectHmrClient, isEntryModule, isVueModule, isVueQueryModule } from "./sfc.ts"
+import { compileArrangeSfa, injectHmrClient, isEntryModule, isSfaModule, isSfaQueryModule } from "./sfa.ts"
 import type { ArrangeTransformPlugin, ArrangeTransformPluginOptions, TransformThis } from "./types.ts"
 
 export function createArrangeTransformPlugin(options: ArrangeTransformPluginOptions): ArrangeTransformPlugin {
@@ -7,25 +7,25 @@ export function createArrangeTransformPlugin(options: ArrangeTransformPluginOpti
         name: options.name,
         enforce: "pre",
         load(id: string): string | null {
-            if (!isVueQueryModule(id)) return null
+            if (!isSfaQueryModule(id)) return null
             return ""
         },
-        transform(this: TransformThis, code: string, id: string): string | Promise<string | null> | null {
+        transform(this: TransformThis, code: string, id: string) {
             if (isEntryModule(id, options.entry)) {
                 return options.injectEntryHmrClient() ? injectHmrClient(code) : code
             }
-            if (!isVueModule(id)) return null
+            if (!isSfaModule(id)) return null
             if (String(id).includes("?")) return ""
 
-            const { code: transformed, warnings, needsTranspile } = compileArrangeSfc(code, id)
+            const { code: transformed, warnings, map, dependencies } = compileArrangeSfa(code, id)
             for (const message of warnings) this.warn({ id, message })
-            if (!needsTranspile) return transformed
+            for (const dependency of dependencies) this.addWatchFile?.(dependency)
 
             return transformWithOxc(transformed, id, {
                 lang: "ts",
                 target: "es2022",
-                sourcemap: false,
-            }).then((result) => result.code)
+                sourcemap: true,
+            }, map).then(result => ({ code: result.code, map: result.map }))
         },
     }
 }

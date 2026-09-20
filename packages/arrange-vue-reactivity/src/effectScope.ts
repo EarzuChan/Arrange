@@ -137,7 +137,7 @@ export class EffectScope {
       if (activeEffectScope === this) {
         activeEffectScope = this.prevScope
       } else {
-        // withAsyncContext() restores the current component scope for the
+        // withAsyncContext() restores the current arrangable scope for the
         // current async continuation, then defers its cleanup to a microtask.
         // If sibling continuations interleave (A restore -> B restore ->
         // A cleanup), activeEffectScope is already B instead of this scope A

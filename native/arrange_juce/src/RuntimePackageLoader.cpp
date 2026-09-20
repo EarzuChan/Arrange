@@ -1,3 +1,4 @@
+#include <arrange/juce/PainterResources.h>
 #include <arrange/juce/RuntimePackageLoader.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
@@ -53,13 +54,14 @@ namespace arrange::juce {
             result.error = makeErrorScreenModel(
                 ErrorSource::ScriptRuntime,
                 "Arrange dev bundle request failed with HTTP " + std::to_string(statusCode) + ".\n" + source,
-                "Fix the Vue/SFC build error and save again; ArrangeEditor will retry through the same reload path.",
+                "修复 SFA 构建错误并保存；ArrangeEditor 将通过同一重载路径重试",
                 bundleUrl);
             setDiagnostic(result, LogLevel::Error, "Live bundle failed", "HTTP " + std::to_string(statusCode) + " from " + bundleUrl, true);
             return result;
         }
 
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+        scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
         const auto modulePath = result.packageDir / "__arrange_dev_app.js";
         const auto executed = scriptHost->executeModule(modulePath, source);
         if (!executed.ok) {
@@ -102,6 +104,7 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+        scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
         arrange::quickjs::AppScriptLoader loader(*scriptHost);
         const auto loaded = loader.loadEntry(resolved.entryPath);
         if (!loaded.ok) {

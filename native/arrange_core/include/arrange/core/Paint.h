@@ -15,8 +15,7 @@ namespace arrange::core {
         FillRect,
         StrokeRect,
         DrawText,
-        DrawImage,
-        DrawIcon,
+        DrawPainter,
         PushClip,
         PopClip,
         PushTransform,
@@ -45,9 +44,7 @@ namespace arrange::core {
         std::shared_ptr<const TextLayout> textLayout;
         std::string textAlign;
         std::string overflow;
-        std::string resource;
-        std::optional<std::string> resourceOrigin;
-        bool resourceIsIcon = false;
+        PainterSnapshot painter;
         std::string contentScale;
         std::string alignment;
         bool hasTint = false;
@@ -90,12 +87,10 @@ namespace arrange::core {
         std::shared_ptr<const std::vector<DrawOp>> content;
         std::vector<PlacedPaintFragment> children;
         PaintBounds bounds;
-        bool hasExternalResources = false;
     };
 
     PaintBounds drawOpBounds(const DrawOp& op);
     std::vector<DrawOp> exportDrawOps(const PlacedPaintFragment& root);
-    void visitPaintOps(const PaintFragment& fragment, const std::function<void(const std::vector<DrawOp>&)>& visitor, bool resourcesOnly = false);
 
     struct PaintWorkCounters {
         std::uint64_t nodesBuilt = 0;

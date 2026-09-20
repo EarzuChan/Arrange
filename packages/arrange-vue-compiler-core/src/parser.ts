@@ -40,16 +40,14 @@ import Tokenizer, {
 import {
     forAliasRE,
     isAllWhitespace,
-    isCoreComponent,
     isSimpleIdentifier,
-    isVPre
 } from './utils.ts'
 
 type OptionalOptions =
     | 'decodeEntities'
     | 'whitespace'
     | 'isNativeTag'
-    | 'isBuiltInComponent'
+    | 'isBuiltInArrangable'
     | 'expressionPlugins'
 
 export type MergedParserOptions = Omit<
@@ -83,8 +81,6 @@ let currentAttrValue = ''
 let currentAttrStartIndex = -1
 let currentAttrEndIndex = -1
 let inPre = 0
-let inVPre = false
-let currentVPreBoundary: ElementNode | null = null
 const stack: ElementNode[] = []
 
 const tokenizer = new Tokenizer(stack, {
@@ -96,9 +92,6 @@ const tokenizer = new Tokenizer(stack, {
         onText(char, start, end)
     },
     oninterpolation(start, end) {
-        if (inVPre) {
-            return onText(getSlice(start, end), start, end)
-        }
         let innerStart = start + tokenizer.delimiterOpen.length
         let innerEnd = end - tokenizer.delimiterClose.length
         while (isWhitespace(currentInput.charCodeAt(innerStart))) {
@@ -188,11 +181,11 @@ const tokenizer = new Tokenizer(stack, {
                         ? 'slot'
                         : raw.slice(2)
 
-        if (!inVPre && name === '') {
+        if (name === '') {
             emitError(ErrorCodes.X_MISSING_DIRECTIVE_NAME, start)
         }
 
-        if (inVPre || name === '') {
+        if (name === '') {
             currentProp = {
                 type: NodeTypes.ATTRIBUTE,
                 name: raw,
@@ -210,52 +203,19 @@ const tokenizer = new Tokenizer(stack, {
                 modifiers: raw === '.' ? [createSimpleExpression('prop')] : [],
                 loc: getLoc(start),
             }
-            if (name === 'pre') {
-                inVPre = tokenizer.inVPre = true
-                currentVPreBoundary = currentOpenTag
-                // convert dirs before this one to attributes
-                const props = currentOpenTag!.props
-                for (let i = 0; i < props.length; i++) {
-                    if (props[i].type === NodeTypes.DIRECTIVE) {
-                        props[i] = dirToAttr(props[i] as DirectiveNode)
-                    }
-                }
-            }
+
         }
     },
     ondirarg(start, end) {
         if (start === end) return
         const arg = getSlice(start, end)
-        if (inVPre && !isVPre(currentProp!)) {
-            ; (currentProp as AttributeNode).name += arg
-            setLocEnd((currentProp as AttributeNode).nameLoc, end)
-        } else {
-            const isStatic = arg[0] !== `[`
-                ; (currentProp as DirectiveNode).arg = createExp(
-                    isStatic ? arg : arg.slice(1, -1),
-                    isStatic,
-                    getLoc(start, end),
-                    isStatic ? ConstantTypes.CAN_STRINGIFY : ConstantTypes.NOT_CONSTANT,
-                )
-        }
+        const isStatic = arg[0] !== '['
+        const directive = currentProp as DirectiveNode
+        directive.arg = createExp(isStatic ? arg : arg.slice(1, -1), isStatic, getLoc(start, end), isStatic ? ConstantTypes.CAN_STRINGIFY : ConstantTypes.NOT_CONSTANT)
     },
     ondirmodifier(start, end) {
-        const mod = getSlice(start, end)
-        if (inVPre && !isVPre(currentProp!)) {
-            ; (currentProp as AttributeNode).name += '.' + mod
-            setLocEnd((currentProp as AttributeNode).nameLoc, end)
-        } else if ((currentProp as DirectiveNode).name === 'slot') {
-            // slot has no modifiers, special case for edge cases like
-            // https://github.com/vuejs/language-tools/issues/2710
-            const arg = (currentProp as DirectiveNode).arg
-            if (arg) {
-                ; (arg as SimpleExpressionNode).content += '.' + mod
-                setLocEnd(arg.loc, end)
-            }
-        } else {
-            const exp = createSimpleExpression(mod, true, getLoc(start, end))
-                ; (currentProp as DirectiveNode).modifiers.push(exp)
-        }
+        const directive = currentProp as DirectiveNode
+        directive.modifiers.push(createSimpleExpression(getSlice(start, end), true, getLoc(start, end)))
     },
     onattribdata(start, end) {
         currentAttrValue += getSlice(start, end)
@@ -305,13 +265,13 @@ const tokenizer = new Tokenizer(stack, {
                                 : getLoc(currentAttrStartIndex - 1, currentAttrEndIndex + 1),
                     }
                     if (
-                        tokenizer.inSFCRoot &&
+                        tokenizer.inSFARoot &&
                         currentOpenTag.tag === 'template' &&
                         currentProp.name === 'lang' &&
                         currentAttrValue &&
                         currentAttrValue !== 'html'
                     ) {
-                        // SFC root template with preprocessor lang, force tokenizer to
+                        // SFA root template with preprocessor lang, force tokenizer to
                         // RCDATA mode
                         tokenizer.enterRCDATA(toCharCodes(`</template`), 0)
                     }
@@ -330,27 +290,25 @@ const tokenizer = new Tokenizer(stack, {
                             expParseMode = ExpParseMode.Statements
                         }
                     }
+                    const trimmed = currentAttrValue.trim()
+                    const preserveRef = currentProp.name === 'bind' && isRawRefExpression(trimmed)
+                    const expressionStart = preserveRef ? currentAttrStartIndex + currentAttrValue.indexOf('<') + 1 : currentAttrStartIndex
+                    const expressionEnd = preserveRef ? currentAttrStartIndex + currentAttrValue.lastIndexOf('>') : currentAttrEndIndex
                     currentProp.exp = createExp(
-                        currentAttrValue,
+                        preserveRef ? trimmed.slice(1, -1) : currentAttrValue,
                         false,
-                        getLoc(currentAttrStartIndex, currentAttrEndIndex),
+                        getLoc(expressionStart, expressionEnd),
                         ConstantTypes.NOT_CONSTANT,
                         expParseMode,
                     )
+                    currentProp.exp.preserveRef = preserveRef
                     if (currentProp.name === 'for') {
                         currentProp.forParseResult = parseForExpression(currentProp.exp)
                     }
-                    // 2.x compat v-bind:foo.sync -> v-model:foo
-                    let syncIndex = -1
 
                 }
             }
-            if (
-                currentProp.type !== NodeTypes.DIRECTIVE ||
-                currentProp.name !== 'pre'
-            ) {
-                currentOpenTag.props.push(currentProp)
-            }
+            currentOpenTag.props.push(currentProp)
         }
         currentAttrValue = ''
         currentAttrStartIndex = currentAttrEndIndex = -1
@@ -514,8 +472,8 @@ function getSlice(start: number, end: number) {
 }
 
 function endOpenTag(end: number) {
-    if (tokenizer.inSFCRoot) {
-        // in SFC mode, generate locations for root-level tags' inner content.
+    if (tokenizer.inSFARoot) {
+        // in SFA mode, generate locations for root-level tags' inner content.
         currentOpenTag!.innerLoc = getLoc(end + 1, end + 1)
     }
     addNode(currentOpenTag!)
@@ -560,8 +518,8 @@ function onCloseTag(el: ElementNode, end: number, isImplied = false) {
         setLocEnd(el.loc, lookAhead(end, CharCodes.Gt) + 1)
     }
 
-    if (tokenizer.inSFCRoot) {
-        // SFC root tag, resolve inner end
+    if (tokenizer.inSFARoot) {
+        // SFA root tag, resolve inner end
         if (el.children.length) {
             el.innerLoc!.end = extend({}, el.children[el.children.length - 1].loc.end)
         } else {
@@ -575,15 +533,9 @@ function onCloseTag(el: ElementNode, end: number, isImplied = false) {
 
     // refine element type
     const { tag, ns, children } = el
-    if (!inVPre) {
-        if (tag === 'slot') {
-            el.tagType = ElementTypes.SLOT
-        } else if (isFragmentTemplate(el)) {
-            el.tagType = ElementTypes.TEMPLATE
-        } else if (isComponent(el)) {
-            el.tagType = ElementTypes.COMPONENT
-        }
-    }
+    if (tag === 'Slot') el.tagType = ElementTypes.SLOT
+    else if (tag === 'Template') el.tagType = ElementTypes.TEMPLATE
+    else if (isArrangable(el)) el.tagType = ElementTypes.ARRANGABLE
 
     // whitespace management
     if (!tokenizer.inRCDATA) {
@@ -601,10 +553,6 @@ function onCloseTag(el: ElementNode, end: number, isImplied = false) {
 
     if (ns === Namespaces.HTML && currentOptions.isPreTag(tag)) {
         inPre--
-    }
-    if (currentVPreBoundary === el) {
-        inVPre = tokenizer.inVPre = false
-        currentVPreBoundary = null
     }
     if (
         tokenizer.inXML &&
@@ -630,47 +578,8 @@ function backTrack(index: number, c: number) {
 }
 
 const specialTemplateDir = new Set(['if', 'else', 'else-if', 'for', 'slot'])
-function isFragmentTemplate({ tag, props }: ElementNode): boolean {
-    if (tag === 'template') {
-        for (let i = 0; i < props.length; i++) {
-            if (
-                props[i].type === NodeTypes.DIRECTIVE &&
-                specialTemplateDir.has((props[i] as DirectiveNode).name)
-            ) {
-                return true
-            }
-        }
-    }
-    return false
-}
-
-function isComponent({ tag, props }: ElementNode): boolean {
-    if (currentOptions.isNativeTag?.(tag)) {
-        return false
-    }
-    if (
-        tag === 'component' ||
-        isUpperCase(tag.charCodeAt(0)) ||
-        isCoreComponent(tag) ||
-        (currentOptions.isBuiltInComponent &&
-            currentOptions.isBuiltInComponent(tag)) ||
-        (currentOptions.isNativeTag && !currentOptions.isNativeTag(tag))
-    ) {
-        return true
-    }
-    // at this point the tag should be a native tag, but check for potential "is"
-    // casting
-    for (let i = 0; i < props.length; i++) {
-        const p = props[i]
-        if (p.type === NodeTypes.ATTRIBUTE) {
-            if (p.name === 'is' && p.value) {
-                if (p.value.content.startsWith('vue:')) {
-                    return true
-                }
-            }
-        }
-    }
-    return false
+function isArrangable({ tag }: ElementNode): boolean {
+    return isUpperCase(tag.charCodeAt(0))
 }
 
 function isUpperCase(c: number) {
@@ -894,8 +803,8 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
     tokenizer.mode =
         currentOptions.parseMode === 'html'
             ? ParseMode.HTML
-            : currentOptions.parseMode === 'sfc'
-                ? ParseMode.SFC
+            : currentOptions.parseMode === 'sfa'
+                ? ParseMode.SFA
                 : ParseMode.BASE
 
     tokenizer.inXML =
@@ -914,4 +823,17 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
     root.children = condenseWhitespace(root.children)
     currentRoot = null
     return root
+}
+
+// 先识别完整 TS 表达式，类型断言与泛型实例化不能被误当作原样标记
+function isRawRefExpression(expression: string): boolean {
+    if (!expression.startsWith('<') || !expression.endsWith('>')) return false
+
+    try {
+        parseExpression(expression, { plugins: ['typescript'] })
+        return false
+    } catch {
+        // 外层不是合法 TS 时，仅剥离一对标记；内部仍由正式表达式解析器校验
+        return true
+    }
 }

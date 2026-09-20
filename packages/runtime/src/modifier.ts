@@ -4,6 +4,9 @@ import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation.ts"
 import { PaddingValues } from "./primitives.ts"
 import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts"
 import type { ScrollState } from "./state.ts"
+import { painterSnapshot } from './painter.ts'
+import type { Painter } from './painter.ts'
+import type { ContentScaleValue, ImageAlignment } from './primitives.ts'
 
 export type ModifierValue = Readonly<Record<string, unknown>>
 
@@ -18,6 +21,7 @@ export type SizeRange = { minWidth?: number; maxWidth?: number; minHeight?: numb
 export type BorderOptions = { width: number; brush: Brush | number; shape?: Shape }
 export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
+export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
 export type GraphicsLayerOptions = {
     translationX?: number
     translationY?: number
@@ -53,7 +57,7 @@ export class Modifier {
         return new Modifier(elements)
     }
 
-    if(condition: boolean, ifModifier: Modifier, elseModifier: Modifier = m): Modifier {
+    if(condition: boolean, ifModifier: Modifier, elseModifier: Modifier = M): Modifier {
         return condition ? this.then(ifModifier) : this.then(elseModifier)
     }
 
@@ -79,11 +83,12 @@ export class Modifier {
     absoluteOffset(args: { x?: number; y?: number }): Modifier { return this.#add("absoluteOffset", { x: args.x ?? 0, y: args.y ?? 0 }) }
     align(alignment: AlignmentValue): Modifier { return this.#add("align", { alignment }) }
     weight(weight: number, args: { fill?: boolean } = {}): Modifier {
-        if (!(weight > 0)) throw new RangeError("m.weight(...) 的权重必须大于零")
+        if (!(weight > 0)) throw new RangeError("M.weight(...) 的权重必须大于零")
         return this.#add("weight", { weight, fill: args.fill ?? true })
     }
     zIndex(value: number): Modifier { return this.#add("zIndex", { value }) }
     background(brush: Brush | number, shape?: Shape): Modifier { return this.#add("background", { brush, shape }) }
+    paint(painter: Painter, options: PaintOptions = {}): Modifier { return this.#add('paint', { painter: painterSnapshot(painter), ...options }) }
     border(args: BorderOptions): Modifier
     border(width: number, brush: Brush | number, shape?: Shape): Modifier
     border(widthOrArgs: number | BorderOptions, brush?: Brush | number, shape?: Shape): Modifier {
@@ -112,12 +117,12 @@ function checkedFraction(fraction: number): Readonly<{ fraction: number }> {
 }
 
 export function toModifier(value: Modifier | null | undefined): Modifier {
-    if (value == null) return m
+    if (value == null) return M
     if (value instanceof Modifier) return value
     throw new TypeError("需要 Arrange Modifier 对象")
 }
 
-export const m = new Modifier()
+export const M = new Modifier()
 
 function scrollStateSnapshot(state: ScrollStateLike): ScrollStateLike {
     return {
@@ -139,7 +144,7 @@ export function arrangeModifier(root: Modifier, segments: readonly (readonly [st
         const factory = (receiver as unknown as Record<string, (...args: unknown[]) => Modifier>)[method]
         return factory.apply(receiver, args)
     }
-    const valid = () => root === m && segments.every(([name]) => (Modifier.prototype as unknown as Record<string, unknown>)[name] === builtinMethods.get(name))
+    const valid = () => root === M && segments.every(([name]) => (Modifier.prototype as unknown as Record<string, unknown>)[name] === builtinMethods.get(name))
     const parameters = segments.map(([method, read]) => computed(() => {
         modifierStats.parameterEvaluations++
         return invoke(root, method, read())

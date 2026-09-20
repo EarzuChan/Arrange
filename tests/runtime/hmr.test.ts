@@ -20,8 +20,8 @@ test("Arrange HMR client forwards Vite reload payloads to native runtime", () =>
     assert.equal(installed, true)
     assert.equal(typeof handlers.get(ARRANGE_HMR_RELOAD_EVENT), "function")
 
-    handlers.get(ARRANGE_HMR_RELOAD_EVENT)?.({path: "src/App.vue", timestamp: 1})
-    assert.deepEqual(reloads, [{path: "src/App.vue", timestamp: 1}])
+    handlers.get(ARRANGE_HMR_RELOAD_EVENT)?.({path: "src/App.sfa", timestamp: 1})
+    assert.deepEqual(reloads, [{path: "src/App.sfa", timestamp: 1}])
 })
 
 test("Arrange HMR client is inert when no Vite hot object is available", () => {

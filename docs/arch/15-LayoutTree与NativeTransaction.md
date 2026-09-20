@@ -10,7 +10,7 @@ Arrange 的 QuickJS 与 C++ 是同进程关系，不是传统“JS 前端向 C++
 - Composition Phase 的离散界面变化进入 `MutationTransaction`。
 - JS Value Phase 的 UI value 变化进入 `SlotUpdateBatch`。
 - 批处理是 transaction / slot update 优化，不是序列化协议。
-- Canvas、动画、高频绘制不通过普通 component render / VNode diff / generic prop patch 传大对象。
+- Canvas、动画、高频绘制不通过结构重排 传大对象。
 - QuickJS host 不做泛用 serializer；只按稳定 TS object shape / native API 参数读取字段。
 - core 不解析 JSON、不解析 encoded string、不知道 QuickJS 业务对象。
 
@@ -21,8 +21,7 @@ Arrange Vue compiler / runtime 产生两类生产更新：
 ```txt
 Composition mutations:
   create / delete / insert / remove node
-  set text
-  set typed prop
+  update measure policy
   set modifier
   update / retire event slot
   explicit native invalidation
@@ -37,7 +36,7 @@ Reactive slot updates:
   accessibility slot
 ```
 
-host target lowering 必须基于 Arrange host component schema、Modifier schema、prop schema 与 slot schema。运行时不得把任意 JS object 当作可生产提交的 UI payload。
+节点应用只承接 Layout 所属 RearrangeNode 的布局结构、Policy、Modifier 与正式值绑定，见 [运行时](04-运行时.md)。原生输入依据 Policy、Modifier 和绑定的明确契约解码，不建立按 FA 名称分派的 host arrangable schema。运行时不得把任意 JS object 当作可生产提交的 UI payload。
 
 # Native transaction API
 
@@ -49,8 +48,7 @@ native.createNode(id, type)
 native.deleteNode(id)
 native.insertChild(parent, child, index)
 native.removeChild(parent, child)
-native.setText(id, text)
-native.setProp(id, propNameOrId, value)
+native.setMeasurePolicy(id, policy)
 native.setModifier(id, modifierObject)
 native.updateEventSlot(id, slot, callback)
 native.invalidate(intent)
@@ -101,7 +99,7 @@ slot update 不表达结构增删。结构变化必须使用 `MutationTransactio
 QuickJS native boundary 的职责：
 
 - 读取 node id、node type、child index、text 等 primitive。
-- 按明确 prop schema 读取 prop value。
+- 按明确 Policy 与 Modifier 输入契约读取字段，不把文本元素转为宿主 text/value/textPresentation 属性。
 - 按明确 Modifier object shape 读取 Modifier descriptor。
 - 读取真实 JS callback function，并注册到 native event registry。
 - 按明确 slot schema 读取 UI slot value。
@@ -126,8 +124,7 @@ struct CreateNodeMutation;
 struct DeleteNodeMutation;
 struct InsertChildMutation;
 struct RemoveChildMutation;
-struct SetTextMutation;
-struct SetPropMutation;
+struct SetMeasurePolicyMutation;
 struct SetModifierMutation;
 struct NativeInvalidationMutation;
 
@@ -136,8 +133,7 @@ using TreeMutation = std::variant<
     DeleteNodeMutation,
     InsertChildMutation,
     RemoveChildMutation,
-    SetTextMutation,
-    SetPropMutation,
+    SetMeasurePolicyMutation,
     SetModifierMutation,
     NativeInvalidationMutation
 >;
@@ -189,7 +185,7 @@ C++ SceneFramePipeline 消费 slot update，更新 LayoutNode、scene state 或�
 - `Layout` slot 必须进入必要 layout dirty。
 - `Event` slot 不得触发无理由 measure / layout / paint。
 - `Resource` slot 影响 resource state 与相关 draw / layout dirty。
-- retired binding 必须在节点删除、组件卸载、reload、HMR reload、错误恢复和 source 切换时同步清理。
+- retired binding 必须在节点删除、Arrangable卸载、reload、HMR reload、错误恢复和 source 切换时同步清理。
 
 # JSON 与诊断
 
@@ -241,7 +237,7 @@ Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、
 JS 侧 Modifier 是不可变链：
 
 ```ts
-m.padding(dp(8)).background(Color(0xFF000000))
+M.padding(dp(8)).background(Color(0xFF000000))
 ```
 
 生产链路必须是：

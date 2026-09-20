@@ -1,0 +1,15 @@
+<template>
+    <Column :vertical-arrangement="Arrangement.spacedBy(8)">
+        <Text text="保留页面 · 输入与状态" :text-style="{fontSize: 15, color: 0xff61d6bb}" />
+
+        <Input :value="note" :onValueChange="value => note = value" :text-style="{color: 0xffedf4fa}" :modifier="M.width(300).height(32).background(0xff263443).padding(6)" />
+
+        <Text :text="`笔记：${note}`" :text-style="{fontSize: 12, color: 0xffc7d5e1}" />
+    </Column>
+</template>
+
+<script>
+import {ref, M, Arrangement} from '@arrange/framework'
+
+const note = ref('切页后仍保留这段笔记')
+</script>

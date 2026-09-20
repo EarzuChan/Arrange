@@ -1,5 +1,5 @@
 import { type ComputedRefImpl, computed as _computed } from '@arrange/vue-reactivity'
-import { getCurrentInstance } from './component.ts'
+import { getCurrentInstance } from './arrangable.ts'
 
 export const computed: typeof _computed = (
     getterOrOptions: any,

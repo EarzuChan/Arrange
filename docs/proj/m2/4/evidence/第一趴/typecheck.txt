@@ -1,0 +1,4 @@
+
+> arrange@0.0.0-m.2.2 typecheck E:\a_dev\proj\Arrange
+> tsc -p tsconfig.json --noEmit
+

@@ -21,7 +21,7 @@ export interface ErrorHandlingOptions {
 export interface ParserOptions
     extends ErrorHandlingOptions {
 
-    parseMode?: 'base' | 'html' | 'sfc'
+    parseMode?: 'base' | 'html' | 'sfa'
 
     ns?: Namespaces
     /**
@@ -42,9 +42,9 @@ export interface ParserOptions
      */
     isIgnoreNewlineTag?: (tag: string) => boolean
     /**
-     * Platform-specific built-in components e.g. `<Transition>`
+     * Platform-specific built-in arrangables e.g. `<Transition>`
      */
-    isBuiltInComponent?: (tag: string) => symbol | void
+    isBuiltInArrangable?: (tag: string) => symbol | void
     /**
      * Get tag namespace
      */
@@ -167,23 +167,18 @@ export interface TransformOptions
     extends
     SharedTransformCodegenOptions,
     ErrorHandlingOptions {
+    arrangeTypecheck?: boolean
     /**
      * An array of node transforms to be applied to every AST node.
      */
     nodeTransforms?: NodeTransform[]
-    /**
-     * An object of { name: transform } to be applied to every directive attribute
-     * node found on element nodes.
-     */
-    directiveTransforms?: Record<string, DirectiveTransform | undefined>
 
-    transformHoist?: HoistTransform | null
     /**
      * If the pairing runtime provides additional built-in elements, use this to
-     * mark them as built-in so the compiler will generate component vnodes
+     * mark them as built-in so the compiler will generate arrangable vnodes
      * for them.
      */
-    isBuiltInComponent?: (tag: string) => symbol | void
+    isBuiltInArrangable?: (tag: string) => symbol | void
     /**
      * Transform expressions like {{ foo }} to `_ctx.foo`.
      * If this option is false, the generated code will be wrapped in a
@@ -199,31 +194,18 @@ export interface TransformOptions
      */
     hoistStatic?: boolean
     /**
-     * Cache v-on handlers to avoid creating new inline functions on each render,
-     * also avoids the need for dynamically patching the handlers by wrapping it.
-     * e.g `@click="foo"` by default is compiled to `{ onClick: foo }`. With this
-     * option it's compiled to:
-     * ```js
-     * { onClick: _cache[0] || (_cache[0] = e => _ctx.foo(e)) }
-     * ```
-     * - Requires "prefixIdentifiers" to be enabled because it relies on scope
-     * analysis to determine if a handler is safe to cache.
-     * @default false
-     */
-    cacheHandlers?: boolean
-    /**
      * A list of parser plugins to enable for `@babel/parser`, which is used to
      * parse expressions in bindings and interpolations.
      * https://babeljs.io/docs/en/next/babel-parser#plugins
      */
     expressionPlugins?: ParserPlugin[]
     /**
-     * SFC scoped styles ID
+     * SFA scoped styles ID
      */
 
     /**
-     * Indicates this SFC template has used :slotted in its styles
-     * Defaults to `true` for backwards compatibility - SFC tooling should set it
+     * Indicates this SFA template has used :slotted in its styles
+     * Defaults to `true` for backwards compatibility - SFA tooling should set it
      * to `false` if no `:slotted` usage is detected in `<style>`
      */
 
@@ -252,7 +234,7 @@ export interface CodegenOptions extends SharedTransformCodegenOptions {
      */
     sourceMap?: boolean
     /**
-     * SFC scoped styles ID
+     * SFA scoped styles ID
      */
 
     /**
@@ -275,4 +257,4 @@ export interface CodegenOptions extends SharedTransformCodegenOptions {
     runtimeGlobalName?: string
 }
 
-export type CompilerOptions = ParserOptions & TransformOptions & CodegenOptions
+export type CompilerOptions = ParserOptions & Omit<TransformOptions, 'nodeTransforms'> & CodegenOptions

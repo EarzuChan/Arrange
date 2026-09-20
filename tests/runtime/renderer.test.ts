@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { ARRANGE_RUNTIME_VERSION, Column, Icon, Text, createApp, diagnostics, h as vueH, logger, m, nextTick, provideContentColor, ref, createScrollState } from "../../packages/runtime/src/index.ts"
+import { painter,  ARRANGE_RUNTIME_VERSION, Column, Icon, Text, createApp, diagnostics, h as vueH, logger, M, nextTick, ref, createScrollState } from "../../packages/runtime/src/index.ts"
 import type { NativeTransactionTarget } from "../../packages/runtime/src/index.ts"
 
 type NativeCall = readonly [string, ...unknown[]]
@@ -50,13 +50,13 @@ test("Vue renderer drives native transaction API on mount", () => {
     const native = recordingNative()
     createApp({
         setup() {
-            return () => vueH(Column, { modifier: m.padding(8) }, [vueH(Text, { text: "Hello" })])
+            return () => vueH(Column, { modifier: M.padding(8) }, { default: () => [vueH(Text, { text: "Hello" })] })
         },
     }).mount(native)
 
     assert.deepEqual(native.calls[0], ["createNode", 1, "Root"])
-    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 2 && call[2] === "Column"))
-    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 3 && call[2] === "Text"))
+    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 2 && call[2] === "LayoutNode"))
+    assert.ok(native.calls.some((call) => call[0] === "createNode" && call[1] === 3 && call[2] === "LayoutNode"))
     assert.ok(native.calls.some((call) => call[0] === "setText" && call[1] === 3 && call[2] === "Hello"))
     assert.ok(native.calls.some((call) => call[0] === "setModifier" && call[1] === 2))
 })
@@ -78,7 +78,7 @@ test("ScrollState native object snapshots trigger modifier updates without JSON"
     const scrollState = createScrollState()
     createApp({
         setup() {
-            return () => vueH(Column, { modifier: m.verticalScroll(scrollState) }, [vueH(Text, { text: `scroll ${scrollState.value}` })])
+            return () => vueH(Column, { modifier: M.verticalScroll(scrollState) }, { default: () => [vueH(Text, { text: `scroll ${scrollState.value}` })] })
         },
     }).mount(native)
     native.calls.length = 0
@@ -104,7 +104,7 @@ test("diagnostics TS API forwards to native diagnostics functions", () => {
         diagnostics.setLogLevel("error")
         diagnostics.setCategoryEnabled("runtime.script", false)
         diagnostics.setToastsEnabled(false)
-        diagnostics.requestReload("src/App.vue")
+        diagnostics.requestReload("src/App.sfa")
         assert.equal(diagnostics.copyDiagnostics(), "copied")
         assert.equal(diagnostics.copyRecentEvents(), "recent")
     } finally {
@@ -129,15 +129,28 @@ test("diagnostics TS API rejects unsupported levels and categories before native
     assert.deepEqual(native.calls, [])
 })
 
-test("Icon without explicit tint reads LocalContentColor before native commit", () => {
+test('Icon 未指定 tint 时保留 Painter 原色，指定时只增加 colorFilter', () => {
     const native = recordingNative()
-    createApp({
-        setup() {
-            provideContentColor(0xffe8eaed)
-            return () => vueH(Column, null, [vueH(Icon, { source: "icons/play.svg" })])
-        },
-    }).mount(native)
-
-    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "source" && (call[3] as {path?: string}).path === "icons/play.svg"))
-    assert.ok(native.calls.some((call) => call[0] === "setProp" && call[2] === "tint" && call[3] === 0xffe8eaed))
+    native.acquirePainter = (resource, complete) => {
+        assert.equal(resource, 'icons/play.svg')
+        complete({ contentVersion: 1, width: 24, height: 24 })
+        return { identity: 99n, generation: 1n }
+    }
+    native.releasePainter = handle => native.calls.push(['释放资源', handle.identity])
+    globalThis.__ARRANGE_NATIVE__ = native
+    try {
+        const app = createApp({ setup() {
+            const image = painter('icons/play.svg')
+            return () => vueH(Column, null, { default: () => [vueH(Icon, { painter: image }), vueH(Icon, { painter: image, tint: 0xffe8eaed })] })
+        } })
+        app.mount(native)
+        const paints = native.calls.filter(call => call[0] === 'setModifier').flatMap(call => (call[2] as typeof M).elements).filter(element => element.type === 'paint')
+        assert.equal(paints.length, 2)
+        assert.equal(paints[0].value.colorFilter, undefined)
+        assert.deepEqual(paints[1].value.colorFilter, { tint: 0xffe8eaed })
+        app.unmount()
+        assert.ok(native.calls.some(call => call[0] === '释放资源' && call[1] === 99n))
+    } finally {
+        delete globalThis.__ARRANGE_NATIVE__
+    }
 })

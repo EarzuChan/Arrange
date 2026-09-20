@@ -6,7 +6,7 @@
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/DiagnosticsScene.h>
 #include <arrange/juce/ErrorScreenModel.h>
-#include <arrange/juce/ImageResourceCache.h>
+#include <arrange/juce/PainterResources.h>
 #include <arrange/juce/JuceDrawOpsPainter.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/ScriptEventDispatcher.h>
@@ -49,36 +49,27 @@ namespace {
         arrange::core::EventSlotKind kind) {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
-            if (tree.node(id).type != arrange::core::NodeType::Input) continue;
+            if (tree.node(id).textPresentation != arrange::core::TextPresentation::Editable) continue;
             if (tree.node(id).eventSlots.contains(kind)) return id;
         }
         return std::nullopt;
     }
 
-    arrange::core::DrawOp imageOp(std::string resource) {
+    arrange::core::DrawOp painterOp(std::shared_ptr<const arrange::core::PainterContent> content, bool tinted = false) {
         arrange::core::DrawOp op;
-        op.type = arrange::core::DrawOpType::DrawImage;
-        op.resource = std::move(resource);
-        op.rect = {0.0f, 0.0f, 8.0f, 8.0f};
-        op.color = 0xffffffff;
-        return op;
-    }
-
-    arrange::core::DrawOp iconOp(std::string resource) {
-        arrange::core::DrawOp op;
-        op.type = arrange::core::DrawOpType::DrawIcon;
-        op.resource = std::move(resource);
-        op.resourceIsIcon = true;
-        op.hasTint = true;
+        op.type = arrange::core::DrawOpType::DrawPainter;
+        op.painter = {1, 1, 1, std::move(content)};
+        op.rect = {0, 0, 8, 8};
+        op.hasTint = tinted;
         op.color = 0xffe8eaed;
-        op.rect = {0.0f, 0.0f, 8.0f, 8.0f};
         return op;
     }
 
     bool verifyScriptEventDispatcherRequiresTypedSlotContract() {
         arrange::core::ArrangeNode inputNode;
         inputNode.id = 42;
-        inputNode.type = arrange::core::NodeType::Input;
+        inputNode.type = arrange::core::NodeType::Layout;
+        inputNode.textPresentation = arrange::core::TextPresentation::Editable;
 
         const auto missingSubmit = arrange::juce::ScriptEventDispatcher::eventSlot(inputNode, arrange::core::EventSlotKind::InputSubmit);
         if (missingSubmit.valid()) return false;
@@ -113,6 +104,7 @@ int main(int argc, char** argv) {
         : std::filesystem::absolute("build/demo-ui-dist/app.js");
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+    host->setPainterLoader(arrange::juce::packagePainterLoader(entry.parent_path()));
     arrange::quickjs::AppScriptLoader loader(*host);
     const auto loaded = loader.loadEntry(entry);
     if (!loaded.ok) {
@@ -272,13 +264,9 @@ int main(int argc, char** argv) {
 
     const auto resourceDir = std::filesystem::temp_directory_path() / "arrange-resource-prepare-smoke";
     std::filesystem::create_directories(resourceDir);
-    arrange::juce::ImageResourceCache imageCache;
-    imageCache.setPackageDir(resourceDir);
-    const std::vector missingOps{imageOp("missing.png")};
-    const auto missing = imageCache.prepare(missingOps);
-    if (!missing.error || missing.error->source != arrange::ErrorSource::Resource) return 21;
-
-    imageCache.clear();
+    const auto acquire = arrange::juce::packagePainterLoader(resourceDir);
+    const auto missing = acquire("missing.png").get();
+    if (missing.error.empty() || missing.content) return 21;
     const auto validPath = resourceDir / "valid.png";
     {
         ::juce::Image validImage(::juce::Image::RGB, 2, 2, true);
@@ -290,26 +278,66 @@ int main(int argc, char** argv) {
 
     arrange::juce::JuceDrawOpsPainter painter;
     ::juce::Image canvas(::juce::Image::RGB, 16, 16, true);
-    ::juce::Graphics graphics(canvas);
-    const std::vector validOps{imageOp("valid.png")};
-    const auto paintWithoutPrepare = painter.paint(graphics, validOps, imageCache);
-    if (paintWithoutPrepare.error || imageCache.find("valid.png").isValid() || imageCache.lastError()) return 23;
-
-    const auto prepared = imageCache.prepare(validOps);
-    if (prepared.error || !prepared.changed || !imageCache.find("valid.png").isValid()) return 24;
-    const auto paintAfterPrepare = painter.paint(graphics, validOps, imageCache);
-    if (paintAfterPrepare.error) return 25;
+    const auto prepared = acquire("valid.png").get();
+    if (!prepared.error.empty() || !prepared.content || prepared.content->intrinsicSize != arrange::core::Size{2, 2}) return 24;
+    const std::vector validOps{painterOp(prepared.content)};
+    {
+        ::juce::Graphics graphics(canvas);
+        if (painter.paint(graphics, validOps).error) return 25;
+    }
+    if (canvas.getPixelAt(4, 4) != ::juce::Colours::red) {
+        std::cerr << "Painter 绘制像素不匹配：" << canvas.getPixelAt(4, 4).toString() << "，跳过操作：" << painter.counters().opsSkipped << '\n';
+        return 25;
+    }
 
     const auto validSvg = resourceDir / "play.svg";
     {
         std::ofstream svg(validSvg);
         svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
     }
-    const std::vector iconOps{iconOp("play.svg")};
-    const auto iconPrepared = imageCache.prepare(iconOps);
-    if (iconPrepared.error || !iconPrepared.changed || !imageCache.findIcon("play.svg")) return 31;
-    const auto iconPaint = painter.paint(graphics, iconOps, imageCache);
+    const auto iconPrepared = acquire("play.svg").get();
+    if (!iconPrepared.error.empty() || !iconPrepared.content || iconPrepared.content->intrinsicSize != arrange::core::Size{24, 24}) return 31;
+    const std::vector iconOps{painterOp(iconPrepared.content, true)};
+    ::juce::Graphics graphics(canvas);
+    const auto iconPaint = painter.paint(graphics, iconOps);
     if (iconPaint.error) return 32;
+
+    auto raster = std::make_shared<arrange::juce::JucePainterContent>();
+    raster->image = ::juce::Image(::juce::Image::ARGB, 4, 2, true, ::juce::SoftwareImageType{});
+    raster->image.clear(raster->image.getBounds(), ::juce::Colours::red);
+    auto vector = std::make_shared<arrange::juce::JucePainterContent>();
+    auto rectangle = ::juce::XmlDocument::parse("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"2\" viewBox=\"0 0 4 2\"><rect width=\"4\" height=\"2\" fill=\"red\"/></svg>");
+    vector->vector = ::juce::Drawable::createFromSVG(*rectangle);
+    for (const auto extent : {2.0f, 8.0f}) {
+        for (const auto* scale : {"Fit", "Crop", "FillBounds", "FillWidth", "FillHeight", "Inside", "None"}) {
+            for (const auto* alignment : {"TopStart", "Center", "BottomEnd"}) {
+                for (const auto tinted : {false, true}) {
+                    const auto render = [&](std::shared_ptr<const arrange::core::PainterContent> content) {
+                        ::juce::Image output(::juce::Image::ARGB, 16, 16, true, ::juce::SoftwareImageType{});
+                        auto op = painterOp(std::move(content), tinted);
+                        op.rect = {2, 2, extent, extent};
+                        op.contentScale = scale;
+                        op.alignment = alignment;
+                        {
+                            ::juce::Graphics target(output);
+                            painter.paint(target, std::vector{op});
+                        }
+                        return output;
+                    };
+                    const auto bitmap = render(raster);
+                    const auto svg = render(vector);
+                    for (int y = 0; y < 16; ++y) for (int x = 0; x < 16; ++x) {
+                        const auto a = bitmap.getPixelAt(x, y), b = svg.getPixelAt(x, y);
+                        // 位图插值与矢量覆盖率在半像素边界最多相差一级量化值
+                        if (std::abs(int(a.getAlpha()) - int(b.getAlpha())) <= 1 && std::abs(int(a.getRed()) - int(b.getRed())) <= 1 && std::abs(int(a.getGreen()) - int(b.getGreen())) <= 1 && std::abs(int(a.getBlue()) - int(b.getBlue())) <= 1) continue;
+                        std::cerr << "Painter 位图与矢量缩放不一致：" << scale << '/' << alignment << "，着色=" << tinted << "，像素=" << x << ',' << y << "，位图=" << bitmap.getPixelAt(x, y).toString() << "，矢量=" << svg.getPixelAt(x, y).toString() << '\n';
+                        return 39;
+                    }
+                }
+            }
+        }
+
+    }
 
     std::cout << "ArrangeRuntime queued counter/scroll/input smoke passed\n";
     return 0;

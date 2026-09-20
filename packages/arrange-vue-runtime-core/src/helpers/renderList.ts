@@ -7,7 +7,7 @@ import {
     toReadonly,
 } from '@arrange/vue-reactivity'
 import { isArray, isObject, isString } from '@arrange/vue-shared'
-import type { VNode, VNodeChild } from '../vnode.ts'
+import type { VNodeChild } from '../vnode.ts'
 import { warn } from '../warning.ts'
 
 /**
@@ -61,11 +61,8 @@ export function renderList<T>(
 export function renderList(
     source: any,
     renderItem: (...args: any[]) => VNodeChild,
-    cache?: any[],
-    index?: number,
 ): VNodeChild[] {
     let ret: VNodeChild[]
-    const cached = (cache && cache[index!]) as VNode[] | undefined
     const sourceIsArray = isArray(source)
 
     if (sourceIsArray || isString(source)) {
@@ -86,8 +83,6 @@ export function renderList(
                         : toReactive(source[i])
                     : source[i],
                 i,
-                undefined,
-                cached && cached[i],
             )
         }
     } else if (typeof source === 'number') {
@@ -99,28 +94,25 @@ export function renderList(
         } else {
             ret = new Array(source)
             for (let i = 0; i < source; i++) {
-                ret[i] = renderItem(i + 1, i, undefined, cached && cached[i])
+                ret[i] = renderItem(i + 1, i)
             }
         }
     } else if (isObject(source)) {
         if (source[Symbol.iterator as any]) {
             ret = Array.from(source as Iterable<any>, (item, i) =>
-                renderItem(item, i, undefined, cached && cached[i]),
+                renderItem(item, i),
             )
         } else {
             const keys = Object.keys(source)
             ret = new Array(keys.length)
             for (let i = 0, l = keys.length; i < l; i++) {
                 const key = keys[i]
-                ret[i] = renderItem(source[key], key, i, cached && cached[i])
+                ret[i] = renderItem(source[key], key, i)
             }
         }
     } else {
         ret = []
     }
 
-    if (cache) {
-        cache[index!] = ret
-    }
     return ret
 }

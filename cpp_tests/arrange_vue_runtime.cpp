@@ -8,6 +8,7 @@
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/FramePumpDriver.h>
 #include <arrange/juce/JuceTextServices.h>
+#include <arrange/juce/PainterResources.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
@@ -20,6 +21,7 @@
 #include <algorithm>
 #include <chrono>
 #include <numeric>
+#include <thread>
 #include "AllocationProbe.h"
 
 using namespace arrange::core;
@@ -52,14 +54,15 @@ namespace {
 int main(int argc, char** argv) {
     try {
         ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
-        check(argc == 2, "Expected the compiled SFC fixture path");
+        check(argc == 2, "需要编译后的 SFA 夹具路径");
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+        host->setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
         auto* hostView = host.get();
         arrange::quickjs::AppScriptLoader loader(*host);
         const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         auto initialSubmission = host->takePendingTransaction();
-        check(initialSubmission.has_value(), "SFC mount did not submit a scene");
+        check(initialSubmission.has_value(), "SFA 挂载没有提交场景");
         arrange::juce::JuceTextMeasurer measurer;
         TextLayoutService textService(measurer);
         arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{textService}}};
@@ -165,7 +168,7 @@ int main(int argc, char** argv) {
         check(runtime.frameCounters().paintBuilds > colorBaseline.paintBuilds + 10, "real gallery did not publish intermediate animation samples");
         check(runtime.frameCounters().paintWork.layersBuilt - colorBaseline.paintWork.layersBuilt <= 24, "gallery color rebuilt unrelated Modifier layers");
         NodeId focusedInput = 0;
-        for (NodeId id = 1; id < 1024; ++id) if (runtime.scene().contains(id) && runtime.scene().node(id).type == NodeType::Input && stringProp(runtime.scene().node(id), "modelValue", "") == "编辑我，如果我彻底离场会被重置") focusedInput = id;
+        for (NodeId id = 1; id < 1024; ++id) if (runtime.scene().contains(id) && runtime.scene().node(id).textPresentation == TextPresentation::Editable && stringProp(runtime.scene().node(id), "value", "") == "编辑我，如果我彻底离场会被重置") focusedInput = id;
         check(focusedInput != 0, "gallery focus input is missing");
         auto inputTree = runtime.scene().tree();
         const auto inputBounds = inputTree.node(focusedInput).contentBounds;
@@ -227,7 +230,7 @@ int main(int argc, char** argv) {
         command("showcase:async");
         findText(runtime.scene(), "详情正在等待，点击完成加载");
         command("showcase:resolve");
-        findText(runtime.scene(), "详情已就绪 2");
+        findText(runtime.scene(), "详情已就绪 1");
         command("showcase:list");
 
         arrange::juce::PassivePaintRenderer performancePaint(textService);
@@ -313,6 +316,7 @@ int main(int argc, char** argv) {
                 if (!running.ok) throw std::runtime_error(running.error);
             }
             auto nextHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+            nextHost->setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
             auto* nextView = nextHost.get();
             arrange::quickjs::AppScriptLoader nextLoader(*nextHost);
             const auto nextLoaded = nextLoader.loadEntry(std::filesystem::path(argv[1]));
@@ -337,10 +341,14 @@ int main(int argc, char** argv) {
             for (const auto& slot : runtime.scene().activeEventSlots()) if (slot.kind == EventSlotKind::InputSubmit) oldSubmit = slot;
         }
         runtime.enqueueStringEvent(oldSubmit, "bad-resource");
-        (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16);
-        check(diagnostics.hasError() && diagnostics.error()->summary.find("FrameApp.vue:") != std::string::npos && diagnostics.error()->summary.find("missing-m23-image.png") != std::string::npos, "资源准备失败丢失了资源路径或 SFC 来源");
+        const auto resourceDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!diagnostics.hasError() && std::chrono::steady_clock::now() < resourceDeadline) {
+            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16);
+            std::this_thread::yield();
+        }
+        check(diagnostics.hasError() && diagnostics.error()->summary.find("FrameApp.sfa:") != std::string::npos && diagnostics.error()->summary.find("missing-m24-image.png") != std::string::npos, "资源加载失败丢失了资源路径或 SFA 来源");
         check(runtime.publishedFrame().content.errorFrame.has_value(), "资源错误没有经过正式发布边界");
-        std::cout << "SFC/Vite/QuickJS/native: value phases, component props, computed/helper/slots, keyed order and retirement passed\n";
+        std::cout << "SFA/Vite/QuickJS/原生集成：值阶段、参数、计算值、内容、身份复用与退休验证通过\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

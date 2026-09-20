@@ -19,49 +19,29 @@ async function runNpm(args: readonly string[]): Promise<void> {
     await run("npm", args, {cwd: consumerDir, env})
 }
 
-if (!existsSync(frameworkTarball) || !existsSync(cliTarball)) {
-    await import("./pack-npm-package.ts")
-}
-if (!existsSync(frameworkTarball)) throw new Error(`missing framework tarball: ${frameworkTarball}`)
-if (!existsSync(cliTarball)) throw new Error(`missing CLI tarball: ${cliTarball}`)
+// 验证当前源码生成的发布包，不复用旧产物
+await import("./pack-npm-package.ts")
+if (!existsSync(frameworkTarball)) throw new Error(`缺少 Framework 发布包： ${frameworkTarball}`)
+if (!existsSync(cliTarball)) throw new Error(`缺少 CLI 发布包： ${cliTarball}`)
 
 rmSync(consumerDir, {recursive: true, force: true})
 mkdirSync(resolve(consumerDir, "src"), {recursive: true})
 cpSync(resolve(repoRoot, "demo/ui-src/src"), resolve(consumerDir, "src"), {recursive: true})
-writeFileSync(resolve(consumerDir, "arrange.config.yaml"), [
-    "arrange:",
-    `  version: ${contract.frameworkVersion}`,
-    "",
-    "project:",
-    "  name: PackageConsumer",
-    "  version: 0.1.0",
-    "  companyName: Arrange",
-    "  companyCode: Arng",
-    "  pluginCode: PkgC",
-    "  pluginType: effect",
-    "  products:",
-    "    - standalone",
-    "",
-    "ui:",
-    "  path: .",
-    "  packageManager: npm",
-    "",
-    "native:",
-    "  path: native",
-    "  cmake:",
-    "    buildDir: build",
-    "",
-    "artifacts:",
-    "  path: artifacts",
-    "  includeVersionDir: true",
-    "",
+cpSync(resolve(repoRoot, "demo/ui-src/public"), resolve(consumerDir, "public"), {recursive: true})
+cpSync(resolve(repoRoot, "demo/ui-src/vite.config.ts"), resolve(consumerDir, "vite.config.ts"))
+writeFileSync(resolve(consumerDir, "tsconfig.json"), JSON.stringify({ compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", allowImportingTsExtensions: true, noEmit: true, skipLibCheck: true, strict: true, lib: ["ES2022", "DOM"] }, include: ["src/**/*.ts", "src/**/*.sfa"] }, null, 4))
+writeFileSync(resolve(consumerDir, "check.mts"), [
+    "import { checkSfaProject } from '@arrange/framework/vite'",
+    "const diagnostics = checkSfaProject('tsconfig.json', ['src'])",
+    "if (diagnostics.length) throw new Error(JSON.stringify(diagnostics, null, 4))",
+    "console.log('发布包 SFA 参数、内容与脚本类型检查通过')",
 ].join("\n"))
 writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
     name: "arrange-npm-package-consumer",
     private: true,
     type: "module",
     scripts: {
-        build: "arrange build --ui-only",
+        build: "vite build --configLoader runner",
     },
     dependencies: {
         "@arrange/framework": `file:../../artifacts/npm/arrange-framework-${contract.frameworkVersion}.tgz`,
@@ -70,12 +50,13 @@ writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
 }, null, 2)}\n`)
 
 await runNpm(["install"])
+await run(process.execPath, ["--import", import.meta.resolve("tsx"), "check.mts"], {cwd: consumerDir, env: npmSubprocessEnv()})
 await runNpm(["run", "build"])
 
 const appBundle = resolve(consumerDir, "dist/app.js")
-if (!existsSync(appBundle)) throw new Error(`npm package consumer did not produce ${appBundle}`)
+if (!existsSync(appBundle)) throw new Error(`发布包消费者未生成产物： ${appBundle}`)
 const source = readFileSync(appBundle, "utf8")
 const macro = source.match(macroPattern)
-if (macro) throw new Error(`npm package consumer bundle contains unresolved Arrange Vue macro ${macro[0]}`)
+if (macro) throw new Error(`发布包产物残留未替换的编译宏： ${macro[0]}`)
 
-console.log(`verified @arrange/framework ${contract.frameworkVersion} and @arrange/cli ${cliManifest.version} npm package consumer`)
+console.log(`Framework ${contract.frameworkVersion} 发布包的真实 SFA 类型检查与 Vite 生产构建通过，CLI ${cliManifest.version} 仅验证安装`)

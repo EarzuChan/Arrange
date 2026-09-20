@@ -8,7 +8,7 @@ export interface TemplateCompiler {
     parse(template: string, options: ParserOptions): RootNode
 }
 
-export interface SFCTemplateCompileResults {
+export interface SFATemplateCompileResults {
     code: string
     ast?: RootNode
     preamble?: string
@@ -18,7 +18,7 @@ export interface SFCTemplateCompileResults {
     map?: RawSourceMap
 }
 
-export interface SFCTemplateCompileOptions {
+export interface SFATemplateCompileOptions {
     source: string
     ast?: RootNode
     filename: string
@@ -27,12 +27,12 @@ export interface SFCTemplateCompileOptions {
     compilerOptions?: CompilerOptions
 }
 
-export function compileTemplate({ filename, inMap, source, ast: inputAst, isProd = false, compilerOptions = {} }: SFCTemplateCompileOptions): SFCTemplateCompileResults {
+export function compileTemplate({ filename, inMap, source, ast: inputAst, isProd = false, compilerOptions = {} }: SFATemplateCompileOptions): SFATemplateCompileResults {
     const errors: CompilerError[] = []
     const warnings: CompilerError[] = []
 
     if (inputAst?.transformed) {
-        const parsed = ArrangeCompiler.parse(inputAst.source, { ...compilerOptions, parseMode: 'sfc', onError: error => errors.push(error) })
+        const parsed = ArrangeCompiler.parse(inputAst.source, { ...compilerOptions, parseMode: 'sfa', onError: error => errors.push(error) })
         const template = parsed.children.find(node => node.type === NodeTypes.ELEMENT && node.tag === 'template') as ElementNode
         inputAst = createRoot(template.children, inputAst.source)
     }
@@ -41,7 +41,6 @@ export function compileTemplate({ filename, inMap, source, ast: inputAst, isProd
         mode: 'module',
         prefixIdentifiers: true,
         hoistStatic: true,
-        cacheHandlers: true,
         sourceMap: true,
         ...compilerOptions,
         hmr: !isProd,
@@ -50,7 +49,7 @@ export function compileTemplate({ filename, inMap, source, ast: inputAst, isProd
         onWarn: warning => warnings.push(warning),
     })
 
-    // 将模板内的位置映射回完整 SFC，运行时和编译器共享源文件坐标
+    // 将模板内的位置映射回完整 SFA，运行时和编译器共享源文件坐标
     if (inMap && !inputAst) {
         if (map) map = mapLines(inMap, map)
         const offset = inMap.sourcesContent![0].indexOf(source)

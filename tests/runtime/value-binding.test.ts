@@ -1,4 +1,9 @@
 import test from 'node:test'
+import ts from 'typescript'
+
+function evaluateRender(code: string): Function {
+    return new Function('Vue', ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText)(runtime)
+}
 import assert from 'node:assert/strict'
 import * as runtime from '../../packages/runtime/src/index.ts'
 import { compile } from '../../packages/arrange-vue-compiler-arrange/src/index.ts'
@@ -18,7 +23,7 @@ function nativeTarget() {
     const target: NativeTransactionTarget = {
         createNode(id, type) {
             assert.ok(!nodes.has(id), 'duplicate native node')
-            assert.ok(['Root', 'Column', 'Row', 'Box', 'Text', 'Input', 'Spacer'].includes(type), `unexpected native type ${type}`)
+            assert.ok(['Root', 'LayoutNode'].includes(type), `unexpected native type ${type}`)
             nodes.set(id, { type, children: [] })
         },
         insertChild(parent, child, index) {
@@ -51,7 +56,7 @@ function nativeTarget() {
 
 async function flush() { await runtime.nextTick(); await Promise.resolve() }
 
-test('开发和生产组件入口拒绝未实现配置，保留来源且不执行 setup', context => {
+test('开发和生产Arrangable入口拒绝未实现配置，保留来源且不执行 setup', context => {
     const globals = globalThis as Record<string, unknown>
     const original = globals.__DEV__
     context.after(() => { globals.__DEV__ = original })
@@ -60,44 +65,41 @@ test('开发和生产组件入口拒绝未实现配置，保留来源且不执�
         globals.__DEV__ = dev
         for (const key of ['data', 'computed', 'methods', 'watch', 'created', 'mounted', 'mixins', 'extends', 'inject', 'provide', 'expose', 'template', 'compilerOptions', '未知配置']) {
             let setups = 0
-            const component = { [key]: {}, __file: '配置错误.vue', setup: () => { setups++; return () => runtime.h(runtime.Text, { text: '不应出现' }) } }
-            const matches = (error: unknown) => error instanceof TypeError && error.message.includes(key) && error.message.includes('配置错误.vue')
-            assert.throws(() => runtime.defineComponent(component), matches)
+            const arrangable = { [key]: {}, __file: '配置错误.sfa', setup: () => { setups++; return () => runtime.h(runtime.Text, { text: '不应出现' }) } }
+            const matches = (error: unknown) => error instanceof TypeError && error.message.includes(key) && error.message.includes('配置错误.sfa')
+            assert.throws(() => runtime.defineArrangable(arrangable), matches)
 
             const native = nativeTarget()
-            assert.throws(() => runtime.createApp(component).mount(native.target), matches)
+            assert.throws(() => runtime.createApp(arrangable).mount(native.target), matches)
             assert.equal(setups, 0)
             assert.equal(native.nodes.size, 0)
         }
     }
 })
 
-test('正式组件配置保留默认 props、事件、setup 实例和组合式生命周期', async () => {
+test('正式Arrangable配置保留默认 props、事件、setup 实例和组合式生命周期', async () => {
     const native = nativeTarget()
     const events: number[] = []
     const lifecycle: string[] = []
-    const Counter = runtime.defineComponent({
+    let increment: () => void
+    const Counter = runtime.defineArrangable({
         name: '计数器',
-        inheritAttrs: false,
-        props: { count: { type: Number, default: 2 } },
-        emits: { change: (value: number) => Number.isFinite(value) },
-        setup(props, { emit, expose }) {
+        props: { count: { type: Number, default: 2 }, onChange: Function as runtime.PropType<(value: number) => void> },
+        setup(props) {
             const value = runtime.ref(props.count)
-            const increment = () => { value.value++; emit('change', value.value) }
+            increment = () => { value.value++; props.onChange?.(value.value) }
             runtime.onMounted(() => lifecycle.push('挂载'))
             runtime.onUnmounted(() => lifecycle.push('卸载'))
-            expose({ increment })
-            return { value }
+            return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => String(value.value)) })
         },
-        render() { return runtime.h(runtime.Text, { text: runtime.arrangeValue(() => String(this.value)) }) },
     })
     const app = runtime.createApp(Counter, { onChange: (value: number) => events.push(value) })
-    const instance = app.mount(native.target) as unknown as { increment(): void }
+    app.mount(native.target)
     const text = () => [...native.values].find(([key]) => key.endsWith(':text'))?.[1]
     assert.equal(text(), '2')
     assert.deepEqual(lifecycle, ['挂载'])
 
-    instance.increment()
+    increment!()
     await flush()
     assert.equal(text(), '3')
     assert.deepEqual(events, [3])
@@ -106,14 +108,13 @@ test('正式组件配置保留默认 props、事件、setup 实例和组合式�
     assert.equal(native.bindings.size, 0)
 })
 
-test('实例 watch 观察 setup 状态，并随组件卸载退休', async () => {
+test('实例 watch 观察 setup 状态，并随Arrangable卸载退休', async () => {
     const native = nativeTarget()
     const count = runtime.ref(0)
     const observed: number[] = []
     const app = runtime.createApp({
         setup() {
-            const instance = runtime.getCurrentInstance()!
-            runtime.onMounted(() => instance.proxy!.$watch('count', value => observed.push(value)))
+            runtime.watch(count, value => observed.push(value))
             return { count }
         },
         render() { return runtime.h(runtime.Text, { text: '实例观察' }) },
@@ -129,70 +130,12 @@ test('实例 watch 观察 setup 状态，并随组件卸载退休', async () => 
     assert.deepEqual(observed, [1])
 })
 
-test('Suspense 替换等待分支重建延迟，取消后忽略迟到拒绝', async context => {
-    const clock = runtime.createManualAnimationClock()
-    const descriptors = ['requestAnimationFrame', 'cancelAnimationFrame'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const)
-    Object.defineProperty(globalThis, 'requestAnimationFrame', { configurable: true, value: clock.requestFrame })
-    Object.defineProperty(globalThis, 'cancelAnimationFrame', { configurable: true, value: clock.cancelFrame })
-    context.mock.method(performance, 'now', clock.now)
-    context.after(() => {
-        for (const [name, descriptor] of descriptors) {
-            if (descriptor) Object.defineProperty(globalThis, name, descriptor)
-            else Reflect.deleteProperty(globalThis, name)
-        }
-    })
-
-    const native = nativeTarget()
-    const active = runtime.shallowRef(runtime.defineComponent({ setup: () => () => runtime.h(runtime.Text, { text: '已显示内容' }) }))
-    let reject!: (error: Error) => void
-    const pending = () => runtime.defineComponent({ setup: () => new Promise<() => runtime.VNode>((_resolve, fail) => { reject = fail }) })
-    const errors: unknown[] = []
-    const app = runtime.createApp({
-        setup() {
-            runtime.onErrorCaptured(error => { errors.push(error); return false })
-            return () => runtime.h(runtime.Suspense, { timeout: 40 }, {
-                default: () => runtime.h(active.value),
-                fallback: () => runtime.h(runtime.Text, { text: '等待新内容' }),
-            })
-        },
-    })
-    context.after(() => app.unmount())
-    app.mount(native.target)
-    const texts = () => [...native.nodes].filter(([, node]) => node.type === 'Text').map(([id]) => native.values.get(`${id}:text`))
-
-    active.value = pending()
-    await flush()
-    const rejectRetired = reject
-    clock.advanceBy(20)
-    active.value = pending()
-    await flush()
-    assert.equal(clock.pendingFrames, 1)
-    clock.advanceBy(20)
-    await flush()
-    assert.deepEqual(texts(), ['已显示内容'])
-    clock.advanceBy(20)
-    await flush()
-    assert.deepEqual(texts(), ['等待新内容'])
-
-    rejectRetired(new Error('已退休分支'))
-    await flush()
-    assert.deepEqual(errors, [])
-    active.value = pending()
-    await flush()
-    app.unmount()
-    reject(new Error('已卸载分支'))
-    await flush()
-    assert.deepEqual(errors, [])
-    assert.equal(clock.pendingFrames, 0)
-    assert.equal(native.bindings.size, 0)
-})
-
-test('组件自定义输入保留同名字段及独立值依赖', async () => {
+test('Arrangable自定义输入保留同名字段及独立值依赖', async () => {
     const native = nativeTarget()
     const style = runtime.ref('初始')
     let renders = 0
     let parentRenders = 0
-    const Styled = runtime.defineComponent({
+    const Styled = runtime.defineArrangable({
         props: ['style', 'class'],
         setup(props) {
             return () => {
@@ -202,9 +145,9 @@ test('组件自定义输入保留同名字段及独立值依赖', async () => {
         },
     })
     const { code } = compile('<Styled :style="style.value" class="自己的分类" />', { mode: 'function', prefixIdentifiers: true })
-    const render = new Function('Vue', code)(runtime)
+    const render = evaluateRender(code)
     const app = runtime.createApp({
-        components: { Styled }, setup: () => () => {
+        arrangables: { Styled }, setup: () => () => {
             parentRenders++
             return render({ style })
         }
@@ -219,49 +162,26 @@ test('组件自定义输入保留同名字段及独立值依赖', async () => {
     app.unmount()
 })
 
-test('宿主 schema 错误提供具体输入与源码位置', () => {
-    assert.throws(() => compile('<Column>\n<Text :fontSzie="20" />\n</Column>'), (error: any) => error.message.includes('fontSzie') && error.loc.start.line === 2)
-})
-
-test('顶层 await 不恢复已经卸载的 setup 作用域', async () => {
-    const native = nativeTarget()
-    let resolve!: () => void
-    let resumed = false
-    const ready = new Promise<void>(done => { resolve = done })
-    const Child = runtime.defineComponent({
-        async setup() {
-            const [pending, restore] = runtime.withAsyncContext(() => ready)
-            await pending
-            restore()
-            resumed = true
-            return () => runtime.h(runtime.Text, { text: '异步完成' })
-        },
-    })
-    const app = runtime.createApp({ setup: () => () => runtime.h(runtime.Suspense, null, { default: () => runtime.h(Child) }) })
-    app.mount(native.target)
-    app.unmount()
-    resolve()
-    await flush()
-    await flush()
-
-    assert.equal(resumed, false)
-    assert.equal(runtime.getCurrentInstance(), null)
-    assert.equal(native.bindings.size, 0)
+test('运行边界拒绝内建 Arrangable 未声明的参数', () => {
+    const { code } = compile('<Column>\n<Text :fontSzie="20" />\n</Column>')
+    const render = evaluateRender(code)
+    const app = runtime.createApp({ setup: () => () => render({}, []) })
+    assert.throws(() => app.mount(nativeTarget().target), /未声明参数：fontSzie/)
 })
 
 test('编译后的值输入在类型化提交失败时保留原始行列', () => {
     const native = nativeTarget()
     const write = native.target.updateBinding
     native.target.updateBinding = (handle, value) => {
-        if (native.bindings.get(handle.identity)?.input === 'modelValue') throw new TypeError('输入值不符合原生类型')
+        if (native.bindings.get(handle.identity)?.input === 'value') throw new TypeError('输入值不符合原生类型')
         write(handle, value)
     }
-    const { code } = compile('<Column>\n    <Input :model-value="value" />\n</Column>', { filename: '输入页面.vue', mode: 'function', prefixIdentifiers: true })
-    const render = new Function('Vue', code)(runtime)
+    const { code } = compile('<Column>\n    <Input :value="value" />\n</Column>', { filename: '输入页面.sfa', mode: 'function', prefixIdentifiers: true })
+    const render = evaluateRender(code)
     const app = runtime.createApp({ setup: () => () => render({ value: '测试' }) })
 
     try {
-        assert.throws(() => app.mount(native.target), /输入页面\.vue:2:\d+ \(model-value\)/)
+        assert.throws(() => app.mount(native.target), /输入页面\.sfa:2:\d+ \(value\)/)
     } finally {
         app.unmount()
     }
@@ -272,13 +192,13 @@ test('KeepAlive 停用退休原生资源，激活同步最新状态并保留 set
     const active = runtime.ref(true)
     const value = runtime.ref('初始')
     let setups = 0
-    const Child = runtime.defineComponent({
+    const Child = runtime.defineArrangable({
         setup() {
             setups++
-            return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => value.value), modifier: runtime.m.clickable(() => { }) })
+            return () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => value.value), modifier: runtime.M.clickable(() => { }) })
         }
     })
-    const app = runtime.createApp({ setup: () => () => runtime.h(runtime.KeepAlive, null, { default: () => active.value ? runtime.h(Child, { key: '内容' }) : null }) })
+    const app = runtime.createApp({ setup: () => () => runtime.h(runtime.KeepAlive, { cacheKey: active.value ? "内容" : "空" }, { default: () => active.value ? runtime.h(Child, { key: '内容' }) : null }) })
     app.mount(native.target)
     const count = native.bindings.size
 
@@ -294,7 +214,7 @@ test('KeepAlive 停用退休原生资源，激活同步最新状态并保留 set
         active.value = true
         await flush()
         assert.equal(native.bindings.size, count)
-        const id = [...native.nodes].find(([, node]) => node.type === 'Text')![0]
+        const id = [...native.nodes].find(([id, node]) => native.values.get(`${id}:textPresentation`) === 'display')![0]
         assert.equal(native.values.get(`${id}:text`), value.value)
     }
 
@@ -303,42 +223,11 @@ test('KeepAlive 停用退休原生资源，激活同步最新状态并保留 set
     assert.equal(native.bindings.size, 0)
 })
 
-test('Suspense 只发布已选分支，异步完成与卸载正确退休', async () => {
-    const native = nativeTarget()
-    let resolve!: () => void
-    const pending = new Promise<void>(done => { resolve = done })
-    const Child = runtime.defineComponent({
-        async setup() {
-            await pending
-            return () => runtime.h(runtime.Text, { text: '异步结果' })
-        }
-    })
-    const shown = runtime.ref(true)
-    const app = runtime.createApp({
-        setup: () => () => shown.value ? runtime.h(runtime.Suspense, null, {
-            default: () => runtime.h(Child),
-            fallback: () => runtime.h(runtime.Text, { text: '正在加载' }),
-        }) : null
-    })
-    app.mount(native.target)
-    assert.equal([...native.nodes.values()].filter(node => node.type === 'Text').length, 1)
-    resolve()
-    await pending
-    await flush()
-    await flush()
-    const id = [...native.nodes].find(([, node]) => node.type === 'Text')![0]
-    assert.equal(native.values.get(`${id}:text`), '异步结果')
-    shown.value = false
-    await flush()
-    assert.equal(native.bindings.size, 0)
-    app.unmount()
-})
-
-test('value expressions cross component props and computed without structural renders', async () => {
+test('value expressions cross arrangable props and computed without structural renders', async () => {
     const native = nativeTarget()
     const color = runtime.ref(1)
     let parentRenders = 0, childRenders = 0, setups = 0
-    const Child = runtime.defineComponent({
+    const Child = runtime.defineArrangable({
         props: ['color'],
         setup(props: { color: number }) {
             setups++
@@ -378,7 +267,7 @@ test('compiler places ordinary template reads in independent bindings', async ()
         mode: 'function', prefixIdentifiers: true,
     })
     assert.match(code, /arrangeValue/)
-    const render = new Function('Vue', code)(runtime)
+    const render = evaluateRender(code)
     const app = runtime.createApp({
         setup() {
             return () => { structures++; return render({ color, label: (value: { value: number }) => `value ${value.value}` }) }
@@ -400,7 +289,7 @@ test('branch deletion stops queued binding effects and retires native handles', 
     let reads = 0
     const app = runtime.createApp({
         setup: () => () => runtime.h(runtime.Column, null,
-            shown.value ? [runtime.h(runtime.Text, { text: runtime.arrangeValue(() => { reads++; return label.value }) })] : [],
+            { default: () => shown.value ? [runtime.h(runtime.Text, { text: runtime.arrangeValue(() => { reads++; return label.value }) })] : [] },
         )
     })
     app.mount(native.target)
@@ -425,14 +314,14 @@ test('one ref may drive both structure and values while bindings follow keyed in
     const app = runtime.createApp({
         setup: () => () => {
             structures++
-            return runtime.h(runtime.Column, null, rows.value.map((item, index) => runtime.h(runtime.Text, {
+            return runtime.h(runtime.Column, null, { default: () => rows.value.map((item, index) => runtime.h(runtime.Text, {
                 key: item.id,
                 text: runtime.arrangeValue(() => `${item.text}:${index}:${color.value}`),
                 modifier: runtime.arrangeValue(() => {
                     evaluations++
-                    return runtime.m.background(switchRead.value ? color.value : secondary.value)
+                    return runtime.M.background(switchRead.value ? color.value : secondary.value)
                 }),
-            })))
+            })) })
         }
     })
     app.mount(native.target)
@@ -464,19 +353,19 @@ test('compiled object literals, interpolation and native v-model keep value depe
     const model = runtime.ref('first')
     const color = runtime.ref(10)
     let renders = 0
-    const { code } = compile('<Column><Text :text-style="{color: color.value}" >Hello {{ model.value }}</Text><Input v-model="model.value" /></Column>', { mode: 'function', prefixIdentifiers: true })
-    const render = new Function('Vue', code)(runtime)
+    const { code } = compile('<Column><Text :text-style="{color: color.value}" :text="`Hello ${model.value}`" /><Input :value="model.value" :onValueChange="value => model.value = value" /></Column>', { mode: 'function', prefixIdentifiers: true })
+    const render = evaluateRender(code)
     const app = runtime.createApp({ setup: () => () => { renders++; return render({ model, color }, []) } })
     app.mount(native.target)
     assert.equal(native.values.get('3:text'), 'Hello first', code + JSON.stringify([...native.values]))
     assert.deepEqual(native.values.get('3:textStyle'), { color: 10 })
-    const update = native.values.get('4:onUpdate:modelValue') as (value: string) => void
+    const update = native.values.get('4:onValueChange') as (value: string) => void
     assert.equal(typeof update, 'function')
     update('second')
     color.value = 20
     await flush()
     assert.equal(native.values.get('3:text'), 'Hello second')
-    assert.equal(native.values.get('4:modelValue'), 'second')
+    assert.equal(native.values.get('4:value'), 'second')
     assert.deepEqual(native.values.get('3:textStyle'), { color: 20 })
     assert.equal(renders, 1)
     app.unmount()
@@ -489,15 +378,15 @@ test('one ref drives branch structure and color without duplicate value evaluati
     const app = runtime.createApp({
         setup: () => () => {
             renders++
-            return runtime.h(runtime.Column, null, value.value > 0 ? [runtime.h(runtime.Text, {
+            return runtime.h(runtime.Column, null, { default: () => value.value > 0 ? [runtime.h(runtime.Text, {
                 text: runtime.arrangeValue(() => { evaluations++; return String(value.value) }),
-            })] : [])
+            })] : [] })
         }
     })
     app.mount(native.target)
     value.value = 2
     await flush()
-    assert.equal(renders, 2)
+    assert.equal(renders, 1)
     assert.equal(evaluations, 2)
     assert.equal(native.values.get('3:text'), '2')
     value.value = 0
@@ -506,12 +395,12 @@ test('one ref drives branch structure and color without duplicate value evaluati
     app.unmount()
 })
 
-test('attribute fallthrough crosses two wrapper components without their render effects', async () => {
+test('attribute fallthrough crosses two wrapper arrangables without their render effects', async () => {
     const native = nativeTarget()
     const label = runtime.ref('before')
     let outer = 0, inner = 0
-    const Inner = { setup: () => () => { inner++; return runtime.h(runtime.Text) } }
-    const Outer = { setup: () => () => { outer++; return runtime.h(Inner) } }
+    const Inner = runtime.defineArrangable({ props: { text: String }, setup: props => () => { inner++; return runtime.h(runtime.Text, { text: runtime.arrangeValue(() => props.text) }) } })
+    const Outer = runtime.defineArrangable({ props: { text: String }, setup: props => () => { outer++; return runtime.h(Inner, { text: runtime.arrangeValue(() => props.text) }) } })
     const app = runtime.createApp({ setup: () => () => runtime.h(Outer, { text: runtime.arrangeValue(() => label.value) }) })
     app.mount(native.target)
     assert.equal(native.values.get('2:text'), 'before')
@@ -529,8 +418,8 @@ test('cloned mounted vnodes retain expression sources and do not write the origi
     const duplicate = runtime.ref(false)
     const cached = runtime.h(runtime.Text, { text: runtime.arrangeValue(() => label.value) })
     const app = runtime.createApp({
-        setup: () => () => runtime.h(runtime.Column, null, duplicate.value
-            ? [cached, runtime.cloneVNode(cached, { key: 'copy' })] : [cached])
+        setup: () => () => runtime.h(runtime.Column, null, { default: () => duplicate.value
+            ? [cached, runtime.cloneVNode(cached, { key: 'copy' })] : [cached] })
     })
     app.mount(native.target)
     duplicate.value = true
@@ -551,7 +440,7 @@ test('spread values stay independent while key changes coordinate and removed in
     const nodeKey = runtime.ref('a')
     let renders = 0
     const { code } = compile('<Input :key="nodeKey.value" v-bind="fields.value" :text-style="{color: color.value}" />', { mode: 'function', prefixIdentifiers: true })
-    const render = new Function('Vue', code)(runtime)
+    const render = evaluateRender(code)
     const app = runtime.createApp({ setup: () => () => { renders++; return render({ color, fields, nodeKey }, []) } })
     app.mount(native.target)
     color.value = 2
@@ -577,8 +466,8 @@ test('compiled keyed fragments, empty branches and root replacement preserve nat
     const native = nativeTarget()
     const rows = runtime.ref([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }])
     const shown = runtime.ref(true)
-    const { code } = compile('<Column v-if="shown.value"><Text v-for="row in rows.value" :key="row.id">{{ row.name }}</Text></Column><Input v-else model-value="replacement" />', { mode: 'function', prefixIdentifiers: true })
-    const render = new Function('Vue', code)(runtime)
+    const { code } = compile('<Column v-if="shown.value"><Text v-for="row in rows.value" :key="row.id" :text="row.name" /></Column><Input v-else value="replacement" />', { mode: 'function', prefixIdentifiers: true })
+    const render = evaluateRender(code)
     const app = runtime.createApp({ setup: () => () => render({ rows, shown }, []) })
     app.mount(native.target)
     assert.deepEqual(native.nodes.get(2)?.children, [3, 4])
@@ -608,7 +497,7 @@ test('branch churn releases effects from the living owner scope', async () => {
     const app = runtime.createApp({
         setup() {
             owner = runtime.getCurrentInstance()
-            return () => runtime.h(runtime.Column, null, shown.value ? [runtime.h(runtime.Text, { text: runtime.arrangeValue(() => label.value) })] : [])
+            return () => runtime.h(runtime.Column, null, { default: () => shown.value ? [runtime.h(runtime.Text, { text: runtime.arrangeValue(() => label.value) })] : [] })
         }
     })
     app.mount(native.target)
@@ -622,21 +511,21 @@ test('branch churn releases effects from the living owner scope', async () => {
     assert.equal(owner!.scope.effects.length, 0)
 })
 
-test('scoped slot destructuring, aliases and defaults defer to the consuming value scope', async () => {
+test('无参 Slot 的词法状态只更新实际值消费者', async () => {
     const native = nativeTarget()
     const color = runtime.ref<number | undefined>(3)
     let parentRenders = 0, outletRenders = 0, labels = 0
-    const outletCode = compile('<Column><slot :color="color" /></Column>', { mode: 'function', prefixIdentifiers: true }).code
-    const outletRender = new Function('Vue', outletCode)(runtime)
+    const outletCode = compile('<Column><Slot /></Column>', { mode: 'function', prefixIdentifiers: true }).code
+    const outletRender = evaluateRender(outletCode)
     const Outlet = {
-        props: ['color'], setup(props: Record<string, unknown>, { slots }: { slots: unknown }) {
+        slotNames: ['default'], setup(props: Record<string, unknown>, { slots }: { slots: unknown }) {
             return () => { outletRenders++; return outletRender(new Proxy(props, { get: (target, key) => key === '$slots' ? slots : target[key as string] }), []) }
         }
     }
-    const parentCode = compile('<Outlet :color="color.value"><template #default="{color: ink = 9}"><Text :text="label(ink)" /></template></Outlet>', { mode: 'function', prefixIdentifiers: true }).code
-    const parentRender = new Function('Vue', parentCode)(runtime)
+    const parentCode = compile('<Outlet><Template #default><Text :text="label(color.value ?? 9)" /></Template></Outlet>', { mode: 'function', prefixIdentifiers: true }).code
+    const parentRender = evaluateRender(parentCode)
     const app = runtime.createApp({
-        components: { Outlet }, setup: () => () => {
+        arrangables: { Outlet }, setup: () => () => {
             parentRenders++
             return parentRender({ color, label(value: unknown) { assert.equal(typeof value, 'number'); labels++; return `ink ${value}` } }, [])
         }
@@ -655,13 +544,13 @@ test('scoped slot destructuring, aliases and defaults defer to the consuming val
     app.unmount()
 })
 
-test('slot aliases preserve inner callback lexical shadowing', () => {
-    const { code } = compile('<Outlet #default="{color}"><Text :text="[1, 2].map(color => color * 2).join() + color" /></Outlet>', { mode: 'function', prefixIdentifiers: true })
+test('无参内容中的回调保持词法遮蔽', () => {
+    const { code } = compile('<Outlet><Text :text="[1, 2].map(color => color * 2).join() + color" /></Outlet>', { mode: 'function', prefixIdentifiers: true })
     assert.match(code, /color => color \* 2/)
     const native = nativeTarget()
-    const Outlet = runtime.defineComponent({ setup(_props, { slots }) { return () => slots.default?.({ color: 5 }) } })
-    const render = new Function('Vue', code)(runtime)
-    const app = runtime.createApp({ components: { Outlet }, setup: () => () => render({}, []) })
+    const Outlet = runtime.defineArrangable({ slotNames: ['default'], setup(_props, { slots }) { return () => runtime.renderSlot(slots, 'default') } })
+    const render = evaluateRender(code)
+    const app = runtime.createApp({ arrangables: { Outlet }, setup: () => () => render({ color: 5 }, []) })
     app.mount(native.target)
     assert.equal(native.values.get('2:text'), '2,45')
     app.unmount()
@@ -671,7 +560,7 @@ test('ordinary render prop changes update child consumers and defaults without f
     const native = nativeTarget()
     const value = runtime.ref<number | undefined>(1)
     let childRenders = 0
-    const Child = runtime.defineComponent({
+    const Child = runtime.defineArrangable({
         props: { value: { type: Number, default: 7 } }, setup(props) {
             return () => { childRenders++; return runtime.h(runtime.Text, { text: runtime.arrangeValue(() => String(props.value)) }) }
         }
@@ -692,7 +581,7 @@ test('structural child prop reads and pre watchers still update before value con
     const native = nativeTarget()
     const value = runtime.ref(1)
     const order: string[] = []
-    const Child = runtime.defineComponent({
+    const Child = runtime.defineArrangable({
         props: ['value'], setup(props) {
             const derived = runtime.ref('initial')
             runtime.watch(() => props.value, current => { order.push('pre'); derived.value = `watched ${current}` })
@@ -700,7 +589,7 @@ test('structural child prop reads and pre watchers still update before value con
             return () => {
                 order.push('structure')
                 return runtime.h(props.value > 1 ? runtime.Input : runtime.Text, props.value > 1
-                    ? { modelValue: runtime.arrangeValue(() => { order.push('value'); return derived.value }) }
+                    ? { value: runtime.arrangeValue(() => { order.push('value'); return derived.value }) }
                     : { text: 'initial' })
             }
         }
@@ -711,21 +600,22 @@ test('structural child prop reads and pre watchers still update before value con
     value.value = 2
     await flush()
     assert.deepEqual(order, ['pre', 'structure', 'value', 'post'])
-    assert.equal(native.values.get('3:modelValue'), 'watched 2')
+    assert.equal(native.values.get('3:value'), 'watched 2')
     app.unmount()
 })
 
-test('local and fallthrough event expressions compose without structural rerenders', async () => {
+test('显式函数参数按实现调用两个回调，更新不触发结构重排', async () => {
     const native = nativeTarget()
     const calls: string[] = []
     const external = runtime.ref(() => calls.push('external one'))
     let renders = 0
-    const Child = {
-        setup: () => () => {
+    const Child = runtime.defineArrangable({
+        props: { onSubmit: Function as runtime.PropType<() => void> },
+        setup: props => () => {
             renders++
-            return runtime.h(runtime.Input, { onSubmit: runtime.arrangeValue(() => () => calls.push('local')) })
+            return runtime.h(runtime.Input, { onSubmit: () => { calls.push('local'); props.onSubmit?.() } })
         }
-    }
+    })
     const app = runtime.createApp({ setup: () => () => runtime.h(Child, { onSubmit: runtime.arrangeValue(() => external.value) }) })
     app.mount(native.target)
         ; (native.values.get('2:onSubmit') as () => void)()
@@ -737,24 +627,23 @@ test('local and fallthrough event expressions compose without structural rerende
     app.unmount()
 })
 
-test('dynamic slots and nested destructuring follow branch ownership and slot list order', async () => {
+test('动态具名内容遵守声明与调用顺序，词法值独立更新', async () => {
     const native = nativeTarget()
     const value = runtime.ref(3)
     const shown = runtime.ref(true)
-    const names = runtime.ref(['one', 'two'])
-    const outletCode = compile('<Column><slot name="one" :payload="{nested: {value: value}}" /><slot name="two" :payload="{nested: {value: value + 1}}" /></Column>', { mode: 'function', prefixIdentifiers: true }).code
-    const outletRender = new Function('Vue', outletCode)(runtime)
+    const outletCode = compile('<Column><Slot name="one" /><Slot name="two" /></Column>', { mode: 'function', prefixIdentifiers: true }).code
+    const outletRender = evaluateRender(outletCode)
     let structures = 0
-    const Outlet = runtime.defineComponent({
-        props: ['value'], setup(props, { slots }) {
-            const context = { get value() { return props.value }, $slots: slots }
+    const Outlet = runtime.defineArrangable({
+        slotNames: ['one', 'two'], setup(_props, { slots }) {
+            const context = { $slots: slots }
             return () => { structures++; return outletRender(context, []) }
         }
     })
-    const code = compile('<Outlet :value="value.value"><template v-for="name in names.value" #[name]="{payload: {nested: {value: number = 9}}}"><Text v-if="shown.value" :text="name + number" /></template></Outlet>', { mode: 'function', prefixIdentifiers: true }).code
-    const render = new Function('Vue', code)(runtime)
-    const app = runtime.createApp({ components: { Outlet }, setup: () => () => render({ value, shown, names }, []) })
-    const liveText = () => [...native.nodes].filter(([, node]) => node.type === 'Text').map(([id]) => native.values.get(`${id}:text`))
+    const code = compile('<Outlet><Template #two><Text v-if="shown.value" :text="`two${value.value + 1}`" /></Template><Template #one><Text v-if="shown.value" :text="`one${value.value}`" /></Template></Outlet>', { mode: 'function', prefixIdentifiers: true }).code
+    const render = evaluateRender(code)
+    const app = runtime.createApp({ arrangables: { Outlet }, setup: () => () => render({ value, shown }, []) })
+    const liveText = () => [...native.nodes].filter(([id, node]) => native.values.get(`${id}:textPresentation`) === 'display').map(([id]) => native.values.get(`${id}:text`))
     app.mount(native.target)
     const baseline = runtime.getArrangeExecutionStats().activeValueBindings
     assert.deepEqual(liveText(), ['one3', 'two4'])
@@ -765,7 +654,6 @@ test('dynamic slots and nested destructuring follow branch ownership and slot li
     shown.value = false
     await flush()
     assert.deepEqual(liveText(), [])
-    names.value = ['two', 'one']
     shown.value = true
     await flush()
     assert.deepEqual(liveText(), ['one5', 'two6'])
@@ -773,33 +661,37 @@ test('dynamic slots and nested destructuring follow branch ownership and slot li
     app.unmount()
 })
 
-test('dynamic component replacement cancels old value jobs and releases scopes', async () => {
+test('dynamic arrangable replacement cancels old value jobs and releases scopes', async () => {
     const native = nativeTarget()
     const value = runtime.ref('old')
-    const selected = runtime.shallowRef(runtime.defineComponent({ setup: () => () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => value.value) }) }))
+    const selected = runtime.shallowRef(runtime.defineArrangable({ setup: () => () => runtime.h(runtime.Text, { text: runtime.arrangeValue(() => value.value) }) }))
     const baseline = runtime.getArrangeExecutionStats().activeValueBindings
     const app = runtime.createApp({ setup: () => () => runtime.h(selected.value) })
     app.mount(native.target)
     native.writes.length = 0
     value.value = 'new'
-    selected.value = runtime.defineComponent({ setup: () => () => runtime.h(runtime.Input, { modelValue: runtime.arrangeValue(() => value.value) }) })
+    selected.value = runtime.defineArrangable({ setup: () => () => runtime.h(runtime.Input, { value: runtime.arrangeValue(() => value.value) }) })
     await flush()
     assert.ok(!native.nodes.has(2))
     assert.ok(!native.writes.includes('2:text'))
-    assert.equal(native.values.get('3:modelValue'), 'new')
-    assert.equal(runtime.getArrangeExecutionStats().activeValueBindings, baseline + 1)
+    assert.equal(native.values.get('3:value'), 'new')
+    const retainedBindings = runtime.getArrangeExecutionStats().activeValueBindings
+    value.value = '再更新'
+    await flush()
+    assert.equal(runtime.getArrangeExecutionStats().activeValueBindings, retainedBindings)
+    assert.equal(native.values.get('3:value'), '再更新')
     app.unmount()
     assert.equal(runtime.getArrangeExecutionStats().activeValueBindings, baseline)
 })
 
-test('value getter and native events use component error boundaries and recover on new dependencies', async () => {
+test('value getter and native events use arrangable error boundaries and recover on new dependencies', async () => {
     const native = nativeTarget()
     const value = runtime.ref(1)
     const errors: string[] = []
-    const Child = runtime.defineComponent({
+    const Child = runtime.defineArrangable({
         setup() {
             return () => runtime.h(runtime.Input, {
-                modelValue: runtime.arrangeValue(() => {
+                value: runtime.arrangeValue(() => {
                     if (value.value === 2) throw new Error('getter failed')
                     return String(value.value)
                 }),
@@ -816,10 +708,10 @@ test('value getter and native events use component error boundaries and recover 
     app.mount(native.target)
     value.value = 2
     await flush()
-    assert.equal(native.values.get('2:modelValue'), '1')
+    assert.equal(native.values.get('2:value'), '1')
     value.value = 3
     await flush()
-    assert.equal(native.values.get('2:modelValue'), '3')
+    assert.equal(native.values.get('2:value'), '3')
         ; (native.values.get('2:onSubmit') as () => void)()
     assert.deepEqual(errors, ['getter failed', 'event failed'])
     app.unmount()
@@ -843,7 +735,7 @@ test('AnimatedVisibility retains exiting structure, disables interaction immedia
         setup: () => () => runtime.h(runtime.AnimatedVisibility, {
             visible: runtime.arrangeValue(() => visible.value), clock,
             animationSpec: runtime.tween({ durationMillis: 100, easing: runtime.linearEasing }),
-        }, { default: () => runtime.h('Text', { text: 'retained' }) })
+        }, { default: () => runtime.h(runtime.Text, { text: 'retained' }) })
     })
     app.mount(native.target)
     const count = native.nodes.size
@@ -869,9 +761,11 @@ test('Crossfade preserves outgoing state and resurrects interrupted content with
     const native = nativeTarget(), clock = runtime.createManualAnimationClock(), selection = runtime.ref('A')
     const app = runtime.createApp({
         setup: () => () => runtime.h(runtime.Crossfade, {
+            is: runtime.Text,
+            props: runtime.arrangeValue(() => ({ text: selection.value })),
             targetState: runtime.arrangeValue(() => selection.value), clock,
             animationSpec: runtime.tween({ durationMillis: 100, easing: runtime.linearEasing }),
-        }, { default: ({ state }: { state: string }) => runtime.h('Text', { text: state }) })
+        })
     })
     app.mount(native.target); await flush()
     const count = native.nodes.size
@@ -891,22 +785,22 @@ test('proven Modifier chain isolates parameter reads while helpers and dynamic c
     const color = runtime.ref(1), width = runtime.ref(20), native = nativeTarget()
     const options = {
         mode: 'function' as const, prefixIdentifiers: true, bindingMetadata: {
-            __arrangeModifierRoots: ['m'], m: 'setup-const', color: 'setup-ref', width: 'setup-ref',
+            __arrangeModifierRoots: ['M'], M: 'setup-const', color: 'setup-ref', width: 'setup-ref',
         } as never
     }
-    const { code } = compile('<Box :modifier="m.width(width).height(20).background(color)" />', options)
+    const { code } = compile('<Box :modifier="M.width(width).height(20).background(color)" />', options)
     assert.match(code, /arrangeModifier/)
-    const render = new Function('Vue', code)(runtime)
-    const setup = { m: runtime.m, get width() { return width.value }, get color() { return color.value } }
+    const render = evaluateRender(code)
+    const setup = { M: runtime.M, get width() { return width.value }, get color() { return color.value } }
     const app = runtime.createApp({ setup: () => () => render({}, [], {}, setup) })
     app.mount(native.target)
     const evaluations = runtime.modifierStats.parameterEvaluations
     color.value = 2; await flush()
     assert.equal(runtime.modifierStats.parameterEvaluations - evaluations, 1)
     assert.equal((native.values.get('2:modifier') as runtime.Modifier).elements[2].value.brush, 2)
-    const fallback = compile('<Box :modifier="m.width(helper(width)).background(color)" />', options).code
+    const fallback = compile('<Box :modifier="M.width(helper(width)).background(color)" />', options).code
     assert.doesNotMatch(fallback, /arrangeModifier/)
-    const dynamic = compile('<Box :modifier="m.width(width).then(extra).background(color)" />', options).code
+    const dynamic = compile('<Box :modifier="M.width(width).then(extra).background(color)" />', options).code
     assert.doesNotMatch(dynamic, /arrangeModifier/)
     app.unmount()
 })

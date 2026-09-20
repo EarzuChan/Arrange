@@ -2,7 +2,7 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-#include <arrange/juce/ImageResourceCache.h>
+#include <arrange/juce/PainterResources.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <stdexcept>
 #include <chrono>
@@ -46,9 +46,7 @@ namespace arrange::juce {
             return 0.5f;
         }
 
-        ::juce::Rectangle<float> imageFillAxisTarget(const ::juce::Image& image, ::juce::Rectangle<float> target, const std::string& contentScale, const std::string& alignment) {
-            const auto imageWidth = static_cast<float>(image.getWidth());
-            const auto imageHeight = static_cast<float>(image.getHeight());
+        ::juce::Rectangle<float> imageFillAxisTarget(float imageWidth, float imageHeight, ::juce::Rectangle<float> target, const std::string& contentScale, const std::string& alignment) {
             if (imageWidth <= 0.0f || imageHeight <= 0.0f || target.isEmpty()) return target;
 
             const auto scale = contentScale == "FillHeight" ? target.getHeight() / imageHeight : target.getWidth() / imageWidth;
@@ -60,6 +58,8 @@ namespace arrange::juce {
         }
 
         void drawImageOp(::juce::Graphics& g, const ::juce::Image& image, ::juce::Rectangle<float> rect, const arrange::core::DrawOp& op, float alpha) {
+            ::juce::Graphics::ScopedSaveState scope(g);
+            g.reduceClipRegion(rect.toNearestInt());
             const auto fillAlphaWithTint = op.hasTint;
             if (fillAlphaWithTint) { g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha)); }
             else { g.setOpacity(static_cast<float>((op.color >> 24u) & 0xffu) / 255.0f * alpha); }
@@ -67,7 +67,7 @@ namespace arrange::juce {
             if (op.contentScale == "FillWidth" || op.contentScale == "FillHeight") {
                 g.saveState();
                 g.reduceClipRegion(rect.toNearestInt());
-                g.drawImage(image, imageFillAxisTarget(image, rect, op.contentScale, op.alignment), ::juce::RectanglePlacement::stretchToFit, fillAlphaWithTint);
+                g.drawImage(image, imageFillAxisTarget(static_cast<float>(image.getWidth()), static_cast<float>(image.getHeight()), rect, op.contentScale, op.alignment), ::juce::RectanglePlacement::stretchToFit, fillAlphaWithTint);
                 g.restoreState();
             }
             else {
@@ -76,6 +76,18 @@ namespace arrange::juce {
             }
 
             if (!fillAlphaWithTint) g.setOpacity(1.0f);
+        }
+
+        void drawVector(::juce::Graphics& graphics, const JucePainterContent& content, ::juce::Rectangle<float> target, const arrange::core::DrawOp& op, float alpha) {
+            ::juce::Graphics::ScopedSaveState scope(graphics);
+            graphics.reduceClipRegion(target.toNearestInt());
+            const auto bounds = content.vectorViewport.isEmpty() ? content.vector->getDrawableBounds() : content.vectorViewport;
+            auto placement = imagePlacementFlags(op.contentScale, op.alignment);
+            if (op.contentScale == "FillWidth" || op.contentScale == "FillHeight") {
+                target = imageFillAxisTarget(bounds.getWidth(), bounds.getHeight(), target, op.contentScale, op.alignment);
+                placement = ::juce::RectanglePlacement::stretchToFit;
+            }
+            content.vector->draw(graphics, alpha, ::juce::RectanglePlacement(placement).getTransformToFit(bounds, target));
         }
 
 
@@ -104,21 +116,21 @@ namespace arrange::juce {
         return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX) const {
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, std::optional<arrange::core::NodeId> focused, float viewportX) const {
         g.saveState();
         int depth = 1;
-        try { replayOps(g, ops, resources, focused, viewportX, 1, depth); }
+        try { replayOps(g, ops, focused, viewportX, 1, depth); }
         catch (...) { while (depth-- > 0) g.restoreState(); throw; }
         while (depth-- > 0) g.restoreState();
         return {};
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX) const {
-        replayFragment(g, root, resources, focused, viewportX, 1);
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, std::optional<arrange::core::NodeId> focused, float viewportX) const {
+        replayFragment(g, root, focused, viewportX, 1);
         return {};
     }
 
-    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, const ImageResourceCache& resources, std::optional<arrange::core::NodeId> focused, float viewportX, float alpha) const {
+    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, std::optional<arrange::core::NodeId> focused, float viewportX, float alpha) const {
         if (!placed.fragment) return;
         ++counters_.fragmentsVisited;
         ::juce::Graphics::ScopedSaveState scope(g);
@@ -128,17 +140,17 @@ namespace arrange::juce {
         g.saveState();
         int depth = 1;
         try {
-            if (fragment.layer) replayOps(g, fragment.layer->before, resources, focused, viewportX, alpha, depth);
+            if (fragment.layer) replayOps(g, fragment.layer->before, focused, viewportX, alpha, depth);
             const auto contentAlpha = alpha * (fragment.layer ? fragment.layer->contentAlpha : 1.0f);
-            if (fragment.content) replayOps(g, *fragment.content, resources, focused, viewportX, contentAlpha, depth);
-            for (const auto& child : fragment.children) replayFragment(g, child, resources, focused, viewportX, contentAlpha);
-            if (fragment.layer) replayOps(g, fragment.layer->after, resources, focused, viewportX, alpha, depth);
+            if (fragment.content) replayOps(g, *fragment.content, focused, viewportX, contentAlpha, depth);
+            for (const auto& child : fragment.children) replayFragment(g, child, focused, viewportX, contentAlpha);
+            if (fragment.layer) replayOps(g, fragment.layer->after, focused, viewportX, alpha, depth);
         }
         catch (...) { while (depth-- > 0) g.restoreState(); throw; }
         while (depth-- > 0) g.restoreState();
     }
 
-    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, const ImageResourceCache& imageResources, std::optional<arrange::core::NodeId> focusedInputNode, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
+    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, std::optional<arrange::core::NodeId> focusedInputNode, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
         for (const auto& op : ops) {
             ++counters_.opsVisited;
             const auto state = op.type == arrange::core::DrawOpType::PushClip || op.type == arrange::core::DrawOpType::PopClip || op.type == arrange::core::DrawOpType::PushTransform || op.type == arrange::core::DrawOpType::PopTransform;
@@ -160,34 +172,22 @@ namespace arrange::juce {
             case arrange::core::DrawOpType::DrawText:
                 drawText(g, op, op.inputText && focusedInputNode && op.nodeId == *focusedInputNode ? focusedInputViewportX : 0.0f, alpha);
                 break;
-            case arrange::core::DrawOpType::DrawImage:
-                if (const auto image = imageResources.find(op.resource); image.isValid()) { drawImageOp(g, image, rect, op, alpha); }
-                else {
-                    g.setColour(::juce::Colour(0xff151922));
-                    g.fillRect(rect);
-                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f * alpha));
-                    g.drawRect(rect, 1.0f);
-                    g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 1.0f);
-                }
-                break;
-            case arrange::core::DrawOpType::DrawIcon: {
-                const auto drawable = imageResources.findIcon(op.resource);
-                if (drawable && *drawable != nullptr) {
-                    auto icon = (*drawable)->createCopy();
+            case arrange::core::DrawOpType::DrawPainter: {
+                const auto* content = dynamic_cast<const JucePainterContent*>(op.painter.content.get());
+                if (!content) throw std::runtime_error("Painter 绘制内容不属于 JUCE 受体");
+                if (content->image.isValid()) drawImageOp(g, content->image, rect, op, alpha);
+                else if (content->vector && !rect.isEmpty()) {
                     if (op.hasTint) {
-                        icon->replaceColour(::juce::Colours::black, ::juce::Colour(op.color));
-                        icon->replaceColour(::juce::Colours::white, ::juce::Colour(op.color));
-                        icon->replaceColour(::juce::Colour(0xff000000), ::juce::Colour(op.color));
-                        icon->replaceColour(::juce::Colour(0xffffffff), ::juce::Colour(op.color));
+                        ::juce::Image mask(::juce::Image::ARGB, std::max(1, static_cast<int>(std::ceil(rect.getWidth()))), std::max(1, static_cast<int>(std::ceil(rect.getHeight()))), true);
+                        {
+                            ::juce::Graphics graphics(mask);
+                            drawVector(graphics, *content, mask.getBounds().toFloat(), op, 1.0f);
+                        }
+                        g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
+                        g.drawImage(mask, rect, ::juce::RectanglePlacement::stretchToFit, true);
+                    } else {
+                        drawVector(g, *content, rect, op, static_cast<float>((op.color >> 24u) & 0xffu) / 255.0f * alpha);
                     }
-                    icon->drawWithin(g, rect, ::juce::RectanglePlacement::stretchToFit, alpha);
-                }
-                else {
-                    g.setColour(::juce::Colour(0xff151922));
-                    g.fillRect(rect);
-                    g.setColour(::juce::Colour(op.color).withAlpha(0.42f * alpha));
-                    g.drawRect(rect, 1.0f);
-                    g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 1.0f);
                 }
                 break;
             }

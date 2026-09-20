@@ -135,33 +135,33 @@ namespace arrange {
         result.resource = std::string(resource);
 
         if (result.resource.empty()) {
-            result.error = "Arrange resource path is empty.";
+            result.error = "Painter 资源路径不能为空";
             return result;
         }
 
         const auto resourcePath = std::filesystem::path(result.resource);
         if (resourcePath.is_absolute()) {
-            result.error = "Arrange resource path must be relative to the UI package: " + result.resource;
+            result.error = "Painter 资源路径必须相对 UI package：" + result.resource;
             return result;
         }
 
         if (!std::filesystem::exists(result.packageDir) || !std::filesystem::is_directory(result.packageDir)) {
-            result.error = "Arrange UI package directory is not available while resolving resource: " + result.packageDir.string();
+            result.error = "解析 Painter 资源时 UI package 目录不可用：" + result.packageDir.string();
             return result;
         }
 
         result.path = (result.packageDir / resourcePath).lexically_normal();
         if (pathEscapesBase(result.path, result.packageDir)) {
-            result.error = "Arrange resource path escapes the UI package: " + result.resource;
+            result.error = "Painter 资源路径越出 UI package：" + result.resource;
             return result;
         }
 
         if (!std::filesystem::exists(result.path)) {
-            result.error = "Arrange resource does not exist: " + result.path.string();
+            result.error = "Painter 资源不存在：" + result.path.string();
             return result;
         }
         if (!std::filesystem::is_regular_file(result.path)) {
-            result.error = "Arrange resource is not a file: " + result.path.string();
+            result.error = "Painter 资源不是文件：" + result.path.string();
             return result;
         }
 

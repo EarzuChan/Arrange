@@ -1,7 +1,7 @@
 import {ARRANGE_VUE_DEFINES, DEV_BUNDLE_PATH, PUBLIC_PLUGIN_NAME} from "./constraints.ts"
 import {buildDevBundle} from "./dev-bundle.ts"
 import {createArrangeTransformPlugin} from "./transform.ts"
-import {isHotSourceFile, normalizePath} from "./sfc.ts"
+import {invalidateSfaTypeDependency, isHotSourceFile, normalizePath} from "./sfa.ts"
 import type {
     ArrangeDevServer,
     ArrangeViteConfig,
@@ -63,6 +63,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
             })
         },
         handleHotUpdate(ctx: HotUpdateContext): HotUpdateModule[] {
+            invalidateSfaTypeDependency(ctx.file)
             if (!isHotSourceFile(ctx.file)) return ctx.modules
             ctx.server?.ws?.send?.({
                 type: "custom",

@@ -16,6 +16,7 @@ add_library(arrange_core STATIC
   src/Modifier.cpp
   src/ModifierGeometry.cpp
   src/Layout.cpp
+  src/MeasurePolicy.cpp
   src/HitTest.cpp
   src/PointerInputProcessor.cpp
   src/Scroll.cpp

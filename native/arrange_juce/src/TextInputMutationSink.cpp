@@ -20,7 +20,7 @@ namespace arrange::juce {
         TextInputCallbacks result;
         result.setModelValue = [&runtime](arrange::core::NodeId nodeId, std::string value) {
             arrange::core::MutationTransaction transaction;
-            transaction.operations.emplace_back(arrange::core::SetPropMutation{nodeId, "modelValue", arrange::core::PropValue::stringValue(std::move(value))});
+            transaction.operations.emplace_back(arrange::core::SetPropMutation{nodeId, "value", arrange::core::PropValue::stringValue(std::move(value))});
             enqueueMutation(runtime, std::move(transaction), "native text input editing state");
         };
         result.invokeStringEvent = [&runtime](

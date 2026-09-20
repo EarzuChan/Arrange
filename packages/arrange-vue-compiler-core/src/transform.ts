@@ -33,7 +33,7 @@ import type { TransformOptions } from './options.ts'
 import {
     CREATE_COMMENT,
     FRAGMENT,
-    TO_DISPLAY_STRING,
+
     helperNameMap,
 } from './runtimeHelpers.ts'
 import { cacheStatic, getSingleElementRoot } from './transforms/cacheStatic.ts'
@@ -86,8 +86,7 @@ export interface TransformContext
     selfName: string | null
     root: RootNode
     helpers: Map<symbol, number>
-    components: Set<string>
-    directives: Set<string>
+    arrangables: Set<string>
     hoists: (JSChildNode | null)[]
     imports: ImportItem[]
     temps: number
@@ -96,8 +95,6 @@ export interface TransformContext
     scopes: {
         vFor: number
         vSlot: number
-        vPre: number
-        vOnce: number
     }
     parent: ParentNode | null
     // we could use a stack but in practice we've only ever needed two layers up
@@ -105,7 +102,6 @@ export interface TransformContext
     grandParent: ParentNode | null
     childIndex: number
     currentNode: RootNode | TemplateChildNode | null
-    inVOnce: boolean
     helper<T extends symbol>(name: T): T
     removeHelper<T extends symbol>(name: T): void
     helperString(name: symbol): string
@@ -115,7 +111,7 @@ export interface TransformContext
     addIdentifiers(exp: ExpressionNode | string): void
     removeIdentifiers(exp: ExpressionNode | string): void
     hoist(exp: string | JSChildNode | ArrayExpression): SimpleExpressionNode
-    cache(exp: JSChildNode, isVNode?: boolean, inVOnce?: boolean): CacheExpression
+    cache(exp: JSChildNode, isVNode?: boolean): CacheExpression
     constantCache: WeakMap<TemplateChildNode, ConstantTypes>
 
     // 2.x Compat only
@@ -129,14 +125,12 @@ export function createTransformContext(
         prefixIdentifiers = false,
         hoistStatic = false,
         hmr = false,
-        cacheHandlers = false,
         nodeTransforms = [],
-        directiveTransforms = {},
-        transformHoist = null,
-        isBuiltInComponent = NOOP,
+        isBuiltInArrangable = NOOP,
         expressionPlugins = [],
         bindingMetadata = EMPTY_OBJ,
         inline = false,
+        arrangeTypecheck = false,
         isTS = false,
         onError = defaultOnError,
         onWarn = defaultOnWarn,
@@ -150,22 +144,19 @@ export function createTransformContext(
         prefixIdentifiers,
         hoistStatic,
         hmr,
-        cacheHandlers,
         nodeTransforms,
-        directiveTransforms,
-        transformHoist,
-        isBuiltInComponent,
+        isBuiltInArrangable,
         expressionPlugins,
         bindingMetadata,
         inline,
+        arrangeTypecheck,
         isTS,
         onError,
         onWarn,
         // state
         root,
         helpers: new Map(),
-        components: new Set(),
-        directives: new Set(),
+        arrangables: new Set(),
         hoists: [],
         imports: [],
         cached: [],
@@ -175,14 +166,11 @@ export function createTransformContext(
         scopes: {
             vFor: 0,
             vSlot: 0,
-            vPre: 0,
-            vOnce: 0,
         },
         parent: null,
         grandParent: null,
         currentNode: root,
         childIndex: 0,
-        inVOnce: false,
         // methods
         helper(name) {
             const count = context.helpers.get(name) || 0
@@ -280,12 +268,11 @@ export function createTransformContext(
             identifier.hoisted = exp
             return identifier
         },
-        cache(exp, isVNode = false, inVOnce = false) {
+        cache(exp, isVNode = false) {
             const cacheExp = createCacheExpression(
                 context.cached.length,
                 exp,
                 isVNode,
-                inVOnce,
             )
             context.cached.push(cacheExp)
             return cacheExp
@@ -318,8 +305,7 @@ export function transform(root: RootNode, options: TransformOptions): void {
     }
     // finalize meta information
     root.helpers = new Set([...context.helpers.keys()])
-    root.components = [...context.components]
-    root.directives = [...context.directives]
+    root.arrangables = [...context.arrangables]
     root.imports = context.imports
     root.hoists = context.hoists
     root.temps = context.temps
@@ -366,10 +352,9 @@ function createRootCodegen(root: RootNode, context: TransformContext) {
             root.children,
             patchFlag,
             undefined,
-            undefined,
             true,
             undefined,
-            false /* isComponent */,
+            false /* isArrangable */,
         )
     } else {
         // no children = noop. codegen will return null.
@@ -430,11 +415,7 @@ export function traverseNode(
             }
             break
         case NodeTypes.INTERPOLATION:
-            // no need to traverse, but we need to inject toString helper
-            {
-                context.helper(TO_DISPLAY_STRING)
-            }
-            break
+            throw new SyntaxError('模板内容不接受插值，请使用 Text 的 text 参数')
 
         // for container types, further traverse downwards
         case NodeTypes.IF:

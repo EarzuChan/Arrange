@@ -9,11 +9,11 @@ import type {
 } from '@babel/types'
 import { getObjectOrArrayExpressionKeys } from './analyzeScriptBindings.ts'
 import type { ScriptCompileContext } from './context.ts'
-import { genModelProps } from './defineModel.ts'
 import { processPropsDestructure } from './definePropsDestructure.ts'
 import {
     type TypeResolveContext,
     inferRuntimeType,
+    inferRefContract,
     resolveTypeElements,
 } from './resolveType.ts'
 import {
@@ -34,6 +34,7 @@ export interface PropTypeData {
     type: string[]
     required: boolean
     skipCheck: boolean
+    refKind?: string
 }
 
 export type PropsDestructureBindings = Record<
@@ -164,15 +165,7 @@ export function genRuntimeProps(ctx: ScriptCompileContext): string | undefined {
         propsDecls = extractRuntimeProps(ctx)
     }
 
-    const modelsDecls = genModelProps(ctx)
-
-    if (propsDecls && modelsDecls) {
-        return `/*@__PURE__*/${ctx.helper(
-            'mergeModels',
-        )}(${propsDecls}, ${modelsDecls})`
-    } else {
-        return modelsDecls || propsDecls
-    }
+    return propsDecls
 }
 
 export function extractRuntimeProps(
@@ -215,7 +208,9 @@ function resolveRuntimePropsFromType(
     const elements = resolveTypeElements(ctx, node)
     for (const key in elements.props) {
         const e = elements.props[key]
-        let type = inferRuntimeType(ctx, e)
+        const annotation = e.type === 'TSPropertySignature' ? e.typeAnnotation?.typeAnnotation : undefined
+        const refKind = inferRefContract(ctx, annotation, e._ownerScope)
+        let type = refKind ? ['Object'] : inferRuntimeType(ctx, e)
         let skipCheck = false
         // skip check for result containing unknown types
         if (type.includes(UNKNOWN_TYPE)) {
@@ -231,6 +226,7 @@ function resolveRuntimePropsFromType(
             required: !e.optional,
             type: type || [`null`],
             skipCheck,
+            refKind,
         })
     }
     return props
@@ -238,7 +234,7 @@ function resolveRuntimePropsFromType(
 
 function genRuntimePropFromType(
     ctx: TypeResolveContext,
-    { key, required, type, skipCheck }: PropTypeData,
+    { key, required, type, skipCheck, refKind }: PropTypeData,
     hasStaticDefaults: boolean,
 ): string {
     let defaultString: string | undefined
@@ -271,32 +267,13 @@ function genRuntimePropFromType(
     }
 
     const finalKey = getEscapedPropName(key)
-    if (!ctx.options.isProd) {
-        return `${finalKey}: { ${concatStrings([
-            `type: ${toRuntimeTypeString(type)}`,
-            `required: ${required}`,
-            skipCheck && 'skipCheck: true',
-            defaultString,
-        ])} }`
-    } else if (
-        type.some(
-            el =>
-                el === 'Boolean' ||
-                ((!hasStaticDefaults || defaultString) && el === 'Function'),
-        )
-    ) {
-        // #4783 for boolean, should keep the type
-        // #7111 for function, if default value exists or it's not static, should keep it
-        // in production
-        return `${finalKey}: { ${concatStrings([
-            `type: ${toRuntimeTypeString(type)}`,
-            defaultString,
-        ])} }`
-    } else {
+    return `${finalKey}: { ${concatStrings([
+        `type: ${toRuntimeTypeString(refKind ? ['Object'] : type)} as ${ctx.helper('PropType')}<(${ctx.getString(ctx.propsTypeDecl!)})[${JSON.stringify(key)}]>`,
+        `required: ${required}`,
+        refKind && `refKind: '${refKind}'`,
+        defaultString,
+    ])} }`
 
-        // production: checks are useless
-        return `${finalKey}: ${defaultString ? `{ ${defaultString} }` : `{}`}`
-    }
 }
 
 /**

@@ -33,8 +33,6 @@ namespace arrange::core {
         Size measureContent(LayoutTree& tree, NodeId id, Constraints constraints);
         void placeWithModifier(LayoutTree& tree, NodeId id, std::size_t index, float x, float y);
         void placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height);
-        static float rowSpacing(const ArrangeNode& node);
-        static float columnSpacing(const ArrangeNode& node);
 
         LayoutWorkCounters counters_;
         const TextLayoutService* textLayoutService_ = nullptr;

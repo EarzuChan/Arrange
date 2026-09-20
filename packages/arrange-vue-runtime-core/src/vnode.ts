@@ -7,50 +7,34 @@ import {
 } from '@arrange/vue-reactivity'
 import {
     EMPTY_ARR,
+    camelize,
+    hasOwn,
     PatchFlags,
     ShapeFlags,
     SlotFlags,
     extend,
     isArray,
     isFunction,
-    isModelListener,
     isObject,
-    isOn,
     isString,
 } from '@arrange/vue-shared'
 import type { AppContext } from './apiCreateApp.ts'
 import {
-    type ClassComponent,
-    type Component,
-    type ComponentInternalInstance,
-    type ConcreteComponent,
+    type ClassArrangable,
+    type Arrangable,
+    type ArrangableInstance,
+    type ConcreteArrangable,
     type Data,
-    isClassComponent,
-} from './component.ts'
-import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+    isClassArrangable,
+} from './arrangable.ts'
+import type { ArrangablePublicInstance } from './arrangablePublicInstance.ts'
 import {
     currentRenderingInstance,
-} from './componentRenderContext.ts'
-import {
-    type TransitionHooks,
-    setTransitionHooks,
-} from './components/BaseTransition.ts'
-import {
-    type Suspense,
-    type SuspenseBoundary,
-    type SuspenseImpl,
-    isSuspense,
-} from './components/Suspense.ts'
-import {
-    type Teleport,
-    type TeleportImpl,
-    isTeleport,
-} from './components/Teleport.ts'
-import type { RawSlots } from './componentSlots.ts'
-import type { DirectiveBinding } from './directives.ts'
+} from './arrangableRenderContext.ts'
+import type { RawSlots } from './arrangableSlots.ts'
 import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
-import { NULL_DYNAMIC_COMPONENT } from './helpers/resolveAssets.ts'
-import { hmrDirtyComponents } from './hmr.ts'
+import { NULL_DYNAMIC_ARRANGABLE } from './helpers/resolveAssets.ts'
+import { hmrDirtyArrangables } from './hmr.ts'
 import { isInternalObject } from './internalObject.ts'
 import type { RendererElement, RendererNode } from './renderer.ts'
 import { type ValueExpression, arrangeValue, isValueExpression } from './valueBinding.ts'
@@ -62,77 +46,20 @@ export const Fragment = Symbol.for('v-fgt') as any as {
         $props: VNodeProps
     }
 }
-export const Text: unique symbol = Symbol.for('v-txt')
+export const Content: unique symbol = Symbol('Arrange 内容调用')
+export const LayoutInvocation: unique symbol = Symbol('Arrange 布局调用')
 export const Comment: unique symbol = Symbol.for('v-cmt')
-export const Static: unique symbol = Symbol.for('v-stc')
 
 export type VNodeTypes =
     | string
     | VNode
-    | Component
-    | typeof Text
-    | typeof Static
+    | Arrangable
     | typeof Comment
+    | typeof Content
+    | typeof LayoutInvocation
     | typeof Fragment
-    | typeof Teleport
-    | typeof TeleportImpl
-    | typeof Suspense
-    | typeof SuspenseImpl
 
-export type VNodeRef =
-    | string
-    | Ref
-    | ((
-        ref: RendererElement | ComponentPublicInstance | null,
-        refs: Record<string, any>,
-    ) => void)
-
-export type VNodeNormalizedRefAtom = {
-    /**
-     * component instance
-     */
-    i: ComponentInternalInstance
-    /**
-     * Actual ref
-     */
-    r: VNodeRef
-    /**
-     * setup ref key
-     */
-    k?: string
-    /**
-     * refInFor marker
-     */
-    f?: boolean
-}
-
-export type VNodeNormalizedRef =
-    | VNodeNormalizedRefAtom
-    | VNodeNormalizedRefAtom[]
-
-type VNodeMountHook = (vnode: VNode) => void
-type VNodeUpdateHook = (vnode: VNode, oldVNode: VNode) => void
-export type VNodeHook =
-    | VNodeMountHook
-    | VNodeUpdateHook
-    | VNodeMountHook[]
-    | VNodeUpdateHook[]
-
-// https://github.com/microsoft/TypeScript/issues/33099
-export type VNodeProps = {
-    key?: PropertyKey
-    ref?: VNodeRef
-    ref_for?: boolean
-    ref_key?: string
-
-    // vnode hooks
-    onVnodeBeforeMount?: VNodeMountHook | VNodeMountHook[]
-    onVnodeMounted?: VNodeMountHook | VNodeMountHook[]
-    onVnodeBeforeUpdate?: VNodeUpdateHook | VNodeUpdateHook[]
-    onVnodeUpdated?: VNodeUpdateHook | VNodeUpdateHook[]
-    onVnodeBeforeUnmount?: VNodeMountHook | VNodeMountHook[]
-    onVnodeUnmounted?: VNodeMountHook | VNodeMountHook[]
-}
+export type VNodeProps = { key?: PropertyKey }
 
 type VNodeChildAtom =
     | VNode
@@ -171,41 +98,24 @@ export interface VNode<
     type: VNodeTypes
     props: (VNodeProps & ExtraProps) | null
     valueSources: Record<string, ValueExpression> | null
-    textSource: ValueExpression | null
+    content?: () => VNodeArrayChildren
+    contentScope?: import('./contentScope.ts').ContentScope
     key: PropertyKey | null
-    ref: VNodeNormalizedRef | null
     /**
-     * SFC only. This is assigned on vnode creation using currentScopeId
+     * SFA only. This is assigned on vnode creation using currentScopeId
      * which is set alongside currentRenderingInstance.
      */
 
     children: VNodeNormalizedChildren
-    component: ComponentInternalInstance | null
-    dirs: DirectiveBinding[] | null
-    transition: TransitionHooks<HostElement> | null
+    arrangable: ArrangableInstance | null
 
     el: HostNode | null
-    placeholder: HostNode | null // async component el placeholder
     anchor: HostNode | null // fragment anchor
-    target: HostElement | null // teleport target
-    targetStart: HostNode | null // teleport target start anchor
-    targetAnchor: HostNode | null // teleport target anchor
     /**
      * number of elements contained in a static vnode
      * @internal
      */
     staticCount: number
-
-    // suspense
-    suspense: SuspenseBoundary | null
-    /**
-     * @internal
-     */
-    ssContent: VNode | null
-    /**
-     * @internal
-     */
-    ssFallback: VNode | null
 
     // optimization only
     shapeFlag: number
@@ -217,7 +127,7 @@ export interface VNode<
     /**
      * @internal
      */
-    dynamicChildren: (VNode[] & { hasOnce?: boolean }) | null
+    dynamicChildren: VNode[] | null
 
     // application root node only
     appContext: AppContext | null
@@ -225,15 +135,9 @@ export interface VNode<
     /**
      * @internal lexical scope owner instance
      */
-    ctx: ComponentInternalInstance | null
+    ctx: ArrangableInstance | null
 
-    /**
-     * @internal attached by v-memo
-     */
-    memo?: any[]
-    /**
-     * @internal index for cleaning v-memo cache
-     */
+    // 编译器静态缓存的回收位置
     cacheIndex?: number
 }
 
@@ -276,29 +180,9 @@ export function closeBlock(): void {
 // incremented/decremented by nested usage of v-once (see below)
 export let isBlockTreeEnabled = 1
 
-/**
- * Block tracking sometimes needs to be disabled, for example during the
- * creation of a tree that needs to be cached by v-once. The compiler generates
- * code like this:
- *
- * ``` js
- * _cache[1] || (
- *   setBlockTracking(-1, true),
- *   _cache[1] = createVNode(...),
- *   setBlockTracking(1),
- *   _cache[1]
- * )
- * ```
- *
- * @private
- */
-export function setBlockTracking(value: number, inVOnce = false): void {
+// 编译器缓存确定的静态结构时暂停动态节点收集
+export function setBlockTracking(value: number): void {
     isBlockTreeEnabled += value
-    if (value < 0 && currentBlock && inVOnce) {
-        // mark current block so it doesn't take fast path and skip possible
-        // nested components during unmount
-        currentBlock.hasOnce = true
-    }
 }
 
 function setupBlock(vnode: VNode) {
@@ -347,7 +231,7 @@ export function createElementBlock(
  * @private
  */
 export function createBlock(
-    type: VNodeTypes | ClassComponent,
+    type: VNodeTypes | ClassArrangable,
     props?: Record<string, any> | null,
     children?: any,
     patchFlag?: number,
@@ -370,14 +254,14 @@ export function isVNode(value: any): value is VNode {
 }
 
 export function isSameVNodeType(n1: VNode, n2: VNode): boolean {
-    if (__DEV__ && n2.shapeFlag & ShapeFlags.COMPONENT && n1.component) {
-        const dirtyInstances = hmrDirtyComponents.get(n2.type as ConcreteComponent)
-        if (dirtyInstances && dirtyInstances.has(n1.component)) {
+    if (__DEV__ && n2.shapeFlag & ShapeFlags.ARRANGABLE && n1.arrangable) {
+        const dirtyInstances = hmrDirtyArrangables.get(n2.type as ConcreteArrangable)
+        if (dirtyInstances && dirtyInstances.has(n1.arrangable)) {
             // #7042, ensure the vnode being unmounted during HMR
             // bitwise operations to remove keep alive flags
-            n1.shapeFlag &= ~ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE
-            n2.shapeFlag &= ~ShapeFlags.COMPONENT_KEPT_ALIVE
-            // HMR only: if the component has been hot-updated, force a reload.
+            n1.retention = undefined
+            n2.retention = undefined
+            // HMR only: if the arrangable has been hot-updated, force a reload.
             return false
         }
     }
@@ -387,7 +271,7 @@ export function isSameVNodeType(n1: VNode, n2: VNode): boolean {
 let vnodeArgsTransformer:
     | ((
         args: Parameters<typeof _createVNode>,
-        instance: ComponentInternalInstance | null,
+        instance: ArrangableInstance | null,
     ) => Parameters<typeof _createVNode>)
     | undefined
 
@@ -416,56 +300,28 @@ const createVNodeWithArgsTransform = (
 const normalizeKey = ({ key }: VNodeProps): VNode['key'] =>
     key != null ? key : null
 
-const normalizeRef = ({
-    ref,
-    ref_key,
-    ref_for,
-}: VNodeProps): VNodeNormalizedRefAtom | null => {
-    if (typeof ref === 'number') {
-        ref = '' + ref
-    }
-    return (
-        ref != null
-            ? isString(ref) || isRef(ref) || isFunction(ref)
-                ? { i: currentRenderingInstance, r: ref, k: ref_key, f: !!ref_for }
-                : ref
-            : null
-    ) as any
-}
-
 function createBaseVNode(
-    type: VNodeTypes | ClassComponent | typeof NULL_DYNAMIC_COMPONENT,
+    type: VNodeTypes | ClassArrangable | typeof NULL_DYNAMIC_ARRANGABLE,
     props: (Data & VNodeProps) | null = null,
     children: unknown = null,
     patchFlag = 0,
     dynamicProps: string[] | null = null,
-    shapeFlag: number = type === Fragment ? 0 : ShapeFlags.ELEMENT,
+    shapeFlag: number = type === Fragment ? 0 : ShapeFlags.LAYOUT_INVOCATION,
     isBlockNode = false,
     needFullChildrenNormalization = false,
 ): VNode {
-    const textSource = isValueExpression(children) ? children : null
-    if (textSource) children = ''
+    if (typeof type === 'string') throw new TypeError(`不能通过字符串 ${type} 创建布局实体；请调用 Arrangable 定义`)
     const vnode = {
         __v_isVNode: true,
         __v_skip: true,
         type,
         props,
         valueSources: null,
-        textSource,
         key: props && normalizeKey(props),
-        ref: props && normalizeRef(props),
         children,
-        component: null,
-        suspense: null,
-        ssContent: null,
-        ssFallback: null,
-        dirs: null,
-        transition: null,
+        arrangable: null,
         el: null,
         anchor: null,
-        target: null,
-        targetStart: null,
-        targetAnchor: null,
         staticCount: 0,
         shapeFlag,
         patchFlag,
@@ -477,19 +333,10 @@ function createBaseVNode(
 
     if (needFullChildrenNormalization) {
         normalizeChildren(vnode, children)
-        // normalize suspense children
-        if ((shapeFlag & ShapeFlags.SUSPENSE)) {
-            ; (type as typeof SuspenseImpl).normalize(vnode)
-        }
-    } else if (children) {
-        // compiled element vnode - if children is passed, only possible types are
-        // string or Array.
-        vnode.shapeFlag |= isString(children)
-            ? ShapeFlags.TEXT_CHILDREN
-            : ShapeFlags.ARRAY_CHILDREN
-    }
 
-    if (textSource) vnode.shapeFlag |= ShapeFlags.TEXT_CHILDREN
+    } else {
+        normalizeChildren(vnode, children)
+    }
 
     // validate key
     if (__DEV__ && vnode.key !== vnode.key) {
@@ -504,10 +351,10 @@ function createBaseVNode(
         // has current parent block
         currentBlock &&
         // presence of a patch flag indicates this node needs patching on updates.
-        // component nodes also should always be patched, because even if the
-        // component doesn't need to update, it needs to persist the instance on to
+        // arrangable nodes also should always be patched, because even if the
+        // arrangable doesn't need to update, it needs to persist the instance on to
         // the next vnode so that it can be properly unmounted later.
-        (vnode.patchFlag > 0 || shapeFlag & ShapeFlags.COMPONENT)
+        (vnode.patchFlag > 0 || shapeFlag & ShapeFlags.ARRANGABLE || type === Content)
     ) {
         currentBlock.push(vnode)
     }
@@ -522,14 +369,14 @@ export const createVNode = (
 ) as typeof _createVNode
 
 function _createVNode(
-    type: VNodeTypes | ClassComponent | typeof NULL_DYNAMIC_COMPONENT,
+    type: VNodeTypes | ClassArrangable | typeof NULL_DYNAMIC_ARRANGABLE,
     props: (Data & VNodeProps) | null = null,
     children: unknown = null,
     patchFlag: number = 0,
     dynamicProps: string[] | null = null,
     isBlockNode = false,
 ): VNode {
-    if (!type || type === NULL_DYNAMIC_COMPONENT) {
+    if (!type || type === NULL_DYNAMIC_ARRANGABLE) {
         if (__DEV__ && !type) {
             warn(`Invalid vnode type when creating vnode: ${type}.`)
         }
@@ -538,14 +385,14 @@ function _createVNode(
 
     if (isVNode(type)) {
         // createVNode receiving an existing vnode. This happens in cases like
-        // <component :is="vnode"/>
+        // <arrangable :is="vnode"/>
         // #2078 make sure to merge refs during the clone instead of overwriting it
-        const cloned = cloneVNode(type, props, true /* mergeRef: true */)
+        const cloned = cloneVNode(type, props)
         if (children) {
             normalizeChildren(cloned, children)
         }
         if (isBlockTreeEnabled > 0 && !isBlockNode && currentBlock) {
-            if (cloned.shapeFlag & ShapeFlags.COMPONENT) {
+            if (cloned.shapeFlag & ShapeFlags.ARRANGABLE) {
                 currentBlock[currentBlock.indexOf(type)] = cloned
             } else {
                 currentBlock.push(cloned)
@@ -555,37 +402,33 @@ function _createVNode(
         return cloned
     }
 
-    // class component normalization.
-    if (isClassComponent(type)) {
+    // class arrangable normalization.
+    if (isClassArrangable(type)) {
         type = type.__vccOpts
     }
 
-    // 2.x async/functional component compat
+    // 2.x async/functional arrangable compat
 
     // Native props keep their original values; only clone reactive input records.
     if (props) props = guardReactiveProps(props)!
 
     // encode the vnode type information into a bitmap
-    const shapeFlag = isString(type)
-        ? ShapeFlags.ELEMENT
-        : (isSuspense(type))
-            ? ShapeFlags.SUSPENSE
-            : isTeleport(type)
-                ? ShapeFlags.TELEPORT
-                : isObject(type)
-                    ? ShapeFlags.STATEFUL_COMPONENT
+    const shapeFlag = type === LayoutInvocation
+        ? ShapeFlags.LAYOUT_INVOCATION
+        : isObject(type)
+                    ? ShapeFlags.STATEFUL_ARRANGABLE
                     : isFunction(type)
-                        ? ShapeFlags.FUNCTIONAL_COMPONENT
+                        ? ShapeFlags.FUNCTIONAL_ARRANGABLE
                         : 0
 
-    if (__DEV__ && shapeFlag & ShapeFlags.STATEFUL_COMPONENT && isProxy(type)) {
+    if (__DEV__ && shapeFlag & ShapeFlags.STATEFUL_ARRANGABLE && isProxy(type)) {
         type = toRaw(type)
         warn(
-            `Vue received a Component that was made a reactive object. This can ` +
+            `Vue received a Arrangable that was made a reactive object. This can ` +
             `lead to unnecessary performance overhead and should be avoided by ` +
-            `marking the component with \`markRaw\` or using \`shallowRef\` ` +
+            `marking the arrangable with \`markRaw\` or using \`shallowRef\` ` +
             `instead of \`ref\`.`,
-            `\nComponent that was made reactive: `,
+            `\nArrangable that was made reactive: `,
             type,
         )
     }
@@ -612,12 +455,10 @@ export function guardReactiveProps(
 export function cloneVNode<T, U>(
     vnode: VNode<T, U>,
     extraProps?: (Data & VNodeProps) | null,
-    mergeRef = false,
-    cloneTransition = false,
 ): VNode<T, U> {
     // This is intentionally NOT using spread or extend to avoid the runtime
     // key enumeration cost.
-    const { props, ref, patchFlag, children, transition } = vnode
+    const { props, patchFlag, children } = vnode
     const mergedProps = extraProps ? mergeProps(props || {}, extraProps) : props
     const cloned: VNode<T, U> = {
         __v_isVNode: true,
@@ -625,26 +466,13 @@ export function cloneVNode<T, U>(
         type: vnode.type,
         props: mergedProps,
         valueSources: vnode.valueSources && Object.fromEntries(Object.entries(vnode.valueSources).filter(([key]) => !extraProps || !(key in extraProps))),
-        textSource: vnode.textSource,
         key: mergedProps && normalizeKey(mergedProps),
-        ref:
-            extraProps && extraProps.ref
-                ? // #2078 in the case of <component :is="vnode" ref="extra"/>
-                // if the vnode itself already has a ref, cloneVNode will need to merge
-                // the refs so the single vnode can be set on multiple refs
-                mergeRef && ref
-                    ? isArray(ref)
-                        ? ref.concat(normalizeRef(extraProps)!)
-                        : [ref, normalizeRef(extraProps)!]
-                    : normalizeRef(extraProps)
-                : ref,
+        content: vnode.content,
+        contentScope: vnode.contentScope,
         children:
             __DEV__ && patchFlag === PatchFlags.CACHED && isArray(children)
                 ? (children as VNode[]).map(deepCloneVNode)
                 : children,
-        target: vnode.target,
-        targetStart: vnode.targetStart,
-        targetAnchor: vnode.targetAnchor,
         staticCount: vnode.staticCount,
         shapeFlag: vnode.shapeFlag,
         // if the vnode is cloned with extra props, we can no longer assume its
@@ -660,30 +488,15 @@ export function cloneVNode<T, U>(
         dynamicProps: vnode.dynamicProps,
         dynamicChildren: vnode.dynamicChildren,
         appContext: vnode.appContext,
-        dirs: vnode.dirs,
-        transition,
+        retention: vnode.retention,
         // These should technically only be non-null on mounted VNodes. However,
         // they *should* be copied for kept-alive vnodes. So we just always copy
         // them since them being non-null during a mount doesn't affect the logic as
         // they will simply be overwritten.
-        component: vnode.component,
-        suspense: vnode.suspense,
-        ssContent: vnode.ssContent && cloneVNode(vnode.ssContent),
-        ssFallback: vnode.ssFallback && cloneVNode(vnode.ssFallback),
-        placeholder: vnode.placeholder,
+        arrangable: vnode.arrangable,
         el: vnode.el,
         anchor: vnode.anchor,
         ctx: vnode.ctx,
-    }
-
-    // if the vnode will be replaced by the cloned one, it is necessary
-    // to clone the transition to ensure that the vnode referenced within
-    // the transition hooks is fresh.
-    if (transition && cloneTransition) {
-        setTransitionHooks(
-            cloned as VNode,
-            transition.clone(cloned as VNode) as TransitionHooks,
-        )
     }
 
     return cloned
@@ -699,27 +512,6 @@ function deepCloneVNode(vnode: VNode): VNode {
         cloned.children = (vnode.children as VNode[]).map(deepCloneVNode)
     }
     return cloned
-}
-
-/**
- * @private
- */
-export function createTextVNode(text: string | ValueExpression = ' ', flag: number = 0): VNode {
-    return createVNode(Text, null, text, flag)
-}
-
-/**
- * @private
- */
-export function createStaticVNode(
-    content: string,
-    numberOfNodes: number,
-): VNode {
-    // A static vnode can contain multiple stringified elements, and the number
-
-    const vnode = createVNode(Static, null, content)
-    vnode.staticCount = numberOfNodes
-    return vnode
 }
 
 /**
@@ -753,15 +545,13 @@ export function normalizeVNode(child: VNodeChild): VNode {
         // always produce all-vnode children arrays
         return cloneIfMounted(child)
     } else {
-        // strings and numbers
-        return createVNode(Text, null, String(child))
+        throw new TypeError('内容只能包含 Arrangable 调用；显示文字请显式使用 Text 的 text 参数')
     }
 }
 
 // optimized normalization for template-compiled render fns
 export function cloneIfMounted(child: VNode): VNode {
-    return (child.el === null && child.patchFlag !== PatchFlags.CACHED) ||
-        child.memo
+    return (child.el === null && child.patchFlag !== PatchFlags.CACHED)
         ? child
         : cloneVNode(child)
 }
@@ -774,8 +564,8 @@ export function normalizeChildren(vnode: VNode, children: unknown): void {
     } else if (isArray(children)) {
         type = ShapeFlags.ARRAY_CHILDREN
     } else if (typeof children === 'object') {
-        if (shapeFlag & (ShapeFlags.ELEMENT | ShapeFlags.TELEPORT)) {
-            // Normalize slot to plain children for plain element and Teleport
+        if (shapeFlag & ShapeFlags.LAYOUT_INVOCATION) {
+            // 布局调用的内容进入明确子结构
             const slot = (children as any).default
             if (slot) {
                 // _c marker is added by withCtx() indicating this is a compiled slot
@@ -792,7 +582,7 @@ export function normalizeChildren(vnode: VNode, children: unknown): void {
                 // (compiled / normalized slots already have context)
                 ; (children as RawSlots)._ctx = currentRenderingInstance
             } else if (slotFlag === SlotFlags.FORWARDED && currentRenderingInstance) {
-                // a child component receives forwarded slots from the parent.
+                // a child arrangable receives forwarded slots from the parent.
                 // its slot type is determined by its parent's slot type.
                 if (
                     (currentRenderingInstance.slots as RawSlots)._ === SlotFlags.STABLE
@@ -808,68 +598,23 @@ export function normalizeChildren(vnode: VNode, children: unknown): void {
         children = { default: children, _ctx: currentRenderingInstance }
         type = ShapeFlags.SLOTS_CHILDREN
     } else {
-        children = String(children)
-        // force teleport children to array so it can be moved around
-        if (shapeFlag & ShapeFlags.TELEPORT) {
-            type = ShapeFlags.ARRAY_CHILDREN
-            children = [createTextVNode(children as string)]
-        } else {
-            type = ShapeFlags.TEXT_CHILDREN
-        }
+        if (vnode.type !== Comment || typeof children !== 'string') throw new TypeError('内容不能自动转换为文字；请显式使用 Text 的 text 参数')
     }
+
     vnode.children = children as VNodeNormalizedChildren
     vnode.shapeFlag |= type
 }
 
 export function mergeProps(...args: (Data & VNodeProps)[]): Data {
-    const ret: Data = {}
-    for (let i = 0; i < args.length; i++) {
-        const toMerge = args[i]
-        for (const key in toMerge) {
-            if (isOn(key)) {
-                const existing = ret[key]
-                const incoming = toMerge[key]
-                if (isValueExpression(existing) || isValueExpression(incoming)) {
-                    ret[key] = arrangeValue(() => {
-                        const left = isValueExpression(existing) ? existing.read() : existing
-                        const right = isValueExpression(incoming) ? incoming.read() : incoming
-                        return left && right && left !== right ? [left, right].flat() : right ?? left
-                    })
-                    continue
-                }
-                if (
-                    incoming &&
-                    existing !== incoming &&
-                    !(isArray(existing) && existing.includes(incoming))
-                ) {
-                    ret[key] = existing
-                        ? [].concat(existing as any, incoming as any)
-                        : incoming
-                } else if (
-                    incoming == null &&
-                    existing == null &&
-                    // mergeProps({ 'onUpdate:modelValue': undefined }) should not retain
-                    // the model listener.
-                    !isModelListener(key)
-                ) {
-                    ret[key] = incoming
-                }
-            } else if (key !== '') {
-                ret[key] = toMerge[key]
-            }
+    const result: Data = Object.create(null)
+    for (const source of args) {
+        if (source == null || typeof source !== 'object' || Array.isArray(source)) throw new TypeError('参数对象必须是普通对象')
+        for (const original of Object.keys(source)) {
+            const key = camelize(original)
+            if (!key) throw new TypeError('参数名称不能为空')
+            if (hasOwn(result, key)) throw new TypeError(`重复参数：${key}`)
+            result[key] = source[original]
         }
     }
-    return ret
-}
-
-export function invokeVNodeHook(
-    hook: VNodeHook,
-    instance: ComponentInternalInstance | null,
-    vnode: VNode,
-    prevVNode: VNode | null = null,
-): void {
-    callWithAsyncErrorHandling(hook, instance, ErrorCodes.VNODE_HOOK, [
-        vnode,
-        prevVNode,
-    ])
+    return result
 }

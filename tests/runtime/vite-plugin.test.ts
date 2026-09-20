@@ -48,7 +48,8 @@ test("vite plugin injects Arrange HMR client into the configured entry", async (
         warn() {
         }
     }, 'import { createApp } from "@arrange/framework";\n', "C:/demo/ui-src/src/main.ts")
-    assert.ok(transformed)
+    assert.equal(typeof transformed, 'string')
+    if (typeof transformed !== 'string') throw new Error('入口转换未返回源码')
     assert.match(transformed, /installArrangeHmrClient/)
     assert.match(transformed, /import\.meta\.hot/)
 })
@@ -56,9 +57,9 @@ test("vite plugin injects Arrange HMR client into the configured entry", async (
 test("vite plugin emits Arrange reload events over Vite HMR channel", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
-    const modules = [{ id: "App.vue" }]
+    const modules = [{ id: "App.sfa" }]
     const result = plugin.handleHotUpdate({
-        file: "C:\\demo\\ui-src\\src\\App.vue",
+        file: "C:\\demo\\ui-src\\src\\App.sfa",
         modules,
         server: {
             ws: {
@@ -72,16 +73,16 @@ test("vite plugin emits Arrange reload events over Vite HMR channel", () => {
     assert.equal(sent.length, 1)
     assert.equal(sent[0].type, "custom")
     assert.equal(sent[0].event, "arrange:reload")
-    assert.equal(sent[0]?.data?.path, "C:/demo/ui-src/src/App.vue")
+    assert.equal(sent[0]?.data?.path, "C:/demo/ui-src/src/App.sfa")
     assert.equal(typeof sent[0]?.data?.timestamp, "number")
 })
 
-test("vite plugin suppresses component-level HMR so native reload owns state cleanup", () => {
+test("vite plugin suppresses arrangable-level HMR so native reload owns state cleanup", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
     const result = plugin.handleHotUpdate({
-        file: "C:/demo/ui-src/src/Counter.vue",
-        modules: [{ id: "Counter.vue" }, { id: "Counter.vue?type=script" }],
+        file: "C:/demo/ui-src/src/Counter.sfa",
+        modules: [{ id: "Counter.sfa" }, { id: "Counter.sfa?type=script" }],
         server: {
             ws: {
                 send(event: { type?: string; event?: string; data?: { path?: string; timestamp?: number } }) {
@@ -113,32 +114,44 @@ test("vite plugin does not emit Arrange reload for dependency updates", () => {
     assert.deepEqual(sent, [])
 })
 
-test("vite plugin accepts Arrange component template without warnings", () => {
+test("vite plugin accepts Arrange arrangable template without warnings", async () => {
     const plugin = arrange()
     const warnings: string[] = []
-    plugin.transform.call({
+    await plugin.transform.call({
         warn(warning: { message: string }) {
             warnings.push(warning.message)
         }
-    }, '<template><Column><Text text="ok" /><Input placeholder="ok" /></Column></template>', 'App.vue')
+    }, '<template><Column><Text text="ok" /><Input placeholder="ok" /></Column></template>', 'App.sfa')
     assert.deepEqual(warnings, [])
 })
 
-test('SFC 配置诊断覆盖普通 script 与 defineOptions，定位非法字段', () => {
-    const compile = (source: string) => compileScript(parse(source, { filename: '组件配置.vue' }).descriptor, {})
-    for (const options of ['data() { return {} }', 'computed: {}', 'methods: {}', "['created']() {}", 'mixins: []', 'extends: {}', 'template: "旧模板"']) {
-        for (const source of [
-            `<script>export default { ${options} }</script>`,
-            `<script>import { defineComponent } from '@arrange/framework'; export default defineComponent({ ${options} })</script>`,
-            `<script setup>defineOptions({ ${options} })</script>`,
-        ]) {
-            assert.throws(() => compile(source), error => error instanceof Error && error.message.includes('组件配置.vue') && error.message.includes(options))
-        }
+test('SFA 仅接受 TS setup，模块导出及脚本属性在源码边界报错', () => {
+    const compile = (source: string) => {
+        const result = parse(source, { filename: '声明.sfa' })
+        if (result.errors.length) throw result.errors[0]
+        return compileScript(result.descriptor, {})
     }
+    for (const source of ['<script>export default {}</script>', '<script setup>const count = 1</script>', '<script lang="ts">const count = 1</script>']) assert.throws(() => compile(source))
+    assert.throws(() => compile('<script>const result = await Promise.resolve(1)</script>'), /初始化必须同步/)
+    assert.throws(() => compile('<script>for await (const item of source) { console.log(item) }</script>'), /初始化必须同步/)
+    assert.doesNotThrow(() => compile('<script>async function load() { return await Promise.resolve(1) }</script>'))
 
-    const result = compile('<script>export default { props: { title: String }, setup() { return { count: 1 } } }</script><template><Text :text="title + count" /></template>')
+    const result = compile('<template><Text :text="title + count" /></template><script>defineProps<{ title: string }>()\nconst count = 1</script>')
     assert.equal(result.bindings?.title, 'props')
-    assert.equal(result.bindings?.count, 'setup-maybe-ref')
-    const macro = compile('<script setup>defineOptions({ name: "正式组件", inheritAttrs: false })</script><template><Text text="有效" /></template>')
-    assert.match(macro.content, /inheritAttrs: false/)
+    assert.equal(result.bindings?.count, 'literal-const')
+})
+
+
+test('SFA 转译源码映射保留脚本位置与原始文件', async () => {
+    const { SourceMapConsumer } = await import('source-map-js')
+    const plugin = arrange()
+    const source = '<template>\n    <Text :text="String(count)" />\n</template>\n<script>\nconst count: number = 17\n</script>'
+    const result = await plugin.transform.call({ warn() {} }, source, 'Mapped.sfa')
+    assert.ok(result && typeof result === 'object' && result.map)
+    const consumer = new SourceMapConsumer(result.map as import('source-map-js').RawSourceMap)
+    const lines: number[] = []
+    consumer.eachMapping(mapping => { if (mapping.originalLine) lines.push(mapping.originalLine) })
+    assert.ok(lines.includes(5), JSON.stringify(lines))
+    assert.ok(lines.includes(2), JSON.stringify(lines))
+    assert.ok(consumer.sourceContentFor('Mapped.sfa')?.includes('const count: number = 17'))
 })

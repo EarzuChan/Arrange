@@ -1,6 +1,8 @@
 import type {Modifier, ModifierElement} from "./modifier.ts"
 import type {ArrangementName, AxisAlignment, ColorValue, HorizontalAlignment, VerticalAlignment} from "./primitives.ts"
 import {ARRANGE_PROTOCOL_VERSION} from "./version.ts"
+import type { PainterCompletion } from './painter.ts'
+export type { Painter } from './painter.ts'
 
 export type NodeId = number
 export type NativeEventCallback = (...args: unknown[]) => unknown
@@ -37,8 +39,7 @@ export type VerticalArrangementProp = ArrangementProp<VerticalAlignment, Exclude
 
 export type ResourceRef =
     | string
-    | Readonly<{path: string; url?: never}>
-    | Readonly<{url: string; path?: never}>
+    | Readonly<{path: string}>
 
 export type NativePropValue =
     | string
@@ -54,6 +55,8 @@ export type NativeBindingHandle = Readonly<{identity: bigint; generation: bigint
 export type NativeModifierHandle = NativeBindingHandle & Readonly<{key: string; kind: string}>
 
 export type NativeTransactionTarget = {
+    acquirePainter?: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
+    releasePainter?: (handle: NativeBindingHandle) => void
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
     updateBinding: (handle: NativeBindingHandle, value: NativePropValue | Modifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void

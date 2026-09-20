@@ -17,15 +17,15 @@ export {
     // utilities
     unref
 } from '@arrange/vue-reactivity'
-export { defineAsyncComponent } from './apiAsyncComponent.ts'
+export { defineAsyncArrangable } from './apiAsyncArrangable.ts'
 export { computed } from './apiComputed.ts'
-export { defineComponent } from './apiDefineComponent.ts'
+export { defineArrangable } from './apiDefineArrangable.ts'
 export { hasInjectionContext, inject, provide } from './apiInject.ts'
 export {
     onActivated, onBeforeMount, onBeforeUnmount, onBeforeUpdate, onDeactivated, onErrorCaptured, onMounted, onRenderTracked,
     onRenderTriggered, onUnmounted, onUpdated
 } from './apiLifecycle.ts'
-export { useAttrs, useSlots } from './apiSetupHelpers.ts'
+export { useSlots } from './apiSetupHelpers.ts'
 export {
     watch,
     watchEffect,
@@ -33,17 +33,12 @@ export {
     watchSyncEffect
 } from './apiWatch.ts'
 export { useId } from './helpers/useId.ts'
-export { useModel } from './helpers/useModel.ts'
-export { type TemplateRef, useTemplateRef } from './helpers/useTemplateRef.ts'
 export { nextTick } from './scheduler.ts'
 
 // <script setup> API ----------------------------------------------------------
 export {
-    type ComponentTypeEmits, type DefineProps,
-    type ModelRef, defineEmits,
-    defineExpose, defineModel, defineOptions,
     // macros runtime, for typing and warnings only
-    defineProps, defineSlots, withDefaults
+    type DefineProps, defineProps, withDefaults
 } from './apiSetupHelpers.ts'
 
 /**
@@ -51,14 +46,13 @@ export {
  */
 export {
     createPropsRestProxy, mergeDefaults,
-    mergeModels, withAsyncContext
 } from './apiSetupHelpers.ts'
 
 // Advanced API ----------------------------------------------------------------
 
 // For getting a hold of the internal instance in setup() - useful for advanced
 // plugins
-export { getCurrentInstance } from './component.ts'
+export { getCurrentInstance } from './arrangable.ts'
 
 // For raw render function users
 export { h } from './h.ts'
@@ -66,18 +60,9 @@ export { h } from './h.ts'
 export { cloneVNode, createVNode, isVNode, mergeProps } from './vnode.ts'
 
 // VNode types
-export { Comment, Fragment, Static, Text, type VNodeRef } from './vnode.ts'
+export { Comment, Fragment } from './vnode.ts'
 
-// Built-in components
-export {
-    BaseTransition, type BaseTransitionProps, BaseTransitionPropsValidators
-} from './components/BaseTransition.ts'
-export { KeepAlive, type KeepAliveProps } from './components/KeepAlive.ts'
-export { Suspense, type SuspenseProps } from './components/Suspense.ts'
-export { Teleport, type TeleportProps } from './components/Teleport.ts'
-
-// For using custom directives
-export { withDirectives } from './directives.ts'
+// Built-in arrangables
 
 // Custom Renderer API ---------------------------------------------------------
 export { createRenderer } from './renderer.ts'
@@ -91,16 +76,11 @@ export {
     ErrorCodes, callWithAsyncErrorHandling, callWithErrorHandling, handleError
 } from './errorHandling.ts'
 export {
-    resolveComponent,
-    resolveDirective,
-    resolveDynamicComponent
+    resolveArrangable,
+    resolveDynamicArrangable
 } from './helpers/resolveAssets.ts'
 export { assertNumber } from './warning.ts'
 
-export {
-    getTransitionRawChildren, resolveTransitionHooks,
-    setTransitionHooks, useTransitionState
-} from './components/BaseTransition.ts'
 
 import { ErrorTypeStrings as _ErrorTypeStrings } from './errorHandling.ts'
 /**
@@ -112,7 +92,7 @@ export const ErrorTypeStrings = (
 ) as typeof _ErrorTypeStrings
 
 // Types -----------------------------------------------------------------------
-import type { ComponentInternalInstance } from './component.ts'
+import type { ArrangableInstance } from './arrangable.ts'
 import type { VNode } from './vnode.ts'
 
 // Augment Ref unwrap bail types.
@@ -121,9 +101,9 @@ declare module '@arrange/vue-reactivity' {
         runtimeCoreBailTypes:
         | VNode
         | {
-            // directly bailing on ComponentPublicInstance results in recursion
+            // directly bailing on ArrangablePublicInstance results in recursion
             // so we use this as a bail hint
-            $: ComponentInternalInstance
+            $: ArrangableInstance
         }
     }
 }
@@ -137,51 +117,40 @@ export type {
     ToRefs, UnwrapNestedRefs, UnwrapRef, WritableComputedOptions, WritableComputedRef
 } from '@arrange/vue-reactivity'
 export type {
-    AsyncComponentLoader, AsyncComponentOptions
-} from './apiAsyncComponent.ts'
+    AsyncArrangableLoader, AsyncArrangableOptions
+} from './apiAsyncArrangable.ts'
 export type {
     App,
     AppConfig,
     AppContext, CreateAppFunction, FunctionPlugin, ObjectPlugin, Plugin
 } from './apiCreateApp.ts'
 export type {
-    DefineComponent,
-    DefineSetupFnComponent,
+    DefineArrangable,
+    DefineSetupFnArrangable,
     PublicProps
-} from './apiDefineComponent.ts'
+} from './apiDefineArrangable.ts'
 export type { InjectionKey } from './apiInject.ts'
 export type {
     MultiWatchSources, WatchCallback, WatchEffect, WatchHandle, WatchOptions,
     WatchEffectOptions as WatchOptionsBase, WatchSource, WatchStopHandle
 } from './apiWatch.ts'
 export type {
-    AllowedAttrs, AllowedComponentProps, Attrs, Component, ComponentCustomProps, ComponentInstance, ComponentInternalInstance, ConcreteComponent,
-    FunctionalComponent, GlobalComponents,
-    GlobalDirectives, SetupContext
-} from './component.ts'
+    Arrangable, ArrangableInstance, ConcreteArrangable,
+    FunctionalArrangable, GlobalArrangables,
+    SetupContext
+} from './arrangable.ts'
 export type {
-    EmitFn, EmitsOptions, EmitsToProps, ObjectEmitsOptions, ShortEmitsToObject
-} from './componentEmits.ts'
+    ArrangableOptions, ArrangableOptionsBase, RenderFunction
+} from './arrangableOptions.ts'
 export type {
-    ComponentOptions, ComponentOptionsBase, RenderFunction
-} from './componentOptions.ts'
-export type {
-    ComponentObjectPropsOptions, ComponentPropsOptions, ExtractDefaultPropTypes, ExtractPropTypes,
+    ArrangableObjectPropsOptions, ArrangablePropsOptions, ExtractDefaultPropTypes, ExtractPropTypes,
     ExtractPublicPropTypes, Prop,
     PropType
-} from './componentProps.ts'
+} from './arrangableProps.ts'
 export type {
-    ComponentCustomProperties, ComponentPublicInstance
-} from './componentPublicInstance.ts'
-export type {
-    TransitionHooks, TransitionState
-} from './components/BaseTransition.ts'
-export type { SuspenseBoundary } from './components/Suspense.ts'
-export type { Slot, Slots, SlotsType } from './componentSlots.ts'
-export type {
-    Directive, DirectiveArguments, DirectiveBinding,
-    DirectiveHook, DirectiveModifiers, FunctionDirective, ObjectDirective
-} from './directives.ts'
+    ArrangableCustomProperties, ArrangablePublicInstance
+} from './arrangablePublicInstance.ts'
+export type { Slot, Slots, SlotsType } from './arrangableSlots.ts'
 export type { HMRRuntime } from './hmr.ts'
 export type {
     Renderer, RendererElement, RendererNode, RendererOptions,
@@ -200,18 +169,18 @@ export type {
 // should sync with '@arrange/vue-compiler-core/src/runtimeHelpers.ts'
 export {
     camelize,
-    capitalize, toDisplayString, toHandlerKey
+    arrangeParameterName,
+    capitalize
 } from '@arrange/vue-shared'
 export {
     withCtx
-} from './componentRenderContext.ts'
+} from './arrangableRenderContext.ts'
 export { createSlots } from './helpers/createSlots.ts'
+export { arrangeParameters } from './propDeclarations.ts'
 export { renderList } from './helpers/renderList.ts'
 export { renderSlot } from './helpers/renderSlot.ts'
-export { toHandlers } from './helpers/toHandlers.ts'
-export { isMemoSame, withMemo } from './helpers/withMemo.ts'
 export {
-    createBlock, createCommentVNode, createElementBlock, createElementVNode, createStaticVNode, createTextVNode, guardReactiveProps, openBlock, setBlockTracking
+    createBlock, createCommentVNode, createElementBlock, createElementVNode, guardReactiveProps, openBlock, setBlockTracking
 } from './vnode.ts'
 
 // For test-utils
@@ -219,8 +188,11 @@ export { transformVNodeArgs } from './vnode.ts'
 
 export { getArrangeExecutionStats } from './executionStats.ts'
 export { arrangeProps, arrangeValue } from './valueBinding.ts'
-export { arrangeResource } from './resource.ts'
 
 import { NOOP } from '@arrange/vue-shared'
 
+export { isValueExpression } from './valueBinding.ts'
 export type { ValueExpression } from './valueBinding.ts'
+
+export { defineFoundationArrangable } from './apiDefineFoundationArrangable.ts'
+

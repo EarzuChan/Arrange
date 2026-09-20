@@ -2,7 +2,6 @@
 
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/DiagnosticEvent.h>
-#include <arrange/juce/ImageResourceCache.h>
 #include <arrange/juce/JuceDrawOpsPainter.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
@@ -21,7 +20,6 @@ namespace arrange::juce {
     class PassivePaintRenderer final {
     public:
         explicit PassivePaintRenderer(const arrange::core::TextLayoutService& service) : textLayoutService_(service) {}
-        void setPackageDir(const std::filesystem::path& packageDir);
         void clearResources();
         void prepareResources(arrange::core::PublishedFrameContent& content);
 
@@ -41,7 +39,6 @@ namespace arrange::juce {
         double paintMillis_ = 0;
         double preparationMillis_ = 0;
         JuceDrawOpsPainter drawOpsPainter_;
-        ImageResourceCache imageResources_;
     };
 
 #endif

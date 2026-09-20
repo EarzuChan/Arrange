@@ -21,6 +21,7 @@ namespace arrange::core {
 
         std::uint32_t capabilities(const ModifierValue& value) {
             if (std::holds_alternative<LayoutModifierSemantics>(value) || std::holds_alternative<ParentDataModifierSemantics>(value) || std::holds_alternative<AnimateContentSizeModifier>(value)) return kMeasure;
+            if (std::holds_alternative<PaintModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::Resource);
             if (std::holds_alternative<OffsetModifier>(value)) return kPlace;
             if (std::holds_alternative<PaintStyleSemantics>(value)) return kPaint;
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
@@ -44,6 +45,7 @@ namespace arrange::core {
                 return names[static_cast<std::size_t>(input.kind)];
             }
             if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : "align";
+            if constexpr (std::is_same_v<T, PaintModifier>) return "paint";
             if constexpr (std::is_same_v<T, ClipModifier>) return "clip";
             if constexpr (std::is_same_v<T, TransformModifierSemantics>) return "graphicsLayer";
             if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
@@ -82,6 +84,18 @@ namespace arrange::core {
                 for (auto value : spec.bezier) finite(value);
                 if (spec.durationMillis < 0 || spec.delayMillis < 0 || spec.stiffness <= 0 || spec.dampingRatio <= 0 || spec.threshold <= 0 || spec.bezier[0] < 0 || spec.bezier[0] > 1 || spec.bezier[2] < 0 || spec.bezier[2] > 1) throw std::invalid_argument("Arrange invalid content-size animation spec");
             }
+            else if constexpr (std::is_same_v<T, PaintModifier>) {
+                finite(input.alpha);
+                if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("paint alpha 必须在 0..1 之间");
+                if (!isImageAlignment(input.alignment)) throw std::invalid_argument("paint 对齐值无效");
+                if (input.contentScale != "Fit" && input.contentScale != "Crop" && input.contentScale != "FillBounds" && input.contentScale != "Inside" && input.contentScale != "None" && input.contentScale != "FillWidth" && input.contentScale != "FillHeight") throw std::invalid_argument("paint 缩放模式无效");
+                if (input.painter.content && input.painter.content->intrinsicSize) {
+                    const auto size = *input.painter.content->intrinsicSize;
+                    finite(size.width);
+                    finite(size.height);
+                    if (size.width < 0 || size.height < 0) throw std::invalid_argument("Painter 固有尺寸不能为负数");
+                }
+            }
             else if constexpr (std::is_same_v<T, ClipModifier>) validateModifierValue(input.shape);
             else if constexpr (std::is_same_v<T, TransformModifierSemantics>) {
                 for (auto number : {input.translationX, input.translationY, input.scaleX, input.scaleY, input.rotationZ, input.transformOriginX, input.transformOriginY, input.alpha}) finite(number);
@@ -99,6 +113,13 @@ namespace arrange::core {
 
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after) {
         if (before == after) return 0;
+        if (const auto* a = std::get_if<PaintModifier>(&before)) {
+            if (const auto* b = std::get_if<PaintModifier>(&after)) {
+                const auto oldSize = a->painter.content ? a->painter.content->intrinsicSize : std::nullopt;
+                const auto newSize = b->painter.content ? b->painter.content->intrinsicSize : std::nullopt;
+                if (a->sizeToIntrinsics == b->sizeToIntrinsics && (!a->sizeToIntrinsics || oldSize == newSize)) return kPaint | dirtyMask(DirtyFlag::Resource);
+            }
+        }
         if (const auto* a = std::get_if<LayoutModifierSemantics>(&before)) {
             if (const auto* b = std::get_if<LayoutModifierSemantics>(&after); b && a->kind == b->kind) {
                 auto previous = *a;

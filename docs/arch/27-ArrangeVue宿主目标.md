@@ -1,146 +1,74 @@
-﻿# 目标
+# Arrange Vue 宿主目标
 
-Arrange Vue 是面向 Arrange host target 的 authoring、composition 与 scheduling 前端。本文定义 Arrange Vue 的宿主目标、authoring 能力与 lowering 口径。
+Arrange Vue 是 Arrange 的模板编译与响应式执行前端，服务于原生 LayoutNode、Modifier、typed mutation 和帧发布。Arrangable 是唯一的可组合视图定义；定义、调用实例、Layout 所属 RearrangeNode 和原生布局实体具有不同身份，完整模型见 [运行时](04-运行时.md)。
 
-Arrange Vue 仅服务于 Arrange 项目本身，不能作为独立通用 Vue runtime 使用，更不面向 Web / DOM 场景（道不同不相为谋！）；其语义必须服从 Arrange 的 Composition、Layout、Draw 与 FramePlan 链路。
+## SFA 与初始化
 
-Arrange Vue 的核心作用：
+用户视图通过 SFA（Single-File Arrangable）模板创建，扩展名为 .sfa。文件最多一个无属性的 script 块，统一按 TS setup 处理；没有逻辑时可省略。template 在前、script 在后，同级模板节点之间留空行。
 
-```txt
-SFC / template / script setup
--> Arrange host component lowering
--> phase-aware dependency
--> typed mutation / typed slot update
--> FramePlan
-```
+script 顶层绑定可供模板读取，初始化按实例执行一次，重排不重新初始化。import 保留模块语义；共享状态、导出和工具函数放到独立 .ts 模块。script setup、lang、双脚本、Options API、JSX/TSX 和 .vue 双扩展名加载均不属于正式契约。
 
-# Authoring 能力
+初始化为同步过程，SFA 顶层 await/for-await 在编译期拒绝，运行时拒绝返回 Promise 的初始化。异步业务函数可正常使用，加载状态、成功结果与错误通过明确状态和模板控制流表达；没有隐式等待分支或跨 await 恢复初始化上下文的协议。
 
-以下能力属于 Arrange Vue authoring 基础能力：
+defineProps 与 withDefaults 声明业务参数。响应式状态、观察、生命周期及 provide/inject 在 setup 中使用。公开 API 与内建参数签名见 [基础 API 形态](21-基础API形态.md)。直接代码编写与 SFA 编译使用同一 Arrangable 契约，普通 FA 没有原生特权；用户仍通过 SFA 组织视图，可直接调用 Layout 并组合与 FA 相同的 UI 描述，不需要 Foundation 专用入口。公共包分层及内部 helper 的收口仍须按包边界完成，不能把内部可调用等同于公开承诺。
 
-- SFC。
-- `<script setup>`。
-- props / emits。
-- slots / scoped slots。
-- `ref` / `reactive` / `computed`。
-- `watch` / `watchEffect`。
-- lifecycle hooks，例如 `onMounted`、`onUnmounted`。
-- provide / inject。
-- `v-if`。
-- `v-for`。
-- `v-model`。
-- dynamic component。
-- Pinia 类业务状态管理。
-- memory routing 类导航组织。
+## 封闭模板语言
 
-这些能力必须 lowering 到 Arrange host components、Modifier、typed prop、event slot、resource slot、reactive slot、MutationTransaction 或 SlotUpdateBatch。
+模板只接受准确 PascalCase 定义名称、v-if/v-else-if/v-else、v-for、显式组合 key、参数绑定和内容入口。标签不进行 kebab-case、大小写或模糊名称猜测。
 
-组件状态、副作用、生命周期和依赖注入统一使用 `setup` / `<script setup>` 中的 Composition API。普通组件对象保留 props/emits、setup/render、name、inheritAttrs、局部 components/directives 注册及 slots 类型声明；`setup` 返回状态或 render，公开实例成员使用 setup context 的 `expose` / `defineExpose`。
+内容位置不接受裸文本或插值。标签之间的排版空白统一忽略，显示文字只能通过 Text 的 text 参数。对象不会被转换成显示字符串。内部结构锚点没有文字呈现能力。
 
-Options API 的 data/computed/methods/watch、对象生命周期、mixins/extends、对象 provide/inject 和 expose 配置不属于组件契约；App 不提供 mixin 或 optionMergeStrategies。模板由 SFC 工具链编译，不提供组件 template/compilerOptions 或运行时编译器。公开配置签名见 [基础 API 形态](21-基础API形态.md)。
+保留的参数语法如下：
 
-编译器和运行时共用组件配置名称集合：SFC 静态对象的非法键在编译期报告，动态对象在运行时报告，生产构建同样拒绝，不静默跳过。`defineOptions` 必须使用可静态检查、无展开项的对象，动态值可放在已声明字段中；普通组件对象的展开配置仍由最终运行时对象校验。错误保留 SFC 文件与可用的源码行列。
+| 写法 | 语义 |
+| --- | --- |
+| title="正文" | 固定字符串，不解析为 JS |
+| enabled | 固定布尔 true |
+| :amount="expression" 或 v-bind:amount="expression" | TS 表达式的反应式求值 |
+| :[name]="expression" 或 v-bind:[name]="expression" | 动态参数名与表达式 |
+| v-bind="parameters" | 按声明逐项处理对象字段 |
+| .camel | 仅转换参数名称 |
 
-# Host vocabulary
+冒号绑定必须给出表达式，不存在同名补全。参数声明名与传入名使用确定的 camelize 规则，槽位名称和标签不参与此转换。静态重复在编译期报告；动态名字与对象字段在组装边界拒绝归一后的重复，不覆盖、不合并函数、不按顺序选择胜者。
 
-Arrange host target 的基础词汇是：
+模板 ref、@/v-on、v-model、emits/emit、defineModel、defineOptions、defineExpose、v-html、v-show、v-pre、v-once、v-memo 及用户指令扩展不具有解释或执行入口。回调通过明确声明的普通函数 prop 传递，原生 typed event slot 仍负责真实输入事件的注册、代际与退休。
 
-```txt
-Box / Row / Column / Spacer
-Text / Input / Image / Icon
-用户 Vue 组件，且最终展开为 Arrange host components
+## 参数边界
 
-未来或还有：Canvas / FlowRow / FlowColumn / LazyColumn / LazyRow / LazyVerticalGrid / LazyHorizontalGrid
-```
+每个 Arrangable 只接收自己声明的参数；modifier 同样必须声明。未声明参数报错，不收集 attrs，不透传，不因零根、单根或多根而改变行为。实现必须显式读取和转交参数，Modifier 多次交付产生独立受体实例。
 
-Arrange compiler 与 Framework 使用同一份正向 host schema。已知宿主的 prop 与事件名在编译期校验；动态输入和手写 render 在宿主边界校验。Modifier 描述和值由正式类型化 reader 校验，资源在候选帧发布前准备。用户组件自主声明 props，包括 style、class 等普通字段。
+类型错误拒绝调用或更新，不转换字符串/布尔值，不警告后继续执行。没有显式默认值就保持未传，required 则报告缺失。默认工厂按实例求值，优化不能提前执行它。modelValue、style 等词可以由业务声明为普通参数，但没有系统特权。
 
-枚举输入使用有限联合类型；原生按照具体输入和轴向验证实际值。未知值、拼写错误或轴向不匹配须报告字段和值，拒绝无效更新，保持已发布帧不变；随后有效更新可继续使用原绑定。枚举不以默认值吞掉错误。
+编译器对固定定义和固定名称生成位置表；定义连接阶段按正式声明核对名称、默认值及校验入口，后续消费使用确定位置。连接在调用点首次运行时完成，不提前执行默认工厂。单个表达式分别缓存，完整新参数组先校验再交付实例，校验器不接收组合 key。动态定义及对象字段遵守同一实际调用边界。安全参数描述与内容入口可以缓存，列表条目、槽位词法变量和组合 key 不得被缓存冻结。
 
-# `v-if`
+## Ref 本体
 
-`v-if` 表达结构增删。它进入 Composition Phase，并产生 create / insert / remove / delete 等结构 mutation。
+普通绑定自动解包 Ref。完整表达式外层的尖括号标记表示原样传递，例如 :state="<documentRef>"。编译器先辨认完整 TS 表达式，类型断言和泛型语法不能被简单字符串替换误拆；标记内部仍按 TS 求值。显式 .value、函数及代理已经产生的解包结果不会被重建。
 
-要求：
+接收方声明 Ref<T> 或只读 Ref 契约。参数保持原 Ref 身份，只读状态不因传递获得写权限；不能重新给 prop 赋值。原样表达式仍反应式求值，选择另一个 Ref 时切换身份；仅传本体不会订阅它的 value，实际消费 .value 的结构或值作用域自行订阅。运行时验证可识别的 Ref 契约，不假装验证任意泛型业务内容。
 
-- 删除分支必须退休对应 event slot 与 reactive slot binding。
-- 重新出现分支必须重新建立 native node、Modifier、prop state 与 slot binding。
-- 不保留不可见但仍参与 hit-test、focus、输入事件或绘制的幽灵节点。
+## 内容声明与调用
 
-# `v-for`
+Slot 是模板语法，不是运行时 Arrangable 或布局盒子。实现中的 Slot 声明并调用默认内容；Slot name="header" 声明并调用具名内容。name 必须静态，不接受业务 prop、Modifier、出口参数或默认子内容。未提供已声明内容时为空，未声明内容则拒绝。
 
-`v-for` 可用于小规模普通列表。可重排列表必须提供稳定 key。
+提供方使用 Template #header 或 Template v-slot:header；默认内容可直接书写，或显式选择 default。Template 仅分组，不增加实例、RearrangeNode 或 LayoutNode。内容为无参数函数，不能使用 scoped slot 解构。
 
-未来的大型集合由 Lazy 组件承接；该能力未公开前，普通列表明确承担全部物化成本。Lazy 拥有可视范围物化、测量缓存、滚动状态、item key、content type 与回收策略；Lazy 不是 `v-for` 语法糖。
+每次内容调用建立独立结构作用域，词法输入来自提供方，生命周期属于调用位置。同一内容可调用多次，各次拥有独立状态、订阅和实例；内容调用本身不产生 RearrangeNode，只有其中实际调用的 Layout 产生节点。内容依赖只唤醒实际消费者；词法条目更新刷新闭包，退出后取消任务及依赖，描述缓存不能冻结变量或窥探内容根数量。
 
-# `v-model`
+## 控制流与生命周期
 
-`v-model` 是受控 prop + event 的便捷写法。对 `Input` 等受控组件，应 lowering 到明确 schema：
+v-if 和 v-for 产生结构操作，显式组合 key 决定复用和替换。组合 key 不进入业务 props，与 Modifier.keyed 和原生 handle 分开。分支退出退休绑定与事件资源；keyed 移动保留对应实例，删除后迟到任务不得写入退休目标。
 
-```txt
-modelValue
-onUpdate:modelValue / onUpdate:model-value
-```
+KeepAlive 按 cacheKey 缓存整份零根、单根或多根内容；有限缓存逐出与所有者卸载停止整份作用域。停用撤销原生交互资格并暂停 UI 消费，恢复同步最新状态。缓存管理使用统一实例与内容作用域机制，后端资源仍由内容中的 Layout 管理；不持有复制的 VNode，也没有专属 FA 状态工厂。具体帧资格和生命周期通知归属 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 
-事件 callback 必须来自真实 JS function，并注册为 typed event slot。
+DynamicArrangable 的 is 明确选择定义，props 是该定义的参数对象；外层与目标分别校验，不能把外层未声明参数透传给目标。导航可用业务状态选择定义，不依赖浏览器地址栏。
 
-# Dynamic component
+异步工作必须具有作用域、请求身份与代际，迟到结果不能恢复已卸载内容。Suspense、Teleport 和 Vue Transition/TransitionGroup/BaseTransition 没有公共入口、专用结构字段或执行协议。动画采用 Arrange 自有 API，见 [动画与 Transition](28-动画与Transition.md)。统一帧调度与公共包分层存在后续施工边界时，以工作记录说明实际完成度，不把目标文档作为已实现证据。
 
-`<component :is="...">` 可用于 Arrange 内建组件与用户 Vue 组件。dynamic component 的最终产物必须是 Arrange host component tree。
+## 工具链与诊断
 
-# KeepAlive
+真实 .sfa 文件经过统一编译、TS 转译、源码映射及 Vite 构建进入 QuickJS。命令行检查保留脚本与跨 SFA 的参数、内容契约，支持 TS paths 解析；不能以通配 any 声明代替检查。类型依赖进入 watch，并在更新时清理解析缓存；热更新通过宿主 reload 统一退休旧上下文。
 
-`KeepAlive` 可以保留组件实例状态。其 native tree 激活、停用、event slot、resource slot 与 reactive slot binding 必须有明确行为：
+模板值携带文件、行列与输入名称，求值、参数拒绝和原生 typed 提交保留错误来源。Painter 异步失败保留资源地址与消费位置，经正式发布边界展示。专用 IDE 插件不作为交付前提。
 
-- deactivated 子树不参与 hit-test、focus、输入事件或绘制。
-- activated 子树重新同步必要 native state 与 slot binding。
-- 停用时退休原生节点、binding 与 callback，保留逻辑组件实例与状态；激活重新建立原生身份并同步最新值。
-- 逻辑值依赖归组件 effect scope，最终逐出缓存或卸载时停止；停用期间不向已退休原生目标写入。
-
-# Suspense
-
-`Suspense` 的 default 与 fallback 内容都必须展开为 Arrange host component tree。
-
-要求：
-
-- fallback / resolved 切换进入结构 mutation。
-- 异步错误进入 Arrange Vue error handling 与 Arrange diagnostics。
-- pending / resolved 状态不得绕过 FramePlan。
-- 延迟 fallback 与 defineAsyncComponent 的 loading delay、timeout 使用宿主帧时钟；完成、卸载与等待分支替换取消相应需求。
-- 异步 setup 的迟到结果或拒绝不重新挂载已退休分支；编译后的顶层 await 不恢复已经退休的 setup 作用域。errorComponent 是显式错误展示边界；未处理错误进入宿主故障恢复路径。
-
-# Pinia 与业务状态
-
-Pinia 类业务状态管理属于 semantic state。业务状态变化进入 Arrange Vue composition 或 phase-aware dependency，不直接访问 native scene、layout tree、FramePlan 或音频线程。
-
-音频线程数据必须经互操作通道进入 UI owner，由 InputIntent / RuntimeStore / JS Value Phase / FramePlan 消费。
-
-# Memory routing
-
-导航组织采用 memory routing 语义：route state 驱动 Arrange component tree 切换。导航动作进入业务状态与 composition，不依赖外部宿主地址栏。
-
-# 副作用
-
-普通副作用使用 Arrange Vue Composition API：
-
-- `onMounted` 启动订阅、frame callback 或资源请求。
-- `onUnmounted` 取消订阅、释放资源并退休 slot binding。
-- `watch` / `watchEffect` 处理业务状态变化。
-- `watch(..., onCleanup)` 处理 keyed effect 清理。
-- `effectScope` 管理组合式封装的作用域。
-
-帧相关逻辑使用 Arrange VBlankSource 驱动的 frame API 或更高层动画 API。Promise / microtask、JS timer 或 production timer fallback 不表达 frame。
-
-# 动画与 transition
-
-动画 authoring 使用 Arrange runtime API，例如 `animatedXAsRef`、transition API 与高层 visibility / content size / crossfade API。动画过程值进入 JS Value Phase 与 Reactive Slot Runtime。动画过程值变化不默认触发 component render。语义见 [动画与Transition](28-动画与Transition.md)。
-
-# 对象创建与手写 render
-
-setup 对每个组件实例执行一次。组合式对象在 setup 内创建，订阅与动画归创建时的 effect scope；独立 effectScope 由调用方 stop，手动 requestAnimationFrame 由创建者取消。ScrollState 为响应式数据对象，原生绑定随挂载/停用/卸载管理，不要求额外缓存工厂。
-
-模板把普通表达式交给实际结构消费者或持久值消费者。手写 render 使用 `arrangeValue(() => expression)` 声明独立值输入；普通 TS 已经求出的值保持快照语义。组件 props/attrs 的值传递、computed、helper、scoped slots 均按实际读取建立依赖。
-
-# Compiler 诊断
-
-Arrange compiler 以 Arrange host target 为正向目标。未知宿主输入、事件或指令转换产生具体诊断及原始 SFC 位置。动态输入的值表达式携带文件、行列与输入名，求值和类型化提交错误保留该来源；组件附带 __file 供手写 render 错误归属。资源输入的路径或 URL 与编译来源一同传到原生绘制记录；资源准备错误保留资源路径和 SFC 行列，并经发布边界统一显示。上游维护和行为测试边界记录于各内部包 UPSTREAM.md。
+源码发布形态下，Vite 配置使用 `--configLoader runner` 解析 Framework 的 TS 工具入口；独立消费者需同时执行 `checkSfaProject` 和生产构建，不能仅以脚本转译结果作为类型验证。

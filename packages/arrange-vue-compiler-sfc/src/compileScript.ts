@@ -11,7 +11,6 @@ import type {
     ArrayPattern,
     CallExpression,
     Declaration,
-    ExportSpecifier,
     Identifier,
     LVal,
     Node,
@@ -25,24 +24,15 @@ import {
     SourceMapGenerator,
 } from 'source-map-js'
 import {
-    type SFCTemplateCompileOptions,
+    type SFATemplateCompileOptions,
     compileTemplate,
 } from './compileTemplate.ts'
 import {
     DEFAULT_FILENAME,
-    type SFCDescriptor,
-    type SFCScriptBlock,
+    type SFADescriptor,
+    type SFAScriptBlock,
 } from './parse.ts'
-import { analyzeScriptBindings } from './script/analyzeScriptBindings.ts'
 import { ScriptCompileContext } from './script/context.ts'
-import {
-    DEFINE_EMITS,
-    genRuntimeEmits,
-    processDefineEmits,
-} from './script/defineEmits.ts'
-import { DEFINE_EXPOSE, processDefineExpose } from './script/defineExpose.ts'
-import { DEFINE_MODEL, processDefineModel } from './script/defineModel.ts'
-import { DEFINE_OPTIONS, processDefineOptions } from './script/defineOptions.ts'
 import {
     DEFINE_PROPS,
     WITH_DEFAULTS,
@@ -50,75 +40,22 @@ import {
     processDefineProps,
 } from './script/defineProps.ts'
 import { transformDestructuredProps } from './script/definePropsDestructure.ts'
-import { DEFINE_SLOTS, processDefineSlots } from './script/defineSlots.ts'
-import {
-    isImportUsed,
-    resolveTemplateVModelIdentifiers,
-} from './script/importUsageCheck.ts'
-import {
-    normalScriptDefaultVar,
-    processNormalScript,
-} from './script/normalScript.ts'
-import { processAwait } from './script/topLevelAwait.ts'
 import {
     getImportedName,
     isCallOf,
-    isJS,
     isLiteralNode,
-    isTS,
 } from './script/utils.ts'
 import { warnOnce } from './warn.ts'
 
-export interface SFCScriptCompileOptions {
-
-
+export interface SFAScriptCompileOptions {
     isProd?: boolean
-    /**
-     * Enable/disable source map. Defaults to true.
-     */
     sourceMap?: boolean
-    /**
-     * https://babeljs.io/docs/en/babel-parser#plugins
-     */
     babelParserPlugins?: ParserPlugin[]
-    /**
-     * A list of files to parse for global types to be made available for type
-     * resolving in SFC macros. The list must be fully resolved file system paths.
-     */
     globalTypeFiles?: string[]
-    /**
-     * Compile the template and inline the resulting render function
-     * directly inside setup().
-     * - Only affects `<script setup>`
-     * - This should only be used in production because it prevents the template
-     * from being hot-reloaded separately from component state.
-     */
-    inlineTemplate?: boolean
-    /**
-     * Generate the final component as a variable instead of default export.
-     * This is useful in e.g. @vitejs/plugin-vue where the script needs to be
-     * placed inside the main module.
-     */
     genDefaultAs?: string
-
-    templateOptions?: Partial<SFCTemplateCompileOptions>
-    /**
-     * Hoist <script setup> static constants.
-     * - Only enables when one `<script setup>` exists.
-     * @default true
-     */
+    templateOptions?: Partial<SFATemplateCompileOptions>
     hoistStatic?: boolean
-    /**
-     * Set to `false` to disable reactive destructure for `defineProps` (pre-3.5
-     * behavior), or set to `'error'` to throw hard error on props destructures.
-     * @default true
-     */
     propsDestructure?: boolean | 'error'
-    /**
-     * File system access methods to be used when resolving types
-     * imported in SFC macros. Defaults to ts.sys in Node.js, can be overwritten
-     * to use a virtual file system for use in browsers (e.g. in REPLs)
-     */
     fs?: {
         fileExists(file: string): boolean
         readFile(file: string): string | undefined
@@ -131,78 +68,25 @@ export interface ImportBinding {
     imported: string
     local: string
     source: string
-    isFromSetup: boolean
-    isUsedInTemplate: boolean
 }
 
 const MACROS = [
     DEFINE_PROPS,
-    DEFINE_EMITS,
-    DEFINE_EXPOSE,
-    DEFINE_OPTIONS,
-    DEFINE_SLOTS,
-    DEFINE_MODEL,
     WITH_DEFAULTS,
 ]
 
-/**
- * Compile `<script setup>`
- * It requires the whole SFC descriptor because we need to handle and merge
- * normal `<script>` + `<script setup>` if both are present.
- */
+// 唯一的 TS setup 脚本模式，模板直接共享实例词法作用域
 export function compileScript(
-    sfc: SFCDescriptor,
-    options: SFCScriptCompileOptions,
-): SFCScriptBlock {
-    const { script, scriptSetup, source, filename } = sfc
-    const hoistStatic = options.hoistStatic !== false && !script
-    const scriptLang = script && script.lang
-    const scriptSetupLang = scriptSetup && scriptSetup.lang
-    const isJSOrTS =
-        isJS(scriptLang, scriptSetupLang) || isTS(scriptLang, scriptSetupLang)
-
-    if (script && scriptSetup && scriptLang !== scriptSetupLang) {
-        throw new Error(
-            `[@vue/compiler-sfc] <script> and <script setup> must have the same ` +
-            `language type.`,
-        )
-    }
-
-    if (!scriptSetup) {
-        if (!script) {
-            throw new Error(`[@vue/compiler-sfc] SFC contains no <script> tags.`)
-        }
-
-        // normal <script> only
-        if (script.lang && !isJSOrTS) {
-            // do not process non js/ts script blocks
-            return script
-        }
-
-        const ctx = new ScriptCompileContext(sfc, options)
-        return processNormalScript(ctx)
-    }
-
-    if (scriptSetupLang && !isJSOrTS) {
-        // do not process non js/ts script blocks
-        return scriptSetup
-    }
-
-    const ctx = new ScriptCompileContext(sfc, options)
-
-    // metadata that needs to be returned
-    // const ctx.bindingMetadata: BindingMetadata = {}
-    const scriptBindings: Record<string, BindingTypes> = Object.create(null)
+    sfa: SFADescriptor,
+    options: SFAScriptCompileOptions,
+): SFAScriptBlock {
+    const { script, source, filename } = sfa
+    if (!script) throw new Error('SFA 没有可编译的 script 区块')
+    const hoistStatic = options.hoistStatic !== false
+    const ctx = new ScriptCompileContext(sfa, options)
     const setupBindings: Record<string, BindingTypes> = Object.create(null)
-
-    let defaultExport: Node | undefined
-    let hasAwait = false
-
-    // string offsets
     const startOffset = ctx.startOffset!
     const endOffset = ctx.endOffset!
-    const scriptStartOffset = script && script.loc.start.offset
-    const scriptEndOffset = script && script.loc.end.offset
 
     function hoistNode(node: Statement) {
         const start = node.start! + startOffset
@@ -228,30 +112,8 @@ export function compileScript(
         local: string,
         imported: string,
         isType: boolean,
-        isFromSetup: boolean,
-        needTemplateUsageCheck: boolean,
     ) {
-        // template usage check is only needed in non-inline mode, so we can skip
-        // the work if inlineTemplate is true.
-        let isUsedInTemplate = needTemplateUsageCheck
-        if (
-            needTemplateUsageCheck &&
-            ctx.isTS &&
-            sfc.template &&
-            !sfc.template.src &&
-            !sfc.template.lang
-        ) {
-            isUsedInTemplate = isImportUsed(local, sfc)
-        }
-
-        ctx.userImports[local] = {
-            isType,
-            imported,
-            local,
-            source,
-            isFromSetup,
-            isUsedInTemplate,
-        }
+        ctx.userImports[local] = { isType, imported, local, source }
     }
 
     function checkInvalidScopeReference(node: Node | undefined, method: string) {
@@ -260,44 +122,17 @@ export function compileScript(
             const binding = setupBindings[id.name]
             if (binding && binding !== BindingTypes.LITERAL_CONST) {
                 ctx.error(
-                    `\`${method}()\` in <script setup> cannot reference locally ` +
-                    `declared variables because it will be hoisted outside of the ` +
-                    `setup() function. If your component options require initialization ` +
-                    `in the module scope, use a separate normal <script> to export ` +
-                    `the options instead.`,
+                    `${method}() 的声明会提升到模块，不能读取实例局部变量；共享定义请移入独立 TS 模块`,
                     id,
                 )
             }
         })
     }
 
-    const scriptAst = ctx.scriptAst
-    const scriptSetupAst = ctx.scriptSetupAst!
-
-    // 1.1 walk import declarations of <script>
-    if (scriptAst) {
-        for (const node of scriptAst.body) {
-            if (node.type === 'ImportDeclaration') {
-                // record imports for dedupe
-                for (const specifier of node.specifiers) {
-                    const imported = getImportedName(specifier)
-                    registerUserImport(
-                        node.source.value,
-                        specifier.local.name,
-                        imported,
-                        node.importKind === 'type' ||
-                        (specifier.type === 'ImportSpecifier' &&
-                            specifier.importKind === 'type'),
-                        false,
-                        !options.inlineTemplate,
-                    )
-                }
-            }
-        }
-    }
+    const scriptAst = ctx.scriptAst!
 
     // 1.2 walk import declarations of <script setup>
-    for (const node of scriptSetupAst.body) {
+    for (const node of scriptAst.body) {
         if (node.type === 'ImportDeclaration') {
             // import declarations are moved to top
             hoistNode(node)
@@ -325,7 +160,7 @@ export function compileScript(
                 const imported = getImportedName(specifier)
                 const source = node.source.value
                 const existing = ctx.userImports[local]
-                if (source === 'vue' && MACROS.includes(imported)) {
+                if ((source === '@arrange/framework' || source === '@arrange/runtime') && MACROS.includes(imported)) {
                     if (local === imported) {
                         warnOnce(
                             `\`${imported}\` is a compiler macro and no longer needs to be imported.`,
@@ -356,8 +191,6 @@ export function compileScript(
                         node.importKind === 'type' ||
                         (specifier.type === 'ImportSpecifier' &&
                             specifier.importKind === 'type'),
-                        true,
-                        !options.inlineTemplate,
                     )
                 }
             }
@@ -371,152 +204,13 @@ export function compileScript(
     const vueImportAliases: Record<string, string> = {}
     for (const key in ctx.userImports) {
         const { source, imported, local } = ctx.userImports[key]
-        if (source === 'vue') vueImportAliases[imported] = local
-    }
-
-    // 2.1 process normal <script> body
-    if (script && scriptAst) {
-        for (const node of scriptAst.body) {
-            if (node.type === 'ExportDefaultDeclaration') {
-                // export default
-                defaultExport = node
-
-                // check if user has manually specified `name` or 'render` option in
-                // export default
-                // if has name, skip name inference
-                // if has render and no template, generate return object instead of
-                // empty render function (#4980)
-                let optionProperties
-                if (defaultExport.declaration.type === 'ObjectExpression') {
-                    optionProperties = defaultExport.declaration.properties
-                } else if (
-                    defaultExport.declaration.type === 'CallExpression' &&
-                    defaultExport.declaration.arguments[0] &&
-                    defaultExport.declaration.arguments[0].type === 'ObjectExpression'
-                ) {
-                    optionProperties = defaultExport.declaration.arguments[0].properties
-                }
-                if (optionProperties) {
-                    for (const p of optionProperties) {
-                        if (
-                            p.type === 'ObjectProperty' &&
-                            p.key.type === 'Identifier' &&
-                            p.key.name === 'name'
-                        ) {
-                            ctx.hasDefaultExportName = true
-                        }
-                        if (
-                            (p.type === 'ObjectMethod' || p.type === 'ObjectProperty') &&
-                            p.key.type === 'Identifier' &&
-                            p.key.name === 'render'
-                        ) {
-                            // TODO warn when we provide a better way to do it?
-                            ctx.hasDefaultExportRender = true
-                        }
-                    }
-                }
-
-                // export default { ... } --> const __default__ = { ... }
-                const start = node.start! + scriptStartOffset!
-                const end = node.declaration.start! + scriptStartOffset!
-                ctx.s.overwrite(start, end, `const ${normalScriptDefaultVar} = `)
-            } else if (node.type === 'ExportNamedDeclaration') {
-                const defaultSpecifier = node.specifiers.find(
-                    s =>
-                        s.exported.type === 'Identifier' && s.exported.name === 'default',
-                ) as ExportSpecifier
-                if (defaultSpecifier) {
-                    defaultExport = node
-                    // 1. remove specifier
-                    if (node.specifiers.length > 1) {
-                        ctx.s.remove(
-                            defaultSpecifier.start! + scriptStartOffset!,
-                            defaultSpecifier.end! + scriptStartOffset!,
-                        )
-                    } else {
-                        ctx.s.remove(
-                            node.start! + scriptStartOffset!,
-                            node.end! + scriptStartOffset!,
-                        )
-                    }
-                    if (node.source) {
-                        // export { x as default } from './x'
-                        // rewrite to `import { x as __default__ } from './x'` and
-                        // add to top
-                        ctx.s.prepend(
-                            `
-import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${node.source.value}'\n`,
-                        )
-                    } else {
-                        // export { x as default }
-                        // rewrite to `const __default__ = x` and move to end
-                        ctx.s.appendLeft(
-                            scriptEndOffset!,
-                            `\nconst ${normalScriptDefaultVar} = ${defaultSpecifier.local.name}\n`,
-                        )
-                    }
-                }
-                if (node.declaration) {
-                    walkDeclaration(
-                        'script',
-                        node.declaration,
-                        scriptBindings,
-                        vueImportAliases,
-                        hoistStatic,
-                    )
-                }
-            } else if (
-                (node.type === 'VariableDeclaration' ||
-                    node.type === 'FunctionDeclaration' ||
-                    node.type === 'ClassDeclaration' ||
-                    node.type === 'TSEnumDeclaration') &&
-                !node.declare
-            ) {
-                walkDeclaration(
-                    'script',
-                    node,
-                    scriptBindings,
-                    vueImportAliases,
-                    hoistStatic,
-                )
-            }
-        }
-
-        // <script> after <script setup>
-        // we need to move the block up so that `const __default__` is
-        // declared before being used in the actual component definition
-        if (scriptStartOffset! > startOffset) {
-            // if content doesn't end with newline, add one
-            if (!/\n$/.test(script.content.trim())) {
-                ctx.s.appendLeft(scriptEndOffset!, `\n`)
-            }
-            ctx.s.move(scriptStartOffset!, scriptEndOffset!, 0)
-        }
+        if ((source === '@arrange/framework' || source === '@arrange/runtime')) vueImportAliases[imported] = local
     }
 
     // 2.2 process <script setup> body
-    for (const node of scriptSetupAst.body) {
-        if (node.type === 'ExpressionStatement') {
-            const expr = unwrapTSNode(node.expression)
-            // process `defineProps` and `defineEmit(s)` calls
-            if (
-                processDefineProps(ctx, expr) ||
-                processDefineEmits(ctx, expr) ||
-                processDefineOptions(ctx, expr) ||
-                processDefineSlots(ctx, expr)
-            ) {
-                ctx.s.remove(node.start! + startOffset, node.end! + startOffset)
-            } else if (processDefineExpose(ctx, expr)) {
-                // defineExpose({}) -> expose({})
-                const callee = (expr as CallExpression).callee
-                ctx.s.overwrite(
-                    callee.start! + startOffset,
-                    callee.end! + startOffset,
-                    '__expose',
-                )
-            } else {
-                processDefineModel(ctx, expr)
-            }
+    for (const node of scriptAst.body) {
+        if (node.type === 'ExpressionStatement' && processDefineProps(ctx, unwrapTSNode(node.expression))) {
+            ctx.s.remove(node.start! + startOffset, node.end! + startOffset)
         }
 
         if (node.type === 'VariableDeclaration' && !node.declare) {
@@ -528,26 +222,12 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
                 const decl = node.declarations[i]
                 const init = decl.init && unwrapTSNode(decl.init)
                 if (init) {
-                    if (processDefineOptions(ctx, init)) {
-                        ctx.error(
-                            `${DEFINE_OPTIONS}() has no returning value, it cannot be assigned.`,
-                            node,
-                        )
-                    }
-
                     // defineProps
                     const isDefineProps = processDefineProps(ctx, init, decl.id as LVal)
                     if (ctx.propsDestructureRestId) {
                         setupBindings[ctx.propsDestructureRestId] =
                             BindingTypes.SETUP_REACTIVE_CONST
                     }
-
-                    // defineEmits
-                    const isDefineEmits =
-                        !isDefineProps && processDefineEmits(ctx, init, decl.id as LVal)
-                    !isDefineEmits &&
-                        (processDefineSlots(ctx, init, decl.id as LVal) ||
-                            processDefineModel(ctx, init, decl.id as LVal))
 
                     if (
                         isDefineProps &&
@@ -571,12 +251,6 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
                             ctx.s.remove(start, end)
                             left--
                         }
-                    } else if (isDefineEmits) {
-                        ctx.s.overwrite(
-                            startOffset + init.start!,
-                            startOffset + init.end!,
-                            '__emit',
-                        )
                     } else {
                         lastNonRemoved = i
                     }
@@ -594,7 +268,6 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
             !node.declare
         ) {
             isAllLiteral = walkDeclaration(
-                'scriptSetup',
                 node,
                 setupBindings,
                 vueImportAliases,
@@ -614,52 +287,25 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
             (node.type === 'VariableDeclaration' && !node.declare) ||
             node.type.endsWith('Statement')
         ) {
-            const scope: Statement[][] = [scriptSetupAst.body]
             walk(node, {
-                enter(child: Node, parent: Node | null) {
+                enter(child: Node) {
                     if (isFunctionType(child)) {
                         this.skip()
                     }
-                    if (child.type === 'BlockStatement') {
-                        scope.push(child.body)
+                    if (child.type === 'AwaitExpression' || child.type === 'ForOfStatement' && child.await) {
+                        ctx.error('SFA 初始化必须同步；异步加载请通过明确状态与控制流表达', child)
                     }
-                    if (child.type === 'AwaitExpression') {
-                        hasAwait = true
-                        // if the await expression is an expression statement and
-                        // - is in the root scope
-                        // - or is not the first statement in a nested block scope
-                        // then it needs a semicolon before the generated code.
-                        const currentScope = scope[scope.length - 1]
-                        const needsSemi = currentScope.some((n, i) => {
-                            return (
-                                (scope.length === 1 || i > 0) &&
-                                n.type === 'ExpressionStatement' &&
-                                n.start === child.start
-                            )
-                        })
-                        processAwait(
-                            ctx,
-                            child,
-                            needsSemi,
-                            parent!.type === 'ExpressionStatement',
-                        )
-                    }
-                },
-                exit(node: Node) {
-                    if (node.type === 'BlockStatement') scope.pop()
                 },
             })
         }
 
         if (
-            (node.type === 'ExportNamedDeclaration' && node.exportKind !== 'type') ||
+            node.type === 'ExportNamedDeclaration' ||
             node.type === 'ExportAllDeclaration' ||
             node.type === 'ExportDefaultDeclaration'
         ) {
             ctx.error(
-                `<script setup> cannot contain ES module exports. ` +
-                `If you are using a previous version of <script setup>, please ` +
-                `consult the updated RFC at https://github.com/vuejs/rfcs/pull/227.`,
+                'SFA script 不接受模块导出，请将共享逻辑和类型导出放入独立 TS 模块',
                 node,
             )
         }
@@ -689,116 +335,29 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
     checkInvalidScopeReference(ctx.propsRuntimeDecl, DEFINE_PROPS)
     checkInvalidScopeReference(ctx.propsRuntimeDefaults, DEFINE_PROPS)
     checkInvalidScopeReference(ctx.propsDestructureDecl, DEFINE_PROPS)
-    checkInvalidScopeReference(ctx.emitsRuntimeDecl, DEFINE_EMITS)
-    checkInvalidScopeReference(ctx.optionsRuntimeDecl, DEFINE_OPTIONS)
-    for (const { runtimeOptionNodes } of Object.values(ctx.modelDecls)) {
-        for (const node of runtimeOptionNodes) {
-            checkInvalidScopeReference(node, DEFINE_MODEL)
-        }
-    }
+    ctx.s.remove(0, startOffset)
+    ctx.s.remove(endOffset, source.length)
 
-    // 5. remove non-script content
-    if (script) {
-        if (startOffset < scriptStartOffset!) {
-            // <script setup> before <script>
-            ctx.s.remove(0, startOffset)
-            ctx.s.remove(endOffset, scriptStartOffset!)
-            ctx.s.remove(scriptEndOffset!, source.length)
-        } else {
-            // <script> before <script setup>
-            ctx.s.remove(0, scriptStartOffset!)
-            ctx.s.remove(scriptEndOffset!, startOffset)
-            ctx.s.remove(endOffset, source.length)
-        }
-    } else {
-        // only <script setup>
-        ctx.s.remove(0, startOffset)
-        ctx.s.remove(endOffset, source.length)
-    }
-
-    // 6. analyze binding metadata
-    // `defineProps` & `defineModel` also register props bindings
-    if (scriptAst) {
-        Object.assign(ctx.bindingMetadata, analyzeScriptBindings(scriptAst.body, ctx))
-    }
     for (const [key, { isType, imported, source }] of Object.entries(
         ctx.userImports,
     )) {
         if (isType) continue
-        if ((source === '@arrange/framework' || source === '@arrange/runtime') && imported === 'm') {
+        if ((source === '@arrange/framework' || source === '@arrange/runtime') && imported === 'M') {
             (ctx.bindingMetadata.__arrangeModifierRoots ??= []).push(key)
         }
         ctx.bindingMetadata[key] =
             imported === '*' ||
-                (imported === 'default' && source.endsWith('.vue')) ||
-                source === 'vue'
+                (imported === 'default' && source.endsWith('.sfa')) ||
+                (source === '@arrange/framework' || source === '@arrange/runtime')
                 ? BindingTypes.SETUP_CONST
                 : BindingTypes.SETUP_MAYBE_REF
-    }
-    for (const key in scriptBindings) {
-        ctx.bindingMetadata[key] = scriptBindings[key]
     }
     for (const key in setupBindings) {
         ctx.bindingMetadata[key] = setupBindings[key]
     }
 
-    // #11265, https://github.com/vitejs/rolldown-vite/issues/432
-    // 6.1 demote `const foo = reactive()` to `let` when used as v-model target.
-    // In non-inline template compilation, v-model assigns via `$setup.foo = $event`,
-    // which requires a SETUP_LET binding (getter + setter) to keep script state in sync.
-    // In inline mode, it generates `foo = $event`, which also requires `let`.
-    if (sfc.template && !sfc.template.src && sfc.template.ast) {
-        const vModelIds = resolveTemplateVModelIdentifiers(sfc)
-        if (vModelIds.size) {
-            const toDemote = new Set<string>()
-            for (const id of vModelIds) {
-                if (setupBindings[id] === BindingTypes.SETUP_REACTIVE_CONST) {
-                    toDemote.add(id)
-                }
-            }
-
-            if (toDemote.size) {
-                for (const node of scriptSetupAst.body) {
-                    if (
-                        node.type === 'VariableDeclaration' &&
-                        node.kind === 'const' &&
-                        !node.declare
-                    ) {
-                        const demotedInDecl: string[] = []
-                        for (const decl of node.declarations) {
-                            if (decl.id.type === 'Identifier' && toDemote.has(decl.id.name)) {
-                                demotedInDecl.push(decl.id.name)
-                            }
-                        }
-                        if (demotedInDecl.length) {
-                            ctx.s.overwrite(
-                                node.start! + startOffset,
-                                node.start! + startOffset + 'const'.length,
-                                'let',
-                            )
-                            for (const id of demotedInDecl) {
-                                setupBindings[id] = BindingTypes.SETUP_LET
-                                ctx.bindingMetadata[id] = BindingTypes.SETUP_LET
-                                warnOnce(
-                                    `\`v-model\` cannot update a \`const\` reactive binding \`${id}\`. ` +
-                                    `The compiler has transformed it to \`let\` to make the update work.`,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // 整理 setup 参数
     let args = `__props`
-    if (ctx.propsTypeDecl) {
-        // mark as any and only cast on assignment
-        // since the user defined complex types may be incompatible with the
-        // inferred type from generated runtime declarations
-        args += `: any`
-    }
     // inject user assignment of props
     // we use a default __props so that template expressions referencing props
     // can use it directly
@@ -825,78 +384,22 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
         }
     }
 
-    // inject temp variables for async context preservation
-    if (hasAwait) {
-        const any = ctx.isTS ? `: any` : ``
-        ctx.s.prependLeft(startOffset, `\nlet __temp${any}, __restore${any}\n`)
-    }
-
-    const destructureElements =
-        ctx.hasDefineExposeCall || !options.inlineTemplate
-            ? [`expose: __expose`]
-            : []
-    if (ctx.emitDecl) {
-        destructureElements.push(`emit: __emit`)
-    }
-    if (destructureElements.length) {
-        args += `, { ${destructureElements.join(', ')} }`
-    }
-
     let templateMap
+    let slotNames: readonly string[] = []
     // 9. generate return statement
     let returned
     // ensure props bindings register before compile template in inline mode
     const propsDecl = genRuntimeProps(ctx)
-    if (
-        !options.inlineTemplate ||
-        (!sfc.template && ctx.hasDefaultExportRender)
-    ) {
-        // non-inline mode, or has manual render in normal <script>
-        // return bindings from script and script setup
-        const allBindings: Record<string, any> = {
-            ...scriptBindings,
-            ...setupBindings,
-        }
-        for (const key in ctx.userImports) {
-            if (
-                !ctx.userImports[key].isType &&
-                ctx.userImports[key].isUsedInTemplate
-            ) {
-                allBindings[key] = true
-            }
-        }
-        returned = `{ `
-        for (const key in allBindings) {
-            if (
-                allBindings[key] === true &&
-                ctx.userImports[key].source !== 'vue' &&
-                !ctx.userImports[key].source.endsWith('.vue')
-            ) {
-                // generate getter for import bindings
-                // skip vue imports since we know they will never change
-                returned += `get ${key}() { return ${key} }, `
-            } else if (ctx.bindingMetadata[key] === BindingTypes.SETUP_LET) {
-                // local let binding, also add setter
-                const setArg = key === 'v' ? `_v` : `v`
-                returned +=
-                    `get ${key}() { return ${key} }, ` +
-                    `set ${key}(${setArg}) { ${key} = ${setArg} }, `
-            } else {
-                returned += `${key}, `
-            }
-        }
-        returned = returned.replace(/, $/, '') + ` }`
-    } else {
         // inline mode
-        if (sfc.template && !sfc.template.src) {
+        if (sfa.template) {
 
             // inline render function mode - we are going to compile the template and
             // inline it right here
             const { code, ast, preamble, tips, errors, map } = compileTemplate({
                 filename,
-                ast: sfc.template.ast,
-                source: sfc.template.content,
-                inMap: sfc.template.map,
+                ast: sfa.template.ast,
+                source: sfa.template.content,
+                inMap: sfa.template.map,
                 ...options.templateOptions,
                 isProd: options.isProd,
                 compilerOptions: {
@@ -907,6 +410,7 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
                     bindingMetadata: ctx.bindingMetadata,
                 },
             })
+            slotNames = ast?.slotNames ?? []
             templateMap = map
             if (tips.length) {
                 tips.forEach(warnOnce)
@@ -918,7 +422,7 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
                 if (err.loc) {
                     err.message +=
                         `\n\n` +
-                        sfc.filename +
+                        sfa.filename +
                         '\n' +
                         generateCodeFrame(
                             source,
@@ -940,31 +444,18 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
             }
             returned = code
         } else {
-            returned = `() => {}`
+            returned = `() => null`
         }
-    }
 
-    if (!options.inlineTemplate && !__TEST__) {
-        // in non-inline mode, the `__isScriptSetup: true` flag is used by
-        // componentPublicInstance proxy to allow properties that start with $ or _
-        ctx.s.appendRight(
-            endOffset,
-            `\nconst __returned__ = ${returned}\n` +
-            `Object.defineProperty(__returned__, '__isScriptSetup', { enumerable: false, value: true })\n` +
-            `return __returned__` +
-            `\n}\n\n`,
-        )
-    } else {
-        ctx.s.appendRight(endOffset, `\nreturn ${returned}\n}\n\n`)
-    }
+    ctx.s.appendRight(endOffset, `\nreturn ${returned}\n}\n\n`)
 
     // 10. finalize default export
     const genDefaultAs = options.genDefaultAs
         ? `const ${options.genDefaultAs} =`
         : `export default`
 
-    let runtimeOptions = ``
-    if (!ctx.hasDefaultExportName && filename && filename !== DEFAULT_FILENAME) {
+    let runtimeOptions = `\n    slotNames: ${JSON.stringify(slotNames)},`
+    if (filename && filename !== DEFAULT_FILENAME) {
         const match = filename.match(/([^/\\]+)\.\w+$/)
         if (match) {
             runtimeOptions += `\n  __name: '${match[1]}',`
@@ -973,58 +464,8 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
 
     if (propsDecl) runtimeOptions += `\n  props: ${propsDecl},`
 
-    const emitsDecl = genRuntimeEmits(ctx)
-    if (emitsDecl) runtimeOptions += `\n  emits: ${emitsDecl},`
-
-    let definedOptions = ''
-    if (ctx.optionsRuntimeDecl) {
-        definedOptions = scriptSetup.content
-            .slice(ctx.optionsRuntimeDecl.start!, ctx.optionsRuntimeDecl.end!)
-            .trim()
-    }
-
-    // <script setup> components are closed by default. If the user did not
-    // explicitly call `defineExpose`, call expose() with no args.
-    const exposeCall =
-        ctx.hasDefineExposeCall || options.inlineTemplate ? `` : `  __expose();\n`
-    // wrap setup code with function.
-    if (ctx.isTS) {
-        // for TS, make sure the exported type is still valid type with
-        // correct props information
-        // we have to use object spread for types to be merged properly
-        // user's TS setting should compile it down to proper targets
-        // export default defineComponent({ ...__default__, ... })
-        const def =
-            (defaultExport ? `\n  ...${normalScriptDefaultVar},` : ``) +
-            (definedOptions ? `\n  ...${definedOptions},` : '')
-        ctx.s.prependLeft(
-            startOffset,
-            `\n${genDefaultAs} /*@__PURE__*/${ctx.helper(
-                `defineComponent`,
-            )}({${def}${runtimeOptions}\n  ${hasAwait ? `async ` : ``
-            }setup(${args}) {\n${exposeCall}`,
-        )
-        ctx.s.appendRight(endOffset, `})`)
-    } else {
-        if (defaultExport || definedOptions) {
-            // without TS, can't rely on rest spread, so we use Object.assign
-            // export default Object.assign(__default__, { ... })
-            ctx.s.prependLeft(
-                startOffset,
-                `\n${genDefaultAs} /*@__PURE__*/Object.assign(${defaultExport ? `${normalScriptDefaultVar}, ` : ''
-                }${definedOptions ? `${definedOptions}, ` : ''}{${runtimeOptions}\n  ` +
-                `${hasAwait ? `async ` : ``}setup(${args}) {\n${exposeCall}`,
-            )
-            ctx.s.appendRight(endOffset, `})`)
-        } else {
-            ctx.s.prependLeft(
-                startOffset,
-                `\n${genDefaultAs} {${runtimeOptions}\n  ` +
-                `${hasAwait ? `async ` : ``}setup(${args}) {\n${exposeCall}`,
-            )
-            ctx.s.appendRight(endOffset, `}`)
-        }
-    }
+    ctx.s.prependLeft(startOffset, `\n${genDefaultAs} /*@__PURE__*/${ctx.helper('defineArrangable')}({${runtimeOptions}\n    setup(${args}) {\n`)
+    ctx.s.appendRight(endOffset, `})`)
 
     // 11. finalize Vue helper imports
     if (ctx.helperImports.size > 0) {
@@ -1032,7 +473,7 @@ import { ${defaultSpecifier.local.name} as ${normalScriptDefaultVar} } from '${n
             options.templateOptions?.compilerOptions?.runtimeModuleName
         const importSrc = runtimeModuleName
             ? JSON.stringify(runtimeModuleName)
-            : `'vue'`
+            : `'@arrange/framework'`
         ctx.s.prepend(
             `
 import { ${[...ctx.helperImports]
@@ -1058,13 +499,12 @@ import { ${[...ctx.helperImports]
         map = mergeSourceMaps(map, templateMap, templateLineOffset)
     }
     return {
-        ...scriptSetup,
+        ...script,
         bindings: ctx.bindingMetadata,
         imports: ctx.userImports,
         content,
         map,
         scriptAst: scriptAst?.body,
-        scriptSetupAst: scriptSetupAst?.body,
         deps: ctx.deps ? [...ctx.deps] : undefined,
     }
 }
@@ -1078,7 +518,6 @@ function registerBinding(
 }
 
 function walkDeclaration(
-    from: 'script' | 'scriptSetup',
     node: Declaration,
     bindings: Record<string, BindingTypes>,
     userImportAliases: Record<string, string>,
@@ -1104,15 +543,13 @@ function walkDeclaration(
                     init,
                     c =>
                         c === DEFINE_PROPS ||
-                        c === DEFINE_EMITS ||
-                        c === WITH_DEFAULTS ||
-                        c === DEFINE_SLOTS,
+                        c === WITH_DEFAULTS,
                 )
             if (id.type === 'Identifier') {
                 let bindingType
                 const userReactiveBinding = userImportAliases['reactive']
                 if (
-                    (hoistStatic || from === 'script') &&
+                    hoistStatic &&
                     (isAllLiteral || (isConst && isStaticNode(init!)))
                 ) {
                     bindingType = BindingTypes.LITERAL_CONST
@@ -1139,9 +576,7 @@ function walkDeclaration(
                                 m === userImportAliases['computed'] ||
                                 m === userImportAliases['shallowRef'] ||
                                 m === userImportAliases['customRef'] ||
-                                m === userImportAliases['toRef'] ||
-                                m === userImportAliases['useTemplateRef'] ||
-                                m === DEFINE_MODEL,
+                                m === userImportAliases['toRef'],
                         )
                     ) {
                         bindingType = BindingTypes.SETUP_REF

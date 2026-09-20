@@ -57,15 +57,15 @@ namespace {
         LayoutModifierSemantics padding;
         padding.kind = LayoutModifierKind::Padding;
         padding.padding.start = padding.padding.top = padding.padding.end = padding.padding.bottom = 10;
-        tree.apply({CreateNodeMutation{1, NodeType::Box}, CreateNodeMutation{2, NodeType::Input},
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("editable")},
             SetModifierMutation{1, {{fixedSize(400, 200), {}}, {outer, {}}, {ClipModifier{}, {}}}},
             SetModifierMutation{2, {{fixedSize(220, 60), {}}, {padding, {}}, {inner, {}}, {ClipModifier{}, {}}}},
-            SetPropMutation{2, "modelValue", PropValue::stringValue("abcdef")}, InsertChildMutation{1, 2, 0}});
+            SetPropMutation{2, "value", PropValue::stringValue("abcdef")}, InsertChildMutation{1, 2, 0}});
         LayoutEngine(text).layout(tree, 1, {0, 500, 0, 400});
         const auto content = tree.node(2).contentBounds;
-        const auto point = nodeContentToRoot(tree, 2, {content.x + 8, content.y + 20});
+        const auto point = nodeContentToRoot(tree, 2, {content.x + 1, content.y + 1});
         const auto local = rootToNodeContent(tree, 2, point);
-        check(std::fabs(local.x - content.x - 8) < 0.001f, "Nested content coordinate roundtrip failed");
+        check(std::fabs(local.x - content.x - 1) < 0.001f, "Nested content coordinate roundtrip failed");
         const auto hit = HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point);
         check(hit.hit && hit.node == 2, "Transformed input could not be hit");
         arrange::juce::TextInputOwner input(text);
@@ -77,7 +77,7 @@ namespace {
         const auto transforms = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; });
         const auto clips = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; });
         check(transforms == 2 && clips >= 2, "Caret overlay escaped ancestor onion geometry");
-        tree.setHostInput(2, HostInput::ModelValue, PropValue::stringValue("新"));
+        tree.setHostInput(2, HostInput::Value, PropValue::stringValue("新"));
         input.synchronizePublishedInput(tree, true);
         input.updateFocusedInputViewport(tree, true);
         check(input.totalNumChars(tree, true) == 1 && input.textInRange(tree, true, {0, 1}).toStdString() == "新",
@@ -85,7 +85,7 @@ namespace {
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(false));
         check(!HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point).hit && !input.isTextInputActive(tree, true), "Disabled ancestor retained input interest");
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(true));
-        tree.apply({DeleteNodeMutation{2}, CreateNodeMutation{2, NodeType::Input}, InsertChildMutation{1, 2, 0}});
+        tree.apply({DeleteNodeMutation{2}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("editable")}, InsertChildMutation{1, 2, 0}});
         check(!input.isTextInputActive(tree, true), "Focus transferred to a reused node id");
         input.updateFocusedInputViewport(tree, true);
         check(!input.focusedNode(), "Retired focus was not cleared");
@@ -96,7 +96,7 @@ namespace {
         LayoutModifierSemantics scroll;
         scroll.kind = LayoutModifierKind::VerticalScroll;
         scroll.enabled = true;
-        tree.apply({CreateNodeMutation{1, NodeType::Column}, CreateNodeMutation{2, NodeType::Box},
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{1, {{fixedSize(100, 100), {}}, {scroll, {}}}},
             SetModifierMutation{2, {{fixedSize(100, 400), {}}}}, InsertChildMutation{1, 2, 0}});
         LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
@@ -115,7 +115,7 @@ namespace {
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         const auto loaded = host->executeModule("vblank-execution.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Text')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(1, 'textPresentation'), 'display'))
             let ticks = 0
             const sample = () => {
                 n.setText(1, String(++ticks))
@@ -165,14 +165,14 @@ namespace {
         session.resize(400, 300, runtime);
         session.markLoaded();
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Box}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         runtime.enqueue(std::move(initial));
         const auto pump = [&](double now) { return driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 400, 300}, true, {}, now); };
         check(pump(0) && !diagnostics.hasError(), "production host initial frame failed");
         const auto previous = runtime.publishedFrame();
         MutationTransaction missingImage;
         missingImage.operations = {
-            CreateNodeMutation{2, NodeType::Image}, InsertChildMutation{1, 2, 0},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0},
             SetModifierMutation{2, {{fixedSize(30, 30), {}}}},
             SetPropMutation{2, "src", PropValue::stringValue("missing-frame-resource.png")},
         };
@@ -196,7 +196,7 @@ namespace {
         paint.clearResources();
         session.markLoaded();
         MutationTransaction reload;
-        reload.operations = {CreateNodeMutation{1, NodeType::Box}};
+        reload.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         runtime.enqueue(std::move(reload));
         check(pump(32) && !diagnostics.hasError() && !runtime.publishedFrame().content.errorFrame,
               "reset did not recover suspended host");
@@ -218,7 +218,7 @@ namespace {
         const auto entry = directory.getChildFile("app.js");
         const auto writePackage = [&](const char* color, const char* request) {
             const auto source = std::string("const n = globalThis.__ARRANGE_NATIVE__;\n") +
-                "n.createNode(1, 'Box');\n" +
+                "void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}));\n" +
                 "n.setModifier(1, {elements: [{type: 'size', value: {width: 100, height: 100}}," +
                 "{type: 'background', value: {color: " + color + "}}]});\n" + request;
             check(entry.replaceWithText(source), "reload package write failed");
@@ -269,12 +269,12 @@ namespace {
         arrange::juce::ScenePipelineState state;
         const Constraints constraints{0, 400, 0, 300};
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, {{fixedSize(100, 100), {}}}}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{fixedSize(100, 100), {}}}}};
         state.enqueue(std::move(initial));
         check(!state.run(1, constraints, true).error, "initial finalization frame failed");
         const auto previous = state.publishedFrame();
         MutationTransaction candidate;
-        candidate.operations = {CreateNodeMutation{2, NodeType::Text}, InsertChildMutation{1, 2, 0}};
+        candidate.operations = {CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")}, InsertChildMutation{1, 2, 0}};
         state.enqueue(std::move(candidate));
         const auto failed = state.run(1, constraints, true, [&](const auto& scene, auto& frame) {
             check(scene.contains(2) && !state.scene().contains(2), "finalizer did not receive isolated candidate scene");
@@ -310,7 +310,7 @@ namespace {
         arrange::juce::ScenePipelineState state{SceneFramePipeline{LayoutEngine{text}}};
         const Constraints constraints{0, 400, 0, 300};
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Column}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}};
         state.enqueue(std::move(initial));
         check(!state.run(1, constraints, true).error, "initial publication failed");
         const auto previousFrame = state.publishedFrame();
@@ -318,7 +318,7 @@ namespace {
         const BindingHandle content{allocateRuntimeIdentity(), 1};
         MutationTransaction create;
         create.operations = {
-            CreateNodeMutation{2, NodeType::Text, child.generation},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout, child.generation}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")},
             RegisterBinding{content, HostInputTarget{child, HostInput::Text}},
             SlotUpdate{content, PropValue::stringValue("first")},
             InsertChildMutation{1, 2, 0},
@@ -348,7 +348,7 @@ namespace {
         state.reset();
         measurer.failing = false;
         MutationTransaction fresh;
-        fresh.operations = {CreateNodeMutation{1, NodeType::Box}};
+        fresh.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         state.enqueue(std::move(fresh));
         check(!state.run(1, constraints, true).error && !state.scene().contains(2) && state.scene().bindingCount() == 0,
               "reset replayed the failed previous context");

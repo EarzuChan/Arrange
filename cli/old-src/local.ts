@@ -181,7 +181,7 @@ export async function ensureToolchain(config: ArrangeConfig, cwd: string, need: 
         throw new Error([
             `${LOCAL_CONFIG_FILE} tool verification failed.`,
             ...verifyIssues.map(formatIssue),
-            "Fix tool paths in arrange.local.yaml or install the missing components, then retry.",
+            "Fix tool paths in arrange.local.yaml or install the missing arrangables, then retry.",
         ].join("\n"))
     }
     if (options.write ?? true) writeLocalConfig(local, cwd)

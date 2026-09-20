@@ -6,4 +6,4 @@
 
 上游更新按具体缺陷或功能选择性移植；评估动态依赖、结构和值域归属、宿主 schema、作用域退休与帧调度后再合入。不得整包覆盖 Arrange 改动。
 
-行为测试归属仓库 `tests/runtime/`，原生集成归属 `cpp_tests/`；真实 SFC fixture 与主 Demo 复用组件，进入 QuickJS 和 PublishedFrame。上游原样测试副本不作为 Arrange 的行为契约。每次移植修改相应持久行为测试，遵循 [测试策略](../../docs/arch/22-测试策略.md)。
+行为测试归属仓库 `tests/runtime/`，原生集成归属 `cpp_tests/`；真实 SFA fixture 与主 Demo 复用Arrangable，进入 QuickJS 和 PublishedFrame。上游原样测试副本不作为 Arrange 的行为契约。每次移植修改相应持久行为测试，遵循 [测试策略](../../docs/arch/22-测试策略.md)。

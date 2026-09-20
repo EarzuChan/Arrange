@@ -3,6 +3,7 @@
 #include "EventSlot.h"
 #include "Animation.h"
 #include "Geometry.h"
+#include "Painter.h"
 
 #include <cstdint>
 #include <memory>
@@ -121,7 +122,17 @@ namespace arrange::core {
         bool operator==(const AnimateContentSizeModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier>;
+    struct PaintModifier {
+        PainterSnapshot painter;
+        std::string contentScale = "Fit";
+        std::string alignment = "Center";
+        float alpha = 1.0f;
+        std::optional<std::uint32_t> tint;
+        bool sizeToIntrinsics = true;
+        bool operator==(const PaintModifier&) const = default;
+    };
+
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;

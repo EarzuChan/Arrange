@@ -15,8 +15,30 @@
 #include <utility>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace arrange::quickjs {
     namespace {
+        std::size_t scriptStackBudget() {
+#if defined(_WIN32)
+            ULONG_PTR lower = 0;
+            ULONG_PTR upper = 0;
+            GetCurrentThreadStackLimits(&lower, &upper);
+            const auto current = reinterpret_cast<ULONG_PTR>(&lower);
+            constexpr std::size_t hostReserve = 256 * 1024;
+            if (current <= lower || current - lower <= hostReserve) throw std::runtime_error("Owner 线程没有足够的脚本栈空间");
+
+            return (std::min)(std::size_t{2 * 1024 * 1024}, static_cast<std::size_t>(current - lower - hostReserve));
+#else
+            return 512 * 1024;
+#endif
+        }
+
         struct DrainJobsResult {
             bool ok = true;
             std::string error;
@@ -91,6 +113,7 @@ namespace arrange::quickjs {
 
         void reset() {
             if (runtime.context != nullptr) {
+                runtime.painters.reset();
                 runtime.events.reset(nullptr);
                 for (auto& [promise, reason] : runtime.unhandledRejections) {
                     JS_FreeValue(runtime.context, promise);
@@ -135,7 +158,7 @@ namespace arrange::quickjs {
             runtime.runtime = JS_NewRuntime2(&kScriptAllocator, &memory);
             // 给宿主输入、布局与异常处理保留栈空间，先由引擎报告脚本栈溢出
             if (!runtime.runtime) throw std::bad_alloc();
-            JS_SetMaxStackSize(runtime.runtime, 512 * 1024);
+            JS_SetMaxStackSize(runtime.runtime, scriptStackBudget());
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
             runtime.context = JS_NewContext(runtime.runtime);
             if (!runtime.context) throw std::bad_alloc();
@@ -153,6 +176,7 @@ namespace arrange::quickjs {
             }, &runtime);
             runtime.events.reset(runtime.context);
             JS_SetContextOpaque(runtime.context, &runtime);
+            runtime.painters = std::make_unique<QuickJsPainterResources>(runtime.context, runtime.painterLoader);
             QuickJsNativeApi::install(runtime.context, runtime);
         }
 
@@ -173,6 +197,8 @@ namespace arrange::quickjs {
 
     QuickJsScriptHost::QuickJsScriptHost() : impl_(std::make_unique<Impl>()) {}
     QuickJsScriptHost::~QuickJsScriptHost() = default;
+
+    void QuickJsScriptHost::setPainterLoader(arrange::core::PainterLoader loader) { impl_->runtime.painterLoader = std::move(loader); }
 
     std::size_t QuickJsScriptHost::eventSlotCount() const noexcept {
         return impl_ ? impl_->runtime.events.size() : 0;
@@ -239,12 +265,13 @@ namespace arrange::quickjs {
     }
 
     bool QuickJsScriptHost::hasPendingAnimationFrame() const noexcept {
-        return impl_ && !impl_->runtime.animationFrameCallbacks.empty();
+        return impl_ && (!impl_->runtime.animationFrameCallbacks.empty() || (impl_->runtime.painters && impl_->runtime.painters->hasPending()));
     }
 
     CallbackInvokeResult QuickJsScriptHost::pumpAnimationFrame(double nowMillis) {
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         setFrameTimeMillis(nowMillis);
+        if (impl_->runtime.painters && !impl_->runtime.painters->pump()) return {false, quickJsExceptionText(impl_->runtime.context)};
         if (impl_->runtime.animationFrameCallbacks.empty()) {
             const auto drained = impl_->drainJobs();
             return {drained.ok, drained.error};

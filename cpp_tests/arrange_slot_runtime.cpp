@@ -24,7 +24,9 @@ namespace {
         const NodeHandle node{1, allocateRuntimeIdentity()};
         const auto chain = binding();
         MutationTransaction mount;
-        mount.operations.emplace_back(CreateNodeMutation{node.id, NodeType::Text, node.generation});
+        mount.operations.emplace_back(CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation});
+        mount.operations.emplace_back(arrange::core::SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
+        mount.operations.emplace_back(arrange::core::SetPropMutation{node.id, "textPresentation", arrange::core::PropValue::stringValue("display")});
         mount.operations.emplace_back(RegisterBinding{chain, ModifierChainTarget{node}});
         mount.operations.emplace_back(SlotUpdate{chain, box(0xff112233)});
         check(!pipeline.run(scene, 1, {0, 500, 0, 500}, &mount, true, frame).error, "create/register/update in one frame failed");
@@ -73,7 +75,9 @@ namespace {
         check(scene.bindingCount() == 2 && scene.slotCounters().rejected == rejected + 2, "retired Modifier binding still writable");
         MutationTransaction deleted;
         deleted.operations.emplace_back(DeleteNodeMutation{1});
-        deleted.operations.emplace_back(CreateNodeMutation{1, NodeType::Text, allocateRuntimeIdentity()});
+        deleted.operations.emplace_back(CreateNodeMutation{1, arrange::core::NodeType::Layout, allocateRuntimeIdentity()});
+        deleted.operations.emplace_back(arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
+        deleted.operations.emplace_back(arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")});
         deleted.operations.emplace_back(SlotUpdate{chain, box(0xff000000)});
         scene.apply(deleted);
         check(scene.bindingCount() == 0 && scene.node(1).modifier.elements().empty(), "old node generation reached recreated node");
@@ -88,7 +92,7 @@ namespace {
         const auto text = binding();
         MutationTransaction initial;
         initial.operations = {
-            CreateNodeMutation{node.id, NodeType::Text, node.generation},
+            CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation}, arrange::core::SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{node.id, "textPresentation", arrange::core::PropValue::stringValue("display")},
             RegisterBinding{text, HostInputTarget{node, HostInput::Text}},
             SlotUpdate{text, PropValue::stringValue("initial")},
         };
@@ -125,7 +129,7 @@ namespace {
         MutationTransaction replace;
         replace.operations = {
             DeleteNodeMutation{1},
-            CreateNodeMutation{1, NodeType::Text, recreated.generation},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout, recreated.generation}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")},
             RegisterBinding{replacement, HostInputTarget{recreated, HostInput::Text}},
             SlotUpdate{next, PropValue::stringValue("stale")},
             SlotUpdate{replacement, PropValue::stringValue("replacement")},
@@ -142,7 +146,9 @@ namespace {
         const NodeHandle node{1, allocateRuntimeIdentity()};
         const auto text = binding(), style = binding();
         MutationTransaction mount;
-        mount.operations.emplace_back(CreateNodeMutation{1, NodeType::Text, node.generation});
+        mount.operations.emplace_back(CreateNodeMutation{1, arrange::core::NodeType::Layout, node.generation});
+        mount.operations.emplace_back(arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
+        mount.operations.emplace_back(arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("display")});
         mount.operations.emplace_back(RegisterBinding{text, HostInputTarget{node, HostInput::Text}});
         mount.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::TextStyle}});
         mount.operations.emplace_back(SlotUpdate{text, PropValue::stringValue("Reactive slots")});
@@ -156,7 +162,8 @@ namespace {
         const auto unchanged = pipeline.run(scene, 1, {0, 500, 0, 500}, &recolor, true, frame);
         check(!unchanged.plan.publishFrame && pipeline.counters().paintBuilds == paintBuilds && scene.slotCounters().unchanged > 0, "equal typed value rebuilt frame");
         MutationTransaction invalid;
-        invalid.operations.emplace_back(CreateNodeMutation{2, NodeType::Box});
+        invalid.operations.emplace_back(CreateNodeMutation{2, arrange::core::NodeType::Layout});
+        invalid.operations.emplace_back(arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})});
         invalid.operations.emplace_back(InsertChildMutation{2, 2, 0});
         bool failed = false;
         try { scene.apply(invalid); } catch (const std::exception&) { failed = true; }

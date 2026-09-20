@@ -13,7 +13,6 @@
 namespace arrange::core {
     namespace {
         std::string inputValue(const ArrangeNode& node) {
-            if (const auto* value = propValue(node, "modelValue", "model-value")) return value->stringOr();
             if (const auto* value = propValue(node, "value")) return value->stringOr();
             return {};
         }
@@ -23,20 +22,7 @@ namespace arrange::core {
             return {};
         }
 
-        std::string resourceProp(const ArrangeNode& node) {
-            const auto resourceFrom = [](const PropValue* value) -> std::string {
-                if (value == nullptr) return {};
-                if (value->isString()) return value->string;
-                if (value->isObject()) {
-                    if (const auto* path = value->field("path"); path != nullptr && path->isString()) return path->string;
-                    if (const auto* url = value->field("url"); url != nullptr && url->isString()) return url->string;
-                }
-                return {};
-            };
-            if (auto resource = resourceFrom(propValue(node, "source")); !resource.empty()) return resource;
-            if (auto resource = resourceFrom(propValue(node, "src")); !resource.empty()) return resource;
-            return {};
-        }
+
 
         float numericProp(const ArrangeNode& node, const char* key, float fallback) { return numberProp(node, key, fallback); }
 
@@ -149,8 +135,6 @@ namespace arrange::core {
                 for (const auto& op : next.layer->before) includeBounds(next.bounds, drawOpBounds(op));
                 for (const auto& op : next.layer->after) includeBounds(next.bounds, drawOpBounds(op));
             }
-            if (next.content) for (const auto& op : *next.content) if (op.type == DrawOpType::DrawImage || op.type == DrawOpType::DrawIcon) next.hasExternalResources = true;
-            for (const auto& child : next.children) next.hasExternalResources = next.hasExternalResources || child.fragment->hasExternalResources;
             ++counters.fragmentsBuilt;
             return std::make_shared<const PaintFragment>(std::move(next));
         }
@@ -175,7 +159,7 @@ namespace arrange::core {
             rect.y += op.rect.y;
             rect.width += maxShift - minShift;
         }
-        if (op.type == DrawOpType::DrawImage && (op.contentScale == "None" || op.contentScale == "Inside" || op.contentScale == "Crop")) return {{}, false, false};
+        if (op.type == DrawOpType::DrawPainter && (op.contentScale == "None" || op.contentScale == "Inside" || op.contentScale == "Crop")) return {{}, false, false};
         auto margin = 1.0f;
         if (op.type == DrawOpType::StrokeRect) margin += op.strokeWidth * 0.5f;
         if (op.type == DrawOpType::DrawLine) {
@@ -196,10 +180,6 @@ namespace arrange::core {
             collectContent(tree, id, *ops, 1);
             for (auto& op : *ops) {
                 prepareText(op, textLayoutService_);
-                if (op.type == DrawOpType::DrawText) {
-                    if (node.type == NodeType::Input && inputValue(node).empty()) node.placeholderLayout = op.textLayout;
-                    else node.textLayout = op.textLayout;
-                }
                 translateOp(op, {-node.contentBounds.x, -node.contentBounds.y});
             }
             counters.emittedOps += ops->size();
@@ -260,14 +240,6 @@ namespace arrange::core {
         if (!tree.contains(root)) return {};
         const auto& node = tree.node(root);
         return {buildFragment(tree, root, counters), {node.bounds.x, node.bounds.y}};
-    }
-
-    void visitPaintOps(const PaintFragment& fragment, const std::function<void(const std::vector<DrawOp>&)>& visitor, bool resourcesOnly) {
-        if (resourcesOnly && !fragment.hasExternalResources) return;
-        if (fragment.layer) visitor(fragment.layer->before);
-        if (fragment.content) visitor(*fragment.content);
-        for (const auto& child : fragment.children) visitPaintOps(*child.fragment, visitor, resourcesOnly);
-        if (fragment.layer) visitor(fragment.layer->after);
     }
 
     std::vector<DrawOp> exportDrawOps(const PlacedPaintFragment& root) {
@@ -370,6 +342,22 @@ namespace arrange::core {
             pop(DrawOpType::PopTransform);
             return;
         }
+        if (const auto* paint = std::get_if<PaintModifier>(&value)) {
+            if (!geometryOnly && paint->painter.content) {
+                DrawOp op;
+                op.type = DrawOpType::DrawPainter;
+                op.nodeId = id;
+                op.rect = instance.bounds;
+                op.painter = paint->painter;
+                op.contentScale = paint->contentScale;
+                op.alignment = paint->alignment;
+                op.hasTint = paint->tint.has_value();
+                op.color = withAlpha(paint->tint.value_or(0xffffffffu), alpha * paint->alpha);
+                ops.push_back(std::move(op));
+            }
+            content();
+            return;
+        }
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value); layout && (layout->kind == LayoutModifierKind::VerticalScroll || layout->kind == LayoutModifierKind::HorizontalScroll)) {
             pushClip({});
             content();
@@ -377,103 +365,6 @@ namespace arrange::core {
             return;
         }
         content();
-    }
-
-    void DrawOpsBuilder::collectContent(const LayoutTree& tree, NodeId id, std::vector<DrawOp>& ops, float alpha) const {
-        const auto& node = tree.node(id);
-        const auto contentRect = node.contentBounds;
-        if (node.type == NodeType::Text && !node.text.empty()) {
-            std::uint32_t textColor = 0xff000000u;
-            float fontSize = 14.0f;
-            const auto style = objectProp(node, "textStyle", "text-style");
-            textColor = style.color("color", textColor);
-            fontSize = style.number("fontSize", fontSize);
-            const auto lineHeight = std::max(fontSize, style.number("lineHeight", fontSize * 1.2f));
-            DrawOp op;
-            op.type = DrawOpType::DrawText;
-            op.nodeId = id;
-            op.rect = contentRect;
-            op.color = withAlpha(textColor, alpha);
-            op.fontSize = fontSize;
-            op.lineHeight = lineHeight;
-            op.maxLines = std::max(0, intProp(node, "maxLines", 0));
-            op.text = node.text;
-            op.textLayout = node.textLayout;
-            op.textAlign = textProp(node, "textAlign", "start");
-            op.overflow = textProp(node, "overflow", "clip");
-            if (op.overflow == "clip" || op.overflow == "ellipsis") {
-                DrawOp pushClip;
-                pushClip.type = DrawOpType::PushClip;
-                pushClip.nodeId = id;
-                pushClip.rect = contentRect;
-                ops.push_back(std::move(pushClip));
-                ops.push_back(std::move(op));
-                DrawOp popClip;
-                popClip.type = DrawOpType::PopClip;
-                popClip.nodeId = id;
-                ops.push_back(std::move(popClip));
-            }
-            else {
-                ops.push_back(std::move(op));
-            }
-        }
-
-        if (node.type == NodeType::Input) {
-            std::uint32_t textColor = 0xffe8eaedu;
-            float fontSize = 14.0f;
-            const auto style = objectProp(node, "textStyle", "text-style");
-            textColor = style.color("color", textColor);
-            fontSize = style.number("fontSize", fontSize);
-            const auto lineHeight = style.number("lineHeight", fontSize);
-            const auto singleLine = !TextInputOverlayBuilder::allowsLineBreak(node);
-            auto text = inputValue(node);
-            if (text.empty()) {
-                text = inputPlaceholder(node);
-                textColor = 0xff8a9099u;
-            }
-            if (!text.empty()) {
-                auto rect = TextInputOverlayBuilder::textRect(node, 0.0f);
-                DrawOp op;
-                op.type = DrawOpType::DrawText;
-                op.nodeId = id;
-                op.inputText = true;
-                op.rect = rect;
-                op.color = withAlpha(textColor, alpha);
-                op.fontSize = fontSize;
-                op.lineHeight = std::max(fontSize, lineHeight);
-                op.text = text;
-                op.textLayout = inputValue(node).empty() ? node.placeholderLayout : node.textLayout;
-                op.maxLines = singleLine ? 1 : 0;
-                ops.push_back(std::move(op));
-            }
-        }
-
-        if (node.type == NodeType::Image) {
-            DrawOp op;
-            op.type = DrawOpType::DrawImage;
-            op.rect = contentRect;
-            op.color = withAlpha(0xffffffffu, alpha * numericProp(node, "alpha", 1.0f));
-            op.resource = resourceProp(node);
-            if (auto origin = objectProp(node, "source").string("origin"); !origin.empty()) op.resourceOrigin = std::move(origin);
-            op.contentScale = textProp(node, "contentScale", "content-scale", "Fit");
-            op.alignment = textProp(node, "alignment", "Center");
-            ops.push_back(std::move(op));
-        }
-
-        if (node.type == NodeType::Icon) {
-            DrawOp op;
-            op.type = DrawOpType::DrawIcon;
-            op.rect = contentRect;
-            op.hasTint = !hasColorUnspecified(node, "tint");
-            op.color = withAlpha(colorProp(node, "tint", 0xff000000u), alpha);
-            op.resource = resourceProp(node);
-            if (auto origin = objectProp(node, "source").string("origin"); !origin.empty()) op.resourceOrigin = std::move(origin);
-            op.resourceIsIcon = true;
-            ops.push_back(std::move(op));
-        }
-
-
-
     }
 
     std::string DrawOpsBuilder::textStyleProp(const ArrangeNode& node) { return stringProp(node, "textStyle", "text-style", ""); }
@@ -491,13 +382,13 @@ namespace arrange::core {
         const auto style = objectProp(node, "textStyle", "text-style");
         result.fontSize = style.number("fontSize", 14.0f);
         result.singleLine = !allowsLineBreak(node);
-        result.textLeft = result.rect.x + 8.0f;
-        result.textWidth = std::max(0.0f, result.rect.width - 16.0f);
+        result.textLeft = result.rect.x;
+        result.textWidth = std::max(0.0f, result.rect.width);
         result.lineHeight = std::max(result.fontSize, style.number("lineHeight", result.fontSize));
         result.textTop = result.singleLine
                              ? result.rect.y + std::max(0.0f, (result.rect.height - result.lineHeight) * 0.5f)
-                             : result.rect.y + 4.0f;
-        result.textHeight = result.singleLine ? std::min(result.rect.height, result.lineHeight) : std::max(0.0f, result.rect.height - 8.0f);
+                             : result.rect.y;
+        result.textHeight = result.singleLine ? std::min(result.rect.height, result.lineHeight) : std::max(0.0f, result.rect.height);
         result.viewportX = result.singleLine ? viewportX : 0.0f;
         return result;
     }

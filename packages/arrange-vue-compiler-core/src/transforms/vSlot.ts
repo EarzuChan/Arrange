@@ -1,6 +1,4 @@
 import { SlotFlags, slotFlagsText } from '@arrange/vue-shared'
-import { parseExpression } from '@babel/parser'
-import type { ArrowFunctionExpression } from '@babel/types'
 import {
     type CallExpression,
     type ConditionalExpression,
@@ -23,7 +21,6 @@ import {
     createObjectProperty,
     createSimpleExpression,
 } from '../ast.ts'
-import { extractIdentifiers } from '../babelUtils.ts'
 import { ErrorCodes, createCompilerError } from '../errors.ts'
 import { CREATE_SLOTS, RENDER_LIST, WITH_CTX } from '../runtimeHelpers.ts'
 import type { NodeTransform, TransformContext } from '../transform.ts'
@@ -37,52 +34,15 @@ import {
     isVSlot,
     isWhitespaceText,
 } from '../utils.ts'
-import { enterSlotAliases, parameterSource, slotParameterName } from './slotAliases.ts'
 import { createForLoopParams, finalizeForParseResult } from './vFor.ts'
 
 const defaultFallback = createSimpleExpression(`undefined`, false)
 
-// A NodeTransform that:
-// 1. Tracks scope identifiers for scoped slots so that they don't get prefixed
-
-//    { prefixIdentifiers: true }.
-// 2. Track v-slot depths so that we know a slot is inside another slot.
-//    Note the exit callback is executed before buildSlots() on the same node,
-//    so only nested slots see positive numbers.
+// 记录内容声明的嵌套深度，不引入槽位参数作用域
 export const trackSlotScopes: NodeTransform = (node, context) => {
-    if (
-        node.type === NodeTypes.ELEMENT &&
-        (node.tagType === ElementTypes.COMPONENT ||
-            node.tagType === ElementTypes.TEMPLATE)
-    ) {
-        // We are only checking non-empty v-slot here
-        // since we only care about slots that introduce scope variables.
-        const vSlot = findDir(node, 'slot')
-        if (vSlot) {
-            const slotProps = vSlot.exp
-            if ((context.prefixIdentifiers)) {
-                slotProps && context.addIdentifiers(slotProps)
-            }
-            let leaveAliases: (() => void) | undefined
-            if ((slotProps && context.prefixIdentifiers)) {
-                const pattern = parameterSource(slotProps)
-                const parsed = parseExpression(`(${pattern}) => 0`, { plugins: context.expressionPlugins }) as ArrowFunctionExpression
-                const names = parsed.params.flatMap(parameter => extractIdentifiers(parameter).map(identifier => identifier.name))
-                const parameter = slotParameterName(context)
-                // 参数解构在实际消费者读取时执行，普通 TS helper 仍然获得普通值
-                leaveAliases = enterSlotAliases(context, Object.fromEntries(names.map(name => [name, `((${pattern}) => ${name})(${parameter})`])))
-                vSlot.exp = createSimpleExpression(parameter, false, slotProps.loc)
-            }
-            context.scopes.vSlot++
-            return () => {
-                if ((context.prefixIdentifiers)) {
-                    slotProps && context.removeIdentifiers(slotProps)
-                }
-                leaveAliases?.()
-                context.scopes.vSlot--
-            }
-        }
-    }
+    if (node.type !== NodeTypes.ELEMENT || !findDir(node, 'slot', true)) return
+    context.scopes.vSlot++
+    return () => { context.scopes.vSlot-- }
 }
 
 // A NodeTransform that tracks scope identifiers for scoped slots with v-for.
@@ -113,15 +73,14 @@ export const trackVForSlotScopes: NodeTransform = (node, context) => {
 }
 
 export type SlotFnBuilder = (
-    slotProps: ExpressionNode | undefined,
     vFor: DirectiveNode | undefined,
     slotChildren: TemplateChildNode[],
     loc: SourceLocation,
 ) => FunctionExpression
 
-const buildClientSlotFn: SlotFnBuilder = (props, _vForExp, children, loc) =>
+const buildClientSlotFn: SlotFnBuilder = (_vForExp, children, loc) =>
     createFunctionExpression(
-        props,
+        undefined,
         children,
         false /* newline */,
         true /* isSlot */,
@@ -129,7 +88,7 @@ const buildClientSlotFn: SlotFnBuilder = (props, _vForExp, children, loc) =>
     )
 
 // Instead of being a DirectiveTransform, v-slot processing is called during
-// transformElement to build the slots object for a component.
+// transformElement to build the slots object for a arrangable.
 export function buildSlots(
     node: ElementNode,
     context: TransformContext,
@@ -161,24 +120,6 @@ export function buildSlots(
             ) || children.some(child => hasScopeRef(child, context.identifiers))
     }
 
-    // 1. Check for slot with slotProps on component itself.
-    //    <Comp v-slot="{ prop }"/>
-    const onComponentSlot = findDir(node, 'slot', true)
-    if (onComponentSlot) {
-        const { arg, exp } = onComponentSlot
-        if (arg && !isStaticExp(arg)) {
-            hasDynamicSlots = true
-        }
-        slotsProperties.push(
-            createObjectProperty(
-                arg || createSimpleExpression('default', true),
-                buildSlotFn(exp, undefined, children, loc),
-            ),
-        )
-    }
-
-    // 2. Iterate through children and check for template slots
-    //    <template v-slot:foo="{ prop }">
     let hasTemplateSlots = false
     let hasNamedDefaultSlot = false
     const implicitDefaultChildren: TemplateChildNode[] = []
@@ -200,19 +141,10 @@ export function buildSlots(
             continue
         }
 
-        if (onComponentSlot) {
-            // already has on-component slot - this is incorrect usage.
-            context.onError(
-                createCompilerError(ErrorCodes.X_V_SLOT_MIXED_SLOT_USAGE, slotDir.loc),
-            )
-            break
-        }
-
         hasTemplateSlots = true
         const { children: slotChildren, loc: slotLoc } = slotElement
         const {
             arg: slotName = createSimpleExpression(`default`, true),
-            exp: slotProps,
             loc: dirLoc,
         } = slotDir
 
@@ -225,7 +157,7 @@ export function buildSlots(
         }
 
         const vFor = findDir(slotElement, 'for')
-        const slotFunction = buildSlotFn(slotProps, vFor, slotChildren, slotLoc)
+        const slotFunction = buildSlotFn(vFor, slotChildren, slotLoc)
 
         // check if this slot is conditional (v-if/v-for)
         let vIf: DirectiveNode | undefined
@@ -324,39 +256,36 @@ export function buildSlots(
         }
     }
 
-    if (!onComponentSlot) {
-        const buildDefaultSlotProperty = (
-            props: ExpressionNode | undefined,
+    const buildDefaultSlotProperty = (
             children: TemplateChildNode[],
-        ) => {
-            const fn = buildSlotFn(props, undefined, children, loc)
+    ) => {
+        const fn = buildSlotFn(undefined, children, loc)
 
-            return createObjectProperty(`default`, fn)
-        }
+        return createObjectProperty(`default`, fn)
+    }
 
-        if (!hasTemplateSlots) {
-            // implicit default slot (on component)
-            slotsProperties.push(buildDefaultSlotProperty(undefined, children))
-        } else if (
-            implicitDefaultChildren.length &&
-            // #3766
-            // with whitespace: 'preserve', whitespaces between slots will end up in
-            // implicitDefaultChildren. Ignore if all implicit children are whitespaces.
-            !implicitDefaultChildren.every(isWhitespaceText)
-        ) {
-            // implicit default slot (mixed with named slots)
-            if (hasNamedDefaultSlot) {
-                context.onError(
-                    createCompilerError(
-                        ErrorCodes.X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN,
-                        implicitDefaultChildren[0].loc,
-                    ),
-                )
-            } else {
-                slotsProperties.push(
-                    buildDefaultSlotProperty(undefined, implicitDefaultChildren),
-                )
-            }
+    if (!hasTemplateSlots) {
+        // implicit default slot (on arrangable)
+        slotsProperties.push(buildDefaultSlotProperty(children))
+    } else if (
+        implicitDefaultChildren.length &&
+        // #3766
+        // with whitespace: 'preserve', whitespaces between slots will end up in
+        // implicitDefaultChildren. Ignore if all implicit children are whitespaces.
+        !implicitDefaultChildren.every(isWhitespaceText)
+    ) {
+        // implicit default slot (mixed with named slots)
+        if (hasNamedDefaultSlot) {
+            context.onError(
+                createCompilerError(
+                    ErrorCodes.X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN,
+                    implicitDefaultChildren[0].loc,
+                ),
+            )
+        } else {
+            slotsProperties.push(
+                buildDefaultSlotProperty(implicitDefaultChildren),
+            )
         }
     }
 

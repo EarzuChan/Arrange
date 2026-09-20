@@ -7,6 +7,7 @@
 #include <arrange/core/Scroll.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
+#include <arrange/juce/PainterResources.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -53,7 +54,7 @@ namespace {
         for (arrange::core::NodeId id = 1; id < 512; ++id) {
             if (!tree.contains(id)) continue;
             const auto& node = tree.node(id);
-            if (node.type != arrange::core::NodeType::Input) continue;
+            if (node.textPresentation != arrange::core::TextPresentation::Editable) continue;
             if (const auto slot = node.eventSlots.find(arrange::core::EventSlotKind::InputSubmit); slot != node.eventSlots.end() && slot->second.valid()) return slot->second;
         }
         return std::nullopt;
@@ -105,7 +106,7 @@ namespace {
             "native.diagnosticsSetLogLevel('error');\n"
             "native.diagnosticsSetCategoryEnabled('runtime.script', false);\n"
             "native.diagnosticsSetToastsEnabled(false);\n"
-            "native.diagnosticsRequestReload({ path: 'src/App.vue', timestamp: 12 });\n"
+            "native.diagnosticsRequestReload({ path: 'src/App.sfa', timestamp: 12 });\n"
             "native.createNode(1, 'Box');\n"
             "native.createNode(2, 'Box');\n"
             "native.setModifier(2, { elements: [] });\n"
@@ -139,7 +140,7 @@ namespace {
         if (actions[2].kind != arrange::quickjs::QuickJsDiagnosticActionKind::SetToastsEnabled ||
             actions[2].enabled) return false;
         if (actions[3].kind != arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload ||
-            actions[3].path != "src/App.vue" ||
+            actions[3].path != "src/App.sfa" ||
             actions[3].timestamp != 12.0) return false;
         if (host.hasPendingDiagnostics()) return false;
         return true;
@@ -230,6 +231,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    host.setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
     arrange::quickjs::AppScriptLoader loader(host);
     const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
     if (!loaded.ok) {

@@ -4,6 +4,7 @@
 
 #include "QuickJsEventRegistry.h"
 #include "QuickJsModuleLoader.h"
+#include "QuickJsPainterResources.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <arrange/core/Mutation.h>
 #include <arrange/core/MutationTransaction.h>
@@ -41,6 +42,8 @@ namespace arrange::quickjs {
         std::unordered_map<std::uint64_t, PublishedModifier> publishedModifiers;
         std::uint64_t rejectedBindingUpdates = 0;
         QuickJsModuleLoader moduleLoader;
+        arrange::core::PainterLoader painterLoader;
+        std::unique_ptr<QuickJsPainterResources> painters;
         std::unordered_map<std::uint32_t, JSValue> animationFrameCallbacks;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeType> nodeTypes;
         std::unordered_map<arrange::core::NodeId, std::uint64_t> nodeGenerations;

@@ -20,7 +20,7 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
     const npmrcPath = resolve(uiDir, ".npmrc")
     const srcDir = resolve(uiDir, "src")
     const mainPath = resolve(srcDir, "main.ts")
-    const appPath = resolve(srcDir, "App.vue")
+    const appPath = resolve(srcDir, "App.sfa")
     const changes: string[] = []
     const manifest = existsSync(packagePath) ? JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown> : {name: packageName(config.project.name), private: true, type: "module"}
     const dependencies = asRecord(manifest.dependencies)
@@ -40,7 +40,7 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
         if (!existsSync(mainPath)) {
             writeFileSync(mainPath, [
                 `import { createApp } from "@arrange/framework"`,
-                `import App from "./App.vue"`,
+                `import App from "./App.sfa"`,
                 "",
                 "createApp(App).mount()",
                 "",
@@ -50,9 +50,9 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
         if (!existsSync(appPath)) {
             writeFileSync(appPath, [
                 "<template>",
-                "  <Column>",
-                `    <Text text=\"${config.project.name}\" />`,
-                "  </Column>",
+                "    <Column>",
+                `        <Text text=\"${config.project.name}\" />`,
+                "    </Column>",
                 "</template>",
                 "",
             ].join("\n"))

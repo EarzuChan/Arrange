@@ -32,19 +32,15 @@ export { type TransformPreset, getBaseTransformPreset } from './compile.ts'
 export { getConstantType } from './transforms/cacheStatic.ts'
 export { noopDirectiveTransform } from './transforms/noopDirectiveTransform.ts'
 export {
-    type PropsExpression, buildDirectiveArgs, buildProps, resolveComponentType, transformElement
+    type PropsExpression, buildProps, resolveArrangableType, transformElement
 } from './transforms/transformElement.ts'
 export {
     processExpression,
     stringifyExpression, transformExpression
 } from './transforms/transformExpression.ts'
-export { processSlotOutlet } from './transforms/transformSlotOutlet.ts'
-export { transformVBindShorthand } from './transforms/transformVBindShorthand.ts'
 export { transformBind } from './transforms/vBind.ts'
 export { createForLoopParams, processFor } from './transforms/vFor.ts'
 export { processIf } from './transforms/vIf.ts'
-export { transformModel } from './transforms/vModel.ts'
-export { transformOn } from './transforms/vOn.ts'
 export {
     type SlotFnBuilder, buildSlots, trackSlotScopes, trackVForSlotScopes
 } from './transforms/vSlot.ts'

@@ -1,26 +1,26 @@
 import { isRef, pauseTracking, resetTracking, toRaw } from '@arrange/vue-reactivity'
 import { isFunction, isString } from '@arrange/vue-shared'
 import {
-    type ComponentInternalInstance,
-    type ConcreteComponent,
+    type ArrangableInstance,
+    type ConcreteArrangable,
     type Data,
-    formatComponentName,
-} from './component.ts'
+    formatArrangableName,
+} from './arrangable.ts'
 import { ErrorCodes, callWithErrorHandling } from './errorHandling.ts'
 import type { VNode } from './vnode.ts'
 
-type ComponentVNode = VNode & {
-    type: ConcreteComponent
+type ArrangableVNode = VNode & {
+    type: ConcreteArrangable
 }
 
 const stack: VNode[] = []
 
 type TraceEntry = {
-    vnode: ComponentVNode
+    vnode: ArrangableVNode
     recurseCount: number
 }
 
-type ComponentTraceStack = TraceEntry[]
+type ArrangableTraceStack = TraceEntry[]
 
 export function pushWarningContext(vnode: VNode): void {
     stack.push(vnode)
@@ -40,9 +40,9 @@ export function warn(msg: string, ...args: any[]): void {
     // during patch, leading to infinite recursion.
     pauseTracking()
 
-    const instance = stack.length ? stack[stack.length - 1].component : null
+    const instance = stack.length ? stack[stack.length - 1].arrangable : null
     const appWarnHandler = instance && instance.appContext.config.warnHandler
-    const trace = getComponentTrace()
+    const trace = getArrangableTrace()
 
     if (appWarnHandler) {
         callWithErrorHandling(
@@ -55,14 +55,14 @@ export function warn(msg: string, ...args: any[]): void {
                 instance && instance.proxy,
                 trace
                     .map(
-                        ({ vnode }) => `at <${formatComponentName(instance, vnode.type)}>`,
+                        ({ vnode }) => `at <${formatArrangableName(instance, vnode.type)}>`,
                     )
                     .join('\n'),
                 trace,
             ],
         )
     } else {
-        const warnArgs = [`[Vue warn]: ${msg}`, ...args]
+        const warnArgs = [`[Arrange 警告]: ${msg}`, ...args]
         if (
             trace.length &&
             // avoid spamming console during tests
@@ -78,7 +78,7 @@ export function warn(msg: string, ...args: any[]): void {
     isWarning = false
 }
 
-export function getComponentTrace(): ComponentTraceStack {
+export function getArrangableTrace(): ArrangableTraceStack {
     let currentVNode: VNode | null = stack[stack.length - 1]
     if (!currentVNode) {
         return []
@@ -87,7 +87,7 @@ export function getComponentTrace(): ComponentTraceStack {
     // we can't just use the stack because it will be incomplete during updates
     // that did not start from the root. Re-construct the parent chain using
     // instance parent pointers.
-    const normalizedStack: ComponentTraceStack = []
+    const normalizedStack: ArrangableTraceStack = []
 
     while (currentVNode) {
         const last = normalizedStack[0]
@@ -95,12 +95,12 @@ export function getComponentTrace(): ComponentTraceStack {
             last.recurseCount++
         } else {
             normalizedStack.push({
-                vnode: currentVNode as ComponentVNode,
+                vnode: currentVNode as ArrangableVNode,
                 recurseCount: 0,
             })
         }
-        const parentInstance: ComponentInternalInstance | null =
-            currentVNode.component && currentVNode.component.parent
+        const parentInstance: ArrangableInstance | null =
+            currentVNode.arrangable && currentVNode.arrangable.parent
         currentVNode = parentInstance && parentInstance.vnode
     }
 
@@ -108,7 +108,7 @@ export function getComponentTrace(): ComponentTraceStack {
 }
 
 /* v8 ignore start */
-function formatTrace(trace: ComponentTraceStack): any[] {
+function formatTrace(trace: ArrangableTraceStack): any[] {
     const logs: any[] = []
     trace.forEach((entry, i) => {
         logs.push(...(i === 0 ? [] : [`\n`]), ...formatTraceEntry(entry))
@@ -118,10 +118,10 @@ function formatTrace(trace: ComponentTraceStack): any[] {
 
 function formatTraceEntry({ vnode, recurseCount }: TraceEntry): any[] {
     const postfix =
-        recurseCount > 0 ? `... (${recurseCount} recursive calls)` : ``
-    const isRoot = vnode.component ? vnode.component.parent == null : false
-    const open = ` at <${formatComponentName(
-        vnode.component,
+        recurseCount > 0 ? `... (递归调用 ${recurseCount} 次)` : ``
+    const isRoot = vnode.arrangable ? vnode.arrangable.parent == null : false
+    const open = ` at <${formatArrangableName(
+        vnode.arrangable,
         vnode.type,
         isRoot,
     )}`

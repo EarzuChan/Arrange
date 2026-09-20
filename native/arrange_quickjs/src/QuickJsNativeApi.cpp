@@ -16,7 +16,7 @@
 namespace arrange::quickjs {
     namespace {
         arrange::core::EventSlotKind propEventSlotKind(std::string_view key) noexcept {
-            if (key == "onUpdate:modelValue" || key == "onUpdate:model-value") return arrange::core::EventSlotKind::InputUpdate;
+            if (key == "onValueChange") return arrange::core::EventSlotKind::InputUpdate;
             if (key == "onSubmit") return arrange::core::EventSlotKind::InputSubmit;
             if (key == "onChange") return arrange::core::EventSlotKind::InputChange;
             if (key == "onBlur") return arrange::core::EventSlotKind::InputBlur;
@@ -92,11 +92,7 @@ namespace arrange::quickjs {
             event.pathOrUrl = payloadStringField(context, reader, payload, "pathOrUrl");
             event.toast = forceToast || reader.boolField(payload, "toast", false);
             event.coalesceToast = reader.boolField(payload, "coalesceToast", true);
-            if (!category && !categoryName.empty()) {
-                event.detail = event.detail.empty()
-                                   ? "Unsupported diagnostics category '" + categoryName + "'; fell back to runtime.script."
-                                   : event.detail + "\nUnsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.";
-            }
+            if (!category && !categoryName.empty())event.detail = event.detail.empty()? "Unsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.": event.detail + "\nUnsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.";
             return event;
         }
 
@@ -681,10 +677,11 @@ namespace arrange::quickjs {
         };
     }
 
-    void QuickJsNativeApi::install(JSContext* context, QuickJsRuntimeContext&) {
+    void QuickJsNativeApi::install(JSContext* context, QuickJsRuntimeContext& runtime) {
         ScopedValue global(context, JS_GetGlobalObject(context));
         ScopedValue native(context, JS_NewObject(context));
         JS_SetPropertyFunctionList(context, native.get(), nativeApiFunctions, static_cast<int>(std::size(nativeApiFunctions)));
+        runtime.painters->install(native.get());
         JS_SetPropertyStr(context, native.get(), "runtimeVersion", JS_NewUint32(context, arrange::core::RuntimeVersion));
         JS_SetPropertyStr(context, global.get(), "__ARRANGE_NATIVE__", native.release());
 

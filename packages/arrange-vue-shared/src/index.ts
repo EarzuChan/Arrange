@@ -1,3 +1,4 @@
+/// <reference path="./build-globals.d.ts" />
 import './featureFlags.ts'
 export * from './codeframe.ts'
 export * from './general.ts'
@@ -8,5 +9,4 @@ export { makeMap } from './makeMap.ts'
 export * from './patchFlags.ts'
 export * from './shapeFlags.ts'
 export * from './slotFlags.ts'
-export * from './toDisplayString.ts'
 export * from './typeUtils.ts'

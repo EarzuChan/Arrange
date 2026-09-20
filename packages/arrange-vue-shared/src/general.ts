@@ -12,15 +12,6 @@ export const NOOP = (): void => {}
  */
 export const NO = () => false
 
-export const isOn = (key: string): boolean =>
-  key.charCodeAt(0) === 111 /* o */ &&
-  key.charCodeAt(1) === 110 /* n */ &&
-  // uppercase letter
-  (key.charCodeAt(2) > 122 || key.charCodeAt(2) < 97)
-
-export const isModelListener = (key: string): key is `onUpdate:${string}` =>
-  key.startsWith('onUpdate:')
-
 export const extend: typeof Object.assign = Object.assign
 
 export const remove = <T>(arr: T[], el: T): void => {
@@ -80,13 +71,7 @@ export const isIntegerKey = (key: unknown): boolean =>
   key[0] !== '-' &&
   '' + parseInt(key, 10) === key
 
-export const isReservedProp: (key: string) => boolean = /*@__PURE__*/ makeMap(
-  // the leading comma is intentional so empty string "" is also included
-  ',key,ref,ref_for,ref_key,' +
-    'onVnodeBeforeMount,onVnodeMounted,' +
-    'onVnodeBeforeUpdate,onVnodeUpdated,' +
-    'onVnodeBeforeUnmount,onVnodeUnmounted',
-)
+export const isReservedProp = (key: string): boolean => key === 'key'
 
 export const isBuiltInDirective: (key: string) => boolean =
   /*@__PURE__*/ makeMap(
@@ -127,17 +112,6 @@ export const capitalize: <T extends string>(str: T) => Capitalize<T> =
     return (str.charAt(0).toUpperCase() + str.slice(1)) as Capitalize<T>
   })
 
-/**
- * @private
- */
-export const toHandlerKey: <T extends string>(
-  str: T,
-) => T extends '' ? '' : `on${Capitalize<T>}` = cacheStringFunction(
-  <T extends string>(str: T) => {
-    const s = str ? `on${capitalize(str)}` : ``
-    return s as T extends '' ? '' : `on${Capitalize<T>}`
-  },
-)
 
 // compare whether a value has changed, accounting for NaN.
 export const hasChanged = (value: any, oldValue: any): boolean =>

@@ -1,6 +1,6 @@
 import { isFunction } from '@arrange/vue-shared'
 import { currentApp } from './apiCreateApp.ts'
-import { currentInstance, getCurrentInstance } from './component.ts'
+import { currentInstance, getCurrentInstance } from './arrangable.ts'
 import { warn } from './warning.ts'
 
 interface InjectionConstraint<T> { }
@@ -50,7 +50,7 @@ export function inject(
     treatDefaultAsFactory = false,
 ) {
     // fallback to `currentRenderingInstance` so that this can be called in
-    // a functional component
+    // a functional arrangable
     const instance = getCurrentInstance()
 
     // also support looking up from app-level provides w/ `app.runWithContext()`
@@ -80,7 +80,7 @@ export function inject(
             warn(`injection "${String(key)}" not found.`)
         }
     } else if (__DEV__) {
-        warn(`inject() can only be used inside setup() or functional components.`)
+        warn(`inject() can only be used inside setup() or functional arrangables.`)
     }
 }
 

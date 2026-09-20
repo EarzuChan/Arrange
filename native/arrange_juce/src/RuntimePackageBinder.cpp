@@ -49,10 +49,6 @@ namespace arrange::juce {
         PassivePaintRenderer& paint) const {
         resetRuntimeState(session, runtime, diagnostics, interaction, paint);
 
-        if (!outcome.packageDir.empty()) {
-            paint.setPackageDir(outcome.packageDir);
-        }
-
         if (outcome.error) {
             diagnostics.setError(std::move(*outcome.error));
         }

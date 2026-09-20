@@ -1,4 +1,3 @@
-import { slotAlias } from './slotAliases.ts'
 // - Parse expressions in templates into compound expressions so that each
 //   identifier gets more accurate source-map locations.
 //
@@ -46,46 +45,13 @@ import { advancePositionWithClone, findDir, isSimpleIdentifier } from '../utils.
 const isLiteralWhitelisted = /*@__PURE__*/ makeMap('true,false,null,this')
 
 export const transformExpression: NodeTransform = (node, context) => {
-    if (node.type === NodeTypes.INTERPOLATION) {
-        node.content = processExpression(
-            node.content as SimpleExpressionNode,
-            context,
-        )
-    } else if (node.type === NodeTypes.ELEMENT) {
-        // handle directives on element
-        const memo = findDir(node, 'memo')
-        for (let i = 0; i < node.props.length; i++) {
-            const dir = node.props[i]
-            // do not process for v-on & v-for since they are special handled
-            if (dir.type === NodeTypes.DIRECTIVE && dir.name !== 'for') {
-                const exp = dir.exp
-                const arg = dir.arg
-                // do not process exp if this is v-on:arg - we need special handling
-                // for wrapping inline statements.
-                if (
-                    exp &&
-                    exp.type === NodeTypes.SIMPLE_EXPRESSION &&
-                    !(dir.name === 'on' && arg) &&
-                    // key has been processed in transformFor(vMemo + vFor)
-                    !(
-                        memo &&
-                        arg &&
-                        arg.type === NodeTypes.SIMPLE_EXPRESSION &&
-                        arg.content === 'key'
-                    )
-                ) {
-                    dir.exp = processExpression(
-                        exp,
-                        context,
-                        // slot args must be processed as function params
-                        dir.name === 'slot',
-                    )
-                }
-                if (arg && arg.type === NodeTypes.SIMPLE_EXPRESSION && !arg.isStatic) {
-                    dir.arg = processExpression(arg, context)
-                }
-            }
-        }
+    if (node.type !== NodeTypes.ELEMENT) return
+
+    for (const parameter of node.props) {
+        if (parameter.type !== NodeTypes.DIRECTIVE || parameter.name === 'for') continue
+        const { exp, arg } = parameter
+        if (exp?.type === NodeTypes.SIMPLE_EXPRESSION) parameter.exp = processExpression(exp, context)
+        if (arg?.type === NodeTypes.SIMPLE_EXPRESSION && !arg.isStatic) parameter.arg = processExpression(arg, context)
     }
 }
 
@@ -121,6 +87,7 @@ export function processExpression(
         id?: Identifier,
     ) => {
         const type = hasOwn(bindingMetadata, raw) && bindingMetadata[raw]
+        if (node.preserveRef && inline && type && type.startsWith('setup')) return raw
         if (inline) {
             // x = y
             const isAssignmentLVal =
@@ -232,11 +199,6 @@ export function processExpression(
     }
 
     if (ast === null || (!ast && isSimpleIdentifier(rawExp))) {
-        const alias = !asParams && slotAlias(context, rawExp)
-        if (alias) {
-            node.content = alias
-            return node
-        }
         const isScopeVarReference = context.identifiers[rawExp]
         const isAllowedGlobal = isGloballyAllowed(rawExp)
         const isLiteral = isLiteralWhitelisted(rawExp)
@@ -302,15 +264,14 @@ export function processExpression(
             }
             // v2 wrapped filter call
 
-            const alias = isReferenced && slotAlias(context, node.name, knownIds[node.name])
             const needPrefix = isReferenced && canPrefix(node)
-            if (alias || (needPrefix && !isLocal)) {
+            if (needPrefix && !isLocal) {
                 if (isStaticProperty(parent!) && parent.shorthand) {
                     // property shorthand like { foo }, we need to add the key since
                     // we rewrite the value
                     ; (node as QualifiedId).prefix = `${node.name}: `
                 }
-                node.name = alias || rewriteIdentifier(node.name, parent, node)
+                node.name = rewriteIdentifier(node.name, parent, node)
                 ids.push(node as QualifiedId)
             } else {
                 // The identifier is considered constant unless it's pointing to a

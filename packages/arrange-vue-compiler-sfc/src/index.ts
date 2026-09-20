@@ -5,13 +5,12 @@ export const version: string = __VERSION__
 export { compileScript } from './compileScript.ts'
 export { compileTemplate } from './compileTemplate.ts'
 export { parse } from './parse.ts'
-export { rewriteDefault, rewriteDefaultAST } from './rewriteDefault.ts'
 export { inferRuntimeType, resolveTypeElements } from './script/resolveType.ts'
 
-import { type SFCParseResult, parseCache as _parseCache } from './parse.ts'
+import { type SFAParseResult, parseCache as _parseCache } from './parse.ts'
 
 // #9521 export parseCache as a simple map to avoid exposing LRU types
-export const parseCache = _parseCache as Map<string, SFCParseResult>
+export const parseCache = _parseCache as Map<string, SFAParseResult>
 
 // error messages
 import {
@@ -37,7 +36,6 @@ export {
 } from '@arrange/vue-compiler-core'
 
 // Internals for type resolution
-export { extractRuntimeEmits } from './script/defineEmits.ts'
 export { extractRuntimeProps } from './script/defineProps.ts'
 export { invalidateTypeCache, registerTS } from './script/resolveType.ts'
 
@@ -45,14 +43,14 @@ export { invalidateTypeCache, registerTS } from './script/resolveType.ts'
 export type {
     BindingMetadata, CompilerError, CompilerOptions
 } from '@arrange/vue-compiler-core'
-export type { SFCScriptCompileOptions } from './compileScript.ts'
+export type { SFAScriptCompileOptions } from './compileScript.ts'
 export type {
-    SFCTemplateCompileOptions,
-    SFCTemplateCompileResults, TemplateCompiler
+    SFATemplateCompileOptions,
+    SFATemplateCompileResults, TemplateCompiler
 } from './compileTemplate.ts'
 export type {
-    SFCBlock, SFCDescriptor, SFCParseOptions,
-    SFCParseResult, SFCScriptBlock, SFCTemplateBlock
+    SFABlock, SFADescriptor, SFAParseOptions,
+    SFAParseResult, SFAScriptBlock, SFATemplateBlock
 } from './parse.ts'
 export type { ScriptCompileContext } from './script/context.ts'
 export type {

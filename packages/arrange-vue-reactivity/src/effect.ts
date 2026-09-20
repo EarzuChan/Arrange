@@ -118,9 +118,10 @@ export class ReactiveEffect<T = any>
                 activeEffectScope.effects.push(this)
             } else {
                 // The active scope has already been stopped. This happens when a
-                // component's setup is resumed after a top-level `await` (via the
+                // arrangable's setup is resumed after a top-level `await` (via the
                 // compiler-emitted `__restore()` from `withAsyncContext`) but the
-                // component was unmounted while pending under <Suspense>. Without
+                // 作用域在延迟任务完成前已经卸载，退休任务不能重新收集依赖
+                // Without
                 // this guard the effect would become an orphan: not held by any
                 // scope (so it cannot be stopped via the scope chain) yet still
                 // able to subscribe to reactive deps and fire forever.
@@ -216,6 +217,10 @@ export class ReactiveEffect<T = any>
      * @internal
      */
     runIfDirty(): void {
+        if (this.flags & EffectFlags.PAUSED) {
+            pausedQueueEffects.add(this)
+            return
+        }
         if (isDirty(this)) {
             this.run()
         }

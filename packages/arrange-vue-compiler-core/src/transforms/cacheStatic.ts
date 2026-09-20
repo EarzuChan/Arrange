@@ -1,5 +1,4 @@
 import {
-    PatchFlagNames,
     PatchFlags,
     isArray,
     isString,
@@ -8,7 +7,7 @@ import {
 import {
     type CacheExpression,
     type CallExpression,
-    type ComponentNode,
+    type ArrangableNode,
     ConstantTypes,
     ElementTypes,
     type ExpressionNode,
@@ -21,7 +20,6 @@ import {
     type SlotFunctionExpression,
     type TemplateChildNode,
     type TemplateNode,
-    type TextCallNode,
     type VNodeCall,
     createArrayExpression,
     getVNodeBlockHelper,
@@ -47,7 +45,7 @@ export function cacheStatic(root: RootNode, context: TransformContext): void {
 
 export function getSingleElementRoot(
     root: RootNode,
-): PlainElementNode | ComponentNode | TemplateNode | null {
+): PlainElementNode | ArrangableNode | TemplateNode | null {
     const children = root.children.filter(x => x.type !== NodeTypes.COMMENT)
     return children.length === 1 &&
         children[0].type === NodeTypes.ELEMENT &&
@@ -64,7 +62,7 @@ function walk(
     inFor = false,
 ) {
     const { children } = node
-    const toCache: (PlainElementNode | TextCallNode)[] = []
+    const toCache: PlainElementNode[] = []
     for (let i = 0; i < children.length; i++) {
         const child = children[i]
         // only plain elements & text calls are eligible for caching.
@@ -104,33 +102,16 @@ function walk(
                     }
                 }
             }
-        } else if (child.type === NodeTypes.TEXT_CALL) {
-            const constantType = doNotHoistNode
-                ? ConstantTypes.NOT_CONSTANT
-                : getConstantType(child, context)
-            if (constantType >= ConstantTypes.CAN_CACHE) {
-                if (
-                    child.codegenNode.type === NodeTypes.JS_CALL_EXPRESSION &&
-                    child.codegenNode.arguments.length > 0
-                ) {
-                    child.codegenNode.arguments.push(
-                        PatchFlags.CACHED +
-                        (__DEV__ ? ` /* ${PatchFlagNames[PatchFlags.CACHED]} */` : ``),
-                    )
-                }
-                toCache.push(child)
-                continue
-            }
         }
 
-        // walk further
+        // 继续遍历结构
         if (child.type === NodeTypes.ELEMENT) {
-            const isComponent = child.tagType === ElementTypes.COMPONENT
-            if (isComponent) {
+            const isArrangable = child.tagType === ElementTypes.ARRANGABLE
+            if (isArrangable) {
                 context.scopes.vSlot++
             }
             walk(child, node, context, false, inFor)
-            if (isComponent) {
+            if (isArrangable) {
                 context.scopes.vSlot--
             }
         } else if (child.type === NodeTypes.FOR) {
@@ -164,7 +145,7 @@ function walk(
             )
             cachedAsArray = true
         } else if (
-            node.tagType === ElementTypes.COMPONENT &&
+            node.tagType === ElementTypes.ARRANGABLE &&
             node.codegenNode &&
             node.codegenNode.type === NodeTypes.VNODE_CALL &&
             node.codegenNode.children &&
@@ -183,7 +164,7 @@ function walk(
             node.tagType === ElementTypes.TEMPLATE &&
             parent &&
             parent.type === NodeTypes.ELEMENT &&
-            parent.tagType === ElementTypes.COMPONENT &&
+            parent.tagType === ElementTypes.ARRANGABLE &&
             parent.codegenNode &&
             parent.codegenNode.type === NodeTypes.VNODE_CALL &&
             parent.codegenNode.children &&
@@ -241,9 +222,6 @@ function walk(
         }
     }
 
-    if (toCache.length && context.transformHoist) {
-        context.transformHoist(children, context, node)
-    }
 }
 
 export function getConstantType(
@@ -337,10 +315,10 @@ export function getConstantType(
 
                     context.removeHelper(OPEN_BLOCK)
                     context.removeHelper(
-                        getVNodeBlockHelper(codegenNode.isComponent),
+                        getVNodeBlockHelper(codegenNode.isArrangable),
                     )
                     codegenNode.isBlock = false
-                    context.helper(getVNodeHelper(codegenNode.isComponent))
+                    context.helper(getVNodeHelper(codegenNode.isArrangable))
                 }
 
                 constantCache.set(node, returnType)
@@ -357,7 +335,6 @@ export function getConstantType(
         case NodeTypes.IF_BRANCH:
             return ConstantTypes.NOT_CONSTANT
         case NodeTypes.INTERPOLATION:
-        case NodeTypes.TEXT_CALL:
             return getConstantType(node.content, context)
         case NodeTypes.SIMPLE_EXPRESSION:
             return node.constType

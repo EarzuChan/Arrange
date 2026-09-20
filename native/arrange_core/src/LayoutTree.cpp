@@ -38,6 +38,7 @@ namespace arrange::core {
             ArrangeNode node;
             node.id = op->id;
             node.type = op->type;
+            if (op->type == NodeType::Root) node.measurePolicy = BoxMeasurePolicy{"TopStart", true};
             node.generation = op->generation ? op->generation : allocateRuntimeIdentity();
             markDirty(node, DirtyFlag::Structure);
             recordDirtyAttribution(op->id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "node", "create node");
@@ -112,11 +113,6 @@ namespace arrange::core {
             return;
         }
 
-        if (const auto* op = getIf<SetTextMutation>(mutation)) {
-            setHostInput(op->id, HostInput::Text, PropValue::stringValue(op->text));
-            return;
-        }
-
         if (const auto* op = getIf<NativeInvalidationMutation>(mutation)) {
             markDirtyAttributed(op->id, op->flag, InvalidationSource::NativeState, op->field, op->reason);
         }
@@ -131,12 +127,10 @@ namespace arrange::core {
     std::uint32_t LayoutTree::setHostInput(NodeId id, HostInput input, const PropValue& value) {
         auto& node = require(id);
         const auto name = std::string(hostInputName(input));
-        if (input == HostInput::Text) {
-            if (!value.isString()) throw std::invalid_argument("Arrange text input requires string");
-            if (node.text == value.string) return 0;
-            const auto mask = hostInputInvalidation(input, nullptr, value);
-            node.text = value.string;
-            ++node.contentRevision;
+        if (input == HostInput::MeasurePolicy) {
+            const auto policy = readMeasurePolicy(value);
+            const auto mask = measurePolicyInvalidation(node.measurePolicy, policy);
+            node.measurePolicy = policy;
             markInputDirty(id, mask);
             return mask;
         }

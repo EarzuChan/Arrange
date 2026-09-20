@@ -39,16 +39,16 @@ import type { CodegenOptions } from './options.ts'
 import {
     CREATE_COMMENT,
     CREATE_ELEMENT_VNODE,
-    CREATE_STATIC,
-    CREATE_TEXT,
+
+
     CREATE_VNODE,
     OPEN_BLOCK,
-    RESOLVE_COMPONENT,
-    RESOLVE_DIRECTIVE,
+    RESOLVE_ARRANGABLE,
+
     SET_BLOCK_TRACKING,
-    TO_DISPLAY_STRING,
+
     WITH_CTX,
-    WITH_DIRECTIVES,
+
     helperNameMap
 } from './runtimeHelpers.ts'
 import type { ImportItem } from './transform.ts'
@@ -339,14 +339,8 @@ export function generate(
     }
 
     // generate asset resolution statements
-    if (ast.components.length) {
-        genAssets(ast.components, 'component', context)
-        if (ast.directives.length || ast.temps > 0) {
-            newline()
-        }
-    }
-    if (ast.directives.length) {
-        genAssets(ast.directives, 'directive', context)
+    if (ast.arrangables.length) {
+        genAssets(ast.arrangables, 'arrangable', context)
         if (ast.temps > 0) {
             newline()
         }
@@ -358,7 +352,7 @@ export function generate(
             push(`${i > 0 ? `, ` : ``}_temp${i}`)
         }
     }
-    if (ast.components.length || ast.directives.length || ast.temps) {
+    if (ast.arrangables.length || ast.temps) {
         push(`\n`, NewlineType.Start)
         newline()
     }
@@ -423,8 +417,7 @@ function genFunctionPreamble(ast: RootNode, context: CodegenContext) {
                     CREATE_VNODE,
                     CREATE_ELEMENT_VNODE,
                     CREATE_COMMENT,
-                    CREATE_TEXT,
-                    CREATE_STATIC,
+
                 ]
                     .filter(helper => helpers.includes(helper))
                     .map(aliasHelper)
@@ -459,7 +452,7 @@ function genModulePreamble(
             // as a function leads to it being wrapped with `Object(a.b)` or `(0,a.b)`,
             // incurring both payload size increase and potential perf overhead.
             // therefore we assign the imports to variables (which is a constant ~50b
-            // cost per-component instead of scaling with template size)
+            // cost per-arrangable instead of scaling with template size)
             push(
                 `
 import { ${helpers
@@ -499,17 +492,13 @@ import { ${helpers
 
 function genAssets(
     assets: string[],
-    type: 'component' | 'directive' | 'filter',
+    type: 'arrangable',
     { helper, push, newline, isTS }: CodegenContext,
 ) {
-    const resolver = helper(
-        (type === 'component'
-            ? RESOLVE_COMPONENT
-            : RESOLVE_DIRECTIVE),
-    )
+    const resolver = helper(RESOLVE_ARRANGABLE)
     for (let i = 0; i < assets.length; i++) {
         let id = assets[i]
-        // potential component implicit self-reference inferred from SFC filename
+        // potential arrangable implicit self-reference inferred from SFA filename
         const maybeSelfReference = id.endsWith('__self')
         if (maybeSelfReference) {
             id = id.slice(0, -6)
@@ -635,11 +624,7 @@ function genNode(node: CodegenNode | symbol | string, context: CodegenContext) {
             genExpression(node, context)
             break
         case NodeTypes.INTERPOLATION:
-            genInterpolation(node, context)
-            break
-        case NodeTypes.TEXT_CALL:
-            genNode(node.codegenNode, context)
-            break
+            throw new SyntaxError('模板内容不接受插值，请使用 Text 的 text 参数')
         case NodeTypes.COMPOUND_EXPRESSION:
             genCompoundExpression(node, context)
             break
@@ -719,13 +704,6 @@ function genExpression(node: SimpleExpressionNode, context: CodegenContext) {
     )
 }
 
-function genInterpolation(node: InterpolationNode, context: CodegenContext) {
-    const { push, helper, pure } = context
-    if (pure) push(PURE_ANNOTATION)
-    push(`${helper(TO_DISPLAY_STRING)}(`)
-    genNode(node.content, context)
-    push(`)`)
-}
 
 function genCompoundExpression(
     node: CompoundExpressionNode,
@@ -781,10 +759,10 @@ function genVNodeCall(node: VNodeCall, context: CodegenContext) {
         children,
         patchFlag,
         dynamicProps,
-        directives,
+
         isBlock,
         disableTracking,
-        isComponent,
+        isArrangable,
     } = node
 
     // add dev annotations to patch flags
@@ -807,10 +785,6 @@ function genVNodeCall(node: VNodeCall, context: CodegenContext) {
             patchFlagString = String(patchFlag)
         }
     }
-
-    if (directives) {
-        push(helper(WITH_DIRECTIVES) + `(`)
-    }
     if (isBlock) {
         push(`(${helper(OPEN_BLOCK)}(${disableTracking ? `true` : ``}), `)
     }
@@ -818,8 +792,8 @@ function genVNodeCall(node: VNodeCall, context: CodegenContext) {
         push(PURE_ANNOTATION)
     }
     const callHelper: symbol = isBlock
-        ? getVNodeBlockHelper(isComponent)
-        : getVNodeHelper(isComponent)
+        ? getVNodeBlockHelper(isArrangable)
+        : getVNodeHelper(isArrangable)
     push(helper(callHelper) + `(`, NewlineType.None, node)
     genNodeList(
         genNullableArgs([tag, props, children, patchFlagString, dynamicProps]),
@@ -827,11 +801,6 @@ function genVNodeCall(node: VNodeCall, context: CodegenContext) {
     )
     push(`)`)
     if (isBlock) {
-        push(`)`)
-    }
-    if (directives) {
-        push(`, `)
-        genNode(directives, context)
         push(`)`)
     }
 }
@@ -978,7 +947,6 @@ function genCacheExpression(node: CacheExpression, context: CodegenContext) {
     if (needPauseTracking) {
         indent()
         push(`${helper(SET_BLOCK_TRACKING)}(-1`)
-        if (node.inVOnce) push(`, true`)
         push(`),`)
         newline()
         push(`(`)

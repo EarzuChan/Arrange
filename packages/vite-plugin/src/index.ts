@@ -10,4 +10,5 @@ export {
 export {buildDevBundle} from "./dev-bundle.ts"
 export {arrange, default} from "./plugin.ts"
 export type {ArrangeVitePlugin, ArrangeVitePluginOptions} from "./types.ts"
+export { checkSfaProject, type SfaDiagnostic } from './typecheck.ts'
 

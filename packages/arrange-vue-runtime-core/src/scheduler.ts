@@ -1,5 +1,5 @@
 import { isArray } from '@arrange/vue-shared'
-import { type ComponentInternalInstance, getComponentName } from './component.ts'
+import { type ArrangableInstance, getArrangableName } from './arrangable.ts'
 import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling.ts'
 
 export enum SchedulerJobFlags {
@@ -12,8 +12,8 @@ export enum SchedulerJobFlags {
      * By default, a job cannot trigger itself because some built-in method calls,
      * e.g. Array.prototype.push actually performs reads as well (#1740) which
      * can lead to confusing infinite loops.
-     * The allowed cases are component update functions and watch callbacks.
-     * Component update functions may update child component props, which in turn
+     * The allowed cases are arrangable update functions and watch callbacks.
+     * Arrangable update functions may update child arrangable props, which in turn
      * trigger flush: "pre" watch callbacks that mutates state that the parent
      * relies on (#1801). Watch callbacks doesn't track its dependencies so if it
      * triggers itself again, it's likely intentional and it is the user's
@@ -32,10 +32,10 @@ export interface SchedulerJob extends Function {
      */
     flags?: SchedulerJobFlags
     /**
-     * Attached by renderer.ts when setting up a component's render effect
-     * Used to obtain component information when reporting max recursive updates.
+     * Attached by renderer.ts when setting up a arrangable's render effect
+     * Used to obtain arrangable information when reporting max recursive updates.
      */
-    i?: ComponentInternalInstance
+    i?: ArrangableInstance
 }
 
 export type SchedulerJobs = SchedulerJob | SchedulerJob[]
@@ -68,13 +68,13 @@ export function nextTick<T, R>(
 
 // Use binary-search to find a suitable position in the queue. The queue needs
 // to be sorted in increasing order of the job ids. This ensures that:
-// 1. Components are updated from parent to child. As the parent is always
+// 1. Arrangables are updated from parent to child. As the parent is always
 //    created before the child it will always have a smaller id.
-// 2. If a component is unmounted during a parent component's update, its update
+// 2. If a arrangable is unmounted during a parent arrangable's update, its update
 //    can be skipped.
-// A pre watcher will have the same id as its component's update job. The
+// A pre watcher will have the same id as its arrangable's update job. The
 // watcher should be inserted immediately before the update job. This allows
-// watchers to be skipped if the component is unmounted by the parent update.
+// watchers to be skipped if the arrangable is unmounted by the parent update.
 function findInsertionIndex(id: number) {
     let start = flushIndex + 1
     let end = queue.length
@@ -131,7 +131,7 @@ export function queuePostFlushCb(cb: SchedulerJobs): void {
             cb.flags! |= SchedulerJobFlags.QUEUED
         }
     } else {
-        // if cb is an array, it is a component lifecycle hook which can only be
+        // if cb is an array, it is a arrangable lifecycle hook which can only be
         // triggered by a job, which is already deduped in the main queue, so
         // we can skip duplicate check here to improve perf
         pendingPostFlushCbs.push(...cb)
@@ -140,7 +140,7 @@ export function queuePostFlushCb(cb: SchedulerJobs): void {
 }
 
 export function flushPreFlushCbs(
-    instance?: ComponentInternalInstance,
+    instance?: ArrangableInstance,
     seen?: CountMap,
     // skip the current job
     i: number = flushIndex + 1,
@@ -230,7 +230,7 @@ function flushJobs(seen?: CountMap) {
                 callWithErrorHandling(
                     job,
                     job.i,
-                    job.i ? ErrorCodes.COMPONENT_UPDATE : ErrorCodes.SCHEDULER,
+                    job.i ? ErrorCodes.ARRANGABLE_UPDATE : ErrorCodes.SCHEDULER,
                 )
                 if (!(job.flags! & SchedulerJobFlags.ALLOW_RECURSE)) {
                     job.flags! &= ~SchedulerJobFlags.QUEUED
@@ -265,13 +265,13 @@ function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {
     const count = seen.get(fn) || 0
     if (count > RECURSION_LIMIT) {
         const instance = fn.i
-        const componentName = instance && getComponentName(instance.type)
+        const arrangableName = instance && getArrangableName(instance.type)
         handleError(
-            `Maximum recursive updates exceeded${componentName ? ` in component <${componentName}>` : ``
+            `Maximum recursive updates exceeded${arrangableName ? ` in arrangable <${arrangableName}>` : ``
             }. ` +
             `This means you have a reactive effect that is mutating its own ` +
             `dependencies and thus recursively triggering itself. Possible sources ` +
-            `include component template, render function, updated hook or ` +
+            `include arrangable template, render function, updated hook or ` +
             `watcher source function.`,
             null,
             ErrorCodes.APP_ERROR_HANDLER,

@@ -3,20 +3,16 @@ import { generateCodeFrame, isArray } from '@arrange/vue-shared'
 import { type ParserPlugin, parse as babelParse } from '@babel/parser'
 import type { CallExpression, Node, ObjectPattern, Program } from '@babel/types'
 import MagicString from 'magic-string'
-import type { ImportBinding, SFCScriptCompileOptions } from '../compileScript.ts'
-import type { SFCDescriptor } from '../parse.ts'
+import type { ImportBinding, SFAScriptCompileOptions } from '../compileScript.ts'
+import type { SFADescriptor } from '../parse.ts'
 import { warn } from '../warn.ts'
-import type { ModelDecl } from './defineModel.ts'
 import type { PropsDestructureBindings } from './defineProps.ts'
 import type { TypeScope } from './resolveType.ts'
-import { isJS, isTS } from './utils.ts'
 
 export class ScriptCompileContext {
-    isJS: boolean
-    isTS: boolean
+    readonly isTS = true
 
     scriptAst: Program | null
-    scriptSetupAst: Program | null
 
     source: string
     filename: string
@@ -31,13 +27,6 @@ export class ScriptCompileContext {
 
     // macros presence check
     hasDefinePropsCall = false
-    hasDefineEmitCall = false
-    hasDefineExposeCall = false
-    hasDefaultExportName = false
-    hasDefaultExportRender = false
-    hasDefineOptionsCall = false
-    hasDefineSlotsCall = false
-    hasDefineModelCall = false
 
     // defineProps
     propsCall: CallExpression | undefined
@@ -48,17 +37,6 @@ export class ScriptCompileContext {
     propsDestructuredBindings: PropsDestructureBindings = Object.create(null)
     propsDestructureRestId: string | undefined
     propsRuntimeDefaults: Node | undefined
-
-    // defineEmits
-    emitsRuntimeDecl: Node | undefined
-    emitsTypeDecl: Node | undefined
-    emitDecl: Node | undefined
-
-    // defineModel
-    modelDecls: Record<string, ModelDecl> = Object.create(null)
-
-    // defineOptions
-    optionsRuntimeDecl: Node | undefined
 
     // codegen
     bindingMetadata: BindingMetadata = {}
@@ -76,30 +54,19 @@ export class ScriptCompileContext {
     /**
      * cache for resolved fs
      */
-    fs?: NonNullable<SFCScriptCompileOptions['fs']>
+    fs?: NonNullable<SFAScriptCompileOptions['fs']>
 
     constructor(
-        public descriptor: SFCDescriptor,
-        public options: Partial<SFCScriptCompileOptions>,
+        public descriptor: SFADescriptor,
+        public options: Partial<SFAScriptCompileOptions>,
     ) {
         this.source = descriptor.source
         this.filename = descriptor.filename
         this.s = new MagicString(this.source)
-        this.startOffset = descriptor.scriptSetup?.loc.start.offset
-        this.endOffset = descriptor.scriptSetup?.loc.end.offset
+        this.startOffset = descriptor.script?.loc.start.offset
+        this.endOffset = descriptor.script?.loc.end.offset
 
-        const { script, scriptSetup } = descriptor
-        const scriptLang = script && script.lang
-        const scriptSetupLang = scriptSetup && scriptSetup.lang
-
-        this.isJS = isJS(scriptLang, scriptSetupLang)
-        this.isTS = isTS(scriptLang, scriptSetupLang)
-
-        // resolve parser plugins
-        const plugins: ParserPlugin[] = resolveParserPlugins(
-            (scriptLang || scriptSetupLang)!,
-            options.babelParserPlugins,
-        )
+        const plugins = resolveParserPlugins('ts', options.babelParserPlugins)
 
         function parse(input: string, offset: number): Program {
             try {
@@ -108,7 +75,7 @@ export class ScriptCompileContext {
                     sourceType: 'module',
                 }).program
             } catch (e: any) {
-                e.message = `[vue/compiler-sfc] ${e.message}\n\n${descriptor.filename
+                e.message = `[Arrange/SFA] ${e.message}\n\n${descriptor.filename
                     }\n${generateCodeFrame(
                         descriptor.source,
                         e.pos + offset,
@@ -120,18 +87,11 @@ export class ScriptCompileContext {
 
         this.scriptAst =
             descriptor.script &&
-            parse(descriptor.script.content, descriptor.script.loc.start.offset)
-
-        this.scriptSetupAst =
-            descriptor.scriptSetup &&
-            parse(descriptor.scriptSetup!.content, this.startOffset!)
+            parse(descriptor.script!.content, this.startOffset!)
     }
 
-    getString(node: Node, scriptSetup = true): string {
-        const block = scriptSetup
-            ? this.descriptor.scriptSetup!
-            : this.descriptor.script!
-        return block.content.slice(node.start!, node.end!)
+    getString(node: Node): string {
+        return this.descriptor.script!.content.slice(node.start!, node.end!)
     }
 
     warn(msg: string, node: Node, scope?: TypeScope): void {
@@ -140,7 +100,7 @@ export class ScriptCompileContext {
 
     error(msg: string, node: Node, scope?: TypeScope): never {
         throw new Error(
-            `[@vue/compiler-sfc] ${generateError(msg, node, this, scope)}`,
+            `[Arrange/SFA] ${generateError(msg, node, this, scope)}`,
         )
     }
 }

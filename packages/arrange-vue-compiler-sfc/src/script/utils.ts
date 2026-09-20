@@ -130,7 +130,7 @@ export const joinPaths: (...paths: string[]) => string = (path.posix || path)
 
 /**
  * key may contain symbols
- * e.g. onUpdate:modelValue -> "onUpdate:modelValue"
+ * 含非标识符字符的名称转换为字符串键
  */
 export const propNameEscapeSymbolsRE: RegExp =
     /[ !"#$%&'()*+,./:;<=>?@[\\\]^`{|}~\-]/

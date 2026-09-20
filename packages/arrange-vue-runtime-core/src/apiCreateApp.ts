@@ -1,22 +1,19 @@
 import { NO, extend, hasOwn, isFunction, isObject } from '@arrange/vue-shared'
-import type { DefineComponent } from './apiDefineComponent.ts'
+import type { DefineArrangable } from './apiDefineArrangable.ts'
 import type { InjectionKey } from './apiInject.ts'
 import {
-    type Component,
-    type ComponentInternalInstance,
-    type ConcreteComponent,
+    type Arrangable,
+    type ArrangableInstance,
+    type ConcreteArrangable,
     type Data,
-    getComponentPublicInstance,
-    validateComponentName,
-} from './component.ts'
-import type { ObjectEmitsOptions } from './componentEmits.ts'
-import type { NormalizedPropsOptions } from './componentProps.ts'
+    getArrangablePublicInstance,
+    validateArrangableName,
+} from './arrangable.ts'
+import type { NormalizedPropsOptions } from './arrangableProps.ts'
 import type {
-    ComponentCustomProperties,
-    ComponentPublicInstance,
-} from './componentPublicInstance.ts'
-
-import { type Directive, validateDirectiveName } from './directives.ts'
+    ArrangableCustomProperties,
+    ArrangablePublicInstance,
+} from './arrangablePublicInstance.ts'
 import { ErrorCodes, callWithAsyncErrorHandling } from './errorHandling.ts'
 import { version } from './index.ts'
 import type { RootRenderFunction } from './renderer.ts'
@@ -33,27 +30,10 @@ export interface App<HostElement = any> {
     ): this
     use<Options>(plugin: Plugin<Options>, options: NoInfer<Options>): this
 
-    component(name: string): Component | undefined
-    component<T extends Component | DefineComponent>(
+    arrangable(name: string): Arrangable | undefined
+    arrangable<T extends Arrangable | DefineArrangable>(
         name: string,
-        component: T,
-    ): this
-    directive<
-        HostElement = any,
-        Value = any,
-        Modifiers extends string = string,
-        Arg = any,
-    >(
-        name: string,
-    ): Directive<HostElement, Value, Modifiers, Arg> | undefined
-    directive<
-        HostElement = any,
-        Value = any,
-        Modifiers extends string = string,
-        Arg = any,
-    >(
-        name: string,
-        directive: Directive<HostElement, Value, Modifiers, Arg>,
+        arrangable: T,
     ): this
     mount(
         rootContainer: HostElement | string,
@@ -65,7 +45,7 @@ export interface App<HostElement = any> {
          * @internal
          */
         vnode?: VNode,
-    ): ComponentPublicInstance
+    ): ArrangablePublicInstance
     unmount(): void
     onUnmount(cb: () => void): void
     provide<T, K = InjectionKey<T> | string | number>(
@@ -82,11 +62,11 @@ export interface App<HostElement = any> {
     runWithContext<T>(fn: () => T): T
 
     _uid: number
-    _component: ConcreteComponent
+    _arrangable: ConcreteArrangable
     _props: Data | null
     _container: HostElement | null
     _context: AppContext
-    _instance: ComponentInternalInstance | null
+    _instance: ArrangableInstance | null
 
 }
 
@@ -94,15 +74,15 @@ export interface AppConfig {
     // @private
     readonly isNativeTag: (tag: string) => boolean
 
-    globalProperties: ComponentCustomProperties & Record<string, any>
+    globalProperties: ArrangableCustomProperties & Record<string, any>
     errorHandler?: (
         err: unknown,
-        instance: ComponentPublicInstance | null,
+        instance: ArrangablePublicInstance | null,
         info: string,
     ) => void
     warnHandler?: (
         msg: string,
-        instance: ComponentPublicInstance | null,
+        instance: ArrangablePublicInstance | null,
         trace: string,
     ) => void
 
@@ -125,20 +105,18 @@ export interface AppConfig {
 export interface AppContext {
     app: App // for devtools
     config: AppConfig
-    components: Record<string, Component>
-    directives: Record<string, Directive>
+    arrangables: Record<string, Arrangable>
     provides: Record<string | symbol, any>
 
     /**
      * Cache for normalized props options
      * @internal
      */
-    propsCache: WeakMap<ConcreteComponent, NormalizedPropsOptions>
+    propsCache: WeakMap<ConcreteArrangable, NormalizedPropsOptions>
     /**
      * Cache for normalized emits options
      * @internal
      */
-    emitsCache: WeakMap<ConcreteComponent, ObjectEmitsOptions | null>
     /**
      * HMR only
      * @internal
@@ -171,16 +149,14 @@ export function createAppContext(): AppContext {
             errorHandler: undefined,
             warnHandler: undefined,
         },
-        components: {},
-        directives: {},
+        arrangables: {},
         provides: Object.create(null),
         propsCache: new WeakMap(),
-        emitsCache: new WeakMap(),
     }
 }
 
 export type CreateAppFunction<HostElement> = (
-    rootComponent: Component,
+    rootArrangable: Arrangable,
     rootProps?: Data | null,
 ) => App<HostElement>
 
@@ -189,10 +165,7 @@ let uid = 0
 export function createAppAPI<HostElement>(
     render: RootRenderFunction<HostElement>,
 ): CreateAppFunction<HostElement> {
-    return function createApp(rootComponent, rootProps = null) {
-        if (!isFunction(rootComponent)) {
-            rootComponent = extend({}, rootComponent)
-        }
+    return function createApp(rootArrangable, rootProps = null) {
 
         if (rootProps != null && !isObject(rootProps)) {
             __DEV__ && warn(`root props passed to app.mount() must be an object.`)
@@ -207,7 +180,7 @@ export function createAppAPI<HostElement>(
 
         const app: App = (context.app = {
             _uid: uid++,
-            _component: rootComponent as ConcreteComponent,
+            _arrangable: rootArrangable as ConcreteArrangable,
             _props: rootProps,
             _container: null,
             _context: context,
@@ -240,31 +213,17 @@ export function createAppAPI<HostElement>(
                 }
                 return app
             },
-            component(name: string, component?: Component): any {
+            arrangable(name: string, arrangable?: Arrangable): any {
                 if (__DEV__) {
-                    validateComponentName(name, context.config)
+                    validateArrangableName(name, context.config)
                 }
-                if (!component) {
-                    return context.components[name]
+                if (!arrangable) {
+                    return context.arrangables[name]
                 }
-                if (__DEV__ && context.components[name]) {
-                    warn(`Component "${name}" has already been registered in target app.`)
+                if (__DEV__ && context.arrangables[name]) {
+                    warn(`Arrangable "${name}" has already been registered in target app.`)
                 }
-                context.components[name] = component
-                return app
-            },
-            directive(name: string, directive?: Directive) {
-                if (__DEV__) {
-                    validateDirectiveName(name)
-                }
-
-                if (!directive) {
-                    return context.directives[name] as any
-                }
-                if (__DEV__ && context.directives[name]) {
-                    warn(`Directive "${name}" has already been registered in target app.`)
-                }
-                context.directives[name] = directive
+                context.arrangables[name] = arrangable
                 return app
             },
             mount(
@@ -279,7 +238,7 @@ export function createAppAPI<HostElement>(
                             ` you need to unmount the previous app by calling \`app.unmount()\` first.`,
                         )
                     }
-                    const vnode = createVNode(rootComponent, rootProps)
+                    const vnode = createVNode(rootArrangable, rootProps)
                     // store app context on the root VNode.
                     // this will be set on the root instance on initial mount.
                     vnode.appContext = context
@@ -303,11 +262,11 @@ export function createAppAPI<HostElement>(
                         ; (rootContainer as any).__vue_app__ = app
 
                     if ((__DEV__)) {
-                        app._instance = vnode.component
+                        app._instance = vnode.arrangable
 
                     }
 
-                    return getComponentPublicInstance(vnode.component!)
+                    return getArrangablePublicInstance(vnode.arrangable!)
                 } else if (__DEV__) {
                     warn(
                         `App has already been mounted.\n` +

@@ -10,11 +10,11 @@ import {
 } from '@arrange/vue-reactivity'
 import { EMPTY_OBJ, extend, isFunction, isString } from '@arrange/vue-shared'
 import {
-    type ComponentInternalInstance,
+    type ArrangableInstance,
     currentInstance,
     setCurrentInstance
-} from './component.ts'
-import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+} from './arrangable.ts'
+import type { ArrangablePublicInstance } from './arrangablePublicInstance.ts'
 import { callWithAsyncErrorHandling } from './errorHandling.ts'
 import { queuePostRenderEffect } from './renderer.ts'
 import { type SchedulerJob, SchedulerJobFlags, queueJob } from './scheduler.ts'
@@ -178,7 +178,7 @@ function doWatch(
     let isPre = false
     if (flush === 'post') {
         baseWatchOptions.scheduler = job => {
-            queuePostRenderEffect(job, instance && instance.suspense)
+            queuePostRenderEffect(job)
         }
     } else if (flush !== 'sync') {
         // default: 'pre'
@@ -214,7 +214,7 @@ function doWatch(
 
 // this.$watch
 export function instanceWatch(
-    this: ComponentInternalInstance,
+    this: ArrangableInstance,
     source: string | Function,
     value: WatchCallback,
     options?: WatchOptions,
@@ -233,7 +233,7 @@ export function instanceWatch(
 }
 
 export function createPathGetter(
-    ctx: ComponentPublicInstance,
+    ctx: ArrangablePublicInstance,
     path: string,
 ): () => WatchSource | WatchSource[] | WatchEffect | object {
     const segments = path.split('.')

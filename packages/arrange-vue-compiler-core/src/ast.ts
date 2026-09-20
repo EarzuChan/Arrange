@@ -10,8 +10,7 @@ import {
     OPEN_BLOCK,
     type RENDER_LIST,
     type RENDER_SLOT,
-    WITH_DIRECTIVES,
-    type WITH_MEMO,
+
 } from './runtimeHelpers.ts'
 import type { ImportItem, TransformContext } from './transform.ts'
 import type { PropsExpression } from './transforms/transformElement.ts'
@@ -40,7 +39,6 @@ export enum NodeTypes {
     IF,
     IF_BRANCH,
     FOR,
-    TEXT_CALL,
     // codegen
     VNODE_CALL,
     JS_CALL_EXPRESSION,
@@ -60,7 +58,7 @@ export enum NodeTypes {
 
 export enum ElementTypes {
     ELEMENT,
-    COMPONENT,
+    ARRANGABLE,
     SLOT,
     TEMPLATE,
 }
@@ -97,15 +95,14 @@ export type TemplateChildNode =
     | IfNode
     | IfBranchNode
     | ForNode
-    | TextCallNode
 
 export interface RootNode extends Node {
+    slotNames?: readonly string[]
     type: NodeTypes.ROOT
     source: string
     children: TemplateChildNode[]
     helpers: Set<symbol>
-    components: string[]
-    directives: string[]
+    arrangables: string[]
     hoists: (JSChildNode | null)[]
     imports: ImportItem[]
     cached: (CacheExpression | null)[]
@@ -120,7 +117,7 @@ export interface RootNode extends Node {
 
 export type ElementNode =
     | PlainElementNode
-    | ComponentNode
+    | ArrangableNode
     | SlotOutletNode
     | TemplateNode
 
@@ -132,7 +129,7 @@ export interface BaseElementNode extends Node {
     props: Array<AttributeNode | DirectiveNode>
     children: TemplateChildNode[]
     isSelfClosing?: boolean
-    innerLoc?: SourceLocation // only for SFC root level elements
+    innerLoc?: SourceLocation // only for SFA root level elements
 }
 
 export interface PlainElementNode extends BaseElementNode {
@@ -141,17 +138,15 @@ export interface PlainElementNode extends BaseElementNode {
     | VNodeCall
     | SimpleExpressionNode // when hoisted
     | CacheExpression // when cached by v-once
-    | MemoExpression // when cached by v-memo
     | undefined
 
 }
 
-export interface ComponentNode extends BaseElementNode {
-    tagType: ElementTypes.COMPONENT
+export interface ArrangableNode extends BaseElementNode {
+    tagType: ElementTypes.ARRANGABLE
     codegenNode:
     | VNodeCall
     | CacheExpression // when cached by v-once
-    | MemoExpression // when cached by v-memo
     | undefined
 
 }
@@ -242,6 +237,7 @@ export interface SimpleExpressionNode extends Node {
      */
     identifiers?: string[]
     isHandlerKey?: boolean
+    preserveRef?: boolean
 }
 
 export interface InterpolationNode extends Node {
@@ -307,12 +303,6 @@ export interface ForParseResult {
     finalized: boolean
 }
 
-export interface TextCallNode extends Node {
-    type: NodeTypes.TEXT_CALL
-    content: TextNode | InterpolationNode | CompoundExpressionNode
-    codegenNode: CallExpression | SimpleExpressionNode // when hoisted
-}
-
 export type TemplateTextChildNode =
     | TextNode
     | InterpolationNode
@@ -326,17 +316,16 @@ export interface VNodeCall extends Node {
     | CallExpression // Arrange 延迟文本表达式
     | TemplateChildNode[] // multiple children
     | TemplateTextChildNode // single text child
-    | SlotsExpression // component slots
+    | SlotsExpression // arrangable slots
     | ForRenderListExpression // v-for fragment call
     | SimpleExpressionNode // hoisted
     | CacheExpression // cached
     | undefined
     patchFlag: PatchFlags | undefined
     dynamicProps: string | SimpleExpressionNode | undefined
-    directives: DirectiveArguments | undefined
     isBlock: boolean
     disableTracking: boolean
-    isComponent: boolean
+    isArrangable: boolean
 }
 
 // JS Node Types ---------------------------------------------------------------
@@ -412,17 +401,7 @@ export interface CacheExpression extends Node {
     index: number
     value: JSChildNode
     needPauseTracking: boolean
-    inVOnce: boolean
     needArraySpread: boolean
-}
-
-export interface MemoExpression extends CallExpression {
-    callee: typeof WITH_MEMO
-    arguments: [ExpressionNode, MemoFactory, string, string]
-}
-
-interface MemoFactory extends FunctionExpression {
-    returns: BlockCodegenNode
 }
 
 export type SSRCodegenNode =
@@ -466,32 +445,10 @@ export interface ReturnStatement extends Node {
     returns: TemplateChildNode | TemplateChildNode[] | JSChildNode
 }
 
-// Codegen Node Types ----------------------------------------------------------
-
-export interface DirectiveArguments extends ArrayExpression {
-    elements: DirectiveArgumentNode[]
-}
-
-export interface DirectiveArgumentNode extends ArrayExpression {
-    elements: // dir, exp, arg, modifiers
-    | [string]
-    | [string, ExpressionNode]
-    | [string, ExpressionNode, ExpressionNode]
-    | [string, ExpressionNode, ExpressionNode, ObjectExpression]
-}
-
 // renderSlot(...)
 export interface RenderSlotCall extends CallExpression {
     callee: typeof RENDER_SLOT
-    arguments: // $slots, name, props, fallback
-    | [string, string | ExpressionNode]
-    | [string, string | ExpressionNode, PropsExpression]
-    | [
-        string,
-        string | ExpressionNode,
-        PropsExpression | '{}',
-        TemplateChildNode[],
-    ]
+    arguments: [string, string | ExpressionNode] | [string, string | ExpressionNode, ExpressionNode]
 }
 
 export type SlotsExpression = SlotsObjectExpression | DynamicSlotsExpression
@@ -547,8 +504,8 @@ export interface DynamicSlotFnProperty extends Property {
 export type BlockCodegenNode = VNodeCall | RenderSlotCall
 
 export interface IfConditionalExpression extends ConditionalExpression {
-    consequent: BlockCodegenNode | MemoExpression
-    alternate: BlockCodegenNode | IfConditionalExpression | MemoExpression
+    consequent: BlockCodegenNode
+    alternate: BlockCodegenNode | IfConditionalExpression
 }
 
 export interface ForCodegenNode extends VNodeCall {
@@ -589,8 +546,7 @@ export function createRoot(
         source,
         children,
         helpers: new Set(),
-        components: [],
-        directives: [],
+        arrangables: [],
         hoists: [],
         imports: [],
         cached: [],
@@ -607,21 +563,18 @@ export function createVNodeCall(
     children?: VNodeCall['children'],
     patchFlag?: VNodeCall['patchFlag'],
     dynamicProps?: VNodeCall['dynamicProps'],
-    directives?: VNodeCall['directives'],
+
     isBlock: VNodeCall['isBlock'] = false,
     disableTracking: VNodeCall['disableTracking'] = false,
-    isComponent: VNodeCall['isComponent'] = false,
+    isArrangable: VNodeCall['isArrangable'] = false,
     loc: SourceLocation = locStub,
 ): VNodeCall {
     if (context) {
         if (isBlock) {
             context.helper(OPEN_BLOCK)
-            context.helper(getVNodeBlockHelper(isComponent))
+            context.helper(getVNodeBlockHelper(isArrangable))
         } else {
-            context.helper(getVNodeHelper(isComponent))
-        }
-        if (directives) {
-            context.helper(WITH_DIRECTIVES)
+            context.helper(getVNodeHelper(isArrangable))
         }
     }
 
@@ -632,10 +585,9 @@ export function createVNodeCall(
         children,
         patchFlag,
         dynamicProps,
-        directives,
         isBlock,
         disableTracking,
-        isComponent,
+        isArrangable,
         loc,
     }
 }
@@ -767,14 +719,12 @@ export function createCacheExpression(
     index: number,
     value: JSChildNode,
     needPauseTracking: boolean = false,
-    inVOnce: boolean = false,
 ): CacheExpression {
     return {
         type: NodeTypes.JS_CACHE_EXPRESSION,
         index,
         value,
         needPauseTracking: needPauseTracking,
-        inVOnce,
         needArraySpread: false,
         loc: locStub,
     }
@@ -848,16 +798,16 @@ export function createReturnStatement(
 
 export function getVNodeHelper(
 
-    isComponent: boolean,
+    isArrangable: boolean,
 ): typeof CREATE_VNODE | typeof CREATE_ELEMENT_VNODE {
-    return (isComponent) ? CREATE_VNODE : CREATE_ELEMENT_VNODE
+    return (isArrangable) ? CREATE_VNODE : CREATE_ELEMENT_VNODE
 }
 
 export function getVNodeBlockHelper(
 
-    isComponent: boolean,
+    isArrangable: boolean,
 ): typeof CREATE_BLOCK | typeof CREATE_ELEMENT_BLOCK {
-    return (isComponent) ? CREATE_BLOCK : CREATE_ELEMENT_BLOCK
+    return (isArrangable) ? CREATE_BLOCK : CREATE_ELEMENT_BLOCK
 }
 
 export function convertToBlock(
@@ -866,8 +816,8 @@ export function convertToBlock(
 ): void {
     if (!node.isBlock) {
         node.isBlock = true
-        removeHelper(getVNodeHelper(node.isComponent))
+        removeHelper(getVNodeHelper(node.isArrangable))
         helper(OPEN_BLOCK)
-        helper(getVNodeBlockHelper(node.isComponent))
+        helper(getVNodeBlockHelper(node.isArrangable))
     }
 }

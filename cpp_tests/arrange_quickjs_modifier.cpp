@@ -28,9 +28,9 @@ namespace {
                 try { fn() } catch (error) { if (error instanceof Error) return }
                 throw new Error(`Expected rejection: ${name}`)
             }
-            n.createNode(1, 'Box')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             rejects(() => n.setProp(1, 'notAnInput', 3), 'caught native schema error')
-            n.createNode(2, 'Text')
+            void (n.createNode(2, 'LayoutNode'), n.updateBinding(n.registerBinding(2, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(2, 'textPresentation'), 'display'))
             n.insertChild(1, 2, 0)
             const old = n.registerBinding(2, 'text')
             n.updateBinding(old, 'before')
@@ -52,13 +52,13 @@ namespace {
             n.updateBinding(style, null)
             n.releaseBinding(style)
             rejects(() => n.updateBinding(style, {color: 1}), 'released')
-            n.createNode(3, 'Text')
+            void (n.createNode(3, 'LayoutNode'), n.updateBinding(n.registerBinding(3, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(3, 'textPresentation'), 'display'))
             n.insertChild(1, 3, 1)
             const removed = n.registerBinding(3, 'text')
             n.updateBinding(removed, 'old generation')
             n.removeChild(1, 3)
             n.deleteNode(3)
-            n.createNode(3, 'Text')
+            void (n.createNode(3, 'LayoutNode'), n.updateBinding(n.registerBinding(3, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(3, 'textPresentation'), 'display'))
             n.insertChild(1, 3, 1)
             const recreated = n.registerBinding(3, 'text')
             rejects(() => n.updateBinding(removed, 'late'), 'deleted node')
@@ -67,7 +67,7 @@ namespace {
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         frame(host, scene, pipeline, published);
         check(scene.node(2).text == "after" && !scene.node(2).props.contains("textStyle"), "Explicit binding failed to update/clear input");
-        check(scene.node(3).text == "new generation" && scene.bindingCount() == 2, "Deletion retained binding or accepted old generation");
+        check(scene.node(3).text == "new generation" && scene.bindingCount() == 7, "删除后绑定泄漏或旧代际更新被接受");
     }
 
     void verifyModifierInstanceBindings() {
@@ -78,8 +78,8 @@ namespace {
         const auto loaded = host.executeModule("instance-input.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
             const reject = fn => { try { fn() } catch { return }; throw new Error('Expected rejection') }
-            for (const id of [-1, 0, 1.5, NaN, Infinity, 4294967297, '1']) reject(() => n.createNode(id, 'Box'))
-            n.createNode(1, 'Input')
+            for (const id of [-1, 0, 1.5, NaN, Infinity, 4294967297, '1']) reject(() => void (n.createNode(id, 'LayoutNode'), n.updateBinding(n.registerBinding(id, 'measurePolicy'), {kind: 'Box'})))
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(1, 'textPresentation'), 'editable'))
             const background = color => ({type: 'background', key: 'bg', value: {color}})
             const click = (key, value) => ({type: 'clickable', key, value: {onClick: () => n.setText(1, value)}})
             const chain = n.registerBinding(1, 'modifier')
@@ -151,7 +151,7 @@ namespace {
         PublishedFrame published;
         const auto loaded = host.executeModule("callback-publication.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Input')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(1, 'textPresentation'), 'editable'))
             n.setText(1, 'initial')
             n.setProp(1, 'onSubmit', () => n.setText(1, 'old callback'))
             n.setModifier(1, {elements: [{type: 'clickable', value: {onClick: () => {
@@ -209,9 +209,9 @@ int main() {
     try {
         {
             QuickJsScriptHost host;
-            const auto caught = host.executeModule("caught-async.js", "globalThis.__ARRANGE_NATIVE__.createNode(1, 'Box'); Promise.reject(new Error('handled')).catch(() => {})");
+            const auto caught = host.executeModule("caught-async.js", "void (globalThis.__ARRANGE_NATIVE__.createNode(1, 'LayoutNode'), globalThis.__ARRANGE_NATIVE__.updateBinding(globalThis.__ARRANGE_NATIVE__.registerBinding(1, 'measurePolicy'), {kind: 'Box'})); Promise.reject(new Error('handled')).catch(() => {})");
             check(caught.ok, "same-turn Promise rejection handler was ignored");
-            const auto unhandled = host.executeModule("unhandled-async.js", "globalThis.__ARRANGE_NATIVE__.createNode(1, 'Box'); Promise.resolve().then(() => { throw new Error('async value failure') })");
+            const auto unhandled = host.executeModule("unhandled-async.js", "void (globalThis.__ARRANGE_NATIVE__.createNode(1, 'LayoutNode'), globalThis.__ARRANGE_NATIVE__.updateBinding(globalThis.__ARRANGE_NATIVE__.registerBinding(1, 'measurePolicy'), {kind: 'Box'})); Promise.resolve().then(() => { throw new Error('async value failure') })");
             check(!unhandled.ok && unhandled.error.find("async value failure") != std::string::npos, "unhandled scheduler-style Promise rejection was swallowed");
         }
         verifyExplicitBindings();
@@ -221,7 +221,7 @@ int main() {
             QuickJsScriptHost schemaHost;
             const auto schema = schemaHost.executeModule("modifier-schema.js", R"JS(
                 const n = globalThis.__ARRANGE_NATIVE__
-                n.createNode(1, 'Box')
+                void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
                 const rejects = (element, field) => {
                     try { n.setModifier(1, { elements: [element] }) }
                     catch (error) {
@@ -253,13 +253,13 @@ int main() {
             PublishedFrame published;
             const auto loaded = host.executeModule("enum-schema.js", R"JS(
                 const n = globalThis.__ARRANGE_NATIVE__
-                n.createNode(1, 'Box')
-                n.createNode(2, 'Image')
+                void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
+                void (n.createNode(2, 'LayoutNode'), n.updateBinding(n.registerBinding(2, 'measurePolicy'), {kind: 'MinSize'}))
                 n.insertChild(1, 2, 0)
-                n.createNode(3, 'Input')
+                void (n.createNode(3, 'LayoutNode'), n.updateBinding(n.registerBinding(3, 'measurePolicy'), {kind: 'Text'}), n.updateBinding(n.registerBinding(3, 'textPresentation'), 'editable'))
                 n.insertChild(1, 3, 1)
-                const scale = n.registerBinding(2, 'contentScale')
-                n.updateBinding(scale, 'Fit')
+                const scale = n.registerBinding(2, 'textAlign')
+                n.updateBinding(scale, 'left')
                 n.setProp(3, 'onSubmit', value => n.updateBinding(scale, value))
             )JS");
             if (!loaded.ok) throw std::runtime_error(loaded.error);
@@ -269,19 +269,19 @@ int main() {
 
             EventSlotId submit;
             for (const auto& slot : scene.activeEventSlots()) if (slot.kind == EventSlotKind::InputSubmit) submit = slot;
-            const auto invalid = host.invokeEventSlot(submit, {true, "Crpo"});
-            if (invalid.ok || invalid.error.find("contentScale") == std::string::npos || invalid.error.find("Crpo") == std::string::npos || invalid.error.find("enum-schema.js") == std::string::npos) throw std::runtime_error("枚举错误必须包含字段、输入值和脚本来源：" + invalid.error);
-            check(scene.node(2).props.at("contentScale").string == "Fit" && published.revision == revision, "非法枚举污染了已发布状态");
+            const auto invalid = host.invokeEventSlot(submit, {true, "middel"});
+            if (invalid.ok || invalid.error.find("textAlign") == std::string::npos || invalid.error.find("middel") == std::string::npos || invalid.error.find("enum-schema.js") == std::string::npos) throw std::runtime_error("枚举错误必须包含字段、输入值和脚本来源：" + invalid.error);
+            check(scene.node(2).props.at("textAlign").string == "left" && published.revision == revision, "非法枚举污染了已发布状态");
 
-            const auto recovered = host.invokeEventSlot(submit, {true, "Crop"});
+            const auto recovered = host.invokeEventSlot(submit, {true, "center"});
             if (!recovered.ok) throw std::runtime_error(recovered.error);
             frame(host, scene, pipeline, published);
-            check(scene.node(2).props.at("contentScale").string == "Crop" && scene.bindingCount() == bindings, "枚举拒绝后有效值应正常恢复且复用绑定");
+            check(scene.node(2).props.at("textAlign").string == "center" && scene.bindingCount() == bindings, "枚举拒绝后有效值应正常恢复且复用绑定");
         }
         {
             QuickJsScriptHost unstable;
             const auto result = unstable.executeModule("unstable-jobs.js", R"JS(
-                globalThis.__ARRANGE_NATIVE__.createNode(1, 'Box')
+                void (globalThis.__ARRANGE_NATIVE__.createNode(1, 'LayoutNode'), globalThis.__ARRANGE_NATIVE__.updateBinding(globalThis.__ARRANGE_NATIVE__.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
                 const again = () => Promise.resolve().then(again)
                 again()
             )JS");
@@ -294,7 +294,7 @@ int main() {
         PublishedFrame published;
         const auto loaded = host.executeModule("modifier-onion.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Box')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             const size = {type: 'size', value: {width: 100, height: 80}}
             const outer = () => n.setText(1, 'outer')
             const inner = () => {
@@ -327,7 +327,7 @@ int main() {
         check(!host.invokeEventSlot(innerHit.eventSlot).ok, "retired callback accepted");
         const auto removedInOneSubmission = host.executeModule("retire-before-publish.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Box')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             n.setModifier(1, {elements: [{type: 'clickable', value: {onClick: () => {}}}]})
             n.setModifier(1, {elements: []})
         )JS");
@@ -337,7 +337,7 @@ int main() {
         check(host.eventSlotCount() == 0 && scene.eventSlotCount() == 0, "same-submission retirement resurrected callback");
         const auto bad = host.executeModule("invalid-modifier.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Box')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             n.setModifier(1, {elements: [
                 {type: 'clickable', value: {onClick: () => {}}},
                 {type: 'size', value: {width: NaN, height: 20}}
@@ -346,7 +346,7 @@ int main() {
         check(!bad.ok && host.eventSlotCount() == 0, "invalid chain leaked callback before validation");
         const auto reloaded = host.executeModule("fresh-modifier.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
-            n.createNode(1, 'Box')
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             n.setModifier(1, {elements: [{type: 'clickable', value: {onClick: () => {}}}]})
         )JS");
         check(reloaded.ok && !host.invokeEventSlot(outerHit.eventSlot).ok, "context reset accepted old callback token");

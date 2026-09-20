@@ -1,0 +1,118 @@
+<template>
+    <Column :vertical-arrangement="Arrangement.spacedBy(6)" :modifier="M.width(330).padding(8).background(0xff202633)">
+        <Text text="动画の画廊" :text-style="{ fontSize: 17, color: 0xffeeeeee }" />
+
+        <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
+            <Text text="耍起嘛" :text-style="{ color: 0xffffffff }" :modifier="M.padding(6).background(0xff374866).clickable(() => run('all'))" />
+            <Text text="统计" :text-style="{ color: 0xffffffff }" :modifier="M.padding(6).background(0xff374866).clickable(() => run('stats'))" />
+        </Row>
+
+        <Row :horizontal-arrangement="Arrangement.spacedBy(8)">
+            <Box :modifier="M.width(72).height(24).background(color)" />
+            <Box :modifier="M.size(dimensions.width, dimensions.height).offset(position).background(0xffc18ff0)" />
+        </Row>
+
+        <ValueSurface :tone="groupColor" :offset="groupOffset">
+            <Box :modifier="M.size(72, 12)" />
+        </ValueSurface>
+
+        <Column :modifier="M.animateContentSize(spec).background(0xff303b4d).padding(6)">
+            <Text :text="label" :text-style="{ color: 0xffdddddd, fontSize: 12 }" />
+            <Text v-if="expanded" text="相邻内容跟随动画高度放置" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="M.height(28)" />
+        </Column>
+
+        <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16 }"
+            :exit-to="{ alpha: 0, translationX: 16 }">
+            <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
+                <Text text="可视的啊一个内容" :text-style="{ color: 0xffeeeeee }" />
+                <Input value="编辑我，如果我彻底离场会被重置" :modifier="M.size(130, 24).background(0xff151922)" />
+            </Row>
+        </AnimatedVisibility>
+
+        <Crossfade :is="Text" :props="{ text: `页面啊一个 ${page}`, textStyle: { color: 0xffeeeeee }, modifier: M.padding(5).background(page === 'A' ? 0xff315a72 : 0xff6c395e) }" :targetState="page" :animationSpec="spec" />
+
+        <Text :text="status" :text-style="{ fontSize: 10, color: 0xffaabbcc }" />
+    </Column>
+</template>
+
+<script>
+import { Text, AnimatedVisibility, Crossfade, Arrangement, M, ref, computed, tween, spring, linearEasing, animatedColorAsRef, animatedOffsetAsRef, animatedSizeAsRef, createTransition, getArrangeExecutionStats, animationStats, modifierStats, modifierAllocationStats, watch } from '@arrange/framework'
+import ValueSurface from './ValueSurface.sfa'
+
+const props = defineProps({ command: { type: String, default: '' } })
+
+const expanded = ref(false)
+const visible = ref(true)
+const page = ref('A')
+const colorTarget = ref(0xff41b883)
+const positionTarget = ref({ x: 0, y: 0 })
+const sizeTarget = ref({ width: 72, height: 24 })
+const spec = tween({ durationMillis: 320, easing: linearEasing })
+const color = animatedColorAsRef(colorTarget, { animationSpec: spec })
+const position = animatedOffsetAsRef(positionTarget, { animationSpec: spring({ stiffness: 220, dampingRatio: 0.8 }) })
+const dimensions = animatedSizeAsRef(sizeTarget, { animationSpec: spec })
+const transition = createTransition(expanded, { animationSpec: spec })
+const groupColor = transition.animatedColor('group-color', state => state ? 0xffe9b949 : 0xff5798ef)
+const groupOffset = transition.animatedDp('group-offset', state => state ? 24 : 0)
+const label = computed(() => expanded.value ? '展开的啊一个内容。野兽先辈恶臭114514' : '紧绷の内容')
+const status = ref('动画、反向、隐藏、恢复和切页')
+let baseline: ReturnType<typeof getArrangeExecutionStats> | undefined
+
+function run(command: string) {
+    switch (command) {
+        case 'baseline':
+            baseline = getArrangeExecutionStats()
+            break
+
+        case 'color':
+            colorTarget.value = colorTarget.value === 0xff41b883 ? 0xffe66b8b : 0xff41b883
+            break
+
+        case 'move':
+            positionTarget.value = { x: positionTarget.value.x ? 0 : 28, y: 0 }
+            break
+
+        case 'size':
+            sizeTarget.value = { width: sizeTarget.value.width === 72 ? 130 : 72, height: 24 }
+            break
+
+        case 'expand':
+            expanded.value = !expanded.value
+            break
+
+        case 'visibility':
+            visible.value = !visible.value
+            break
+
+        case 'page':
+            page.value = page.value === 'A' ? 'B' : 'A'
+            break
+
+        case 'all':
+            run('color')
+            run('move')
+            run('size')
+            run('expand')
+            run('visibility')
+            run('page')
+            break
+
+        case 'validate-color':
+            if (getArrangeExecutionStats().structureRuns !== baseline?.structureRuns) throw new Error('颜色动画错误地重跑了结构')
+            break
+
+        case 'validate-settled':
+            if (animationStats.activeAnimations !== 0) throw new Error('画廊动画结束后仍保留帧需求')
+            break
+
+        case 'stats': {
+            const stats = getArrangeExecutionStats()
+            status.value = `结构 ${stats.structureRuns} / 值 ${stats.valueEvaluations} / 参数 ${modifierStats.parameterEvaluations} / 链 ${modifierAllocationStats.chains}`
+            break
+        }
+    }
+}
+
+// 命令Prop也驱动这个实际Arrangable从本地集成夹♂具（意味深）
+watch(() => props.command, command => run(command), { flush: 'sync' })
+</script>

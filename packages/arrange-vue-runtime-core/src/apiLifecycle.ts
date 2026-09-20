@@ -3,23 +3,23 @@ import {
     pauseTracking,
     resetTracking,
 } from '@arrange/vue-reactivity'
-import { toHandlerKey } from '@arrange/vue-shared'
 import {
-    type ComponentInternalInstance,
+    type ArrangableInstance,
     currentInstance,
     setCurrentInstance,
-} from './component.ts'
-import type { ComponentPublicInstance } from './componentPublicInstance.ts'
+} from './arrangable.ts'
+import type { ArrangablePublicInstance } from './arrangablePublicInstance.ts'
 import { LifecycleHooks } from './enums.ts'
 import { ErrorTypeStrings, callWithAsyncErrorHandling } from './errorHandling.ts'
 import { warn } from './warning.ts'
 
-export { onActivated, onDeactivated } from './components/KeepAlive.ts'
+export const onActivated = (hook: Function, target?: ArrangableInstance | null): void => { injectHook(LifecycleHooks.ACTIVATED, hook, target) }
+export const onDeactivated = (hook: Function, target?: ArrangableInstance | null): void => { injectHook(LifecycleHooks.DEACTIVATED, hook, target) }
 
 export function injectHook(
     type: LifecycleHooks,
     hook: Function & { __weh?: Function },
-    target: ComponentInternalInstance | null = currentInstance,
+    target: ArrangableInstance | null = currentInstance,
     prepend: boolean = false,
 ): Function | undefined {
     if (target) {
@@ -49,14 +49,7 @@ export function injectHook(
         }
         return wrappedHook
     } else if (__DEV__) {
-        const apiName = toHandlerKey(ErrorTypeStrings[type].replace(/ hook$/, ''))
-        warn(
-            `${apiName} is called when there is no active component instance to be ` +
-            `associated with. ` +
-            `Lifecycle injection APIs can only be used during execution of setup().` +
-            ((` If you are using async setup(), make sure to register lifecycle ` +
-                `hooks before the first await statement.`)),
-        )
+        warn('生命周期钩子必须在活动 Arrangable 的 setup 中注册；异步 setup 须在首次 await 前注册')
     }
 }
 
@@ -64,13 +57,13 @@ const createHook =
     <T extends Function = () => any>(lifecycle: LifecycleHooks) =>
         (
             hook: T,
-            target: ComponentInternalInstance | null = currentInstance,
+            target: ArrangableInstance | null = currentInstance,
         ): void => {
             injectHook(lifecycle, (...args: unknown[]) => hook(...args), target)
         }
 type CreateHook<T = any> = (
     hook: T,
-    target?: ComponentInternalInstance | null,
+    target?: ArrangableInstance | null,
 ) => void
 
 export const onBeforeMount: CreateHook = createHook(LifecycleHooks.BEFORE_MOUNT)
@@ -92,13 +85,13 @@ export const onRenderTracked: CreateHook<DebuggerHook> =
 
 export type ErrorCapturedHook<TError = unknown> = (
     err: TError,
-    instance: ComponentPublicInstance | null,
+    instance: ArrangablePublicInstance | null,
     info: string,
 ) => boolean | void
 
 export function onErrorCaptured<TError = Error>(
     hook: ErrorCapturedHook<TError>,
-    target: ComponentInternalInstance | null = currentInstance,
+    target: ArrangableInstance | null = currentInstance,
 ): void {
     injectHook(LifecycleHooks.ERROR_CAPTURED, hook, target)
 }

@@ -73,7 +73,7 @@ namespace {
         TransformModifierSemantics layer;
         layer.translationX = 50;
         ModifierDescriptors chain{{size(100, 80), {}}, {background(0xffff0000), {}}, {click("outer"), {}}, {padding, {}}, {layer, {}}, {background(0xff0000ff), {}}, {click("inner"), {}}};
-        tree.apply({CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, chain}});
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, chain}});
         LayoutEngine layout;
         layout.layout(tree, 1, {0, 500, 0, 500});
         const auto& node = tree.node(1);
@@ -100,7 +100,7 @@ namespace {
         PaintStyleSemantics circle;
         circle.shapeType = "circle";
         ModifierDescriptors chain{{size(60, 60), {}}, {background(0xff111111), {}}, {required, {}}, {background(0xff222222), {}}, {ClipModifier{circle}, {}}, {click("circle"), {}}};
-        tree.apply({CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, chain}});
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, chain}});
         LayoutEngine layout;
         layout.layout(tree, 1, {0, 500, 0, 500});
         check(tree.node(1).bounds == Rect{0, 0, 60, 60}, "required size did not report constrained size to parent");
@@ -134,7 +134,7 @@ namespace {
             {background(2), {}}, {ClipModifier{circle}, {}}, {innerLayer, {}},
             {click("deep"), {}},
         };
-        tree.apply({CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, wrappers}});
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, wrappers}});
         layout.layout(tree, 1, {0, 500, 0, 500});
         check(tree.node(1).modifier.elements()[6].bounds == Rect{15, 15, 90, 70}, "repeated padding did not compose by layer");
         const auto ops = DrawOpsBuilder{}.exportScene(tree, 1);
@@ -179,9 +179,10 @@ namespace {
         SceneFramePipeline pipeline;
         PublishedFrame frame;
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Column}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}};
         for (NodeId id = 2; id < 52; ++id) {
-            initial.operations.push_back(CreateNodeMutation{id, NodeType::Box});
+            initial.operations.push_back(CreateNodeMutation{id, arrange::core::NodeType::Layout});
+        initial.operations.push_back(arrange::core::SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})});
             initial.operations.push_back(SetModifierMutation{id, {{size(100, 20), {}}, {OffsetModifier{}, {}}, {background(0xff123456), {}}, {click("row"), {}}}});
             initial.operations.push_back(InsertChildMutation{1, id, id - 2});
         }
@@ -248,7 +249,7 @@ namespace {
         LayoutEngine layout;
         ParentDataModifierSemantics weight;
         weight.weight = 1;
-        tree.apply({CreateNodeMutation{1, NodeType::Row}, CreateNodeMutation{2, NodeType::Box}, CreateNodeMutation{3, NodeType::Box},
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Row")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{1, {{size(240, 40), {}}}}, SetModifierMutation{2, {{weight, {}}}}, SetModifierMutation{3, {{weight, {}}}},
             InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}});
         layout.layout(tree, 1, {0, 500, 0, 500}); tree.clearDirty();
@@ -262,8 +263,8 @@ namespace {
         check(layout.counters().measuredNodes == 1 && layout.counters().measureCacheHits == 2, "unchanged descendant constraints missed resize cache");
         LayoutModifierSemantics padding;
         padding.padding.top = 7;
-        tree.apply({CreateNodeMutation{4, NodeType::Text}, CreateNodeMutation{5, NodeType::Text}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
-            SetModifierMutation{1, {}}, SetPropMutation{1, "verticalAlignment", PropValue::stringValue("Baseline")},
+        tree.apply({CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{4, "textPresentation", arrange::core::PropValue::stringValue("display")}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{5, "textPresentation", arrange::core::PropValue::stringValue("display")}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
+            SetModifierMutation{1, {}}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Row")}, {"verticalAlignment", PropValue::stringValue("Baseline")}})},
             SetTextMutation{4, "small"}, SetTextMutation{5, "large"}, SetModifierMutation{4, {{padding, {}}}},
             InsertChildMutation{1, 4, 0}, InsertChildMutation{1, 5, 1}});
         PropValue textStyle = PropValue::objectValue({{"fontSize", PropValue::numberValue(30)}, {"lineHeight", PropValue::numberValue(36)}});
@@ -288,7 +289,7 @@ namespace {
         animated.animationSpec.bezier = {0, 0, 1, 1};
         MutationTransaction initial;
         initial.operations = {
-            CreateNodeMutation{1, NodeType::Column}, CreateNodeMutation{2, NodeType::Box}, CreateNodeMutation{3, NodeType::Box}, CreateNodeMutation{4, NodeType::Box},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{2, {{animated, "animation"}}}, SetModifierMutation{3, {{size(100, 20), {}}, {background(0xff123456), {}}, {click("animated"), {}}}},
             SetModifierMutation{4, {{size(100, 20), {}}, {background(0xff654321), {}}}},
             InsertChildMutation{1, 2, 0}, InsertChildMutation{2, 3, 0}, InsertChildMutation{1, 4, 1},
@@ -325,7 +326,7 @@ namespace {
         PublishedFrame frame;
         ModifierDescriptors chain{{size(100, 60), {}}, {OffsetModifier{}, {}}, {background(1), {}}};
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, chain}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, chain}};
         (void)pipeline.run(scene, 1, {0, 500, 0, 500}, &initial, true, frame);
         chain.back().value = background(2);
         MutationTransaction color;

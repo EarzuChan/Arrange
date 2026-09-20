@@ -31,7 +31,7 @@ target_sources(arrange_juce PRIVATE
   src/EditorFrameClock.cpp
   src/EditorSceneHost.cpp
   src/FramePumpDriver.cpp
-  src/ImageResourceCache.cpp
+  src/PainterResources.cpp
   src/InteractionStateOwner.cpp
   src/TextInputOwner.cpp
   src/TextInputMutationSink.cpp

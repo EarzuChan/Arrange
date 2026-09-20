@@ -5,6 +5,12 @@ export const arrangeExecutionStats = {
     valueEvaluationMillis: 0,
     valueWrites: 0,
     activeValueBindings: 0,
+    parameterPlans: 0,
+    parameterNameChecks: 0,
+    parameterPositionReads: 0,
+    valueDescriptions: 0,
+    fixedParameterGroups: 0,
+    dynamicParameterGroups: 0,
 }
 
 export function getArrangeExecutionStats(): Readonly<typeof arrangeExecutionStats> {

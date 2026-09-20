@@ -35,7 +35,7 @@ import {
 export enum ParseMode {
     BASE,
     HTML,
-    SFC,
+    SFA,
 }
 
 export enum CharCodes {
@@ -120,7 +120,7 @@ export enum State {
     SpecialStartSequence,
     InRCDATA,
     InEntity,
-    InSFCRootTagName,
+    InSFARootTagName,
 }
 
 function isTagStartChar(c: number): boolean {
@@ -232,16 +232,14 @@ export default class Tokenizer {
     public inRCDATA = false
     /** For disabling RCDATA tags handling */
     public inXML = false
-    /** For disabling interpolation parsing in v-pre */
-    public inVPre = false
     /** Record newline positions for fast line / column calculation */
     private newlines: number[] = []
 
     private readonly entityDecoder?: EntityDecoder
 
     public mode: ParseMode = ParseMode.BASE
-    public get inSFCRoot(): boolean {
-        return this.mode === ParseMode.SFC && this.stack.length === 0
+    public get inSFARoot(): boolean {
+        return this.mode === ParseMode.SFA && this.stack.length === 0
     }
 
     constructor(
@@ -322,7 +320,7 @@ export default class Tokenizer {
             this.sectionStart = this.index
         } else if ((c === CharCodes.Amp)) {
             this.startEntity()
-        } else if (!this.inVPre && c === this.delimiterOpen[0]) {
+        } else if (c === this.delimiterOpen[0]) {
             this.state = State.InterpolationOpen
             this.delimiterIndex = 0
             this.stateInterpolationOpen(c)
@@ -431,12 +429,12 @@ export default class Tokenizer {
         } else if (this.sequenceIndex === 0) {
             if (
                 this.currentSequence === Sequences.TitleEnd ||
-                (this.currentSequence === Sequences.TextareaEnd && !this.inSFCRoot)
+                (this.currentSequence === Sequences.TextareaEnd && !this.inSFARoot)
             ) {
                 // We have to parse entities in <title> and <textarea> tags.
                 if ((c === CharCodes.Amp)) {
                     this.startEntity()
-                } else if (!this.inVPre && c === this.delimiterOpen[0]) {
+                } else if (c === this.delimiterOpen[0]) {
                     // We also need to handle interpolation
                     this.state = State.InterpolationOpen
                     this.delimiterIndex = 0
@@ -550,11 +548,11 @@ export default class Tokenizer {
             if (this.mode === ParseMode.BASE) {
                 // no special tags in base mode
                 this.state = State.InTagName
-            } else if (this.inSFCRoot) {
-                // SFC mode + root level
+            } else if (this.inSFARoot) {
+                // SFA mode + root level
                 // - everything except <template> is RAWTEXT
                 // - <template> with lang other than html is also RAWTEXT
-                this.state = State.InSFCRootTagName
+                this.state = State.InSFARootTagName
             } else if (!this.inXML) {
                 // HTML mode
                 // - <script>, <style> RAWTEXT
@@ -580,7 +578,7 @@ export default class Tokenizer {
             this.handleTagName(c)
         }
     }
-    private stateInSFCRootTagName(c: number): void {
+    private stateInSFARootTagName(c: number): void {
         if (isEndOfTagSection(c)) {
             const tag = this.buffer.slice(this.sectionStart, this.index)
             if (tag !== 'template') {
@@ -999,8 +997,8 @@ export default class Tokenizer {
                     this.stateInTagName(c)
                     break
                 }
-                case State.InSFCRootTagName: {
-                    this.stateInSFCRootTagName(c)
+                case State.InSFARootTagName: {
+                    this.stateInSFARootTagName(c)
                     break
                 }
                 case State.InClosingTagName: {

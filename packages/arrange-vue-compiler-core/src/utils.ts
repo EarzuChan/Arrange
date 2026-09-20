@@ -12,7 +12,6 @@ import {
     type IfBranchNode,
     type InterpolationNode,
     type JSChildNode,
-    type MemoExpression,
     NodeTypes,
     type ObjectExpression,
     type Position,
@@ -30,14 +29,8 @@ import {
 } from './ast.ts'
 import { unwrapTSNode } from './babelUtils.ts'
 import {
-    BASE_TRANSITION,
     GUARD_REACTIVE_PROPS,
-    KEEP_ALIVE,
     MERGE_PROPS,
-    SUSPENSE,
-    TELEPORT,
-    TO_HANDLERS,
-    WITH_MEMO,
 } from './runtimeHelpers.ts'
 import { isWhitespace } from './tokenizer.ts'
 import type { TransformContext } from './transform.ts'
@@ -45,23 +38,6 @@ import type { PropsExpression } from './transforms/transformElement.ts'
 
 export const isStaticExp = (p: JSChildNode): p is SimpleExpressionNode =>
     p.type === NodeTypes.SIMPLE_EXPRESSION && p.isStatic
-
-export function isCoreComponent(tag: string): symbol | void {
-    switch (tag) {
-        case 'Teleport':
-        case 'teleport':
-            return TELEPORT
-        case 'Suspense':
-        case 'suspense':
-            return SUSPENSE
-        case 'KeepAlive':
-        case 'keep-alive':
-            return KEEP_ALIVE
-        case 'BaseTransition':
-        case 'base-transition':
-            return BASE_TRANSITION
-    }
-}
 
 const nonIdentifierRE = /^$|^\d|[^\$\w\xA0-\uFFFF]/
 export const isSimpleIdentifier = (name: string): boolean =>
@@ -387,17 +363,27 @@ export function injectProp(
     prop: Property,
     context: TransformContext,
 ): void {
+    if (node.type !== NodeTypes.VNODE_CALL) {
+        if (!node.arguments[2]) node.arguments[2] = prop.value as ExpressionNode
+        return
+    }
+    if (node.props?.type === NodeTypes.JS_CALL_EXPRESSION && node.props.callee === '__arrangeCheck') {
+        const check = node.props
+        node.props = check.arguments[1] as PropsExpression
+        injectProp(node, prop, context)
+        check.arguments[1] = node.props
+        node.props = check
+        return
+    }
     let propsWithInjection: ObjectExpression | CallExpression | undefined
     /**
      * 1. mergeProps(...)
-     * 2. toHandlers(...)
      * 3. normalizeProps(...)
      * 4. normalizeProps(guardReactiveProps(...))
      *
      * we need to get the real props before normalization
      */
-    let props =
-        node.type === NodeTypes.VNODE_CALL ? node.props : node.arguments[2]
+    let props: PropsExpression | '{}' | undefined = node.props
     let callPath: CallExpression[] = []
     let parentCall: CallExpression | undefined
     if (
@@ -424,15 +410,7 @@ export function injectProp(
                 first.properties.unshift(prop)
             }
         } else {
-            if (props.callee === TO_HANDLERS) {
-                // #2366
-                propsWithInjection = createCallExpression(context.helper(MERGE_PROPS), [
-                    createObjectExpression([prop]),
-                    props,
-                ])
-            } else {
-                props.arguments.unshift(createObjectExpression([prop]))
-            }
+            props.arguments.unshift(createObjectExpression([prop]))
         }
         !propsWithInjection && (propsWithInjection = props)
     } else if (props.type === NodeTypes.JS_OBJECT_EXPRESSION) {
@@ -453,19 +431,8 @@ export function injectProp(
             parentCall = callPath[callPath.length - 2]
         }
     }
-    if (node.type === NodeTypes.VNODE_CALL) {
-        if (parentCall) {
-            parentCall.arguments[0] = propsWithInjection
-        } else {
-            node.props = propsWithInjection
-        }
-    } else {
-        if (parentCall) {
-            parentCall.arguments[0] = propsWithInjection
-        } else {
-            node.arguments[2] = propsWithInjection
-        }
-    }
+    if (parentCall) parentCall.arguments[0] = propsWithInjection
+    else node.props = propsWithInjection
 }
 
 // check existing key to avoid overriding user provided keys
@@ -484,7 +451,7 @@ function hasProp(prop: Property, props: ObjectExpression) {
 
 export function toValidAssetId(
     name: string,
-    type: 'component' | 'directive' | 'filter',
+    type: 'arrangable',
 ): string {
     // see issue#4422, we need adding identifier on validAssetId if variable `name` has specific character
     return `_${type}_${name.replace(/[^\w]/g, (searchValue, replaceValue) => {
@@ -538,7 +505,6 @@ export function hasScopeRef(
         case NodeTypes.COMPOUND_EXPRESSION:
             return node.children.some(c => isObject(c) && hasScopeRef(c, ids))
         case NodeTypes.INTERPOLATION:
-        case NodeTypes.TEXT_CALL:
             return hasScopeRef(node.content, ids)
         case NodeTypes.TEXT:
         case NodeTypes.COMMENT:
@@ -550,16 +516,6 @@ export function hasScopeRef(
                 exhaustiveCheck
             }
             return false
-    }
-}
-
-export function getMemoedVNodeCall(
-    node: BlockCodegenNode | MemoExpression,
-): VNodeCall | RenderSlotCall {
-    if (node.type === NodeTypes.JS_CALL_EXPRESSION && node.callee === WITH_MEMO) {
-        return node.arguments[1].returns as VNodeCall
-    } else {
-        return node
     }
 }
 
@@ -575,10 +531,7 @@ export function isAllWhitespace(str: string): boolean {
 }
 
 export function isWhitespaceText(node: TemplateChildNode): boolean {
-    return (
-        (node.type === NodeTypes.TEXT && isAllWhitespace(node.content)) ||
-        (node.type === NodeTypes.TEXT_CALL && isWhitespaceText(node.content))
-    )
+    return node.type === NodeTypes.TEXT && isAllWhitespace(node.content)
 }
 
 export function isCommentOrWhitespace(node: TemplateChildNode): boolean {

@@ -7,9 +7,10 @@
 #include "Geometry.h"
 #include "Modifier.h"
 #include "PropValue.h"
+#include "MeasurePolicy.h"
 
 namespace arrange::core {
-    enum class NodeType { Root, Box, Row, Column, Spacer, Text, Input, Image, Icon, Canvas, Unknown };
+    enum class NodeType { Root, Layout, Unknown };
 
     struct PaintFragment;
     struct HitFragment;
@@ -19,7 +20,7 @@ namespace arrange::core {
     struct ArrangeNode {
         NodeId id = 0;
         NodeType type = NodeType::Unknown;
-        std::string text;
+        MeasurePolicy measurePolicy = MinSizeMeasurePolicy{};
         std::unordered_map<std::string, PropValue> props;
         std::unordered_map<EventSlotKind, EventSlotId> eventSlots;
         ModifierChain modifier;
@@ -32,9 +33,6 @@ namespace arrange::core {
         Constraints measuredConstraints;
         bool measurementValid = false;
         bool placementValid = false;
-        std::shared_ptr<const TextLayout> textLayout;
-        std::shared_ptr<const TextLayout> placeholderLayout;
-        std::shared_ptr<const TextLayout> paintedTextLayout;
         std::shared_ptr<const PaintFragment> paintCache;
         std::shared_ptr<const PaintFragment> contentFragment;
         std::shared_ptr<const std::vector<DrawOp>> paintContent;

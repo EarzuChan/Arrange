@@ -226,7 +226,7 @@ export function transformDestructuredProps(
     }
 
     // check root scope first
-    const ast = ctx.scriptSetupAst!
+    const ast = ctx.scriptAst!
     walkScope(ast, true)
     walk(ast, {
         enter(node: Node, parent: Node | null) {

@@ -2,9 +2,13 @@ add_executable(arrange_core_smoke arrange_core_smoke.cpp)
 target_link_libraries(arrange_core_smoke PRIVATE Arrange::framework)
 add_test(NAME arrange_core_smoke COMMAND arrange_core_smoke)
 
+add_executable(arrange_m24_contract arrange_m24_contract.cpp)
+target_link_libraries(arrange_m24_contract PRIVATE Arrange::framework)
+add_test(NAME arrange_m24_contract COMMAND arrange_m24_contract)
+
 if(TARGET qjs)
   add_executable(arrange_quickjs_app_smoke arrange_quickjs_app_smoke.cpp)
-  target_link_libraries(arrange_quickjs_app_smoke PRIVATE Arrange::core Arrange::quickjs)
+  target_link_libraries(arrange_quickjs_app_smoke PRIVATE Arrange::framework)
   add_test(NAME arrange_quickjs_app_smoke COMMAND arrange_quickjs_app_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js")
 endif()
 
@@ -38,13 +42,13 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   file(GLOB_RECURSE ARRANGE_VUE_FIXTURE_INPUTS CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/packages/*/src/*.ts"
     "${CMAKE_SOURCE_DIR}/tests/fixtures/vue-runtime/*"
-    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/components/*.vue")
+    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/arrangables/*.sfa")
   add_custom_command(
     OUTPUT "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js"
     COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/build-vue-runtime-fixture.ts
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     DEPENDS ${ARRANGE_VUE_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-vue-runtime-fixture.ts"
-    COMMENT "Compile Arrange Vue runtime SFC fixture")
+    COMMENT "编译 Arrange SFA 原生运行夹具")
   add_custom_target(arrange_vue_fixture DEPENDS "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js")
   add_executable(arrange_vue_runtime arrange_vue_runtime.cpp AllocationProbe.cpp)
   target_link_libraries(arrange_vue_runtime PRIVATE Arrange::framework)

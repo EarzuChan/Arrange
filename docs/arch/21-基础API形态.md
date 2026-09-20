@@ -1,6 +1,6 @@
 ﻿# 基础 API 形态
 
-本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，组件行为见 [内建组件](12-内建组件.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)，动画与 transition 见 [动画与Transition](28-动画与Transition.md)。
+本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，Arrangable行为见 [内建 Arrangable](12-内建Arrangable.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)，动画与 transition 见 [动画与Transition](28-动画与Transition.md)。
 
 # TypeScript 包
 
@@ -22,7 +22,7 @@
 
 ```ts
 import { createApp } from "@arrange/framework"
-import App from "./App.vue"
+import App from "./App.sfa"
 
 createApp(App).mount()
 ```
@@ -30,16 +30,16 @@ createApp(App).mount()
 正式 authoring 路径：
 
 ```txt
-Vue SFC / template / render function
+SFA 模板与 TS setup
 -> Arrange Vue compiler / runtime
 -> Composition mutations + Reactive slot updates
 -> QuickJS native boundary
 -> MutationTransaction / SlotUpdateBatch
 ```
 
-`@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。测试 helper 若需要 vnode 入口，应放在 test/internal 范围。
+`@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
 
-组件对象由 `defineComponent({ props, emits, setup, render, name, inheritAttrs, components, directives, slots })` 定义；`defineComponent(setup, options)` 保留函数形式。`defineOptions` 仅声明 `name`、`inheritAttrs`、`components`、`directives`，props/emits/slots/实例公开成员分别使用对应宏。配置边界与错误行为见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
+用户通过 SFA 的 defineProps/withDefaults 声明参数，通过模板中的 Slot 声明内容。内建 FA 直接用代码编写，与 SFA 编译结果遵守同一种 Arrangable 定义和调用契约，见 [运行时](04-运行时.md)。参数、内容与错误行为见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
 
 # C++ App source
 
@@ -86,11 +86,12 @@ Input
 Image
 Icon
 KeepAlive
-Suspense
+Layout
+DynamicArrangable
 AnimatedVisibility
 Crossfade
 
-m
+M
 Modifier
 
 dp
@@ -125,14 +126,8 @@ createScrollState
 logger
 diagnostics
 
-LocalContentColor
-LocalTextStyle
-LocalDensity
-LocalLayoutDirection
-provideArrangeLocal
-useArrangeLocal
-provideContentColor
-useContentColor
+provide
+inject
 ```
 
 # 基础类型 API
@@ -178,6 +173,7 @@ interface Modifier {
     weight(weight: number, args?: { fill?: boolean }): Modifier
     zIndex(value: number): Modifier
     background(brush: Brush | number, shape?: Shape): Modifier
+    paint(painter: Painter, options?: PaintOptions): Modifier
     border(args: BorderOptions): Modifier
     border(width: number, brush: Brush | number, shape?: Shape): Modifier
     clip(shape: Shape): Modifier
@@ -196,7 +192,7 @@ interface Modifier {
 
 Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 
-# 组件 Props
+# Arrangable Props
 
 ## Box
 
@@ -204,6 +200,9 @@ Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 interface BoxProps {
     modifier?: Modifier
     contentAlignment?: BoxAlignment
+    propagateMinConstraints?: boolean
+    enabled?: boolean
+    contentDescription?: string
 }
 ```
 
@@ -222,6 +221,14 @@ interface ColumnProps {
     horizontalAlignment?: HorizontalAlignment
 }
 ```
+
+## Layout 与动态定义
+
+Layout 接收必需的 measurePolicy: MeasurePolicy、modifier?: Modifier 及默认内容，默认 modifier 为 M。行为、交互与语义描述经正式 Modifier 组合交付，不附加 Foundation 专用输入。
+
+预制策略为 BoxMeasurePolicy(options?)、RowMeasurePolicy(options?)、ColumnMeasurePolicy(options?)、MinSizeMeasurePolicy；前三者按显式参数构造值，后者为稳定策略值。文本测量归文本 Modifier，旧 TextMeasurePolicy 不作为 Layout 策略保留。策略语义见 [内建 Arrangable](12-内建Arrangable.md)。
+
+DynamicArrangable 接收必需的 is: Arrangable 及 props?: Record<string, unknown>，默认参数对象为空。KeepAlive 接收必需的 cacheKey: string | number | symbol、max?: number 和默认内容；max 默认为 10，须为正整数。
 
 ## Spacer
 
@@ -249,13 +256,17 @@ interface TextProps {
 ## Input
 
 ```ts
-interface InputProps extends Omit<TextProps, 'text' | 'textAlign' | 'overflow'> {
-    modelValue?: string
+interface InputProps {
+    modifier?: Modifier
+    textStyle?: TextStyleProp
+    singleLine?: boolean
+    minLines?: number
+    maxLines?: number
     value?: string
     placeholder?: string
     enabled?: boolean
     selectAllOnFocus?: boolean
-    'onUpdate:modelValue'?: (value: string) => void
+    onValueChange?: (value: string) => void
     onChange?: (value: string) => void
     onSubmit?: (value: string) => void
     onBlur?: (value: string) => void
@@ -266,23 +277,23 @@ interface InputProps extends Omit<TextProps, 'text' | 'textAlign' | 'overflow'> 
 
 ```ts
 interface ImageProps {
-    source: ResourceRef
+    painter: Painter
     modifier?: Modifier
     contentScale?: ContentScaleValue
+    alpha?: number
     alignment?: ImageAlignment
     contentDescription?: string
 }
 
 interface IconProps {
-    source: ResourceRef
+    painter: Painter
     modifier?: Modifier
     tint?: ArrangeColor
-    size?: Dp
     contentDescription?: string
 }
 ```
 
-`ResourceRef` 为字符串、`{path: string}` 或 `{url: string}`。资源来源显式写入 source 输入。字符串资源路径按 UI package root 解析。Icon 初期只承诺 SVG 子集，且核心不内建官方图标包。行为见 [内建组件](12-内建组件.md) 与 [工具链与App发布包](14-工具链与App发布包.md)。
+Painter 获取 API 为 painter(resource: string | {path: string}): Painter。Painter 提供只读 intrinsicSize、contentVersion、status、error 及 dispose()。业务通过 painter 取得能力对象再传入 Image/Icon；生命周期与绘制语义见 [内建 Arrangable](12-内建Arrangable.md)，路径约束见 [工具链与 App 发布包](14-工具链与App发布包.md)。
 
 ## 后续能力的签名草案
 
@@ -299,7 +310,7 @@ interface CanvasProps {
 }
 ```
 
-Canvas 行为见 [文本输入与绘制](18-文本输入与绘制.md) 与 [内建组件](12-内建组件.md)。
+Canvas 行为见 [文本输入与绘制](18-文本输入与绘制.md) 与 [内建 Arrangable](12-内建Arrangable.md)。
 
 ## Flow
 
@@ -381,7 +392,7 @@ interface LazyHorizontalGridProps<T> {
 }
 ```
 
-Lazy 行为见 [内建组件](12-内建组件.md)。
+Lazy 行为见 [内建 Arrangable](12-内建Arrangable.md)。
 
 # 动画 API
 
@@ -448,22 +459,9 @@ diagnostics.error(message: string, detail?: unknown): void
 
 `logger` 与 `diagnostics.toast` 都进入 `DiagnosticEvent` 系统。行为见 [开发期诊断表层](25-开发期诊断表层.md)。
 
-# Arrange Local API
+# 上下文能力
 
-```ts
-interface ArrangeLocalKey<T> {
-    readonly name: string
-    readonly defaultValue: T
-}
-
-provideArrangeLocal<T>(key: ArrangeLocalKey<T>, value: T): void
-useArrangeLocal<T>(key: ArrangeLocalKey<T>): T
-
-provideContentColor(color: ArrangeColor): void
-useContentColor(): ArrangeColor
-```
-
-内置 Local 与读取优先级见 [主题与扩展包](20-主题与扩展包.md)。
+通过 provide/inject 和明确的 InjectionKey 交付业务上下文。主题与行为服务的边界见 [主题与扩展包](20-主题与扩展包.md)。
 
 # Runtime Hello
 

@@ -21,7 +21,6 @@ namespace arrange::juce {
         }
 
         std::string inputModelValue(const arrange::core::ArrangeNode& node) {
-            if (const auto* value = nodeProp(node, "modelValue", "model-value")) return value->stringOr();
             if (const auto* value = nodeProp(node, "value")) return value->stringOr();
             return {};
         }
@@ -51,59 +50,6 @@ namespace arrange::juce {
 
     float TextInputOwner::viewportX() const noexcept {
         return session_.viewportX();
-    }
-
-    const arrange::core::ArrangeNode* TextInputOwner::activeInputNode(
-        const arrange::core::LayoutTree& tree,
-        bool runtimeReady) const {
-        if (!runtimeReady || !session_.focusedNode() || !tree.contains(*session_.focusedNode())) return nullptr;
-        const auto& node = tree.node(*session_.focusedNode());
-        return node.type == arrange::core::NodeType::Input && node.generation == focusedGeneration_ && arrange::core::nodeInteractionEnabled(tree, node.id) ? &node : nullptr;
-    }
-
-    arrange::core::ArrangeNode* TextInputOwner::activeInputNode(
-        arrange::core::LayoutTree& tree,
-        bool runtimeReady) {
-        if (!runtimeReady || !session_.focusedNode() || !tree.contains(*session_.focusedNode())) return nullptr;
-        auto& node = tree.node(*session_.focusedNode());
-        return node.type == arrange::core::NodeType::Input && node.generation == focusedGeneration_ && arrange::core::nodeInteractionEnabled(tree, node.id) ? &node : nullptr;
-    }
-
-    void TextInputOwner::pointerDown(
-        arrange::core::LayoutTree& tree,
-        const arrange::core::HitTestResult& hit,
-        float x,
-        float y,
-        const TextInputCallbacks& callbacks) {
-        if (!hit.hit || !tree.contains(hit.node) || tree.node(hit.node).type != arrange::core::NodeType::Input || !arrange::core::nodeInteractionEnabled(tree, hit.node)) {
-            const auto previous = session_.focusedNode();
-            finishFocusedInput(tree, false, callbacks);
-            cancelDrag();
-            if (previous && callbacks.invalidateNativeState) {
-                callbacks.invalidateNativeState(*previous, arrange::core::DirtyFlag::Paint, "input focus cleared");
-            }
-            return;
-        }
-
-        const auto sameInput = activeInputNode(tree, true) && *session_.focusedNode() == hit.node;
-        if (session_.focusedNode() && *session_.focusedNode() != hit.node) finishFocusedInput(tree, false, callbacks);
-        session_.focusedNode() = hit.node;
-        focusedGeneration_ = tree.node(hit.node).generation;
-
-        const auto& node = tree.node(hit.node);
-        const auto selectAllOnFocus = !sameInput && boolProp(node, "selectAllOnFocus", "select-all-on-focus", false);
-        if (!sameInput) {
-            session_.viewportX() = 0.0f;
-            publishedModelValue_ = inputModelValue(node);
-            session_.state().begin(publishedModelValue_, selectAllOnFocus);
-        }
-        if (!selectAllOnFocus) {
-            const auto point = arrange::core::rootToNodeContent(tree, node.id, {x, y});
-            session_.state().moveCursorTo(text_.textIndexAtPoint(node, session_.state().text(), session_.viewportX(), point.x, point.y));
-        }
-        updateFocusedInputViewport(tree, true);
-        session_.dragAnchor() = session_.state().cursorIndex();
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(hit.node, arrange::core::DirtyFlag::Paint, "input focus/caret changed");
     }
 
     bool TextInputOwner::pointerDrag(

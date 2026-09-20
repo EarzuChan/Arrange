@@ -1,3 +1,4 @@
+#include <arrange/juce/PainterResources.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/PassivePaintRenderer.h>
@@ -77,12 +78,11 @@ namespace {
         blue.rect.y = 50;
         blue.color = 0xff0000ff;
         arrange::juce::JuceDrawOpsPainter painter;
-        arrange::juce::ImageResourceCache images;
         ::juce::Image colors(::juce::Image::ARGB, 240, 100, true);
         const auto count = service.counters().layoutsCreated;
         {
             ::juce::Graphics graphics(colors);
-            painter.paint(graphics, std::vector<DrawOp>{red, blue}, images);
+            painter.paint(graphics, std::vector<DrawOp>{red, blue});
         }
         bool sawRed = false, sawBlue = false;
         for (int y = 0; y < 100; ++y) for (int x = 0; x < 240; ++x) {
@@ -134,7 +134,6 @@ namespace {
         check(withSpace->width > a->width && near(service.layout("A \nB", {18, 24})->lines[0].width, withSpace->width), "排除换行时错误丢弃了真实尾随空格");
 
         arrange::juce::JuceDrawOpsPainter painter;
-        arrange::juce::ImageResourceCache images;
         for (const std::string alignment : {"center", "end"}) {
             DrawOp multiline;
             multiline.type = DrawOpType::DrawText;
@@ -152,8 +151,8 @@ namespace {
             auto second = first;
             second.rect.y += multiline.textLayout->lines[1].y;
             ::juce::Image actual(::juce::Image::ARGB, 200, 100, true), expected(::juce::Image::ARGB, 200, 100, true);
-            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{multiline}, images); }
-            { ::juce::Graphics graphics(expected); painter.paint(graphics, std::vector<DrawOp>{first, second}, images); }
+            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{multiline}); }
+            { ::juce::Graphics graphics(expected); painter.paint(graphics, std::vector<DrawOp>{first, second}); }
             for (int y = 0; y < 100; ++y) for (int x = 0; x < 200; ++x) check(actual.getPixelAt(x, y) == expected.getPixelAt(x, y), "显式换行改变了居中或末端对齐的绘制位置");
         }
 
@@ -180,7 +179,7 @@ namespace {
             op.rect = {10, 10, 180, 30};
             op.textLayout = layout;
             op.color = 0xffffffff;
-            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{op}, images); }
+            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{op}); }
             {
                 ::juce::GlyphArrangement glyphs;
                 glyphs.addLineOfText(font, ::juce::String::fromUTF8(text.c_str()), 10, 10 + layout->baseline);
@@ -204,9 +203,11 @@ namespace {
         LayoutModifierSemantics scroll;
         scroll.kind = LayoutModifierKind::VerticalScroll;
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Column}, SetModifierMutation{1, {{size(320, 240), {}}, {scroll, "scroll"}}}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{1, {{size(320, 240), {}}, {scroll, "scroll"}}}};
         for (NodeId id = 2; id < 82; ++id) {
-            initial.operations.push_back(CreateNodeMutation{id, NodeType::Text});
+            initial.operations.push_back(CreateNodeMutation{id, arrange::core::NodeType::Layout});
+        initial.operations.push_back(arrange::core::SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})});
+        initial.operations.push_back(arrange::core::SetPropMutation{id, "textPresentation", arrange::core::PropValue::stringValue("display")});
             initial.operations.push_back(SetTextMutation{id, "音轨 " + std::to_string(id) + " English 🙂"});
             initial.operations.push_back(SetPropMutation{id, "textStyle", style(0xffabcdef)});
             initial.operations.push_back(SetModifierMutation{id, {{size(300, 30), {}}}});
@@ -266,7 +267,7 @@ namespace {
         check(frame.revision == retained.revision && frame.content.scenePaint == retained.content.scenePaint && scene.node(2).text == "屏外更新后的文字", "失败候选改写了已发布内容");
         compare(painter, frame);
         MutationTransaction recreate;
-        recreate.operations = {RemoveChildMutation{1, 2}, DeleteNodeMutation{2}, CreateNodeMutation{2, NodeType::Text}, SetTextMutation{2, "新代际"}, InsertChildMutation{1, 2, 0}};
+        recreate.operations = {RemoveChildMutation{1, 2}, DeleteNodeMutation{2}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{2, "textPresentation", arrange::core::PropValue::stringValue("display")}, SetTextMutation{2, "新代际"}, InsertChildMutation{1, 2, 0}};
         check(!publish(&recreate).error && scene.node(2).textLayout != firstText, "节点代际重用命中了过期文字");
         compare(painter, frame);
         const auto stats = painter.replayCounters();
@@ -281,7 +282,7 @@ namespace {
         PublishedFrame frame;
         arrange::juce::PassivePaintRenderer painter(service);
         MutationTransaction initial;
-        initial.operations = {CreateNodeMutation{1, NodeType::Input}, SetModifierMutation{1, {{size(180, 40), {}}}}, SetPropMutation{1, "textStyle", style(0xffeeeeee, 20)}, SetPropMutation{1, "modelValue", PropValue::stringValue("English 中文 e\xcc\x81 🙂 很长的输入文字")}, SetPropMutation{1, "placeholder", PropValue::stringValue("输入占位符")}};
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{1, "textPresentation", arrange::core::PropValue::stringValue("editable")}, SetModifierMutation{1, {{size(180, 40), {}}}}, SetPropMutation{1, "textStyle", style(0xffeeeeee, 20)}, SetPropMutation{1, "value", PropValue::stringValue("English 中文 e\xcc\x81 🙂 很长的输入文字")}, SetPropMutation{1, "placeholder", PropValue::stringValue("输入占位符")}};
         auto publish = [&](const MutationTransaction* transaction) { return pipeline.run(scene, 1, {0, 320, 0, 240}, transaction, true, frame); };
         check(!publish(&initial).error, "输入节点准备失败");
         const auto& node = scene.node(1);
@@ -309,7 +310,7 @@ namespace {
         check(service.counters().layoutsCreated == layouts, "选区、光标或 viewport 更新重新排版");
         const auto oldFrame = frame;
         MutationTransaction empty;
-        empty.operations = {SetPropMutation{1, "modelValue", PropValue::stringValue("")}};
+        empty.operations = {SetPropMutation{1, "value", PropValue::stringValue("")}};
         check(!publish(&empty).error && scene.node(1).placeholderLayout, "占位符没有准备文本资源");
         check(scene.node(1).placeholderLayout->text == "输入占位符", "占位符误用了正文资源");
         compare(painter, oldFrame);
@@ -319,7 +320,7 @@ namespace {
             NativeScene temporary;
             PublishedFrame retained;
             MutationTransaction create;
-            create.operations = {CreateNodeMutation{7, NodeType::Text}, SetTextMutation{7, "只有旧帧持有的文字"}};
+            create.operations = {CreateNodeMutation{7, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{7, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{7, "textPresentation", arrange::core::PropValue::stringValue("display")}, SetTextMutation{7, "只有旧帧持有的文字"}};
             check(!pipeline.run(temporary, 7, {0, 320, 0, 240}, &create, true, retained).error, "寿命场景发布失败");
             retired = temporary.node(7).textLayout;
             temporary = NativeScene{};
@@ -357,12 +358,12 @@ namespace {
         scroll.scrollValue = 18;
         MutationTransaction create;
         create.operations = {
-            CreateNodeMutation{1, NodeType::Box}, SetModifierMutation{1, {{size(320, 240), {}}, {rounded, {}}, {outer, {}}}},
-            CreateNodeMutation{2, NodeType::Column}, SetModifierMutation{2, {{size(160, 100), {}}, {OffsetModifier{90, 15}, {}}, {circle, {}}, {scroll, {}}}}, InsertChildMutation{1, 2, 0},
-            CreateNodeMutation{3, NodeType::Text}, SetTextMutation{3, "VISIBLE 中文溢出 English"}, SetPropMutation{3, "overflow", PropValue::stringValue("visible")}, SetPropMutation{3, "maxLines", PropValue::numberValue(1)}, SetPropMutation{3, "textStyle", style(0xffff0000, 30)}, SetModifierMutation{3, {{size(25, 45), {}}, {OffsetModifier{-140, 20}, {}}}}, InsertChildMutation{2, 3, 0},
-            CreateNodeMutation{4, NodeType::Box}, SetModifierMutation{4, {{size(25, 50), {}}, {OffsetModifier{230, 130}, {}}, {border, {}}}}, InsertChildMutation{1, 4, 1},
-            CreateNodeMutation{5, NodeType::Text}, SetTextMutation{5, "同资源不同颜色"}, SetPropMutation{5, "textStyle", style(0xff00ff00)}, SetModifierMutation{5, {{size(160, 30), {}}, {OffsetModifier{20, 170}, {}}}}, InsertChildMutation{1, 5, 2},
-            CreateNodeMutation{6, NodeType::Text}, SetTextMutation{6, "同资源不同颜色"}, SetPropMutation{6, "textStyle", style(0xff0000ff)}, SetModifierMutation{6, {{size(160, 30), {}}, {OffsetModifier{20, 195}, {}}}}, InsertChildMutation{1, 6, 3}
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{size(320, 240), {}}, {rounded, {}}, {outer, {}}}},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{2, {{size(160, 100), {}}, {OffsetModifier{90, 15}, {}}, {circle, {}}, {scroll, {}}}}, InsertChildMutation{1, 2, 0},
+            CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{3, "textPresentation", arrange::core::PropValue::stringValue("display")}, SetTextMutation{3, "VISIBLE 中文溢出 English"}, SetPropMutation{3, "overflow", PropValue::stringValue("visible")}, SetPropMutation{3, "maxLines", PropValue::numberValue(1)}, SetPropMutation{3, "textStyle", style(0xffff0000, 30)}, SetModifierMutation{3, {{size(25, 45), {}}, {OffsetModifier{-140, 20}, {}}}}, InsertChildMutation{2, 3, 0},
+            CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{4, {{size(25, 50), {}}, {OffsetModifier{230, 130}, {}}, {border, {}}}}, InsertChildMutation{1, 4, 1},
+            CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{5, "textPresentation", arrange::core::PropValue::stringValue("display")}, SetTextMutation{5, "同资源不同颜色"}, SetPropMutation{5, "textStyle", style(0xff00ff00)}, SetModifierMutation{5, {{size(160, 30), {}}, {OffsetModifier{20, 170}, {}}}}, InsertChildMutation{1, 5, 2},
+            CreateNodeMutation{6, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Text")}})}, arrange::core::SetPropMutation{6, "textPresentation", arrange::core::PropValue::stringValue("display")}, SetTextMutation{6, "同资源不同颜色"}, SetPropMutation{6, "textStyle", style(0xff0000ff)}, SetModifierMutation{6, {{size(160, 30), {}}, {OffsetModifier{20, 195}, {}}}}, InsertChildMutation{1, 6, 3}
         };
         {
             ::juce::Image source(::juce::Image::ARGB, 100, 10, true);
@@ -373,11 +374,14 @@ namespace {
             stream->truncate();
             check(::juce::PNGImageFormat{}.writeImageToStream(source, *stream), "无法创建图片边界验收资源");
         }
-        painter.setPackageDir(::juce::File::getCurrentWorkingDirectory().getFullPathName().toStdString());
-        create.operations.push_back(CreateNodeMutation{7, NodeType::Image});
-        create.operations.push_back(SetPropMutation{7, "source", PropValue::stringValue("m23-crop-source.png")});
-        create.operations.push_back(SetPropMutation{7, "contentScale", PropValue::stringValue("Crop")});
-        create.operations.push_back(SetModifierMutation{7, {{size(20, 40), {}}, {OffsetModifier{330, 20}, {}}}});
+        const auto loaded = arrange::juce::packagePainterLoader(std::filesystem::current_path())("m23-crop-source.png").get();
+        check(loaded.content != nullptr, "绘制验收图片加载失败");
+        PaintModifier imagePaint;
+        imagePaint.painter = {1, 1, 1, loaded.content};
+        imagePaint.contentScale = "Crop";
+        create.operations.push_back(CreateNodeMutation{7, arrange::core::NodeType::Layout});
+        create.operations.push_back(arrange::core::SetPropMutation{7, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
+        create.operations.push_back(SetModifierMutation{7, {{size(20, 40), {}}, {OffsetModifier{330, 20}, {}}, {imagePaint, {}}}});
         create.operations.push_back(InsertChildMutation{1, 7, 4});
         const auto result = pipeline.run(scene, 1, {0, 320, 0, 240}, &create, true, frame, [&](const auto&, auto& candidate) { painter.prepareResources(candidate.content); });
         check(!result.error, "变换与溢出场景发布失败");
@@ -397,15 +401,13 @@ namespace {
         }
         for (int index = 0; index < 4; ++index) compare(painter, frame);
         check(service.counters().layoutsCreated == created, "图像对照在重放期间重新排版");
-
-        arrange::juce::ImageResourceCache images;
         arrange::juce::JuceDrawOpsPainter draw;
         ::juce::Image skippedImage(::juce::Image::ARGB, 320, 240, true);
         {
             ::juce::Graphics graphics(skippedImage);
             PlacedPaintFragment invisible{scene.node(5).paintCache, {}};
             invisible.offset = {10000, 10000};
-            draw.paint(graphics, invisible, images);
+            draw.paint(graphics, invisible);
         }
         check(draw.counters().fragmentsVisited == 1 && draw.counters().fragmentsSkipped == 1 && draw.counters().opsVisited == 0, "整段剔除仍访问内部 DrawOps");
         draw.resetCounters();
@@ -423,7 +425,7 @@ namespace {
         ::juce::Image image(::juce::Image::ARGB, 320, 240, true);
         {
             ::juce::Graphics graphics(image);
-            draw.paint(graphics, std::vector<DrawOp>{clip, offscreen, pop, visible}, images);
+            draw.paint(graphics, std::vector<DrawOp>{clip, offscreen, pop, visible});
         }
         check(draw.counters().opsSkipped == 1 && image.getPixelAt(155, 155) == ::juce::Colour(0xff00ff00), "操作剔除破坏了相邻片段的状态");
     }

@@ -10,6 +10,7 @@
 #include <arrange/core/NativeScene.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
+#include <arrange/core/Painter.h>
 #include "ScriptHost.h"
 
 namespace arrange::quickjs {
@@ -84,6 +85,7 @@ namespace arrange::quickjs {
     public:
         QuickJsScriptHost();
         ~QuickJsScriptHost() override;
+        void setPainterLoader(arrange::core::PainterLoader loader);
 
         ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override;
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});

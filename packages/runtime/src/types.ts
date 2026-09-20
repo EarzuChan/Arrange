@@ -1,14 +1,12 @@
 import type { Modifier } from "./modifier.ts"
 import type { NativeBindingHandle, NativeMutation, NativeTransactionTarget, NodeId } from "./native.ts"
 
-export type ArrangeVNode = ArrangeElementVNode | string | number
+export type ArrangeVNode = ArrangeElementVNode
 export type ArrangeChild = ArrangeVNode | null | undefined
 
 export type ArrangeHostProps = {
     modifier?: Modifier
-    text?: string | number
-    modelValue?: string
-    "model-value"?: string
+    text?: string
     value?: string
     [key: string]: unknown
 }
@@ -22,7 +20,7 @@ export type ArrangeElementVNode = {
 }
 
 export type ArrangeHostNode = Omit<ArrangeElementVNode, "children"> & {
-    kind: "element" | "text" | "anchor"
+    kind: "element" | "anchor"
     children: ArrangeHostNode[]
     __arrangeParent?: ArrangeHostNode | ArrangeContainer | null
     __arrangeNodeId?: NodeId

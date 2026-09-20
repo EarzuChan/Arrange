@@ -10,7 +10,6 @@ import {
     type IfBranchNode,
     type IfConditionalExpression,
     type IfNode,
-    type MemoExpression,
     NodeTypes,
     type SimpleExpressionNode,
     convertToBlock,
@@ -34,7 +33,6 @@ import {
 import {
     findDir,
     findProp,
-    getMemoedVNodeCall,
     injectProp,
     isCommentOrWhitespace,
 } from '../utils.ts'
@@ -152,17 +150,7 @@ export function processIf(
                 // move the node to the if node's branches
                 context.removeNode()
                 const branch = createIfBranch(node, dir)
-                if (
-                    __DEV__ &&
-                    comments.length &&
-                    // #3619 ignore comments if the v-if is direct child of <transition>
-                    !(
-                        context.parent &&
-                        context.parent.type === NodeTypes.ELEMENT &&
-                        (context.parent.tag === 'transition' ||
-                            context.parent.tag === 'Transition')
-                    )
-                ) {
+                if (__DEV__ && comments.length) {
                     branch.children = [...comments, ...branch.children]
                 }
 
@@ -219,7 +207,7 @@ function createCodegenNodeForBranch(
     branch: IfBranchNode,
     keyIndex: number,
     context: TransformContext,
-): IfConditionalExpression | BlockCodegenNode | MemoExpression {
+): IfConditionalExpression | BlockCodegenNode {
     if (branch.condition) {
         return createConditionalExpression(
             branch.condition,
@@ -240,7 +228,7 @@ function createChildrenCodegenNode(
     branch: IfBranchNode,
     keyIndex: number,
     context: TransformContext,
-): BlockCodegenNode | MemoExpression {
+): BlockCodegenNode {
     const { helper } = context
     const keyProperty = createObjectProperty(
         `key`,
@@ -280,18 +268,17 @@ function createChildrenCodegenNode(
                 children,
                 patchFlag,
                 undefined,
-                undefined,
                 true,
                 false,
-                false /* isComponent */,
+                false /* isArrangable */,
                 branch.loc,
             )
         }
     } else {
         const ret = (firstChild as ElementNode).codegenNode as
             | BlockCodegenNode
-            | MemoExpression
-        const vnodeCall = getMemoedVNodeCall(ret)
+
+        const vnodeCall = ret
         // Change createVNode to createBlock.
         if (vnodeCall.type === NodeTypes.VNODE_CALL) {
             convertToBlock(vnodeCall, context)

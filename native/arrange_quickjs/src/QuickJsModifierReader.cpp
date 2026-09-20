@@ -1,4 +1,5 @@
 #include "QuickJsModifierReader.h"
+#include "QuickJsPainterResources.h"
 
 #if ARRANGE_WITH_QUICKJS_NG
 
@@ -30,6 +31,7 @@ namespace arrange::quickjs {
 
         bool modifierFieldsMatch(JSContext* context, JSValueConst value, std::string_view type) {
             const auto check = [&](std::initializer_list<std::string_view> fields) { return fieldsMatch(context, value, fields, type); };
+            if (type == "paint") return check({"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"});
             if (type == "padding") return check({"start", "top", "end", "bottom"});
             if (type == "width" || type == "height" || type == "alpha" || type == "zIndex") return check({"value"});
             if (type == "requiredWidth") return check({"width"});
@@ -318,6 +320,28 @@ namespace arrange::quickjs {
                 input.threshold = numberField(spec.get(), "visibilityThreshold", 0.01f);
                 input.bezier = {numberField(spec.get(), "x1", 0.4f), numberField(spec.get(), "y1", 0), numberField(spec.get(), "x2", 0.2f), numberField(spec.get(), "y2", 1)};
                 item.clip = boolField(payload, "clip", true);
+                result.push_back({item, key});
+            }
+            else if (type == "paint") {
+                arrange::core::PaintModifier item;
+                ScopedValue painter(context_, JS_GetPropertyStr(context_, payload, "painter"));
+                const auto snapshot = QuickJsPainterResources::read(context_, painter.get());
+                if (!snapshot) { failed_ = true; return {}; }
+                item.painter = *snapshot;
+                item.alpha = numberField(payload, "alpha", 1.0f);
+                item.sizeToIntrinsics = boolField(payload, "sizeToIntrinsics", true);
+                const auto scale = reader_.stringField(payload, "contentScale");
+                const auto alignment = reader_.stringField(payload, "alignment");
+                if (!scale.empty()) item.contentScale = scale;
+                if (!alignment.empty()) item.alignment = alignment;
+                ScopedValue filter(context_, JS_GetPropertyStr(context_, payload, "colorFilter"));
+                if (!JS_IsUndefined(filter.get())) {
+                    if (!JS_IsObject(filter.get()) || !fieldsMatch(context_, filter.get(), {"tint"}, "colorFilter")) { failed_ = true; return {}; }
+                    ScopedValue tint(context_, JS_GetPropertyStr(context_, filter.get(), "tint"));
+                    const auto number = reader_.toDouble(tint.get());
+                    if (!JS_IsNumber(tint.get()) || !std::isfinite(number) || number < 0 || number > 4294967295.0 || std::floor(number) != number) { failed_ = true; JS_ThrowTypeError(context_, "colorFilter.tint 必须是 uint32 颜色值"); return {}; }
+                    item.tint = static_cast<std::uint32_t>(number);
+                }
                 result.push_back({item, key});
             }
             else if (type == "weight" || type == "align") {
