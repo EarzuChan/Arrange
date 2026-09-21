@@ -1,60 +1,15 @@
 import { NO, extend } from '@arrange/vue-shared'
-import {
-    type ParserOptions as BabelOptions,
-    parse,
-    parseExpression,
-} from '@babel/parser'
+import { type ParserOptions as BabelOptions, parse, parseExpression } from '@babel/parser'
 import { decodeHTML } from 'entities/decode'
-import {
-    type AttributeNode,
-    ConstantTypes,
-    type DirectiveNode,
-    type ElementNode,
-    ElementTypes,
-    type ForParseResult,
-    Namespaces,
-    NodeTypes,
-    type RootNode,
-    type SimpleExpressionNode,
-    type SourceLocation,
-    type TemplateChildNode,
-    createRoot,
-    createSimpleExpression,
-} from './ast.ts'
-import {
-    ErrorCodes,
-    createCompilerError,
-    defaultOnError,
-    defaultOnWarn,
-} from './errors.ts'
+import { type AttributeNode, ConstantTypes, type DirectiveNode, type ElementNode, ElementTypes, type ForParseResult, Namespaces, NodeTypes, type RootNode, type SimpleExpressionNode, type SourceLocation, type TemplateChildNode, createRoot, createSimpleExpression } from './ast.ts'
+import { ErrorCodes, createCompilerError, defaultOnError, defaultOnWarn } from './errors.ts'
 import type { ParserOptions } from './options.ts'
-import Tokenizer, {
-    CharCodes,
-    ParseMode,
-    QuoteType,
-    Sequences,
-    State,
-    isWhitespace,
-    toCharCodes,
-} from './tokenizer.ts'
-import {
-    forAliasRE,
-    isAllWhitespace,
-    isSimpleIdentifier,
-} from './utils.ts'
+import Tokenizer, { CharCodes, ParseMode, QuoteType, Sequences, State, isWhitespace, toCharCodes } from './tokenizer.ts'
+import {forAliasRE, isAllWhitespace, isSimpleIdentifier,} from './utils.ts'
 
-type OptionalOptions =
-    | 'decodeEntities'
-    | 'whitespace'
-    | 'isNativeTag'
-    | 'isBuiltInArrangable'
-    | 'expressionPlugins'
+type OptionalOptions = 'decodeEntities' | 'whitespace' | 'isNativeTag' | 'isBuiltInArrangable' | 'expressionPlugins'
 
-export type MergedParserOptions = Omit<
-    Required<ParserOptions>,
-    OptionalOptions
-> &
-    Pick<ParserOptions, OptionalOptions>
+export type MergedParserOptions = Omit<Required<ParserOptions>, OptionalOptions> & Pick<ParserOptions, OptionalOptions>
 
 export const defaultParserOptions: MergedParserOptions = {
     parseMode: 'base',
@@ -850,6 +805,7 @@ function sanitizeRawRefMarkers(expression: string): { content: string; ranges: [
         for (let cursor = index + 1; cursor < expression.length; cursor++) {
             const character = expression[cursor]
             if (quote) { if (character === quote && expression[cursor - 1] !== '\\') quote = ''; continue }
+            // 这几行代码与“packages/arrange-vue-compiler-core/src/transforms/transformExpression.ts”有重复
             if (character === '"' || character === "'" || character === '`') { quote = character; continue }
             if (character === '(' || character === '[' || character === '{') depth++
             else if (character === ')' || character === ']' || character === '}') depth--

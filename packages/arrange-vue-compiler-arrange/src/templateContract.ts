@@ -2,11 +2,11 @@ import { ElementTypes, NodeTypes, type CompilerOptions, type RootNode, type Sour
 import { camelize } from '@arrange/vue-shared'
 
 // 在结构转换之前检查源码契约，不能让被转换掉的指令绕过校验
-export function validateTemplateContract(root: RootNode, options: CompilerOptions): string[] {
+export function validateTemplateContract(root: RootNode, options: CompilerOptions): string[] { // Options 未被使用喵
     const slots = new Set<string>()
-    const fail = (message: string, loc: SourceLocation): never => {
-        throw Object.assign(new SyntaxError(message), { code: 'ARRANGE_TEMPLATE', loc })
-    }
+
+    const fail = (message: string, loc: SourceLocation): never => {throw Object.assign(new SyntaxError(message), { code: 'ARRANGE_TEMPLATE', loc })}
+
     const visit = (children: TemplateChildNode[]) => {
         for (let index = children.length - 1; index >= 0; index--) {
             const node = children[index]
@@ -38,18 +38,19 @@ export function validateTemplateContract(root: RootNode, options: CompilerOption
 
             if (node.tag === 'Slot') {
                 let name = 'default'
+
                 for (const prop of node.props) {
                     if (prop.type === NodeTypes.DIRECTIVE && ['if', 'else', 'else-if', 'for'].includes(prop.name)) continue
                     if (prop.type === NodeTypes.ATTRIBUTE && prop.name === 'key' || prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic && prop.arg.content === 'key') continue
                     if (prop.type !== NodeTypes.ATTRIBUTE || prop.name !== 'name' || !prop.value?.content) fail('Slot 只接受静态 name，不接受业务参数', prop.loc)
                     if (prop.type === NodeTypes.ATTRIBUTE) name = prop.value!.content
                 }
+
                 if (node.children.some(child => child.type !== NodeTypes.COMMENT && !(child.type === NodeTypes.TEXT && !child.content.trim()))) fail('Slot 未被提供时为空内容，不接受默认子内容', node.loc)
                 slots.add(name)
                 node.tagType = ElementTypes.SLOT
-            } else if (node.tag === 'Template') {
-                node.tagType = ElementTypes.TEMPLATE
-            }
+            } else if (node.tag === 'Template') node.tagType = ElementTypes.TEMPLATE
+
             visit(node.children)
         }
     }

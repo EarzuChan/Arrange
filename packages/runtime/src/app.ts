@@ -2,7 +2,11 @@ import type { AppConfig, AppContext, ArrangableDefinition, Data } from '@arrange
 import { Composition } from '@arrange/vue-runtime-core/internal'
 import { isArrangableDefinition } from '@arrange/vue-runtime-core/internal'
 import { NativeComposition } from './rearrangeNode.ts'
-import { foundationArrangables } from './arrangables.ts'
+import { Layout } from './arrangable/Layout.ts'
+import { Box, Row, Column, Spacer } from './arrangable/LayoutingArrangables.ts'
+import { Text, Input } from './arrangable/TextAndInput.ts'
+import { Image, Icon } from './arrangable/ImageAndIcon.ts'
+import { DynamicArrangable } from './arrangable/ToolArrangables.ts'
 import { ARRANGE_RUNTIME_VERSION, type NativeTransactionTarget } from './native.ts'
 
 declare global {
@@ -16,6 +20,8 @@ export interface ArrangeApp {
     mount(target?: NativeTransactionTarget): void
     unmount(): void
 }
+
+const foundationArrangables = { Layout, Box, Row, Column, Spacer, Text, Input, Image, Icon, DynamicArrangable }
 
 const mountedTargets = new WeakSet<NativeTransactionTarget>()
 

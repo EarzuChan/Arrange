@@ -1,5 +1,3 @@
-// 源自 HtmlParser2。遵循 MIT 许可证（详见 https://github.com/fb55/htmlparser2/blob/master/LICENSE），版权所有：2010-2011，Chris Winberry <chris@winberry.net>。保留所有权利
-
 import type { ElementNode, Position } from './ast.ts'
 import { ErrorCodes } from './errors.ts'
 
@@ -93,10 +91,7 @@ export enum State {
 }
 
 function isTagStartChar(c: number): boolean {
-    return (
-        (c >= CharCodes.LowerA && c <= CharCodes.LowerZ) ||
-        (c >= CharCodes.UpperA && c <= CharCodes.UpperZ)
-    )
+    return ((c >= CharCodes.LowerA && c <= CharCodes.LowerZ) || (c >= CharCodes.UpperA && c <= CharCodes.UpperZ))
 }
 
 export function isWhitespace(c: number): boolean {
@@ -115,9 +110,8 @@ function isEndOfTagSection(c: number): boolean {
 
 export function toCharCodes(str: string): Uint8Array {
     const ret = new Uint8Array(str.length)
-    for (let i = 0; i < str.length; i++) {
-        ret[i] = str.charCodeAt(i)
-    }
+    for (let i = 0; i < str.length; i++) ret[i] = str.charCodeAt(i)
+
     return ret
 }
 
@@ -158,30 +152,17 @@ export interface Callbacks {
     onerr(code: ErrorCodes, index: number): void
 }
 
-/**
- * Sequences used to match longer strings.
- *
- * We don't have `Script`, `Style`, or `Title` here. Instead, we re-use the *End
- * sequences with an increased offset.
- */
-export const Sequences: {
-    Cdata: Uint8Array
-    CdataEnd: Uint8Array
-    CommentEnd: Uint8Array
-    ScriptEnd: Uint8Array
-    StyleEnd: Uint8Array
-    TitleEnd: Uint8Array
-    TextareaEnd: Uint8Array
-} = {
+// 真该砍你了：说明Cdata什么的我们全然没有
+export const Sequences: { Cdata: Uint8Array, CdataEnd: Uint8Array, CommentEnd: Uint8Array, ScriptEnd: Uint8Array, StyleEnd: Uint8Array, TitleEnd: Uint8Array, TextareaEnd: Uint8Array } = {
     Cdata: new Uint8Array([0x43, 0x44, 0x41, 0x54, 0x41, 0x5b]), // CDATA[
     CdataEnd: new Uint8Array([0x5d, 0x5d, 0x3e]), // ]]>
     CommentEnd: new Uint8Array([0x2d, 0x2d, 0x3e]), // `-->`
     ScriptEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74]), // `</script`
-    StyleEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x74, 0x79, 0x6c, 0x65]), // `</style`
+    StyleEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x74, 0x79, 0x6c, 0x65]), // `</style`更是恶劣的
     TitleEnd: new Uint8Array([0x3c, 0x2f, 0x74, 0x69, 0x74, 0x6c, 0x65]), // `</title`
     TextareaEnd: new Uint8Array([
         0x3c, 0x2f, 116, 101, 120, 116, 97, 114, 101, 97,
-    ]), // `</textarea
+    ]), // `</textarea到了死几百回的时候了
 }
 
 export default class Tokenizer {
@@ -211,14 +192,9 @@ export default class Tokenizer {
         return this.mode === ParseMode.SFA && this.stack.length === 0
     }
 
-    constructor(
-        private readonly stack: ElementNode[],
-        private readonly cbs: Callbacks,
-    ) {
+    constructor(private readonly stack: ElementNode[], private readonly cbs: Callbacks,) {
         {
-            this.entityDecoder = new EntityDecoder(htmlDecodeTree, (cp, consumed) =>
-                this.emitCodePoint(cp, consumed),
-            )
+            this.entityDecoder = new EntityDecoder(htmlDecodeTree, (cp, consumed) => this.emitCodePoint(cp, consumed),)
         }
     }
 
@@ -841,11 +817,9 @@ export default class Tokenizer {
         }
     }
     private stateBeforeSpecialT(c: number): void {
-        if (c === Sequences.TitleEnd[3]) {
-            this.startSpecial(Sequences.TitleEnd, 4)
-        } else if (c === Sequences.TextareaEnd[3]) {
-            this.startSpecial(Sequences.TextareaEnd, 4)
-        } else {
+        if (c === Sequences.TitleEnd[3]) this.startSpecial(Sequences.TitleEnd, 4)
+        else if (c === Sequences.TextareaEnd[3]) this.startSpecial(Sequences.TextareaEnd, 4)
+        else {
             this.state = State.InTagName
             this.stateInTagName(c) // Consume the token again
         }
@@ -856,11 +830,7 @@ export default class Tokenizer {
             this.baseState = this.state
             this.state = State.InEntity
             this.entityStart = this.index
-            this.entityDecoder!.startEntity(
-                this.baseState === State.Text || this.baseState === State.InRCDATA
-                    ? DecodingMode.Legacy
-                    : DecodingMode.Attribute,
-            )
+            this.entityDecoder!.startEntity(this.baseState === State.Text || this.baseState === State.InRCDATA ? DecodingMode.Legacy : DecodingMode.Attribute)
         }
     }
 
@@ -868,17 +838,13 @@ export default class Tokenizer {
         {
             const length = this.entityDecoder!.write(this.buffer, this.index)
 
-            // If `length` is positive, we are done with the entity.
+            // 如果长度为正，我们做完了，你气不气？（依旧虚空锁敌）
             if (length >= 0) {
                 this.state = this.baseState
 
-                if (length === 0) {
-                    this.index = this.entityStart
-                }
-            } else {
-                // Mark buffer as consumed.
-                this.index = this.buffer.length - 1
-            }
+                if (length === 0) this.index = this.entityStart
+            } else this.index = this.buffer.length - 1 // 标记这缓冲区被消费了
+
         }
     }
 
@@ -891,9 +857,7 @@ export default class Tokenizer {
         this.buffer = input
         while (this.index < this.buffer.length) {
             const c = this.buffer.charCodeAt(this.index)
-            if (c === CharCodes.NewLine && this.state !== State.InEntity) {
-                this.newlines.push(this.index)
-            }
+            if (c === CharCodes.NewLine && this.state !== State.InEntity) this.newlines.push(this.index)
             switch (this.state) {
                 case State.Text: {
                     this.stateText(c)
@@ -1077,16 +1041,11 @@ export default class Tokenizer {
         const endIndex = this.buffer.length
 
         // If there is no remaining data, we are done.
-        if (this.sectionStart >= endIndex) {
-            return
-        }
+        if (this.sectionStart >= endIndex) return
 
         if (this.state === State.InCommentLike) {
-            if (this.currentSequence === Sequences.CdataEnd) {
-                this.cbs.oncdata(this.sectionStart, endIndex)
-            } else {
-                this.cbs.oncomment(this.sectionStart, endIndex)
-            }
+            if (this.currentSequence === Sequences.CdataEnd) this.cbs.oncdata(this.sectionStart, endIndex)
+            else this.cbs.oncomment(this.sectionStart, endIndex)
         } else if (
             this.state === State.InTagName ||
             this.state === State.BeforeAttrName ||
@@ -1102,41 +1061,24 @@ export default class Tokenizer {
             this.state === State.InAttrValueNq ||
             this.state === State.InClosingTagName
         ) {
-            /*
-             * If we are currently in an opening or closing tag, us not calling the
-             * respective callback signals that the tag should be ignored.
-             */
-        } else {
-            this.cbs.ontext(this.sectionStart, endIndex)
-        }
+            // 如果我们当前处于开始标签或结束标签中，而不调用相应的回调函数，则表明该标签应被忽略
+        } else this.cbs.ontext(this.sectionStart, endIndex)
     }
 
     private emitCodePoint(cp: number, consumed: number): void {
         {
             if (this.baseState !== State.Text && this.baseState !== State.InRCDATA) {
-                if (this.sectionStart < this.entityStart) {
-                    this.cbs.onattribdata(this.sectionStart, this.entityStart)
-                }
+                if (this.sectionStart < this.entityStart) this.cbs.onattribdata(this.sectionStart, this.entityStart)
                 this.sectionStart = this.entityStart + consumed
                 this.index = this.sectionStart - 1
 
-                this.cbs.onattribentity(
-                    fromCodePoint(cp),
-                    this.entityStart,
-                    this.sectionStart,
-                )
+                this.cbs.onattribentity(fromCodePoint(cp), this.entityStart, this.sectionStart)
             } else {
-                if (this.sectionStart < this.entityStart) {
-                    this.cbs.ontext(this.sectionStart, this.entityStart)
-                }
+                if (this.sectionStart < this.entityStart) this.cbs.ontext(this.sectionStart, this.entityStart)
                 this.sectionStart = this.entityStart + consumed
                 this.index = this.sectionStart - 1
 
-                this.cbs.ontextentity(
-                    fromCodePoint(cp),
-                    this.entityStart,
-                    this.sectionStart,
-                )
+                this.cbs.ontextentity(fromCodePoint(cp), this.entityStart, this.sectionStart)
             }
         }
     }

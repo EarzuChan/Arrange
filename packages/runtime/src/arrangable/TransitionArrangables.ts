@@ -1,14 +1,14 @@
-import { Box } from './arrangables.ts'
+import { Box } from './LayoutingArrangables.ts'
 import {arrangeScope, defineArrangable, onMounted, shallowRef, watch} from "@arrange/vue-runtime-core"
-import type {Arrangable, PropType} from "@arrange/vue-runtime-core"
-import {animatedNumberAsRef, tween} from "./animation.ts"
-import type {AnimationClock, AnimationSpec} from "./animation.ts"
-import {M} from "./modifier.ts"
+import type {Arrangable, ArrangableProps, PropType} from "@arrange/vue-runtime-core"
+import {animatedNumberAsRef, tween} from "../animation.ts"
+import type {AnimationClock, AnimationSpec} from "../animation.ts"
+import {M} from "../modifier.ts"
 
 export type VisibilityTransform = Readonly<{alpha?: number; translationX?: number; translationY?: number; scaleX?: number; scaleY?: number}>
 const clampAlpha = (value: number) => Math.max(0, Math.min(1, value))
 
-// 这个为什么不导出Props
+export type AnimatedVisibilityProps = ArrangableProps<typeof AnimatedVisibility>
 export const AnimatedVisibility = defineArrangable({
     name: "AnimatedVisibility",
     slotNames: ["default"],
@@ -74,7 +74,7 @@ const CrossfadeLayer = defineArrangable({
     },
 })
 
-// 这个为什么不导出Props
+export type CrossfadeProps = ArrangableProps<typeof Crossfade>
 export const Crossfade = defineArrangable({
     name: "Crossfade",
     props: {

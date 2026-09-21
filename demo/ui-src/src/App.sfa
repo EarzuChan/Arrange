@@ -54,11 +54,11 @@
 <script>
 import { painter, tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, M, onMounted, onUnmounted, ref, createScrollState, shallowRef, sp} from "@arrange/framework"
 
-import CounterPanel from './views/CounterPanel.sfa'
-import AnimationGallery from './views/AnimationGallery.sfa'
-import ShowcaseGallery from './views/ShowcaseGallery.sfa'
-import PropBoundary from './views/PropBoundary.sfa'
-import RefRelay from './views/RefRelay.sfa'
+import CounterPanel from './view/CounterPanel.sfa'
+import AnimationGallery from './view/AnimationGallery.sfa'
+import ShowcaseGallery from './view/ShowcaseGallery.sfa'
+import PropBoundary from './view/PropBoundary.sfa'
+import RefRelay from './view/RefRelay.sfa'
 
 const clicks = ref(0)
 const firstRef = ref(11)
