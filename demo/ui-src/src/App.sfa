@@ -20,9 +20,9 @@
 
         <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
 
-        <PropBoundary secret="App 传给 PropBoundary 的 secret" />
+        <PropBoundary secret="App 传给 PropBoundary 的 secret"/> // 这是一个“不透传”的测试
 
-        <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef" />
+        <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
 
         <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }" :modifier="M.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"/>
 
@@ -46,7 +46,7 @@
             <AnimationGallery/>
         </Row>
 
-        <Text text="Arrangeの本格界面" :text-style="{fontSize: 12, color: 0xff91a6b8}"/>
+        <Text text="Arrangeの本格界面" :text-style="{fontSize: 12, color: 0xff91a6b8}"/> // 以后颜色、尺寸单位不得裸写
     </Column>
 </template>
 

@@ -1,4 +1,4 @@
-// HtmlParser2。遵循 MIT 许可证（详见 https://github.com/fb55/htmlparser2/blob/master/LICENSE），版权所有：2010-2011，Chris Winberry <chris@winberry.net>。保留所有权利
+// 源自 HtmlParser2。遵循 MIT 许可证（详见 https://github.com/fb55/htmlparser2/blob/master/LICENSE），版权所有：2010-2011，Chris Winberry <chris@winberry.net>。保留所有权利
 
 import type { ElementNode, Position } from './ast.ts'
 import { ErrorCodes } from './errors.ts'
@@ -281,15 +281,23 @@ export default class Tokenizer {
     }
 
     private stateText(c: number): void {
+        // 仅在模板标签外消费行注释，不改写源码，也不创建注释或运行时节点
+        if (c === 47 && this.buffer[this.index + 1] === '/' && this.mode === ParseMode.SFA) {
+            if (this.index > this.sectionStart) this.cbs.ontext(this.sectionStart, this.index)
+            while (this.index < this.buffer.length && this.buffer[this.index] !== '\n' && this.buffer[this.index] !== '\r') this.index++
+            this.sectionStart = this.index
+            this.index--
+            return
+        }
+
         if (c === CharCodes.Lt) {
             if (this.index > this.sectionStart) {
                 this.cbs.ontext(this.sectionStart, this.index)
             }
             this.state = State.BeforeTagName
             this.sectionStart = this.index
-        } else if ((c === CharCodes.Amp)) {
-            this.startEntity()
-        } else if (c === this.delimiterOpen[0]) {
+        } else if ((c === CharCodes.Amp)) this.startEntity()
+        else if (c === this.delimiterOpen[0]) {
             this.state = State.InterpolationOpen
             this.delimiterIndex = 0
             this.stateInterpolationOpen(c)
@@ -304,14 +312,10 @@ export default class Tokenizer {
         if (c === this.delimiterOpen[this.delimiterIndex]) {
             if (this.delimiterIndex === this.delimiterOpen.length - 1) {
                 const start = this.index + 1 - this.delimiterOpen.length
-                if (start > this.sectionStart) {
-                    this.cbs.ontext(this.sectionStart, start)
-                }
+                if (start > this.sectionStart) this.cbs.ontext(this.sectionStart, start)
                 this.state = State.Interpolation
                 this.sectionStart = start
-            } else {
-                this.delimiterIndex++
-            }
+            } else this.delimiterIndex++
         } else if (this.inRCDATA) {
             this.state = State.InRCDATA
             this.stateInRCDATA(c)
@@ -333,15 +337,9 @@ export default class Tokenizer {
         if (c === this.delimiterClose[this.delimiterIndex]) {
             if (this.delimiterIndex === this.delimiterClose.length - 1) {
                 this.cbs.oninterpolation(this.sectionStart, this.index + 1)
-                if (this.inRCDATA) {
-                    this.state = State.InRCDATA
-                } else {
-                    this.state = State.Text
-                }
+                this.state = this.inRCDATA ? State.InRCDATA : State.Text
                 this.sectionStart = this.index + 1
-            } else {
-                this.delimiterIndex++
-            }
+            } else this.delimiterIndex++
         } else {
             this.state = State.Interpolation
             this.stateInterpolation(c)
@@ -358,9 +356,8 @@ export default class Tokenizer {
             : // Otherwise, do a case-insensitive comparison
             (c | 0x20) === this.currentSequence[this.sequenceIndex]
 
-        if (!isMatch) {
-            this.inRCDATA = false
-        } else if (!isEnd) {
+        if (!isMatch) this.inRCDATA = false
+        else if (!isEnd) {
             this.sequenceIndex++
             return
         }

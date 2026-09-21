@@ -66,6 +66,20 @@ test('内建 Arrangable 各自声明参数，不给 Spacer 和文本补充通用
     }
 })
 
+test('SFA 模板支持独占行与行末 // 彩蛋注释且不进入产物', () => {
+    const source = `<template>
+    // 独占行注释
+    <Column> // 开始内容
+        <Text text="标题" /> // 行末注释
+        <Text :text="'http://example.test//'" />
+    </Column>
+</template>`
+    const result = compileArrangeSfa(source, '注释.sfa')
+    assert.doesNotMatch(result.code, /独占行注释|开始内容|行末注释/)
+    assert.match(result.code, /http:\/\/example\.test\/\//)
+    assert.equal((result.code.match(/_callArrangable\(/g) ?? []).length, 3)
+})
+
 test('对象参数类型检查保留字段类型、必需性与未声明字段', () => {
     const directory = mkdtempSync(resolve('tmp-refs/sfa-object-typecheck-'))
     try {

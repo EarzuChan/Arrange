@@ -1,6 +1,6 @@
 # 内建 Arrangable
 
-本文定义 Foundation Arrangable（FA）的布局、呈现与资源职责；公开参数及类型归属见 [基础 API 形态](21-基础API形态.md)，模板调用规则见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
+本文定义 Foundation Arrangable（FA）的布局、呈现与资源职责；公开参数及类型归属见 [基础 API 形态](21-基础API形态.md)，模板调用规则见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
 ## 定义与组合
 
@@ -10,7 +10,7 @@ Foundation Arrangable（FA）是 Framework 提供、直接用代码编写的 Arr
 
 Layout 是其中唯一具有框架深层节点接入的正式 Arrangable；它可被所有 SFA 和代码定义使用。Layout 的唯一特权、RearrangeNode 生命周期和重排过程以 [运行时](04-运行时.md) 为唯一事实源。普通 FA 只组织调用，最终 Modifier 应用经过 Layout。
 
-KeepAlive 和 DynamicArrangable 同样遵守普通定义与调用契约。KeepAlive 通过统一实例和内容作用域机制表达保留，不复制虚拟节点字段，不另设 Foundation 状态工厂或权限声明；内容契约见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
+KeepAlive 和 DynamicArrangable 同样遵守普通定义与调用契约。KeepAlive 通过统一实例和内容作用域机制表达保留，不复制虚拟节点字段，不另设 Foundation 状态工厂或权限声明；内容契约见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
 ## 布局策略
 
@@ -55,3 +55,6 @@ Painter 在创建作用域退出时释放，也可显式 dispose。释放后取�
 ## 后续能力
 
 Canvas、Flow、Lazy 与复杂图像滤镜尚未公开。Canvas 必须采用受控绘制描述与缓存；不能以任意 onDraw JS 回调穿透原生绘制阶段。Lazy 必须设计可视范围物化、稳定条目身份、滚动与回收能力；不沿用已经删除的带参 Slot 协议，也不把普通 v-for 冒充虚拟化。
+
+
+

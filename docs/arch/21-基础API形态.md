@@ -1,4 +1,4 @@
-﻿# 基础 API 形态
+# 基础 API 形态
 
 本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，Arrangable行为见 [内建 Arrangable](12-内建Arrangable.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)，动画与 transition 见 [动画与Transition](28-动画与Transition.md)。
 
@@ -39,7 +39,7 @@ SFA 模板与 TS setup
 
 `@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
 
-用户通过 SFA 的 defineProps/withDefaults 声明参数，通过模板中的 Slot 声明内容。内建 FA 直接用代码编写，与 SFA 编译结果遵守同一种 Arrangable 定义和调用契约，见 [运行时](04-运行时.md)。参数、内容与错误行为见 [Arrange Vue 宿主目标](27-ArrangeVue宿主目标.md)。
+用户通过 SFA 的 defineProps/withDefaults 声明参数，通过模板中的 Slot 声明内容。内建 FA 直接用代码编写，与 SFA 编译结果遵守同一种 Arrangable 定义和调用契约，见 [运行时](04-运行时.md)。参数、内容与错误行为见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
 # C++ App source
 
@@ -476,3 +476,6 @@ interface RuntimeHello {
 ```
 
 生产 native transaction 细节见 [LayoutTree与NativeTransaction](15-LayoutTree与NativeTransaction.md)。
+
+
+
