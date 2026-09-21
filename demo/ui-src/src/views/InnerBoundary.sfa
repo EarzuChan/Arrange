@@ -5,5 +5,5 @@
 <script>
 import { M, Text } from '@arrange/framework'
 
-const { secret = 'InnerBoundary 的默认 secret（父层没有传入）' } = defineProps<{ secret?: string }>()
+const { secret = 'InnerBoundary 的默认恩情（父层没有传入）' } = defineProps<{ secret?: string }>()
 </script>

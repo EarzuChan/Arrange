@@ -16,11 +16,12 @@
             <Box :modifier="M.size(dp(180), dp(38)).background(Color(0xFFFFB020))"/>
         </Row>
 
+        // 模版内支持单行双斜杠注释，带派不带派！
         <Spacer :modifier="M.height(dp(4))"/>
 
         <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
 
-        <PropBoundary secret="App 传给 PropBoundary 的 secret"/> // 这是一个“不透传”的测试
+        <PropBoundary secret="App 传给 PropBoundary 的恩情"/> // 这是一个“不透传”的测试
 
         <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
 

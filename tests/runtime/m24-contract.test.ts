@@ -216,6 +216,44 @@ test('原样 Ref 标记保留泛型、比较与类型断言的 TS 边界', () =>
     assert.throws(() => compileBinding('<state><other>'))
 })
 
+test('原样 Ref 外层标记不会被比较、右移或泛型中的尖括号提前截断', () => {
+    const firstRef = runtime.ref(1)
+    const secondRef = runtime.ref(2)
+    const cases: [string, ts.SyntaxKind, unknown][] = [
+        ['<a > b ? firstRef : secondRef>', ts.SyntaxKind.ConditionalExpression, firstRef],
+        ['<a > b>', ts.SyntaxKind.GreaterThanToken, true],
+        ['<a >> b>', ts.SyntaxKind.GreaterThanGreaterThanToken, 1],
+        ['<a < b>', ts.SyntaxKind.LessThanToken, false],
+        ['<foo<T>()>', ts.SyntaxKind.CallExpression, firstRef],
+    ]
+    for (const [expression, kind, expected] of cases) {
+        const { code } = compileArrangeSfa('<template><Editor :state="' + expression + '" /></template><script>import { ref } from "@arrange/framework"; const a = 4, b = 2; type T = number; const firstRef = ref(1), secondRef = ref(2); function foo<X>() { return firstRef }</script>', '尖括号边界.sfa')
+        const ast = ts.createSourceFile('编译产物.ts', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+        let getter: ts.ArrowFunction | undefined
+        const visit = (node: ts.Node) => {
+            if (ts.isPropertyAssignment(node) && ts.isStringLiteral(node.name) && node.name.text === 'state' && ts.isArrowFunction(node.initializer)) getter = node.initializer
+            ts.forEachChild(node, visit)
+        }
+        visit(ast)
+        assert.ok(getter, expression)
+        let body = getter.body
+        while (ts.isParenthesizedExpression(body)) body = body.expression
+        assert.equal(ts.isBinaryExpression(body) ? body.operatorToken.kind : body.kind, kind, expression)
+
+        // 执行真实编译产物中的参数 getter，检查运算结果与 Ref 身份
+        const output = ts.transpileModule('const result = ' + getter.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+        const evaluate = new Function('a', 'b', 'firstRef', 'secondRef', 'foo', output + '\nreturn result()')
+        assert.equal(evaluate(4, 2, firstRef, secondRef, () => firstRef), expected, expression)
+        if (ts.isConditionalExpression(body)) {
+            assert.ok(ts.isBinaryExpression(body.condition))
+            assert.equal(body.condition.operatorToken.kind, ts.SyntaxKind.GreaterThanToken)
+            assert.equal(body.whenTrue.getText(ast), 'firstRef')
+            assert.equal(body.whenFalse.getText(ast), 'secondRef')
+            assert.equal(evaluate(1, 2, firstRef, secondRef, () => firstRef), secondRef)
+        }
+    }
+})
+
 test('原样 Ref 标记可以嵌入条件表达式并只跳过作用域内解包', () => {
     const compileBinding = (expression: string) => compileArrangeSfa('<template><Editor :state="' + expression + '" /></template><script>import {ref} from "@arrange/framework"; const selectedKey=ref(false); const firstRef=ref(1); const secondRef=ref(2)</script>', '嵌套原样.sfa').code
     const nested = compileBinding('selectedKey.value ? <secondRef> : <firstRef>')
