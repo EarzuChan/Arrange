@@ -51,14 +51,18 @@ namespace arrange {
                 const auto ch = text[pos];
                 if (escaping) {
                     switch (ch) {
-                    case 'n': result.push_back('\n');
-                        break;
-                    case 'r': result.push_back('\r');
-                        break;
-                    case 't': result.push_back('\t');
-                        break;
-                    default: result.push_back(ch);
-                        break;
+                        case 'n':
+                            result.push_back('\n');
+                            break;
+                        case 'r':
+                            result.push_back('\r');
+                            break;
+                        case 't':
+                            result.push_back('\t');
+                            break;
+                        default:
+                            result.push_back(ch);
+                            break;
                     }
                     escaping = false;
                     continue;
@@ -91,9 +95,13 @@ namespace arrange {
             for (; pos < text.size(); ++pos) {
                 const auto ch = text[pos];
                 if (inString) {
-                    if (escaping) { escaping = false; }
-                    else if (ch == '\\') { escaping = true; }
-                    else if (ch == '"') { inString = false; }
+                    if (escaping) {
+                        escaping = false;
+                    } else if (ch == '\\') {
+                        escaping = true;
+                    } else if (ch == '"') {
+                        inString = false;
+                    }
                     continue;
                 }
                 if (ch == '"') {
@@ -165,20 +173,22 @@ namespace arrange {
             std::vector<std::uint8_t> frame;
             frame.push_back(static_cast<std::uint8_t>(0x80u | opcode));
             const auto length = payload.size();
-            if (length <= 125) { frame.push_back(static_cast<std::uint8_t>(0x80u | length)); }
-            else if (length <= 0xffffu) {
+            if (length <= 125) {
+                frame.push_back(static_cast<std::uint8_t>(0x80u | length));
+            } else if (length <= 0xffffu) {
                 frame.push_back(0x80u | 126u);
                 frame.push_back(static_cast<std::uint8_t>((length >> 8u) & 0xffu));
                 frame.push_back(static_cast<std::uint8_t>(length & 0xffu));
+            } else {
+                return false;
             }
-            else { return false; }
             const std::uint8_t mask[4] = {0x12u, 0x34u, 0x56u, 0x78u};
             frame.insert(frame.end(), std::begin(mask), std::end(mask));
             for (std::size_t i = 0; i < payload.size(); ++i) frame.push_back(static_cast<std::uint8_t>(payload[i]) ^ mask[i % 4u]);
             return writeAll(socket, frame.data(), static_cast<int>(frame.size()));
         }
 #endif
-    } // namespace
+    }  // namespace
 
     DevServerEndpoint parseDevServerUrl(std::string_view url) {
         DevServerEndpoint endpoint;
@@ -216,8 +226,7 @@ namespace arrange {
         if (colon == std::string::npos) {
             endpoint.host = hostPort;
             endpoint.port = endpoint.secure ? 443 : 80;
-        }
-        else {
+        } else {
             endpoint.host = hostPort.substr(0, colon);
             const auto portText = std::string_view(hostPort).substr(colon + 1);
             auto parsed = 0;
@@ -264,10 +273,11 @@ namespace arrange {
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-    DevServerReloadClient::DevServerReloadClient()
-        : ::juce::Thread("Arrange DevServerReloadClient") {}
+    DevServerReloadClient::DevServerReloadClient() : ::juce::Thread("Arrange DevServerReloadClient") {}
 
-    DevServerReloadClient::~DevServerReloadClient() { stop(); }
+    DevServerReloadClient::~DevServerReloadClient() {
+        stop();
+    }
 
     void DevServerReloadClient::start(std::string devServerUrl, ReloadCallback callback) {
         stop();
@@ -334,13 +344,13 @@ namespace arrange {
         const auto hostHeader = endpoint.host + ":" + std::to_string(endpoint.port);
         std::ostringstream request;
         request << "GET " << endpoint.websocketPath << " HTTP/1.1\r\n"
-            << "Host: " << hostHeader << "\r\n"
-            << "Upgrade: websocket\r\n"
-            << "Connection: Upgrade\r\n"
-            << "Sec-WebSocket-Key: " << websocketKey() << "\r\n"
-            << "Sec-WebSocket-Version: 13\r\n"
-            << "Sec-WebSocket-Protocol: vite-hmr\r\n"
-            << "\r\n";
+                << "Host: " << hostHeader << "\r\n"
+                << "Upgrade: websocket\r\n"
+                << "Connection: Upgrade\r\n"
+                << "Sec-WebSocket-Key: " << websocketKey() << "\r\n"
+                << "Sec-WebSocket-Version: 13\r\n"
+                << "Sec-WebSocket-Protocol: vite-hmr\r\n"
+                << "\r\n";
         const auto requestText = request.str();
         if (!writeAll(*socket_, requestText.data(), static_cast<int>(requestText.size()))) return false;
 
@@ -376,8 +386,7 @@ namespace arrange {
                 std::uint8_t ext[2] = {};
                 if (!readExact(*socket_, ext, 2, *this)) return false;
                 length = (static_cast<std::uint64_t>(ext[0]) << 8u) | ext[1];
-            }
-            else if (length == 127) {
+            } else if (length == 127) {
                 std::uint8_t ext[8] = {};
                 if (!readExact(*socket_, ext, 8, *this)) return false;
                 length = 0;
@@ -413,4 +422,4 @@ namespace arrange {
     }
 
 #endif
-} // namespace arrange
+}  // namespace arrange

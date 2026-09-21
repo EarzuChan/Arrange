@@ -1,7 +1,7 @@
-import {existsSync, mkdirSync, rmSync, writeFileSync} from "node:fs"
-import {resolve} from "node:path"
-import {cmakeExe, ninjaExe, repoRoot, runInVsDev} from "./common.ts"
-import {readArrangeVersionContract} from "./version-contract.ts"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { cmakeExe, ninjaExe, repoRoot, runInVsDev } from "./common.ts"
+import { readArrangeVersionContract } from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
 const consumerRoot = resolve(repoRoot, "build/native-fetchcontent-consumer")
@@ -27,8 +27,8 @@ function arrangeFetchContentDeclaration(): string {
     return `FetchContent_Declare(arrange SOURCE_DIR [[${arrangeSource}]])`
 }
 
-if (existsSync(consumerRoot)) rmSync(consumerRoot, {recursive: true, force: true})
-mkdirSync(consumerRoot, {recursive: true})
+if (existsSync(consumerRoot)) rmSync(consumerRoot, { recursive: true, force: true })
+mkdirSync(consumerRoot, { recursive: true })
 
 writeFileSync(resolve(consumerRoot, "CMakeLists.txt"), `
 cmake_minimum_required(VERSION 3.24)

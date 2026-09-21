@@ -13,8 +13,13 @@ namespace arrange::core {
     namespace {
         constexpr float InfiniteConstraint = 1000000.0f;
 
-        float clamp(float value, float min, float max) noexcept { return std::max(min, std::min(max, value)); }
-        float safeMax(float value, float fallback) noexcept { return value > 0.0f ? value : fallback; }
+        float clamp(float value, float min, float max) noexcept {
+            return std::max(min, std::min(max, value));
+        }
+
+        float safeMax(float value, float fallback) noexcept {
+            return value > 0.0f ? value : fallback;
+        }
 
         Constraints shrink(Constraints constraints, float dx, float dy) {
             return {
@@ -64,9 +69,12 @@ namespace arrange::core {
             const auto remaining = std::max(0.0f, size - used);
             const auto& name = arrangement.alignment;
 
-            if (name == "Center" || name == "CenterHorizontally" || name == "CenterVertically") result.offset = remaining * 0.5f;
-            else if (name == "End" || name == "Bottom") result.offset = remaining;
-            else if (name == "SpaceBetween" && count > 1) result.spacing = remaining / static_cast<float>(count - 1);
+            if (name == "Center" || name == "CenterHorizontally" || name == "CenterVertically")
+                result.offset = remaining * 0.5f;
+            else if (name == "End" || name == "Bottom")
+                result.offset = remaining;
+            else if (name == "SpaceBetween" && count > 1)
+                result.spacing = remaining / static_cast<float>(count - 1);
             else if (name == "SpaceAround") {
                 result.spacing = remaining / static_cast<float>(count);
                 result.offset = result.spacing * 0.5f;
@@ -81,26 +89,29 @@ namespace arrange::core {
             return stringProp(node, camelCase, kebabCase, fallback);
         }
 
-        std::string alignModifier(const LayoutNode& node) { return node.modifier.parentData().align; }
-    } // namespace
+        std::string alignModifier(const LayoutNode& node) {
+            return node.modifier.parentData().align;
+        }
+    }  // namespace
 
     LayoutEngine::LayoutEngine() : textLayoutService_(&defaultTextLayoutService()) {}
 
     LayoutEngine::LayoutEngine(const TextLayoutService& textLayoutService) : textLayoutService_(&textLayoutService) {}
 
     void LayoutEngine::layout(LayoutTree& tree, NodeId root, Constraints constraints) {
+        scrollUpdates_.clear();
         measure(tree, root, constraints);
         place(tree, root, 0.0f, 0.0f);
     }
 
     Size LayoutEngine::measure(LayoutTree& tree, NodeId id, Constraints constraints) {
         auto& node = tree.node(id);
-        if (node.measurementValid && node.measuredConstraints == constraints &&
-            !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure)))) {
+        if (node.measurementValid && node.measuredConstraints == constraints && !((node.dirty | node.subtreeDirty) & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure)))) {
             ++counters_.measureCacheHits;
             return {node.bounds.width, node.bounds.height};
         }
         ++counters_.measuredNodes;
+        // 放置依赖完整测量结果，约束改变或子项重测都可能改变内部几何
         node.placementValid = false;
         const auto measured = measureWithModifier(tree, id, 0, constraints);
         node.measuredConstraints = constraints;
@@ -128,44 +139,65 @@ namespace arrange::core {
         if (input) {
             const auto& item = *input;
             switch (item.kind) {
-            case LayoutModifierKind::Padding:
-                padding = true;
-                inner = shrink(constraints, item.padding.start + item.padding.end, item.padding.top + item.padding.bottom);
-                instance.childOffset = {item.padding.start, item.padding.top};
-                break;
-            case LayoutModifierKind::Width: inner = exact(inner, item.value, 0, true, false); break;
-            case LayoutModifierKind::Height: inner = exact(inner, 0, item.value, false, true); break;
-            case LayoutModifierKind::Size: inner = exact(inner, item.width, item.height, true, true); break;
-            case LayoutModifierKind::RequiredWidth: required = true; inner = exact(inner, item.value, 0, true, false, true); break;
-            case LayoutModifierKind::RequiredHeight: required = true; inner = exact(inner, 0, item.value, false, true, true); break;
-            case LayoutModifierKind::RequiredSize: required = true; inner = exact(inner, item.width, item.height, true, true, true); break;
-            case LayoutModifierKind::FillMaxWidth:
-            case LayoutModifierKind::FillMaxHeight:
-            case LayoutModifierKind::FillMaxSize: {
-                const auto fraction = std::clamp(item.fraction, 0.0f, 1.0f);
-                const auto width = item.kind != LayoutModifierKind::FillMaxHeight && inner.maxWidth < InfiniteConstraint;
-                const auto height = item.kind != LayoutModifierKind::FillMaxWidth && inner.maxHeight < InfiniteConstraint;
-                inner = exact(inner, inner.maxWidth * fraction, inner.maxHeight * fraction, width, height);
-                break;
-            }
-            case LayoutModifierKind::WidthIn:
-            case LayoutModifierKind::HeightIn:
-            case LayoutModifierKind::SizeIn:
-                if (item.kind != LayoutModifierKind::HeightIn) {
-                    if (item.minWidth >= 0) inner.minWidth = clamp(item.minWidth, constraints.minWidth, constraints.maxWidth);
-                    if (item.maxWidth >= 0) inner.maxWidth = clamp(item.maxWidth, inner.minWidth, constraints.maxWidth);
+                case LayoutModifierKind::Padding:
+                    padding = true;
+                    inner = shrink(constraints, item.padding.start + item.padding.end, item.padding.top + item.padding.bottom);
+                    instance.childOffset = {item.padding.start, item.padding.top};
+                    break;
+                case LayoutModifierKind::Width:
+                    inner = exact(inner, item.value, 0, true, false);
+                    break;
+                case LayoutModifierKind::Height:
+                    inner = exact(inner, 0, item.value, false, true);
+                    break;
+                case LayoutModifierKind::Size:
+                    inner = exact(inner, item.width, item.height, true, true);
+                    break;
+                case LayoutModifierKind::RequiredWidth:
+                    required = true;
+                    inner = exact(inner, item.value, 0, true, false, true);
+                    break;
+                case LayoutModifierKind::RequiredHeight:
+                    required = true;
+                    inner = exact(inner, 0, item.value, false, true, true);
+                    break;
+                case LayoutModifierKind::RequiredSize:
+                    required = true;
+                    inner = exact(inner, item.width, item.height, true, true, true);
+                    break;
+                case LayoutModifierKind::FillMaxWidth:
+                case LayoutModifierKind::FillMaxHeight:
+                case LayoutModifierKind::FillMaxSize: {
+                    const auto fraction = std::clamp(item.fraction, 0.0f, 1.0f);
+                    const auto width = item.kind != LayoutModifierKind::FillMaxHeight && inner.maxWidth < InfiniteConstraint;
+                    const auto height = item.kind != LayoutModifierKind::FillMaxWidth && inner.maxHeight < InfiniteConstraint;
+                    inner = exact(inner, inner.maxWidth * fraction, inner.maxHeight * fraction, width, height);
+                    break;
                 }
-                if (item.kind != LayoutModifierKind::WidthIn) {
-                    if (item.minHeight >= 0) inner.minHeight = clamp(item.minHeight, constraints.minHeight, constraints.maxHeight);
-                    if (item.maxHeight >= 0) inner.maxHeight = clamp(item.maxHeight, inner.minHeight, constraints.maxHeight);
-                }
-                break;
-            case LayoutModifierKind::DefaultMinSize:
-                if (inner.minWidth == 0 && item.minWidth >= 0) inner.minWidth = std::min(item.minWidth, inner.maxWidth);
-                if (inner.minHeight == 0 && item.minHeight >= 0) inner.minHeight = std::min(item.minHeight, inner.maxHeight);
-                break;
-            case LayoutModifierKind::VerticalScroll: scrolling = true; inner.maxHeight = InfiniteConstraint; break;
-            case LayoutModifierKind::HorizontalScroll: scrolling = true; inner.maxWidth = InfiniteConstraint; break;
+                case LayoutModifierKind::WidthIn:
+                case LayoutModifierKind::HeightIn:
+                case LayoutModifierKind::SizeIn:
+                    if (item.kind != LayoutModifierKind::HeightIn) {
+                        if (item.minWidth >= 0) inner.minWidth = clamp(item.minWidth, constraints.minWidth, constraints.maxWidth);
+                        if (item.maxWidth >= 0) inner.maxWidth = clamp(item.maxWidth, inner.minWidth, constraints.maxWidth);
+                    }
+                    if (item.kind != LayoutModifierKind::WidthIn) {
+                        if (item.minHeight >= 0) inner.minHeight = clamp(item.minHeight, constraints.minHeight, constraints.maxHeight);
+                        if (item.maxHeight >= 0) inner.maxHeight = clamp(item.maxHeight, inner.minHeight, constraints.maxHeight);
+                    }
+                    break;
+                case LayoutModifierKind::DefaultMinSize:
+                    if (inner.minWidth == 0 && item.minWidth >= 0) inner.minWidth = std::min(item.minWidth, inner.maxWidth);
+                    if (inner.minHeight == 0 && item.minHeight >= 0) inner.minHeight = std::min(item.minHeight, inner.maxHeight);
+                    break;
+                case LayoutModifierKind::VerticalScroll:
+                    scrolling = true;
+                    inner.maxHeight = InfiniteConstraint;
+                    break;
+                case LayoutModifierKind::HorizontalScroll:
+                    scrolling = true;
+                    inner.maxWidth = InfiniteConstraint;
+                    break;
             }
         }
         if (const auto* paint = std::get_if<PaintModifier>(&instance.descriptor.value); paint && paint->sizeToIntrinsics && paint->painter.content && paint->painter.content->intrinsicSize) {
@@ -209,100 +241,105 @@ namespace arrange::core {
         node.baseline = -1.0f;
         Size content;
 
-        std::visit([&](const auto& policy) {
-            using Policy = std::decay_t<decltype(policy)>;
-            if constexpr (std::is_same_v<Policy, MinSizeMeasurePolicy>) {
-                content = {constraints.minWidth, constraints.minHeight};
-                for (auto child : node.children) measure(tree, child, {0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
-            } else if constexpr (std::is_same_v<Policy, RowMeasurePolicy>) {
-                const auto spacing = policy.arrangement.spacing;
-                float width = 0.0f;
-                float height = 0.0f;
-                float totalWeight = 0.0f;
-                struct WeightedChild {
-                    NodeId id = 0;
-                    float weight = 0.0f;
-                    bool fill = true;
-                };
-                std::vector<WeightedChild> weighted;
-                for (auto childId : node.children) {
-                    const auto childModifier = tree.node(childId).modifier.parentData();
-                    if (childModifier.weight > 0.0f) {
-                        totalWeight += childModifier.weight;
-                        weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
-                        continue;
+        std::visit(
+            [&](const auto& policy) {
+                using Policy = std::decay_t<decltype(policy)>;
+                if constexpr (std::is_same_v<Policy, MinSizeMeasurePolicy>) {
+                    content = {constraints.minWidth, constraints.minHeight};
+                    for (auto child : node.children) measure(tree, child, {0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
+                } else if constexpr (std::is_same_v<Policy, RowMeasurePolicy>) {
+                    const auto spacing = policy.arrangement.spacing;
+                    float width = 0.0f;
+                    float height = 0.0f;
+                    float totalWeight = 0.0f;
+                    struct WeightedChild {
+                        NodeId id = 0;
+                        float weight = 0.0f;
+                        bool fill = true;
+                    };
+                    std::vector<WeightedChild> weighted;
+                    for (auto childId : node.children) {
+                        const auto childModifier = tree.node(childId).modifier.parentData();
+                        if (childModifier.weight > 0.0f) {
+                            totalWeight += childModifier.weight;
+                            weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
+                            continue;
+                        }
+                        const auto child = measure(tree, childId, {0.0f, InfiniteConstraint, constraints.minHeight, constraints.maxHeight});
+                        width += child.width;
+                        height = std::max(height, child.height);
                     }
-                    const auto child = measure(tree, childId, {0.0f, InfiniteConstraint, constraints.minHeight, constraints.maxHeight});
-                    width += child.width;
-                    height = std::max(height, child.height);
-                }
-                const auto gaps = node.children.empty() ? 0.0f : spacing * static_cast<float>(node.children.size() - 1);
-                const auto availableForWeight = std::max(0.0f, safeMax(constraints.maxWidth, 0.0f) - width - gaps);
-                for (const auto& child : weighted) {
-                    const auto childId = child.id;
-                    const auto share = totalWeight > 0.0f ? availableForWeight * (child.weight / totalWeight) : 0.0f;
-                    const auto measuredChild = measure(tree, childId, {child.fill ? share : 0.0f, share, constraints.minHeight, constraints.maxHeight});
-                    width += measuredChild.width;
-                    height = std::max(height, measuredChild.height);
-                }
-                width += gaps;
-                const auto defaultAlign = policy.verticalAlignment;
-                float maxBaseline = -1.0f, maxDescent = 0.0f;
-                for (auto childId : node.children) {
-                    const auto& child = tree.node(childId);
-                    const auto alignment = alignModifier(child);
-                    if (child.baseline >= 0 && (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline"))) {
-                        maxBaseline = std::max(maxBaseline, child.baseline);
-                        maxDescent = std::max(maxDescent, child.bounds.height - child.baseline);
+                    const auto gaps = node.children.empty() ? 0.0f : spacing * static_cast<float>(node.children.size() - 1);
+                    const auto availableForWeight = std::max(0.0f, safeMax(constraints.maxWidth, 0.0f) - width - gaps);
+                    for (const auto& child : weighted) {
+                        const auto childId = child.id;
+                        const auto share = totalWeight > 0.0f ? availableForWeight * (child.weight / totalWeight) : 0.0f;
+                        const auto measuredChild = measure(tree, childId, {child.fill ? share : 0.0f, share, constraints.minHeight, constraints.maxHeight});
+                        width += measuredChild.width;
+                        height = std::max(height, measuredChild.height);
                     }
-                }
-                if (maxBaseline >= 0) { height = std::max(height, maxBaseline + maxDescent); node.baseline = maxBaseline; }
-                content = {width, height};
-            } else if constexpr (std::is_same_v<Policy, ColumnMeasurePolicy>) {
-                const auto spacing = policy.arrangement.spacing;
-                float width = 0.0f;
-                float height = 0.0f;
-                float totalWeight = 0.0f;
-                struct WeightedChild {
-                    NodeId id = 0;
-                    float weight = 0.0f;
-                    bool fill = true;
-                };
-                std::vector<WeightedChild> weighted;
-                for (auto childId : node.children) {
-                    const auto childModifier = tree.node(childId).modifier.parentData();
-                    if (childModifier.weight > 0.0f) {
-                        totalWeight += childModifier.weight;
-                        weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
-                        continue;
+                    width += gaps;
+                    const auto defaultAlign = policy.verticalAlignment;
+                    float maxBaseline = -1.0f, maxDescent = 0.0f;
+                    for (auto childId : node.children) {
+                        const auto& child = tree.node(childId);
+                        const auto alignment = alignModifier(child);
+                        if (child.baseline >= 0 && (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline"))) {
+                            maxBaseline = std::max(maxBaseline, child.baseline);
+                            maxDescent = std::max(maxDescent, child.bounds.height - child.baseline);
+                        }
                     }
-                    const auto child = measure(tree, childId, {0.0f, constraints.maxWidth, 0.0f, InfiniteConstraint});
-                    width = std::max(width, child.width);
-                    height += child.height;
+                    if (maxBaseline >= 0) {
+                        height = std::max(height, maxBaseline + maxDescent);
+                        node.baseline = maxBaseline;
+                    }
+                    content = {width, height};
+                } else if constexpr (std::is_same_v<Policy, ColumnMeasurePolicy>) {
+                    const auto spacing = policy.arrangement.spacing;
+                    float width = 0.0f;
+                    float height = 0.0f;
+                    float totalWeight = 0.0f;
+                    struct WeightedChild {
+                        NodeId id = 0;
+                        float weight = 0.0f;
+                        bool fill = true;
+                    };
+                    std::vector<WeightedChild> weighted;
+                    for (auto childId : node.children) {
+                        const auto childModifier = tree.node(childId).modifier.parentData();
+                        if (childModifier.weight > 0.0f) {
+                            totalWeight += childModifier.weight;
+                            weighted.push_back({childId, childModifier.weight, childModifier.weightFill});
+                            continue;
+                        }
+                        const auto child = measure(tree, childId, {0.0f, constraints.maxWidth, 0.0f, InfiniteConstraint});
+                        width = std::max(width, child.width);
+                        height += child.height;
+                    }
+                    const auto gaps = node.children.empty() ? 0.0f : spacing * static_cast<float>(node.children.size() - 1);
+                    const auto availableForWeight = std::max(0.0f, safeMax(constraints.maxHeight, 0.0f) - height - gaps);
+                    for (const auto& child : weighted) {
+                        const auto childId = child.id;
+                        const auto share = totalWeight > 0.0f ? availableForWeight * (child.weight / totalWeight) : 0.0f;
+                        const auto measuredChild = measure(tree, childId, {0.0f, constraints.maxWidth, child.fill ? share : 0.0f, share});
+                        width = std::max(width, measuredChild.width);
+                        height += measuredChild.height;
+                    }
+                    height += gaps;
+                    if (!node.children.empty()) node.baseline = tree.node(node.children.front()).baseline;
+                    content = {width, height};
+                } else if constexpr (std::is_same_v<Policy, BoxMeasurePolicy>) {
+                    float width = 0.0f;
+                    float height = 0.0f;
+                    for (auto childId : node.children) {
+                        const auto child = measure(tree, childId, policy.propagateMinConstraints ? constraints : Constraints{0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
+                        width = std::max(width, child.width);
+                        height = std::max(height, child.height);
+                    }
+                    content = {width, height};
                 }
-                const auto gaps = node.children.empty() ? 0.0f : spacing * static_cast<float>(node.children.size() - 1);
-                const auto availableForWeight = std::max(0.0f, safeMax(constraints.maxHeight, 0.0f) - height - gaps);
-                for (const auto& child : weighted) {
-                    const auto childId = child.id;
-                    const auto share = totalWeight > 0.0f ? availableForWeight * (child.weight / totalWeight) : 0.0f;
-                    const auto measuredChild = measure(tree, childId, {0.0f, constraints.maxWidth, child.fill ? share : 0.0f, share});
-                    width = std::max(width, measuredChild.width);
-                    height += measuredChild.height;
-                }
-                height += gaps;
-                if (!node.children.empty()) node.baseline = tree.node(node.children.front()).baseline;
-                content = {width, height};
-            } else if constexpr (std::is_same_v<Policy, BoxMeasurePolicy>) {
-                float width = 0.0f;
-                float height = 0.0f;
-                for (auto childId : node.children) {
-                    const auto child = measure(tree, childId, policy.propagateMinConstraints ? constraints : Constraints{0.0f, constraints.maxWidth, 0.0f, constraints.maxHeight});
-                    width = std::max(width, child.width);
-                    height = std::max(height, child.height);
-                }
-                content = {width, height};
-            }
-        }, node.measurePolicy);
+            },
+            node.measurePolicy);
 
         node.bounds.width = clamp(content.width, constraints.minWidth, safeMax(constraints.maxWidth, content.width));
         node.bounds.height = clamp(content.height, constraints.minHeight, safeMax(constraints.maxHeight, content.height));
@@ -319,8 +356,7 @@ namespace arrange::core {
 
     void LayoutEngine::place(LayoutTree& tree, NodeId id, float x, float y) {
         auto& node = tree.node(id);
-        if (node.placementValid && node.bounds.x == x && node.bounds.y == y &&
-            !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Placement)))) {
+        if (node.placementValid && node.bounds.x == x && node.bounds.y == y && !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Placement)))) {
             ++counters_.placeCacheHits;
             return;
         }
@@ -328,7 +364,7 @@ namespace arrange::core {
         node.bounds.x = x;
         node.bounds.y = y;
         node.placementValid = true;
-        // Geometry is an input to both paint fragments and hit regions.
+        // 几何是绘制片段与命中区域的共同输入
         markDirty(node, DirtyFlag::Paint);
         markDirty(node, DirtyFlag::HitTest);
         placeWithModifier(tree, id, 0, x, y);
@@ -345,12 +381,24 @@ namespace arrange::core {
         auto& instance = node.modifier.elements()[index];
         instance.bounds = {x, y, instance.measured.width, instance.measured.height};
         auto offset = instance.childOffset;
-        if (const auto* input = std::get_if<OffsetModifier>(&instance.descriptor.value)) { offset.x += input->x; offset.y += input->y; }
-        if (const auto* input = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value)) {
-            if (input->kind == LayoutModifierKind::VerticalScroll) offset.y -= input->scrollValue;
-            if (input->kind == LayoutModifierKind::HorizontalScroll) offset.x -= input->scrollValue;
+        if (const auto* input = std::get_if<OffsetModifier>(&instance.descriptor.value)) {
+            offset.x += input->x;
+            offset.y += input->y;
+        }
+        if (const auto* input = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value); input && (input->kind == LayoutModifierKind::VerticalScroll || input->kind == LayoutModifierKind::HorizontalScroll)) {
+            const auto snapshot = ScrollDispatcher::snapshot(instance);
+            if (instance.scrollSnapshot != snapshot || input->scrollValue != snapshot.value) scrollUpdates_.push_back({snapshot, false, id, input->eventSlot, instance.handle});
+            instance.scrollSnapshot = snapshot;
+            if (input->kind == LayoutModifierKind::VerticalScroll)
+                offset.y -= snapshot.value;
+            else
+                offset.x -= snapshot.value;
         }
         placeWithModifier(tree, id, index + 1, x + offset.x, y + offset.y);
+    }
+
+    std::vector<ScrollResult> LayoutEngine::takeScrollUpdates() {
+        return std::exchange(scrollUpdates_, {});
     }
 
     void LayoutEngine::placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height) {
@@ -369,8 +417,7 @@ namespace arrange::core {
                 auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
                 const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
-                const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline
-                    : crossAxisOffset(height, child.bounds.height, alignment, false);
+                const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline : crossAxisOffset(height, child.bounds.height, alignment, false);
                 place(tree, childId, cursor, y + offset);
                 cursor += child.bounds.width + arrangement.spacing;
             }
@@ -405,4 +452,4 @@ namespace arrange::core {
         for (auto childId : node.children) place(tree, childId, x, y);
     }
 
-}
+}  // namespace arrange::core

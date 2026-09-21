@@ -22,12 +22,10 @@
 #include <string>
 
 namespace {
-    std::optional<arrange::core::EventSlotId> firstModifierEventSlot(
-        const arrange::core::LayoutTree& tree,
-        arrange::core::EventSlotKind kind) {
-        for (arrange::core::NodeId id = 1; id < 512; ++id) {
-            if (!tree.contains(id)) continue;
+    std::optional<arrange::core::EventSlotId> firstModifierEventSlot(const arrange::core::LayoutTree& tree, arrange::core::EventSlotKind kind) {
+        for (const auto id : tree.nodeIds()) {
             if (kind == arrange::core::EventSlotKind::Click && test_support::textOf(tree.node(id)) != "撅了啊 0 次") continue;
+
             for (const auto& instance : tree.node(id).modifier.elements()) {
                 arrange::core::EventSlotId slot;
                 if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
@@ -39,18 +37,14 @@ namespace {
     }
 
     bool treeContainsText(const arrange::core::LayoutTree& tree, const std::string& text) {
-        for (arrange::core::NodeId id = 1; id < 512; ++id) {
-            if (!tree.contains(id)) continue;
+        for (const auto id : tree.nodeIds()) {
             if (test_support::textOf(tree.node(id)) == text) return true;
         }
         return false;
     }
 
-    std::optional<arrange::core::NodeId> firstInputNodeWithEventSlot(
-        const arrange::core::LayoutTree& tree,
-        arrange::core::EventSlotKind kind) {
-        for (arrange::core::NodeId id = 1; id < 512; ++id) {
-            if (!tree.contains(id)) continue;
+    std::optional<arrange::core::NodeId> firstInputNodeWithEventSlot(const arrange::core::LayoutTree& tree, arrange::core::EventSlotKind kind) {
+        for (const auto id : tree.nodeIds()) {
             if (test_support::event(tree.node(id), kind).valid()) return id;
         }
         return std::nullopt;
@@ -77,25 +71,23 @@ namespace {
         const auto slot = test_support::event(inputNode, arrange::core::EventSlotKind::InputSubmit);
         return slot.valid() && slot.node == 42 && !test_support::event(inputNode, arrange::core::EventSlotKind::InputUpdate).valid();
     }
-} // namespace
+}  // namespace
 
 int main(int argc, char** argv) {
 #if !ARRANGE_WITH_QUICKJS_NG || !ARRANGE_JUCE_WITH_JUCE
     (void)argc;
     (void)argv;
-    std::cerr << "Arrange JUCE runtime smoke requires QuickJS and JUCE\n";
+    std::cerr << "Arrange JUCE 运行时烟雾测试需要 QuickJS 和 JUCE\n";
     return 2;
 #else
     ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
     if (!verifyScriptEventDispatcherRequiresTypedSlotContract()) {
-        std::cerr << "script event dispatcher generated a fake slot or failed to read a typed slot\n";
+        std::cerr << "脚本事件分发器生成了虚假事件槽，或未能读取类型化事件槽\n";
         return 18;
     }
 
-    const auto entry = argc > 1
-        ? std::filesystem::path(argv[1])
-        : std::filesystem::absolute("build/demo-ui-dist/app.js");
+    const auto entry = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::absolute("build/demo-ui-dist/app.js");
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
     host->setPainterLoader(arrange::juce::packagePainterLoader(entry.parent_path()));
@@ -120,21 +112,22 @@ int main(int argc, char** argv) {
     const arrange::core::Constraints constraints{0.0f, 520.0f, 0.0f, 380.0f};
     const auto firstFrame = runtime.pumpFrame(1, constraints, 0.0);
     if (!firstFrame.ok || !firstFrame.pipelineRan || !runtime.scene().contains(1)) {
-        std::cerr << "initial runtime frame failed: " << firstFrame.error << "\n";
+        std::cerr << "运行时初始帧失败：" << firstFrame.error << "\n";
         return 7;
     }
 
     const auto clickSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::Click);
     if (!clickSlot || !clickSlot->valid()) return 5;
     const auto scrollSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
-    if (!scrollSlot || !scrollSlot->valid()) return 6;
+    if (!scrollSlot || !scrollSlot->valid()) {
+        std::cerr << "实际布局节点中未找到 VerticalScroll 事件槽\n";
+        return 6;
+    }
 
     arrange::core::PointerInputProcessor pointer;
     for (int index = 0; index < 13; ++index) {
         const auto& snapshot = *runtime.publishedFrame().content.hitTest;
-        auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) {
-            return candidate.target.eventSlot == *clickSlot;
-        });
+        auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) { return candidate.target.eventSlot == *clickSlot; });
         if (region == snapshot.regions.end()) return 20;
         const arrange::core::Point point{region->bounds.x + region->bounds.width / 2, region->bounds.y + region->bounds.height / 2};
         pointer.pointerDown(snapshot, point);
@@ -143,7 +136,7 @@ int main(int argc, char** argv) {
         runtime.enqueueEvent(clicked.eventSlot);
         const auto frame = runtime.pumpFrame(1, constraints, 16.0 * static_cast<double>(index + 1));
         if (!frame.ok) {
-            std::cerr << "event frame failed at " << index << ": " << frame.error << "\n";
+            std::cerr << "事件帧失败，索引为 " << index << ": " << frame.error << "\n";
             return 8;
         }
     }
@@ -155,7 +148,7 @@ int main(int argc, char** argv) {
         if (!frame.ok || !frame.pipelineRan) return 23;
     }
     if (!treeContainsText(runtime.scene().tree(), "撅了啊 13 次")) {
-        std::cerr << "counter text did not reach 撅了啊 13 次\n";
+        std::cerr << "计数器文本未达到预期的“撅了啊 13 次”\n";
         return 9;
     }
 
@@ -170,7 +163,7 @@ int main(int argc, char** argv) {
     runtime.enqueueScrollSnapshotEvent(*scrollSlot, scroll);
     const auto scrollFrame = runtime.pumpFrame(1, constraints, 240.0);
     if (!scrollFrame.ok) {
-        std::cerr << "scroll snapshot frame failed: " << scrollFrame.error << "\n";
+        std::cerr << "滚动快照帧失败：" << scrollFrame.error << "\n";
         return 10;
     }
     if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
@@ -179,26 +172,24 @@ int main(int argc, char** argv) {
     }
 
     if (arrange::core::ScrollDispatcher::verticalScrollValue(runtime.scene().tree().node(scrollSlot->node)) != 17.0f) {
-        std::cerr << "scroll value did not sync through compiled modifier\n";
+        std::cerr << "滚动值未通过编译后的 Modifier 同步\n";
         return 11;
     }
 
     const auto inputNode = firstInputNodeWithEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::InputSubmit);
     if (!inputNode) {
-        std::cerr << "input submit node not found\n";
+        std::cerr << "未找到输入提交节点\n";
         return 12;
     }
-    const auto inputSubmitSlot = test_support::event(
-        runtime.scene().tree().node(*inputNode),
-        arrange::core::EventSlotKind::InputSubmit);
+    const auto inputSubmitSlot = test_support::event(runtime.scene().tree().node(*inputNode), arrange::core::EventSlotKind::InputSubmit);
     if (!inputSubmitSlot.valid()) {
-        std::cerr << "input submit slot not found on node\n";
+        std::cerr << "节点上未找到输入提交事件槽\n";
         return 13;
     }
     runtime.enqueueStringEvent(inputSubmitSlot, "Runtime Smoke");
     const auto inputFrame = runtime.pumpFrame(1, constraints, 272.0);
     if (!inputFrame.ok) {
-        std::cerr << "input submit frame failed: " << inputFrame.error << "\n";
+        std::cerr << "输入提交帧失败：" << inputFrame.error << "\n";
         return 14;
     }
     if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
@@ -207,15 +198,12 @@ int main(int argc, char** argv) {
     }
 
     if (!treeContainsText(runtime.scene().tree(), "提交啊一个：Runtime Smoke")) {
-        std::cerr << "input submit text did not sync through runtime event queue\n";
+        std::cerr << "输入提交文本未通过运行时事件队列同步\n";
         return 15;
     }
 
     arrange::juce::DiagnosticsScene diagnosticsScene;
-    const auto errorOps = diagnosticsScene.buildErrorScreen(
-        {0, 0, 320, 180},
-        arrange::makeErrorScreenModel(arrange::ErrorSource::ScriptRuntime, "diagnostics scene smoke", "details"),
-        true);
+    const auto errorOps = diagnosticsScene.buildErrorScreen({0, 0, 320, 180}, arrange::makeErrorScreenModel(arrange::ErrorSource::ScriptRuntime, "diagnostics scene smoke", "details"), true);
     if (errorOps.size() < 3 || errorOps.front().type != arrange::core::DrawOpType::FillRect) return 16;
     bool sawErrorText = false;
     for (const auto& op : errorOps) {
@@ -258,13 +246,9 @@ int main(int argc, char** argv) {
     if (DiagnosticsState.emit(std::move(toastDisabledEvent))) return 36;
     if (DiagnosticsState.recentEvents().back().code != "toast.disabled") return 37;
     if (DiagnosticsState.hasActiveToasts()) return 38;
-    DiagnosticsState.setError(arrange::makeErrorScreenModel(
-        arrange::ErrorSource::ScriptRuntime,
-        "prepared diagnostics frame smoke",
-        "details"));
+    DiagnosticsState.setError(arrange::makeErrorScreenModel(arrange::ErrorSource::ScriptRuntime, "prepared diagnostics frame smoke", "details"));
     if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 26;
-    if (DiagnosticsState.errorOpsSnapshot().empty() ||
-        DiagnosticsState.badgeOpsSnapshot().empty()) return 27;
+    if (DiagnosticsState.errorOpsSnapshot().empty() || DiagnosticsState.badgeOpsSnapshot().empty()) return 27;
     if (DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 28;
     DiagnosticsState.clearError();
     if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 29;
@@ -334,20 +318,20 @@ int main(int argc, char** argv) {
                     };
                     const auto bitmap = render(raster);
                     const auto svg = render(vector);
-                    for (int y = 0; y < 16; ++y) for (int x = 0; x < 16; ++x) {
-                        const auto a = bitmap.getPixelAt(x, y), b = svg.getPixelAt(x, y);
-                        // 位图插值与矢量覆盖率在半像素边界最多相差一级量化值
-                        if (std::abs(int(a.getAlpha()) - int(b.getAlpha())) <= 1 && std::abs(int(a.getRed()) - int(b.getRed())) <= 1 && std::abs(int(a.getGreen()) - int(b.getGreen())) <= 1 && std::abs(int(a.getBlue()) - int(b.getBlue())) <= 1) continue;
-                        std::cerr << "Painter 位图与矢量缩放不一致：" << scale << '/' << alignment << "，着色=" << tinted << "，像素=" << x << ',' << y << "，位图=" << bitmap.getPixelAt(x, y).toString() << "，矢量=" << svg.getPixelAt(x, y).toString() << '\n';
-                        return 39;
-                    }
+                    for (int y = 0; y < 16; ++y)
+                        for (int x = 0; x < 16; ++x) {
+                            const auto a = bitmap.getPixelAt(x, y), b = svg.getPixelAt(x, y);
+                            // 位图插值与矢量覆盖率在半像素边界最多相差一级量化值
+                            if (std::abs(int(a.getAlpha()) - int(b.getAlpha())) <= 1 && std::abs(int(a.getRed()) - int(b.getRed())) <= 1 && std::abs(int(a.getGreen()) - int(b.getGreen())) <= 1 && std::abs(int(a.getBlue()) - int(b.getBlue())) <= 1) continue;
+                            std::cerr << "Painter 位图与矢量缩放不一致：" << scale << '/' << alignment << "，着色=" << tinted << "，像素=" << x << ',' << y << "，位图=" << bitmap.getPixelAt(x, y).toString() << "，矢量=" << svg.getPixelAt(x, y).toString() << '\n';
+                            return 39;
+                        }
                 }
             }
         }
-
     }
 
-    std::cout << "ArrangeRuntime queued counter/scroll/input smoke passed\n";
+    std::cout << "ArrangeRuntime 计数、滚动与输入事件队列烟雾测试通过\n";
     return 0;
 #endif
 }

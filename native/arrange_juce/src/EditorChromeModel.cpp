@@ -14,10 +14,7 @@ namespace arrange::juce {
 #endif
     }
 
-    std::string EditorChromeModel::windowTitle(
-        std::string_view baseTitle,
-        const PackageRuntimeSource& package,
-        const DiagnosticsState& diagnostics) const {
+    std::string EditorChromeModel::windowTitle(std::string_view baseTitle, const PackageRuntimeSource& package, const DiagnosticsState& diagnostics) const {
 #if defined(NDEBUG)
         return std::string(baseTitle);
 #else
@@ -25,14 +22,11 @@ namespace arrange::juce {
         title += " [Debug ";
         if (!package.config().app.hasAnySource()) {
             title += "no app";
-        }
-        else if (diagnostics.hasError()) {
+        } else if (diagnostics.hasError()) {
             title += "error";
-        }
-        else if (package.activeSource() == PackageSource::Dist && package.lastLiveUnavailable()) {
+        } else if (package.activeSource() == PackageSource::Dist && package.lastLiveUnavailable()) {
             title += "dist fallback";
-        }
-        else {
+        } else {
             title += packageSourceLabel(package.activeSource());
         }
         title += "]";
@@ -40,9 +34,7 @@ namespace arrange::juce {
 #endif
     }
 
-    DiagnosticsBadgeModel EditorChromeModel::diagnosticsBadgeModel(
-        const PackageRuntimeSource& package,
-        const DiagnosticsState& diagnostics) const {
+    DiagnosticsBadgeModel EditorChromeModel::diagnosticsBadgeModel(const PackageRuntimeSource& package, const DiagnosticsState& diagnostics) const {
         DiagnosticsBadgeModel model;
         model.dot = ::juce::Colour(0xffef4444);
         model.text = std::string(buildModeLabel()) + " " + packageSourceLabel(package.activeSource());
@@ -51,9 +43,7 @@ namespace arrange::juce {
             model.dot = ::juce::Colour(0xff22c55e);
         }
         if (package.activeSource() == PackageSource::Dist) {
-            model.dot = package.lastLiveUnavailable()
-                            ? ::juce::Colour(0xfff59e0b)
-                            : ::juce::Colour(0xff3b82f6);
+            model.dot = package.lastLiveUnavailable() ? ::juce::Colour(0xfff59e0b) : ::juce::Colour(0xff3b82f6);
         }
         if (diagnostics.hasError()) {
             model.text = std::string(buildModeLabel()) + " error";
@@ -65,9 +55,7 @@ namespace arrange::juce {
         return model;
     }
 
-    DiagnosticsTextContext EditorChromeModel::diagnosticsTextContext(
-        const PackageRuntimeSource& package,
-        const DiagnosticsState& diagnostics) const {
+    DiagnosticsTextContext EditorChromeModel::diagnosticsTextContext(const PackageRuntimeSource& package, const DiagnosticsState& diagnostics) const {
         DiagnosticsTextContext context;
         context.activeSource = packageSourceLabel(package.activeSource());
         context.liveRuntimeEnabled = package.liveRuntimeEnabled();
@@ -78,6 +66,6 @@ namespace arrange::juce {
         context.error = diagnostics.error();
         return context;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

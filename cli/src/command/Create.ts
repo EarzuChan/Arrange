@@ -1,9 +1,9 @@
-import type {Command} from "commander"
-import {relative} from "node:path"
-import type {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
-import {createInitialProjectState} from "../project/CreateProject.ts"
-import type {ProjectStateStore} from "../project/ProjectStateStore.ts"
-import {runCreateWizard} from "../wizard/Create.ts"
+import type { Command } from "commander"
+import { relative } from "node:path"
+import type { FrameworkRegistryClient } from "../framework/FrameworkRegistryClient.ts"
+import { createInitialProjectState } from "../project/CreateProject.ts"
+import type { ProjectStateStore } from "../project/ProjectStateStore.ts"
+import { runCreateWizard } from "../wizard/Create.ts"
 
 export interface CreateCommandOptions {
     registry?: string
@@ -11,11 +11,7 @@ export interface CreateCommandOptions {
 }
 
 export function registerCreateCommand(program: Command, store: ProjectStateStore, registry: FrameworkRegistryClient): void {
-    program
-        .command("create")
-        .description("Create a new Arrange project")
-        .option("--registry <url>", "Framework npm registry URL")
-        .option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
+    program.command("create").description("Create a new Arrange project").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: CreateCommandOptions) => {
             const request = await runCreateWizard(registry, {
                 nodeRegistryUrl: options.registry,

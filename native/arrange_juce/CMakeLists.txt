@@ -22,7 +22,7 @@ target_sources(arrange_juce PRIVATE
   src/ArrangeEditor.cpp
   src/ArrangeRuntime.cpp
   src/EditorChromeModel.cpp
-  src/CompositionHost.cpp
+  src/RearrangeHost.cpp
   src/DiagnosticEvent.cpp
   src/DiagnosticsState.cpp
   src/DiagnosticsModel.cpp

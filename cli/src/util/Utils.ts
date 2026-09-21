@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
-import {createHash} from "node:crypto"
+import { createHash } from "node:crypto"
 
 // FILE
 export async function writeTextFile(filePath: string, content: string): Promise<void> {

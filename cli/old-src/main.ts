@@ -1,21 +1,21 @@
-﻿import {mkdirSync} from "node:fs"
-import {resolve} from "node:path"
-import {packageArtifacts, findNativeArtifact} from "./artifacts.ts"
-import type {ArrangeConfig, Flavor, Product} from "./config.ts"
-import {hasConfig, readProjectConfig} from "./config.ts"
-import {CLI_COMPATIBILITY, CLI_VERSION} from "./constants.ts"
-import {renderError} from "./errors.ts"
-import {assertCompatible, fetchFrameworkMetadata, readInstalledFrameworkMetadata} from "./framework.ts"
-import {adoptProject, createProject} from "./wizard.ts"
-import {cmakeBuildArgs, cmakeConfigureArgs, ensureProjectFiles} from "./project.ts"
-import {run} from "./process.ts"
-import {runVite, spawnNativeStandalone} from "./vite.ts"
-import {readArrangeRegistryFromNpmrc} from "./package-resolve.ts"
-import {ensureToolchain, type ResolvedToolchain} from "./local.ts"
+import { mkdirSync } from "node:fs"
+import { resolve } from "node:path"
+import { packageArtifacts, findNativeArtifact } from "./artifacts.ts"
+import type { ArrangeConfig, Flavor, Product } from "./config.ts"
+import { hasConfig, readProjectConfig } from "./config.ts"
+import { CLI_COMPATIBILITY, CLI_VERSION } from "./constants.ts"
+import { renderError } from "./errors.ts"
+import { assertCompatible, fetchFrameworkMetadata, readInstalledFrameworkMetadata } from "./framework.ts"
+import { adoptProject, createProject } from "./wizard.ts"
+import { cmakeBuildArgs, cmakeConfigureArgs, ensureProjectFiles } from "./project.ts"
+import { run } from "./process.ts"
+import { runVite, spawnNativeStandalone } from "./vite.ts"
+import { readArrangeRegistryFromNpmrc } from "./package-resolve.ts"
+import { ensureToolchain, type ResolvedToolchain } from "./local.ts"
 
-export type CliResult = {exitCode: number}
+export type CliResult = { exitCode: number }
 
-type Parsed = {command: string; flags: Map<string, string[]>; positionals: string[]}
+type Parsed = { command: string; flags: Map<string, string[]>; positionals: string[] }
 
 type ProjectContext = {
     root: string
@@ -28,39 +28,39 @@ export async function main(argv = process.argv.slice(2)): Promise<CliResult> {
         if (parsed.command === "--help" || parsed.command === "-h" || parsed.command === "help") return help()
         if (parsed.command === "--version" || parsed.command === "-v") {
             console.log(CLI_VERSION)
-            return {exitCode: 0}
+            return { exitCode: 0 }
         }
         switch (parsed.command || "help") {
             case "create":
                 assertFlags(parsed, ["registry"])
-                await createProject({registry: optionalFlag(parsed, "registry")})
-                return {exitCode: 0}
+                await createProject({ registry: optionalFlag(parsed, "registry") })
+                return { exitCode: 0 }
             case "adopt":
                 assertFlags(parsed, ["registry"])
-                await adoptProject({registry: optionalFlag(parsed, "registry")})
-                return {exitCode: 0}
+                await adoptProject({ registry: optionalFlag(parsed, "registry") })
+                return { exitCode: 0 }
             case "sync":
                 assertFlags(parsed, ["project-only", "toolchain-only", "ui", "native", "check"])
                 await sync(parsed)
-                return {exitCode: 0}
+                return { exitCode: 0 }
             case "dev":
                 assertFlags(parsed, ["ui-only", "native-only", "flavor"])
                 await dev(parsed)
-                return {exitCode: 0}
+                return { exitCode: 0 }
             case "build":
                 assertFlags(parsed, ["flavor", "ui-only", "native-only", "no-package", "product", "clean"])
                 await build(parsed)
-                return {exitCode: 0}
+                return { exitCode: 0 }
             case "package":
                 assertFlags(parsed, ["flavor", "product", "clean"])
                 await packageOnly(parsed)
-                return {exitCode: 0}
+                return { exitCode: 0 }
             default:
                 throw new Error(`Unknown command: ${parsed.command}\nRun arrange --help for usage.`)
         }
     } catch (error) {
         console.error(renderError(error))
-        return {exitCode: 1}
+        return { exitCode: 1 }
     }
 }
 
@@ -76,7 +76,7 @@ Usage:
   arrange package [--flavor debug|release] [--product standalone|vst3] [--clean]
   arrange --version
 `)
-    return {exitCode: 0}
+    return { exitCode: 0 }
 }
 
 export function parse(argv: string[]): Parsed {
@@ -97,7 +97,7 @@ export function parse(argv: string[]): Parsed {
         values.push(value)
         flags.set(name, values)
     }
-    return {command, flags, positionals}
+    return { command, flags, positionals }
 }
 
 function optionalFlag(parsed: Parsed, name: string): string | undefined {
@@ -140,35 +140,35 @@ function productsOf(parsed: Parsed, defaults: Product[]): Product[] {
 // CMD IMPLs
 
 async function sync(parsed: Parsed): Promise<void> {
-    const {root, config} = await loadAndCheckProject()
+    const { root, config } = await loadAndCheckProject()
     const projectOnly = parsed.flags.has("project-only")
     const toolchainOnly = parsed.flags.has("toolchain-only")
     const check = parsed.flags.has("check")
     if (projectOnly && toolchainOnly) throw new Error("--project-only and --toolchain-only are mutually exclusive.")
     const scope = scopeOf(parsed)
     if (!toolchainOnly) {
-        const changed = ensureProjectFiles(config, root, {scope, check})
+        const changed = ensureProjectFiles(config, root, { scope, check })
         reportProjectSync(changed, check)
     }
     if (!projectOnly && check) {
-        await ensureToolchain(config, root, {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"}, {interactive: false, write: false})
+        await ensureToolchain(config, root, { ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native" }, { interactive: false, write: false })
         console.log("Toolchain check passed.")
     }
     if (!projectOnly && !check) {
-        const toolchain = await ensureToolchain(config, root, {ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native"})
-        if (scope === "all" || scope === "ui") await run(toolchain.packageManagerCommand!, ["install"], {cwd: resolve(root, config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
+        const toolchain = await ensureToolchain(config, root, { ui: scope === "all" || scope === "ui", native: scope === "all" || scope === "native" })
+        if (scope === "all" || scope === "ui") await run(toolchain.packageManagerCommand!, ["install"], { cwd: resolve(root, config.ui.path), toolchain, label: `${config.ui.packageManager} install` })
         if (scope === "all" || scope === "native") await configureNative(config, root, "debug", toolchain)
     }
 }
 
 async function dev(parsed: Parsed): Promise<void> {
-    const {root, config} = await loadAndCheckProject()
+    const { root, config } = await loadAndCheckProject()
     const flavor = flavorOf(parsed, "debug")
     const uiOnly = parsed.flags.has("ui-only")
     const nativeOnly = parsed.flags.has("native-only")
     if (uiOnly && nativeOnly) throw new Error("--ui-only and --native-only are mutually exclusive.")
     if (!uiOnly && !hasProduct(config, "standalone")) throw new Error("arrange dev requires project.products to include standalone. Add standalone and run arrange sync, or use arrange dev --ui-only.")
-    const toolchain = await ensureToolchain(config, root, {ui: !nativeOnly, native: !uiOnly})
+    const toolchain = await ensureToolchain(config, root, { ui: !nativeOnly, native: !uiOnly })
     if (!uiOnly) await ensureDevStandalone(config, root, flavor, toolchain)
     if (nativeOnly) {
         await spawnNativeStandalone(config, root, flavor, toolchain)
@@ -190,25 +190,25 @@ async function build(parsed: Parsed): Promise<void> {
     const nativeOnly = parsed.flags.has("native-only")
     if (uiOnly && nativeOnly) throw new Error("--ui-only and --native-only are mutually exclusive.")
     if (parsed.flags.has("clean") && (uiOnly || nativeOnly || parsed.flags.has("no-package"))) throw new Error("--clean is only valid for a full build that also packages artifacts.")
-    const {root, config} = await loadAndCheckProject()
+    const { root, config } = await loadAndCheckProject()
     const products = productsOf(parsed, config.project.products)
-    const toolchain = await ensureToolchain(config, root, {ui: !nativeOnly, native: !uiOnly})
+    const toolchain = await ensureToolchain(config, root, { ui: !nativeOnly, native: !uiOnly })
     if (!nativeOnly) await runVite(config, root, "build", [], toolchain)
     if (!uiOnly) {
         await configureNative(config, root, flavor, toolchain)
         await buildNative(config, root, flavor, products, toolchain)
     }
     if (!uiOnly && !nativeOnly && !parsed.flags.has("no-package")) {
-        const written = packageArtifacts(config, root, {flavor, products, clean: parsed.flags.has("clean")})
+        const written = packageArtifacts(config, root, { flavor, products, clean: parsed.flags.has("clean") })
         reportArtifacts(written)
     }
 }
 
 async function packageOnly(parsed: Parsed): Promise<void> {
-    const {root, config} = await loadAndCheckProject()
+    const { root, config } = await loadAndCheckProject()
     const flavor = flavorOf(parsed, "release")
     const products = productsOf(parsed, config.project.products)
-    const written = packageArtifacts(config, root, {flavor, products, clean: parsed.flags.has("clean")})
+    const written = packageArtifacts(config, root, { flavor, products, clean: parsed.flags.has("clean") })
     reportArtifacts(written)
 }
 
@@ -221,7 +221,7 @@ async function loadAndCheckProject(): Promise<ProjectContext> {
     const metadata = readInstalledFrameworkMetadata(root, config.ui.path) ?? await fetchFrameworkMetadata(config.arrange.version, readArrangeRegistryFromNpmrc(uiRoot))
 
     assertCompatible(metadata)
-    return {root, config}
+    return { root, config }
 }
 
 export async function ensureDevStandalone(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
@@ -238,14 +238,14 @@ function hasProduct(config: ArrangeConfig, product: Product): boolean {
 
 async function configureNative(config: ArrangeConfig, root: string, flavor: Flavor, toolchain: ResolvedToolchain): Promise<void> {
     if (!toolchain.cmake) throw new Error("Native configure requires CMake, but the local toolchain does not provide it.")
-    mkdirSync(resolve(root, config.native.path, config.native.cmake.buildDir, flavor), {recursive: true})
-    await run(toolchain.cmake.command, cmakeConfigureArgs(config, root, flavor, toolchain.cmake), {cwd: root, toolchain, msvc: true, label: "cmake configure"})
+    mkdirSync(resolve(root, config.native.path, config.native.cmake.buildDir, flavor), { recursive: true })
+    await run(toolchain.cmake.command, cmakeConfigureArgs(config, root, flavor, toolchain.cmake), { cwd: root, toolchain, msvc: true, label: "cmake configure" })
 }
 
 async function buildNative(config: ArrangeConfig, root: string, flavor: Flavor, products: Product[], toolchain: ResolvedToolchain): Promise<void> {
     if (!toolchain.cmake) throw new Error("Native build requires CMake, but the local toolchain does not provide it.")
     const targets = products.map((product) => `${config.project.name}_${product === "standalone" ? "Standalone" : "VST3"}`)
-    for (const target of targets) await run(toolchain.cmake.command, [...cmakeBuildArgs(config, root, flavor, toolchain.cmake), "--target", target], {cwd: root, toolchain, msvc: true, label: `cmake build ${target}`})
+    for (const target of targets) await run(toolchain.cmake.command, [...cmakeBuildArgs(config, root, flavor, toolchain.cmake), "--target", target], { cwd: root, toolchain, msvc: true, label: `cmake build ${target}` })
 }
 
 function reportProjectSync(changed: string[], check: boolean): void {

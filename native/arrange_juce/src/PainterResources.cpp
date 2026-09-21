@@ -12,15 +12,20 @@ namespace arrange::juce {
             const auto text = value.trim();
             if (text.isEmpty() || text.endsWithChar('%')) return fallback;
             auto result = text.getFloatValue();
-            if (text.endsWithIgnoreCase("in")) result *= 96.0f;
-            else if (text.endsWithIgnoreCase("cm")) result *= 96.0f / 2.54f;
-            else if (text.endsWithIgnoreCase("mm")) result *= 96.0f / 25.4f;
-            else if (text.endsWithIgnoreCase("pt")) result *= 96.0f / 72.0f;
-            else if (text.endsWithIgnoreCase("pc")) result *= 16.0f;
+            if (text.endsWithIgnoreCase("in"))
+                result *= 96.0f;
+            else if (text.endsWithIgnoreCase("cm"))
+                result *= 96.0f / 2.54f;
+            else if (text.endsWithIgnoreCase("mm"))
+                result *= 96.0f / 25.4f;
+            else if (text.endsWithIgnoreCase("pt"))
+                result *= 96.0f / 72.0f;
+            else if (text.endsWithIgnoreCase("pc"))
+                result *= 16.0f;
             if (!std::isfinite(result) || result <= 0.0f) throw std::runtime_error("Painter SVG 视口尺寸必须是正有限数");
             return result;
         }
-    }
+    }  // namespace
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir) {
         return [packageDir = std::move(packageDir)](const std::string& resource) {
@@ -62,6 +67,6 @@ namespace arrange::juce {
             return future;
         };
     }
-}
+}  // namespace arrange::juce
 
 #endif

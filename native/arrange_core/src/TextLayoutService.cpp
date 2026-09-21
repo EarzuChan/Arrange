@@ -22,9 +22,11 @@ namespace arrange::core {
             }
             return line.width;
         }
-    } // namespace
+    }  // namespace
 
-    float ApproximateTextMeasurer::advance(std::string_view, char32_t codepoint, const TextStyle& style) const { return textCodepointAdvance(codepoint, style.fontSize > 0.0f ? style.fontSize : 14.0f); }
+    float ApproximateTextMeasurer::advance(std::string_view, char32_t codepoint, const TextStyle& style) const {
+        return textCodepointAdvance(codepoint, style.fontSize > 0.0f ? style.fontSize : 14.0f);
+    }
 
     TextLayoutService::TextLayoutService(const TextMeasurer& measurer, std::size_t maxEntries, std::size_t maxBytes) : measurer_(measurer), maxEntries_(maxEntries), maxBytes_(maxBytes) {}
 
@@ -53,7 +55,9 @@ namespace arrange::core {
         line.end = 0;
         line.y = 0.0f;
 
-        auto settleLineWidth = [&](TextLineLayout& target) { target.width = target.end > target.start ? lineWidth(source.substr(target.start, target.end - target.start), style) : 0.0f; };
+        auto settleLineWidth = [&](TextLineLayout& target) {
+            target.width = target.end > target.start ? lineWidth(source.substr(target.start, target.end - target.start), style) : 0.0f;
+        };
 
         auto finishLine = [&](std::size_t nextStart) {
             settleLineWidth(line);
@@ -65,7 +69,9 @@ namespace arrange::core {
             line.y = static_cast<float>(result.lines.size()) * result.lineHeight;
         };
 
-        auto visibleLineLimitReached = [&] { return options.maxLines > 0 && static_cast<int>(result.lines.size()) >= options.maxLines; };
+        auto visibleLineLimitReached = [&] {
+            return options.maxLines > 0 && static_cast<int>(result.lines.size()) >= options.maxLines;
+        };
 
         for (std::size_t byteIndex = 0; byteIndex < source.size();) {
             const auto runStart = byteIndex;
@@ -95,7 +101,9 @@ namespace arrange::core {
             result.width = std::max(result.width, line.width);
             result.lines.push_back(std::move(line));
         }
-        if (result.lines.empty()) { result.lines.push_back({}); }
+        if (result.lines.empty()) {
+            result.lines.push_back({});
+        }
 
         result.height = result.lineHeight * static_cast<float>(result.lines.size());
         result.baseline = result.lineHeight * 0.8f;
@@ -105,7 +113,9 @@ namespace arrange::core {
 
     std::size_t TextLayoutService::KeyHash::operator()(const Key& key) const noexcept {
         auto hash = std::hash<std::string>{}(key.text);
-        const auto mix = [&](std::size_t value) { hash ^= value + 0x9e3779b9u + (hash << 6) + (hash >> 2); };
+        const auto mix = [&](std::size_t value) {
+            hash ^= value + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+        };
         mix(std::hash<float>{}(key.style.fontSize));
         mix(std::hash<float>{}(key.style.lineHeight));
         mix(std::hash<float>{}(key.options.maxWidth));
@@ -202,7 +212,9 @@ namespace arrange::core {
         while (lineIndex + 1 < layout.lines.size() && point.y >= layout.lines[lineIndex + 1].y) ++lineIndex;
         const auto& line = layout.lines[lineIndex];
         const auto localX = std::max(0.0f, point.x);
-        for (const auto& run : line.runs) { if (localX < run.x + run.width * 0.5f) return run.start; }
+        for (const auto& run : line.runs) {
+            if (localX < run.x + run.width * 0.5f) return run.start;
+        }
         return line.end;
     }
 
@@ -236,7 +248,9 @@ namespace arrange::core {
     const TextLineLayout& TextLayoutService::lineForByteIndex(const TextLayout& layout, std::size_t index) const {
         const auto clamped = std::min(index, layout.text.size());
         // 自动换行的公共字节位置归下一行；显式换行前的位置仍归上一行
-        for (auto line = layout.lines.rbegin(); line != layout.lines.rend(); ++line) { if (clamped >= line->start) return *line; }
+        for (auto line = layout.lines.rbegin(); line != layout.lines.rend(); ++line) {
+            if (clamped >= line->start) return *line;
+        }
         return layout.lines.front();
     }
 
@@ -245,4 +259,4 @@ namespace arrange::core {
         static const TextLayoutService service(measurer, 0, 0);
         return service;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

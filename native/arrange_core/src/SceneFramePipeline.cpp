@@ -7,11 +7,7 @@
 namespace arrange::core {
     SceneFramePipeline::SceneFramePipeline(LayoutEngine layoutEngine) : layout_(std::move(layoutEngine)), drawOpsBuilder_(layout_.textLayoutService()) {}
 
-    FramePlan SceneFramePipeline::planFrame(
-        const NativeScene& scene,
-        NodeId root,
-        bool hasTransaction,
-        bool framePipelineRequested) const {
+    FramePlan SceneFramePipeline::planFrame(const NativeScene& scene, NodeId root, bool hasTransaction, bool framePipelineRequested) const {
         FramePlan plan;
         plan.applyMutations = hasTransaction;
 
@@ -30,19 +26,11 @@ namespace arrange::core {
             return plan;
         }
 
-        plan.measure =
-            invalidation.affects(DirtyFlag::Structure) ||
-            invalidation.affects(DirtyFlag::Layout);
+        plan.measure = invalidation.affects(DirtyFlag::Structure) || invalidation.affects(DirtyFlag::Layout);
         plan.measure = plan.measure || plan.fullFallback;
         plan.layout = plan.measure || invalidation.affects(DirtyFlag::Placement);
-        plan.buildPaint = plan.layout ||
-            invalidation.affects(DirtyFlag::Paint) ||
-            invalidation.affects(DirtyFlag::Transform) ||
-            invalidation.affects(DirtyFlag::Resource) ||
-            plan.fullFallback;
-        plan.buildHitTest = plan.layout ||
-            invalidation.affects(DirtyFlag::HitTest) ||
-            invalidation.affects(DirtyFlag::Transform);
+        plan.buildPaint = plan.layout || invalidation.affects(DirtyFlag::Paint) || invalidation.affects(DirtyFlag::Transform) || invalidation.affects(DirtyFlag::Resource) || plan.fullFallback;
+        plan.buildHitTest = plan.layout || invalidation.affects(DirtyFlag::HitTest) || invalidation.affects(DirtyFlag::Transform);
         plan.buildDiagnostics = invalidation.affects(DirtyFlag::Accessibility);
         plan.publishFrame = plan.measure || plan.layout || plan.buildPaint || plan.buildHitTest || plan.buildDiagnostics || invalidation.affects(DirtyFlag::EventSlot) || invalidation.affects(DirtyFlag::Focus) || plan.fullFallback;
         plan.passivePaint = plan.buildPaint || plan.fullFallback;
@@ -59,15 +47,9 @@ namespace arrange::core {
         return plan;
     }
 
-    SceneFramePipelineResult SceneFramePipeline::run(
-        NativeScene& scene,
-        NodeId root,
-        Constraints constraints,
-        const MutationTransaction* transaction,
-        bool framePipelineRequested,
-        PublishedFrame& publishedFrame,
-        const FrameFinalizer& finalize, double timeMillis) {
+    SceneFramePipelineResult SceneFramePipeline::run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize, double timeMillis) {
         SceneFramePipelineResult result;
+        (void)layout_.takeScrollUpdates();
         result.ran = true;
         // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame
         auto candidateScene = scene;
@@ -81,8 +63,7 @@ namespace arrange::core {
             recordPhase(result.phases, FramePhase::ApplyMutations, transaction != nullptr, transaction ? "applied structural and typed input submission" : "no submission");
             auto& tree = candidateScene.tree();
             tree.advanceAnimations(timeMillis);
-            if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints)
-                tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::Resize, "constraints", "root constraints changed");
+            if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::Resize, "constraints", "root constraints changed");
             result.plan = planFrame(candidateScene, root, transaction != nullptr, framePipelineRequested);
             candidateFrame.dirty = candidateScene.dirtySnapshot();
             result.invalidation = candidateScene.takeInvalidation();
@@ -92,8 +73,7 @@ namespace arrange::core {
                 candidateFrame.content.overlayDrawOps.clear();
                 candidateFrame.content.focusedInputNode.reset();
                 candidateFrame.content.focusedInputModifier = {};
-            }
-            else {
+            } else {
                 if (result.plan.measure) {
                     const auto started = std::chrono::steady_clock::now();
                     layout_.resetCounters();
@@ -134,8 +114,8 @@ namespace arrange::core {
                 ++counters_.hitBuilds;
                 counters_.hitBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
                 recordPhase(result.phases, FramePhase::BuildHitTest, true, "built immutable hit regions and constraints");
-            }
-            else recordPhase(result.phases, FramePhase::BuildHitTest, false, "retained hit snapshot");
+            } else
+                recordPhase(result.phases, FramePhase::BuildHitTest, false, "retained hit snapshot");
             if (finalize) finalize(candidateScene, candidateFrame);
             candidateFrame.plan = result.plan;
             finishCandidate(publishedFrame, candidateFrame);
@@ -150,8 +130,8 @@ namespace arrange::core {
             candidateScene.clearDirty();
             scene = std::move(candidateScene);
             publishedFrame = std::move(candidateFrame);
-        }
-        catch (const std::exception& exception) {
+            result.scrollUpdates = layout_.takeScrollUpdates();
+        } catch (const std::exception& exception) {
             ++counters_.failedSubmissions;
             result.error = exception.what();
             // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何
@@ -162,11 +142,8 @@ namespace arrange::core {
     void SceneFramePipeline::finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate) {
         const auto& before = previous.content;
         const auto& after = candidate.content;
-        candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps ||
-            before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
-        candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps ||
-            before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps ||
-            before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
+        candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps || before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
+        candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
         // Transformed overlays require the same full viewport repaint as transformed scene ops.
         // Local untransformed rectangles cannot safely bound them.
         if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
@@ -196,6 +173,4 @@ namespace arrange::core {
     void SceneFramePipeline::recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason) {
         phases.push_back({phase, ran, std::move(reason)});
     }
-} // namespace arrange::core
-
-
+}  // namespace arrange::core

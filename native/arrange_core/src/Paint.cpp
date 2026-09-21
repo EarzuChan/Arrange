@@ -22,15 +22,21 @@ namespace arrange::core {
             return {};
         }
 
+        float numericProp(const LayoutNode& node, const char* key, float fallback) {
+            return numberProp(node, key, fallback);
+        }
 
+        std::string textProp(const LayoutNode& node, const char* key, const char* fallback = "") {
+            return stringProp(node, key, fallback);
+        }
 
-        float numericProp(const LayoutNode& node, const char* key, float fallback) { return numberProp(node, key, fallback); }
+        std::string textProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
+            return stringProp(node, camelCase, kebabCase, fallback);
+        }
 
-        std::string textProp(const LayoutNode& node, const char* key, const char* fallback = "") { return stringProp(node, key, fallback); }
-
-        std::string textProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) { return stringProp(node, camelCase, kebabCase, fallback); }
-
-        bool hasProp(const LayoutNode& node, const char* key) { return node.props.find(key) != node.props.end(); }
+        bool hasProp(const LayoutNode& node, const char* key) {
+            return node.props.find(key) != node.props.end();
+        }
 
         bool hasColorUnspecified(const LayoutNode& node, const char* key) {
             const auto* value = propValue(node, key);
@@ -57,16 +63,13 @@ namespace arrange::core {
             return DrawShapeType::Rectangle;
         }
 
-
-
-
         std::uint32_t withAlpha(std::uint32_t color, float alpha) {
             const auto clamped = std::clamp(alpha, 0.0f, 1.0f);
             const auto sourceAlpha = static_cast<float>((color >> 24u) & 0xffu);
             const auto nextAlpha = static_cast<std::uint32_t>(std::clamp(sourceAlpha * clamped, 0.0f, 255.0f) + 0.5f);
             return (color & 0x00ffffffu) | (nextAlpha << 24u);
         }
-    } // namespace
+    }  // namespace
 
     void DrawOpsBuilder::prepareText(DrawOp& op, const TextLayoutService& service) {
         if (op.type != DrawOpType::DrawText) return;
@@ -85,7 +88,10 @@ namespace arrange::core {
             if (op.type == DrawOpType::PopClip || op.type == DrawOpType::PopTransform) return;
             op.rect.x += offset.x;
             op.rect.y += offset.y;
-            if (op.type == DrawOpType::DrawLine) { op.lineEnd.x += offset.x; op.lineEnd.y += offset.y; }
+            if (op.type == DrawOpType::DrawLine) {
+                op.lineEnd.x += offset.x;
+                op.lineEnd.y += offset.y;
+            }
         }
 
         PaintBounds translated(PaintBounds bounds, Point offset) {
@@ -97,7 +103,11 @@ namespace arrange::core {
         void includeBounds(PaintBounds& target, PaintBounds source) {
             target.known = target.known && source.known;
             if (source.empty) return;
-            if (target.empty) { target.rect = source.rect; target.empty = false; return; }
+            if (target.empty) {
+                target.rect = source.rect;
+                target.empty = false;
+                return;
+            }
             const auto right = std::max(target.rect.x + target.rect.width, source.rect.x + source.rect.width);
             const auto bottom = std::max(target.rect.y + target.rect.height, source.rect.y + source.rect.height);
             target.rect.x = std::min(target.rect.x, source.rect.x);
@@ -112,14 +122,15 @@ namespace arrange::core {
             const auto py = op.rect.y + op.rect.height * op.transformOriginY;
             const auto radians = op.rotationZ * 3.14159265358979323846 / 180.0;
             PaintBounds result;
-            for (const auto x : {bounds.rect.x, bounds.rect.x + bounds.rect.width}) for (const auto y : {bounds.rect.y, bounds.rect.y + bounds.rect.height}) {
-                const auto sx = (x - px) * op.scaleX;
-                const auto sy = (y - py) * op.scaleY;
-                const auto tx = px + op.translationX + sx * std::cos(radians) - sy * std::sin(radians);
-                const auto ty = py + op.translationY + sx * std::sin(radians) + sy * std::cos(radians);
-                if (!std::isfinite(tx) || !std::isfinite(ty)) return {{}, false, false};
-                includeBounds(result, {{static_cast<float>(tx), static_cast<float>(ty), 0, 0}, true, false});
-            }
+            for (const auto x : {bounds.rect.x, bounds.rect.x + bounds.rect.width})
+                for (const auto y : {bounds.rect.y, bounds.rect.y + bounds.rect.height}) {
+                    const auto sx = (x - px) * op.scaleX;
+                    const auto sy = (y - py) * op.scaleY;
+                    const auto tx = px + op.translationX + sx * std::cos(radians) - sy * std::sin(radians);
+                    const auto ty = py + op.translationY + sx * std::sin(radians) + sy * std::cos(radians);
+                    if (!std::isfinite(tx) || !std::isfinite(ty)) return {{}, false, false};
+                    includeBounds(result, {{static_cast<float>(tx), static_cast<float>(ty), 0, 0}, true, false});
+                }
             return result;
         }
 
@@ -129,16 +140,18 @@ namespace arrange::core {
                 return previous;
             }
             for (const auto& child : next.children) includeBounds(next.bounds, translated(child.fragment->bounds, child.offset));
-            if (next.content) for (const auto& op : *next.content) includeBounds(next.bounds, drawOpBounds(op));
+            if (next.content)
+                for (const auto& op : *next.content) includeBounds(next.bounds, drawOpBounds(op));
             if (next.layer) {
-                for (auto it = next.layer->before.rbegin(); it != next.layer->before.rend(); ++it) if (it->type == DrawOpType::PushTransform) next.bounds = transformBounds(next.bounds, *it);
+                for (auto it = next.layer->before.rbegin(); it != next.layer->before.rend(); ++it)
+                    if (it->type == DrawOpType::PushTransform) next.bounds = transformBounds(next.bounds, *it);
                 for (const auto& op : next.layer->before) includeBounds(next.bounds, drawOpBounds(op));
                 for (const auto& op : next.layer->after) includeBounds(next.bounds, drawOpBounds(op));
             }
             ++counters.fragmentsBuilt;
             return std::make_shared<const PaintFragment>(std::move(next));
         }
-    }
+    }  // namespace
 
     PaintBounds drawOpBounds(const DrawOp& op) {
         if (op.type == DrawOpType::PushClip || op.type == DrawOpType::PopClip || op.type == DrawOpType::PushTransform || op.type == DrawOpType::PopTransform) return {};
@@ -150,8 +163,10 @@ namespace arrange::core {
             float minShift = 0, maxShift = 0;
             for (const auto& line : op.textLayout->lines) {
                 float shift = 0;
-                if (op.textAlign == "center" || op.textAlign == "Center") shift = (op.rect.width - line.width) * 0.5f;
-                else if (op.textAlign == "right" || op.textAlign == "end" || op.textAlign == "End") shift = op.rect.width - line.width;
+                if (op.textAlign == "center" || op.textAlign == "Center")
+                    shift = (op.rect.width - line.width) * 0.5f;
+                else if (op.textAlign == "right" || op.textAlign == "end" || op.textAlign == "End")
+                    shift = op.rect.width - line.width;
                 minShift = std::min(minShift, shift);
                 maxShift = std::max(maxShift, shift);
             }
@@ -173,7 +188,10 @@ namespace arrange::core {
     std::shared_ptr<const PaintFragment> DrawOpsBuilder::buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const {
         auto& node = tree.node(id);
         constexpr auto paintMask = dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Placement) | dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::Transform) | dirtyMask(DirtyFlag::Resource);
-        if (node.paintCache && !(node.dirty & paintMask)) { ++counters.subtreeCacheHits; return node.paintCache; }
+        if (node.paintCache && !((node.dirty | node.subtreeDirty) & paintMask)) {
+            ++counters.subtreeCacheHits;
+            return node.paintCache;
+        }
         PaintFragment content;
         for (auto childId : childrenInPaintOrder(tree, node)) {
             const auto& child = tree.node(childId);
@@ -194,7 +212,13 @@ namespace arrange::core {
                 next->bounds = localBounds;
                 std::vector<DrawOp> ops;
                 std::size_t split = 0;
-                collectModifier(tree, id, index, ops, 1, [&](float alpha) { split = ops.size(); next->contentAlpha = alpha; }, false, index + 1);
+                collectModifier(
+                    tree, id, index, ops, 1,
+                    [&](float alpha) {
+                        split = ops.size();
+                        next->contentAlpha = alpha;
+                    },
+                    false, index + 1);
                 for (auto& op : ops) translateOp(op, {-instance.bounds.x, -instance.bounds.y});
                 next->before.assign(ops.begin(), ops.begin() + static_cast<std::ptrdiff_t>(split));
                 next->after.assign(ops.begin() + static_cast<std::ptrdiff_t>(split), ops.end());
@@ -218,8 +242,10 @@ namespace arrange::core {
             }
             origin = {instance.bounds.x, instance.bounds.y};
         }
-        if (node.paintCache != current) ++counters.nodesBuilt;
-        else ++counters.subtreeCacheHits;
+        if (node.paintCache != current)
+            ++counters.nodesBuilt;
+        else
+            ++counters.subtreeCacheHits;
         node.paintCache = current;
         return current;
     }
@@ -238,7 +264,11 @@ namespace arrange::core {
             origin.y += placed.offset.y;
             const auto& part = *placed.fragment;
             const auto copyOps = [&](const std::vector<DrawOp>& ops, float opacity) {
-                for (auto op : ops) { translateOp(op, origin); op.color = withAlpha(op.color, opacity); result.push_back(std::move(op)); }
+                for (auto op : ops) {
+                    translateOp(op, origin);
+                    op.color = withAlpha(op.color, opacity);
+                    result.push_back(std::move(op));
+                }
             };
             if (part.layer) copyOps(part.layer->before, alpha);
             const auto contentAlpha = alpha * (part.layer ? part.layer->contentAlpha : 1.0f);
@@ -256,7 +286,10 @@ namespace arrange::core {
         if (path.empty()) return ops;
         std::function<void(std::size_t, float)> wrap = [&](std::size_t index, float alpha) {
             if (index == path.size()) {
-                for (auto op : content) { op.color = withAlpha(op.color, alpha); ops.push_back(std::move(op)); }
+                for (auto op : content) {
+                    op.color = withAlpha(op.color, alpha);
+                    ops.push_back(std::move(op));
+                }
                 return;
             }
             auto stopAt = static_cast<std::size_t>(-1);
@@ -273,12 +306,20 @@ namespace arrange::core {
     }
 
     void DrawOpsBuilder::collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride, bool geometryOnly, std::size_t stopAt) const {
-        if (index == stopAt) { contentOverride(alpha); return; }
+        if (index == stopAt) {
+            contentOverride(alpha);
+            return;
+        }
         const auto& chain = tree.node(id).modifier.elements();
-        if (index == chain.size()) { contentOverride(alpha); return; }
+        if (index == chain.size()) {
+            contentOverride(alpha);
+            return;
+        }
         const auto& instance = chain[index];
         const auto& value = instance.descriptor.value;
-        const auto content = [&] { collectModifier(tree, id, index + 1, ops, alpha, contentOverride, geometryOnly, stopAt); };
+        const auto content = [&] {
+            collectModifier(tree, id, index + 1, ops, alpha, contentOverride, geometryOnly, stopAt);
+        };
         const auto pushClip = [&](const PaintStyleSemantics& shape) {
             DrawOp op;
             op.type = DrawOpType::PushClip;
@@ -288,10 +329,22 @@ namespace arrange::core {
             op.cornerRadius = shape.cornerRadius;
             ops.push_back(op);
         };
-        const auto pop = [&](DrawOpType type) { DrawOp op; op.type = type; op.nodeId = id; ops.push_back(op); };
+        const auto pop = [&](DrawOpType type) {
+            DrawOp op;
+            op.type = type;
+            op.nodeId = id;
+            ops.push_back(op);
+        };
         if (const auto* style = std::get_if<PaintStyleSemantics>(&value)) {
-            if (style->kind == PaintStyleKind::Alpha) { alpha *= style->alpha; content(); return; }
-            if (geometryOnly) { content(); return; }
+            if (style->kind == PaintStyleKind::Alpha) {
+                alpha *= style->alpha;
+                content();
+                return;
+            }
+            if (geometryOnly) {
+                content();
+                return;
+            }
             const auto overlay = style->kind == PaintStyleKind::Border;
             if (overlay) content();
             if (style->color != 0) {
@@ -309,7 +362,10 @@ namespace arrange::core {
             return;
         }
         if (const auto* animation = std::get_if<AnimateContentSizeModifier>(&value); animation && animation->clip) {
-            pushClip({}); content(); pop(DrawOpType::PopClip); return;
+            pushClip({});
+            content();
+            pop(DrawOpType::PopClip);
+            return;
         }
         if (const auto* clip = std::get_if<ClipModifier>(&value)) {
             pushClip(clip->shape);
@@ -416,42 +472,26 @@ namespace arrange::core {
         return result;
     }
 
-    std::vector<Rect> TextInputOverlayBuilder::textBoundsForByteRange(
-        const Layout& layout,
-        const std::string& text,
-        std::size_t start,
-        std::size_t end,
-        const TextLayoutService& textLayoutService) {
+    std::vector<Rect> TextInputOverlayBuilder::textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService) {
         std::vector<Rect> bounds;
         start = std::min(start, text.size());
         end = std::min(end, text.size());
         if (end < start) std::swap(start, end);
 
         if (start == end) {
-            const auto rect = textLayoutService.caretRect(
-                *layout.text,
-                start,
-                {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop});
+            const auto rect = textLayoutService.caretRect(*layout.text, start, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop});
             bounds.push_back({rect.x, rect.y, 1.0f, rect.height});
             return bounds;
         }
 
-        for (auto rect : textLayoutService.boundsForRange(
-                 *layout.text,
-                 start,
-                 end,
-                 {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop})) {
+        for (auto rect : textLayoutService.boundsForRange(*layout.text, start, end, {layout.metrics.textLeft - layout.metrics.viewportX, layout.metrics.textTop})) {
             rect.width = std::max(1.0f, rect.width);
             bounds.push_back(rect);
         }
         return bounds;
     }
 
-    std::vector<DrawOp> TextInputOverlayBuilder::build(
-        NodeId node,
-        const ModifierInstance& instance,
-        const TextInputOverlayState& state,
-        const TextLayoutService& textLayoutService) const {
+    std::vector<DrawOp> TextInputOverlayBuilder::build(NodeId node, const ModifierInstance& instance, const TextInputOverlayState& state, const TextLayoutService& textLayoutService) const {
         std::vector<DrawOp> ops;
         const auto inputLayout = layout(instance, state.text, state.viewportX, textLayoutService);
         const auto& overlayMetrics = inputLayout.metrics;
@@ -523,4 +563,4 @@ namespace arrange::core {
         ops.push_back(std::move(popClip));
         return ops;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

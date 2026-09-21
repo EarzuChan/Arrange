@@ -7,8 +7,10 @@
 
 namespace arrange::juce {
     namespace {
-        bool isUtf8Continuation(unsigned char ch) { return (ch & 0xc0u) == 0x80u; }
-    } // namespace
+        bool isUtf8Continuation(unsigned char ch) {
+            return (ch & 0xc0u) == 0x80u;
+        }
+    }  // namespace
 
     std::size_t nextUtf8Boundary(const std::string& text, std::size_t cursor) {
         if (cursor >= text.size()) return text.size();
@@ -20,18 +22,24 @@ namespace arrange::juce {
     std::size_t byteIndexForCharIndex(const std::string& text, int charIndex) {
         if (charIndex <= 0) return 0;
         std::size_t byteIndex = 0;
-        for (int index = 0; index < charIndex && byteIndex < text.size(); ++index) { byteIndex = nextUtf8Boundary(text, byteIndex); }
+        for (int index = 0; index < charIndex && byteIndex < text.size(); ++index) {
+            byteIndex = nextUtf8Boundary(text, byteIndex);
+        }
         return byteIndex;
     }
 
     int charIndexForByteIndex(const std::string& text, std::size_t byteIndex) {
         const auto target = std::min(byteIndex, text.size());
         int charIndex = 0;
-        for (std::size_t pos = 0; pos < target; pos = nextUtf8Boundary(text, pos)) { ++charIndex; }
+        for (std::size_t pos = 0; pos < target; pos = nextUtf8Boundary(text, pos)) {
+            ++charIndex;
+        }
         return charIndex;
     }
 
-    int totalUtf8Chars(const std::string& text) { return charIndexForByteIndex(text, text.size()); }
+    int totalUtf8Chars(const std::string& text) {
+        return charIndexForByteIndex(text, text.size());
+    }
 
     std::size_t JuceTextResource::estimatedBytes() const noexcept {
         auto bytes = sizeof(JuceTextResource) + runs.capacity() * sizeof(Run);
@@ -44,8 +52,10 @@ namespace arrange::juce {
         for (const auto& run : runs) {
             const auto width = layout.lines[run.line].width;
             auto x = area.x - viewportX;
-            if (alignment == "center" || alignment == "Center") x += (area.width - width) * 0.5f;
-            else if (alignment == "right" || alignment == "end" || alignment == "End") x += area.width - width;
+            if (alignment == "center" || alignment == "Center")
+                x += (area.width - width) * 0.5f;
+            else if (alignment == "right" || alignment == "end" || alignment == "End")
+                x += area.width - width;
             context.setFont(run.font);
             context.drawGlyphs({run.glyphs.data(), run.glyphs.size()}, {run.positions.data(), run.positions.size()}, ::juce::AffineTransform::translation(x, area.y));
         }
@@ -73,7 +83,9 @@ namespace arrange::juce {
             offset = nextUtf8Boundary(utf8, offset);
             byteOffsets.push_back(offset);
         }
-        const auto byteAt = [&](::juce::int64 index) { return byteOffsets[static_cast<std::size_t>(std::clamp<::juce::int64>(index, 0, static_cast<::juce::int64>(byteOffsets.size() - 1)))]; };
+        const auto byteAt = [&](::juce::int64 index) {
+            return byteOffsets[static_cast<std::size_t>(std::clamp<::juce::int64>(index, 0, static_cast<::juce::int64>(byteOffsets.size() - 1)))];
+        };
         ::juce::Rectangle<float> ink;
         bool hasInk = false;
         shaped.accessTogetherWith([&](auto glyphs, const auto& positions, ::juce::Font resolvedFont, auto glyphRange, auto metrics) {
@@ -99,8 +111,12 @@ namespace arrange::juce {
                     run.positions.push_back(positions[i]);
                     if (typeface) {
                         const auto bounds = typeface->getGlyphBounds(resolvedFont.getMetricsKind(), static_cast<int>(glyph.glyphId)).transformedBy(::juce::AffineTransform::scale(resolvedFont.getHeight() * resolvedFont.getHorizontalScale(), resolvedFont.getHeight())).translated(positions[i].x, positions[i].y);
-                        if (!bounds.isEmpty()) { ink = hasInk ? ink.getUnion(bounds) : bounds; hasInk = true; }
-                    } else result.boundsKnown = false;
+                        if (!bounds.isEmpty()) {
+                            ink = hasInk ? ink.getUnion(bounds) : bounds;
+                            hasInk = true;
+                        }
+                    } else
+                        result.boundsKnown = false;
                 }
 
                 // 输入几何保留占位字形分摊的前进量，使用笔位置而非带字形偏移的墨迹位置
@@ -129,7 +145,8 @@ namespace arrange::juce {
                     const auto right = std::max(previous.x + previous.width, current.x + current.width);
                     previous.x = std::min(previous.x, current.x);
                     previous.width = right - previous.x;
-                } else line.runs[count++] = current;
+                } else
+                    line.runs[count++] = current;
             }
             line.runs.resize(count);
             std::stable_sort(line.runs.begin(), line.runs.end(), [](const auto& left, const auto& right) { return left.x < right.x; });
@@ -150,6 +167,6 @@ namespace arrange::juce {
         result.truncated = result.lines.back().end < source.size();
         return result;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

@@ -17,26 +17,54 @@ namespace arrange::core {
     };
 
     class LayoutTree {
-    public:
+       public:
         void apply(const std::vector<TreeMutation>& mutations);
-        bool contains(NodeId id) const noexcept { return nodes_.find(id) != nodes_.end(); }
+
+        bool contains(NodeId id) const noexcept {
+            return nodes_.find(id) != nodes_.end();
+        }
+
         const LayoutNode& node(NodeId id) const;
         LayoutNode& node(NodeId id);
         [[nodiscard]] std::optional<NodeId> parentOf(NodeId id) const noexcept;
-        std::size_t size() const noexcept { return nodes_.size(); }
+
+        std::size_t size() const noexcept {
+            return nodes_.size();
+        }
+
+        std::vector<NodeId> nodeIds() const;
+
+        std::uint64_t nodeAccesses() const noexcept {
+            return nodeAccesses_;
+        }
+
+        void resetNodeAccesses() const noexcept {
+            nodeAccesses_ = 0;
+        }
+
         DirtySnapshot dirtySnapshot(std::uint32_t mask = 0xffffffffu) const noexcept;
-        [[nodiscard]] const InvalidationSnapshot& invalidationSnapshot() const noexcept { return invalidation_.snapshot(); }
-        [[nodiscard]] InvalidationSnapshot takeInvalidation() noexcept { return invalidation_.take(); }
-        void requestFullFallback(std::string reason) { invalidation_.requireFullFallback(std::move(reason)); }
-        void recordSceneInvalidation(
-            DirtyFlag flag,
-            InvalidationSource source,
-            std::string field,
-            std::string reason);
+
+        [[nodiscard]] const InvalidationSnapshot& invalidationSnapshot() const noexcept {
+            return invalidation_.snapshot();
+        }
+
+        [[nodiscard]] InvalidationSnapshot takeInvalidation() noexcept {
+            return invalidation_.take();
+        }
+
+        void requestFullFallback(std::string reason) {
+            invalidation_.requireFullFallback(std::move(reason));
+        }
+
+        void recordSceneInvalidation(DirtyFlag flag, InvalidationSource source, std::string field, std::string reason);
         void clearDirty() noexcept;
         void advanceAnimations(double timeMillis);
         std::size_t activeAnimationCount() const noexcept;
-        double frameTimeMillis() const noexcept { return frameTimeMillis_; }
+
+        double frameTimeMillis() const noexcept {
+            return frameTimeMillis_;
+        }
+
         std::uint32_t setHostInput(NodeId id, HostInput input, const PropValue& value);
         std::uint32_t setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value);
         std::uint32_t setModifierChain(NodeId id, const ModifierDescriptors& descriptors);
@@ -44,21 +72,11 @@ namespace arrange::core {
 
         void applyMutation(const TreeMutation& mutation);
 
-    private:
+       private:
         void markDirtyWithPropagation(NodeId id, DirtyFlag flag);
         void markAncestorsDirty(NodeId id, DirtyFlag flag);
-        void markDirtyAttributed(
-            NodeId id,
-            DirtyFlag flag,
-            InvalidationSource source,
-            std::string field,
-            std::string reason);
-        void recordDirtyAttribution(
-            NodeId id,
-            DirtyFlag flag,
-            InvalidationSource source,
-            std::string field,
-            std::string reason);
+        void markDirtyAttributed(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason);
+        void recordDirtyAttribution(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason);
         void detachFromParents(NodeId id);
         void eraseSubtree(NodeId id);
         void setParent(NodeId child, NodeId parent);
@@ -70,5 +88,6 @@ namespace arrange::core {
         std::unordered_map<NodeId, NodeId> parentByNode_;
         InvalidationGraph invalidation_;
         double frameTimeMillis_ = 0;
+        mutable std::uint64_t nodeAccesses_ = 0;
     };
-} // namespace arrange::core
+}  // namespace arrange::core

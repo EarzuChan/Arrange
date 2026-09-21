@@ -3,24 +3,24 @@
 namespace arrange::core {
     std::string eventSlotKindName(EventSlotKind kind) {
         switch (kind) {
-        case EventSlotKind::Click:
-            return "click";
-        case EventSlotKind::VerticalScroll:
-            return "verticalScroll";
-        case EventSlotKind::HorizontalScroll:
-            return "horizontalScroll";
-        case EventSlotKind::InputUpdate:
-            return "inputUpdate";
-        case EventSlotKind::InputSubmit:
-            return "inputSubmit";
-        case EventSlotKind::InputChange:
-            return "inputChange";
-        case EventSlotKind::InputBlur:
-            return "inputBlur";
-        case EventSlotKind::Custom:
-            return "custom";
-        case EventSlotKind::None:
-            return "none";
+            case EventSlotKind::Click:
+                return "click";
+            case EventSlotKind::VerticalScroll:
+                return "verticalScroll";
+            case EventSlotKind::HorizontalScroll:
+                return "horizontalScroll";
+            case EventSlotKind::InputUpdate:
+                return "inputUpdate";
+            case EventSlotKind::InputSubmit:
+                return "inputSubmit";
+            case EventSlotKind::InputChange:
+                return "inputChange";
+            case EventSlotKind::InputBlur:
+                return "inputBlur";
+            case EventSlotKind::Custom:
+                return "custom";
+            case EventSlotKind::None:
+                return "none";
         }
         return "none";
     }
@@ -42,5 +42,4 @@ namespace arrange::core {
         return {node, kind, std::move(path)};
     }
 
-} // namespace arrange::core
-
+}  // namespace arrange::core

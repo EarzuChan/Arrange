@@ -8,7 +8,8 @@
 
 <script>
 import type { Ref } from '@arrange/framework'
-import { Arrangement, Column, M, Text } from '@arrange/framework'
+import { Arrangement, M } from '@arrange/framework/ui'
+import { Column, Text } from '@arrange/framework/foundation'
 
 const { state, name, onToggle } = defineProps<{ state: Ref<number>; name: string; onToggle: () => void }>()
 </script>

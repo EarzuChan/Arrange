@@ -2,6 +2,10 @@ add_executable(arrange_core_smoke arrange_core_smoke.cpp)
 target_link_libraries(arrange_core_smoke PRIVATE Arrange::framework)
 add_test(NAME arrange_core_smoke COMMAND arrange_core_smoke)
 
+add_executable(arrange_local_work arrange_local_work.cpp)
+target_link_libraries(arrange_local_work PRIVATE Arrange::core)
+add_test(NAME arrange_local_work COMMAND arrange_local_work)
+
 add_executable(arrange_m24_contract arrange_m24_contract.cpp)
 target_link_libraries(arrange_m24_contract PRIVATE Arrange::framework)
 add_test(NAME arrange_m24_contract COMMAND arrange_m24_contract)
@@ -39,21 +43,26 @@ add_test(NAME arrange_frame_submission COMMAND arrange_frame_submission)
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
   find_program(ARRANGE_NODE_EXECUTABLE node REQUIRED)
-  file(GLOB_RECURSE ARRANGE_VUE_FIXTURE_INPUTS CONFIGURE_DEPENDS
+  file(GLOB_RECURSE ARRANGE_RUNTIME_FIXTURE_INPUTS CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/packages/*/src/*.ts"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/vue-runtime/*"
-    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/arrangables/*.sfa")
+    "${CMAKE_SOURCE_DIR}/tests/fixtures/rearrange-runtime/*"
+    "${CMAKE_SOURCE_DIR}/tests/fixtures/viewport-runtime/*"
+    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/view/*.sfa")
   add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js"
-    COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/build-vue-runtime-fixture.ts
+    OUTPUT "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js"
+    COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/build-runtime-fixtures.ts
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    DEPENDS ${ARRANGE_VUE_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-vue-runtime-fixture.ts"
+    DEPENDS ${ARRANGE_RUNTIME_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-runtime-fixtures.ts"
     COMMENT "编译 Arrange SFA 原生运行夹具")
-  add_custom_target(arrange_vue_fixture DEPENDS "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js")
-  add_executable(arrange_vue_runtime arrange_vue_runtime.cpp AllocationProbe.cpp)
-  target_link_libraries(arrange_vue_runtime PRIVATE Arrange::framework)
-  add_dependencies(arrange_vue_runtime arrange_vue_fixture)
-  add_test(NAME arrange_vue_runtime COMMAND arrange_vue_runtime "${CMAKE_SOURCE_DIR}/build/vue-runtime-fixture/app.js")
+  add_custom_target(arrange_runtime_fixture DEPENDS "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js")
+  add_executable(arrange_rearrange_runtime arrange_rearrange_runtime.cpp AllocationProbe.cpp)
+  target_link_libraries(arrange_rearrange_runtime PRIVATE Arrange::framework)
+  add_dependencies(arrange_rearrange_runtime arrange_runtime_fixture)
+  add_test(NAME arrange_rearrange_runtime COMMAND arrange_rearrange_runtime "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js")
+  add_executable(arrange_viewport_runtime arrange_viewport_runtime.cpp)
+  target_link_libraries(arrange_viewport_runtime PRIVATE Arrange::framework)
+  add_dependencies(arrange_viewport_runtime arrange_runtime_fixture)
+  add_test(NAME arrange_viewport_runtime COMMAND arrange_viewport_runtime "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js")
 endif()
 
 if(TARGET juce::juce_audio_processors)

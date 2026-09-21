@@ -1,4 +1,4 @@
-import {cliCompatibility} from "../CliMetadata.ts"
+import { cliCompatibility } from "../CliMetadata.ts"
 
 export interface FrameworkMetadata {
     readonly version: string
@@ -20,7 +20,7 @@ export function addIncompatibilityIfPresenceFor(candidates: readonly FrameworkVe
     return candidates.map((candidate) => {
         const compatibility = candidate.cliCompatibility
 
-        return {...candidate, incompatibility: compatibility === null ? "incompatible: no compatibility code" : (compatibility !== cliCompatibility ? `incompatible: ${compatibility}` : null)}
+        return { ...candidate, incompatibility: compatibility === null ? "incompatible: no compatibility code" : (compatibility !== cliCompatibility ? `incompatible: ${compatibility}` : null) }
     })
 }
 

@@ -10,63 +10,31 @@
 #include <arrange/juce/RuntimeSessionState.h>
 
 namespace arrange::juce {
-    void JucePointerInputAdapter::pointerDown(
-        ArrangeRuntime& runtime,
-        const RuntimeSessionState& session,
-        const DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        arrange::core::NodeId root,
-        const ::juce::MouseEvent& event,
-        const TextInputCallbacks& inputCallbacks) const {
+    void JucePointerInputAdapter::pointerDown(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const {
         if (!session.interactive(diagnostics)) {
             return;
         }
 
         runtime.enqueueIntent(arrange::core::InputIntent::pointer("native pointer down"));
-        interaction.pointerDown(
-            runtime.scene().tree(),
-            *runtime.publishedFrame().content.hitTest,
-            static_cast<float>(event.x),
-            static_cast<float>(event.y),
-            inputCallbacks);
+        interaction.pointerDown(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, static_cast<float>(event.x), static_cast<float>(event.y), inputCallbacks);
     }
 
-    bool JucePointerInputAdapter::pointerDrag(
-        ArrangeRuntime& runtime,
-        const RuntimeSessionState& session,
-        const DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        const ::juce::MouseEvent& event,
-        const TextInputCallbacks& inputCallbacks) const {
+    bool JucePointerInputAdapter::pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const {
         if (!session.interactive(diagnostics)) {
             return false;
         }
 
-        runtime.enqueueIntent(arrange::core::InputIntent::pointer("native pointer drag"));
-        return interaction.pointerDrag(
-            runtime.scene().tree(),
-            session.loaded(),
-            static_cast<float>(event.x),
-            static_cast<float>(event.y),
-            inputCallbacks);
+        const auto changed = interaction.pointerDrag(runtime.scene().tree(), session.loaded(), static_cast<float>(event.x), static_cast<float>(event.y), inputCallbacks);
+        if (changed) runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针拖动"));
+        return changed;
     }
 
-    bool JucePointerInputAdapter::pointerUp(
-        ArrangeRuntime& runtime,
-        const RuntimeSessionState& session,
-        const DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        arrange::core::NodeId root,
-        const ::juce::MouseEvent& event) const {
+    bool JucePointerInputAdapter::pointerUp(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event) const {
         if (!session.interactive(diagnostics)) {
             return false;
         }
 
-        const auto result = interaction.pointerUp(
-            runtime.scene().tree(),
-            *runtime.publishedFrame().content.hitTest,
-            static_cast<float>(event.x),
-            static_cast<float>(event.y));
+        const auto result = interaction.pointerUp(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, static_cast<float>(event.x), static_cast<float>(event.y));
         if (!result.clickTriggered || !result.eventSlot.valid()) {
             return false;
         }
@@ -76,38 +44,21 @@ namespace arrange::juce {
         return true;
     }
 
-    bool JucePointerInputAdapter::wheelMove(
-        ArrangeRuntime& runtime,
-        const RuntimeSessionState& session,
-        const DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        arrange::core::NodeId root,
-        const ::juce::MouseEvent& event,
-        const ::juce::MouseWheelDetails& wheel) const {
+    bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) const {
         if (!session.interactive(diagnostics) || !runtime.scene().contains(root)) {
             return false;
         }
 
-        const auto wheelResult = interaction.wheel(
-            runtime.scene().tree(),
-            root,
-            static_cast<float>(event.x),
-            static_cast<float>(event.y),
-            wheel.deltaX,
-            wheel.deltaY,
-            runtime.publishedFrame().revision);
+        const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, static_cast<float>(event.x), static_cast<float>(event.y), wheel.deltaX, wheel.deltaY, runtime.publishedFrame().revision);
         const auto& result = wheelResult.scroll;
         if (!result.consumed) {
             return false;
         }
 
-        runtime.enqueueIntent(arrange::core::InputIntent::wheel(
-            wheelResult.horizontal ? "native horizontal wheel input" : "native vertical wheel input",
-            result.target,
-            result.eventSlot));
+        runtime.enqueueIntent(arrange::core::InputIntent::wheel(wheelResult.horizontal ? "native horizontal wheel input" : "native vertical wheel input", result.target, result.eventSlot));
         runtime.enqueueScrollSnapshotEvent(result.eventSlot, result);
         return true;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

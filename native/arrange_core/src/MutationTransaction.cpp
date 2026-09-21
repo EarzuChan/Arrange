@@ -6,16 +6,11 @@
 
 namespace arrange::core {
     bool MutationTransaction::hasTreeMutations() const noexcept {
-        return std::any_of(operations.begin(), operations.end(), [](const auto& op) {
-            return std::holds_alternative<TreeMutation>(op);
-        });
+        return std::any_of(operations.begin(), operations.end(), [](const auto& op) { return std::holds_alternative<TreeMutation>(op); });
     }
 
     bool MutationTransaction::hasEventSlotChanges() const noexcept {
-        return std::any_of(operations.begin(), operations.end(), [](const auto& op) {
-            return std::holds_alternative<RegisterEventSlot>(op) ||
-                   std::holds_alternative<RetireEventSlot>(op);
-        });
+        return std::any_of(operations.begin(), operations.end(), [](const auto& op) { return std::holds_alternative<RegisterEventSlot>(op) || std::holds_alternative<RetireEventSlot>(op); });
     }
 
     void MutationTransaction::append(MutationTransaction transaction) {
@@ -26,9 +21,7 @@ namespace arrange::core {
         }
         if (rearrange && transaction.rearrange && rearrange != transaction.rearrange) throw std::logic_error("不同重排提交不能共用一次应用回执");
         if (transaction.rearrange) rearrange = std::move(transaction.rearrange);
-        operations.insert(operations.end(),
-            std::make_move_iterator(transaction.operations.begin()),
-            std::make_move_iterator(transaction.operations.end()));
+        operations.insert(operations.end(), std::make_move_iterator(transaction.operations.begin()), std::make_move_iterator(transaction.operations.end()));
     }
 
     void MutationTransactionQueue::push(MutationTransaction transaction) {
@@ -54,4 +47,4 @@ namespace arrange::core {
     void MutationTransactionQueue::clear() noexcept {
         pending_.reset();
     }
-} // namespace arrange::core
+}  // namespace arrange::core

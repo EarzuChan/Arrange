@@ -27,10 +27,11 @@ namespace arrange::juce {
     };
 
     class InteractionStateOwner final {
-    public:
+       public:
         explicit InteractionStateOwner(arrange::core::TextLayoutService& textLayoutService) noexcept;
 
         void reset();
+
         void commitState(InteractionStateOwner&& candidate) noexcept {
             pointer_ = std::move(candidate.pointer_);
             input_.commitState(std::move(candidate.input_));
@@ -38,87 +39,40 @@ namespace arrange::juce {
 
         [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
         [[nodiscard]] float viewportX() const noexcept;
-        [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept { return input_.focusedModifier(); }
 
-        void pointerDown(
-            arrange::core::LayoutTree& tree,
-            const arrange::core::HitTestSnapshot& snapshot,
-            float x,
-            float y,
-            const TextInputCallbacks& callbacks);
-        [[nodiscard]] bool pointerDrag(
-            arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            float x,
-            float y,
-            const TextInputCallbacks& callbacks);
-        [[nodiscard]] InteractionPointerUpResult pointerUp(
-            arrange::core::LayoutTree& tree,
-            const arrange::core::HitTestSnapshot& snapshot,
-            float x,
-            float y);
-        [[nodiscard]] InteractionWheelResult wheel(
-            arrange::core::LayoutTree& tree,
-            arrange::core::NodeId root,
-            float x,
-            float y,
-            float deltaX,
-            float deltaY,
-            std::uint64_t publishedRevision = 0);
+        [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept {
+            return input_.focusedModifier();
+        }
+
+        void pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks);
+        [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks);
+        [[nodiscard]] InteractionPointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y);
+        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision = 0);
 
         [[nodiscard]] bool isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
         [[nodiscard]] ::juce::Range<int> highlightedRegion(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] bool setHighlightedRegion(
-            arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            const ::juce::Range<int>& range,
-            const TextInputCallbacks& callbacks);
-        [[nodiscard]] bool setTemporaryUnderlining(
-            arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            const ::juce::Array<::juce::Range<int>>& ranges,
-            const TextInputCallbacks& callbacks);
-        [[nodiscard]] ::juce::String textInRange(
-            const arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            const ::juce::Range<int>& range) const;
-        [[nodiscard]] bool insertTextAtCaret(
-            arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            const ::juce::String& textToInsert,
-            const TextInputCallbacks& callbacks);
+        [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range, const TextInputCallbacks& callbacks);
+        [[nodiscard]] bool setTemporaryUnderlining(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Array<::juce::Range<int>>& ranges, const TextInputCallbacks& callbacks);
+        [[nodiscard]] ::juce::String textInRange(const arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range) const;
+        [[nodiscard]] bool insertTextAtCaret(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::String& textToInsert, const TextInputCallbacks& callbacks);
         [[nodiscard]] int caretPosition(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
         [[nodiscard]] int totalNumChars(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] int charIndexForPoint(
-            const arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            ::juce::Point<int> point) const;
-        [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(
-            const arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            int characterIndex) const;
-        [[nodiscard]] ::juce::RectangleList<int> textBounds(
-            const arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            ::juce::Range<int> range) const;
-        [[nodiscard]] bool keyPressed(
-            arrange::core::LayoutTree& tree,
-            bool runtimeReady,
-            const ::juce::KeyPress& key,
-            const TextInputCallbacks& callbacks);
+        [[nodiscard]] int charIndexForPoint(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Point<int> point) const;
+        [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(const arrange::core::LayoutTree& tree, bool runtimeReady, int characterIndex) const;
+        [[nodiscard]] ::juce::RectangleList<int> textBounds(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Range<int> range) const;
+        [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks);
 
         void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
             input_.synchronizePublishedInput(tree, runtimeReady);
         }
-        void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady);
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(
-            const arrange::core::LayoutTree& tree,
-            bool runtimeReady) const;
 
-    private:
+        void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady);
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
+
+       private:
         PointerInputState pointer_;
         TextInputOwner input_;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

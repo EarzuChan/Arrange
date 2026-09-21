@@ -1,8 +1,8 @@
-import {spawn, spawnSync} from "node:child_process"
-import {existsSync} from "node:fs"
-import {extname, resolve} from "node:path"
-import type {ResolvedToolchain} from "./local.ts"
-import {ExternalCommandError} from "./errors.ts"
+import { spawn, spawnSync } from "node:child_process"
+import { existsSync } from "node:fs"
+import { extname, resolve } from "node:path"
+import type { ResolvedToolchain } from "./local.ts"
+import { ExternalCommandError } from "./errors.ts"
 
 export type RunOptions = {
     cwd?: string
@@ -102,7 +102,7 @@ export function runCaptureSync(command: string, args: readonly string[], options
     return result.stdout
 }
 
-function createInvocation(command: string, args: readonly string[], options: RunOptions): {command: string; args: string[]; display: string; windowsVerbatimArguments: boolean} {
+function createInvocation(command: string, args: readonly string[], options: RunOptions): { command: string; args: string[]; display: string; windowsVerbatimArguments: boolean } {
     const display = options.label ?? commandDisplay(command, args)
     const toolchain = options.toolchain
     if (process.platform === "win32") {
@@ -132,7 +132,7 @@ function createInvocation(command: string, args: readonly string[], options: Run
             }
         }
     }
-    return {command, args: [...args], display, windowsVerbatimArguments: false}
+    return { command, args: [...args], display, windowsVerbatimArguments: false }
 }
 
 function isCmdLike(command: string): boolean {

@@ -1,0 +1,42 @@
+{
+  "name": "@arrange/compiler",
+  "version": "0.0.0-m.2.2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "arrange-ts": "./src/sfa/index.ts",
+      "import": "./src/sfa/index.ts"
+    },
+    "./core": {
+      "arrange-ts": "./src/core/index.ts",
+      "import": "./src/core/index.ts"
+    },
+    "./template": {
+      "arrange-ts": "./src/template/index.ts",
+      "import": "./src/template/index.ts"
+    }
+  },
+  "dependencies": {
+    "@babel/parser": "7.29.3",
+    "entities": "7.0.1",
+    "estree-walker": "2.0.2",
+    "source-map-js": "1.2.1",
+    "magic-string": "0.30.21",
+    "typescript": "^5.9.0",
+    "@arrange/shared": "0.0.0-m.2.2",
+    "lru-cache": "10.1.0"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "LICENSE",
+    "UPSTREAM.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@babel/types": "7.29.0"
+  }
+}

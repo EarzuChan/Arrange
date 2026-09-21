@@ -22,8 +22,8 @@ namespace arrange::quickjs {
     };
 
     class ScriptHost {
-    public:
+       public:
         virtual ~ScriptHost() = default;
         virtual ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) = 0;
     };
-} // namespace arrange::quickjs
+}  // namespace arrange::quickjs

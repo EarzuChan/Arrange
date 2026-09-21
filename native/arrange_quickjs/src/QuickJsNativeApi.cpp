@@ -84,7 +84,7 @@ namespace arrange::quickjs {
             event.pathOrUrl = payloadStringField(context, reader, payload, "pathOrUrl");
             event.toast = forceToast || reader.boolField(payload, "toast", false);
             event.coalesceToast = reader.boolField(payload, "coalesceToast", true);
-            if (!category && !categoryName.empty())event.detail = event.detail.empty()? "Unsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.": event.detail + "\nUnsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.";
+            if (!category && !categoryName.empty()) event.detail = event.detail.empty() ? "Unsupported diagnostics category '" + categoryName + "'; fell back to runtime.script." : event.detail + "\nUnsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.";
             return event;
         }
 
@@ -114,33 +114,55 @@ namespace arrange::quickjs {
         std::string diagnosticsTextLine(const QuickJsDiagnosticEventInput& event) {
             const auto level = [event]() {
                 switch (event.level) {
-                case QuickJsDiagnosticLevel::Trace: return "trace";
-                case QuickJsDiagnosticLevel::Debug: return "debug";
-                case QuickJsDiagnosticLevel::Info: return "info";
-                case QuickJsDiagnosticLevel::Warn: return "warn";
-                case QuickJsDiagnosticLevel::Error: return "error";
+                    case QuickJsDiagnosticLevel::Trace:
+                        return "trace";
+                    case QuickJsDiagnosticLevel::Debug:
+                        return "debug";
+                    case QuickJsDiagnosticLevel::Info:
+                        return "info";
+                    case QuickJsDiagnosticLevel::Warn:
+                        return "warn";
+                    case QuickJsDiagnosticLevel::Error:
+                        return "error";
                 }
                 return "info";
             }();
             const auto category = [event]() {
                 switch (event.category) {
-                case QuickJsDiagnosticCategory::App: return "app";
-                case QuickJsDiagnosticCategory::HostLive: return "host.live";
-                case QuickJsDiagnosticCategory::HostDist: return "host.dist";
-                case QuickJsDiagnosticCategory::HostHmr: return "host.hmr";
-                case QuickJsDiagnosticCategory::RuntimeScript: return "runtime.script";
-                case QuickJsDiagnosticCategory::RuntimeTransaction: return "runtime.transaction";
-                case QuickJsDiagnosticCategory::PipelineFrame: return "pipeline.frame";
-                case QuickJsDiagnosticCategory::PipelineLayout: return "pipeline.layout";
-                case QuickJsDiagnosticCategory::PipelinePaint: return "pipeline.paint";
-                case QuickJsDiagnosticCategory::InputPointer: return "input.pointer";
-                case QuickJsDiagnosticCategory::InputKey: return "input.key";
-                case QuickJsDiagnosticCategory::InputIme: return "input.ime";
-                case QuickJsDiagnosticCategory::InputScroll: return "input.scroll";
-                case QuickJsDiagnosticCategory::ResourcePackage: return "resource.package";
-                case QuickJsDiagnosticCategory::ResourceImage: return "resource.image";
-                case QuickJsDiagnosticCategory::ResourceIcon: return "resource.icon";
-                case QuickJsDiagnosticCategory::Diagnostics: return "diagnostics";
+                    case QuickJsDiagnosticCategory::App:
+                        return "app";
+                    case QuickJsDiagnosticCategory::HostLive:
+                        return "host.live";
+                    case QuickJsDiagnosticCategory::HostDist:
+                        return "host.dist";
+                    case QuickJsDiagnosticCategory::HostHmr:
+                        return "host.hmr";
+                    case QuickJsDiagnosticCategory::RuntimeScript:
+                        return "runtime.script";
+                    case QuickJsDiagnosticCategory::RuntimeTransaction:
+                        return "runtime.transaction";
+                    case QuickJsDiagnosticCategory::PipelineFrame:
+                        return "pipeline.frame";
+                    case QuickJsDiagnosticCategory::PipelineLayout:
+                        return "pipeline.layout";
+                    case QuickJsDiagnosticCategory::PipelinePaint:
+                        return "pipeline.paint";
+                    case QuickJsDiagnosticCategory::InputPointer:
+                        return "input.pointer";
+                    case QuickJsDiagnosticCategory::InputKey:
+                        return "input.key";
+                    case QuickJsDiagnosticCategory::InputIme:
+                        return "input.ime";
+                    case QuickJsDiagnosticCategory::InputScroll:
+                        return "input.scroll";
+                    case QuickJsDiagnosticCategory::ResourcePackage:
+                        return "resource.package";
+                    case QuickJsDiagnosticCategory::ResourceImage:
+                        return "resource.image";
+                    case QuickJsDiagnosticCategory::ResourceIcon:
+                        return "resource.icon";
+                    case QuickJsDiagnosticCategory::Diagnostics:
+                        return "diagnostics";
                 }
                 return "diagnostics";
             }();
@@ -154,19 +176,20 @@ namespace arrange::quickjs {
 
         std::uint32_t readIndex(JSContext* context, JSValueConst value, bool allowZero = false) {
             double number = 0;
-            if (!JS_IsNumber(value) || JS_ToFloat64(context, &number, value) < 0 || !std::isfinite(number) ||
-                std::floor(number) != number || number < (allowZero ? 0 : 1) || number > UINT32_MAX) {
+            if (!JS_IsNumber(value) || JS_ToFloat64(context, &number, value) < 0 || !std::isfinite(number) || std::floor(number) != number || number < (allowZero ? 0 : 1) || number > UINT32_MAX) {
                 JS_ThrowTypeError(context, "Arrange identity/index must be an exact uint32 number");
                 return 0;
             }
             return static_cast<std::uint32_t>(number);
         }
 
-
         JSValue nativeBeginRearrange(JSContext* context, JSValueConst, int, JSValueConst*) {
             auto* self = runtime(context);
-            try { self->beginRearrange(); }
-            catch (const std::exception& error) { return JS_ThrowInternalError(context, "%s", error.what()); }
+            try {
+                self->beginRearrange();
+            } catch (const std::exception& error) {
+                return JS_ThrowInternalError(context, "%s", error.what());
+            }
             return JS_UNDEFINED;
         }
 
@@ -292,7 +315,10 @@ namespace arrange::quickjs {
         }
 
         std::optional<arrange::core::BindingHandle> readBinding(JSContext* context, JSValueConst value) {
-            if (!JS_IsObject(value)) { JS_ThrowTypeError(context, "Arrange binding handle must be an object"); return std::nullopt; }
+            if (!JS_IsObject(value)) {
+                JS_ThrowTypeError(context, "Arrange binding handle must be an object");
+                return std::nullopt;
+            }
             ScopedValue identity(context, JS_GetPropertyStr(context, value, "identity"));
             ScopedValue generation(context, JS_GetPropertyStr(context, value, "generation"));
             if (!JS_IsBigInt(identity.get()) || !JS_IsBigInt(generation.get())) {
@@ -340,8 +366,7 @@ namespace arrange::quickjs {
             const auto handle = readBinding(context, argv[1]);
             if (!handle) return JS_EXCEPTION;
             const auto found = self->publishedModifiers.find(handle->identity);
-            if (found == self->publishedModifiers.end() || found->second.handle.generation != handle->generation ||
-                found->second.node.id != id || !self->nodeGenerations.contains(id) || self->nodeGenerations.at(id) != found->second.node.generation) {
+            if (found == self->publishedModifiers.end() || found->second.handle.generation != handle->generation || found->second.node.id != id || !self->nodeGenerations.contains(id) || self->nodeGenerations.at(id) != found->second.node.generation) {
                 ++self->rejectedBindingUpdates;
                 return JS_ThrowReferenceError(context, "Arrange Modifier instance is retired or not published");
             }
@@ -368,8 +393,7 @@ namespace arrange::quickjs {
                 if (const auto previous = self->modifierBindings.find(id); previous != self->modifierBindings.end()) self->retireBinding(previous->second);
                 handle = self->registerBinding(arrange::core::ModifierChainTarget{node});
                 self->modifierBindings[id] = handle;
-            }
-            else {
+            } else {
                 const auto input = arrange::core::hostInputFromName(name);
                 if (!input) return JS_ThrowTypeError(context, "Arrange unsupported binding input: %s", name.c_str());
                 if (const auto previous = self->hostBindings[id].find(*input); previous != self->hostBindings[id].end()) self->retireBinding(previous->second);
@@ -390,36 +414,36 @@ namespace arrange::quickjs {
                 return JS_ThrowReferenceError(context, "Arrange binding is retired or belongs to another context");
             }
             const auto target = found->second.target;
-            return std::visit([&](const auto& input) -> JSValue {
-                using T = std::decay_t<decltype(input)>;
-                if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
-                    QuickJsValueReader reader(context);
-                    auto value = reader.propValue(argv[1]);
-                    if (JS_HasException(context)) return JS_EXCEPTION;
-                    std::string error;
-                    if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
-                    self->updateBinding(*handle, std::move(value));
-                }
-                else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
-                    QuickJsModifierReader reader(context, self->events, self->currentTransaction());
-                    const auto previous = self->modifierInputDescriptors(input.node.id);
-                    auto value = reader.read(input.node.id, argv[1], nullptr, previous);
-                    if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
-                    self->updateBinding(*handle, std::move(value));
-                }
-                else if constexpr (std::is_same_v<T, arrange::core::ModifierInputTarget>) {
-                    auto& inputs = self->modifierInputs[input.node.id];
-                    const auto instance = std::find_if(inputs.begin(), inputs.end(), [&](const auto& value) { return value.handle == input.modifier; });
-                    if (instance == inputs.end()) return JS_ThrowReferenceError(context, "Modifier 实例已从当前候选退出");
-                    ScopedValue array(context, JS_NewArray(context));
-                    JS_SetPropertyUint32(context, array.get(), 0, JS_DupValue(context, argv[1]));
-                    QuickJsModifierReader reader(context, self->events, self->currentTransaction());
-                    auto descriptors = reader.read(input.node.id, array.get(), &instance->descriptor.value);
-                    if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
-                    self->updateBinding(*handle, std::move(descriptors.front().value));
-                }
-                return JS_UNDEFINED;
-            }, target);
+            return std::visit(
+                [&](const auto& input) -> JSValue {
+                    using T = std::decay_t<decltype(input)>;
+                    if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
+                        QuickJsValueReader reader(context);
+                        auto value = reader.propValue(argv[1]);
+                        if (JS_HasException(context)) return JS_EXCEPTION;
+                        std::string error;
+                        if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
+                        self->updateBinding(*handle, std::move(value));
+                    } else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
+                        QuickJsModifierReader reader(context, self->events, self->currentTransaction());
+                        const auto previous = self->modifierInputDescriptors(input.node.id);
+                        auto value = reader.read(input.node.id, argv[1], nullptr, previous);
+                        if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
+                        self->updateBinding(*handle, std::move(value));
+                    } else if constexpr (std::is_same_v<T, arrange::core::ModifierInputTarget>) {
+                        auto& inputs = self->modifierInputs[input.node.id];
+                        const auto instance = std::find_if(inputs.begin(), inputs.end(), [&](const auto& value) { return value.handle == input.modifier; });
+                        if (instance == inputs.end()) return JS_ThrowReferenceError(context, "Modifier 实例已从当前候选退出");
+                        ScopedValue array(context, JS_NewArray(context));
+                        JS_SetPropertyUint32(context, array.get(), 0, JS_DupValue(context, argv[1]));
+                        QuickJsModifierReader reader(context, self->events, self->currentTransaction());
+                        auto descriptors = reader.read(input.node.id, array.get(), &instance->descriptor.value);
+                        if (reader.failed() || JS_HasException(context)) return JS_EXCEPTION;
+                        self->updateBinding(*handle, std::move(descriptors.front().value));
+                    }
+                    return JS_UNDEFINED;
+                },
+                target);
         }
 
         JSValue nativeReleaseBinding(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
@@ -637,33 +661,9 @@ namespace arrange::quickjs {
         }
 
         const JSCFunctionListEntry nativeApiFunctions[] = {
-            JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange),
-            JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange),
-            JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange),
-            JS_CFUNC_DEF("createNode", 2, nativeCreateNode),
-            JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode),
-            JS_CFUNC_DEF("insertChild", 3, nativeInsertChild),
-            JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild),
-            JS_CFUNC_DEF("setProp", 3, nativeSetProp),
-            JS_CFUNC_DEF("setModifier", 2, nativeSetModifier),
-            JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding),
-            JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances),
-            JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding),
-            JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding),
-            JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding),
-            JS_CFUNC_DEF("unmount", 0, nativeUnmount),
-            JS_CFUNC_DEF("reload", 1, nativeReload),
-            JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog),
-            JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast),
-            JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload),
-            JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError),
-            JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics),
-            JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents),
-            JS_CFUNC_DEF("diagnosticsSetLogLevel", 1, nativeDiagnosticsSetLogLevel),
-            JS_CFUNC_DEF("diagnosticsSetCategoryEnabled", 2, nativeDiagnosticsSetCategoryEnabled),
-            JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
+            JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog), JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics), JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents), JS_CFUNC_DEF("diagnosticsSetLogLevel", 1, nativeDiagnosticsSetLogLevel), JS_CFUNC_DEF("diagnosticsSetCategoryEnabled", 2, nativeDiagnosticsSetCategoryEnabled), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
         };
-    }
+    }  // namespace
 
     void QuickJsNativeApi::install(JSContext* context, QuickJsRuntimeContext& runtime) {
         ScopedValue global(context, JS_GetGlobalObject(context));
@@ -685,6 +685,6 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(context, console.get(), "error", JS_NewCFunction(context, consoleError, "error", 1));
         JS_SetPropertyStr(context, global.get(), "console", console.release());
     }
-}
+}  // namespace arrange::quickjs
 
 #endif

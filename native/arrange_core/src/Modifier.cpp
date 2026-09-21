@@ -39,92 +39,99 @@ namespace arrange::core {
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             return kPaint | kHit;
         }
-    } // namespace
+    }  // namespace
 
     std::string_view modifierKindName(const ModifierValue& value) {
-        return std::visit([](const auto& input) -> std::string_view {
-            using T = std::decay_t<decltype(input)>;
-            if constexpr (std::is_same_v<T, LayoutModifierSemantics>) {
-                constexpr std::string_view names[]{"padding", "width", "height", "size", "requiredWidth", "requiredHeight", "requiredSize", "fillMaxWidth", "fillMaxHeight", "fillMaxSize", "widthIn", "heightIn", "sizeIn", "defaultMinSize", "verticalScroll", "horizontalScroll"};
-                return names[static_cast<std::size_t>(input.kind)];
-            }
-            if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
-                constexpr std::string_view names[]{"background", "border", "alpha"};
-                return names[static_cast<std::size_t>(input.kind)];
-            }
-            if constexpr (std::is_same_v<T, InputModifierSemantics>) {
-                constexpr std::string_view names[]{"clickable", "hoverable", "focusable"};
-                return names[static_cast<std::size_t>(input.kind)];
-            }
-            if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : "align";
-            if constexpr (std::is_same_v<T, PaintModifier>) return "paint";
-            if constexpr (std::is_same_v<T, TextModifier>) return "text";
-            if constexpr (std::is_same_v<T, TextFieldModifier>) return "textField";
-            if constexpr (std::is_same_v<T, ClipModifier>) return "clip";
-            if constexpr (std::is_same_v<T, TransformModifierSemantics>) return "graphicsLayer";
-            if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
-            if constexpr (std::is_same_v<T, ZIndexModifier>) return "zIndex";
-            if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) return "animateContentSize";
-            return "";
-        }, value);
+        return std::visit(
+            [](const auto& input) -> std::string_view {
+                using T = std::decay_t<decltype(input)>;
+                if constexpr (std::is_same_v<T, LayoutModifierSemantics>) {
+                    constexpr std::string_view names[]{"padding", "width", "height", "size", "requiredWidth", "requiredHeight", "requiredSize", "fillMaxWidth", "fillMaxHeight", "fillMaxSize", "widthIn", "heightIn", "sizeIn", "defaultMinSize", "verticalScroll", "horizontalScroll"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
+                if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
+                    constexpr std::string_view names[]{"background", "border", "alpha"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
+                if constexpr (std::is_same_v<T, InputModifierSemantics>) {
+                    constexpr std::string_view names[]{"clickable", "hoverable", "focusable"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
+                if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : "align";
+                if constexpr (std::is_same_v<T, PaintModifier>) return "paint";
+                if constexpr (std::is_same_v<T, TextModifier>) return "text";
+                if constexpr (std::is_same_v<T, TextFieldModifier>) return "textField";
+                if constexpr (std::is_same_v<T, ClipModifier>) return "clip";
+                if constexpr (std::is_same_v<T, TransformModifierSemantics>) return "graphicsLayer";
+                if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
+                if constexpr (std::is_same_v<T, ZIndexModifier>) return "zIndex";
+                if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) return "animateContentSize";
+                return "";
+            },
+            value);
     }
 
     bool sameModifierKind(const ModifierValue& left, const ModifierValue& right) {
         if (left.index() != right.index()) return false;
-        return std::visit([&](const auto& a) {
-            using T = std::decay_t<decltype(a)>;
-            if constexpr (requires { a.kind; }) return a.kind == std::get<T>(right).kind;
-            return true;
-        }, left);
+        return std::visit(
+            [&](const auto& a) {
+                using T = std::decay_t<decltype(a)>;
+                if constexpr (requires { a.kind; }) return a.kind == std::get<T>(right).kind;
+                return true;
+            },
+            left);
     }
 
     void validateModifierValue(const ModifierValue& value) {
-        std::visit([](const auto& input) {
-            using T = std::decay_t<decltype(input)>;
-            if constexpr (std::is_same_v<T, LayoutModifierSemantics>) {
-                for (auto number : {input.padding.start, input.padding.top, input.padding.end, input.padding.bottom, input.value, input.width, input.height, input.fraction, input.minWidth, input.maxWidth, input.minHeight, input.maxHeight, input.scrollValue}) finite(number);
-                if (input.padding.start < 0 || input.padding.top < 0 || input.padding.end < 0 || input.padding.bottom < 0 || input.value < 0 || input.width < 0 || input.height < 0 || input.scrollValue < 0) throw std::invalid_argument("Arrange Modifier size, padding and scroll inputs must be nonnegative");
-                if (input.minWidth >= 0 && input.maxWidth >= 0 && input.minWidth > input.maxWidth) throw std::invalid_argument("Arrange Modifier minWidth exceeds maxWidth");
-                if (input.minHeight >= 0 && input.maxHeight >= 0 && input.minHeight > input.maxHeight) throw std::invalid_argument("Arrange Modifier minHeight exceeds maxHeight");
-            }
-            else if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
-                for (auto number : {input.strokeWidth, input.cornerRadius, input.alpha}) finite(number);
-                if (input.strokeWidth < 0 || input.cornerRadius < 0 || input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange invalid paint Modifier input");
-                if (!input.shapeType.empty() && input.shapeType != "rectangle" && input.shapeType != "rounded" && input.shapeType != "circle") throw std::invalid_argument("Arrange unknown Modifier shape");
-            }
-            else if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) {
-                const auto& spec = input.animationSpec;
-                for (auto value : {spec.durationMillis, spec.delayMillis, spec.stiffness, spec.dampingRatio, spec.threshold}) finite(value);
-                for (auto value : spec.bezier) finite(value);
-                if (spec.durationMillis < 0 || spec.delayMillis < 0 || spec.stiffness <= 0 || spec.dampingRatio <= 0 || spec.threshold <= 0 || spec.bezier[0] < 0 || spec.bezier[0] > 1 || spec.bezier[2] < 0 || spec.bezier[2] > 1) throw std::invalid_argument("Arrange invalid content-size animation spec");
-            }
-            else if constexpr (std::is_same_v<T, PaintModifier>) {
-                finite(input.alpha);
-                if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("paint alpha 必须在 0..1 之间");
-                if (!isImageAlignment(input.alignment)) throw std::invalid_argument("paint 对齐值无效");
-                if (input.contentScale != "Fit" && input.contentScale != "Crop" && input.contentScale != "FillBounds" && input.contentScale != "Inside" && input.contentScale != "None" && input.contentScale != "FillWidth" && input.contentScale != "FillHeight") throw std::invalid_argument("paint 缩放模式无效");
-                if (input.painter.content && input.painter.content->intrinsicSize) {
-                    const auto size = *input.painter.content->intrinsicSize;
-                    finite(size.width);
-                    finite(size.height);
-                    if (size.width < 0 || size.height < 0) throw std::invalid_argument("Painter 固有尺寸不能为负数");
+        std::visit(
+            [](const auto& input) {
+                using T = std::decay_t<decltype(input)>;
+                if constexpr (std::is_same_v<T, LayoutModifierSemantics>) {
+                    for (auto number : {input.padding.start, input.padding.top, input.padding.end, input.padding.bottom, input.value, input.width, input.height, input.fraction, input.minWidth, input.maxWidth, input.minHeight, input.maxHeight, input.scrollValue}) finite(number);
+                    if (input.padding.start < 0 || input.padding.top < 0 || input.padding.end < 0 || input.padding.bottom < 0 || input.value < 0 || input.width < 0 || input.height < 0 || input.scrollValue < 0) throw std::invalid_argument("Arrange Modifier size, padding and scroll inputs must be nonnegative");
+                    if (input.minWidth >= 0 && input.maxWidth >= 0 && input.minWidth > input.maxWidth) throw std::invalid_argument("Arrange Modifier minWidth exceeds maxWidth");
+                    if (input.minHeight >= 0 && input.maxHeight >= 0 && input.minHeight > input.maxHeight) throw std::invalid_argument("Arrange Modifier minHeight exceeds maxHeight");
+                } else if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
+                    for (auto number : {input.strokeWidth, input.cornerRadius, input.alpha}) finite(number);
+                    if (input.strokeWidth < 0 || input.cornerRadius < 0 || input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange invalid paint Modifier input");
+                    if (!input.shapeType.empty() && input.shapeType != "rectangle" && input.shapeType != "rounded" && input.shapeType != "circle") throw std::invalid_argument("Arrange unknown Modifier shape");
+                } else if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) {
+                    const auto& spec = input.animationSpec;
+                    for (auto value : {spec.durationMillis, spec.delayMillis, spec.stiffness, spec.dampingRatio, spec.threshold}) finite(value);
+                    for (auto value : spec.bezier) finite(value);
+                    if (spec.durationMillis < 0 || spec.delayMillis < 0 || spec.stiffness <= 0 || spec.dampingRatio <= 0 || spec.threshold <= 0 || spec.bezier[0] < 0 || spec.bezier[0] > 1 || spec.bezier[2] < 0 || spec.bezier[2] > 1) throw std::invalid_argument("Arrange invalid content-size animation spec");
+                } else if constexpr (std::is_same_v<T, PaintModifier>) {
+                    finite(input.alpha);
+                    if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("paint alpha 必须在 0..1 之间");
+                    if (!isImageAlignment(input.alignment)) throw std::invalid_argument("paint 对齐值无效");
+                    if (input.contentScale != "Fit" && input.contentScale != "Crop" && input.contentScale != "FillBounds" && input.contentScale != "Inside" && input.contentScale != "None" && input.contentScale != "FillWidth" && input.contentScale != "FillHeight") throw std::invalid_argument("paint 缩放模式无效");
+                    if (input.painter.content && input.painter.content->intrinsicSize) {
+                        const auto size = *input.painter.content->intrinsicSize;
+                        finite(size.width);
+                        finite(size.height);
+                        if (size.width < 0 || size.height < 0) throw std::invalid_argument("Painter 固有尺寸不能为负数");
+                    }
+                } else if constexpr (std::is_same_v<T, TextModifier>)
+                    validateTextPresentation(input);
+                else if constexpr (std::is_same_v<T, TextFieldModifier>)
+                    validateTextPresentation(input.presentation);
+                else if constexpr (std::is_same_v<T, ClipModifier>)
+                    validateModifierValue(input.shape);
+                else if constexpr (std::is_same_v<T, TransformModifierSemantics>) {
+                    for (auto number : {input.translationX, input.translationY, input.scaleX, input.scaleY, input.rotationZ, input.transformOriginX, input.transformOriginY, input.alpha}) finite(number);
+                    if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange graphicsLayer alpha must be within [0, 1]");
+                } else if constexpr (std::is_same_v<T, OffsetModifier>) {
+                    finite(input.x);
+                    finite(input.y);
+                } else if constexpr (std::is_same_v<T, ZIndexModifier>)
+                    finite(input.value);
+                else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
+                    finite(input.weight);
+                    if (input.weight < 0) throw std::invalid_argument("Arrange weight must be nonnegative");
+                    if (input.kind == ParentDataKind::Align && !isImageAlignment(input.align) && input.align != "Baseline") throw std::invalid_argument("Arrange Modifier.align 不支持对齐值：'" + input.align + "'");
                 }
-            }
-            else if constexpr (std::is_same_v<T, TextModifier>) validateTextPresentation(input);
-            else if constexpr (std::is_same_v<T, TextFieldModifier>) validateTextPresentation(input.presentation);
-            else if constexpr (std::is_same_v<T, ClipModifier>) validateModifierValue(input.shape);
-            else if constexpr (std::is_same_v<T, TransformModifierSemantics>) {
-                for (auto number : {input.translationX, input.translationY, input.scaleX, input.scaleY, input.rotationZ, input.transformOriginX, input.transformOriginY, input.alpha}) finite(number);
-                if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange graphicsLayer alpha must be within [0, 1]");
-            }
-            else if constexpr (std::is_same_v<T, OffsetModifier>) { finite(input.x); finite(input.y); }
-            else if constexpr (std::is_same_v<T, ZIndexModifier>) finite(input.value);
-            else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
-                finite(input.weight);
-                if (input.weight < 0) throw std::invalid_argument("Arrange weight must be nonnegative");
-                if (input.kind == ParentDataKind::Align && !isImageAlignment(input.align) && input.align != "Baseline") throw std::invalid_argument("Arrange Modifier.align 不支持对齐值：'" + input.align + "'");
-            }
-        }, value);
+            },
+            value);
     }
 
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after) {
@@ -194,7 +201,8 @@ namespace arrange::core {
     std::vector<std::size_t> matchModifierDescriptors(std::span<const ModifierDescriptor* const> previous, const ModifierDescriptors& next) {
         // key 允许移动，无 key 按类型及相对次序匹配；FFI 回调和原生实例使用同一规则
         std::unordered_map<std::string, std::size_t> keyed;
-        for (std::size_t i = 0; i < previous.size(); ++i) if (!previous[i]->key.empty()) keyed.emplace(previous[i]->key, i);
+        for (std::size_t i = 0; i < previous.size(); ++i)
+            if (!previous[i]->key.empty()) keyed.emplace(previous[i]->key, i);
         std::vector<bool> used(previous.size(), false);
         std::vector<std::size_t> matches;
         matches.reserve(next.size());
@@ -203,10 +211,13 @@ namespace arrange::core {
             auto match = previous.size();
             if (!descriptor.key.empty()) {
                 if (auto found = keyed.find(descriptor.key); found != keyed.end() && !used[found->second] && sameModifierKind(previous[found->second]->value, descriptor.value)) match = found->second;
-            }
-            else {
+            } else {
                 for (auto i = cursor; i < previous.size(); ++i) {
-                    if (!used[i] && previous[i]->key.empty() && sameModifierKind(previous[i]->value, descriptor.value)) { match = i; cursor = i + 1; break; }
+                    if (!used[i] && previous[i]->key.empty() && sameModifierKind(previous[i]->value, descriptor.value)) {
+                        match = i;
+                        cursor = i + 1;
+                        break;
+                    }
                 }
             }
             if (match < previous.size()) used[match] = true;
@@ -235,27 +246,31 @@ namespace arrange::core {
                 if (match != next.size()) result.dirty |= kMeasure;
                 instance.descriptor = descriptor;
                 next.push_back(std::move(instance));
-            }
-            else {
+            } else {
                 // identity 在进程生命周期内不复用；generation 保留在协议中供显式代际校验
                 next.push_back({{allocateRuntimeIdentity(), 1}, descriptor, {}, {}, {}, {}});
                 result.dirty |= kMeasure;
             }
         }
         for (std::size_t i = 0; i < elements_.size(); ++i) {
-            if (!used[i]) { result.retired.push_back(elements_[i].handle); result.dirty |= kMeasure; }
+            if (!used[i]) {
+                result.retired.push_back(elements_[i].handle);
+                result.dirty |= kMeasure;
+            }
         }
         elements_ = std::move(next);
         return result;
     }
 
     ModifierInstance* ModifierChain::find(ModifierHandle handle) {
-        for (auto& instance : elements_) if (instance.handle == handle) return &instance;
+        for (auto& instance : elements_)
+            if (instance.handle == handle) return &instance;
         return nullptr;
     }
 
     const ModifierInstance* ModifierChain::find(ModifierHandle handle) const {
-        for (const auto& instance : elements_) if (instance.handle == handle) return &instance;
+        for (const auto& instance : elements_)
+            if (instance.handle == handle) return &instance;
         return nullptr;
     }
 
@@ -273,8 +288,11 @@ namespace arrange::core {
         ParentDataModifierSemantics result;
         for (const auto& instance : elements_) {
             if (const auto* input = std::get_if<ParentDataModifierSemantics>(&instance.descriptor.value)) {
-                if (input->kind == ParentDataKind::Weight) { result.weight = input->weight; result.weightFill = input->weightFill; }
-                else result.align = input->align;
+                if (input->kind == ParentDataKind::Weight) {
+                    result.weight = input->weight;
+                    result.weightFill = input->weightFill;
+                } else
+                    result.align = input->align;
             }
         }
         return result;
@@ -282,7 +300,8 @@ namespace arrange::core {
 
     float ModifierChain::zIndex() const {
         float result = 0;
-        for (const auto& instance : elements_) if (const auto* input = std::get_if<ZIndexModifier>(&instance.descriptor.value)) result += input->value;
+        for (const auto& instance : elements_)
+            if (const auto* input = std::get_if<ZIndexModifier>(&instance.descriptor.value)) result += input->value;
         return result;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

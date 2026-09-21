@@ -1,4 +1,4 @@
-import {syncArrangeVersionContract} from "./version-contract.ts"
+import { syncArrangeVersionContract } from "./version-contract.ts"
 
 syncArrangeVersionContract()
 console.log("synced Arrange version contract")

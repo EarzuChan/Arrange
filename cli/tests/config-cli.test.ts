@@ -1,28 +1,28 @@
 import assert from "node:assert/strict"
-import {test} from "node:test"
-import {createServer} from "node:http"
-import {once} from "node:events"
-import {execFile} from "node:child_process"
-import {promisify} from "node:util"
-import {fileURLToPath} from "node:url"
-import {join} from "node:path"
-import {readFile, readdir, rm} from "node:fs/promises"
-import {fixture, write} from "./fixture.ts"
-import {ProjectStateStore} from "../src/project/ProjectStateStore.ts"
-import {managedFiles} from "../src/sync/ConfigScanner.ts"
-import {cmakeListsFile} from "../src/cmake/CmakeStuffs.ts"
-import {cliCompatibility} from "../src/CliMetadata.ts"
+import { test } from "node:test"
+import { createServer } from "node:http"
+import { once } from "node:events"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
+import { fileURLToPath } from "node:url"
+import { join } from "node:path"
+import { readFile, readdir, rm } from "node:fs/promises"
+import { fixture, write } from "./fixture.ts"
+import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
+import { managedFiles } from "../src/sync/ConfigScanner.ts"
+import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
+import { cliCompatibility } from "../src/CliMetadata.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
 
 async function cli(root: string, args: string[]) {
     try {
-        const result = await exec(process.execPath, ["--experimental-transform-types", sourceEntry, ...args], {cwd: root, env: {...process.env, NODE_NO_WARNINGS: "1"}, timeout: 15000})
-        return {...result, code: 0}
+        const result = await exec(process.execPath, ["--experimental-transform-types", sourceEntry, ...args], { cwd: root, env: { ...process.env, NODE_NO_WARNINGS: "1" }, timeout: 15000 })
+        return { ...result, code: 0 }
     } catch (error) {
-        const failure = error as Error & {code: number, stdout: string, stderr: string}
-        return {stdout: failure.stdout, stderr: failure.stderr, code: failure.code}
+        const failure = error as Error & { code: number, stdout: string, stderr: string }
+        return { stdout: failure.stdout, stderr: failure.stderr, code: failure.code }
     }
 }
 
@@ -32,7 +32,7 @@ test("真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async
     const server = createServer((request, response) => {
         requests.push(request.url ?? "")
         response.setHeader("Content-Type", "application/json")
-        response.end(JSON.stringify({version: state.project.framework.version, arrange: {cliCompatibility}}))
+        response.end(JSON.stringify({ version: state.project.framework.version, arrange: { cliCompatibility } }))
     })
     server.listen(0, "127.0.0.1")
     await once(server, "listening")
@@ -51,7 +51,7 @@ test("真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async
     assert.equal(scan.code, 0, scan.stderr)
     assert.match(scan.stdout, /Applicable .*cmake.plugin-version/)
     assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), before)
-    await assert.rejects(readdir(join(state.rootDir, ".arrange")), {code: "ENOENT"})
+    await assert.rejects(readdir(join(state.rootDir, ".arrange")), { code: "ENOENT" })
 
     const applied = await cli(state.rootDir, ["sync", "--config"])
     assert.equal(applied.code, 0, applied.stderr + applied.stdout)

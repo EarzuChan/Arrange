@@ -1,4 +1,4 @@
-﻿import {checkbox, input, select} from "@inquirer/prompts"
+import { checkbox, input, select } from "@inquirer/prompts"
 
 export type Choice<T> = {
     name: string
@@ -8,7 +8,7 @@ export type Choice<T> = {
     checked?: boolean
 }
 
-export async function promptRequiredText(message: string, args: {hint: string; validate?: (value: string) => true | string | Promise<true | string>}): Promise<string> {
+export async function promptRequiredText(message: string, args: { hint: string; validate?: (value: string) => true | string | Promise<true | string> }): Promise<string> {
     return input({
         message: `${message} (${args.hint})`,
         required: true,
@@ -21,7 +21,7 @@ export async function promptRequiredText(message: string, args: {hint: string; v
     })
 }
 
-export async function promptOptionalText(message: string, args: {defaultValue: string; hint: string; validate?: (value: string) => true | string | Promise<true | string>}): Promise<string> {
+export async function promptOptionalText(message: string, args: { defaultValue: string; hint: string; validate?: (value: string) => true | string | Promise<true | string> }): Promise<string> {
     return input({
         message: `${message} (${args.hint})`,
         default: args.defaultValue,
@@ -35,7 +35,7 @@ export async function promptOptionalText(message: string, args: {defaultValue: s
 }
 
 export async function promptSelect<T>(message: string, choices: Array<Choice<T>>): Promise<T> {
-    return select({message, choices, loop: false})
+    return select({ message, choices, loop: false })
 }
 
 export async function promptCheckbox<T>(message: string, choices: Array<Choice<T>>, required = true): Promise<T[]> {
@@ -50,7 +50,7 @@ export async function promptCheckbox<T>(message: string, choices: Array<Choice<T
 
 export async function promptExplicitConfirm(message: string): Promise<boolean> {
     return promptSelect(message, [
-        {name: "Yes", value: true},
-        {name: "No", value: false},
+        { name: "Yes", value: true },
+        { name: "No", value: false },
     ])
 }

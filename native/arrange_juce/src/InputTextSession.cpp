@@ -10,6 +10,6 @@ namespace arrange::juce {
         viewportX_ = 0.0f;
         temporaryUnderlines_.clear();
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

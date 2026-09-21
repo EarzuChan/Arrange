@@ -14,21 +14,12 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class DiagnosticsScene final {
-    public:
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildErrorScreen(
-            ::juce::Rectangle<int> editorBounds,
-            const ErrorScreenModel& error,
-            bool detailed) const;
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildBadge(
-            ::juce::Rectangle<int> editorBounds,
-            const DiagnosticsBadgeModel& model,
-            DiagnosticVisibility visibility) const;
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildToasts(
-            ::juce::Rectangle<int> editorBounds,
-            const std::vector<DiagnosticsToastModel>& toasts,
-            DiagnosticVisibility visibility) const;
+       public:
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildErrorScreen(::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const;
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility) const;
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildToasts(::juce::Rectangle<int> editorBounds, const std::vector<DiagnosticsToastModel>& toasts, DiagnosticVisibility visibility) const;
 
-    private:
+       private:
         static arrange::core::Rect rect(::juce::Rectangle<int> value) noexcept;
         static arrange::core::DrawOp fill(arrange::core::Rect rect, std::uint32_t color, float radius = 0.0f);
         static arrange::core::DrawOp stroke(arrange::core::Rect rect, std::uint32_t color, float width = 1.0f, float radius = 0.0f);
@@ -36,4 +27,4 @@ namespace arrange::juce {
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

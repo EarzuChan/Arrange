@@ -12,28 +12,14 @@ namespace arrange::juce {
     class RuntimeSessionState;
 
     class RuntimePackageBinder final {
-    public:
-        void apply(
-            PackageLoadOutcome outcome,
-            RuntimeSessionState& session,
-            ArrangeRuntime& runtime,
-            DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            PassivePaintRenderer& paint) const;
+       public:
+        void apply(PackageLoadOutcome outcome, RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint) const;
 
-    private:
-        static void resetRuntimeState(
-            RuntimeSessionState& session,
-            ArrangeRuntime& runtime,
-            DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            PassivePaintRenderer& paint);
+       private:
+        static void resetRuntimeState(RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint);
 
-        static void emitDiagnostic(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime,
-            RuntimeLoadDiagnostic diagnostic);
+        static void emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadDiagnostic diagnostic);
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

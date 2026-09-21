@@ -15,12 +15,12 @@
         </Row>
 
         <KeepAlive :cacheKey="page">
-            <RetainedEditor v-if="page === '笔记'" />
+            <RetainedEditor a-if="page === '笔记'" />
         </KeepAlive>
 
-        <Text v-if="page === '详情'" :text="details" :textStyle="{ fontSize: 13, color: 0xff61d6bb }" :modifier="M.padding(8)" />
+        <Text a-if="page === '详情'" :text="details" :textStyle="{ fontSize: 13, color: 0xff61d6bb }" :modifier="M.padding(8)" />
 
-        <Column v-if="page === '列表'" :vertical-arrangement="Arrangement.spacedBy(8)">
+        <Column a-if="page === '列表'" :vertical-arrangement="Arrangement.spacedBy(8)">
             <Input :value="query" :onValueChange="value => query = value" placeholder="筛选音轨" :text-style="{color: 0xffedf4fa}" :modifier="M.width(320).height(30).background(0xff263443).padding(6)" />
 
             <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
@@ -34,7 +34,7 @@
             </Row>
 
             <Column :modifier="M.width(370).height(220).verticalScroll(scroll)" :vertical-arrangement="Arrangement.spacedBy(4)">
-                <GalleryItem v-for="item in filtered" :key="item.id" :item="item" :selected="selected === item.id" :tone="tone" :on-select="select" />
+                <GalleryItem a-for="item in filtered" :key="item.id" :item="item" :selected="selected === item.id" :tone="tone" :on-select="select" />
             </Column>
 
             <Text :text="`显示 ${filtered.length} 条 · 选中 ${selected}`" :text-style="{fontSize: 11, color: 0xff91a6b8}" />
@@ -51,25 +51,31 @@
 </template>
 
 <script>
-import {Arrangement, Text, KeepAlive, AnimatedVisibility, Crossfade, computed, createScrollState, onScopeDispose, M, ref, tween, watch} from '@arrange/framework'
+import { Arrangement, M } from '@arrange/framework/ui'
+import { Text, KeepAlive } from '@arrange/framework/foundation'
+import { AnimatedVisibility, Crossfade, tween } from '@arrange/framework/animation'
+import { computed, createScrollState, onScopeDispose, ref, watch } from '@arrange/framework'
 import GalleryButton from './GalleryButton.sfa'
 import GalleryItem from './GalleryItem.sfa'
 import RetainedEditor from './RetainedEditor.sfa'
 
-const props = defineProps({command: {type: String, default: ''}})
+const props = defineProps({ command: { type: String, default: '' } })
 const page = ref('列表')
 const query = ref('')
 const selected = ref(1)
 const tone = ref(0xff356b7a)
 const shown = ref(true)
 const scroll = createScrollState()
-const items = ref(Array.from({length: 80}, (_, index) => ({id: index + 1, name: `音轨 ${index + 1}`})))
+const items = ref(Array.from({ length: 80 }, (_, index) => ({ id: index + 1, name: `音轨 ${index + 1}` })))
 const filtered = computed(() => items.value.filter(item => item.name.includes(query.value)))
-const spec = tween({durationMillis: 240})
+const spec = tween({ durationMillis: 240 })
 let release: (() => void) | undefined
 let request = 0
 const details = ref('详情正在等待，点击完成加载')
-onScopeDispose(() => { request++; release = undefined })
+onScopeDispose(() => {
+    request++
+    release = undefined
+})
 
 function makeAsyncDetails() {
     const identity = ++request
@@ -101,7 +107,7 @@ function run(command: string) {
             break
 
         case 'restore':
-            items.value = Array.from({length: 80}, (_, index) => ({id: index + 1, name: `音轨 ${index + 1}`}))
+            items.value = Array.from({ length: 80 }, (_, index) => ({ id: index + 1, name: `音轨 ${index + 1}` }))
             break
 
         case 'hide':
@@ -133,5 +139,5 @@ function run(command: string) {
     }
 }
 
-watch(() => props.command, value => { if (value) run(value.split(':')[0]) }, {flush: 'sync'})
+watch(() => props.command, value => { if (value) run(value.split(':')[0]) }, { flush: 'sync' })
 </script>

@@ -1,6 +1,5 @@
 #pragma once
 
-
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_gui_basics/juce_gui_basics.h>
 #endif
@@ -15,7 +14,7 @@ namespace arrange::juce {
     struct EditorConfig;
 
     class EditorSceneHost final {
-    public:
+       public:
         EditorSceneHost();
         ~EditorSceneHost();
 
@@ -58,11 +57,10 @@ namespace arrange::juce {
         [[nodiscard]] ::juce::RectangleList<int> textBounds(::juce::Range<int> range) const;
         [[nodiscard]] bool keyPressed(const ::juce::KeyPress& key);
 
-    private:
+       private:
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
 
 #endif
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

@@ -1,0 +1,67 @@
+
+> @arrange/cli@1.0.1 test E:\a_dev\proj\Arrange\cli
+> node --experimental-transform-types --test tests/*.test.ts
+
+(node:25748) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥 (2220.1434ms)
+(node:40616) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 文本位置是父级相对的 outer/inner，支持嵌套、中文及 CRLF (0.999ms)
+✔ Wrapper 缺端、重复、反序、交叉闭合均不提供可写区间 (0.1887ms)
+✔ 子 Region 缺端不冒充父 Cluster 损坏，独立相邻 Region 仍可检查 (0.1162ms)
+✔ optional 文本值 undefined 的 missing/idle/outdated 与生成 (0.1376ms)
+✔ optional 文本值 null 的 missing/idle/outdated 与生成 (0.0759ms)
+✔ optional 文本值  的 missing/idle/outdated 与生成 (0.0737ms)
+✔ optional 文本值 https://registry.example 的 missing/idle/outdated 与生成 (0.0612ms)
+✔ 受管正文逐字符比较，不 trim，不解析语义 (0.1053ms)
+✔ JSON 矩阵：有值而缺失 (0.5095ms)
+✔ JSON 矩阵：相等 (0.1054ms)
+✔ JSON 矩阵：类型不同 (0.0542ms)
+✔ JSON 矩阵：值不同 (0.0628ms)
+✔ JSON 矩阵：不存在且缺失 (0.0422ms)
+✔ JSON 矩阵：不存在但显式 null (0.0653ms)
+✔ JSON 矩阵：配置 null 期望字段不存在 (0.0426ms)
+✔ JSON 矩阵：中间容器损坏 (0.0784ms)
+✔ JSON 值比较尊重对象成员、数组顺序，更新保持兄弟字段和原型安全 (0.3243ms)
+✔ 非法配置不能生成期望，null 不被误作空字符串 (1.5722ms)
+✔ 同级 Wrapper 嵌套不得提供可重叠的更新区间 (0.0699ms)
+(node:12736) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 同源生成后全部 Idle；检查本身无副作用 (22.7122ms)
+✔ 关闭的 ManagedItem 不检查缺失父级、裸内容或损坏 Wrapper (7.0682ms)
+✔ Fatal、Resolvable、Idle、Applicable 完整收集；Fatal 阻止交互与 Apply (18.407ms)
+✔ 文件缺失只报告文件，不调用子级 check；独立分支继续 (10.4078ms)
+✔ 每轮 Resolve 只处理一项，文件创建后重扫，最终 Apply 后不复检 (51.1175ms)
+✔ 文本精确更新多个 Region，保留 Wrapper、自定义内容和关闭的 Region (23.3702ms)
+✔ 扫描模式只展示 Applicable，退出成功且不建立 .arrange (13.3553ms)
+✔ 范围过滤仅扫描选中分支，不改变 ManagedItem 开关 (9.6713ms)
+✔ 名称和 Framework 版本共同更新 UI/native，保留 CMake target、源路径及自定义内容 (30.3017ms)
+✔ 只托管 FetchContent 仓库地址时，版本的文本与 JSON 均不更新 (25.505ms)
+✔ 只托管 Framework 版本时更新两端，保留未托管仓库地址 (44.4135ms)
+✔ 跨范围 ManagedItem 在 UI 同步时只更新所选分支，不改变共同开关 (28.1764ms)
+✔ 跨范围 ManagedItem 在 Native 同步时只更新所选分支，不改变共同开关 (24.8768ms)
+✔ 关闭共同开关：创建时生成裸文本和 JSON 初值，同步忽略两端即使有损坏 Wrapper (7.7172ms)
+✔ 共同名称的一端缺文件时另一端仍报告过期，取消恢复不能提前更新另一端 (12.9577ms)
+✔ 已有内容补 Wrapper 后保留到重扫，再按配置 Apply (29.7772ms)
+✔ Marker 建立 Region，保留父级自定义内容并删除一次性 Marker (30.3239ms)
+✔ 交互时 YAML 改变，重载开关，不依据旧 Marker 写入 (14.7656ms)
+✔ JSON 缺字段确认补入，类型损坏只允许手改；取消无写入 (32.3713ms)
+✔ 扫描后文件或 YAML 被外部修改，Apply 拒绝且不覆写 (15.8744ms)
+✔ 多文件写入中断保留原文、目标及进度，能区分已写、未写、冲突 (31.3878ms)
+✔ 坏 YAML 收集双方诊断；local 坏时仍扫描独立工程文件；目录目标 Fatal (19.3764ms)
+✔ 同一 ManagedItem 跨文本和 JSON，一支缺失不阻止另一支扫描 (23.2709ms)
+✔ 兼容性失败为 Fatal；SETUP 未实现不能伪装成功 (13.2319ms)
+✔ Marker 新建 Cluster，子 Region 重扫后才出现 (27.402ms)
+✔ 重复 Marker 和错误父级内的 Marker 均不写入 (32.2899ms)
+✔ 交互修复损坏 Wrapper 后全量重扫；未修好仍为同一 Issue (17.8008ms)
+✔ 文件创建确认期间出现同名文件，拒绝覆盖 (13.893ms)
+✔ 两套同步服务并发执行，各自使用自己的存储、registry 与交互 (47.2469ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2445.932

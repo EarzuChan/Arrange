@@ -11,8 +11,7 @@ namespace arrange::quickjs {
         if (ctx_ != nullptr) JS_FreeValue(ctx_, value_);
     }
 
-    ScopedValue::ScopedValue(ScopedValue&& other) noexcept
-        : ctx_(other.ctx_), value_(other.value_) {
+    ScopedValue::ScopedValue(ScopedValue&& other) noexcept : ctx_(other.ctx_), value_(other.value_) {
         other.ctx_ = nullptr;
         other.value_ = JS_UNDEFINED;
     }
@@ -166,6 +165,6 @@ namespace arrange::quickjs {
         }
         return result.empty() ? "QuickJS exception" : result;
     }
-}
+}  // namespace arrange::quickjs
 
 #endif

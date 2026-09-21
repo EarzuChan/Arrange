@@ -103,13 +103,15 @@ namespace arrange::quickjs {
             resizeScriptMemory,
             [](const void* pointer) -> std::size_t { return pointer ? (static_cast<const AllocationHeader*>(pointer) - 1)->size : 0; },
         };
-    }
+    }  // namespace
 
     struct QuickJsScriptHost::Impl {
         ScriptMemoryStats memory;
         QuickJsRuntimeContext runtime;
 
-        ~Impl() { reset(); }
+        ~Impl() {
+            reset();
+        }
 
         void reset() {
             if (runtime.context != nullptr) {
@@ -167,18 +169,21 @@ namespace arrange::quickjs {
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
             runtime.context = JS_NewContext(runtime.runtime);
             if (!runtime.context) throw std::bad_alloc();
-            JS_SetHostPromiseRejectionTracker(runtime.runtime, [](JSContext* context, JSValueConst promise, JSValueConst reason, bool handled, void* opaque) {
-                auto& state = *static_cast<QuickJsRuntimeContext*>(opaque);
-                if (handled) {
-                    std::erase_if(state.unhandledRejections, [&](const auto& entry) {
-                        if (!JS_IsStrictEqual(context, promise, entry.first)) return false;
-                        JS_FreeValue(context, entry.first);
-                        JS_FreeValue(context, entry.second);
-                        return true;
-                    });
-                }
-                else state.unhandledRejections.emplace_back(JS_DupValue(context, promise), JS_DupValue(context, reason));
-            }, &runtime);
+            JS_SetHostPromiseRejectionTracker(
+                runtime.runtime,
+                [](JSContext* context, JSValueConst promise, JSValueConst reason, bool handled, void* opaque) {
+                    auto& state = *static_cast<QuickJsRuntimeContext*>(opaque);
+                    if (handled) {
+                        std::erase_if(state.unhandledRejections, [&](const auto& entry) {
+                            if (!JS_IsStrictEqual(context, promise, entry.first)) return false;
+                            JS_FreeValue(context, entry.first);
+                            JS_FreeValue(context, entry.second);
+                            return true;
+                        });
+                    } else
+                        state.unhandledRejections.emplace_back(JS_DupValue(context, promise), JS_DupValue(context, reason));
+                },
+                &runtime);
             runtime.events.reset(runtime.context);
             JS_SetContextOpaque(runtime.context, &runtime);
             runtime.painters = std::make_unique<QuickJsPainterResources>(runtime.context, runtime.painterLoader);
@@ -201,18 +206,32 @@ namespace arrange::quickjs {
     };
 
     QuickJsScriptHost::QuickJsScriptHost() : impl_(std::make_unique<Impl>()) {}
+
     QuickJsScriptHost::~QuickJsScriptHost() = default;
 
-    void QuickJsScriptHost::setPainterLoader(arrange::core::PainterLoader loader) { impl_->runtime.painterLoader = std::move(loader); }
+    void QuickJsScriptHost::setPainterLoader(arrange::core::PainterLoader loader) {
+        impl_->runtime.painterLoader = std::move(loader);
+    }
 
     std::size_t QuickJsScriptHost::eventSlotCount() const noexcept {
         return impl_ ? impl_->runtime.events.size() : 0;
     }
 
-    std::size_t QuickJsScriptHost::bindingCount() const noexcept { return impl_ ? impl_->runtime.bindings.size() : 0; }
-    std::size_t QuickJsScriptHost::modifierInstanceCount() const noexcept { return impl_ ? impl_->runtime.publishedModifiers.size() : 0; }
-    std::uint64_t QuickJsScriptHost::rejectedBindingUpdates() const noexcept { return impl_ ? impl_->runtime.rejectedBindingUpdates : 0; }
-    ScriptMemoryStats QuickJsScriptHost::memoryStats() const noexcept { return impl_ ? impl_->memory : ScriptMemoryStats{}; }
+    std::size_t QuickJsScriptHost::bindingCount() const noexcept {
+        return impl_ ? impl_->runtime.bindings.size() : 0;
+    }
+
+    std::size_t QuickJsScriptHost::modifierInstanceCount() const noexcept {
+        return impl_ ? impl_->runtime.publishedModifiers.size() : 0;
+    }
+
+    std::uint64_t QuickJsScriptHost::rejectedBindingUpdates() const noexcept {
+        return impl_ ? impl_->runtime.rejectedBindingUpdates : 0;
+    }
+
+    ScriptMemoryStats QuickJsScriptHost::memoryStats() const noexcept {
+        return impl_ ? impl_->memory : ScriptMemoryStats{};
+    }
 
     CallbackInvokeResult QuickJsScriptHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {
         if (!impl_) return {true, {}};
@@ -220,8 +239,10 @@ namespace arrange::quickjs {
         if (!submission || submission->cancelled || submission != state.rearrangeSubmission || JS_IsUndefined(state.rearrangeCompletion)) return {true, {}};
         const auto callback = state.rearrangeCompletion;
         state.rearrangeCompletion = JS_UNDEFINED;
-        if (error.empty()) state.commitRearrange();
-        else state.abortRearrange();
+        if (error.empty())
+            state.commitRearrange();
+        else
+            state.abortRearrange();
 
         auto argument = error.empty() ? JS_UNDEFINED : JS_NewStringLen(state.context, error.data(), error.size());
         ScopedValue result(state.context, JS_Call(state.context, callback, JS_UNDEFINED, 1, &argument));
@@ -379,6 +400,6 @@ namespace arrange::quickjs {
         if (!drained.ok) return {false, drained.error};
         return {true, {}};
     }
-} // namespace arrange::quickjs
+}  // namespace arrange::quickjs
 
 #endif

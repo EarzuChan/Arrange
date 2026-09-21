@@ -13,34 +13,25 @@ namespace arrange::juce {
     struct RuntimeFramePumpResult;
 
     class RuntimeSessionState final {
-    public:
-        void reset(
-            ArrangeRuntime& runtime,
-            DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction);
+       public:
+        void reset(ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction);
 
         void resize(int width, int height, ArrangeRuntime& runtime) noexcept;
         [[nodiscard]] arrange::core::Constraints constraints() const noexcept;
 
         void markLoaded() noexcept;
         void markUnloaded() noexcept;
-        void setLayoutTreeEmptyError(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime);
+        void setLayoutTreeEmptyError(DiagnosticsState& diagnostics, ArrangeRuntime& runtime);
         [[nodiscard]] bool loaded() const noexcept;
         [[nodiscard]] bool interactive(const DiagnosticsState& diagnostics) const noexcept;
 
-        [[nodiscard]] bool applyFrameError(
-            const RuntimeFramePumpResult& frame,
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime,
-            const std::filesystem::path& relatedPath);
+        [[nodiscard]] bool applyFrameError(const RuntimeFramePumpResult& frame, DiagnosticsState& diagnostics, ArrangeRuntime& runtime, const std::filesystem::path& relatedPath);
 
-    private:
+       private:
         bool loaded_ = false;
         int width_ = 0;
         int height_ = 0;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

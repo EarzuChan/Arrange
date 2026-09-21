@@ -29,4 +29,4 @@ namespace arrange::juce {
         }
         ticking_ = false;
     }
-}
+}  // namespace arrange::juce

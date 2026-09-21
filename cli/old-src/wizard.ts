@@ -1,13 +1,13 @@
-﻿import {mkdirSync} from "node:fs"
-import {relative, resolve} from "node:path"
-import type {ArrangeConfig, PackageManager, PluginType, Product} from "./config.ts"
-import {defaultConfig, writeProjectConfig} from "./config.ts"
-import {CLI_COMPATIBILITY, DEFAULT_FRAMEWORK_VERSION} from "./constants.ts"
-import {cmakeBuildDir, cmakeConfigureArgs, ensureProjectFiles} from "./project.ts"
-import {run} from "./process.ts"
-import {assertCompatible, candidateIncompatibility, fetchFrameworkCandidates, fetchFrameworkMetadata, normalizeRegistryUrl, type FrameworkVersionCandidate} from "./framework.ts"
-import {ensureToolchain} from "./local.ts"
-import {promptCheckbox, promptExplicitConfirm, promptRequiredText, promptSelect} from "./prompt.ts"
+import { mkdirSync } from "node:fs"
+import { relative, resolve } from "node:path"
+import type { ArrangeConfig, PackageManager, PluginType, Product } from "./config.ts"
+import { defaultConfig, writeProjectConfig } from "./config.ts"
+import { CLI_COMPATIBILITY, DEFAULT_FRAMEWORK_VERSION } from "./constants.ts"
+import { cmakeBuildDir, cmakeConfigureArgs, ensureProjectFiles } from "./project.ts"
+import { run } from "./process.ts"
+import { assertCompatible, candidateIncompatibility, fetchFrameworkCandidates, fetchFrameworkMetadata, normalizeRegistryUrl, type FrameworkVersionCandidate } from "./framework.ts"
+import { ensureToolchain } from "./local.ts"
+import { promptCheckbox, promptExplicitConfirm, promptRequiredText, promptSelect } from "./prompt.ts"
 
 export type WizardOptions = {
     registry?: string
@@ -22,29 +22,29 @@ export async function createProject(options: WizardOptions = {}): Promise<void> 
     const projectName = await promptProjectName()
     const projectVersion = await promptSemver("Project version")
     const frameworkVersion = await chooseFrameworkVersion(registry)
-    const companyName = await promptRequiredText("Company name", {hint: "non-empty text, for example your company or author name"})
+    const companyName = await promptRequiredText("Company name", { hint: "non-empty text, for example your company or author name" })
     const companyCode = await promptCode("Company code")
     const pluginCode = await promptCode("Plugin code")
     const pluginType = await promptSelect<PluginType>("Plugin type", [
-        {name: "Effect", value: "effect", description: "Audio effect plugin."},
-        {name: "Instrument", value: "instrument", description: "Synth or instrument plugin."},
+        { name: "Effect", value: "effect", description: "Audio effect plugin." },
+        { name: "Instrument", value: "instrument", description: "Synth or instrument plugin." },
     ])
     const packageManager = await promptSelect<PackageManager>("UI package manager", [
-        {name: "pnpm", value: "pnpm"},
-        {name: "npm", value: "npm"},
+        { name: "pnpm", value: "pnpm" },
+        { name: "npm", value: "npm" },
     ])
     const products = await promptProducts()
     const location = await promptSelect<"subdir" | "current">("Where should the project be created?", [
-        {name: `Create in ./${projectName}`, value: "subdir", description: "Recommended for a new project."},
-        {name: "Create in the current directory", value: "current", description: "Use only when the current directory is already the project root."},
+        { name: `Create in ./${projectName}`, value: "subdir", description: "Recommended for a new project." },
+        { name: "Create in the current directory", value: "current", description: "Use only when the current directory is already the project root." },
     ])
     const projectRoot = location === "subdir" ? resolve(process.cwd(), projectName) : process.cwd()
-    const config = defaultConfig({frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products})
+    const config = defaultConfig({ frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products })
     printSummary(config, projectRoot)
     if (!await promptExplicitConfirm("Create this Arrange project?")) return
-    mkdirSync(projectRoot, {recursive: true})
+    mkdirSync(projectRoot, { recursive: true })
     writeProjectConfig(config, projectRoot)
-    const changed = ensureProjectFiles(config, projectRoot, {scope: "all", registry})
+    const changed = ensureProjectFiles(config, projectRoot, { scope: "all", registry })
     reportProjectChanges(changed, "Project scaffolded")
     if (await promptExplicitConfirm("Run sync now?")) await runToolchainSync(config, projectRoot, registry)
     printCreateNextSteps(projectRoot)
@@ -53,39 +53,39 @@ export async function createProject(options: WizardOptions = {}): Promise<void> 
 // HACK：狗屎
 export async function adoptProject(options: WizardOptions = {}): Promise<void> {
     const registry = options.registry ? normalizeRegistryUrl(options.registry) : undefined
-    const nativePath = await promptRequiredText("Native project path", {hint: "relative or absolute path; use native for the standard layout"})
-    const uiPath = await promptRequiredText("UI project path", {hint: "relative or absolute path; use ui for the standard layout"})
+    const nativePath = await promptRequiredText("Native project path", { hint: "relative or absolute path; use native for the standard layout" })
+    const uiPath = await promptRequiredText("UI project path", { hint: "relative or absolute path; use ui for the standard layout" })
     const projectName = await promptProjectName()
     const projectVersion = await promptSemver("Project version")
     const frameworkVersion = await chooseFrameworkVersion(registry)
-    const companyName = await promptRequiredText("Company name", {hint: "non-empty text, for example your company or author name"})
+    const companyName = await promptRequiredText("Company name", { hint: "non-empty text, for example your company or author name" })
     const companyCode = await promptCode("Company code")
     const pluginCode = await promptCode("Plugin code")
     const pluginType = await promptSelect<PluginType>("Plugin type", [
-        {name: "Effect", value: "effect"},
-        {name: "Instrument", value: "instrument"},
+        { name: "Effect", value: "effect" },
+        { name: "Instrument", value: "instrument" },
     ])
     const packageManager = await promptSelect<PackageManager>("UI package manager", [
-        {name: "pnpm", value: "pnpm"},
-        {name: "npm", value: "npm"},
+        { name: "pnpm", value: "pnpm" },
+        { name: "npm", value: "npm" },
     ])
     const products = await promptProducts()
-    const config = defaultConfig({frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products, nativePath, uiPath})
+    const config = defaultConfig({ frameworkVersion, projectName, projectVersion, companyName, companyCode, pluginCode, pluginType, packageManager, products, nativePath, uiPath })
     printSummary(config)
     if (!await promptExplicitConfirm("Adopt this Arrange project?")) return
     writeProjectConfig(config)
-    const changed = ensureProjectFiles(config, process.cwd(), {scope: "all", registry})
+    const changed = ensureProjectFiles(config, process.cwd(), { scope: "all", registry })
     reportProjectChanges(changed, "Project adopted")
     if (await promptExplicitConfirm("Run sync now?")) await runToolchainSync(config, process.cwd(), registry)
 }
 
 async function runToolchainSync(config: ArrangeConfig, projectRoot: string, registry?: string): Promise<void> {
-    const toolchain = await ensureToolchain(config, projectRoot, {ui: true, native: true})
+    const toolchain = await ensureToolchain(config, projectRoot, { ui: true, native: true })
     if (!toolchain.cmake) throw new Error("Native sync requires CMake, but arrange.local.yaml does not provide it.")
     const installArgs = registry ? ["install", "--registry", registry] : ["install"]
-    await run(toolchain.packageManagerCommand!, installArgs, {cwd: resolve(projectRoot, config.ui.path), toolchain, label: `${config.ui.packageManager} install`})
-    mkdirSync(cmakeBuildDir(config, projectRoot, "debug"), {recursive: true})
-    await run(toolchain.cmake.command, cmakeConfigureArgs(config, projectRoot, "debug", toolchain.cmake), {cwd: projectRoot, toolchain, msvc: true, label: "cmake configure"})
+    await run(toolchain.packageManagerCommand!, installArgs, { cwd: resolve(projectRoot, config.ui.path), toolchain, label: `${config.ui.packageManager} install` })
+    mkdirSync(cmakeBuildDir(config, projectRoot, "debug"), { recursive: true })
+    await run(toolchain.cmake.command, cmakeConfigureArgs(config, projectRoot, "debug", toolchain.cmake), { cwd: projectRoot, toolchain, msvc: true, label: "cmake configure" })
 }
 
 async function promptProjectName(): Promise<string> {
@@ -111,8 +111,8 @@ async function promptCode(label: string): Promise<string> {
 
 async function promptProducts(): Promise<Product[]> {
     return promptCheckbox<Product>("Products", [
-        {name: "Standalone", value: "standalone", checked: true},
-        {name: "VST3", value: "vst3", checked: true},
+        { name: "Standalone", value: "standalone", checked: true },
+        { name: "VST3", value: "vst3", checked: true },
     ])
 }
 
@@ -138,17 +138,17 @@ async function chooseFrameworkVersion(registry?: string): Promise<string> {
                     disabled: incompatibility ?? false,
                 }
             }),
-            {name: "Custom version", value: custom},
+            { name: "Custom version", value: custom },
         ])
         if (selected !== custom) return selected.version
         const version = await promptSemver("Custom Arrange framework version")
         try {
             const metadata = await fetchFrameworkMetadata(version, registry)
             assertCompatible(metadata)
-            const candidate: FrameworkVersionCandidate = {version: metadata.version, cliCompatibility: metadata.cliCompatibility, latest: false, stable: !metadata.version.includes("-"), publishedAt: null}
+            const candidate: FrameworkVersionCandidate = { version: metadata.version, cliCompatibility: metadata.cliCompatibility, latest: false, stable: !metadata.version.includes("-"), publishedAt: null }
             const existing = candidates.find((item) => item.version === metadata.version)
             candidates = existing
-                ? candidates.map((item) => item.version === metadata.version ? {...candidate, latest: item.latest, publishedAt: item.publishedAt} : item)
+                ? candidates.map((item) => item.version === metadata.version ? { ...candidate, latest: item.latest, publishedAt: item.publishedAt } : item)
                 : [...candidates, candidate]
             console.log(`${existing ? "Updated" : "Added"} @arrange/framework@${metadata.version} in the version list. Select it to continue.`)
         } catch (error) {

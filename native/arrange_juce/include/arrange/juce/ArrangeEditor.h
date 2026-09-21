@@ -67,7 +67,7 @@ namespace arrange::juce {
     class EditorSceneHost;
 
     class EditorShellDriver final {
-    public:
+       public:
         void afterConfigure(ArrangeEditor& editor) const;
         void afterReload(ArrangeEditor& editor) const;
         void afterResize(ArrangeEditor& editor) const;
@@ -78,14 +78,17 @@ namespace arrange::juce {
     };
 
     class ArrangeEditor final : public ::juce::AudioProcessorEditor, public ::juce::TextInputTarget {
-    public:
+       public:
         explicit ArrangeEditor(::juce::AudioProcessor& processor);
         ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig config);
         ~ArrangeEditor() override;
 
         void configure(EditorConfig config);
         void reload();
-        const EditorConfig& config() const noexcept { return config_; }
+
+        const EditorConfig& config() const noexcept {
+            return config_;
+        }
 
         void paint(::juce::Graphics& g) override;
         void resized() override;
@@ -107,7 +110,7 @@ namespace arrange::juce {
         int getCharIndexForPoint(::juce::Point<int> point) const override;
         ::juce::RectangleList<int> getTextBounds(::juce::Range<int> textRange) const override;
 
-    private:
+       private:
         friend class EditorShellDriver;
 
         void updateWindowTitle();
@@ -123,25 +126,31 @@ namespace arrange::juce {
 #else
 
     class ArrangeEditor {
-    public:
+       public:
         template <class Processor>
         explicit ArrangeEditor(Processor&) {}
 
         template <class Processor>
         ArrangeEditor(Processor&, EditorConfig config) : config_(std::move(config)) {}
 
-        void configure(EditorConfig config) { config_ = std::move(config); }
-        void reload() {}
-        const EditorConfig& config() const noexcept { return config_; }
+        void configure(EditorConfig config) {
+            config_ = std::move(config);
+        }
 
-    private:
+        void reload() {}
+
+        const EditorConfig& config() const noexcept {
+            return config_;
+        }
+
+       private:
         EditorConfig config_;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 namespace arrange {
     using ArrangeEditorConfig = juce::EditorConfig;
     using ArrangeEditor = juce::ArrangeEditor;
-} // namespace arrange
+}  // namespace arrange

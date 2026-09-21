@@ -52,7 +52,11 @@
 </template>
 
 <script>
-import { painter, tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, M, onMounted, onUnmounted, ref, createScrollState, shallowRef, sp} from "@arrange/framework"
+import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
+import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef } from "@arrange/framework/animation"
+import { Icon } from "@arrange/framework/foundation"
+import { logger } from "@arrange/framework/internal"
+import { onMounted, onUnmounted, ref, createScrollState, shallowRef } from '@arrange/framework'
 
 import CounterPanel from './view/CounterPanel.sfa'
 import AnimationGallery from './view/AnimationGallery.sfa'
@@ -65,14 +69,14 @@ const firstRef = ref(11)
 const secondRef = ref(29)
 const selectedRefName = ref('firstRef')
 const selectedKey = ref(false)
-const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})
+const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
 const playPainter = painter('icons/play.svg')
 const logoPainter = painter('logo.png')
 
 const preset = ref("Arrangable与动画发廊")
 const rainbow = [0xFFFF3030, 0xFFFFFF30, 0xFF30FF30, 0xFF30FFFF, 0xFF3030FF, 0xFFFF30FF]
 const presetColorTarget = ref(Color(rainbow[0]))
-const presetColor = animatedColorAsRef(presetColorTarget, {animationSpec: tween({durationMillis: 700, easing: linearEasing})})
+const presetColor = animatedColorAsRef(presetColorTarget, { animationSpec: tween({ durationMillis: 700, easing: linearEasing }) })
 let rainbowFrame = 0
 let rainbowStartedAt
 let rainbowSegment = -1
@@ -87,11 +91,11 @@ function advanceRainbow(now: number) {
         presetColorTarget.value = Color(rainbow[(segment + 1) % rainbow.length])
     }
 
-    rainbowFrame = requestAnimationFrame(advanceRainbow)
+    // rainbowFrame = requestAnimationFrame(advanceRainbow) 还是他妈的很卡，不知道第三趴搞完（换动画API）能不能缓解。你妈的，这个动画导致3的CPU占用，何意味？
 }
 
 onMounted(() => {
-    rainbowFrame = requestAnimationFrame(advanceRainbow) // 这实在不是什么好东西。人家compose用Transition和对其animateFloat
+    rainbowFrame = requestAnimationFrame(advanceRainbow) // 第三趴将手工帧回调迁入 Transition
 })
 
 onUnmounted(() => {
@@ -102,7 +106,7 @@ onUnmounted(() => {
 const inputStatus = ref("你来和我（指输入框↑）搞一下嘛")
 const scrollState = createScrollState()
 const pageScroll = createScrollState()
-const counterColor = animatedColorAsRef(() => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})
+const counterColor = animatedColorAsRef(() => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE), { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
 
 function toggleSelectedRef() {
     if (!selectedKey.value) {

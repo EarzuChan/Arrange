@@ -7,7 +7,9 @@ ArrangeDemoProcessor::ArrangeDemoProcessor() : juce::AudioProcessor(BusesPropert
 
 void ArrangeDemoProcessor::prepareToPlay(double, int) {}
 
-bool ArrangeDemoProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const { return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet(); }
+bool ArrangeDemoProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+    return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet();
+}
 
 void ArrangeDemoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
     juce::ScopedNoDenormals noDenormals;
@@ -34,6 +36,9 @@ juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
 }
 
 void ArrangeDemoProcessor::getStateInformation(juce::MemoryBlock&) {}
+
 void ArrangeDemoProcessor::setStateInformation(const void*, int) {}
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new ArrangeDemoProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
+    return new ArrangeDemoProcessor();
+}

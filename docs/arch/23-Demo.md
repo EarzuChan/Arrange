@@ -9,7 +9,7 @@ Demo 是 Arrange 的实际测试场地，也是面向用户的主样板，不是
 - 真实宿主测试插件。
 - 文档截图与 smoke artifact 来源。
 
-Demo 数量宁少勿多。优先维护一个长期成长的主 Demo，而不是多个散装示例。
+Demo 数量宁少勿多。目前是在优先维护一个长期伴生的主 Demo，而不再搞多个散装示例。
 
 Demo 必须走真实消费路径：通过 Arrange CLI 编排工程，TS 侧通过 `@arrange/framework`，C++ 侧通过 `Arrange::framework`。除非确有必要，不另建其它伪 Demo。
 

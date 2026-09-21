@@ -7,9 +7,20 @@
 using namespace arrange::core;
 
 namespace {
-    void check(bool condition, const char* message) { if (!condition) throw std::runtime_error(message); }
-    BindingHandle binding() { return {allocateRuntimeIdentity(), 1}; }
-    PaintStyleSemantics color(std::uint32_t value) { PaintStyleSemantics paint; paint.color = value; return paint; }
+    void check(bool condition, const char* message) {
+        if (!condition) throw std::runtime_error(message);
+    }
+
+    BindingHandle binding() {
+        return {allocateRuntimeIdentity(), 1};
+    }
+
+    PaintStyleSemantics color(std::uint32_t value) {
+        PaintStyleSemantics paint;
+        paint.color = value;
+        return paint;
+    }
+
     ModifierDescriptors box(std::uint32_t value) {
         LayoutModifierSemantics size;
         size.kind = LayoutModifierKind::Size;
@@ -91,7 +102,9 @@ namespace {
         const auto text = binding();
         MutationTransaction initial;
         initial.operations = {
-            CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation}, SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{text, ModifierChainTarget{node}},
+            CreateNodeMutation{node.id, arrange::core::NodeType::Layout, node.generation},
+            SetPropMutation{node.id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+            RegisterBinding{text, ModifierChainTarget{node}},
             SlotUpdate{text, ModifierDescriptors{{test_support::text("initial"), {}}}},
         };
         scene.apply(initial);
@@ -104,8 +117,7 @@ namespace {
         queue.push(std::move(write));
         queue.push(std::move(retire));
         scene.apply(*queue.take());
-        check(test_support::textOf(scene.node(1)) == "before retirement" && scene.bindingCount() == 0,
-              "merging submissions reordered a write after retirement");
+        check(test_support::textOf(scene.node(1)) == "before retirement" && scene.bindingCount() == 0, "merging submissions reordered a write after retirement");
         check(scene.slotCounters().rejected == 1, "late update was not rejected");
 
         const auto next = binding();
@@ -118,22 +130,21 @@ namespace {
             DeleteNodeMutation{1},
         };
         bool failed = false;
-        try { scene.apply(invalidThenDelete); } catch (const std::exception&) { failed = true; }
-        check(failed && scene.contains(1) && scene.bindingCount() == 1,
-              "later deletion hid an invalid earlier write");
+        try {
+            scene.apply(invalidThenDelete);
+        } catch (const std::exception&) {
+            failed = true;
+        }
+        check(failed && scene.contains(1) && scene.bindingCount() == 1, "later deletion hid an invalid earlier write");
 
         const auto replacement = binding();
         const NodeHandle recreated{1, allocateRuntimeIdentity()};
         MutationTransaction replace;
         replace.operations = {
-            DeleteNodeMutation{1},
-            CreateNodeMutation{1, arrange::core::NodeType::Layout, recreated.generation}, SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{replacement, ModifierChainTarget{recreated}},
-            SlotUpdate{next, ModifierDescriptors{{test_support::text("stale"), {}}}},
-            SlotUpdate{replacement, ModifierDescriptors{{test_support::text("replacement"), {}}}},
+            DeleteNodeMutation{1}, CreateNodeMutation{1, arrange::core::NodeType::Layout, recreated.generation}, SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{replacement, ModifierChainTarget{recreated}}, SlotUpdate{next, ModifierDescriptors{{test_support::text("stale"), {}}}}, SlotUpdate{replacement, ModifierDescriptors{{test_support::text("replacement"), {}}}},
         };
         scene.apply(replace);
-        check(test_support::textOf(scene.node(1)) == "replacement" && scene.bindingCount() == 1,
-              "ordered recreation retained the old binding");
+        check(test_support::textOf(scene.node(1)) == "replacement" && scene.bindingCount() == 1, "ordered recreation retained the old binding");
     }
 
     void verifyTextModifierAndAtomicApply() {
@@ -159,7 +170,11 @@ namespace {
         MutationTransaction invalid;
         invalid.operations = {CreateNodeMutation{2, NodeType::Layout}, InsertChildMutation{2, 2, 0}};
         bool failed = false;
-        try { scene.apply(invalid); } catch (const std::exception&) { failed = true; }
+        try {
+            scene.apply(invalid);
+        } catch (const std::exception&) {
+            failed = true;
+        }
         check(failed && !scene.contains(2), "失败应用不得留下半成品结构");
         MutationTransaction retire;
         retire.operations = {RetireBinding{text}, SlotUpdate{text, ModifierValue{test_support::text("迟到文字")}}};
@@ -167,7 +182,7 @@ namespace {
         check(test_support::textOf(scene.node(1)) == "反应式文本" && scene.bindingCount() == 1, "退休文本绑定接受了迟到更新");
     }
 
-}
+}  // namespace
 
 int main() {
     try {

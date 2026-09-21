@@ -1,4 +1,4 @@
-import { compileScript, invalidateTypeCache, parse } from "@arrange/vue-compiler-sfc"
+import { compileScript, invalidateTypeCache, parse } from "@arrange/compiler"
 import type { RawSourceMap } from 'source-map-js'
 
 const HMR_CLIENT_MARKER = "__ARRANGE_HMR_CLIENT__"
@@ -47,7 +47,7 @@ export function isHotSourceFile(id: unknown): boolean {
 export function injectHmrClient(code: string): string {
     if (code.includes(HMR_CLIENT_MARKER)) return code
     return `${code}
-import { installArrangeHmrClient as ${HMR_CLIENT_MARKER} } from "@arrange/framework"
+import { installArrangeHmrClient as ${HMR_CLIENT_MARKER} } from "@arrange/framework/internal"
 if (import.meta.hot) ${HMR_CLIENT_MARKER}(import.meta.hot)
 `
 }
@@ -60,23 +60,19 @@ export function compileArrangeSfa(code: string, id: string): ArrangeSfaCompileRe
     const filename = normalizePath(id)
     const source = stripBom(code)
     const describeError = (error: unknown) => {
-        const located = error as {message?: string; loc?: {start: {line: number; column: number}}}
+        const located = error as { message?: string; loc?: { start: { line: number; column: number } } }
         const position = located.loc?.start
         return `${filename}${position ? `:${position.line}:${position.column}` : ''}：${located.message ?? String(error)}`
     }
     const descriptorResult = parse(source, { filename })
     if (descriptorResult.errors.length) {
-        throw new Error(
-            descriptorResult.errors
-                .map(describeError)
-                .join("\n"),
-        )
+        throw new Error(descriptorResult.errors.map(describeError).join("\n"))
     }
 
     let descriptor = descriptorResult.descriptor
     const warnings: string[] = []
 
-    const compilerOptions = { runtimeModuleName: "@arrange/framework" }
+    const compilerOptions = { runtimeModuleName: "@arrange/framework/internal" }
     if (!descriptor.script) descriptor = parse(`${source}\n<script></script>`, { filename }).descriptor
 
     if (descriptor.script) {

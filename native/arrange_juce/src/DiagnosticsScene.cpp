@@ -9,24 +9,21 @@ namespace arrange::juce {
     namespace {
         std::uint32_t accentColour(LogLevel level) noexcept {
             switch (level) {
-            case LogLevel::Trace:
-            case LogLevel::Debug:
-                return 0xff94a3b8u;
-            case LogLevel::Info:
-                return 0xff3b82f6u;
-            case LogLevel::Warn:
-                return 0xfff59e0bu;
-            case LogLevel::Error:
-                return 0xffef4444u;
+                case LogLevel::Trace:
+                case LogLevel::Debug:
+                    return 0xff94a3b8u;
+                case LogLevel::Info:
+                    return 0xff3b82f6u;
+                case LogLevel::Warn:
+                    return 0xfff59e0bu;
+                case LogLevel::Error:
+                    return 0xffef4444u;
             }
             return 0xff3b82f6u;
         }
-    } // namespace
+    }  // namespace
 
-    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildErrorScreen(
-        ::juce::Rectangle<int> editorBounds,
-        const ErrorScreenModel& error,
-        bool detailed) const {
+    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildErrorScreen(::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const {
         std::vector<arrange::core::DrawOp> ops;
         auto area = rect(editorBounds.reduced(20));
         ops.push_back(fill(area, detailed ? 0xff2a1014u : 0xff111827u, 10.0f));
@@ -49,17 +46,12 @@ namespace arrange::juce {
         return ops;
     }
 
-    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildBadge(
-        ::juce::Rectangle<int> editorBounds,
-        const DiagnosticsBadgeModel& model,
-        DiagnosticVisibility visibility) const {
+    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility) const {
         std::vector<arrange::core::DrawOp> ops;
         if (!diagnosticVisibilityEnabled(visibility) || model.text.empty()) return ops;
 
         const auto textWidth = static_cast<int>(model.text.size()) * 7 + 26;
-        const auto x = static_cast<int>(std::round(std::max(
-            static_cast<float>(editorBounds.getX() + 8),
-            static_cast<float>(editorBounds.getRight() - 8 - textWidth))));
+        const auto x = static_cast<int>(std::round(std::max(static_cast<float>(editorBounds.getX() + 8), static_cast<float>(editorBounds.getRight() - 8 - textWidth))));
         const auto y = editorBounds.getY() + 20;
         const arrange::core::Rect badge{static_cast<float>(x), static_cast<float>(y), static_cast<float>(textWidth), 20.0f};
         ops.push_back(fill(badge, 0xcc111827u, 6.0f));
@@ -69,10 +61,7 @@ namespace arrange::juce {
         return ops;
     }
 
-    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildToasts(
-        ::juce::Rectangle<int> editorBounds,
-        const std::vector<DiagnosticsToastModel>& toasts,
-        DiagnosticVisibility visibility) const {
+    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildToasts(::juce::Rectangle<int> editorBounds, const std::vector<DiagnosticsToastModel>& toasts, DiagnosticVisibility visibility) const {
         std::vector<arrange::core::DrawOp> ops;
         if (!diagnosticVisibilityEnabled(visibility) || toasts.empty()) return ops;
 
@@ -84,9 +73,7 @@ namespace arrange::juce {
             const auto messageWidth = static_cast<int>(it->message.size()) * 7;
             const auto width = std::min(maxToastWidth, std::max(180, std::max(titleWidth, messageWidth) + 28));
             const auto height = it->message.empty() ? 30 : 48;
-            const auto x = static_cast<int>(std::round(std::max(
-                static_cast<float>(editorBounds.getX() + 12),
-                static_cast<float>(editorBounds.getRight() - width - 12))));
+            const auto x = static_cast<int>(std::round(std::max(static_cast<float>(editorBounds.getX() + 12), static_cast<float>(editorBounds.getRight() - width - 12))));
             const arrange::core::Rect toast{static_cast<float>(x), static_cast<float>(y), static_cast<float>(width), static_cast<float>(height)};
             ops.push_back(fill(toast, 0xe6111827u, 8.0f));
             ops.push_back(stroke(toast, accentColour(it->level), 1.0f, 8.0f));
@@ -142,6 +129,6 @@ namespace arrange::juce {
         op.overflow = "clip";
         return op;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

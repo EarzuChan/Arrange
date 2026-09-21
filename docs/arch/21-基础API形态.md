@@ -1,22 +1,12 @@
 # 基础 API 形态
 
+FUCK：这篇文章和很多文章有很多重复，真死妈了（违背我在 `docs/README.md`）树的规矩。
+
 本文只记录公开 API 的名称、签名、默认值和导出边界。行为语义分别归属其它母文档：基础类型见 [基础类型](10-基础类型.md)，布局见 [布局](09-布局.md)，Modifier 见 [Modifier](11-Modifier.md)，Arrangable行为见 [内建 Arrangable](12-内建Arrangable.md)，事件见 [事件与输入](17-事件与输入.md)，文本与输入见 [文本输入与绘制](18-文本输入与绘制.md)，动画与 transition 见 [动画与Transition](28-动画与Transition.md)。
 
 # TypeScript 包
 
-```json
-{
-  "name": "@arrange/framework",
-  "type": "module",
-  "exports": {
-    ".": {
-      "import": "./src/index.ts"
-    }
-  }
-}
-```
-
-`@arrange/framework` 以 TS-first 方式发布。源码与代码风格要求见 `../proj/5：具体开发的额外约束.md`。
+`@arrange/framework` 以 TS-first 方式发布，能力分层入口及内部协议边界见 [内部包构建与分发契约](29-内部包构建与分发契约.md#入口分层与内部依赖)。
 
 # Authoring 入口
 
@@ -31,13 +21,13 @@ createApp(App).mount()
 
 ```txt
 SFA 模板与 TS setup
--> Arrange Vue compiler / runtime
--> Composition mutations + Reactive slot updates
+-> Arrange compiler / runtime
+-> Rearrange mutations + Reactive slot updates
 -> QuickJS native boundary
 -> MutationTransaction / SlotUpdateBatch
 ```
 
-`@arrange/framework` 是用户导入 Arrange UI API 与 Arrange Vue authoring API 的主入口。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
+`@arrange/framework` 根入口提供核心状态、生命周期、上下文与 App 能力；Foundation、UI 和动画从对应子入口导入。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
 
 用户通过 SFA 的 defineProps/withDefaults 声明参数，通过模板中的 Slot 声明内容。内建 FA 直接用代码编写，与 SFA 编译结果遵守同一种 Arrangable 定义和调用契约，见 [运行时](04-运行时.md)。参数、内容与错误行为见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
@@ -60,75 +50,6 @@ config.app.useLive("http://host:port");
 ```
 
 规则见 [App入口](02-App入口.md)。
-
-# 导出总表
-
-下列为已接入正式宿主的主要 authoring 导出；完整类型从包入口读取：
-
-```ts
-createApp
-
-ref
-reactive
-computed
-watch
-watchEffect
-onMounted
-onUnmounted
-nextTick
-
-Box
-Row
-Column
-Spacer
-Text
-Input
-Image
-Icon
-KeepAlive
-Layout
-DynamicArrangable
-AnimatedVisibility
-Crossfade
-
-M
-Modifier
-
-dp
-sp
-px
-Color
-solidColor
-rounded
-
-Alignment
-Arrangement
-IntrinsicSize
-ContentScale
-Role
-Orientation
-GridCells
-GridItemSpan
-
-
-animatedNumberAsRef
-animatedDpAsRef
-animatedColorAsRef
-animatedOffsetAsRef
-animatedSizeAsRef
-animatedRectAsRef
-animatedNumberArrayAsRef
-transition
-
-createScrollState
-
-
-logger
-diagnostics
-
-provide
-inject
-```
 
 # 基础类型 API
 

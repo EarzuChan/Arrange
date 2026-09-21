@@ -40,7 +40,6 @@ namespace arrange::quickjs {
         events.commitCandidate();
     }
 
-
     arrange::core::MutationTransaction* QuickJsRuntimeContext::currentTransaction() noexcept {
         return pendingTransactions == nullptr ? nullptr : &pendingTransactions->ensurePending();
     }
@@ -80,10 +79,12 @@ namespace arrange::quickjs {
                 next.push_back({chain->node, receiver, descriptors[index], index});
             }
             inputs = std::move(next);
-        }
-        else if (const auto* instance = std::get_if<arrange::core::ModifierInputTarget>(&target)) {
+        } else if (const auto* instance = std::get_if<arrange::core::ModifierInputTarget>(&target)) {
             for (auto& input : modifierInputs.at(instance->node.id)) {
-                if (input.handle == instance->modifier) { input.descriptor.value = std::get<arrange::core::ModifierValue>(value); break; }
+                if (input.handle == instance->modifier) {
+                    input.descriptor.value = std::get<arrange::core::ModifierValue>(value);
+                    break;
+                }
             }
         }
         if (auto* transaction = currentTransaction()) transaction->operations.emplace_back(arrange::core::SlotUpdate{handle, std::move(value)});
@@ -92,18 +93,19 @@ namespace arrange::quickjs {
     void QuickJsRuntimeContext::retireBinding(arrange::core::BindingHandle handle) {
         const auto found = bindings.find(handle.identity);
         if (found == bindings.end() || found->second.handle != handle) return;
-        std::visit([&](const auto& target) {
-            using T = std::decay_t<decltype(target)>;
-            if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
-                if (auto node = hostBindings.find(target.node.id); node != hostBindings.end()) {
-                    auto input = node->second.find(target.input);
-                    if (input != node->second.end() && input->second == handle) node->second.erase(input);
+        std::visit(
+            [&](const auto& target) {
+                using T = std::decay_t<decltype(target)>;
+                if constexpr (std::is_same_v<T, arrange::core::HostInputTarget>) {
+                    if (auto node = hostBindings.find(target.node.id); node != hostBindings.end()) {
+                        auto input = node->second.find(target.input);
+                        if (input != node->second.end() && input->second == handle) node->second.erase(input);
+                    }
+                } else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
+                    if (auto input = modifierBindings.find(target.node.id); input != modifierBindings.end() && input->second == handle) modifierBindings.erase(input);
                 }
-            }
-            else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
-                if (auto input = modifierBindings.find(target.node.id); input != modifierBindings.end() && input->second == handle) modifierBindings.erase(input);
-            }
-        }, found->second.target);
+            },
+            found->second.target);
         bindings.erase(found);
         if (auto* transaction = currentTransaction()) transaction->operations.emplace_back(arrange::core::RetireBinding{handle});
     }
@@ -178,6 +180,6 @@ namespace arrange::quickjs {
         diagnosticActions.push_back(std::move(action));
         while (diagnosticActions.size() > 64) diagnosticActions.erase(diagnosticActions.begin());
     }
-}
+}  // namespace arrange::quickjs
 
 #endif

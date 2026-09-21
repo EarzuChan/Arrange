@@ -6,7 +6,7 @@
 
 namespace arrange {
     class App {
-    public:
+       public:
         App() = default;
 
         App& useDist(std::filesystem::path path = std::filesystem::path("ui")) {
@@ -21,16 +21,30 @@ namespace arrange {
             return *this;
         }
 
-        const std::filesystem::path& distPath() const noexcept { return distPath_; }
-        const std::string& liveUrl() const noexcept { return liveUrl_; }
-        bool hasDist() const noexcept { return distEnabled_; }
-        bool hasLive() const noexcept { return liveEnabled_; }
-        bool hasAnySource() const noexcept { return liveEnabled_ || distEnabled_; }
+        const std::filesystem::path& distPath() const noexcept {
+            return distPath_;
+        }
 
-    private:
+        const std::string& liveUrl() const noexcept {
+            return liveUrl_;
+        }
+
+        bool hasDist() const noexcept {
+            return distEnabled_;
+        }
+
+        bool hasLive() const noexcept {
+            return liveEnabled_;
+        }
+
+        bool hasAnySource() const noexcept {
+            return liveEnabled_ || distEnabled_;
+        }
+
+       private:
         std::filesystem::path distPath_;
         std::string liveUrl_;
         bool distEnabled_ = false;
         bool liveEnabled_ = false;
     };
-} // namespace arrange
+}  // namespace arrange

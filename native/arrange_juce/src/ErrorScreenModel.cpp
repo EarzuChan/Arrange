@@ -6,13 +6,20 @@
 namespace arrange {
     const char* toString(ErrorSource source) noexcept {
         switch (source) {
-        case ErrorSource::AppPackage: return "AppPackage";
-        case ErrorSource::ScriptLoad: return "ScriptLoad";
-        case ErrorSource::ScriptRuntime: return "ScriptRuntime";
-        case ErrorSource::NativeTransaction: return "NativeTransaction";
-        case ErrorSource::Hmr: return "HMR";
-        case ErrorSource::Resource: return "Resource";
-        case ErrorSource::Unknown: return "Unknown";
+            case ErrorSource::AppPackage:
+                return "AppPackage";
+            case ErrorSource::ScriptLoad:
+                return "ScriptLoad";
+            case ErrorSource::ScriptRuntime:
+                return "ScriptRuntime";
+            case ErrorSource::NativeTransaction:
+                return "NativeTransaction";
+            case ErrorSource::Hmr:
+                return "HMR";
+            case ErrorSource::Resource:
+                return "Resource";
+            case ErrorSource::Unknown:
+                return "Unknown";
         }
         return "Unknown";
     }
@@ -39,4 +46,4 @@ namespace arrange {
         model.retryAvailable = retryAvailable;
         return model;
     }
-} // namespace arrange
+}  // namespace arrange

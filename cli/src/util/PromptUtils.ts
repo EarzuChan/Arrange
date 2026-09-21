@@ -1,6 +1,6 @@
 import { cancel, isCancel, text } from "@clack/prompts"
 
-export class PromptCancelled extends Error {}
+export class PromptCancelled extends Error { }
 
 export async function requiredText(label: string, options: {
     readonly placeholder?: string

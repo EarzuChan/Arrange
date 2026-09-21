@@ -1,0 +1,25 @@
+{
+  "name": "@arrange/reactivity",
+  "version": "0.0.0-m.2.2",
+  "description": "Arrange 响应式核心",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@arrange/shared": "0.0.0-m.2.2"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -49,4 +49,4 @@ namespace arrange::core {
         pressedEventSlot_ = {};
         return {true, false, pressed, eventSlot};
     }
-} // namespace arrange::core
+}  // namespace arrange::core

@@ -1,4 +1,7 @@
-import { painter, Alignment, Arrangement, Column, ContentScale, Image, Input, Text, createApp, createScrollState, defineArrangable, callArrangable, M, ref, type PropType, type ArrangableProps, type BoxProps, type ColumnProps, type ImageProps, type InputProps, type RowProps, type TextProps } from '@arrange/framework'
+import { painter, Alignment, Arrangement, ContentScale, M } from '@arrange/framework/ui'
+import { Column, Image, Input, Text, type BoxProps, type ColumnProps, type ImageProps, type InputProps, type RowProps, type TextProps } from '@arrange/framework/foundation'
+import { createApp, createScrollState, ref, type PropType, type ArrangableProps } from '@arrange/framework'
+import { defineArrangable, callArrangable } from '@arrange/framework/internal'
 
 const text = ref('原生输入')
 const inputProps = { value: '初始内容', onSubmit: (value: string) => { text.value = value } } satisfies InputProps
@@ -37,11 +40,11 @@ Arrangement.spacedBy(8, Alignment.TopEnd)
 // @ts-expect-error Arrangable状态由 setup 声明
 defineArrangable({ data: () => ({ count: 1 }) })
 // @ts-expect-error Arrangable不接受 Options 生命周期
-defineArrangable({ created() {} })
+defineArrangable({ created() { } })
 // @ts-expect-error Arrangable不接受 mixins
 defineArrangable({ mixins: [] })
 // @ts-expect-error createApp 同样拒绝 Options API
-createApp({ methods: { act() {} } })
+createApp({ methods: { act() { } } })
 // @ts-expect-error 应用不再提供无效的 mixin 方法
 createApp(defineArrangable({ setup: () => () => callArrangable(0, Text, { text: () => '正式 Arrangable' }) })).mixin({})
 
@@ -73,7 +76,7 @@ const missingSource: ImageProps = {}
 // @ts-expect-error 受控输入回调接收文本
 const invalidInput: InputProps = { onSubmit: (value: number) => { } }
 
-M.graphicsLayer({ translationX: 20, transformOrigin: { x: 0.5, y: 0 } }).clickable({ onClick: () => {}, enabled: true })
+M.graphicsLayer({ translationX: 20, transformOrigin: { x: 0.5, y: 0 } }).clickable({ onClick: () => { }, enabled: true })
 // @ts-expect-error 图层字段必须属于正式参数集合
 M.graphicsLayer({ translation: 20 })
 // @ts-expect-error 点击回调必须是函数
@@ -85,11 +88,13 @@ export const ManualPage = defineArrangable({
     setup(_props, { call }) {
         const scroll = createScrollState()
 
-        return () => call(0, Column, { modifier: () => M.height(300).verticalScroll(scroll) }, { default: () => {
-            call(0, Input, { value: () => inputProps.value, onSubmit: () => inputProps.onSubmit })
-            call(1, Text, { textStyle: () => textProps.textStyle, text: () => text.value })
-            call(2, Image, { painter: () => imageProps.painter })
-        } })
+        return () => call(0, Column, { modifier: () => M.height(300).verticalScroll(scroll) }, {
+            default: () => {
+                call(0, Input, { value: () => inputProps.value, onSubmit: () => inputProps.onSubmit })
+                call(1, Text, { textStyle: () => textProps.textStyle, text: () => text.value })
+                call(2, Image, { painter: () => imageProps.painter })
+            }
+        })
     },
 })
 
@@ -103,4 +108,4 @@ callArrangable(0, TypedArrangable, { title: () => '标题', unknown: () => 1 })
 // @ts-expect-error 文本 Modifier 的样式保持正式类型
 M.text('正文', { textStyle: { fontSize: '错误' } })
 // @ts-expect-error 编辑 Modifier 的回调接收字符串
-M.textField('正文', { onValueChange: (value: number) => {} })
+M.textField('正文', { onValueChange: (value: number) => { } })

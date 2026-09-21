@@ -24,4 +24,4 @@ namespace arrange::quickjs {
         result.ok = true;
         return result;
     }
-} // namespace arrange::quickjs
+}  // namespace arrange::quickjs

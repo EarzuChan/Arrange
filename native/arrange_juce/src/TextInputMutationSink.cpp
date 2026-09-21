@@ -14,7 +14,7 @@ namespace arrange::juce {
         void enqueueMutation(ArrangeRuntime& runtime, arrange::core::MutationTransaction transaction, std::string reason) {
             runtime.enqueueIntent(arrange::core::InputIntent::jsCommit(std::move(transaction), std::move(reason)));
         }
-    } // namespace
+    }  // namespace
 
     TextInputCallbacks TextInputMutationSink::callbacks(ArrangeRuntime& runtime) const {
         TextInputCallbacks result;
@@ -42,6 +42,6 @@ namespace arrange::juce {
         };
         return result;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

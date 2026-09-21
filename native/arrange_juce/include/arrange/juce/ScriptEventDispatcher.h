@@ -21,21 +21,14 @@ namespace arrange::juce {
     };
 
     class ScriptEventDispatcher final {
-    public:
-
-
+       public:
 #if ARRANGE_WITH_QUICKJS_NG
         ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis) const;
-        ScriptEventInvokeResult invoke(
-            arrange::quickjs::QuickJsScriptHost* host,
-            const arrange::core::EventSlotId& slot,
-            double nowMillis,
-            const arrange::quickjs::CallbackInvokeOptions& options) const;
+        ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::quickjs::CallbackInvokeOptions& options) const;
         ScriptEventInvokeResult invokeString(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value) const;
         ScriptEventInvokeResult invokeScroll(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result) const;
 #endif
     };
 
 #endif
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

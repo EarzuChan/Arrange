@@ -1,6 +1,6 @@
-﻿import {resolve} from "node:path"
-import {CLI_COMPATIBILITY} from "./constants.ts"
-import {readFrameworkPackageJson} from "./package-resolve.ts"
+import { resolve } from "node:path"
+import { CLI_COMPATIBILITY } from "./constants.ts"
+import { readFrameworkPackageJson } from "./package-resolve.ts"
 
 export type FrameworkMetadata = {
     version: string
@@ -21,21 +21,21 @@ export function normalizeRegistryUrl(registry?: string): string {
 }
 
 export function localFrameworkMetadata(version: string): FrameworkMetadata {
-    return {version, cliCompatibility: CLI_COMPATIBILITY}
+    return { version, cliCompatibility: CLI_COMPATIBILITY }
 }
 
 export async function fetchFrameworkMetadata(version: string, registry?: string): Promise<FrameworkMetadata> {
     const registryUrl = normalizeRegistryUrl(registry)
     const url = `${registryUrl}/@arrange%2fframework/${encodeURIComponent(version)}`
-    const response = await fetch(url, {headers: {Accept: "application/json"}})
+    const response = await fetch(url, { headers: { Accept: "application/json" } })
     if (!response.ok) throw new Error(`Cannot read @arrange/framework@${version} from ${registryUrl}: HTTP ${response.status}`)
-    const json = await response.json() as {version?: unknown; arrange?: {cliCompatibility?: unknown}}
+    const json = await response.json() as { version?: unknown; arrange?: { cliCompatibility?: unknown } }
     const actualVersion = typeof json.version === "string" ? json.version : version
     const compatibility = json.arrange?.cliCompatibility
     if (typeof compatibility !== "number" || !Number.isInteger(compatibility)) {
         throw new Error(`@arrange/framework@${actualVersion} does not declare arrange.cliCompatibility.`)
     }
-    return {version: actualVersion, cliCompatibility: compatibility}
+    return { version: actualVersion, cliCompatibility: compatibility }
 }
 
 export async function fetchFrameworkCandidates(recentLimit = 5, registry?: string): Promise<FrameworkVersionCandidate[]> {
@@ -72,7 +72,7 @@ export async function fetchFrameworkCandidates(recentLimit = 5, registry?: strin
     // 第一项：雷打不动的 latest 版本，单独找出并将其最新状态标为 true
     if (latestVersion) {
         const latestCandidate = allCandidates.find(c => c.version === latestVersion)
-        if (latestCandidate) result.push({...latestCandidate, latest: true})
+        if (latestCandidate) result.push({ ...latestCandidate, latest: true })
     }
 
     // 第二到六项：按发布时间倒序取前 5 个追加到后面（其 latest 属性**故意**保持默认的 false，即使版本号与 latest 一致也无需特别标出）
@@ -88,7 +88,7 @@ function comparePublishedTimeDesc(a: FrameworkVersionCandidate, b: FrameworkVers
     const aTime = a.publishedAt ? Date.parse(a.publishedAt) : 0
     const bTime = b.publishedAt ? Date.parse(b.publishedAt) : 0
     if (aTime !== bTime) return bTime - aTime
-    return b.version.localeCompare(a.version, undefined, {numeric: true, sensitivity: "base"})
+    return b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: "base" })
 }
 
 export function candidateIncompatibility(candidate: FrameworkVersionCandidate): string | null {
@@ -103,7 +103,7 @@ export function assertCompatible(metadata: FrameworkMetadata): void {
 
 export function readInstalledFrameworkMetadata(projectRoot: string, uiPath: string): FrameworkMetadata | null {
     try {
-        const manifest = readFrameworkPackageJson(resolve(projectRoot, uiPath)) as {version?: string; arrange?: {cliCompatibility?: number}}
+        const manifest = readFrameworkPackageJson(resolve(projectRoot, uiPath)) as { version?: string; arrange?: { cliCompatibility?: number } }
         if (typeof manifest.version !== "string" || typeof manifest.arrange?.cliCompatibility !== "number") return null
         return {
             version: manifest.version,

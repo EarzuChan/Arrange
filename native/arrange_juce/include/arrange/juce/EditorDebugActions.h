@@ -18,32 +18,16 @@ namespace arrange::juce {
     };
 
     class EditorDebugActions final {
-    public:
-        [[nodiscard]] EditorActionResult triggerManualDiagnosticError(
-            DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            ArrangeRuntime& runtime,
-            const std::filesystem::path& relatedPath) const;
+       public:
+        [[nodiscard]] EditorActionResult triggerManualDiagnosticError(DiagnosticsState& diagnostics, InteractionStateOwner& interaction, ArrangeRuntime& runtime, const std::filesystem::path& relatedPath) const;
 
-        [[nodiscard]] bool pushManualDiagnosticToast(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime) const;
+        [[nodiscard]] bool pushManualDiagnosticToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime) const;
 
-        [[nodiscard]] bool copyDiagnosticsToClipboard(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime,
-            DiagnosticsTextContext context) const;
+        [[nodiscard]] bool copyDiagnosticsToClipboard(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, DiagnosticsTextContext context) const;
 
-    private:
-        static void emitDiagnostic(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime,
-            LogLevel level,
-            std::string title,
-            std::string message = {},
-            bool toast = false,
-            bool coalesceToast = true);
+       private:
+        static void emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true);
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

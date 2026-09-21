@@ -5,7 +5,8 @@
 </template>
 
 <script>
-import {computed, dp, M, sp, Color} from '@arrange/framework'
+import { computed } from '@arrange/framework'
+import { dp, M, sp, Color } from '@arrange/framework/ui'
 import ValueSurface from './ValueSurface.sfa'
 
 const props = defineProps<{ clicks: number; color: number; offset: number; onTap: () => void }>()

@@ -4,12 +4,8 @@
 
 namespace arrange::juce {
 
-
 #if ARRANGE_WITH_QUICKJS_NG
-    ScriptEventInvokeResult ScriptEventDispatcher::invoke(
-        arrange::quickjs::QuickJsScriptHost* host,
-        const arrange::core::EventSlotId& slot,
-        double nowMillis) const {
+    ScriptEventInvokeResult ScriptEventDispatcher::invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis) const {
         if (host == nullptr || !slot.valid()) return {};
         host->setFrameTimeMillis(nowMillis);
         const auto invoked = host->invokeEventSlot(slot);
@@ -17,11 +13,7 @@ namespace arrange::juce {
         return {true, true, {}};
     }
 
-    ScriptEventInvokeResult ScriptEventDispatcher::invoke(
-        arrange::quickjs::QuickJsScriptHost* host,
-        const arrange::core::EventSlotId& slot,
-        double nowMillis,
-        const arrange::quickjs::CallbackInvokeOptions& options) const {
+    ScriptEventInvokeResult ScriptEventDispatcher::invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::quickjs::CallbackInvokeOptions& options) const {
         if (host == nullptr || !slot.valid()) return {};
         host->setFrameTimeMillis(nowMillis);
         const auto invoked = host->invokeEventSlot(slot, options);
@@ -29,22 +21,14 @@ namespace arrange::juce {
         return {true, true, {}};
     }
 
-    ScriptEventInvokeResult ScriptEventDispatcher::invokeString(
-        arrange::quickjs::QuickJsScriptHost* host,
-        const arrange::core::EventSlotId& slot,
-        double nowMillis,
-        const std::string& value) const {
+    ScriptEventInvokeResult ScriptEventDispatcher::invokeString(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value) const {
         arrange::quickjs::CallbackInvokeOptions options;
         options.hasStringArgument = true;
         options.stringArgument = value;
         return invoke(host, slot, nowMillis, options);
     }
 
-    ScriptEventInvokeResult ScriptEventDispatcher::invokeScroll(
-        arrange::quickjs::QuickJsScriptHost* host,
-        const arrange::core::EventSlotId& slot,
-        double nowMillis,
-        const arrange::core::ScrollResult& result) const {
+    ScriptEventInvokeResult ScriptEventDispatcher::invokeScroll(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result) const {
         if (host == nullptr || !slot.valid()) return {};
         host->setFrameTimeMillis(nowMillis);
         const auto invoked = host->invokeEventSlot(slot, result);
@@ -52,6 +36,6 @@ namespace arrange::juce {
         return {true, true, {}};
     }
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

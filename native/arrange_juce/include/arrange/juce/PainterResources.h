@@ -14,5 +14,5 @@ namespace arrange::juce {
     };
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir);
-}
+}  // namespace arrange::juce
 #endif

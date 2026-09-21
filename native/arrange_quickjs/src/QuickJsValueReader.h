@@ -14,8 +14,9 @@ extern "C" {
 
 namespace arrange::quickjs {
     class ScopedValue {
-    public:
+       public:
         ScopedValue(JSContext* ctx, JSValue value) : ctx_(ctx), value_(value) {}
+
         ~ScopedValue();
 
         ScopedValue(const ScopedValue&) = delete;
@@ -24,19 +25,25 @@ namespace arrange::quickjs {
         ScopedValue(ScopedValue&& other) noexcept;
         ScopedValue& operator=(ScopedValue&& other) noexcept;
 
-        [[nodiscard]] JSValueConst get() const noexcept { return value_; }
+        [[nodiscard]] JSValueConst get() const noexcept {
+            return value_;
+        }
+
         [[nodiscard]] JSValue release() noexcept;
 
-    private:
+       private:
         JSContext* ctx_ = nullptr;
         JSValue value_ = JS_UNDEFINED;
     };
 
     class QuickJsValueReader {
-    public:
+       public:
         explicit QuickJsValueReader(JSContext* context) : context_(context) {}
 
-        [[nodiscard]] JSContext* context() const noexcept { return context_; }
+        [[nodiscard]] JSContext* context() const noexcept {
+            return context_;
+        }
+
         [[nodiscard]] std::string toString(JSValueConst value) const;
         [[nodiscard]] std::uint32_t toU32(JSValueConst value) const;
         [[nodiscard]] double toDouble(JSValueConst value, double fallback = 0.0) const;
@@ -53,11 +60,11 @@ namespace arrange::quickjs {
         [[nodiscard]] std::string requiredStringField(JSValueConst object, const char* key, std::string_view owner) const;
         [[nodiscard]] std::uint32_t colorField(JSValueConst object, const char* key, std::uint32_t fallback = 0) const;
 
-    private:
+       private:
         JSContext* context_ = nullptr;
     };
 
     [[nodiscard]] std::string quickJsExceptionText(JSContext* context);
-}
+}  // namespace arrange::quickjs
 
 #endif

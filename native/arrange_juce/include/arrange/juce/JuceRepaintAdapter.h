@@ -13,10 +13,9 @@ namespace arrange::juce {
     class DiagnosticsState;
 
     class JuceRepaintAdapter final {
-    public:
+       public:
         void repaintDirty(::juce::Component& owner, const arrange::core::PublishedFrame& frame);
-
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

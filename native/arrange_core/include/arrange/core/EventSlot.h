@@ -21,7 +21,6 @@ namespace arrange::core {
         Custom = 100,
     };
 
-
     struct EventSlotId {
         NodeId node = 0;
         EventSlotKind kind = EventSlotKind::None;
@@ -29,7 +28,10 @@ namespace arrange::core {
         std::uint64_t resource = 0;
         std::uint64_t generation = 0;
 
-        [[nodiscard]] bool valid() const noexcept { return node != 0 && kind != EventSlotKind::None; }
+        [[nodiscard]] bool valid() const noexcept {
+            return node != 0 && kind != EventSlotKind::None;
+        }
+
         [[nodiscard]] bool operator==(const EventSlotId& other) const noexcept {
             return node == other.node && kind == other.kind && path == other.path && resource == other.resource && generation == other.generation;
         }
@@ -51,5 +53,4 @@ namespace arrange::core {
     [[nodiscard]] std::string eventSlotKindName(EventSlotKind kind);
     [[nodiscard]] EventSlotKind eventSlotKindFromName(std::string_view name) noexcept;
     [[nodiscard]] EventSlotId makeEventSlotId(NodeId node, EventSlotKind kind, std::string path = {});
-} // namespace arrange::core
-
+}  // namespace arrange::core

@@ -1,0 +1,21 @@
+<template>
+    <Box :modifier="M.fillMaxSize().verticalScroll(scroll)">
+        <Column :modifier="M.requiredHeight(contentHeight).fillMaxWidth().background(0xff336699)">
+            <Text :text="`${scroll.value}/${scroll.maxValue}/${scroll.viewportSize}/${scroll.contentSize}`" />
+            <Input :onSubmit="command" />
+        </Column>
+    </Box>
+</template>
+
+<script>
+import { createScrollState, ref } from '@arrange/framework'
+import { M } from '@arrange/framework/ui'
+
+const scroll = createScrollState({ initial: 450 })
+const contentHeight = ref(600)
+
+function command(value: string) {
+    if (value === '缩短') contentHeight.value = 80
+    else if (value === '越界') scroll.scrollTo(900)
+}
+</script>

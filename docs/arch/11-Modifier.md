@@ -36,7 +36,8 @@ M.then(other: Modifier)
 M.if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier)
 ```
 
-`M.if` 是 Earzu Chan 大人发明的语法糖，作用等同条件分支拼接 Modifier。
+`M.if` 是 Earzu Chan 大人原创的语法糖，作用等同条件分支拼接 Modifier。
+
 # 阶段
 
 Modifier 可作用于：
@@ -282,6 +283,8 @@ scroll viewport clip 与普通 `M.clip(shape)` 同属于视觉裁剪，但来源
 - Lazy Arrangable自身是滚动 viewport，也必须裁剪到 viewport rect。
 
 滚动 viewport clip 不改变测量尺寸，不把内容从 layout tree 删除；它只限制绘制与命中范围。命中测试应优先按 viewport 裁掉不可见滚动内容，再进行子节点命中与事件派发。
+
+滚动范围是布局输出：视口或内容尺寸变化后，实际偏移在本次放置中限制到合法范围，绘制和命中使用同一结果。只有成功发布的布局快照才回传 ScrollState；值、范围、视口尺寸、内容尺寸及可滚动方向按一组反应式状态交付。Modifier 的输入只订阅请求偏移和回传接口，不把范围等布局输出反向当作输入。反馈引出的后续视觉变化进入下一候选，不在发布调用栈里重跑流水线。
 
 `scrollable` 是手势型滚动：只接收滚动 delta，不自动移动内容；适合自定义控件、Canvas、旋钮轨道等。
 

@@ -6,12 +6,13 @@
 #include <chrono>
 
 namespace arrange::juce {
-    void PassivePaintRenderer::clearResources() { textLayoutService_.clearCache(); }
+    void PassivePaintRenderer::clearResources() {
+        textLayoutService_.clearCache();
+    }
 
     void PassivePaintRenderer::prepareResources(arrange::core::PublishedFrameContent& content) {
         const auto started = std::chrono::steady_clock::now();
-        for (auto* ops : {&content.overlayDrawOps, &content.diagnosticsErrorDrawOps,
-                               &content.diagnosticsBadgeDrawOps, &content.diagnosticsToastDrawOps}) {
+        for (auto* ops : {&content.overlayDrawOps, &content.diagnosticsErrorDrawOps, &content.diagnosticsBadgeDrawOps, &content.diagnosticsToastDrawOps}) {
             for (auto& op : *ops) arrange::core::DrawOpsBuilder::prepareText(op, textLayoutService_);
         }
         preparationMillis_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
@@ -25,8 +26,7 @@ namespace arrange::juce {
         const auto& content = frame.content;
         if (content.errorFrame) {
             (void)drawOpsPainter_.paint(g, content.diagnosticsErrorDrawOps);
-        }
-        else {
+        } else {
             (void)drawOpsPainter_.paint(g, content.scenePaint, content.focusedInputModifier, content.focusedInputViewportX);
             (void)drawOpsPainter_.paint(g, content.overlayDrawOps, content.focusedInputModifier, content.focusedInputViewportX);
         }
@@ -34,6 +34,6 @@ namespace arrange::juce {
         (void)drawOpsPainter_.paint(g, content.diagnosticsToastDrawOps);
         paintMillis_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

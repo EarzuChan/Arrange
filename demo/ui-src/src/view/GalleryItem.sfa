@@ -5,12 +5,14 @@
 </template>
 
 <script>
-import {computed, M, tween, animatedColorAsRef, animatedDpAsRef} from '@arrange/framework'
+import { computed } from '@arrange/framework'
+import { M } from '@arrange/framework/ui'
+import { tween, animatedColorAsRef, animatedDpAsRef } from '@arrange/framework/animation'
 import ValueSurface from './ValueSurface.sfa'
 
-const props = defineProps<{item: {id: number; name: string}; selected: boolean; tone: number; onSelect: (id: number) => void}>()
-const color = animatedColorAsRef(() => props.selected ? props.tone : 0xff263443, {animationSpec: tween({durationMillis: 180})})
-const offset = animatedDpAsRef(() => props.selected ? 8 : 0, {animationSpec: tween({durationMillis: 180})})
+const props = defineProps<{ item: { id: number; name: string }; selected: boolean; tone: number; onSelect: (id: number) => void }>()
+const color = animatedColorAsRef(() => props.selected ? props.tone : 0xff263443, { animationSpec: tween({ durationMillis: 180 }) })
+const offset = animatedDpAsRef(() => props.selected ? 8 : 0, { animationSpec: tween({ durationMillis: 180 }) })
 const caption = computed(() => `${props.item.id.toString().padStart(3, '0')}  ${props.item.name}`)
 function label(value: string) { return value }
 </script>

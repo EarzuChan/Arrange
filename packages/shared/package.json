@@ -1,0 +1,24 @@
+{
+  "name": "@arrange/shared",
+  "version": "0.0.0-m.2.2",
+  "description": "Arrange 编译器与运行时共享契约和工具",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "arrange-ts": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  }
+}

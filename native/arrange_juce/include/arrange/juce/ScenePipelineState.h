@@ -12,7 +12,7 @@
 
 namespace arrange::juce {
     class ScenePipelineState {
-    public:
+       public:
         explicit ScenePipelineState(arrange::core::SceneFramePipeline pipeline = arrange::core::SceneFramePipeline());
 
         void reset();
@@ -22,22 +22,33 @@ namespace arrange::juce {
         [[nodiscard]] bool hasPendingTransactions() const noexcept;
         void clearPendingTransactions() noexcept;
 
-        [[nodiscard]] arrange::core::SceneFramePipelineResult run(
-            arrange::core::NodeId root,
-            arrange::core::Constraints constraints,
-            bool framePipelineRequested,
-            const arrange::core::FrameFinalizer& finalize = {});
-        void setFrameTime(double timeMillis) noexcept { frameTimeMillis_ = timeMillis; }
+        [[nodiscard]] arrange::core::SceneFramePipelineResult run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize = {});
 
-        [[nodiscard]] arrange::core::NativeScene& scene() noexcept { return scene_; }
-        [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept { return scene_; }
-        [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept { return publishedFrame_; }
-        const arrange::core::FrameExecutionCounters& counters() const noexcept { return pipeline_.counters(); }
+        void setFrameTime(double timeMillis) noexcept {
+            frameTimeMillis_ = timeMillis;
+        }
+
+        [[nodiscard]] arrange::core::NativeScene& scene() noexcept {
+            return scene_;
+        }
+
+        [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept {
+            return scene_;
+        }
+
+        [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept {
+            return publishedFrame_;
+        }
+
+        const arrange::core::FrameExecutionCounters& counters() const noexcept {
+            return pipeline_.counters();
+        }
+
         bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
             return pipeline_.publishRetained(scene_, publishedFrame_, finalize);
         }
 
-    private:
+       private:
         double frameTimeMillis_ = 0;
         arrange::core::NativeScene scene_;
         arrange::core::SceneFramePipeline pipeline_;
@@ -45,5 +56,4 @@ namespace arrange::juce {
         arrange::core::MutationTransactionQueue pendingTransactions_;
         arrange::core::PublishedFrame publishedFrame_;
     };
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

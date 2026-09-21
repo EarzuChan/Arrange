@@ -13,7 +13,7 @@ ui/
   src/App.sfa
 ```
 
-该 `ui/` 是 Node / Arrange Vue 项目。工程根目录不是 Node 项目。
+该 `ui/` “算”是 Node.js 项目。工程根目录不是 Node.js 项目。
 
 # 开发模式
 
@@ -23,7 +23,7 @@ ui/
 arrange dev
 ```
 
-Arrange CLI 调用 UI 工具链，提供 Arrange Vue SFA 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
+Arrange CLI 调用 UI 工具链，提供 Arrange SFA 编译入口、HMR adapter、host target diagnostics 与默认 dev server 设置：
 
 ```txt
 host: 127.0.0.1

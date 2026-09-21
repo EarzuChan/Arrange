@@ -14,25 +14,50 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class InputTextSession final {
-    public:
+       public:
         void reset();
 
-        std::optional<arrange::core::NodeId>& focusedNode() noexcept { return focusedNode_; }
-        const std::optional<arrange::core::NodeId>& focusedNode() const noexcept { return focusedNode_; }
+        std::optional<arrange::core::NodeId>& focusedNode() noexcept {
+            return focusedNode_;
+        }
 
-        std::optional<std::size_t>& dragAnchor() noexcept { return dragAnchor_; }
-        const std::optional<std::size_t>& dragAnchor() const noexcept { return dragAnchor_; }
+        const std::optional<arrange::core::NodeId>& focusedNode() const noexcept {
+            return focusedNode_;
+        }
 
-        arrange::core::TextInputState& state() noexcept { return state_; }
-        const arrange::core::TextInputState& state() const noexcept { return state_; }
+        std::optional<std::size_t>& dragAnchor() noexcept {
+            return dragAnchor_;
+        }
 
-        float& viewportX() noexcept { return viewportX_; }
-        float viewportX() const noexcept { return viewportX_; }
+        const std::optional<std::size_t>& dragAnchor() const noexcept {
+            return dragAnchor_;
+        }
 
-        std::vector<::juce::Range<int>>& temporaryUnderlines() noexcept { return temporaryUnderlines_; }
-        const std::vector<::juce::Range<int>>& temporaryUnderlines() const noexcept { return temporaryUnderlines_; }
+        arrange::core::TextInputState& state() noexcept {
+            return state_;
+        }
 
-    private:
+        const arrange::core::TextInputState& state() const noexcept {
+            return state_;
+        }
+
+        float& viewportX() noexcept {
+            return viewportX_;
+        }
+
+        float viewportX() const noexcept {
+            return viewportX_;
+        }
+
+        std::vector<::juce::Range<int>>& temporaryUnderlines() noexcept {
+            return temporaryUnderlines_;
+        }
+
+        const std::vector<::juce::Range<int>>& temporaryUnderlines() const noexcept {
+            return temporaryUnderlines_;
+        }
+
+       private:
         std::optional<arrange::core::NodeId> focusedNode_;
         std::optional<std::size_t> dragAnchor_;
         arrange::core::TextInputState state_;
@@ -41,4 +66,4 @@ namespace arrange::juce {
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

@@ -34,18 +34,7 @@ const allowedExportKeys = new Set(["arrange-ts", "import"])
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const internalPackagePattern = /^@arrange\//
 const publicPackageNames = new Set(["@arrange/framework"])
-const publicBundleDeps = new Map<string, readonly string[]>([
-    ["@arrange/framework", [
-        "@arrange/runtime",
-        "@arrange/vite-plugin",
-        "@arrange/vue-reactivity",
-        "@arrange/vue-runtime-core",
-        "@arrange/vue-compiler-arrange",
-        "@arrange/vue-compiler-core",
-        "@arrange/vue-compiler-sfc",
-        "@arrange/vue-shared",
-    ]],
-])
+const publicBundleDeps = new Map<string, readonly string[]>([['@arrange/framework', ['@arrange/vite-plugin', '@arrange/reactivity', '@arrange/compiler', '@arrange/shared']]])
 
 function fail(message: string): never {
     throw new Error(message)
@@ -129,7 +118,7 @@ function assertPublicPackageContract(manifest: PackageManifest, pkgName: string)
 
     const expectedBundleDeps = publicBundleDeps.get(pkgName) ?? []
     const actual = manifest.bundledDependencies ?? manifest.bundleDependencies
-    if (!Array.isArray(actual)) fail(`${pkgName} must bundle internal Arrange Vue packages`)
+    if (!Array.isArray(actual)) fail(`${pkgName} must bundle internal Arrange packages`)
     const actualNames = new Set(actual.map(String))
     for (const dep of expectedBundleDeps) {
         if (!actualNames.has(dep)) fail(`${pkgName} must bundle ${dep}`)
@@ -194,7 +183,7 @@ function walkFiles(dir: string, visit: (path: string) => void): void {
 function assertNoMacrosInBundle(path: string): void {
     const source = readFileSync(path, "utf8")
     const match = source.match(macroPattern)
-    if (match) fail(`unresolved Arrange Vue macro in app bundle ${path}: ${match[0]}`)
+    if (match) fail(`unresolved Arrange macro in app bundle ${path}: ${match[0]}`)
 }
 
 function assertNoMacrosInBuiltDemoBundle(): void {
@@ -207,9 +196,7 @@ function assertNoMacrosInBuiltDemoBundle(): void {
     assertNoMacrosInBundle(bundle)
 }
 
-const packageDirs = readdirSync(packagesRoot)
-    .map((name) => resolve(packagesRoot, name))
-    .filter((path) => statSync(path).isDirectory() && existsSync(resolve(path, "package.json")))
+const packageDirs = readdirSync(packagesRoot).map((name) => resolve(packagesRoot, name)).filter((path) => statSync(path).isDirectory() && existsSync(resolve(path, "package.json")))
 
 const contract = readArrangeVersionContract()
 assertArrangeVersionContract()
@@ -231,7 +218,7 @@ for (const pkgDir of packageDirs) {
 
 for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
     walkFiles(resolve(repoRoot, root), (path) => {
-        if (!/\.(?:ts|tsx|js|jsx|vue|json)$/.test(path)) return
+        if (!/\.(?:ts|tsx|js|jsx|sfa|json)$/.test(path)) return
         if (path.endsWith("package.json")) return
         assertNoSourceDirectInternalImports(path, readFileSync(path, "utf8"))
     })

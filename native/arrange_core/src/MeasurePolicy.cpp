@@ -25,7 +25,8 @@ namespace arrange::core {
         AxisArrangement arrangement(const PropValue* value, bool horizontal) {
             if (!value) return {horizontal ? "Start" : "Top"};
             AxisArrangement result;
-            if (value->isString()) result.alignment = value->string;
+            if (value->isString())
+                result.alignment = value->string;
             else {
                 fields(*value, {"kind", "space", "alignment"});
                 if (text(*value, "kind", "") != "spacedBy") throw std::invalid_argument("排列策略对象必须声明 spacedBy");
@@ -38,7 +39,7 @@ namespace arrange::core {
             if (!distributed && !(horizontal ? isHorizontalAlignment(result.alignment) : isVerticalAlignment(result.alignment))) throw std::invalid_argument("排列对齐方向不匹配：" + result.alignment);
             return result;
         }
-    }
+    }  // namespace
 
     MeasurePolicy readMeasurePolicy(const PropValue& value) {
         const auto kind = text(value, "kind", "");
@@ -81,4 +82,4 @@ namespace arrange::core {
         }
         return dirtyMask(DirtyFlag::Layout) | placement;
     }
-}
+}  // namespace arrange::core

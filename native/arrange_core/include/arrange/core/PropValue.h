@@ -31,13 +31,31 @@ namespace arrange::core {
         [[nodiscard]] static PropValue stringValue(std::string value);
         [[nodiscard]] static PropValue objectValue(std::vector<PropObjectField> fields);
 
-        [[nodiscard]] bool isNull() const noexcept { return kind == PropValueKind::Null; }
-        [[nodiscard]] bool isNumber() const noexcept { return kind == PropValueKind::Number; }
-        [[nodiscard]] bool isBoolean() const noexcept { return kind == PropValueKind::Boolean; }
-        [[nodiscard]] bool isString() const noexcept { return kind == PropValueKind::String; }
-        [[nodiscard]] bool isObject() const noexcept { return kind == PropValueKind::Object; }
+        [[nodiscard]] bool isNull() const noexcept {
+            return kind == PropValueKind::Null;
+        }
+
+        [[nodiscard]] bool isNumber() const noexcept {
+            return kind == PropValueKind::Number;
+        }
+
+        [[nodiscard]] bool isBoolean() const noexcept {
+            return kind == PropValueKind::Boolean;
+        }
+
+        [[nodiscard]] bool isString() const noexcept {
+            return kind == PropValueKind::String;
+        }
+
+        [[nodiscard]] bool isObject() const noexcept {
+            return kind == PropValueKind::Object;
+        }
+
         [[nodiscard]] const PropValue* field(std::string_view key) const noexcept;
-        [[nodiscard]] bool hasField(std::string_view key) const noexcept { return field(key) != nullptr; }
+
+        [[nodiscard]] bool hasField(std::string_view key) const noexcept {
+            return field(key) != nullptr;
+        }
 
         [[nodiscard]] std::string stringOr(std::string_view fallback = {}) const;
         [[nodiscard]] float numberOr(float fallback = 0.0f) const noexcept;
@@ -52,8 +70,9 @@ namespace arrange::core {
     };
 
     class PropObject {
-    public:
+       public:
         PropObject() = default;
+
         explicit PropObject(const PropValue* value) : value_(value) {}
 
         [[nodiscard]] bool has(std::string_view key) const noexcept;
@@ -64,7 +83,7 @@ namespace arrange::core {
         [[nodiscard]] std::string string(std::string_view key, std::string_view fallback = {}) const;
         [[nodiscard]] std::uint32_t color(std::string_view key, std::uint32_t fallback = 0) const noexcept;
 
-    private:
+       private:
         const PropValue* value_ = nullptr;
     };
 
@@ -79,4 +98,4 @@ namespace arrange::core {
     int intProp(const LayoutNode& node, std::string_view key, int fallback = 0);
     bool boolProp(const LayoutNode& node, std::string_view key, bool fallback = false);
     std::uint32_t colorProp(const LayoutNode& node, std::string_view key, std::uint32_t fallback = 0);
-} // namespace arrange::core
+}  // namespace arrange::core

@@ -21,14 +21,14 @@
         <Column :modifier="M.animateContentSize(spec).background(0xff303b4d).padding(6)">
             <Text :text="label" :text-style="{ color: 0xffdddddd, fontSize: 12 }"/>
 
-            <Text v-if="expanded" text="相邻内容跟随动画高度放置" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="M.height(28)"/>
+            <Text a-if="expanded" text="相邻内容跟随动画高度放置" :text-style="{ color: 0xffeeeeee, fontSize: 12 }" :modifier="M.height(28)"/>
         </Column>
 
         <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16 }" :exit-to="{ alpha: 0, translationX: 16 }">
             <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
                 <Text text="可视的啊一个内容" :text-style="{ color: 0xffeeeeee }"/>
 
-                <Input value="编辑我，如果我彻底离场会被重置" :modifier="M.size(130, 24).background(0xff151922)"/>
+                <Input value="编辑我，如果我彻底离场会被重置" :modifier="M.size(130, 24).background(0xff151922)"/> // FIXME：刚开始离场就重置文本了。或涉及两个问题：刚开始离场为什么会换掉实例，未彻底离场能否复用实例。且得对齐 Compose 实现
             </Row>
         </AnimatedVisibility>
 
@@ -39,7 +39,11 @@
 </template>
 
 <script>
-import { Text, AnimatedVisibility, Crossfade, Arrangement, M, ref, computed, tween, spring, linearEasing, animatedColorAsRef, animatedOffsetAsRef, animatedSizeAsRef, createTransition, getArrangeExecutionStats, animationStats, modifierStats, modifierAllocationStats, watch } from '@arrange/framework'
+import { Text } from '@arrange/framework/foundation'
+import { AnimatedVisibility, Crossfade, tween, spring, linearEasing, animatedColorAsRef, animatedOffsetAsRef, animatedSizeAsRef, createTransition, animationStats } from '@arrange/framework/animation'
+import { Arrangement, M, modifierStats, modifierAllocationStats } from '@arrange/framework/ui'
+import { ref, computed, watch } from '@arrange/framework'
+import { getArrangeExecutionStats } from '@arrange/framework/internal'
 import ValueSurface from './ValueSurface.sfa'
 
 const props = defineProps({ command: { type: String, default: '' } })

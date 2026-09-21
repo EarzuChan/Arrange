@@ -1,12 +1,12 @@
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs"
-import {dirname, relative, resolve} from "node:path"
-import type {ArrangeConfig, Flavor, Product} from "./config.ts"
-import {ensureProjectGitignore, type LocalCMakeConfig} from "./local.ts"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, relative, resolve } from "node:path"
+import type { ArrangeConfig, Flavor, Product } from "./config.ts"
+import { ensureProjectGitignore, type LocalCMakeConfig } from "./local.ts"
 
 export type SyncScope = "all" | "ui" | "native"
 export type SyncMode = "all" | "project" | "toolchain" | "check"
 
-export function ensureProjectFiles(config: ArrangeConfig, root: string, options: {scope: SyncScope; check?: boolean; registry?: string}): string[] {
+export function ensureProjectFiles(config: ArrangeConfig, root: string, options: { scope: SyncScope; check?: boolean; registry?: string }): string[] {
     const changes: string[] = []
     if (ensureProjectGitignore(root, options.check ?? false)) changes.push(".gitignore")
     if (options.scope === "all" || options.scope === "ui") changes.push(...ensureUiProject(config, root, options.check ?? false, options.registry))
@@ -22,7 +22,7 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
     const mainPath = resolve(srcDir, "main.ts")
     const appPath = resolve(srcDir, "App.sfa")
     const changes: string[] = []
-    const manifest = existsSync(packagePath) ? JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown> : {name: packageName(config.project.name), private: true, type: "module"}
+    const manifest = existsSync(packagePath) ? JSON.parse(readFileSync(packagePath, "utf8")) as Record<string, unknown> : { name: packageName(config.project.name), private: true, type: "module" }
     const dependencies = asRecord(manifest.dependencies)
     if (dependencies["@arrange/framework"] !== config.arrange.version) {
         dependencies["@arrange/framework"] = config.arrange.version
@@ -33,10 +33,10 @@ export function ensureUiProject(config: ArrangeConfig, root: string, check: bool
     const npmrc = registry ? scopeRegistryNpmrc(registry) : null
     if (npmrc && (!existsSync(npmrcPath) || readFileSync(npmrcPath, "utf8") !== npmrc)) changes.push(relative(root, npmrcPath))
     if (!check) {
-        mkdirSync(uiDir, {recursive: true})
+        mkdirSync(uiDir, { recursive: true })
         writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`)
         if (npmrc) writeFileSync(npmrcPath, npmrc)
-        mkdirSync(srcDir, {recursive: true})
+        mkdirSync(srcDir, { recursive: true })
         if (!existsSync(mainPath)) {
             writeFileSync(mainPath, [
                 `import { createApp } from "@arrange/framework"`,
@@ -76,7 +76,7 @@ export function ensureNativeProject(config: ArrangeConfig, root: string, check: 
     if (!existsSync(cmakePath)) {
         changes.push(relative(root, cmakePath))
         if (!check) {
-            mkdirSync(nativeDir, {recursive: true})
+            mkdirSync(nativeDir, { recursive: true })
             writeFileSync(cmakePath, createNativeCMake(config))
         }
     } else {
@@ -94,7 +94,7 @@ export function ensureNativeProject(config: ArrangeConfig, root: string, check: 
         }
     }
     if (!check) {
-        mkdirSync(sourceDir, {recursive: true})
+        mkdirSync(sourceDir, { recursive: true })
         if (!existsSync(processorHeaderPath)) {
             writeFileSync(processorHeaderPath, createProcessorHeader(config))
             changes.push(relative(root, processorHeaderPath))
@@ -219,9 +219,7 @@ function createProcessorSource(config: ArrangeConfig): string {
         "",
         `bool ${className}::isBusesLayoutSupported(const BusesLayout& layouts) const {`,
         "    if (layouts.getMainOutputChannelSet().isDisabled()) return false;",
-        config.project.pluginType === "instrument"
-            ? "    return true;"
-            : "    return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet();",
+        config.project.pluginType === "instrument" ? "    return true;" : "    return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet();",
         "}",
         "",
         `void ${className}::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {`,

@@ -32,10 +32,7 @@ namespace arrange {
 
             std::wstring buffer(512, L'\0');
             for (;;) {
-                const auto size = GetModuleFileNameW(
-                    module,
-                    buffer.data(),
-                    static_cast<DWORD>(buffer.size()));
+                const auto size = GetModuleFileNameW(module, buffer.data(), static_cast<DWORD>(buffer.size()));
                 if (size == 0) return {};
                 if (size < buffer.size() - 1) {
                     buffer.resize(size);
@@ -75,7 +72,7 @@ namespace arrange {
             if (root.empty()) return {};
             return (root / configuredPath).lexically_normal();
         }
-    } // namespace
+    }  // namespace
 
     ResolvedApp AppResolver::resolvePackage(const App& app) const {
         ResolvedApp result;
@@ -116,7 +113,7 @@ namespace arrange {
         ResolvedApp result;
         result.ok = true;
         result.devServer = true;
-        result.devServerUrl = devServerUrlFromEnvironment( explicitDevServerUrl.empty() ? app.liveUrl() : explicitDevServerUrl);
+        result.devServerUrl = devServerUrlFromEnvironment(explicitDevServerUrl.empty() ? app.liveUrl() : explicitDevServerUrl);
 
         const auto distPath = app.hasDist() ? app.distPath() : std::filesystem::path("ui");
         result.packageDir = resolvePackageDir(distPath);
@@ -125,7 +122,8 @@ namespace arrange {
 
     std::string AppResolver::devServerUrlFromEnvironment(std::string_view explicitDevServerUrl) const {
         if (!explicitDevServerUrl.empty()) return std::string(explicitDevServerUrl);
-        if (const char* env = std::getenv("ARRANGE_DEV_SERVER")) if (*env != '\0') return std::string(env);
+        if (const char* env = std::getenv("ARRANGE_DEV_SERVER"))
+            if (*env != '\0') return std::string(env);
         return DefaultDevServer;
     }
 
@@ -168,4 +166,4 @@ namespace arrange {
         result.ok = true;
         return result;
     }
-} // namespace arrange
+}  // namespace arrange

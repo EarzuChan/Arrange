@@ -68,20 +68,11 @@ importers:
         specifier: 8.0.11
         version: 8.0.11(@types/node@24.12.4)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)(yaml@2.9.0)
 
-  packages/arrange-vue-compiler-arrange:
+  packages/compiler:
     dependencies:
-      '@arrange/vue-compiler-core':
+      '@arrange/shared':
         specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-core
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
-
-  packages/arrange-vue-compiler-core:
-    dependencies:
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
+        version: link:../shared
       '@babel/parser':
         specifier: 7.29.3
         version: 7.29.3
@@ -91,31 +82,9 @@ importers:
       estree-walker:
         specifier: 2.0.2
         version: 2.0.2
-      source-map-js:
-        specifier: 1.2.1
-        version: 1.2.1
-    devDependencies:
-      '@babel/types':
-        specifier: 7.29.0
-        version: 7.29.0
-
-  packages/arrange-vue-compiler-sfc:
-    dependencies:
-      '@arrange/vue-compiler-arrange':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-arrange
-      '@arrange/vue-compiler-core':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-core
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
-      '@babel/parser':
-        specifier: 7.29.3
-        version: 7.29.3
-      estree-walker:
-        specifier: 2.0.2
-        version: 2.0.2
+      lru-cache:
+        specifier: 10.1.0
+        version: 10.1.0
       magic-string:
         specifier: 0.30.21
         version: 0.30.21
@@ -129,53 +98,21 @@ importers:
       '@babel/types':
         specifier: 7.29.0
         version: 7.29.0
-      lru-cache:
-        specifier: 10.1.0
-        version: 10.1.0
-
-  packages/arrange-vue-reactivity:
-    dependencies:
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
-
-  packages/arrange-vue-runtime-core:
-    dependencies:
-      '@arrange/vue-reactivity':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-reactivity
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
-
-  packages/arrange-vue-shared: {}
 
   packages/framework:
     dependencies:
-      '@arrange/runtime':
+      '@arrange/compiler':
         specifier: 0.0.0-m.2.2
-        version: link:../runtime
+        version: link:../compiler
+      '@arrange/reactivity':
+        specifier: 0.0.0-m.2.2
+        version: link:../reactivity
+      '@arrange/shared':
+        specifier: 0.0.0-m.2.2
+        version: link:../shared
       '@arrange/vite-plugin':
         specifier: 0.0.0-m.2.2
         version: link:../vite-plugin
-      '@arrange/vue-compiler-arrange':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-arrange
-      '@arrange/vue-compiler-core':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-core
-      '@arrange/vue-compiler-sfc':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-sfc
-      '@arrange/vue-reactivity':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-reactivity
-      '@arrange/vue-runtime-core':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-runtime-core
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
       '@babel/parser':
         specifier: 7.29.3
         version: 7.29.3
@@ -201,32 +138,22 @@ importers:
         specifier: 8.0.11
         version: 8.0.11(@types/node@24.12.4)(esbuild@0.28.0)(sass@1.99.0)(tsx@4.22.3)(yaml@2.9.0)
 
-  packages/runtime:
+  packages/reactivity:
     dependencies:
-      '@arrange/vue-reactivity':
+      '@arrange/shared':
         specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-reactivity
-      '@arrange/vue-runtime-core':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-runtime-core
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
+        version: link:../shared
+
+  packages/shared: {}
 
   packages/vite-plugin:
     dependencies:
-      '@arrange/vue-compiler-arrange':
+      '@arrange/compiler':
         specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-arrange
-      '@arrange/vue-compiler-core':
+        version: link:../compiler
+      '@arrange/shared':
         specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-core
-      '@arrange/vue-compiler-sfc':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-compiler-sfc
-      '@arrange/vue-shared':
-        specifier: 0.0.0-m.2.2
-        version: link:../arrange-vue-shared
+        version: link:../shared
       '@babel/parser':
         specifier: 7.29.3
         version: 7.29.3

@@ -1,22 +1,13 @@
-import {cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from "node:fs"
-import {basename, resolve} from "node:path"
-import {npmSubprocessEnv, repoRoot, run} from "./common.ts"
-import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { basename, resolve } from "node:path"
+import { npmSubprocessEnv, repoRoot, run } from "./common.ts"
+import { assertArrangeVersionContract, readArrangeVersionContract } from "./version-contract.ts"
 
 const artifactsDir = resolve(repoRoot, "artifacts/npm")
 const stagingRoot = resolve(artifactsDir, "staging")
 const frameworkSourceDir = resolve(repoRoot, "packages/framework")
 const cliSourceDir = resolve(repoRoot, "cli")
-const frameworkBundleDirs = [
-    resolve(repoRoot, "packages/runtime"),
-    resolve(repoRoot, "packages/vite-plugin"),
-    resolve(repoRoot, "packages/arrange-vue-reactivity"),
-    resolve(repoRoot, "packages/arrange-vue-runtime-core"),
-    resolve(repoRoot, "packages/arrange-vue-compiler-arrange"),
-    resolve(repoRoot, "packages/arrange-vue-compiler-core"),
-    resolve(repoRoot, "packages/arrange-vue-compiler-sfc"),
-    resolve(repoRoot, "packages/arrange-vue-shared"),
-]
+const frameworkBundleDirs = ['vite-plugin', 'reactivity', 'compiler', 'shared'].map(name => resolve(repoRoot, 'packages', name))
 
 function readJson(path: string): Record<string, unknown> {
     return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
@@ -29,10 +20,10 @@ function writeJson(path: string, value: Record<string, unknown>): void {
 async function runNpm(args: readonly string[]): Promise<void> {
     const env = npmSubprocessEnv()
     if (process.platform === "win32") {
-        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], {env})
+        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], { env })
         return
     }
-    await run("npm", args, {env})
+    await run("npm", args, { env })
 }
 
 function copyIfExists(source: string, target: string): void {
@@ -43,12 +34,10 @@ function copyIfExists(source: string, target: string): void {
     })
 }
 
-function copyPackageSource(sourceDir: string, targetDir: string, options: {includeBin?: boolean} = {}): void {
-    mkdirSync(targetDir, {recursive: true})
-    const items = ["src", ...(options.includeBin ? ["bin"] : []), "LICENSE", "README.md", "UPSTREAM.md"]
-    for (const item of items) {
-        copyIfExists(resolve(sourceDir, item), resolve(targetDir, item))
-    }
+function copyPackageSource(sourceDir: string, targetDir: string, options: { includeBin?: boolean } = {}): void {
+    mkdirSync(targetDir, { recursive: true })
+    const items = ["src", ...(options.includeBin ? ["bin"] : []), "README.md"]
+    for (const item of items) copyIfExists(resolve(sourceDir, item), resolve(targetDir, item))
     writeJson(resolve(targetDir, "package.json"), readJson(resolve(sourceDir, "package.json")))
 }
 
@@ -82,15 +71,15 @@ function assertStagedTreeClean(stageDir: string): void {
 assertArrangeVersionContract()
 const contract = readArrangeVersionContract()
 
-rmSync(stagingRoot, {recursive: true, force: true})
-mkdirSync(artifactsDir, {recursive: true})
-mkdirSync(stagingRoot, {recursive: true})
+rmSync(stagingRoot, { recursive: true, force: true })
+mkdirSync(artifactsDir, { recursive: true })
+mkdirSync(stagingRoot, { recursive: true })
 
 const stageDir = resolve(stagingRoot, packageStageName(frameworkSourceDir))
 copyPackageSource(frameworkSourceDir, stageDir)
 
 const arrangeScopeDir = resolve(stageDir, "node_modules/@arrange")
-mkdirSync(arrangeScopeDir, {recursive: true})
+mkdirSync(arrangeScopeDir, { recursive: true })
 for (const bundleDir of frameworkBundleDirs) {
     copyPackageSource(bundleDir, resolve(arrangeScopeDir, packageScopeName(bundleDir)))
 }

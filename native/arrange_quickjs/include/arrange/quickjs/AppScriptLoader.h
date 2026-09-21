@@ -12,11 +12,12 @@ namespace arrange::quickjs {
     };
 
     class AppScriptLoader {
-    public:
+       public:
         explicit AppScriptLoader(ScriptHost& host) : host_(host) {}
+
         ScriptLoadResult loadEntry(const std::filesystem::path& entryPath);
 
-    private:
+       private:
         ScriptHost& host_;
     };
-} // namespace arrange::quickjs
+}  // namespace arrange::quickjs

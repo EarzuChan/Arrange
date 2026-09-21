@@ -2,34 +2,29 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "types": ["node", "./types/arrange-vue-globals.d.ts"],
+    "types": [
+      "node",
+      "./types/arrange-globals.d.ts"
+    ],
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "vue": ["packages/arrange-vue-runtime-core/src/index.ts"],
-      "vue/compiler-sfc": ["packages/arrange-vue-compiler-sfc/src/index.ts"],
-      "@vue/shared": ["packages/arrange-vue-shared/src/index.ts"],
-      "@vue/reactivity": ["packages/arrange-vue-reactivity/src/index.ts"],
-      "@vue/runtime-core": ["packages/arrange-vue-runtime-core/src/index.ts"],
-      "@vue/compiler-core": ["packages/arrange-vue-compiler-core/src/index.ts"],
-      "@vue/compiler-dom": ["packages/arrange-vue-compiler-arrange/src/index.ts"],
-      "@arrange/vue-shared": ["packages/arrange-vue-shared/src/index.ts"],
-      "@arrange/vue-reactivity": ["packages/arrange-vue-reactivity/src/index.ts"],
-      "@arrange/vue-runtime-core": ["packages/arrange-vue-runtime-core/src/index.ts"],
-      "@arrange/vue-compiler-core": ["packages/arrange-vue-compiler-core/src/index.ts"],
-      "@arrange/vue-compiler-sfc": ["packages/arrange-vue-compiler-sfc/src/index.ts"],
-      "@arrange/vue-compiler-arrange": ["packages/arrange-vue-compiler-arrange/src/index.ts"],
-      "@arrange/runtime": ["packages/runtime/src/index.ts"],
-      "@arrange/vite-plugin": ["packages/vite-plugin/src/index.ts"],
       "@arrange/framework": ["packages/framework/src/index.ts"],
+      "@arrange/reactivity": ["packages/reactivity/src/index.ts"],
+      "@arrange/shared": ["packages/shared/src/index.ts"],
+      "@arrange/vite-plugin": ["packages/vite-plugin/src/index.ts"],
+      "@arrange/framework/foundation": ["packages/framework/src/foundation.ts"],
+      "@arrange/framework/ui": ["packages/framework/src/ui.ts"],
+      "@arrange/framework/animation": ["packages/framework/src/animation/index.ts"],
+      "@arrange/framework/internal": ["packages/framework/src/internal.ts"],
       "@arrange/framework/vite": ["packages/framework/src/vite.ts"],
-      "@arrange/framework/*": ["packages/framework/src/*"]
+      "@arrange/compiler": ["packages/compiler/src/sfa/index.ts"],
+      "@arrange/compiler/core": ["packages/compiler/src/core/index.ts"],
+      "@arrange/compiler/template": ["packages/compiler/src/template/index.ts"]
     }
   },
   "include": [
-    "packages/framework/src/**/*.ts",
-    "packages/runtime/src/**/*.ts",
-    "packages/vite-plugin/src/**/*.ts",
+    "packages/**/*.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts"
   ],

@@ -19,10 +19,8 @@
   },
   "dependencies": {
     "typescript": "^5.9.0",
-    "@arrange/vue-compiler-arrange": "0.0.0-m.2.2",
-    "@arrange/vue-compiler-core": "0.0.0-m.2.2",
-    "@arrange/vue-compiler-sfc": "0.0.0-m.2.2",
-    "@arrange/vue-shared": "0.0.0-m.2.2",
+    "@arrange/compiler": "0.0.0-m.2.2",
+    "@arrange/shared": "0.0.0-m.2.2",
     "@babel/parser": "7.29.3",
     "entities": "7.0.1",
     "estree-walker": "2.0.2",

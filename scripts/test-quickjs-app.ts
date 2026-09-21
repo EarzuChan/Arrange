@@ -1,17 +1,21 @@
-import {buildDemoUi} from "./demo-build.ts"
-import {cmakeExe, configureSmokeBuild, runInVsDev} from "./common.ts"
+import { resolve } from 'node:path'
+import { buildDemoUi } from './demo-build.ts'
+import { cmakeExe, configureSmokeBuild, run, runInVsDev } from './common.ts'
 
-const buildDir = "build\\quickjs-app-smoke-ninja"
-const smokeExe = `${buildDir}\\cpp_tests\\arrange_quickjs_app_smoke.exe`
+const buildDir = process.env.ARRANGE_NATIVE_TEST_BUILD_DIR ?? 'build/quickjs-app-smoke-ninja'
+const smokeExe = resolve(buildDir, 'cpp_tests/arrange_quickjs_app_smoke.exe')
+const appBundle = resolve('build/demo-ui-dist/app.js')
 
 await buildDemoUi()
 await configureSmokeBuild(buildDir)
-await runInVsDev(`"${cmakeExe()}" --build ${buildDir} --target arrange_quickjs_app_smoke`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-event-slot-count 6 --invoke-first-click-slot-repeated-transaction 1 --invoke-first-vertical-scroll-slot 17 --invoke-first-input-submit-slot QuickJSSmoke "Submitted: QuickJSSmoke"`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-current-transaction-event-slot-updates 6`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-strict-modifier-ok "{ elements: [] }"`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-strict-modifier-error "{ elements: 'not-array' }"`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-strict-modifier-error "{ elements: [{ type: 'unknownModifier', value: {} }] }"`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-strict-modifier-error "{ elements: [{ type: 'width', value: {} }] }"`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-script-diagnostics`)
-await runInVsDev(`${smokeExe} build\\demo-ui-dist\\app.js --expect-script-diagnostics-rejection`)
+await runInVsDev(`"${cmakeExe()}" --build "${buildDir}" --target arrange_quickjs_app_smoke arrange_juce_runtime_smoke --parallel 6`)
+
+// 交互验证使用生产 ArrangeRuntime，QuickJS 边界测试不另造发布与回执循环
+await run(smokeExe, [appBundle])
+await run(resolve(buildDir, 'cpp_tests/arrange_juce_runtime_smoke.exe'), [appBundle])
+await run(smokeExe, [appBundle, '--expect-strict-modifier-ok', '{ elements: [] }'])
+for (const expression of ["{ elements: 'not-array' }", "{ elements: [{ type: 'unknownModifier', value: {} }] }", "{ elements: [{ type: 'width', value: {} }] }"]) {
+    await run(smokeExe, [appBundle, '--expect-strict-modifier-error', expression])
+}
+await run(smokeExe, [appBundle, '--expect-script-diagnostics'])
+await run(smokeExe, [appBundle, '--expect-script-diagnostics-rejection'])

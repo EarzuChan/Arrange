@@ -1,4 +1,4 @@
-import {cmakeExe, configureSmokeBuild, runInVsDev} from "./common.ts"
+import { cmakeExe, configureSmokeBuild, runInVsDev } from "./common.ts"
 
 const buildDir = "build\\native-smoke-ninja"
 

@@ -14,4 +14,4 @@ namespace arrange::core {
     Point inverseLayerPoint(Point point, Rect bounds, const TransformModifierSemantics& transform) noexcept;
     // 绘制和命中使用同一层 bounds；坐标逆变换只在 graphicsLayer 所在层进行。
     bool enterModifier(const ModifierInstance& instance, Point& point) noexcept;
-} // namespace arrange::core
+}  // namespace arrange::core

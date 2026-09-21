@@ -13,40 +13,32 @@
 
 namespace arrange::juce {
     namespace {
-        arrange::core::InputIntent packageIntent(
-            PackageLoadOutcome::IntentKind kind,
-            arrange::core::MutationTransaction transaction) {
+        arrange::core::InputIntent packageIntent(PackageLoadOutcome::IntentKind kind, arrange::core::MutationTransaction transaction) {
             switch (kind) {
-            case PackageLoadOutcome::IntentKind::Reload:
-                return arrange::core::InputIntent::packageLoad(std::move(transaction), "reload initial commit");
-            case PackageLoadOutcome::IntentKind::HmrReload:
-                return arrange::core::InputIntent::packageLoad(std::move(transaction), "hmr reload initial commit");
-            case PackageLoadOutcome::IntentKind::PackageLoad:
-                return arrange::core::InputIntent::packageLoad(std::move(transaction), "package load initial commit");
+                case PackageLoadOutcome::IntentKind::Reload:
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "reload initial commit");
+                case PackageLoadOutcome::IntentKind::HmrReload:
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "hmr reload initial commit");
+                case PackageLoadOutcome::IntentKind::PackageLoad:
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "package load initial commit");
             }
             return arrange::core::InputIntent::packageLoad(std::move(transaction), "package load initial commit");
         }
 
         arrange::core::InputIntent packageFailureIntent(PackageLoadOutcome::IntentKind kind) {
             switch (kind) {
-            case PackageLoadOutcome::IntentKind::Reload:
-                return arrange::core::InputIntent::reload("reload failed");
-            case PackageLoadOutcome::IntentKind::HmrReload:
-                return arrange::core::InputIntent::hmrReload("hmr reload failed");
-            case PackageLoadOutcome::IntentKind::PackageLoad:
-                return arrange::core::InputIntent::diagnostics("package load failed");
+                case PackageLoadOutcome::IntentKind::Reload:
+                    return arrange::core::InputIntent::reload("reload failed");
+                case PackageLoadOutcome::IntentKind::HmrReload:
+                    return arrange::core::InputIntent::hmrReload("hmr reload failed");
+                case PackageLoadOutcome::IntentKind::PackageLoad:
+                    return arrange::core::InputIntent::diagnostics("package load failed");
             }
             return arrange::core::InputIntent::diagnostics("package load failed");
         }
-    } // namespace
+    }  // namespace
 
-    void RuntimePackageBinder::apply(
-        PackageLoadOutcome outcome,
-        RuntimeSessionState& session,
-        ArrangeRuntime& runtime,
-        DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        PassivePaintRenderer& paint) const {
+    void RuntimePackageBinder::apply(PackageLoadOutcome outcome, RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint) const {
         resetRuntimeState(session, runtime, diagnostics, interaction, paint);
 
         if (outcome.error) {
@@ -71,27 +63,15 @@ namespace arrange::juce {
         session.markLoaded();
     }
 
-    void RuntimePackageBinder::resetRuntimeState(
-        RuntimeSessionState& session,
-        ArrangeRuntime& runtime,
-        DiagnosticsState& diagnostics,
-        InteractionStateOwner& interaction,
-        PassivePaintRenderer& paint) {
+    void RuntimePackageBinder::resetRuntimeState(RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint) {
         session.reset(runtime, diagnostics, interaction);
         paint.clearResources();
     }
 
-    void RuntimePackageBinder::emitDiagnostic(
-        DiagnosticsState& diagnostics,
-        ArrangeRuntime& runtime,
-        RuntimeLoadDiagnostic diagnostic) {
+    void RuntimePackageBinder::emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadDiagnostic diagnostic) {
         DiagnosticEventInput event;
         event.level = diagnostic.level;
-        event.category = diagnostic.title.find("Live") != std::string::npos
-                             ? DiagnosticCategory::HostLive
-                             : diagnostic.title.find("Dist") != std::string::npos
-                                   ? DiagnosticCategory::HostDist
-                                   : DiagnosticCategory::ResourcePackage;
+        event.category = diagnostic.title.find("Live") != std::string::npos ? DiagnosticCategory::HostLive : diagnostic.title.find("Dist") != std::string::npos ? DiagnosticCategory::HostDist : DiagnosticCategory::ResourcePackage;
         event.code = "package.load";
         event.message = std::move(diagnostic.title);
         event.detail = std::move(diagnostic.message);
@@ -101,6 +81,6 @@ namespace arrange::juce {
             runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package diagnostic event"));
         }
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

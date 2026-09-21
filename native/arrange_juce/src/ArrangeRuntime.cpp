@@ -7,8 +7,7 @@
 #include <utility>
 
 namespace arrange::juce {
-    ArrangeRuntime::ArrangeRuntime(arrange::core::SceneFramePipeline pipeline)
-        : pipelineState_(std::move(pipeline)) {}
+    ArrangeRuntime::ArrangeRuntime(arrange::core::SceneFramePipeline pipeline) : pipelineState_(std::move(pipeline)) {}
 
     bool ArrangeRuntime::consumeReloadRequest() noexcept {
         return std::exchange(reloadRequested_, false);
@@ -17,7 +16,7 @@ namespace arrange::juce {
     void ArrangeRuntime::reset() {
         suspended_ = false;
         reloadRequested_ = false;
-        composition_.reset();
+        rearrangeHost_.reset();
         pipelineState_.reset();
         frame_.reset();
         events_.clear();
@@ -25,7 +24,7 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
     void ArrangeRuntime::setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept {
-        composition_.setScriptHost(std::move(host));
+        rearrangeHost_.setScriptHost(std::move(host));
     }
 #endif
 
@@ -66,9 +65,7 @@ namespace arrange::juce {
         events_.push_back(std::move(event));
     }
 
-    void ArrangeRuntime::enqueueScrollSnapshotEvent(
-        const arrange::core::EventSlotId& slot,
-        const arrange::core::ScrollResult& result) {
+    void ArrangeRuntime::enqueueScrollSnapshotEvent(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& result) {
         if (!slot.valid()) return;
         QueuedEvent event;
         event.kind = QueuedEventKind::InvokeScrollSnapshot;
@@ -91,7 +88,7 @@ namespace arrange::juce {
     }
 
     bool ArrangeRuntime::hasPendingAnimationFrame() const noexcept {
-        return composition_.hasPendingAnimationFrame() || pipelineState_.scene().tree().activeAnimationCount() > 0;
+        return rearrangeHost_.hasPendingAnimationFrame() || pipelineState_.scene().tree().activeAnimationCount() > 0;
     }
 
     FrameWorkState ArrangeRuntime::frameWorkState() const noexcept {
@@ -104,26 +101,23 @@ namespace arrange::juce {
     }
 
     bool ArrangeRuntime::hasPendingFrameWork() const noexcept {
-        return reloadRequested_ || composition_.hasPendingDiagnostics() ||
-            (!suspended_ && frame_.hasPendingFrameWork(frameWorkState()));
+        return reloadRequested_ || rearrangeHost_.hasPendingDiagnostics() || (!suspended_ && frame_.hasPendingFrameWork(frameWorkState()));
     }
 
-
-
-    bool ArrangeRuntime::captureCompositionTransactions() {
-        if (!composition_.hasScriptHost()) return false;
-        auto transaction = composition_.takePendingTransaction();
+    bool ArrangeRuntime::captureRearrangeTransactions() {
+        if (!rearrangeHost_.hasScriptHost()) return false;
+        auto transaction = rearrangeHost_.takePendingTransaction();
         if (!transaction) return false;
         enqueue(std::move(*transaction));
         return true;
     }
 
     RuntimeStepResult ArrangeRuntime::pumpAnimationFrame(double nowMillis) {
-        if (!composition_.hasPendingAnimationFrame()) return {};
+        if (!rearrangeHost_.hasPendingAnimationFrame()) return {};
         enqueueIntent(arrange::core::InputIntent::animationFrame("runtime animation frame"));
-        const auto pumped = composition_.pumpAnimationFrame(nowMillis);
+        const auto pumped = rearrangeHost_.pumpAnimationFrame(nowMillis);
         if (!pumped.ok) return {true, false, pumped.error};
-        return {captureCompositionTransactions(), true, {}};
+        return {captureRearrangeTransactions(), true, {}};
     }
 
     RuntimeStepResult ArrangeRuntime::dispatchQueuedEvents(double nowMillis) {
@@ -134,57 +128,57 @@ namespace arrange::juce {
             events_.pop_front();
             if (!pipelineState_.scene().hasEventSlot(event.slot)) continue;
 
-            CompositionInvokeResult invoked;
+            RearrangeInvokeResult invoked;
             switch (event.kind) {
                 case QueuedEventKind::Invoke:
-                    invoked = composition_.invoke(event.slot, nowMillis);
+                    invoked = rearrangeHost_.invoke(event.slot, nowMillis);
                     break;
                 case QueuedEventKind::InvokeString:
-                    invoked = composition_.invokeString(event.slot, nowMillis, event.value);
+                    invoked = rearrangeHost_.invokeString(event.slot, nowMillis, event.value);
                     break;
                 case QueuedEventKind::InvokeScrollSnapshot:
-                    invoked = composition_.invokeScrollSnapshot(event.slot, nowMillis, event.scroll);
+                    invoked = rearrangeHost_.invokeScrollSnapshot(event.slot, nowMillis, event.scroll);
                     break;
             }
 
             if (!invoked.ok) return {true, false, invoked.error};
             if (invoked.invoked) {
                 result.changed = true;
-                result.changed = captureCompositionTransactions() || result.changed;
+                result.changed = captureRearrangeTransactions() || result.changed;
             }
         }
 
         return result;
     }
 
-    RuntimePipelineRunResult ArrangeRuntime::runPipeline(
-        arrange::core::NodeId root,
-        arrange::core::Constraints constraints,
-        const arrange::core::FrameFinalizer& finalize) {
-        (void)captureCompositionTransactions();
+    RuntimePipelineRunResult ArrangeRuntime::runPipeline(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize) {
+        (void)captureRearrangeTransactions();
         const auto hasPending = pipelineState_.hasPendingTransactions() || pipelineState_.hasPendingIntents();
         if (!hasPending && !frame_.framePipelineRunRequested()) return {};
 
         const auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested(), finalize);
         frame_.clearFramePipelineRunRequest();
         if (result.error) {
-            const auto completed = composition_.completeRearrange(result.rearrange, *result.error);
-            (void)captureCompositionTransactions();
+            const auto completed = rearrangeHost_.completeRearrange(result.rearrange, *result.error);
+            (void)captureRearrangeTransactions();
             return {true, completed.ok ? *result.error : *result.error + "\n撤销回调失败：" + completed.error};
         }
 
-        composition_.publishScene(pipelineState_.scene());
-        const auto completed = composition_.completeRearrange(result.rearrange);
-        (void)captureCompositionTransactions();
+        rearrangeHost_.publishScene(pipelineState_.scene());
+        // 布局反馈属于本次成功发布，必须在后续输入及挂载回调前交付
+        // 反馈引出的视觉提交留在队列中，不在当前帧重入流水线
+        for (const auto& snapshot : result.scrollUpdates) {
+            if (!snapshot.eventSlot.valid()) continue;
+            const auto feedback = rearrangeHost_.invokeScrollSnapshot(snapshot.eventSlot, nowMillis, snapshot);
+            if (!feedback.ok) return {true, feedback.error};
+        }
+        const auto completed = rearrangeHost_.completeRearrange(result.rearrange);
+        (void)captureRearrangeTransactions();
         if (!completed.ok) return {true, completed.error};
         return {true, std::nullopt};
     }
 
-    RuntimeFramePumpResult ArrangeRuntime::pumpFrame(
-        arrange::core::NodeId root,
-        arrange::core::Constraints constraints,
-        double nowMillis,
-        const arrange::core::FrameFinalizer& finalize) {
+    RuntimeFramePumpResult ArrangeRuntime::pumpFrame(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize) {
         RuntimeFramePumpResult result;
         if (suspended_) return result;
         pipelineState_.setFrameTime(nowMillis);
@@ -221,7 +215,7 @@ namespace arrange::juce {
             return result;
         }
 
-        const auto pipeline = runPipeline(root, constraints, finalize);
+        const auto pipeline = runPipeline(root, constraints, nowMillis, finalize);
         if (pipeline.error) {
             result.changed = true;
             result.pipelineRan = true;
@@ -238,14 +232,14 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
     std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> ArrangeRuntime::takeDiagnosticEvents() {
-        return composition_.takeDiagnosticEvents();
+        return rearrangeHost_.takeDiagnosticEvents();
     }
 
     std::vector<arrange::quickjs::QuickJsDiagnosticAction> ArrangeRuntime::takeDiagnosticActions() {
-        return composition_.takeDiagnosticActions();
+        return rearrangeHost_.takeDiagnosticActions();
     }
 #endif
 
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

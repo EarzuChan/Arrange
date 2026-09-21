@@ -97,6 +97,7 @@ namespace arrange::core {
     };
 
     struct SceneFramePipelineResult {
+        std::vector<ScrollResult> scrollUpdates;
         std::shared_ptr<RearrangeSubmission> rearrange;
         bool ran = false;
         std::optional<std::string> error;
@@ -108,30 +109,21 @@ namespace arrange::core {
     using FrameFinalizer = std::function<void(const NativeScene&, PublishedFrame&)>;
 
     class SceneFramePipeline {
-    public:
+       public:
         explicit SceneFramePipeline(LayoutEngine layoutEngine = LayoutEngine());
 
-        [[nodiscard]] FramePlan planFrame(
-            const NativeScene& scene,
-            NodeId root,
-            bool hasTransaction,
-            bool framePipelineRequested) const;
+        [[nodiscard]] FramePlan planFrame(const NativeScene& scene, NodeId root, bool hasTransaction, bool framePipelineRequested) const;
 
-        [[nodiscard]] SceneFramePipelineResult run(
-            NativeScene& scene,
-            NodeId root,
-            Constraints constraints,
-            const MutationTransaction* transaction,
-            bool framePipelineRequested,
-            PublishedFrame& publishedFrame,
-            const FrameFinalizer& finalize = {}, double timeMillis = 0);
+        [[nodiscard]] SceneFramePipelineResult run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize = {}, double timeMillis = 0);
 
         // Diagnostics/interaction can publish against retained geometry without replaying JS.
         bool publishRetained(const NativeScene& scene, PublishedFrame& publishedFrame, const FrameFinalizer& finalize);
 
-        const FrameExecutionCounters& counters() const noexcept { return counters_; }
+        const FrameExecutionCounters& counters() const noexcept {
+            return counters_;
+        }
 
-    private:
+       private:
         FrameExecutionCounters counters_;
         void finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate);
         static void recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason);
@@ -139,7 +131,4 @@ namespace arrange::core {
         LayoutEngine layout_;
         DrawOpsBuilder drawOpsBuilder_;
     };
-} // namespace arrange::core
-
-
-
+}  // namespace arrange::core

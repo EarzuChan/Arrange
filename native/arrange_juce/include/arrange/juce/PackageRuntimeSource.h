@@ -43,7 +43,7 @@ namespace arrange::juce {
     };
 
     class PackageRuntimeSource final {
-    public:
+       public:
         ~PackageRuntimeSource();
 
         PackageLoadOutcome configure(EditorConfig config);
@@ -54,12 +54,23 @@ namespace arrange::juce {
         bool consumeDevReloadRequested();
         bool wantsReloadPolling() const;
 
-        const EditorConfig& config() const noexcept { return config_; }
-        PackageSource activeSource() const noexcept { return activeSource_; }
-        bool liveRuntimeEnabled() const noexcept { return liveRuntimeEnabled_; }
-        bool lastLiveUnavailable() const noexcept { return lastLiveUnavailable_; }
+        const EditorConfig& config() const noexcept {
+            return config_;
+        }
 
-    private:
+        PackageSource activeSource() const noexcept {
+            return activeSource_;
+        }
+
+        bool liveRuntimeEnabled() const noexcept {
+            return liveRuntimeEnabled_;
+        }
+
+        bool lastLiveUnavailable() const noexcept {
+            return lastLiveUnavailable_;
+        }
+
+       private:
         PackageLoadOutcome loadConfiguredPackage();
         PackageLoadOutcome loadLivePackage();
         PackageLoadOutcome loadDistPackage();
@@ -81,4 +92,4 @@ namespace arrange::juce {
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

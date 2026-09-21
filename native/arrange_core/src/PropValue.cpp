@@ -5,10 +5,14 @@
 
 namespace arrange::core {
     namespace {
-        std::string toString(std::string_view value) { return {value.data(), value.size()}; }
-    }
+        std::string toString(std::string_view value) {
+            return {value.data(), value.size()};
+        }
+    }  // namespace
 
-    PropValue PropValue::nullValue() { return {}; }
+    PropValue PropValue::nullValue() {
+        return {};
+    }
 
     PropValue PropValue::numberValue(double value) {
         PropValue result;
@@ -55,7 +59,9 @@ namespace arrange::core {
         return fallback;
     }
 
-    int PropValue::intOr(int fallback) const noexcept { return static_cast<int>(numberOr(static_cast<float>(fallback))); }
+    int PropValue::intOr(int fallback) const noexcept {
+        return static_cast<int>(numberOr(static_cast<float>(fallback)));
+    }
 
     bool PropValue::boolOr(bool fallback) const noexcept {
         if (kind == PropValueKind::Boolean) return boolean;
@@ -67,13 +73,38 @@ namespace arrange::core {
         return fallback;
     }
 
-    bool PropObject::has(std::string_view key) const noexcept { return prop(key) != nullptr; }
-    const PropValue* PropObject::prop(std::string_view key) const noexcept { return value_ == nullptr ? nullptr : value_->field(key); }
-    float PropObject::number(std::string_view key, float fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->numberOr(fallback); }
-    int PropObject::integer(std::string_view key, int fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->intOr(fallback); }
-    bool PropObject::boolean(std::string_view key, bool fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->boolOr(fallback); }
-    std::string PropObject::string(std::string_view key, std::string_view fallback) const { const auto* value = prop(key); return value == nullptr ? toString(fallback) : value->stringOr(fallback); }
-    std::uint32_t PropObject::color(std::string_view key, std::uint32_t fallback) const noexcept { const auto* value = prop(key); return value == nullptr ? fallback : value->uint32Or(fallback); }
+    bool PropObject::has(std::string_view key) const noexcept {
+        return prop(key) != nullptr;
+    }
+
+    const PropValue* PropObject::prop(std::string_view key) const noexcept {
+        return value_ == nullptr ? nullptr : value_->field(key);
+    }
+
+    float PropObject::number(std::string_view key, float fallback) const noexcept {
+        const auto* value = prop(key);
+        return value == nullptr ? fallback : value->numberOr(fallback);
+    }
+
+    int PropObject::integer(std::string_view key, int fallback) const noexcept {
+        const auto* value = prop(key);
+        return value == nullptr ? fallback : value->intOr(fallback);
+    }
+
+    bool PropObject::boolean(std::string_view key, bool fallback) const noexcept {
+        const auto* value = prop(key);
+        return value == nullptr ? fallback : value->boolOr(fallback);
+    }
+
+    std::string PropObject::string(std::string_view key, std::string_view fallback) const {
+        const auto* value = prop(key);
+        return value == nullptr ? toString(fallback) : value->stringOr(fallback);
+    }
+
+    std::uint32_t PropObject::color(std::string_view key, std::uint32_t fallback) const noexcept {
+        const auto* value = prop(key);
+        return value == nullptr ? fallback : value->uint32Or(fallback);
+    }
 
     std::string kebabCase(std::string_view key) {
         std::string result;
@@ -81,8 +112,9 @@ namespace arrange::core {
             if (ch >= 'A' && ch <= 'Z') {
                 result.push_back('-');
                 result.push_back(static_cast<char>(ch - 'A' + 'a'));
+            } else {
+                result.push_back(ch);
             }
-            else { result.push_back(ch); }
         }
         return result;
     }
@@ -101,8 +133,13 @@ namespace arrange::core {
         return nullptr;
     }
 
-    bool hasProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) { return propValue(node, camelCase, kebab) != nullptr; }
-    PropObject objectProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) { return PropObject(propValue(node, camelCase, kebab)); }
+    bool hasProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) {
+        return propValue(node, camelCase, kebab) != nullptr;
+    }
+
+    PropObject objectProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) {
+        return PropObject(propValue(node, camelCase, kebab));
+    }
 
     std::string stringProp(const LayoutNode& node, std::string_view key, std::string_view fallback) {
         const auto* value = propValue(node, key);
@@ -133,4 +170,4 @@ namespace arrange::core {
         const auto* value = propValue(node, key);
         return value == nullptr ? fallback : value->uint32Or(fallback);
     }
-} // namespace arrange::core
+}  // namespace arrange::core

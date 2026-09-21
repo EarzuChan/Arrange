@@ -6,4 +6,4 @@ namespace arrange::core {
         if (name == "LayoutNode") return NodeType::Layout;
         return NodeType::Unknown;
     }
-}
+}  // namespace arrange::core

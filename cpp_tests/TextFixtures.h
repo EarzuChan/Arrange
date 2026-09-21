@@ -31,12 +31,14 @@ namespace test_support {
     }
 
     inline const std::shared_ptr<const arrange::core::TextLayout>& textLayoutOf(const arrange::core::LayoutNode& node) {
-        for (const auto& instance : node.modifier.elements()) if (arrange::core::textPresentation(instance.descriptor.value)) return instance.textLayout;
+        for (const auto& instance : node.modifier.elements())
+            if (arrange::core::textPresentation(instance.descriptor.value)) return instance.textLayout;
         throw std::logic_error("夹具节点没有文本 Modifier");
     }
 
     inline const arrange::core::ModifierInstance* editable(const arrange::core::LayoutNode& node) {
-        for (const auto& instance : node.modifier.elements()) if (std::holds_alternative<arrange::core::TextFieldModifier>(instance.descriptor.value)) return &instance;
+        for (const auto& instance : node.modifier.elements())
+            if (std::holds_alternative<arrange::core::TextFieldModifier>(instance.descriptor.value)) return &instance;
         return nullptr;
     }
 
@@ -47,4 +49,4 @@ namespace test_support {
         }
         return {};
     }
-}
+}  // namespace test_support

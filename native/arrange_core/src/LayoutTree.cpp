@@ -12,7 +12,9 @@
 
 namespace arrange::core {
     namespace {
-        bool hasArea(Rect rect) { return rect.width > 0.0f && rect.height > 0.0f; }
+        bool hasArea(Rect rect) {
+            return rect.width > 0.0f && rect.height > 0.0f;
+        }
 
         Rect unionRect(Rect left, Rect right) {
             const auto x1 = std::min(left.x, right.x);
@@ -26,7 +28,7 @@ namespace arrange::core {
         const T* getIf(const TreeMutation& mutation) noexcept {
             return std::get_if<T>(&mutation);
         }
-    } // namespace
+    }  // namespace
 
     void LayoutTree::apply(const std::vector<TreeMutation>& mutations) {
         for (const auto& mutation : mutations) applyMutation(mutation);
@@ -58,18 +60,20 @@ namespace arrange::core {
             require(op->child);
             if (op->parent == op->child) throw std::runtime_error("Arrange layout tree cannot insert a node into itself");
             std::unordered_set<NodeId> visited;
-            if (isDescendant(op->child, op->parent, visited)) { throw std::runtime_error("Arrange layout tree cannot insert an ancestor as a child"); }
+            if (isDescendant(op->child, op->parent, visited)) {
+                throw std::runtime_error("Arrange layout tree cannot insert an ancestor as a child");
+            }
             auto& parent = require(op->parent);
             if (const auto oldParent = parentOf(op->child)) {
                 auto& oldParentNode = require(*oldParent);
                 oldParentNode.children.erase(std::remove(oldParentNode.children.begin(), oldParentNode.children.end(), op->child), oldParentNode.children.end());
-                markDirtyWithPropagation(*oldParent, DirtyFlag::Structure);
+                markDirtyAttributed(*oldParent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "移出子节点");
             }
             parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
             const auto insertAt = std::min<std::size_t>(op->index, parent.children.size());
             parent.children.insert(parent.children.begin() + static_cast<std::ptrdiff_t>(insertAt), op->child);
             setParent(op->child, op->parent);
-            markDirtyWithPropagation(op->parent, DirtyFlag::Structure);
+            markDirtyAttributed(op->parent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "更新子节点顺序");
             return;
         }
 
@@ -79,7 +83,7 @@ namespace arrange::core {
             parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
             if (parent.children.size() != oldSize) {
                 clearParent(op->child);
-                markDirtyWithPropagation(op->parent, DirtyFlag::Structure);
+                markDirtyAttributed(op->parent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "更新子节点顺序");
             }
             return;
         }
@@ -123,8 +127,10 @@ namespace arrange::core {
         if (previous == node.props.end() && value.isNull()) return 0;
         const auto mask = hostInputInvalidation(input, previous == node.props.end() ? nullptr : &previous->second, value);
         if (mask != 0) {
-            if (value.isNull()) node.props.erase(name);
-            else node.props[name] = value;
+            if (value.isNull())
+                node.props.erase(name);
+            else
+                node.props[name] = value;
             markInputDirty(id, mask);
         }
         return mask;
@@ -142,13 +148,26 @@ namespace arrange::core {
         return result.dirty;
     }
 
-    const LayoutNode& LayoutTree::node(NodeId id) const { return require(id); }
-    LayoutNode& LayoutTree::node(NodeId id) { return require(id); }
+    const LayoutNode& LayoutTree::node(NodeId id) const {
+        return require(id);
+    }
+
+    LayoutNode& LayoutTree::node(NodeId id) {
+        return require(id);
+    }
+
+    std::vector<NodeId> LayoutTree::nodeIds() const {
+        std::vector<NodeId> result;
+        result.reserve(nodes_.size());
+        for (const auto& [id, _] : nodes_) result.push_back(id);
+        std::sort(result.begin(), result.end());
+        return result;
+    }
 
     DirtySnapshot LayoutTree::dirtySnapshot(std::uint32_t mask) const noexcept {
         DirtySnapshot snapshot;
         for (const auto& [_, node] : nodes_) {
-            const auto matchedDirty = node.dirty & mask;
+            const auto matchedDirty = (node.dirty | node.subtreeDirty) & mask;
             if (matchedDirty == 0) continue;
             ++snapshot.nodeCount;
             snapshot.combinedDirty |= matchedDirty;
@@ -156,16 +175,18 @@ namespace arrange::core {
             if (!snapshot.hasRepaintBounds) {
                 snapshot.repaintBounds = node.bounds;
                 snapshot.hasRepaintBounds = true;
+            } else {
+                snapshot.repaintBounds = unionRect(snapshot.repaintBounds, node.bounds);
             }
-            else { snapshot.repaintBounds = unionRect(snapshot.repaintBounds, node.bounds); }
         }
         return snapshot;
     }
 
     std::size_t LayoutTree::activeAnimationCount() const noexcept {
         std::size_t count = 0;
-        for (const auto& [_, node] : nodes_) for (const auto& instance : node.modifier.elements())
-            if (std::holds_alternative<AnimateContentSizeModifier>(instance.descriptor.value) && instance.sizeAnimation.running) ++count;
+        for (const auto& [_, node] : nodes_)
+            for (const auto& instance : node.modifier.elements())
+                if (std::holds_alternative<AnimateContentSizeModifier>(instance.descriptor.value) && instance.sizeAnimation.running) ++count;
         return count;
     }
 
@@ -181,46 +202,51 @@ namespace arrange::core {
         }
     }
 
-    void LayoutTree::clearDirty() noexcept { for (auto& [_, node] : nodes_) node.dirty = 0; }
+    void LayoutTree::clearDirty() noexcept {
+        for (auto& [_, node] : nodes_) {
+            node.dirty = 0;
+            node.subtreeDirty = 0;
+        }
+    }
 
     void LayoutTree::markDirtyWithPropagation(NodeId id, DirtyFlag flag) {
         auto& dirtyNode = require(id);
         markDirty(dirtyNode, flag);
 
         switch (flag) {
-        case DirtyFlag::Structure:
-            markDirty(dirtyNode, DirtyFlag::Layout);
-            markDirty(dirtyNode, DirtyFlag::HitTest);
-            markAncestorsDirty(id, DirtyFlag::Structure);
-            markAncestorsDirty(id, DirtyFlag::Layout);
-            markAncestorsDirty(id, DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Layout:
-            markAncestorsDirty(id, DirtyFlag::Layout);
-            break;
-        case DirtyFlag::Placement:
-            markAncestorsDirty(id, DirtyFlag::Placement);
-            [[fallthrough]];
-        case DirtyFlag::Transform:
-            markDirty(dirtyNode, DirtyFlag::Paint);
-            markDirty(dirtyNode, DirtyFlag::HitTest);
-            markAncestorsDirty(id, DirtyFlag::HitTest);
-            markAncestorsDirty(id, DirtyFlag::Paint);
-            break;
-        case DirtyFlag::HitTest:
-            markAncestorsDirty(id, DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Resource:
-            markDirty(dirtyNode, DirtyFlag::Paint);
-            markAncestorsDirty(id, DirtyFlag::Paint);
-            break;
-        case DirtyFlag::Paint:
-            markAncestorsDirty(id, DirtyFlag::Paint);
-            break;
-        case DirtyFlag::Focus:
-        case DirtyFlag::Accessibility:
-        case DirtyFlag::EventSlot:
-            break;
+            case DirtyFlag::Structure:
+                markDirty(dirtyNode, DirtyFlag::Layout);
+                markDirty(dirtyNode, DirtyFlag::HitTest);
+                markAncestorsDirty(id, DirtyFlag::Structure);
+                markAncestorsDirty(id, DirtyFlag::Layout);
+                markAncestorsDirty(id, DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Layout:
+                markAncestorsDirty(id, DirtyFlag::Layout);
+                break;
+            case DirtyFlag::Placement:
+                markAncestorsDirty(id, DirtyFlag::Placement);
+                [[fallthrough]];
+            case DirtyFlag::Transform:
+                markDirty(dirtyNode, DirtyFlag::Paint);
+                markDirty(dirtyNode, DirtyFlag::HitTest);
+                markAncestorsDirty(id, DirtyFlag::HitTest);
+                markAncestorsDirty(id, DirtyFlag::Paint);
+                break;
+            case DirtyFlag::HitTest:
+                markAncestorsDirty(id, DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Resource:
+                markDirty(dirtyNode, DirtyFlag::Paint);
+                markAncestorsDirty(id, DirtyFlag::Paint);
+                break;
+            case DirtyFlag::Paint:
+                markAncestorsDirty(id, DirtyFlag::Paint);
+                break;
+            case DirtyFlag::Focus:
+            case DirtyFlag::Accessibility:
+            case DirtyFlag::EventSlot:
+                break;
         }
     }
 
@@ -229,78 +255,68 @@ namespace arrange::core {
         std::unordered_set<NodeId> visited;
         while (const auto parentId = parentOf(current)) {
             if (!visited.insert(*parentId).second) break;
-            markDirty(require(*parentId), flag);
+            auto& parent = require(*parentId);
+            if (parent.subtreeDirty & dirtyMask(flag)) break;
+            parent.subtreeDirty |= dirtyMask(flag);
+            if (flag == DirtyFlag::Placement || flag == DirtyFlag::Structure || flag == DirtyFlag::Layout) markDirty(parent, flag);
             current = *parentId;
         }
     }
 
-    void LayoutTree::markDirtyAttributed(
-        NodeId id,
-        DirtyFlag flag,
-        InvalidationSource source,
-        std::string field,
-        std::string reason) {
+    void LayoutTree::markDirtyAttributed(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
         markDirtyWithPropagation(id, flag);
         recordDirtyAttribution(id, flag, source, std::move(field), std::move(reason));
     }
 
-    void LayoutTree::recordDirtyAttribution(
-        NodeId id,
-        DirtyFlag flag,
-        InvalidationSource source,
-        std::string field,
-        std::string reason) {
+    void LayoutTree::recordDirtyAttribution(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
         std::uint32_t dirty = dirtyMask(flag);
         switch (flag) {
-        case DirtyFlag::Structure:
-            dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Placement:
-        case DirtyFlag::Transform:
-            dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Resource:
-            dirty |= dirtyMask(DirtyFlag::Paint);
-            break;
-        case DirtyFlag::Layout:
-        case DirtyFlag::Paint:
-        case DirtyFlag::HitTest:
-        case DirtyFlag::Focus:
-        case DirtyFlag::Accessibility:
-        case DirtyFlag::EventSlot:
-            break;
+            case DirtyFlag::Structure:
+                dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Placement:
+            case DirtyFlag::Transform:
+                dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Resource:
+                dirty |= dirtyMask(DirtyFlag::Paint);
+                break;
+            case DirtyFlag::Layout:
+            case DirtyFlag::Paint:
+            case DirtyFlag::HitTest:
+            case DirtyFlag::Focus:
+            case DirtyFlag::Accessibility:
+            case DirtyFlag::EventSlot:
+                break;
         }
         invalidation_.record(source, id, dirty, std::move(field), std::move(reason));
     }
 
-    void LayoutTree::recordSceneInvalidation(
-        DirtyFlag flag,
-        InvalidationSource source,
-        std::string field,
-        std::string reason) {
+    void LayoutTree::recordSceneInvalidation(DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
         std::uint32_t dirty = dirtyMask(flag);
         switch (flag) {
-        case DirtyFlag::Structure:
-            dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Placement:
-        case DirtyFlag::Transform:
-            dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
-            break;
-        case DirtyFlag::Resource:
-            dirty |= dirtyMask(DirtyFlag::Paint);
-            break;
-        case DirtyFlag::Layout:
-        case DirtyFlag::Paint:
-        case DirtyFlag::HitTest:
-        case DirtyFlag::Focus:
-        case DirtyFlag::Accessibility:
-        case DirtyFlag::EventSlot:
-            break;
+            case DirtyFlag::Structure:
+                dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Placement:
+            case DirtyFlag::Transform:
+                dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
+                break;
+            case DirtyFlag::Resource:
+                dirty |= dirtyMask(DirtyFlag::Paint);
+                break;
+            case DirtyFlag::Layout:
+            case DirtyFlag::Paint:
+            case DirtyFlag::HitTest:
+            case DirtyFlag::Focus:
+            case DirtyFlag::Accessibility:
+            case DirtyFlag::EventSlot:
+                break;
         }
         // A viewport resize changes root constraints; descendants validate their
         // actual incoming constraints instead of receiving an indiscriminate dirty.
-        if (source != InvalidationSource::Resize) for (auto& [_, node] : nodes_) node.dirty |= dirty;
+        if (source != InvalidationSource::Resize)
+            for (auto& [_, node] : nodes_) node.dirty |= dirty;
         invalidation_.record(source, std::nullopt, dirty, std::move(field), std::move(reason));
     }
 
@@ -331,8 +347,13 @@ namespace arrange::core {
         nodes_.erase(id);
     }
 
-    void LayoutTree::setParent(NodeId child, NodeId parent) { parentByNode_[child] = parent; }
-    void LayoutTree::clearParent(NodeId child) { parentByNode_.erase(child); }
+    void LayoutTree::setParent(NodeId child, NodeId parent) {
+        parentByNode_[child] = parent;
+    }
+
+    void LayoutTree::clearParent(NodeId child) {
+        parentByNode_.erase(child);
+    }
 
     std::optional<NodeId> LayoutTree::parentOf(NodeId id) const noexcept {
         const auto it = parentByNode_.find(id);
@@ -341,12 +362,14 @@ namespace arrange::core {
     }
 
     LayoutNode& LayoutTree::require(NodeId id) {
+        ++nodeAccesses_;
         const auto it = nodes_.find(id);
         if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
         return it->second;
     }
 
     const LayoutNode& LayoutTree::require(NodeId id) const {
+        ++nodeAccesses_;
         const auto it = nodes_.find(id);
         if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
         return it->second;
@@ -357,7 +380,9 @@ namespace arrange::core {
         if (!visited.insert(ancestor).second) return false;
         const auto it = nodes_.find(ancestor);
         if (it == nodes_.end()) return false;
-        for (auto child : it->second.children) { if (isDescendant(child, candidate, visited)) return true; }
+        for (auto child : it->second.children) {
+            if (isDescendant(child, candidate, visited)) return true;
+        }
         return false;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

@@ -21,7 +21,7 @@ export type ArrangeDevServer = {
         configFile?: string
         arrangeViteApiRoot?: string
     }
-    middlewares?: {use: (path: string, handler: MiddlewareHandler) => void}
+    middlewares?: { use: (path: string, handler: MiddlewareHandler) => void }
 }
 
 export type HotUpdateModule = {
@@ -32,24 +32,24 @@ export type HotUpdateModule = {
 export type ArrangeReloadEvent = {
     type: "custom"
     event: "arrange:reload"
-    data: {path: string; timestamp: number}
+    data: { path: string; timestamp: number }
 }
 
 export type HotUpdateContext = {
     file: string
     modules: HotUpdateModule[]
-    server?: {ws?: {send?: (event: ArrangeReloadEvent) => void}}
+    server?: { ws?: { send?: (event: ArrangeReloadEvent) => void } }
 }
 
-export type TransformWarning = {id: string; message: string}
+export type TransformWarning = { id: string; message: string }
 
-export type TransformThis = {warn: (warning: TransformWarning) => void; addWatchFile?: (file: string) => void}
+export type TransformThis = { warn: (warning: TransformWarning) => void; addWatchFile?: (file: string) => void }
 
-export type ConfigEnv = {command?: string; mode?: string}
+export type ConfigEnv = { command?: string; mode?: string }
 
 export type ArrangeViteConfig = {
     define: Record<string, string>
-    server: {host: string; port: number; strictPort: boolean}
+    server: { host: string; port: number; strictPort: boolean }
     build: {
         target: string
         rollupOptions: {

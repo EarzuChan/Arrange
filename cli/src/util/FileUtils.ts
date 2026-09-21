@@ -1,10 +1,10 @@
-import {readFile} from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 
-export interface FileSnapshot {readonly path: string, readonly content: string | null}
+export interface FileSnapshot { readonly path: string, readonly content: string | null }
 
 export async function readSnapshot(path: string): Promise<FileSnapshot> {
-    try { return {path, content: await readFile(path, "utf8")} } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return {path, content: null}
+    try { return { path, content: await readFile(path, "utf8") } } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return { path, content: null }
         throw error
     }
 }

@@ -1,5 +1,5 @@
-﻿import {existsSync, readFileSync} from "node:fs"
-import {resolve} from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 
 export function frameworkPackageRoot(uiRoot: string): string {
     const packageRoot = resolve(uiRoot, "node_modules", "@arrange", "framework")

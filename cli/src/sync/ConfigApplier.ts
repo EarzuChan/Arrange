@@ -1,7 +1,7 @@
-import {setJsonPath, type JsonValue} from "../managed/JsonRegion.ts"
-import type {ConfigScanReport, ApplicableUpdate} from "./ConfigScanReport.ts"
-import {ConfigWriter, type FileChange} from "./ConfigWriter.ts"
-import type {FileSnapshot} from "../util/FileUtils.ts"
+import { setJsonPath, type JsonValue } from "../managed/JsonRegion.ts"
+import type { ConfigScanReport, ApplicableUpdate } from "./ConfigScanReport.ts"
+import { ConfigWriter, type FileChange } from "./ConfigWriter.ts"
+import type { FileSnapshot } from "../util/FileUtils.ts"
 
 export class ConfigApplier {
     private readonly writer = new ConfigWriter()
@@ -41,7 +41,7 @@ export class ConfigApplier {
                 if (before.content.includes("\r\n")) after = after.replace(/\n/g, "\r\n")
             } else throw new Error("同一文件混用了文本和 JSON 更新")
 
-            changes.push({before, after})
+            changes.push({ before, after })
         }
 
         await this.writer.write(rootDir, changes, guards)

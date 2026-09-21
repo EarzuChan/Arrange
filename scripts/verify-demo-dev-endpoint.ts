@@ -1,10 +1,10 @@
-import {spawn} from "node:child_process"
-import {once} from "node:events"
-import {rmSync, writeFileSync} from "node:fs"
-import {request} from "node:http"
-import {createRequire} from "node:module"
-import {dirname, resolve} from "node:path"
-import {fileURLToPath} from "node:url"
+import { spawn } from "node:child_process"
+import { once } from "node:events"
+import { rmSync, writeFileSync } from "node:fs"
+import { request } from "node:http"
+import { createRequire } from "node:module"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const repoRoot = resolve(import.meta.dirname, "..")
 const uiRoot = resolve(repoRoot, "demo/ui-src")
@@ -14,7 +14,7 @@ const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUN
 const endpoint = `http://127.0.0.1:${port}${devBundlePath}`
 const require = createRequire(import.meta.url)
 
-function fetchText(url: string): Promise<{status: number; body: string; headers: Record<string, string | string[] | undefined>}> {
+function fetchText(url: string): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
     return new Promise((resolvePromise, reject) => {
         const req = request(url, (res) => {
             let body = ""
@@ -23,7 +23,7 @@ function fetchText(url: string): Promise<{status: number; body: string; headers:
                 body += chunk
             })
             res.on("end", () => {
-                resolvePromise({status: res.statusCode ?? 0, body, headers: res.headers})
+                resolvePromise({ status: res.statusCode ?? 0, body, headers: res.headers })
             })
         })
         req.on("error", reject)
@@ -31,7 +31,7 @@ function fetchText(url: string): Promise<{status: number; body: string; headers:
     })
 }
 
-async function probeEndpoint(): Promise<{status: number; body: string; headers: Record<string, string | string[] | undefined>} | null> {
+async function probeEndpoint(): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> } | null> {
     try {
         return await fetchText(endpoint)
     } catch {
@@ -39,11 +39,11 @@ async function probeEndpoint(): Promise<{status: number; body: string; headers: 
     }
 }
 
-function assertBundle(result: {status: number; body: string; headers: Record<string, string | string[] | undefined>}): void {
+function assertBundle(result: { status: number; body: string; headers: Record<string, string | string[] | undefined> }): void {
     if (result.status !== 200) throw new Error(`unexpected dev endpoint status ${result.status}\n${result.body}`)
     if (!/createApp/.test(result.body)) throw new Error("dev endpoint bundle missing createApp")
     if (macroPattern.test(result.body)) {
-        throw new Error("dev endpoint bundle contains unresolved Arrange Vue macro")
+        throw new Error("dev endpoint bundle contains unresolved Arrange macro")
     }
     if (/process\.env/.test(result.body)) throw new Error("dev endpoint bundle contains process.env")
     console.log(`dev endpoint ok: ${result.status}, bytes=${result.body.length}`)
@@ -55,7 +55,7 @@ if (existing) {
     process.exit(0)
 }
 
-const vitePackage = require("vite/package.json") as {bin: {vite: string} | string}
+const vitePackage = require("vite/package.json") as { bin: { vite: string } | string }
 const viteEntry = await import.meta.resolve("vite")
 const viteBinName = typeof vitePackage.bin === "string" ? vitePackage.bin : vitePackage.bin.vite
 const viteBin = resolve(dirname(fileURLToPath(viteEntry)), "..", "..", viteBinName)
@@ -101,5 +101,5 @@ try {
         ])
     }
     if (child.exitCode === null) child.kill("SIGKILL")
-    rmSync(configPath, {force: true})
+    rmSync(configPath, { force: true })
 }

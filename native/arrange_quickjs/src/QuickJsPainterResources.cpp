@@ -29,7 +29,7 @@ namespace arrange::quickjs {
             }
             return std::pair{a, b};
         }
-    }
+    }  // namespace
 
     QuickJsPainterResources::QuickJsPainterResources(JSContext* context, arrange::core::PainterLoader loader) : context_(context), loader_(std::move(loader)) {}
 
@@ -52,8 +52,11 @@ namespace arrange::quickjs {
         Resource resource;
         resource.snapshot.identity = arrange::core::allocateRuntimeIdentity();
         resource.snapshot.generation = arrange::core::allocateRuntimeIdentity();
-        try { resource.pending = owner.loader_(location); }
-        catch (const std::exception& error) { return JS_ThrowInternalError(context, "Painter 请求失败：%s", error.what()); }
+        try {
+            resource.pending = owner.loader_(location);
+        } catch (const std::exception& error) {
+            return JS_ThrowInternalError(context, "Painter 请求失败：%s", error.what());
+        }
         if (!resource.pending.valid()) return JS_ThrowInternalError(context, "Painter 加载器未返回有效请求");
 
         const auto handle = resource.snapshot;
@@ -79,7 +82,8 @@ namespace arrange::quickjs {
     }
 
     bool QuickJsPainterResources::hasPending() const {
-        for (const auto& [_, resource] : resources_) if (resource.pending.valid()) return true;
+        for (const auto& [_, resource] : resources_)
+            if (resource.pending.valid()) return true;
         return false;
     }
 
@@ -94,8 +98,11 @@ namespace arrange::quickjs {
             if (found == resources_.end()) continue;
             auto& resource = found->second;
             arrange::core::PainterLoadResult loaded;
-            try { loaded = resource.pending.get(); }
-            catch (const std::exception& error) { loaded.error = error.what(); }
+            try {
+                loaded = resource.pending.get();
+            } catch (const std::exception& error) {
+                loaded.error = error.what();
+            }
             if (!loaded.content && loaded.error.empty()) loaded.error = "Painter 加载器未返回绘制内容";
             if (loaded.error.empty()) resource.snapshot.content = std::move(loaded.content);
             ++resource.snapshot.contentVersion;
@@ -134,6 +141,6 @@ namespace arrange::quickjs {
         }
         return found->second.snapshot;
     }
-}
+}  // namespace arrange::quickjs
 
 #endif

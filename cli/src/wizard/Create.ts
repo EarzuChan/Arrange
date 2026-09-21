@@ -1,11 +1,11 @@
-import {managedItems} from "../managed/ManageItems.ts"
-import {confirm, group, intro, isCancel, log, multiselect, outro, select} from "@clack/prompts"
-import {resolve} from "node:path"
-import type {CreateProjectRequest, PluginType} from "../project/CreateProject.ts"
-import type {NativeProduct, PackageManagerName} from "../project/ProjectState.ts"
-import {PromptCancelled, requiredText, validateFourCharCode, validateSemver} from "../util/PromptUtils.ts"
-import type {FrameworkRegistryClient} from "../framework/FrameworkRegistryClient.ts"
-import {selectFrameworkVersion} from "./FrameworkVersion.ts"
+import { managedItems } from "../managed/ManageItems.ts"
+import { confirm, group, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts"
+import { resolve } from "node:path"
+import type { CreateProjectRequest, PluginType } from "../project/CreateProject.ts"
+import type { NativeProduct, PackageManagerName } from "../project/ProjectState.ts"
+import { PromptCancelled, requiredText, validateFourCharCode, validateSemver } from "../util/PromptUtils.ts"
+import type { FrameworkRegistryClient } from "../framework/FrameworkRegistryClient.ts"
+import { selectFrameworkVersion } from "./FrameworkVersion.ts"
 
 export interface CreateWizardInput {
     readonly nodeRegistryUrl?: string
@@ -28,7 +28,7 @@ export async function runCreateWizard(registryClient: FrameworkRegistryClient, i
                 placeholder: "e.g 1.0.0",
                 validate: validateSemver,
             }),
-            frameworkVersion: () => selectFrameworkVersion(registryClient, {registryUrl: input.nodeRegistryUrl}),
+            frameworkVersion: () => selectFrameworkVersion(registryClient, { registryUrl: input.nodeRegistryUrl }),
             vendorName: () => requiredText("Vendor name", {
                 placeholder: "Your name or company"
             }),
@@ -43,31 +43,31 @@ export async function runCreateWizard(registryClient: FrameworkRegistryClient, i
             pluginType: () => select({
                 message: "Plugin type",
                 options: [
-                    {label: "Effect", value: "effect"},
-                    {label: "Instrument", value: "instrument"},
+                    { label: "Effect", value: "effect" },
+                    { label: "Instrument", value: "instrument" },
                 ],
             }),
             packageManager: () => select({
                 message: "Package manager of the UI subproject",
                 options: [
-                    {label: "pnpm", value: "pnpm"},
-                    {label: "npm", value: "npm"},
+                    { label: "pnpm", value: "pnpm" },
+                    { label: "npm", value: "npm" },
                 ],
             }),
             products: () => multiselect({
                 message: "Products", // TODO：未来支持更多类型
                 required: true,
                 options: [
-                    {label: "Standalone", value: "standalone", hint: "recommended"},
-                    {label: "VST3", value: "vst3", hint: "recommended"},
+                    { label: "Standalone", value: "standalone", hint: "recommended" },
+                    { label: "VST3", value: "vst3", hint: "recommended" },
                 ],
                 initialValues: ["standalone", "vst3"],
             }),
-            location: ({results}) => select({
+            location: ({ results }) => select({
                 message: "Where should the project be created?",
                 options: [
-                    {label: `Create in ./${results.projectName}`, value: "subdir", hint: "recommended"},
-                    {label: "Create in the current directory", value: "current"},
+                    { label: `Create in ./${results.projectName}`, value: "subdir", hint: "recommended" },
+                    { label: "Create in the current directory", value: "current" },
                 ],
             }),
         }, {
@@ -86,7 +86,7 @@ export async function runCreateWizard(registryClient: FrameworkRegistryClient, i
 
         log.info(`Arrange project summary:\n\nroot: ${rootDir}\nproject: ${answers.projectName}@${answers.projectVersion}\nframework: ${answers.frameworkVersion}\ncompany: ${answers.vendorName} (${answers.vendorCode})\nplugin: ${answers.pluginCode}, ${pluginType}\nproducts: ${products.join(", ")}\nui: ${directories.uiDirectory}, ${packageManager}\nnative: ${directories.nativeDirectory}\nartifacts: ${directories.artifactsDirectory}`)
 
-        const confirmed = await confirm({message: "Create this Arrange project?", initialValue: true})
+        const confirmed = await confirm({ message: "Create this Arrange project?", initialValue: true })
         if (isCancel(confirmed) || !confirmed) throw new PromptCancelled()
 
         outro("Started to create project...")
@@ -163,7 +163,7 @@ async function promptProjectDirectories(): Promise<ProjectDirectories> {
         validate: validateRelativeDirectory,
     })
 
-    return {uiDirectory, nativeDirectory, artifactsDirectory}
+    return { uiDirectory, nativeDirectory, artifactsDirectory }
 }
 
 function defaultProjectDirectories(): ProjectDirectories {
@@ -192,7 +192,7 @@ async function promptManagedItems(): Promise<Record<string, boolean>> {
 
     const choices: Record<string, boolean> = {}
     for (const item of managedItems) {
-        const enabled = await confirm({message: `持续托管${item.label}？`, initialValue: true})
+        const enabled = await confirm({ message: `持续托管${item.label}？`, initialValue: true })
         if (isCancel(enabled)) throw new PromptCancelled()
         choices[item.id] = enabled
     }

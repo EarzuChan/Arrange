@@ -1,4 +1,4 @@
-import {z} from "zod"
+import { z } from "zod"
 
 export const arrangeSubprojectSchema = z.enum(["ui", "native"])
 export type ArrangeSubproject = z.infer<typeof arrangeSubprojectSchema>

@@ -1,6 +1,6 @@
-import {existsSync, rmSync} from "node:fs"
-import {resolve} from "node:path"
-import {cmakeExe, ninjaExe, repoRoot, run, runInVsDev} from "./common.ts"
+import { existsSync, rmSync } from "node:fs"
+import { resolve } from "node:path"
+import { cmakeExe, ninjaExe, repoRoot, run, runInVsDev } from "./common.ts"
 
 const windowsKitBin = "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64"
 const demoUiRoot = resolve(repoRoot, "demo/ui-src")
@@ -27,7 +27,7 @@ function cleanBuildDir(buildDir: string): void {
         throw new Error(`refuse to clean outside repo root: ${absolute}`)
     }
     if (existsSync(absolute)) {
-        rmSync(absolute, {recursive: true, force: true})
+        rmSync(absolute, { recursive: true, force: true })
     }
 }
 
@@ -48,12 +48,8 @@ export async function buildDemoNative(buildType: string | undefined): Promise<vo
     const buildDir = buildDirFor(normalizedBuildType)
     const cmake = cmakeExe()
     const ninja = ninjaExe()
-    const juceDirArg = process.env.JUCE_DIR
-        ? ` -DJUCE_DIR="${process.env.JUCE_DIR}"`
-        : ""
-    const quickJsDirArg = process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR
-        ? ` -DARRANGE_QUICKJS_NG_SOURCE_DIR="${process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR}"`
-        : ""
+    const juceDirArg = process.env.JUCE_DIR ? ` -DJUCE_DIR="${process.env.JUCE_DIR}"` : ""
+    const quickJsDirArg = process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR ? ` -DARRANGE_QUICKJS_NG_SOURCE_DIR="${process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR}"` : ""
     const demoUiDistArg = ` -DARRANGE_DEMO_UI_DIST_DIR="${demoUiDistDir}"`
 
     cleanBuildDir(buildDir)

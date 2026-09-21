@@ -15,7 +15,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class TextInputLayoutModel final {
-    public:
+       public:
         using Metrics = arrange::core::TextInputOverlayBuilder::Metrics;
         using Layout = arrange::core::TextInputOverlayBuilder::Layout;
 
@@ -28,11 +28,14 @@ namespace arrange::juce {
         std::size_t textIndexAtPoint(const arrange::core::ModifierInstance& instance, const std::string& text, float viewportX, float x, float y) const;
         ::juce::RectangleList<int> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end) const;
         float updatedViewportX(const arrange::core::ModifierInstance& instance, const std::string& text, std::size_t cursorIndex, float viewportX) const;
-        [[nodiscard]] arrange::core::TextLayoutService& textLayoutService() const noexcept { return textLayoutService_; }
 
-    private:
+        [[nodiscard]] arrange::core::TextLayoutService& textLayoutService() const noexcept {
+            return textLayoutService_;
+        }
+
+       private:
         arrange::core::TextLayoutService& textLayoutService_;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

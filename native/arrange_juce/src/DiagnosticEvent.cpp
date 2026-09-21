@@ -34,64 +34,91 @@ namespace arrange::juce {
             if (!event.pathOrUrl.empty()) line += " (" + event.pathOrUrl + ")";
             return line;
         }
-    } // namespace
+    }  // namespace
 
     const char* diagnosticCategoryName(DiagnosticCategory category) noexcept {
         switch (category) {
-        case DiagnosticCategory::App: return "app";
-        case DiagnosticCategory::HostLive: return "host.live";
-        case DiagnosticCategory::HostDist: return "host.dist";
-        case DiagnosticCategory::HostHmr: return "host.hmr";
-        case DiagnosticCategory::RuntimeScript: return "runtime.script";
-        case DiagnosticCategory::RuntimeTransaction: return "runtime.transaction";
-        case DiagnosticCategory::PipelineFrame: return "pipeline.frame";
-        case DiagnosticCategory::PipelineLayout: return "pipeline.layout";
-        case DiagnosticCategory::PipelinePaint: return "pipeline.paint";
-        case DiagnosticCategory::InputPointer: return "input.pointer";
-        case DiagnosticCategory::InputKey: return "input.key";
-        case DiagnosticCategory::InputIme: return "input.ime";
-        case DiagnosticCategory::InputScroll: return "input.scroll";
-        case DiagnosticCategory::ResourcePackage: return "resource.package";
-        case DiagnosticCategory::ResourceImage: return "resource.image";
-        case DiagnosticCategory::ResourceIcon: return "resource.icon";
-        case DiagnosticCategory::Diagnostics: return "diagnostics";
+            case DiagnosticCategory::App:
+                return "app";
+            case DiagnosticCategory::HostLive:
+                return "host.live";
+            case DiagnosticCategory::HostDist:
+                return "host.dist";
+            case DiagnosticCategory::HostHmr:
+                return "host.hmr";
+            case DiagnosticCategory::RuntimeScript:
+                return "runtime.script";
+            case DiagnosticCategory::RuntimeTransaction:
+                return "runtime.transaction";
+            case DiagnosticCategory::PipelineFrame:
+                return "pipeline.frame";
+            case DiagnosticCategory::PipelineLayout:
+                return "pipeline.layout";
+            case DiagnosticCategory::PipelinePaint:
+                return "pipeline.paint";
+            case DiagnosticCategory::InputPointer:
+                return "input.pointer";
+            case DiagnosticCategory::InputKey:
+                return "input.key";
+            case DiagnosticCategory::InputIme:
+                return "input.ime";
+            case DiagnosticCategory::InputScroll:
+                return "input.scroll";
+            case DiagnosticCategory::ResourcePackage:
+                return "resource.package";
+            case DiagnosticCategory::ResourceImage:
+                return "resource.image";
+            case DiagnosticCategory::ResourceIcon:
+                return "resource.icon";
+            case DiagnosticCategory::Diagnostics:
+                return "diagnostics";
         }
         return "diagnostics";
     }
 
     const char* logLevelName(LogLevel level) noexcept {
         switch (level) {
-        case LogLevel::Trace: return "trace";
-        case LogLevel::Debug: return "debug";
-        case LogLevel::Info: return "info";
-        case LogLevel::Warn: return "warn";
-        case LogLevel::Error: return "error";
+            case LogLevel::Trace:
+                return "trace";
+            case LogLevel::Debug:
+                return "debug";
+            case LogLevel::Info:
+                return "info";
+            case LogLevel::Warn:
+                return "warn";
+            case LogLevel::Error:
+                return "error";
         }
         return "info";
     }
 
     int logLevelRank(LogLevel level) noexcept {
         switch (level) {
-        case LogLevel::Trace: return 0;
-        case LogLevel::Debug: return 1;
-        case LogLevel::Info: return 2;
-        case LogLevel::Warn: return 3;
-        case LogLevel::Error: return 4;
+            case LogLevel::Trace:
+                return 0;
+            case LogLevel::Debug:
+                return 1;
+            case LogLevel::Info:
+                return 2;
+            case LogLevel::Warn:
+                return 3;
+            case LogLevel::Error:
+                return 4;
         }
         return 2;
     }
 
     bool diagnosticVisibilityEnabled(DiagnosticVisibility visibility) noexcept {
         switch (visibility) {
-        case DiagnosticVisibility::Hidden:
-            return false;
-        case DiagnosticVisibility::Always:
-            return true;
-        case DiagnosticVisibility::DebugOnly:
+            case DiagnosticVisibility::Hidden:
+                return false;
+            case DiagnosticVisibility::Always:
+                return true;
+            case DiagnosticVisibility::DebugOnly:
 #if defined(NDEBUG)
-            return false;
+                return false;
 #else
-            return true;
+                return true;
 #endif
         }
         return false;
@@ -155,6 +182,6 @@ namespace arrange::juce {
         }
         ::juce::Logger::writeToLog("Arrange diagnostic log sink failed: " + file.getFullPathName());
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

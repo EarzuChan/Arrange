@@ -8,7 +8,7 @@
 
 namespace arrange::juce {
     class EditorFrameClock final {
-    public:
+       public:
         using VBlankTickCallback = VBlankSource::Callback;
         ~EditorFrameClock();
         void sync(::juce::Component& owner, bool running, VBlankTickCallback onVBlankTick);
@@ -16,11 +16,11 @@ namespace arrange::juce {
         void beginVBlankCallback() noexcept;
         bool endVBlankCallback() noexcept;
 
-    private:
+       private:
         std::unique_ptr<VBlankSource> source_;
         std::unique_ptr<VBlankFrameDriver> driver_;
         bool insideVBlankCallback_ = false;
         bool resyncAfterVBlank_ = false;
     };
-}
+}  // namespace arrange::juce
 #endif

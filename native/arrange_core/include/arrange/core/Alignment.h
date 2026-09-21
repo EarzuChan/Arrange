@@ -18,4 +18,4 @@ namespace arrange::core {
     constexpr bool isImageAlignment(std::string_view value) noexcept {
         return isBoxAlignment(value) || isHorizontalAlignment(value) || isVerticalAlignment(value);
     }
-}
+}  // namespace arrange::core

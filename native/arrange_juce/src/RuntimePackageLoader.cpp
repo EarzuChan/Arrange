@@ -15,8 +15,10 @@
 
 namespace arrange::juce {
     namespace {
-        void setDiagnostic(RuntimePackageLoadResult& result, LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast = true) { result.diagnostic = RuntimeLoadDiagnostic{level, std::move(title), std::move(message), toast, coalesceToast}; }
-    } // namespace
+        void setDiagnostic(RuntimePackageLoadResult& result, LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast = true) {
+            result.diagnostic = RuntimeLoadDiagnostic{level, std::move(title), std::move(message), toast, coalesceToast};
+        }
+    }  // namespace
 
     RuntimePackageLoadResult RuntimePackageLoader::loadLive(const EditorConfig& config, AppResolver& resolver) const {
         RuntimePackageLoadResult result;
@@ -32,30 +34,18 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
         int statusCode = 0;
-        const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandling::inAddress)
-                             .withConnectionTimeoutMs(800)
-                             .withNumRedirectsToFollow(0)
-                             .withStatusCode(&statusCode)
-                             .withHttpRequestCmd("GET");
+        const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandling::inAddress).withConnectionTimeoutMs(800).withNumRedirectsToFollow(0).withStatusCode(&statusCode).withHttpRequestCmd("GET");
         auto stream = ::juce::URL(bundleUrl).createInputStream(options);
         if (!stream) {
             result.serverUnavailable = true;
-            result.error = makeErrorScreenModel(
-                ErrorSource::AppPackage,
-                "Arrange dev server is not reachable: " + bundleUrl,
-                "Debug fallback may load the last built ui/app.js, but true hot reload needs pnpm dev.",
-                bundleUrl);
+            result.error = makeErrorScreenModel(ErrorSource::AppPackage, "Arrange dev server is not reachable: " + bundleUrl, "Debug fallback may load the last built ui/app.js, but true hot reload needs pnpm dev.", bundleUrl);
             setDiagnostic(result, LogLevel::Warn, "Live unavailable", bundleUrl, true);
             return result;
         }
 
         const auto source = stream->readEntireStreamAsString().toStdString();
         if (statusCode != 200) {
-            result.error = makeErrorScreenModel(
-                ErrorSource::ScriptRuntime,
-                "Arrange dev bundle request failed with HTTP " + std::to_string(statusCode) + ".\n" + source,
-                "修复 SFA 构建错误并保存；ArrangeEditor 将通过同一重载路径重试",
-                bundleUrl);
+            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange dev bundle request failed with HTTP " + std::to_string(statusCode) + ".\n" + source, "修复 SFA 构建错误并保存；ArrangeEditor 将通过同一重载路径重试", bundleUrl);
             setDiagnostic(result, LogLevel::Error, "Live bundle failed", "HTTP " + std::to_string(statusCode) + " from " + bundleUrl, true);
             return result;
         }
@@ -82,11 +72,7 @@ namespace arrange::juce {
         setDiagnostic(result, LogLevel::Info, "Loaded live app", bundleUrl, true);
         return result;
 #else
-        result.error = makeErrorScreenModel(
-            ErrorSource::ScriptRuntime,
-            "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Build through Arrange::framework.",
-            {},
-            bundleUrl);
+        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Build through Arrange::framework.", {}, bundleUrl);
         setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute live app.js.", true);
         return result;
 #endif
@@ -125,15 +111,11 @@ namespace arrange::juce {
         setDiagnostic(result, LogLevel::Info, "Loaded dist app", resolved.entryPath.string(), false);
         return result;
 #else
-        result.error = makeErrorScreenModel(
-            ErrorSource::ScriptRuntime,
-            "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Build through Arrange::framework.",
-            "Arrange runtime has no serialized fallback path; the native transaction API requires QuickJS-NG.",
-            resolved.entryPath);
+        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Build through Arrange::framework.", "Arrange runtime has no serialized fallback path; the native transaction API requires QuickJS-NG.", resolved.entryPath);
         setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute dist ui/app.js.", true);
         return result;
 #endif
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

@@ -1,6 +1,6 @@
-import {existsSync, readFileSync, readdirSync, writeFileSync} from "node:fs"
-import {resolve} from "node:path"
-import {repoRoot} from "./common.ts"
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { repoRoot } from "./common.ts"
 
 export type ArrangeVersionContract = {
     frameworkVersion: string
@@ -26,7 +26,7 @@ export function readArrangeVersionContract(): ArrangeVersionContract {
     if (typeof cliVersion !== "string" || !semverPattern.test(cliVersion)) throw new Error(`Arrange cliVersion must be semver, got ${String(cliVersion)}`)
     const cliCompatibility = parsed.cliCompatibility
     if (typeof cliCompatibility !== "number" || !Number.isInteger(cliCompatibility) || cliCompatibility <= 0) throw new Error(`Arrange cliCompatibility must be a positive integer, got ${String(cliCompatibility)}`)
-    return {frameworkVersion, frameworkInternalProtocolCode, cliVersion, cliCompatibility}
+    return { frameworkVersion, frameworkInternalProtocolCode, cliVersion, cliCompatibility }
 }
 
 function readJson(path: string): JsonObject {
@@ -42,9 +42,7 @@ function packageJsonPaths(): string[] {
     return [
         resolve(repoRoot, "package.json"),
         resolve(repoRoot, "demo/ui-src/package.json"),
-        ...readdirSync(packagesRoot)
-            .map((name) => resolve(packagesRoot, name, "package.json"))
-            .filter((path) => existsSync(path)),
+        ...readdirSync(packagesRoot).map((name) => resolve(packagesRoot, name, "package.json")).filter((path) => existsSync(path)),
     ]
 }
 
@@ -74,8 +72,8 @@ export function syncArrangeVersionContract(): void {
     const frameworkManifestPath = resolve(repoRoot, "packages/framework/package.json")
     const frameworkManifest = readJson(frameworkManifestPath)
     const arrange = frameworkManifest.arrange
-    if (!arrange || typeof arrange !== "object" || Array.isArray(arrange)) frameworkManifest.arrange = {}
-    ;(frameworkManifest.arrange as Record<string, unknown>).cliCompatibility = contract.cliCompatibility
+    if (!arrange || typeof arrange !== "object" || Array.isArray(arrange)) frameworkManifest.arrange = {};
+    (frameworkManifest.arrange as Record<string, unknown>).cliCompatibility = contract.cliCompatibility
     writeJson(frameworkManifestPath, frameworkManifest)
 
     const cliManifestPath = resolve(repoRoot, "cli/package.json")
@@ -84,7 +82,7 @@ export function syncArrangeVersionContract(): void {
     cliManifest.compatibility = contract.cliCompatibility
     writeJson(cliManifestPath, cliManifest)
 
-    const runtimeVersionPath = resolve(repoRoot, "packages/runtime/src/version.ts")
+    const runtimeVersionPath = resolve(repoRoot, "packages/framework/src/version.ts")
     writeFileSync(runtimeVersionPath, [
         `export const ARRANGE_PACKAGE_VERSION = ${JSON.stringify(contract.frameworkVersion)}`,
         `export const ARRANGE_PROTOCOL_VERSION = ${contract.frameworkInternalProtocolCode}`,
@@ -129,8 +127,8 @@ export function assertArrangeVersionContract(): void {
             }
         }
     }
-    assertFileContains(resolve(repoRoot, "packages/runtime/src/version.ts"), `ARRANGE_PACKAGE_VERSION = ${JSON.stringify(contract.frameworkVersion)}`)
-    assertFileContains(resolve(repoRoot, "packages/runtime/src/version.ts"), `ARRANGE_PROTOCOL_VERSION = ${contract.frameworkInternalProtocolCode}`)
+    assertFileContains(resolve(repoRoot, "packages/framework/src/version.ts"), `ARRANGE_PACKAGE_VERSION = ${JSON.stringify(contract.frameworkVersion)}`)
+    assertFileContains(resolve(repoRoot, "packages/framework/src/version.ts"), `ARRANGE_PROTOCOL_VERSION = ${contract.frameworkInternalProtocolCode}`)
     assertFileContains(resolve(repoRoot, "native/arrange_core/include/arrange/core/Version.h"), `RuntimeVersion = ${contract.frameworkInternalProtocolCode}u`)
     assertFileContains(resolve(repoRoot, "native/arrange_core/include/arrange/core/Version.h"), `PackageVersion = ${JSON.stringify(contract.frameworkVersion)}`)
 

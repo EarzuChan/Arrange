@@ -7,19 +7,22 @@
 namespace arrange::juce {
     namespace {
         class JuceVBlankSource final : public VBlankSource {
-        public:
+           public:
             explicit JuceVBlankSource(::juce::Component& owner) : owner_(owner) {}
-            void start(Callback callback) override {
-                attachment_ = std::make_unique<::juce::VBlankAttachment>(&owner_,
-                    [callback = std::move(callback)](double seconds) { callback(seconds * 1000.0); });
-            }
-            void stop() noexcept override { attachment_.reset(); }
 
-        private:
+            void start(Callback callback) override {
+                attachment_ = std::make_unique<::juce::VBlankAttachment>(&owner_, [callback = std::move(callback)](double seconds) { callback(seconds * 1000.0); });
+            }
+
+            void stop() noexcept override {
+                attachment_.reset();
+            }
+
+           private:
             ::juce::Component& owner_;
             std::unique_ptr<::juce::VBlankAttachment> attachment_;
         };
-    }
+    }  // namespace
 
     EditorFrameClock::~EditorFrameClock() = default;
 
@@ -44,11 +47,13 @@ namespace arrange::juce {
         if (driver_) driver_->stop();
     }
 
-    void EditorFrameClock::beginVBlankCallback() noexcept { insideVBlankCallback_ = true; }
+    void EditorFrameClock::beginVBlankCallback() noexcept {
+        insideVBlankCallback_ = true;
+    }
 
     bool EditorFrameClock::endVBlankCallback() noexcept {
         insideVBlankCallback_ = false;
         return std::exchange(resyncAfterVBlank_, false);
     }
-}
+}  // namespace arrange::juce
 #endif

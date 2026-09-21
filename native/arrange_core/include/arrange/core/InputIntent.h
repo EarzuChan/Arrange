@@ -85,7 +85,7 @@ namespace arrange::core {
             return intent;
         }
 
-        static InputIntent imeComposition(std::string reason = "ime composition", std::optional<NodeId> target = std::nullopt) {
+        static InputIntent imeComposition(std::string reason = "输入法组合文本", std::optional<NodeId> target = std::nullopt) {
             InputIntent intent;
             intent.kind = InputIntentKind::ImeComposition;
             intent.reason = std::move(reason);
@@ -148,11 +148,18 @@ namespace arrange::core {
     };
 
     class InputIntentQueue {
-    public:
-        [[nodiscard]] bool empty() const noexcept { return intents_.empty(); }
-        [[nodiscard]] std::size_t size() const noexcept { return intents_.size(); }
+       public:
+        [[nodiscard]] bool empty() const noexcept {
+            return intents_.empty();
+        }
 
-        void push(InputIntent intent) { intents_.push_back(std::move(intent)); }
+        [[nodiscard]] std::size_t size() const noexcept {
+            return intents_.size();
+        }
+
+        void push(InputIntent intent) {
+            intents_.push_back(std::move(intent));
+        }
 
         [[nodiscard]] std::vector<InputIntent> take() noexcept {
             auto intents = std::move(intents_);
@@ -160,9 +167,11 @@ namespace arrange::core {
             return intents;
         }
 
-        void clear() noexcept { intents_.clear(); }
+        void clear() noexcept {
+            intents_.clear();
+        }
 
-    private:
+       private:
         std::vector<InputIntent> intents_;
     };
-} // namespace arrange::core
+}  // namespace arrange::core

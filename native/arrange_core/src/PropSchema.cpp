@@ -24,8 +24,7 @@ namespace arrange::core {
                 if (uppercaseNext) {
                     result.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
                     uppercaseNext = false;
-                }
-                else {
+                } else {
                     result.push_back(ch);
                 }
             }
@@ -52,7 +51,7 @@ namespace arrange::core {
 
             return false;
         }
-    } // namespace
+    }  // namespace
 
     bool validateSetPropMutation(NodeType nodeType, const std::string& rawKey, const PropValue& value, std::string& error) {
         error.clear();
@@ -62,11 +61,16 @@ namespace arrange::core {
             return false;
         }
         if (key == "measurePolicy") {
-            try { (void)readMeasurePolicy(value); return true; }
-            catch (const std::exception& failure) { error = failure.what(); return false; }
+            try {
+                (void)readMeasurePolicy(value);
+                return true;
+            } catch (const std::exception& failure) {
+                error = failure.what();
+                return false;
+            }
         }
         if (value.isNull()) return true;
 
         return validateByKey(key, value, error);
     }
-} // namespace arrange::core
+}  // namespace arrange::core

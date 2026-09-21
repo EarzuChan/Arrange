@@ -47,18 +47,13 @@ namespace arrange::core {
     };
 
     class InvalidationGraph {
-    public:
+       public:
         void record(DirtyAttribution attribution) {
             snapshot_.combinedDirty |= attribution.dirty;
             snapshot_.attributions.push_back(std::move(attribution));
         }
 
-        void record(
-            InvalidationSource source,
-            std::optional<NodeId> node,
-            std::uint32_t dirty,
-            std::string field,
-            std::string reason) {
+        void record(InvalidationSource source, std::optional<NodeId> node, std::uint32_t dirty, std::string field, std::string reason) {
             record({source, node, dirty, std::move(field), std::move(reason)});
         }
 
@@ -67,7 +62,9 @@ namespace arrange::core {
             snapshot_.fallbackReason = std::move(reason);
         }
 
-        [[nodiscard]] const InvalidationSnapshot& snapshot() const noexcept { return snapshot_; }
+        [[nodiscard]] const InvalidationSnapshot& snapshot() const noexcept {
+            return snapshot_;
+        }
 
         [[nodiscard]] InvalidationSnapshot take() noexcept {
             auto snapshot = std::move(snapshot_);
@@ -75,10 +72,11 @@ namespace arrange::core {
             return snapshot;
         }
 
-        void clear() noexcept { snapshot_ = {}; }
+        void clear() noexcept {
+            snapshot_ = {};
+        }
 
-    private:
+       private:
         InvalidationSnapshot snapshot_;
     };
-} // namespace arrange::core
-
+}  // namespace arrange::core

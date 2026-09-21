@@ -1,8 +1,8 @@
-import {ARRANGE_VUE_DEFINES, DEV_BUNDLE_PATH, PUBLIC_PLUGIN_NAME} from "./constraints.ts"
-import {buildDevBundle} from "./dev-bundle.ts"
-import {createArrangeTransformPlugin} from "./transform.ts"
-import {invalidateSfaTypeDependency, isHotSourceFile, normalizePath} from "./sfa.ts"
-import type {ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule,} from "./types.ts"
+import { ARRANGE_DEFINES, DEV_BUNDLE_PATH, PUBLIC_PLUGIN_NAME } from "./constraints.ts"
+import { buildDevBundle } from "./dev-bundle.ts"
+import { createArrangeTransformPlugin } from "./transform.ts"
+import { invalidateSfaTypeDependency, isHotSourceFile, normalizePath } from "./sfa.ts"
+import type { ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule } from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
     const entry = options.entry ?? "src/main.ts"
@@ -20,10 +20,10 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
             const nodeEnv = env.mode === "production" || env.command === "build" ? "production" : "development"
             return {
                 define: {
-                    ...ARRANGE_VUE_DEFINES,
+                    ...ARRANGE_DEFINES,
                     "process.env.NODE_ENV": JSON.stringify(nodeEnv),
                 },
-                server: {host: options.host ?? "127.0.0.1", port: options.port ?? 9178, strictPort: options.strictPort ?? true},
+                server: { host: options.host ?? "127.0.0.1", port: options.port ?? 9178, strictPort: options.strictPort ?? true },
                 build: {
                     target: "es2022",
                     rollupOptions: {
@@ -70,4 +70,4 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
     }
 }
 
-export {arrange}
+export { arrange }

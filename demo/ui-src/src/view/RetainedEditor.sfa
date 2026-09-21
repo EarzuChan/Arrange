@@ -9,7 +9,8 @@
 </template>
 
 <script>
-import {ref, M, Arrangement} from '@arrange/framework'
+import { ref } from '@arrange/framework'
+import { M, Arrangement } from '@arrange/framework/ui'
 
 const note = ref('切页后仍保留这段笔记')
 </script>

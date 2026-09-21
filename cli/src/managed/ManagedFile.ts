@@ -1,19 +1,19 @@
-import {errorMessage} from "../util/Utils.ts"
-import {readFile, stat} from "node:fs/promises"
-import type {ProjectState} from "../project/ProjectState.ts"
-import {TextCluster} from "./TextCluster.ts"
-import {JsonRegion, setJsonPath, type JsonValue} from "./JsonRegion.ts"
+import { errorMessage } from "../util/Utils.ts"
+import { readFile, stat } from "node:fs/promises"
+import type { ProjectState } from "../project/ProjectState.ts"
+import { TextCluster } from "./TextCluster.ts"
+import { JsonRegion, setJsonPath, type JsonValue } from "./JsonRegion.ts"
 
 export type ConfigScope = "Global" | "UI" | "Native"
 
 async function readText(path: string) {
     try {
-        if (!(await stat(path)).isFile()) return {kind: "Fatal" as const, cause: "read-error", message: "目标不是文件"}
+        if (!(await stat(path)).isFile()) return { kind: "Fatal" as const, cause: "read-error", message: "目标不是文件" }
 
-        return {kind: "Idle" as const, text: await readFile(path, "utf8")}
+        return { kind: "Idle" as const, text: await readFile(path, "utf8") }
     } catch (error) {
         const missing = (error as NodeJS.ErrnoException).code === "ENOENT"
-        return missing ? {kind: "Resolvable" as const, cause: "missing" as const, message: "文件不存在"} : {kind: "Fatal" as const, cause: "read-error", message: errorMessage(error)}
+        return missing ? { kind: "Resolvable" as const, cause: "missing" as const, message: "文件不存在" } : { kind: "Fatal" as const, cause: "read-error", message: errorMessage(error) }
     }
 }
 
@@ -34,9 +34,9 @@ export abstract class TextFile {
         const result = await readText(path)
         if (result.kind !== "Idle") return result
 
-        const clusters = this.clusters.filter(cluster => cluster.regions.some(region => region.enabled(state))).map(cluster => ({cluster, result: cluster.check(state, result.text)}))
+        const clusters = this.clusters.filter(cluster => cluster.regions.some(region => region.enabled(state))).map(cluster => ({ cluster, result: cluster.check(state, result.text) }))
 
-        return {kind: "Idle" as const, text: result.text, clusters}
+        return { kind: "Idle" as const, text: result.text, clusters }
     }
 }
 
@@ -64,11 +64,11 @@ export abstract class JsonFile {
         if (result.kind !== "Idle") return result
 
         let json: JsonValue
-        try { json = JSON.parse(result.text) } catch (error) { return {kind: "Fatal" as const, cause: "unparsable", message: errorMessage(error)} }
+        try { json = JSON.parse(result.text) } catch (error) { return { kind: "Fatal" as const, cause: "unparsable", message: errorMessage(error) } }
 
-        const regions = this.regions.filter(region => region.enabled(state)).map(region => ({region, result: region.check(state, json)}))
+        const regions = this.regions.filter(region => region.enabled(state)).map(region => ({ region, result: region.check(state, json) }))
 
-        return {kind: "Idle" as const, text: result.text, regions}
+        return { kind: "Idle" as const, text: result.text, regions }
     }
 }
 

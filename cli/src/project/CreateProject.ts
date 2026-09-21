@@ -1,4 +1,4 @@
-import type {NativeProduct, PackageManagerName, ProjectState} from "./ProjectState.ts"
+import type { NativeProduct, PackageManagerName, ProjectState } from "./ProjectState.ts"
 
 export type PluginType = "effect" | "instrument"
 
@@ -36,8 +36,8 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             framework: {
                 version: request.frameworkVersion,
-                ...(request.frameworkNodeRegistryUrl !== undefined ? {nodeRegistryUrl: request.frameworkNodeRegistryUrl} : {}),
-                ...(request.frameworkCmakeFetchContentUrl !== undefined ? {cmakeFetchContentUrl: request.frameworkCmakeFetchContentUrl} : {}),
+                ...(request.frameworkNodeRegistryUrl !== undefined ? { nodeRegistryUrl: request.frameworkNodeRegistryUrl } : {}),
+                ...(request.frameworkCmakeFetchContentUrl !== undefined ? { cmakeFetchContentUrl: request.frameworkCmakeFetchContentUrl } : {}),
             },
             ui: {
                 directory: request.uiDirectory,
@@ -51,9 +51,7 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
                 directory: request.artifactsDirectory,
                 includeVersionDirectory: true,
             },
-            "managed-items": Object.entries(request.managedItems)
-                .filter(([, managed]) => managed)
-                .map(([key]) => key),
+            "managed-items": Object.entries(request.managedItems).filter(([, managed]) => managed).map(([key]) => key),
         },
         local: null, // TIPS：初次创建时尚未有Local配置，这个是被Sync阶段生成
     }

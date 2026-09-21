@@ -36,16 +36,15 @@ namespace arrange::juce {
         std::optional<RuntimeLoadDiagnostic> diagnostic;
         std::optional<arrange::core::MutationTransaction> initialTransaction;
 #if ARRANGE_WITH_QUICKJS_NG
-    std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost;
+        std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost;
 #endif
     };
 
     class RuntimePackageLoader final {
-    public:
+       public:
         RuntimePackageLoadResult loadLive(const EditorConfig& config, arrange::AppResolver& resolver) const;
         RuntimePackageLoadResult loadDist(const EditorConfig& config, arrange::AppResolver& resolver) const;
     };
 
 #endif
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

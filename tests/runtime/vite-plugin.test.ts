@@ -1,5 +1,5 @@
 import test from "node:test"
-import { compileScript, parse } from '../../packages/arrange-vue-compiler-sfc/src/index.ts'
+import { compileScript, parse } from '../../packages/compiler/src/sfa/index.ts'
 import assert from "node:assert/strict"
 import { resolve } from "node:path"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
@@ -103,7 +103,7 @@ test("vite plugin does not emit Arrange reload for dependency updates", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
     plugin.handleHotUpdate({
-        file: "C:/demo/ui-src/node_modules/vue/index.ts",
+        file: "C:/demo/ui-src/node_modules/@arrange/framework/src/index.ts", // C盘何意味？
         modules: [],
         server: {
             ws: {
@@ -148,7 +148,7 @@ test('SFA 转译源码映射保留脚本位置与原始文件', async () => {
     const { SourceMapConsumer } = await import('source-map-js')
     const plugin = arrange()
     const source = '<template>\n    <Text :text="String(count)" />\n</template>\n<script>\nconst count: number = 17\n</script>'
-    const result = await plugin.transform.call({ warn() {} }, source, 'Mapped.sfa')
+    const result = await plugin.transform.call({ warn() { } }, source, 'Mapped.sfa')
     assert.ok(result && typeof result === 'object' && result.map)
     const consumer = new SourceMapConsumer(result.map as import('source-map-js').RawSourceMap)
     const lines: number[] = []

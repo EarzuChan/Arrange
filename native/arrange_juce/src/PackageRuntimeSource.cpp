@@ -7,18 +7,11 @@
 
 namespace arrange::juce {
     namespace {
-        RuntimeLoadDiagnostic makeDiagnostic(
-            LogLevel level,
-            std::string title,
-            std::string message,
-            bool toast,
-            bool coalesceToast = true) {
+        RuntimeLoadDiagnostic makeDiagnostic(LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast = true) {
             return RuntimeLoadDiagnostic{level, std::move(title), std::move(message), toast, coalesceToast};
         }
 
-        PackageLoadOutcome packageOutcomeFromRuntimeLoad(
-            RuntimePackageLoadResult loaded,
-            PackageSource source) {
+        PackageLoadOutcome packageOutcomeFromRuntimeLoad(RuntimePackageLoadResult loaded, PackageSource source) {
             PackageLoadOutcome outcome;
             outcome.loaded = loaded.ok;
             outcome.serverUnavailable = loaded.serverUnavailable;
@@ -34,13 +27,16 @@ namespace arrange::juce {
 #endif
             return outcome;
         }
-    } // namespace
+    }  // namespace
 
     const char* packageSourceLabel(PackageSource source) noexcept {
         switch (source) {
-        case PackageSource::Live: return "live";
-        case PackageSource::Dist: return "dist";
-        case PackageSource::None: return "none";
+            case PackageSource::Live:
+                return "live";
+            case PackageSource::Dist:
+                return "dist";
+            case PackageSource::None:
+                return "none";
         }
         return "none";
     }
@@ -69,18 +65,14 @@ namespace arrange::juce {
     PackageLoadOutcome PackageRuntimeSource::reload() {
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::Reload;
-        prependDiagnostics(
-            outcome,
-            {makeDiagnostic(LogLevel::Info, "Reload requested", "Reloading Arrange app package.", true)});
+        prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Info, "Reload requested", "Reloading Arrange app package.", true)});
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::reloadFromDevServer() {
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::HmrReload;
-        prependDiagnostics(
-            outcome,
-            {makeDiagnostic(LogLevel::Info, "HMR reload", "Dev server requested Arrange reload.", true)});
+        prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Info, "HMR reload", "Dev server requested Arrange reload.", true)});
         return outcome;
     }
 
@@ -90,13 +82,8 @@ namespace arrange::juce {
             liveRuntimeEnabled_ = !liveRuntimeEnabled_;
             stopDevServerClient();
             startDevServerClientIfNeeded();
-            prelude.push_back(makeDiagnostic(
-                LogLevel::Info,
-                liveRuntimeEnabled_ ? "Live enabled" : "Live disabled",
-                liveRuntimeEnabled_ ? "Manual reload will try live before dist." : "Manual reload will skip live and use dist.",
-                true));
-        }
-        else {
+            prelude.push_back(makeDiagnostic(LogLevel::Info, liveRuntimeEnabled_ ? "Live enabled" : "Live disabled", liveRuntimeEnabled_ ? "Manual reload will try live before dist." : "Manual reload will skip live and use dist.", true));
+        } else {
             prelude.push_back(makeDiagnostic(LogLevel::Info, "Manual reload", "F5 requested Arrange reload.", true));
         }
 
@@ -131,13 +118,7 @@ namespace arrange::juce {
 
             lastLiveUnavailable_ = true;
             auto dist = loadDistPackage();
-            prependDiagnostics(
-                dist,
-                {makeDiagnostic(
-                    LogLevel::Warn,
-                    "Using dist fallback",
-                    "Live dev server is unavailable; loading configured dist package.",
-                    true)});
+            prependDiagnostics(dist, {makeDiagnostic(LogLevel::Warn, "Using dist fallback", "Live dev server is unavailable; loading configured dist package.", true)});
             return dist;
         }
 
@@ -164,45 +145,25 @@ namespace arrange::juce {
         }
 
         activeSource_ = PackageSource::Dist;
-        const auto message = !outcome.diagnostics.empty() && !outcome.diagnostics.front().message.empty()
-                                 ? outcome.diagnostics.front().message
-                                 : outcome.packageDir.string();
+        const auto message = !outcome.diagnostics.empty() && !outcome.diagnostics.front().message.empty() ? outcome.diagnostics.front().message : outcome.packageDir.string();
         outcome.diagnostics.clear();
-        outcome.diagnostics.push_back(makeDiagnostic(
-            LogLevel::Info,
-            lastLiveUnavailable_ ? "Loaded dist fallback" : "Loaded dist app",
-            message,
-            lastLiveUnavailable_));
+        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Info, lastLiveUnavailable_ ? "Loaded dist fallback" : "Loaded dist app", message, lastLiveUnavailable_));
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::noSourceOutcome() const {
         PackageLoadOutcome outcome;
         outcome.activeSource = PackageSource::None;
-        outcome.error = makeErrorScreenModel(
-            ErrorSource::AppPackage,
-            "你啥也没给我给你加载啥app（笑）Call config.app.useLive(...) or config.app.useDist(...).");
-        outcome.diagnostics.push_back(makeDiagnostic(
-            LogLevel::Error,
-            "No app source",
-            "Call config.app.useLive(...) or config.app.useDist(...).",
-            true));
+        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "你啥也没给我给你加载啥app（笑）Call config.app.useLive(...) or config.app.useDist(...).");
+        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Error, "No app source", "Call config.app.useLive(...) or config.app.useDist(...).", true));
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::disabledLiveWithoutDistOutcome() const {
         PackageLoadOutcome outcome;
         outcome.activeSource = PackageSource::None;
-        outcome.error = makeErrorScreenModel(
-            ErrorSource::AppPackage,
-            "Live source is disabled and no dist package is configured.",
-            "Enable live reload again or call config.app.useDist(...).",
-            config_.app.distPath());
-        outcome.diagnostics.push_back(makeDiagnostic(
-            LogLevel::Error,
-            "No enabled app source",
-            "Live source is disabled and no dist package is configured.",
-            true));
+        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "Live source is disabled and no dist package is configured.", "Enable live reload again or call config.app.useDist(...).", config_.app.distPath());
+        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Error, "No enabled app source", "Live source is disabled and no dist package is configured.", true));
         return outcome;
     }
 
@@ -217,9 +178,7 @@ namespace arrange::juce {
         }
 
         devServerClient_ = std::make_unique<arrange::DevServerReloadClient>();
-        devServerClient_->start(resolved.devServerUrl, [this](arrange::DevReloadEvent) {
-            devReloadRequested_ = true;
-        });
+        devServerClient_->start(resolved.devServerUrl, [this](arrange::DevReloadEvent) { devReloadRequested_ = true; });
     }
 
     void PackageRuntimeSource::stopDevServerClient() {
@@ -234,12 +193,9 @@ namespace arrange::juce {
         if (diagnostics.empty()) {
             return;
         }
-        diagnostics.insert(
-            diagnostics.end(),
-            std::make_move_iterator(outcome.diagnostics.begin()),
-            std::make_move_iterator(outcome.diagnostics.end()));
+        diagnostics.insert(diagnostics.end(), std::make_move_iterator(outcome.diagnostics.begin()), std::make_move_iterator(outcome.diagnostics.end()));
         outcome.diagnostics = std::move(diagnostics);
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

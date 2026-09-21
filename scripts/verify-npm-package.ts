@@ -1,22 +1,22 @@
-import {cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs"
-import {resolve} from "node:path"
-import {npmSubprocessEnv, repoRoot, run} from "./common.ts"
-import {readArrangeVersionContract} from "./version-contract.ts"
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { cmakeExe, configureSmokeBuild, npmSubprocessEnv, repoRoot, run, runInVsDev } from "./common.ts"
+import { readArrangeVersionContract } from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
 const consumerDir = resolve(repoRoot, "build/npm-package-consumer")
 const frameworkTarball = resolve(repoRoot, `artifacts/npm/arrange-framework-${contract.frameworkVersion}.tgz`)
-const cliManifest = JSON.parse(readFileSync(resolve(repoRoot, "cli/package.json"), "utf8")) as {version: string}
+const cliManifest = JSON.parse(readFileSync(resolve(repoRoot, "cli/package.json"), "utf8")) as { version: string }
 const cliTarball = resolve(repoRoot, `artifacts/npm/arrange-cli-${cliManifest.version}.tgz`)
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 
 async function runNpm(args: readonly string[]): Promise<void> {
     const env = npmSubprocessEnv()
     if (process.platform === "win32") {
-        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], {cwd: consumerDir, env})
+        await run("cmd.exe", ["/d", "/c", "npm.cmd", ...args], { cwd: consumerDir, env })
         return
     }
-    await run("npm", args, {cwd: consumerDir, env})
+    await run("npm", args, { cwd: consumerDir, env })
 }
 
 // 验证当前源码生成的发布包，不复用旧产物
@@ -24,11 +24,14 @@ await import("./pack-npm-package.ts")
 if (!existsSync(frameworkTarball)) throw new Error(`缺少 Framework 发布包： ${frameworkTarball}`)
 if (!existsSync(cliTarball)) throw new Error(`缺少 CLI 发布包： ${cliTarball}`)
 
-rmSync(consumerDir, {recursive: true, force: true})
-mkdirSync(resolve(consumerDir, "src"), {recursive: true})
-cpSync(resolve(repoRoot, "demo/ui-src/src"), resolve(consumerDir, "src"), {recursive: true})
-cpSync(resolve(repoRoot, "demo/ui-src/public"), resolve(consumerDir, "public"), {recursive: true})
-cpSync(resolve(repoRoot, "demo/ui-src/vite.config.ts"), resolve(consumerDir, "vite.config.ts"))
+rmSync(consumerDir, { recursive: true, force: true })
+mkdirSync(resolve(consumerDir, "src"), { recursive: true })
+cpSync(resolve(repoRoot, "demo/ui-src/src"), resolve(consumerDir, "src"), { recursive: true })
+cpSync(resolve(repoRoot, "demo/ui-src/public"), resolve(consumerDir, "public"), { recursive: true })
+cpSync(resolve(repoRoot, "tests/fixtures/package-consumer/vite.config.ts"), resolve(consumerDir, "vite.config.ts"))
+cpSync(resolve(repoRoot, "tests/fixtures/package-consumer/check-entries.ts"), resolve(consumerDir, "src/check-entries.ts"))
+const consumerEntry = resolve(consumerDir, "src/main.ts")
+writeFileSync(consumerEntry, `import './check-entries.ts'\n${readFileSync(consumerEntry, "utf8")}`)
 writeFileSync(resolve(consumerDir, "tsconfig.json"), JSON.stringify({ compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", allowImportingTsExtensions: true, noEmit: true, skipLibCheck: true, strict: true, lib: ["ES2022", "DOM"] }, include: ["src/**/*.ts", "src/**/*.sfa"] }, null, 4))
 writeFileSync(resolve(consumerDir, "check.mts"), [
     "import { checkSfaProject } from '@arrange/framework/vite'",
@@ -50,7 +53,7 @@ writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
 }, null, 2)}\n`)
 
 await runNpm(["install"])
-await run(process.execPath, ["--import", import.meta.resolve("tsx"), "check.mts"], {cwd: consumerDir, env: npmSubprocessEnv()})
+await run(process.execPath, ["--import", import.meta.resolve("tsx"), "check.mts"], { cwd: consumerDir, env: npmSubprocessEnv() })
 await runNpm(["run", "build"])
 
 const appBundle = resolve(consumerDir, "dist/app.js")
@@ -59,4 +62,15 @@ const source = readFileSync(appBundle, "utf8")
 const macro = source.match(macroPattern)
 if (macro) throw new Error(`发布包产物残留未替换的编译宏： ${macro[0]}`)
 
-console.log(`Framework ${contract.frameworkVersion} 发布包的真实 SFA 类型检查与 Vite 生产构建通过，CLI ${cliManifest.version} 仅验证安装`)
+// 原生宿主必须加载本次安装包生成的产物，源码侧 Demo 不能代替发布包验收
+const nativeBuildDir = process.env.ARRANGE_NATIVE_TEST_BUILD_DIR ?? "build/native-smoke-ninja"
+if (process.platform === "win32") {
+    await configureSmokeBuild(nativeBuildDir)
+    await runInVsDev(`"${cmakeExe()}" --build "${nativeBuildDir}" --target arrange_juce_runtime_smoke --parallel 6`)
+} else {
+    await run(cmakeExe(), ["-S", ".", "-B", nativeBuildDir, "-DCMAKE_BUILD_TYPE=Debug", "-DARRANGE_BUILD_TESTS=ON"])
+    await run(cmakeExe(), ["--build", nativeBuildDir, "--target", "arrange_juce_runtime_smoke", "--parallel", "6"])
+}
+await run(resolve(repoRoot, nativeBuildDir, "cpp_tests", `arrange_juce_runtime_smoke${process.platform === "win32" ? ".exe" : ""}`), [appBundle])
+
+console.log(`Framework ${contract.frameworkVersion} 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI ${cliManifest.version} 已验证安装`)

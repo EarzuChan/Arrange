@@ -13,18 +13,38 @@ namespace arrange::core {
     };
 
     class TextInputState {
-    public:
+       public:
         void begin(std::string value, bool selectAll);
         void reset();
         void replaceExternal(std::string value);
 
-        [[nodiscard]] const std::string& text() const noexcept { return text_; }
-        [[nodiscard]] const std::string& committedText() const noexcept { return committedText_; }
-        [[nodiscard]] std::size_t cursorIndex() const noexcept { return cursorIndex_; }
-        [[nodiscard]] std::size_t selectionStart() const noexcept { return selectionStart_; }
-        [[nodiscard]] std::size_t selectionEnd() const noexcept { return selectionEnd_; }
-        [[nodiscard]] bool hasSelection() const noexcept { return selectionStart_ != selectionEnd_; }
-        [[nodiscard]] bool changedSinceBegin() const noexcept { return text_ != committedText_; }
+        [[nodiscard]] const std::string& text() const noexcept {
+            return text_;
+        }
+
+        [[nodiscard]] const std::string& committedText() const noexcept {
+            return committedText_;
+        }
+
+        [[nodiscard]] std::size_t cursorIndex() const noexcept {
+            return cursorIndex_;
+        }
+
+        [[nodiscard]] std::size_t selectionStart() const noexcept {
+            return selectionStart_;
+        }
+
+        [[nodiscard]] std::size_t selectionEnd() const noexcept {
+            return selectionEnd_;
+        }
+
+        [[nodiscard]] bool hasSelection() const noexcept {
+            return selectionStart_ != selectionEnd_;
+        }
+
+        [[nodiscard]] bool changedSinceBegin() const noexcept {
+            return text_ != committedText_;
+        }
 
         InputEditResult insertCodepoint(char32_t codepoint);
         InputEditResult insertLineBreak();
@@ -48,7 +68,7 @@ namespace arrange::core {
         InputEditResult redo();
         InputEditResult submit() const noexcept;
 
-    private:
+       private:
         struct Snapshot {
             std::string text;
             std::size_t cursorIndex = 0;
@@ -72,4 +92,4 @@ namespace arrange::core {
         std::vector<Snapshot> undoStack_;
         std::vector<Snapshot> redoStack_;
     };
-} // namespace arrange::core
+}  // namespace arrange::core

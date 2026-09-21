@@ -1,13 +1,13 @@
-import {registry} from "../src/managed/ManageItems.ts"
+import { registry } from "../src/managed/ManageItems.ts"
 import assert from "node:assert/strict"
-import {test} from "node:test"
-import {Wrapper} from "../src/managed/Wrapper.ts"
-import {TextRegion} from "../src/managed/TextRegion.ts"
-import {JsonRegion, readJsonPath, setJsonPath, type JsonValue, type JsonExpected} from "../src/managed/JsonRegion.ts"
-import {registryRegion, registryCluster} from "../src/node-js/NodeJsStuffs.ts"
+import { test } from "node:test"
+import { Wrapper } from "../src/managed/Wrapper.ts"
+import { TextRegion } from "../src/managed/TextRegion.ts"
+import { JsonRegion, readJsonPath, setJsonPath, type JsonValue, type JsonExpected } from "../src/managed/JsonRegion.ts"
+import { registryRegion, registryCluster } from "../src/node-js/NodeJsStuffs.ts"
 
-import {projectDefinitionSchema} from "../src/project/ProjectState.ts"
-import {stateFor} from "./fixture.ts"
+import { projectDefinitionSchema } from "../src/project/ProjectState.ts"
+import { stateFor } from "./fixture.ts"
 
 const state = stateFor("unused")
 
@@ -76,13 +76,13 @@ test("受管正文逐字符比较，不 trim，不解析语义", () => {
 
 for (const [label, expected, json, kind, cause] of [
     ["有值而缺失", "1", {}, "Resolvable", "missing"],
-    ["相等", "1", {dependencies: {test: "1"}}, "Idle", undefined],
-    ["类型不同", "1", {dependencies: {test: 1}}, "Applicable", "outdated"],
-    ["值不同", "1", {dependencies: {test: "2"}}, "Applicable", "outdated"],
+    ["相等", "1", { dependencies: { test: "1" } }, "Idle", undefined],
+    ["类型不同", "1", { dependencies: { test: 1 } }, "Applicable", "outdated"],
+    ["值不同", "1", { dependencies: { test: "2" } }, "Applicable", "outdated"],
     ["不存在且缺失", undefined, {}, "Idle", undefined],
-    ["不存在但显式 null", undefined, {dependencies: {test: null}}, "Applicable", "outdated"],
-    ["配置 null 期望字段不存在", null, {dependencies: {test: null}}, "Applicable", "outdated"],
-    ["中间容器损坏", undefined, {dependencies: 123}, "Resolvable", "damaged"],
+    ["不存在但显式 null", undefined, { dependencies: { test: null } }, "Applicable", "outdated"],
+    ["配置 null 期望字段不存在", null, { dependencies: { test: null } }, "Applicable", "outdated"],
+    ["中间容器损坏", undefined, { dependencies: 123 }, "Resolvable", "damaged"],
 ] as const) {
     test(`JSON 矩阵：${label}`, () => {
         const region = new class extends JsonRegion {
@@ -103,15 +103,15 @@ test("JSON 值比较尊重对象成员、数组顺序，更新保持兄弟字段
         readonly id = "test"
         readonly managedItemId = registry.id
         protected readonly path = ["value"]
-        protected override makeValue(): JsonValue { return {a: 1, b: [2, 3]} }
+        protected override makeValue(): JsonValue { return { a: 1, b: [2, 3] } }
     }()
-    assert.equal(region.check(state, {value: {b: [2, 3], a: 1}}).kind, "Idle")
-    assert.equal(region.check(state, {value: {b: [3, 2], a: 1}}).kind, "Applicable")
-    const json: JsonValue = {other: 7}
+    assert.equal(region.check(state, { value: { b: [2, 3], a: 1 } }).kind, "Idle")
+    assert.equal(region.check(state, { value: { b: [3, 2], a: 1 } }).kind, "Applicable")
+    const json: JsonValue = { other: 7 }
     setJsonPath(json, ["dependencies", "test"], "1")
     setJsonPath(json, ["dependencies", "test"], undefined)
-    assert.deepEqual(json, {other: 7, dependencies: {}})
-    assert.throws(() => setJsonPath({dependencies: 123}, ["dependencies", "test"], "1"))
+    assert.deepEqual(json, { other: 7, dependencies: {} })
+    assert.throws(() => setJsonPath({ dependencies: 123 }, ["dependencies", "test"], "1"))
     setJsonPath(json, ["__proto__", "test"], "safe")
     assert.equal(readJsonPath(json, ["__proto__", "test"]), "safe")
     assert.equal(({} as Record<string, unknown>).test, undefined)

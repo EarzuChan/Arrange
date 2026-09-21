@@ -1,9 +1,9 @@
-import {createRequire} from "node:module"
-import {resolve} from "node:path"
-import {pathToFileURL} from "node:url"
-import {ARRANGE_VUE_DEFINES, DEV_BUNDLE_PLUGIN_NAME} from "./constraints.ts"
-import {createArrangeTransformPlugin} from "./transform.ts"
-import type {ArrangeDevServer} from "./types.ts"
+import { createRequire } from "node:module"
+import { resolve } from "node:path"
+import { pathToFileURL } from "node:url"
+import { ARRANGE_DEFINES, DEV_BUNDLE_PLUGIN_NAME } from "./constraints.ts"
+import { createArrangeTransformPlugin } from "./transform.ts"
+import type { ArrangeDevServer } from "./types.ts"
 
 type ViteModule = {
     build: (config: Record<string, unknown>) => Promise<ViteBuildResult | ViteBuildResult[]>
@@ -17,7 +17,7 @@ type ViteBuildChunk = {
 }
 
 type ViteBuildResult = {
-    output?: Array<{type?: string; fileName?: string; code?: string; isEntry?: boolean}>
+    output?: Array<{ type?: string; fileName?: string; code?: string; isEntry?: boolean }>
 }
 
 function importViteApiFromServerRoot(root: string): Promise<ViteModule> {
@@ -45,7 +45,7 @@ export async function buildDevBundle(server: ArrangeDevServer, entry: string): P
     if (!server.config) throw new Error("Arrange dev bundle requires Vite server config.")
     const config = server.config
     const viteApiRoot = config.arrangeViteApiRoot ?? config.root
-    const {build} = await importViteApiFromServerRoot(viteApiRoot)
+    const { build } = await importViteApiFromServerRoot(viteApiRoot)
     const buildConfig = {
         configFile: false,
         root: config.root,
@@ -53,7 +53,7 @@ export async function buildDevBundle(server: ArrangeDevServer, entry: string): P
         logLevel: "silent",
         plugins: createDevBundlePlugins(entry),
         define: {
-            ...ARRANGE_VUE_DEFINES,
+            ...ARRANGE_DEFINES,
             "process.env.NODE_ENV": JSON.stringify(config.mode === "production" ? "production" : "development"),
         },
         build: {
@@ -76,8 +76,7 @@ export async function buildDevBundle(server: ArrangeDevServer, entry: string): P
 
     const result = await build(buildConfig)
     const output = outputOfBuildResult(result)
-    const chunk = output.find((item) => item.type === "chunk" && item.fileName === "app.js")
-        ?? output.find((item) => item.type === "chunk" && item.isEntry)
+    const chunk = output.find((item) => item.type === "chunk" && item.fileName === "app.js") ?? output.find((item) => item.type === "chunk" && item.isEntry)
     if (!chunk?.code) throw new Error("Arrange dev bundle did not produce app.js.")
     return chunk.code
 }

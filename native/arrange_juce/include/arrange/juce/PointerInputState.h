@@ -18,31 +18,19 @@ namespace arrange::juce {
     };
 
     class PointerInputState {
-    public:
+       public:
         void reset();
-        [[nodiscard]] PointerDownResult pointerDown(
-            const arrange::core::HitTestSnapshot& snapshot,
-            arrange::core::Point point,
-            std::uint32_t pointerId = 0);
+        [[nodiscard]] PointerDownResult pointerDown(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId = 0);
 
-        [[nodiscard]] arrange::core::PointerDispatchResult pointerUp(
-            const arrange::core::HitTestSnapshot& snapshot,
-            arrange::core::Point point,
-            std::uint32_t pointerId = 0);
+        [[nodiscard]] arrange::core::PointerDispatchResult pointerUp(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId = 0);
 
-        [[nodiscard]] WheelDispatchResult wheel(
-            arrange::core::LayoutTree& tree,
-            arrange::core::NodeId root,
-            arrange::core::Point point,
-            float deltaX,
-            float deltaY,
-            std::uint64_t publishedRevision = 0);
+        [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision = 0);
 
-    private:
+       private:
         arrange::core::HitTester hitTester_;
         arrange::core::PointerInputProcessor pointer_;
         arrange::core::ScrollDispatcher scroll_;
         arrange::core::PendingScrollValues pendingScrollValues_;
         std::uint64_t scrollRevision_ = 0;
     };
-} // namespace arrange::juce
+}  // namespace arrange::juce

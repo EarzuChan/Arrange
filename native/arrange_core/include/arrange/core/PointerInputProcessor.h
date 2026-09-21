@@ -14,19 +14,18 @@ namespace arrange::core {
     };
 
     class PointerInputProcessor {
-    public:
+       public:
         PointerDispatchResult pointerDown(const HitTestSnapshot& snapshot, Point point, int pointerId = 0);
         PointerDispatchResult pointerUp(const HitTestSnapshot& snapshot, Point point, int pointerId = 0);
         PointerDispatchResult pointerDown(const LayoutTree& tree, NodeId root, Point point, int pointerId = 0);
         PointerDispatchResult pointerUp(const LayoutTree& tree, NodeId root, Point point, int pointerId = 0);
         PointerDispatchResult pointerCancel(int pointerId = 0) noexcept;
 
-    private:
-
+       private:
         int activePointerId_ = -1;
         NodeId pressedNode_ = 0;
         EventSlotId pressedEventSlot_;
         ModifierHandle pressedModifier_;
         HitTester hitTester_;
     };
-} // namespace arrange::core
+}  // namespace arrange::core

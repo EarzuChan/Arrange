@@ -77,6 +77,7 @@ namespace arrange::core {
     };
 
     struct PaintFragment;
+
     struct PlacedPaintFragment {
         std::shared_ptr<const PaintFragment> fragment;
         Point offset;
@@ -107,14 +108,15 @@ namespace arrange::core {
     };
 
     class DrawOpsBuilder {
-    public:
+       public:
         explicit DrawOpsBuilder(const TextLayoutService& service = defaultTextLayoutService()) : textLayoutService_(service) {}
+
         static void prepareText(DrawOp& op, const TextLayoutService& service);
         std::vector<DrawOp> exportScene(const LayoutTree& tree, NodeId root) const;
         PlacedPaintFragment build(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
         std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content, ModifierHandle receiver = {}) const;
 
-    private:
+       private:
         const TextLayoutService& textLayoutService_;
         void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
         std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const;
@@ -133,19 +135,17 @@ namespace arrange::core {
         float viewportX = 0.0f;
         std::vector<TextInputOverlayRange> temporaryUnderlines;
 
-        [[nodiscard]] bool hasSelection() const noexcept { return selectionStart != selectionEnd; }
+        [[nodiscard]] bool hasSelection() const noexcept {
+            return selectionStart != selectionEnd;
+        }
     };
 
     class TextInputOverlayBuilder final {
-    public:
+       public:
         static bool allowsLineBreak(const ModifierInstance& instance);
         static Rect textRect(const ModifierInstance& instance, float viewportX);
 
-        std::vector<DrawOp> build(
-            NodeId node,
-            const ModifierInstance& instance,
-            const TextInputOverlayState& state,
-            const TextLayoutService& textLayoutService) const;
+        std::vector<DrawOp> build(NodeId node, const ModifierInstance& instance, const TextInputOverlayState& state, const TextLayoutService& textLayoutService) const;
 
         struct Metrics {
             Rect rect;
@@ -168,4 +168,4 @@ namespace arrange::core {
         static Layout layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
         static std::vector<Rect> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService);
     };
-} // namespace arrange::core
+}  // namespace arrange::core

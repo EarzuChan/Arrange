@@ -90,32 +90,42 @@ namespace arrange::juce {
     };
 
     class DiagnosticEventStore final {
-    public:
+       public:
         void configure(std::size_t recentLimit);
         void clear();
         DiagnosticEvent append(DiagnosticEventInput input);
-        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept { return events_; }
 
-    private:
+        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept {
+            return events_;
+        }
+
+       private:
         std::uint64_t nextId_ = 1;
         std::size_t recentLimit_ = 64;
         std::vector<DiagnosticEvent> events_;
     };
 
     class DiagnosticLogger final {
-    public:
+       public:
         void configure(DiagnosticsConfig config);
-        [[nodiscard]] const DiagnosticsConfig& config() const noexcept { return config_; }
-        void setLogLevel(LogLevel level) noexcept { config_.logLevel = level; }
+
+        [[nodiscard]] const DiagnosticsConfig& config() const noexcept {
+            return config_;
+        }
+
+        void setLogLevel(LogLevel level) noexcept {
+            config_.logLevel = level;
+        }
+
         void setCategoryEnabled(DiagnosticCategory category, bool enabled);
         [[nodiscard]] bool categoryEnabled(DiagnosticCategory category) const;
         [[nodiscard]] bool shouldWrite(const DiagnosticEvent& event) const noexcept;
         void write(const DiagnosticEvent& event) const;
 
-    private:
+       private:
         DiagnosticsConfig config_;
         std::unordered_map<DiagnosticCategory, bool> categoryEnabled_;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

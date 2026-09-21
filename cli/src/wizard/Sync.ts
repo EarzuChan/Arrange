@@ -1,8 +1,8 @@
-import {confirm, isCancel, log, select} from "@clack/prompts"
-import {targetLabel, type ConfigScanReport, type ResolvableIssue} from "../sync/ConfigScanReport.ts"
-import type {ResolveChoice} from "../sync/ConfigResolver.ts"
+import { confirm, isCancel, log, select } from "@clack/prompts"
+import { targetLabel, type ConfigScanReport, type ResolvableIssue } from "../sync/ConfigScanReport.ts"
+import type { ResolveChoice } from "../sync/ConfigResolver.ts"
 
-const labels: Record<ResolveChoice, string> = {create: "确认创建", wrap: "给已有内容补 Wrapper", marker: "放置 Marker，新建内容", edit: "手动编辑修复", abort: "放弃同步"}
+const labels: Record<ResolveChoice, string> = { create: "确认创建", wrap: "给已有内容补 Wrapper", marker: "放置 Marker，新建内容", edit: "手动编辑修复", abort: "放弃同步" }
 
 export class SyncWizard {
     report(report: ConfigScanReport): void {
@@ -19,13 +19,13 @@ export class SyncWizard {
             console.error("需要交互处理，请在终端运行 sync --config。")
             return "abort"
         }
-        const result = await select({message: `${targetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({value, label: labels[value]}))})
+        const result = await select({ message: `${targetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({ value, label: labels[value] })) })
         return isCancel(result) ? "abort" : result
     }
 
     async edit(instructions: string): Promise<boolean> {
         log.info(instructions)
-        const result = await confirm({message: "编辑完成，继续扫描？", initialValue: true})
+        const result = await confirm({ message: "编辑完成，继续扫描？", initialValue: true })
         return !isCancel(result) && result
     }
 

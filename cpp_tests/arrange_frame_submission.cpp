@@ -27,8 +27,9 @@ namespace {
     }
 
     class FailingTextMeasurer final : public ApproximateTextMeasurer {
-    public:
+       public:
         bool failing = false;
+
         float advance(std::string_view, char32_t, const TextStyle&) const override {
             if (failing) throw std::runtime_error("text measurement unavailable");
             return 8;
@@ -60,8 +61,7 @@ namespace {
         padding.padding.start = padding.padding.top = padding.padding.end = padding.padding.bottom = 10;
         auto field = test_support::textField("abcdef");
         field.onValueChange = makeEventSlotId(2, EventSlotKind::InputUpdate, "编辑");
-        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{fixedSize(400, 200), {}}, {outer, {}}, {ClipModifier{}, {}}}},
-            SetModifierMutation{2, {{fixedSize(220, 60), {}}, {padding, {}}, {inner, {}}, {ClipModifier{}, {}}, {field, "编辑"}}}, InsertChildMutation{1, 2, 0}});
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{fixedSize(400, 200), {}}, {outer, {}}, {ClipModifier{}, {}}}}, SetModifierMutation{2, {{fixedSize(220, 60), {}}, {padding, {}}, {inner, {}}, {ClipModifier{}, {}}, {field, "编辑"}}}, InsertChildMutation{1, 2, 0}});
         LayoutEngine(text).layout(tree, 1, {0, 500, 0, 400});
         const auto content = tree.node(2).contentBounds;
         const auto point = nodeContentToRoot(tree, 2, {content.x + 1, content.y + 1});
@@ -82,7 +82,9 @@ namespace {
 
         std::vector<std::pair<EventSlotId, std::string>> edits;
         arrange::juce::TextInputCallbacks callbacks;
-        callbacks.invokeStringEvent = [&](const EventSlotId& slot, const std::string& value) { edits.emplace_back(slot, value); };
+        callbacks.invokeStringEvent = [&](const EventSlotId& slot, const std::string& value) {
+            edits.emplace_back(slot, value);
+        };
         check(input.setHighlightedRegion(tree, true, {1, 3}, callbacks), "编辑受体未接受选区");
         check(input.highlightedRegion(tree, true) == ::juce::Range<int>(1, 3), "选区没有按字符索引保存");
         ::juce::Array<::juce::Range<int>> underlines;
@@ -97,8 +99,7 @@ namespace {
         tree.setModifierInput(2, receiver, test_support::textField("新"));
         input.synchronizePublishedInput(tree, true);
         input.updateFocusedInputViewport(tree, true);
-        check(input.totalNumChars(tree, true) == 1 && input.textInRange(tree, true, {0, 1}).toStdString() == "新",
-              "published external model value did not replace the editing session");
+        check(input.totalNumChars(tree, true) == 1 && input.textInRange(tree, true, {0, 1}).toStdString() == "新", "published external model value did not replace the editing session");
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(false));
         check(!HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point).hit && !input.isTextInputActive(tree, true), "Disabled ancestor retained input interest");
         tree.setHostInput(1, HostInput::Enabled, PropValue::booleanValue(true));
@@ -128,9 +129,7 @@ namespace {
         LayoutModifierSemantics scroll;
         scroll.kind = LayoutModifierKind::VerticalScroll;
         scroll.enabled = true;
-        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
-            SetModifierMutation{1, {{fixedSize(100, 100), {}}, {scroll, {}}}},
-            SetModifierMutation{2, {{fixedSize(100, 400), {}}}}, InsertChildMutation{1, 2, 0}});
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{fixedSize(100, 100), {}}, {scroll, {}}}}, SetModifierMutation{2, {{fixedSize(100, 400), {}}}}, InsertChildMutation{1, 2, 0}});
         LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
         arrange::juce::PointerInputState pointer;
         const auto first = pointer.wheel(tree, 1, {20, 20}, 0, -1, 1);
@@ -199,20 +198,18 @@ namespace {
         MutationTransaction initial;
         initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         runtime.enqueue(std::move(initial));
-        const auto pump = [&](double now) { return driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 400, 300}, true, {}, now); };
+        const auto pump = [&](double now) {
+            return driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 400, 300}, true, {}, now);
+        };
         check(pump(0) && !diagnostics.hasError(), "production host initial frame failed");
         const auto previous = runtime.publishedFrame();
         MutationTransaction missingImage;
         missingImage.operations = {
-            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0},
-            SetModifierMutation{2, {{fixedSize(30, 30), {}}}},
-            SetPropMutation{2, "src", PropValue::stringValue("missing-frame-resource.png")},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}, SetModifierMutation{2, {{fixedSize(30, 30), {}}}}, SetPropMutation{2, "src", PropValue::stringValue("missing-frame-resource.png")},
         };
         runtime.enqueue(std::move(missingImage));
         check(pump(16) && diagnostics.hasError(), "resource failure did not reach host diagnostics");
-        check(!runtime.scene().contains(2) && runtime.publishedFrame().content.hitTest == previous.content.hitTest &&
-              runtime.publishedFrame().content.errorFrame && runtime.publishedFrame().revision == previous.revision + 1,
-              "resource failure published candidate geometry or multiple frames");
+        check(!runtime.scene().contains(2) && runtime.publishedFrame().content.hitTest == previous.content.hitTest && runtime.publishedFrame().content.errorFrame && runtime.publishedFrame().revision == previous.revision + 1, "resource failure published candidate geometry or multiple frames");
         check(!runtime.hasPendingFrameWork() && !session.loaded(), "failed context continued producing visual work");
         const auto counters = runtime.frameCounters();
         const auto revision = runtime.publishedFrame().revision;
@@ -222,23 +219,19 @@ namespace {
         paint.paint(graphics, runtime.publishedFrame());
         paint.paint(graphics, runtime.publishedFrame());
         check(paint.fullViewportPaints() == paintCount + 2 && !paint.lastFullPaintReason().empty(), "passive raster execution counters did not match actual paint calls");
-        check(runtime.publishedFrame().revision == revision && runtime.frameCounters().measures == counters.measures &&
-              runtime.frameCounters().publications == counters.publications, "paint ran preparation or published state");
+        check(runtime.publishedFrame().revision == revision && runtime.frameCounters().measures == counters.measures && runtime.frameCounters().publications == counters.publications, "paint ran preparation or published state");
         session.reset(runtime, diagnostics, interaction);
         paint.clearResources();
         session.markLoaded();
         MutationTransaction reload;
         reload.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         runtime.enqueue(std::move(reload));
-        check(pump(32) && !diagnostics.hasError() && !runtime.publishedFrame().content.errorFrame,
-              "reset did not recover suspended host");
+        check(pump(32) && !diagnostics.hasError() && !runtime.publishedFrame().content.errorFrame, "reset did not recover suspended host");
         session.reset(runtime, diagnostics, interaction);
         session.markLoaded();
         const auto idleMeasures = runtime.frameCounters().measures;
-        check(pump(48) && diagnostics.hasError() && !session.loaded(),
-              "idle finalization failure escaped the host error boundary");
-        check(runtime.frameCounters().measures == idleMeasures && runtime.publishedFrame().content.errorFrame,
-              "idle failure ran a scene pipeline or lost its diagnostic publication");
+        check(pump(48) && diagnostics.hasError() && !session.loaded(), "idle finalization failure escaped the host error boundary");
+        check(runtime.frameCounters().measures == idleMeasures && runtime.publishedFrame().content.errorFrame, "idle failure ran a scene pipeline or lost its diagnostic publication");
     }
 
     void verifyReloadAtFrameBoundary() {
@@ -249,10 +242,7 @@ namespace {
         check(directory.createDirectory().wasOk(), "reload package directory failed");
         const auto entry = directory.getChildFile("app.js");
         const auto writePackage = [&](const char* color, const char* request) {
-            const auto source = std::string("const n = globalThis.__ARRANGE_NATIVE__;\n") +
-                "void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}));\n" +
-                "n.setModifier(1, {elements: [{type: 'size', value: {width: 100, height: 100}}," +
-                "{type: 'background', value: {color: " + color + "}}]});\n" + request;
+            const auto source = std::string("const n = globalThis.__ARRANGE_NATIVE__;\n") + "void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}));\n" + "n.setModifier(1, {elements: [{type: 'size', value: {width: 100, height: 100}}," + "{type: 'background', value: {color: " + color + "}}]});\n" + request;
             check(entry.replaceWithText(source), "reload package write failed");
         };
         arrange::juce::EditorSceneHost host;
@@ -269,7 +259,9 @@ namespace {
             return image.getPixelAt(50, 50).getARGB();
         };
         double timestamp = 0;
-        const auto pulse = [&] { (void)host.pumpFrame(timestamp += 16); };
+        const auto pulse = [&] {
+            (void)host.pumpFrame(timestamp += 16);
+        };
         writePackage("0xffff0000", "requestAnimationFrame(() => n.reload({path: 'app.js'}));");
         host.configure(config);
         host.resized(100, 100);
@@ -277,7 +269,7 @@ namespace {
         check(pixel() == 0xffff0000, "initial reload package did not publish");
         check(host.wantsVBlank(), "post-evaluation script reload did not retain the frame clock");
         writePackage("0xff0000ff", "");
-        pulse(); // Drain script actions; the request remains pending for the next frame boundary.
+        pulse();  // Drain script actions; the request remains pending for the next frame boundary.
         check(pixel() == 0xffff0000 && host.wantsVBlank(), "script reload escaped its frame boundary");
         pulse();
         check(pixel() == 0xff0000ff && !host.wantsVBlank(), "script reload did not load or settle");
@@ -314,24 +306,24 @@ namespace {
             frame.content.overlayDrawOps.push_back(DrawOp{});
             throw std::runtime_error("resource preparation failed");
         });
-        check(failed.error && !state.scene().contains(2) && state.publishedFrame().revision == previous.revision &&
-              state.publishedFrame().content.overlayDrawOps.empty(), "finalizer failure published partial geometry or attachments");
+        check(failed.error && !state.scene().contains(2) && state.publishedFrame().revision == previous.revision && state.publishedFrame().content.overlayDrawOps.empty(), "finalizer failure published partial geometry or attachments");
         check(state.publishRetained([](const auto&, auto& frame) { frame.content.errorFrame = "failed"; }), "retained error did not publish");
-        check(!state.scene().contains(2) && state.publishedFrame().content.hitTest == previous.content.hitTest,
-              "error publication replayed failed structure");
+        check(!state.scene().contains(2) && state.publishedFrame().content.hitTest == previous.content.hitTest, "error publication replayed failed structure");
         state.enqueue(std::move(candidate));
-        check(!state.run(1, constraints, true, [](const auto&, auto& frame) {
-            frame.content.errorFrame.reset();
-            DrawOp transform;
-            transform.type = DrawOpType::PushTransform;
-            transform.translationX = 12;
-            frame.content.overlayDrawOps = {transform};
-        }).error, "finalized retry failed");
-        check(state.scene().contains(2) && !state.publishedFrame().content.errorFrame &&
-              state.publishedFrame().revision == previous.revision + 2, "scene/attachments did not share one publication");
+        check(!state
+                   .run(1, constraints, true,
+                        [](const auto&, auto& frame) {
+                            frame.content.errorFrame.reset();
+                            DrawOp transform;
+                            transform.type = DrawOpType::PushTransform;
+                            transform.translationX = 12;
+                            frame.content.overlayDrawOps = {transform};
+                        })
+                   .error,
+              "finalized retry failed");
+        check(state.scene().contains(2) && !state.publishedFrame().content.errorFrame && state.publishedFrame().revision == previous.revision + 2, "scene/attachments did not share one publication");
         const auto measures = state.counters().measures;
-        check(state.publishRetained([](const auto&, auto& frame) { frame.content.overlayDrawOps[0].translationX = 24; }),
-              "transform-only overlay change was ignored");
+        check(state.publishRetained([](const auto&, auto& frame) { frame.content.overlayDrawOps[0].translationX = 24; }), "transform-only overlay change was ignored");
         check(state.counters().measures == measures && state.publishedFrame().plan.passivePaint, "overlay change ran layout or missed repaint");
         check(!state.publishRetained([](const auto&, auto&) {}), "identical attachments produced a publication");
         check(state.counters().publications == state.publishedFrame().revision, "publication counter diverged from revisions");
@@ -351,16 +343,12 @@ namespace {
         const BindingHandle content{allocateRuntimeIdentity(), 1};
         MutationTransaction create;
         create.operations = {
-            CreateNodeMutation{2, arrange::core::NodeType::Layout, child.generation}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{content, ModifierChainTarget{child}},
-            SlotUpdate{content, ModifierDescriptors{{test_support::text("first"), {}}}},
-            InsertChildMutation{1, 2, 0},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout, child.generation}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RegisterBinding{content, ModifierChainTarget{child}}, SlotUpdate{content, ModifierDescriptors{{test_support::text("first"), {}}}}, InsertChildMutation{1, 2, 0},
         };
         state.enqueue(create);
         measurer.failing = true;
         check(state.run(1, constraints, true).error.has_value(), "measurement fault did not fail the frame");
-        check(!state.scene().contains(2) && state.publishedFrame().revision == previousFrame.revision &&
-              state.publishedFrame().content.hitTest == previousFrame.content.hitTest,
-              "failed frame changed the published scene or hit geometry");
+        check(!state.scene().contains(2) && state.publishedFrame().revision == previousFrame.revision && state.publishedFrame().content.hitTest == previousFrame.content.hitTest, "failed frame changed the published scene or hit geometry");
         check(!state.hasPendingTransactions() && !state.hasPendingIntents(), "failed submission spins without new work");
         measurer.failing = false;
         MutationTransaction later;
@@ -368,8 +356,7 @@ namespace {
         later.operations.emplace_back(SlotUpdate{content, ModifierDescriptors{{test_support::text("latest"), {}}}});
         state.enqueue(std::move(later));
         check(!state.run(1, constraints, true).error, "retry did not recover");
-        check(state.scene().contains(2) && test_support::textOf(state.scene().node(2)) == "latest" && state.scene().bindingCount() == 1,
-              "重新提交完整候选未恢复结构与最终值");
+        check(state.scene().contains(2) && test_support::textOf(state.scene().node(2)) == "latest" && state.scene().bindingCount() == 1, "重新提交完整候选未恢复结构与最终值");
         check(state.scene().slotCounters().rejected == 0, "retry rejected a valid write to the created node");
         check(state.publishedFrame().revision == previousFrame.revision + 1, "failed frame was counted as a publication");
 
@@ -383,10 +370,9 @@ namespace {
         MutationTransaction fresh;
         fresh.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         state.enqueue(std::move(fresh));
-        check(!state.run(1, constraints, true).error && !state.scene().contains(2) && state.scene().bindingCount() == 0,
-              "reset replayed the failed previous context");
+        check(!state.run(1, constraints, true).error && !state.scene().contains(2) && state.scene().bindingCount() == 0, "reset replayed the failed previous context");
     }
-}
+}  // namespace
 
 int main() {
     try {
@@ -398,7 +384,7 @@ int main() {
         verifyFinalPublication();
         verifyHostResourceFailureAndPassivePaint();
         verifyReloadAtFrameBoundary();
-        std::cout << "Frame submissions: failed measurement, 候选撤销、显式重新提交与上下文重置通过\n";
+        std::cout << "帧提交：失败的测量。候选撤销、显式重新提交与上下文重置通过\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

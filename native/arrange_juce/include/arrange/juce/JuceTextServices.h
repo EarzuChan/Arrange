@@ -20,7 +20,7 @@ namespace arrange::juce {
     int totalUtf8Chars(const std::string& text);
 
     class JuceTextResource final : public arrange::core::TextDrawResource {
-    public:
+       public:
         struct Run {
             ::juce::Font font{::juce::FontOptions{}};
             std::vector<std::uint16_t> glyphs;
@@ -34,9 +34,9 @@ namespace arrange::juce {
     };
 
     class JuceTextMeasurer final : public arrange::core::TextMeasurer {
-    public:
+       public:
         arrange::core::TextLayout createLayout(std::string_view utf8Text, arrange::core::TextStyle style, arrange::core::TextLayoutOptions options) const override;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

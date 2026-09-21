@@ -1,10 +1,10 @@
-import {frameworkPackageName} from "../CliMetadata.ts"
-import {resolve} from "node:path"
-import {TextFile, JsonFile} from "../managed/ManagedFile.ts"
-import {TextCluster} from "../managed/TextCluster.ts"
-import {TextRegion} from "../managed/TextRegion.ts"
-import {JsonRegion, type JsonValue} from "../managed/JsonRegion.ts"
-import type {ProjectState} from "../project/ProjectState.ts"
+import { frameworkPackageName } from "../CliMetadata.ts"
+import { resolve } from "node:path"
+import { TextFile, JsonFile } from "../managed/ManagedFile.ts"
+import { TextCluster } from "../managed/TextCluster.ts"
+import { TextRegion } from "../managed/TextRegion.ts"
+import { JsonRegion, type JsonValue } from "../managed/JsonRegion.ts"
+import type { ProjectState } from "../project/ProjectState.ts"
 
 export const registryRegion: TextRegion = new class extends TextRegion {
     readonly id = "node.registry"
@@ -72,7 +72,7 @@ export const packageJsonFile: JsonFile = new class extends JsonFile {
         return {
             private: true,
             type: "module",
-            scripts: {dev: "vite", build: "vite build"},
+            scripts: { dev: "vite", build: "vite build" },
         }
     }
 }()

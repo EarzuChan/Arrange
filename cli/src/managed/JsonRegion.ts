@@ -1,9 +1,9 @@
-import {errorMessage} from "../util/Utils.ts"
-import {isDeepStrictEqual} from "node:util"
-import {isManagedItem, type ProjectState} from "../project/ProjectState.ts"
-import {type CheckResult} from "./CheckResult.ts"
+import { errorMessage } from "../util/Utils.ts"
+import { isDeepStrictEqual } from "node:util"
+import { isManagedItem, type ProjectState } from "../project/ProjectState.ts"
+import { type CheckResult } from "./CheckResult.ts"
 
-export type JsonValue = null | boolean | number | string | JsonValue[] | {[key: string]: JsonValue}
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 export type JsonPath = readonly (string | number)[]
 // undefined 专指字段不存在，与 JSON null 区分
 export type JsonExpected = JsonValue | undefined
@@ -28,7 +28,7 @@ export function setJsonPath(json: JsonValue, path: JsonPath, value: JsonExpected
         const key = path[i]
         if (!Object.hasOwn(current, key)) {
             if (value === undefined) return
-            Object.defineProperty(current, key, {value: typeof path[i + 1] === "number" ? [] : {}, enumerable: true, writable: true, configurable: true})
+            Object.defineProperty(current, key, { value: typeof path[i + 1] === "number" ? [] : {}, enumerable: true, writable: true, configurable: true })
         }
         current = current[key] as Record<string | number, JsonValue>
     }
@@ -37,7 +37,7 @@ export function setJsonPath(json: JsonValue, path: JsonPath, value: JsonExpected
     if (value === undefined) {
         if (Array.isArray(current) && typeof key === "number") current.splice(key, 1)
         else delete current[key]
-    } else Object.defineProperty(current, key, {value: structuredClone(value), enumerable: true, writable: true, configurable: true})
+    } else Object.defineProperty(current, key, { value: structuredClone(value), enumerable: true, writable: true, configurable: true })
 }
 
 export abstract class JsonRegion {
@@ -57,11 +57,11 @@ export abstract class JsonRegion {
 
     check(state: ProjectState, json: JsonValue): CheckResult<JsonExpected, JsonPath> {
         let expected: JsonExpected
-        try { expected = this.make(state) } catch (error) { return {kind: "Fatal", cause: "config-invalid", message: errorMessage(error)} }
+        try { expected = this.make(state) } catch (error) { return { kind: "Fatal", cause: "config-invalid", message: errorMessage(error) } }
         const location = this.locate(state)
         let actual: JsonExpected
-        try { actual = readJsonPath(json, location) } catch (error) { return {kind: "Resolvable", cause: "damaged", message: errorMessage(error), expected} }
-        if (actual === undefined && expected !== undefined) return {kind: "Resolvable", cause: "missing", message: `缺少 JSON 字段 ${JSON.stringify(location)}`, expected}
-        return isDeepStrictEqual(actual, expected) ? {kind: "Idle", actual, expected, location} : {kind: "Applicable", cause: "outdated", actual, expected, location}
+        try { actual = readJsonPath(json, location) } catch (error) { return { kind: "Resolvable", cause: "damaged", message: errorMessage(error), expected } }
+        if (actual === undefined && expected !== undefined) return { kind: "Resolvable", cause: "missing", message: `缺少 JSON 字段 ${JSON.stringify(location)}`, expected }
+        return isDeepStrictEqual(actual, expected) ? { kind: "Idle", actual, expected, location } : { kind: "Applicable", cause: "outdated", actual, expected, location }
     }
 }

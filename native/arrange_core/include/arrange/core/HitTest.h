@@ -23,34 +23,42 @@ namespace arrange::core {
         std::size_t constraint = 0;
     };
 
-    struct HitTestSnapshot {
-        // constraint 0 是根哨兵，其他索引指向 constraints[index - 1]。
+    struct HitGeometry {
+        // constraint 0 是根哨兵，其他索引指向 constraints[index - 1]
         std::vector<HitConstraint> constraints;
         std::vector<HitRegion> regions;
     };
 
     struct HitFragment {
-        HitTestSnapshot local;
+        std::shared_ptr<const HitGeometry> local;
         std::size_t contentConstraint = 0;
         bool enabled = true;
         std::vector<std::shared_ptr<const HitFragment>> children;
+    };
+
+    struct HitTestSnapshot {
+        std::shared_ptr<const HitFragment> root;
+        std::vector<HitConstraint> constraints;
+        std::vector<HitRegion> regions;
     };
 
     struct HitWorkCounters {
         std::uint64_t nodesBuilt = 0;
         std::uint64_t subtreeCacheHits = 0;
         std::uint64_t emittedRegions = 0;
+        std::uint64_t geometryReuses = 0;
     };
+
+    std::vector<HitRegion> exportHitRegions(const HitTestSnapshot& snapshot);
 
     HitTestSnapshot buildCachedHitTestSnapshot(LayoutTree& tree, NodeId root, HitWorkCounters& counters);
     HitTestSnapshot buildHitTestSnapshot(const LayoutTree& tree, NodeId root);
 
     class HitTester {
-    public:
+       public:
         HitTestResult hitTest(const HitTestSnapshot& snapshot, Point point) const;
         HitTestResult hitTestClickable(const HitTestSnapshot& snapshot, Point point) const;
         HitTestResult hitTest(const LayoutTree& tree, NodeId root, Point point) const;
         HitTestResult hitTestClickable(const LayoutTree& tree, NodeId root, Point point) const;
-
     };
-} // namespace arrange::core
+}  // namespace arrange::core

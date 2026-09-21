@@ -17,7 +17,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class DiagnosticsState final {
-    public:
+       public:
         void configure(DiagnosticsConfig config);
 
         bool hasError() const noexcept;
@@ -40,19 +40,25 @@ namespace arrange::juce {
         [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept;
 
         void invalidatePreparedFrame() noexcept;
-        [[nodiscard]] bool prepareFrame(
-            ::juce::Rectangle<int> bounds,
-            bool detailedErrorScreen,
-            const DiagnosticsBadgeModel& badgeModel);
-        [[nodiscard]] std::vector<arrange::core::DrawOp> errorOpsSnapshot() const { return preparedErrorOps_; }
-        [[nodiscard]] std::vector<arrange::core::DrawOp> badgeOpsSnapshot() const { return preparedBadgeOps_; }
-        [[nodiscard]] std::vector<arrange::core::DrawOp> toastOpsSnapshot() const { return preparedToastOps_; }
+        [[nodiscard]] bool prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel);
+
+        [[nodiscard]] std::vector<arrange::core::DrawOp> errorOpsSnapshot() const {
+            return preparedErrorOps_;
+        }
+
+        [[nodiscard]] std::vector<arrange::core::DrawOp> badgeOpsSnapshot() const {
+            return preparedBadgeOps_;
+        }
+
+        [[nodiscard]] std::vector<arrange::core::DrawOp> toastOpsSnapshot() const {
+            return preparedToastOps_;
+        }
 
         bool copyErrorDiagnosticsToClipboard(DiagnosticsTextContext context);
         std::string diagnosticsText(DiagnosticsTextContext context) const;
         static std::string currentLocalTimeLabel();
 
-    private:
+       private:
         DiagnosticsModel model_;
         DiagnosticsScene diagnosticsScene_;
         std::optional<ErrorScreenModel> error_;
@@ -63,4 +69,4 @@ namespace arrange::juce {
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

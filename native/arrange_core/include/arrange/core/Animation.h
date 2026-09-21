@@ -7,6 +7,7 @@
 
 namespace arrange::core {
     enum class AnimationKind { Tween, Spring, Snap };
+
     struct AnimationSpec {
         AnimationKind kind = AnimationKind::Spring;
         float durationMillis = 300;
@@ -37,11 +38,16 @@ namespace arrange::core {
 
     inline float sampleEasing(float fraction, const std::array<float, 4>& bezier) {
         if (fraction <= 0 || fraction >= 1) return std::clamp(fraction, 0.0f, 1.0f);
-        const auto curve = [](float t, float a, float b) { return 3 * (1-t) * (1-t) * t * a + 3 * (1-t) * t * t * b + t*t*t; };
+        const auto curve = [](float t, float a, float b) {
+            return 3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * b + t * t * t;
+        };
         float low = 0, high = 1;
         for (int i = 0; i < 24; ++i) {
             const auto mid = (low + high) / 2;
-            if (curve(mid, bezier[0], bezier[2]) < fraction) low = mid; else high = mid;
+            if (curve(mid, bezier[0], bezier[2]) < fraction)
+                low = mid;
+            else
+                high = mid;
         }
         return curve((low + high) / 2, bezier[1], bezier[3]);
     }
@@ -54,9 +60,18 @@ namespace arrange::core {
         AnimationSpec spec;
 
         Size update(Size next, const AnimationSpec& nextSpec, double now) {
-            if (!initialized) { initialized = true; current = target = next; spec = nextSpec; return current; }
+            if (!initialized) {
+                initialized = true;
+                current = target = next;
+                spec = nextSpec;
+                return current;
+            }
             if (target != next || spec != nextSpec) {
-                from = current; target = next; initialVelocity = velocity; startMillis = now; spec = nextSpec;
+                from = current;
+                target = next;
+                initialVelocity = velocity;
+                startMillis = now;
+                spec = nextSpec;
                 running = current != target || velocity != Size{};
             }
             if (!running) return current;
@@ -67,16 +82,18 @@ namespace arrange::core {
                 current = {std::max(0.0f, target.width + w.first), std::max(0.0f, target.height + h.first)};
                 velocity = {w.second, h.second};
                 running = std::abs(w.first) > spec.threshold || std::abs(h.first) > spec.threshold || std::abs(w.second) > spec.threshold * 10 || std::abs(h.second) > spec.threshold * 10;
-            }
-            else if (elapsed >= spec.delayMillis) {
+            } else if (elapsed >= spec.delayMillis) {
                 const auto fraction = spec.kind == AnimationKind::Snap || spec.durationMillis == 0 ? 1.0f : std::min(1.0f, static_cast<float>((elapsed - spec.delayMillis) / spec.durationMillis));
                 const auto progress = sampleEasing(fraction, spec.bezier);
-                current = {std::max(0.0f, from.width + (target.width-from.width)*progress), std::max(0.0f, from.height + (target.height-from.height)*progress)};
+                current = {std::max(0.0f, from.width + (target.width - from.width) * progress), std::max(0.0f, from.height + (target.height - from.height) * progress)};
                 velocity = {};
                 running = fraction < 1;
             }
-            if (!running) { current = target; velocity = {}; }
+            if (!running) {
+                current = target;
+                velocity = {};
+            }
             return current;
         }
     };
-}
+}  // namespace arrange::core

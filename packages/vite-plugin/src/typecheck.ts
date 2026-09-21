@@ -1,11 +1,12 @@
 import { dirname, resolve } from 'node:path'
 import ts from 'typescript'
-import { compileScript, parse } from '@arrange/vue-compiler-sfc'
+import { compileScript, parse } from '@arrange/compiler'
 import { SourceMapConsumer } from 'source-map-js'
 
 export type SfaDiagnostic = Readonly<{ file: string; line: number; column: number; message: string; code: string }>
 
 const declarations = `import * as __Arrange from '@arrange/framework'
+import * as __Foundation from '@arrange/framework/foundation'
 type __Parameters<D> = D extends __Arrange.ArrangableDefinition ? __Arrange.ArrangableProps<D> : never
 type __Values<D> = { [K in keyof __Parameters<D>]: () => __Parameters<D>[K] }
 declare function __arrangeGetters<D, P>(definition: D, parameters: P & Record<Exclude<keyof P, keyof __Parameters<D>>, never>): { [K in keyof P]: () => P[K] }
@@ -41,7 +42,7 @@ export function checkSfaProject(configPath: string, roots: readonly string[]): S
             let result = parse(source, { filename: sourceFile })
             if (result.errors.length) throw result.errors[0]
             if (!result.descriptor.script) result = parse(`${source}\n<script></script>`, { filename: sourceFile })
-            const script = compileScript(result.descriptor, { genDefaultAs: '_sfa_main', templateOptions: { compilerOptions: { arrangeTypecheck: true, runtimeModuleName: '@arrange/framework' } } })
+            const script = compileScript(result.descriptor, { genDefaultAs: '_sfa_main', templateOptions: { compilerOptions: { arrangeTypecheck: true, runtimeModuleName: '@arrange/framework/internal' } } })
             const entry = { text: declarations + script.content + '\nexport default _sfa_main\n', map: script.map ? new SourceMapConsumer(script.map) : undefined, templateLine: result.descriptor.template?.loc.start.line ?? 1 }
             virtuals.set(key, entry)
             return entry

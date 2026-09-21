@@ -58,4 +58,4 @@ Arrange::framework
 - xmake helper。
 - 归档布局。
 
-这些能力必须先设计、写文档、再实现。
+但别希求！很有可能不做！

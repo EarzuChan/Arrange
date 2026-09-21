@@ -1,0 +1,129 @@
+<template>
+    <Column>
+        <CounterPanel a-if="shown" :clicks="clicks" :color="color" :offset="offset" :onTap="tap" />
+
+        <Text a-for="row in rows" :key="row.id" :text="row.name" />
+
+        <Input :onSubmit="command" />
+
+        <AnimationGallery a-if="gallery" :command="galleryCommand" />
+
+        <ShowcaseGallery a-if="showcase" :command="showcaseCommand" />
+
+        <Text a-if="asyncStatus === 'loading'" text="延迟加载提示" />
+
+        <Text a-else-if="asyncStatus === 'ready'" text="延迟加载完成" />
+
+        <Text a-else-if="asyncStatus === 'failed'" text="延迟加载超时" />
+
+        <Image a-if="missingResource" :painter="missingPainter!" />
+    </Column>
+</template>
+
+
+<script>
+import { painter } from '@arrange/framework/ui'
+import { ref, shallowRef, onScopeDispose } from '@arrange/framework'
+import { defaultAnimationClock } from '@arrange/framework/animation'
+import { getArrangeExecutionStats } from '@arrange/framework/internal'
+import AnimationGallery from '../../../demo/ui-src/src/view/AnimationGallery.sfa'
+import CounterPanel from '../../../demo/ui-src/src/view/CounterPanel.sfa'
+import ShowcaseGallery from '../../../demo/ui-src/src/view/ShowcaseGallery.sfa'
+
+const color = ref(0xff336699)
+const offset = ref(0)
+const clicks = ref(0)
+const shown = ref(true)
+const rows = ref([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }])
+const gallery = ref(false)
+const galleryCommand = ref('')
+const showcase = ref(false)
+const showcaseCommand = ref('')
+const missingResource = ref(false)
+const missingPainter = shallowRef<ReturnType<typeof painter>>()
+let commandSequence = 0
+let baseline: ReturnType<typeof getArrangeExecutionStats> | undefined
+let performanceBaseline: ReturnType<typeof getArrangeExecutionStats> | undefined
+let lifetimeBaseline: number | undefined
+const asyncStatus = ref<'idle' | 'pending' | 'loading' | 'ready' | 'failed'>('idle')
+let asyncRequest = 0
+let asyncFrame: number | undefined
+let finishAsync: (() => void) | undefined
+
+function cancelAsyncProbe() {
+    asyncRequest++
+    if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
+    asyncFrame = undefined
+    asyncStatus.value = 'idle'
+}
+
+function startAsyncProbe() {
+    cancelAsyncProbe()
+    const request = asyncRequest
+    const started = defaultAnimationClock.now()
+    asyncStatus.value = 'pending'
+    const pending = new Promise<void>(resolve => { finishAsync = resolve })
+    pending.then(() => {
+        if (request !== asyncRequest) return
+        if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
+        asyncFrame = undefined
+        asyncStatus.value = 'ready'
+    })
+    const sample = (time: number) => {
+        asyncFrame = undefined
+        if (request !== asyncRequest) return
+        if (time - started >= 96) {
+            asyncRequest++
+            asyncStatus.value = 'failed'
+            return
+        }
+        if (time - started >= 32) asyncStatus.value = 'loading'
+        asyncFrame = defaultAnimationClock.requestFrame(sample)
+    }
+    asyncFrame = defaultAnimationClock.requestFrame(sample)
+}
+
+onScopeDispose(cancelAsyncProbe)
+
+function tap() { clicks.value++ }
+function command(value: string) {
+    if (value === 'bad-resource') {
+        missingPainter.value = painter('missing-m24-image.png')
+        missingResource.value = true
+    }
+    else if (value === 'lifetime-baseline') lifetimeBaseline = getArrangeExecutionStats().activeValueBindings
+    else if (value === 'lifetime-check') {
+        if (getArrangeExecutionStats().activeValueBindings !== lifetimeBaseline) throw new Error('整页退出后仍有 JS 值绑定存活')
+    }
+    else if (value === 'perf-baseline') performanceBaseline = getArrangeExecutionStats()
+    else if (value === 'perf-report') {
+        const current = getArrangeExecutionStats()
+        const delta = Object.fromEntries((Object.keys(current) as (keyof typeof current)[]).map(key => [key, current[key] - (performanceBaseline?.[key] ?? 0)]))
+        console.log(`M23_JS_PERF ${JSON.stringify(delta)}`)
+    }
+    else if (value === 'async-start') startAsyncProbe()
+    else if (value === 'async-finish') finishAsync?.()
+    else if (value === 'async-remove') cancelAsyncProbe()
+    else if (value === 'showcase') showcase.value = true
+    else if (value === 'showcase-remove') showcase.value = false
+    else if (value.startsWith('showcase:')) showcaseCommand.value = `${value.slice(9)}:${++commandSequence}`
+    else if (value === 'gallery') {
+        galleryCommand.value = ''
+        gallery.value = true
+    }
+    else if (value === 'gallery-remove') gallery.value = false
+    else if (value.startsWith('gallery:')) galleryCommand.value = value.slice(8)
+    else if (value === 'baseline') baseline = getArrangeExecutionStats()
+    else if (value === 'color') color.value = color.value === 0xff336699 ? 0xff993366 : 0xff336699
+    else if (value === 'offset') offset.value += 5
+    else if (value === 'text') clicks.value++
+    else if (value === 'remove') shown.value = false
+    else if (value === 'restore') shown.value = true
+    else if (value === 'reorder') rows.value.reverse()
+    else if (value === 'validate') {
+        const current = getArrangeExecutionStats()
+        if (!baseline || current.structureRuns !== baseline.structureRuns) throw new Error('纯值更新重新执行了结构作用域')
+        if (current.activeValueBindings !== baseline.activeValueBindings) throw new Error('纯值更新泄漏了绑定')
+    } else throw new Error(`未知命令：${value}`)
+}
+</script>

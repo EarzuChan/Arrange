@@ -11,7 +11,7 @@ namespace arrange::juce {
     struct EditorFramePlan {
         bool runEvents = false;
         bool runAnimation = false;
-        bool drainComposition = false;
+        bool drainRearrange = false;
         bool applyMutations = false;
         bool runPipeline = false;
         bool hasTickWork = false;
@@ -19,7 +19,7 @@ namespace arrange::juce {
     };
 
     class FramePlanner {
-    public:
+       public:
         void requestFramePipelineRun() noexcept;
         [[nodiscard]] bool framePipelineRunRequested() const noexcept;
         void clearFramePipelineRunRequest() noexcept;
@@ -29,8 +29,7 @@ namespace arrange::juce {
 
         void reset() noexcept;
 
-    private:
+       private:
         bool framePipelineRunRequested_ = false;
     };
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

@@ -7,11 +7,7 @@
 
 namespace arrange::juce {
     namespace {
-        std::string diagnosticsFrameSignature(
-            ::juce::Rectangle<int> bounds,
-            const DiagnosticsState& diagnostics,
-            bool detailedErrorScreen,
-            const DiagnosticsBadgeModel& badgeModel) {
+        std::string diagnosticsFrameSignature(::juce::Rectangle<int> bounds, const DiagnosticsState& diagnostics, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel) {
             std::ostringstream out;
             out << bounds.getX() << ',' << bounds.getY() << ',' << bounds.getWidth() << ',' << bounds.getHeight();
             out << "|detail=" << (detailedErrorScreen ? 1 : 0);
@@ -25,7 +21,7 @@ namespace arrange::juce {
             }
             return out.str();
         }
-    } // namespace
+    }  // namespace
 
     void DiagnosticsState::configure(DiagnosticsConfig config) {
         model_.configure(std::move(config));
@@ -117,10 +113,7 @@ namespace arrange::juce {
         preparedToastOps_.clear();
     }
 
-    bool DiagnosticsState::prepareFrame(
-        ::juce::Rectangle<int> bounds,
-        bool detailedErrorScreen,
-        const DiagnosticsBadgeModel& badgeModel) {
+    bool DiagnosticsState::prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel) {
         const auto signature = diagnosticsFrameSignature(bounds, *this, detailedErrorScreen, badgeModel);
         if (signature == preparedSignature_) {
             return false;
@@ -154,6 +147,6 @@ namespace arrange::juce {
     std::string DiagnosticsState::currentLocalTimeLabel() {
         return DiagnosticsModel::currentLocalTimeLabel();
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif

@@ -26,13 +26,17 @@ namespace arrange {
     ResolvedResource resolvePackageResource(const std::filesystem::path& packageDir, std::string_view resource);
 
     class AppResolver {
-    public:
+       public:
         static constexpr const char* DefaultEntry = "app.js";
         static constexpr const char* DefaultDevServer = "http://127.0.0.1:9178";
 
         ResolvedApp resolvePackage(const App& app) const;
-        ResolvedApp resolveRelease(const App& app) const { return resolvePackage(app); }
+
+        ResolvedApp resolveRelease(const App& app) const {
+            return resolvePackage(app);
+        }
+
         ResolvedApp resolveDebug(const App& app, std::string_view explicitDevServerUrl = {}) const;
         std::string devServerUrlFromEnvironment(std::string_view explicitDevServerUrl = {}) const;
     };
-} // namespace arrange
+}  // namespace arrange

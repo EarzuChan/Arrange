@@ -1,11 +1,11 @@
-import type {ProjectState} from "../project/ProjectState.ts"
-import {readSnapshot, assertSnapshots, type FileSnapshot} from "../util/FileUtils.ts"
-import {setJsonPath, type JsonValue} from "../managed/JsonRegion.ts"
-import type {TextCluster} from "../managed/TextCluster.ts"
-import type {TextRegion} from "../managed/TextRegion.ts"
-import {ConfigWriter} from "./ConfigWriter.ts"
-import type {ConfigTarget, ConfigScanReport, ResolvableIssue} from "./ConfigScanReport.ts"
-import type {SyncWizard} from "../wizard/Sync.ts"
+import type { ProjectState } from "../project/ProjectState.ts"
+import { readSnapshot, assertSnapshots, type FileSnapshot } from "../util/FileUtils.ts"
+import { setJsonPath, type JsonValue } from "../managed/JsonRegion.ts"
+import type { TextCluster } from "../managed/TextCluster.ts"
+import type { TextRegion } from "../managed/TextRegion.ts"
+import { ConfigWriter } from "./ConfigWriter.ts"
+import type { ConfigTarget, ConfigScanReport, ResolvableIssue } from "./ConfigScanReport.ts"
+import type { SyncWizard } from "../wizard/Sync.ts"
 
 export type ResolveChoice = "create" | "wrap" | "marker" | "edit" | "abort"
 type TextElement = TextCluster | TextRegion
@@ -15,7 +15,7 @@ type TextElement = TextCluster | TextRegion
 export class ConfigResolver {
     private readonly writer = new ConfigWriter()
 
-    constructor(private readonly syncWizard: SyncWizard) {}
+    constructor(private readonly syncWizard: SyncWizard) { }
 
     async resolve(state: ProjectState, report: ConfigScanReport, guards: readonly FileSnapshot[]): Promise<"abort" | "rescan" | "ready-to-apply"> {
         if (report.fatal.length) return "abort"
@@ -77,15 +77,15 @@ export class ConfigResolver {
         const start = parent.offset + marker.start
         const end = parent.offset + marker.end
         const after = before.content.slice(0, start) + textElement.make(state) + before.content.slice(end)
-        await this.writer.write(state.rootDir, [{before, after}], guards)
+        await this.writer.write(state.rootDir, [{ before, after }], guards)
         return "rescan"
     }
 
-    private markerParent(state: ProjectState, target: ConfigTarget, content: string): {text: string, offset: number} | undefined {
-        if (!target.region || !target.cluster) return {text: content, offset: 0}
+    private markerParent(state: ProjectState, target: ConfigTarget, content: string): { text: string, offset: number } | undefined {
+        if (!target.region || !target.cluster) return { text: content, offset: 0 }
         const location = target.cluster.locate(state, content)
         if (location.kind !== "located") return undefined
-        return {text: content.slice(location.inner.start, location.inner.end), offset: location.inner.start}
+        return { text: content.slice(location.inner.start, location.inner.end), offset: location.inner.start }
     }
 
     private markerIsAtDirectParent(parent: string, markerStart: number): boolean {
@@ -119,7 +119,7 @@ export class ConfigResolver {
         if (before.content === null || target.region?.kind !== "json-region") return "rescan"
         const json = JSON.parse(before.content) as JsonValue
         setJsonPath(json, target.region.locate(state), target.region.make(state))
-        await this.writer.write(state.rootDir, [{before, after: `${JSON.stringify(json, null, 2)}\n`}], guards)
+        await this.writer.write(state.rootDir, [{ before, after: `${JSON.stringify(json, null, 2)}\n` }], guards)
         return "rescan"
     }
 
@@ -127,7 +127,7 @@ export class ConfigResolver {
         const choice = await this.choose(issue, ["create", "abort"])
         if (choice === "abort") return "abort"
         try { await assertSnapshots(guards) } catch { return "rescan" }
-        await this.writer.write(state.rootDir, [{before: issue.target.snapshot, after: issue.target.file.make(state)}], guards)
+        await this.writer.write(state.rootDir, [{ before: issue.target.snapshot, after: issue.target.file.make(state) }], guards)
         return "rescan"
     }
 

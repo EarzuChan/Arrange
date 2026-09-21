@@ -29,14 +29,16 @@ namespace arrange::core {
         float baseline = -1.0f;
         std::vector<NodeId> children;
         std::uint32_t dirty = 0;
+        std::uint32_t subtreeDirty = 0;
         Constraints measuredConstraints;
         bool measurementValid = false;
         bool placementValid = false;
         std::shared_ptr<const PaintFragment> paintCache;
         std::shared_ptr<const PaintFragment> contentFragment;
         std::shared_ptr<const HitFragment> hitCache;
-
     };
 
-    inline void markDirty(LayoutNode& node, DirtyFlag flag) noexcept { node.dirty |= dirtyMask(flag); }
-}
+    inline void markDirty(LayoutNode& node, DirtyFlag flag) noexcept {
+        node.dirty |= dirtyMask(flag);
+    }
+}  // namespace arrange::core

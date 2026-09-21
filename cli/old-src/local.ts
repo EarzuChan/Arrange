@@ -1,10 +1,10 @@
-﻿import {existsSync, readFileSync, writeFileSync} from "node:fs"
-import {basename, delimiter, dirname, isAbsolute, join, resolve} from "node:path"
-import {stdin as input, stdout as output} from "node:process"
-import {createInterface} from "node:readline/promises"
-import type {ArrangeConfig, PackageManager} from "./config.ts"
-import {assertKnownKeys, expectRecord, expectString, expectStringArray, optionalRecord, parseYaml, stringifyYaml} from "./config.ts"
-import {runCaptureSync, runQuiet} from "./process.ts"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path"
+import { stdin as input, stdout as output } from "node:process"
+import { createInterface } from "node:readline/promises"
+import type { ArrangeConfig, PackageManager } from "./config.ts"
+import { assertKnownKeys, expectRecord, expectString, expectStringArray, optionalRecord, parseYaml, stringifyYaml } from "./config.ts"
+import { runCaptureSync, runQuiet } from "./process.ts"
 
 export const LOCAL_CONFIG_FILE = "arrange.local.yaml"
 
@@ -17,8 +17,8 @@ export type LocalConfig = {
 }
 
 export type WindowsLocalConfig = {
-    shell: {command: string}
-    packageManager: {command: string}
+    shell: { command: string }
+    packageManager: { command: string }
     cmake?: LocalCMakeConfig
     msvc?: {
         devCmd: string
@@ -28,8 +28,8 @@ export type WindowsLocalConfig = {
 }
 
 export type MacosLocalConfig = {
-    shell: {command: string}
-    packageManager: {command: string}
+    shell: { command: string }
+    packageManager: { command: string }
     cmake?: LocalCMakeConfig
 }
 
@@ -199,7 +199,7 @@ export function normalizeLocalConfig(raw: unknown, path = LOCAL_CONFIG_FILE): Lo
     const macos = object.macos === undefined ? undefined : normalizeMacos(optionalRecord(object.macos))
     if (platform === "windows" && !windows) throw new Error("arrange.local.yaml is missing the windows section.")
     if (platform === "macos" && !macos) throw new Error("arrange.local.yaml is missing the macos section.")
-    return {platform, windows, macos}
+    return { platform, windows, macos }
 }
 
 export function stringifyLocalConfig(config: LocalConfig): string {
@@ -216,8 +216,8 @@ function normalizeWindows(raw: Record<string, unknown>): WindowsLocalConfig {
     assertKnownKeys(packageManager, "windows.packageManager", ["command"])
     if (msvc) assertKnownKeys(msvc, "windows.msvc", ["devCmd", "arch", "hostArch"])
     return {
-        shell: {command: shell.command === undefined ? "cmd.exe" : expectString(shell.command, "windows.shell.command")},
-        packageManager: {command: expectString(packageManager.command, "windows.packageManager.command")},
+        shell: { command: shell.command === undefined ? "cmd.exe" : expectString(shell.command, "windows.shell.command") },
+        packageManager: { command: expectString(packageManager.command, "windows.packageManager.command") },
         cmake,
         msvc: msvc ? {
             devCmd: expectString(msvc.devCmd, "windows.msvc.devCmd"),
@@ -234,8 +234,8 @@ function normalizeMacos(raw: Record<string, unknown>): MacosLocalConfig {
     assertKnownKeys(shell, "macos.shell", ["command"])
     assertKnownKeys(packageManager, "macos.packageManager", ["command"])
     return {
-        shell: {command: shell.command === undefined ? "/bin/zsh" : expectString(shell.command, "macos.shell.command")},
-        packageManager: {command: expectString(packageManager.command, "macos.packageManager.command")},
+        shell: { command: shell.command === undefined ? "/bin/zsh" : expectString(shell.command, "macos.shell.command") },
+        packageManager: { command: expectString(packageManager.command, "macos.packageManager.command") },
         cmake: raw.cmake === undefined ? undefined : normalizeCmake(optionalRecord(raw.cmake), "macos.cmake"),
     }
 }
@@ -260,18 +260,18 @@ function safeReadLocalConfig(cwd: string): LocalConfig | null {
 }
 
 function emptyLocalConfig(platform: LocalPlatform): LocalConfig {
-    return platform === "windows" ? {platform, windows: {shell: {command: "cmd.exe"}, packageManager: {command: ""}}} : {platform, macos: {shell: {command: "/bin/zsh"}, packageManager: {command: ""}}}
+    return platform === "windows" ? { platform, windows: { shell: { command: "cmd.exe" }, packageManager: { command: "" } } } : { platform, macos: { shell: { command: "/bin/zsh" }, packageManager: { command: "" } } }
 }
 
 function reconcileLocalConfig(local: LocalConfig, packageManager: PackageManager, need: ToolchainNeed): DiscoveryIssue[] {
     const issues: DiscoveryIssue[] = []
     const section = local.platform === "windows" ? local.windows : local.macos
-    if (!section) return [{field: local.platform, message: "Current platform section is missing."}]
+    if (!section) return [{ field: local.platform, message: "Current platform section is missing." }]
 
     const defaultShell = local.platform === "windows" ? "cmd.exe" : "/bin/zsh"
     if (!validExecutable(section.shell.command)) section.shell.command = defaultShell
     if (!validExecutable(section.shell.command)) {
-        issues.push({field: `${local.platform}.shell.command`, message: "Shell for external command was not found."})
+        issues.push({ field: `${local.platform}.shell.command`, message: "Shell for external command was not found." })
     }
 
     if (!validExecutable(section.packageManager.command)) {
@@ -280,18 +280,18 @@ function reconcileLocalConfig(local: LocalConfig, packageManager: PackageManager
     }
     if (!validExecutable(section.packageManager.command)) {
         if (!hasIssue(issues, `${local.platform}.packageManager.command`)) {
-            issues.push({field: `${local.platform}.packageManager.command`, message: `${packageManager} executable was not found.`})
+            issues.push({ field: `${local.platform}.packageManager.command`, message: `${packageManager} executable was not found.` })
         }
     } else if (!packageManagerMatches(section.packageManager.command, packageManager)) {
-        issues.push({field: `${local.platform}.packageManager.command`, message: `This project requires ${packageManager}, but local config points to ${section.packageManager.command}.`})
+        issues.push({ field: `${local.platform}.packageManager.command`, message: `This project requires ${packageManager}, but local config points to ${section.packageManager.command}.` })
     }
 
     if (need.native) {
         section.cmake = reconcileCmake(section.cmake, local.platform, issues)
-        if (!section.cmake.command && !hasIssue(issues, `${local.platform}.cmake.command`)) issues.push({field: `${local.platform}.cmake.command`, message: "CMake executable was not found."})
-        if (!section.cmake.generator) issues.push({field: `${local.platform}.cmake.generator`, message: "CMake generator is missing."})
-        if (section.cmake.makeProgram && !validExecutable(section.cmake.makeProgram) && !hasIssue(issues, `${local.platform}.cmake.makeProgram`)) issues.push({field: `${local.platform}.cmake.makeProgram`, message: "Build tool path does not exist."})
-        if (generatorNeedsMakeProgram(section.cmake.generator) && !validExecutable(section.cmake.makeProgram) && !hasIssue(issues, `${local.platform}.cmake.makeProgram`)) issues.push({field: `${local.platform}.cmake.makeProgram`, message: `${section.cmake.generator} requires an explicit executable build tool path.`})
+        if (!section.cmake.command && !hasIssue(issues, `${local.platform}.cmake.command`)) issues.push({ field: `${local.platform}.cmake.command`, message: "CMake executable was not found." })
+        if (!section.cmake.generator) issues.push({ field: `${local.platform}.cmake.generator`, message: "CMake generator is missing." })
+        if (section.cmake.makeProgram && !validExecutable(section.cmake.makeProgram) && !hasIssue(issues, `${local.platform}.cmake.makeProgram`)) issues.push({ field: `${local.platform}.cmake.makeProgram`, message: "Build tool path does not exist." })
+        if (generatorNeedsMakeProgram(section.cmake.generator) && !validExecutable(section.cmake.makeProgram) && !hasIssue(issues, `${local.platform}.cmake.makeProgram`)) issues.push({ field: `${local.platform}.cmake.makeProgram`, message: `${section.cmake.generator} requires an explicit executable build tool path.` })
     }
 
     if (local.platform === "windows" && need.native) {
@@ -299,9 +299,9 @@ function reconcileLocalConfig(local: LocalConfig, packageManager: PackageManager
         if (!windows.msvc || !validExecutable(windows.msvc.devCmd)) {
             const candidates = discoverMsvcCandidates()
             const devCmd = chooseDiscovered("windows.msvc.devCmd", "Multiple Visual Studio Developer Command Prompt candidates were found; choose one.", candidates, issues)
-            if (devCmd) windows.msvc = {devCmd, arch: "x64", hostArch: "x64"}
+            if (devCmd) windows.msvc = { devCmd, arch: "x64", hostArch: "x64" }
         }
-        if ((!windows.msvc || !validExecutable(windows.msvc.devCmd)) && !hasIssue(issues, "windows.msvc.devCmd")) issues.push({field: "windows.msvc.devCmd", message: "Visual Studio Developer Command Prompt was not found."})
+        if ((!windows.msvc || !validExecutable(windows.msvc.devCmd)) && !hasIssue(issues, "windows.msvc.devCmd")) issues.push({ field: "windows.msvc.devCmd", message: "Visual Studio Developer Command Prompt was not found." })
     }
     return issues
 }
@@ -311,7 +311,7 @@ async function promptForLocalConfig(local: LocalConfig, packageManager: PackageM
     if (!section) return
     console.log(`${LOCAL_CONFIG_FILE} needs local toolchain settings:`)
     for (const issue of issues) console.log(`- ${issue.field}: ${issue.message}`)
-    const rl = createInterface({input, output})
+    const rl = createInterface({ input, output })
     try {
         const shellIssue = findIssue(issues, `${local.platform}.shell.command`)
         if (shellIssue) section.shell.command = await askExecutablePath(rl, `${local.platform}.shell.command`, section.shell.command, shellIssue.candidates)
@@ -320,7 +320,7 @@ async function promptForLocalConfig(local: LocalConfig, packageManager: PackageM
         if (need.ui && packageManagerIssue) section.packageManager.command = await askExecutablePath(rl, `${local.platform}.packageManager.command (${packageManager})`, section.packageManager.command, packageManagerIssue.candidates)
 
         if (need.native) {
-            section.cmake = section.cmake ?? {command: "", generator: "Ninja", configureArgs: [], buildArgs: []}
+            section.cmake = section.cmake ?? { command: "", generator: "Ninja", configureArgs: [], buildArgs: [] }
             const cmakeIssue = findIssue(issues, `${local.platform}.cmake.command`)
             if (cmakeIssue) section.cmake.command = await askExecutablePath(rl, `${local.platform}.cmake.command`, section.cmake.command, cmakeIssue.candidates)
 
@@ -331,7 +331,7 @@ async function promptForLocalConfig(local: LocalConfig, packageManager: PackageM
 
             if (local.platform === "windows") {
                 const windows = section as WindowsLocalConfig
-                windows.msvc = windows.msvc ?? {devCmd: "", arch: "x64", hostArch: "x64"}
+                windows.msvc = windows.msvc ?? { devCmd: "", arch: "x64", hostArch: "x64" }
                 const msvcIssue = findIssue(issues, "windows.msvc") ?? findIssue(issues, "windows.msvc.devCmd")
 
                 if (msvcIssue) windows.msvc.devCmd = await askExecutablePath(rl, "windows.msvc.devCmd", windows.msvc.devCmd, msvcIssue.candidates)
@@ -400,7 +400,7 @@ function reconcileCmake(current: LocalCMakeConfig | undefined, platform: LocalPl
 function chooseDiscovered(field: string, multipleMessage: string, candidates: string[], issues: DiscoveryIssue[]): string | undefined {
     const uniqueCandidates = unique(candidates)
     if (uniqueCandidates.length === 1) return uniqueCandidates[0]
-    if (uniqueCandidates.length > 1) issues.push({field, message: multipleMessage, candidates: uniqueCandidates})
+    if (uniqueCandidates.length > 1) issues.push({ field, message: multipleMessage, candidates: uniqueCandidates })
     return undefined
 }
 
@@ -423,16 +423,16 @@ function resolveToolchain(local: LocalConfig, need: ToolchainNeed): ResolvedTool
 async function verifyToolchain(toolchain: ResolvedToolchain, packageManager: PackageManager, need: ToolchainNeed): Promise<DiscoveryIssue[]> {
     const issues: DiscoveryIssue[] = []
     if (toolchain.packageManagerCommand) await collectVerification(issues, `${toolchain.platform}.packageManager.command`, `${packageManager} --version`,
-        () => runQuiet(toolchain.packageManagerCommand!, ["--version"], {toolchain, label: `${packageManager} --version`})
+        () => runQuiet(toolchain.packageManagerCommand!, ["--version"], { toolchain, label: `${packageManager} --version` })
     )
     if (need.native) {
-        if (!toolchain.cmake) issues.push({field: `${toolchain.platform}.cmake`, message: "CMake configuration is missing."})
+        if (!toolchain.cmake) issues.push({ field: `${toolchain.platform}.cmake`, message: "CMake configuration is missing." })
         else {
             await collectVerification(issues, `${toolchain.platform}.cmake.command`, "CMake cannot run",
-                () =>runQuiet(toolchain.cmake!.command, ["--version"], {toolchain, label: "cmake --version"})
+                () => runQuiet(toolchain.cmake!.command, ["--version"], { toolchain, label: "cmake --version" })
             )
             if (toolchain.cmake.makeProgram) await collectVerification(issues, `${toolchain.platform}.cmake.makeProgram`, "Build tool cannot run",
-                () => runQuiet(toolchain.cmake!.makeProgram!, ["--version"], {toolchain, label: "build tool --version"})
+                () => runQuiet(toolchain.cmake!.makeProgram!, ["--version"], { toolchain, label: "build tool --version" })
             )
         }
 
@@ -444,7 +444,7 @@ async function verifyToolchain(toolchain: ResolvedToolchain, packageManager: Pac
 async function verifyMsvcDevCmd(issues: DiscoveryIssue[], toolchain: ResolvedToolchain): Promise<void> {
     const tools = ["cl", "link", "lib", "rc", "mt"]
     for (const tool of tools) await collectVerification(issues, "windows.msvc", `MSVC Developer Command Prompt does not provide ${tool}`,
-        () => runQuiet("where", [tool], {toolchain, msvc: true, label: `where ${tool}`})
+        () => runQuiet("where", [tool], { toolchain, msvc: true, label: `where ${tool}` })
     )
 }
 
@@ -452,7 +452,7 @@ async function collectVerification(issues: DiscoveryIssue[], field: string, pref
     try {
         await action()
     } catch (error) {
-        issues.push({field, message: `${prefix}: ${error instanceof Error ? error.message : String(error)}`})
+        issues.push({ field, message: `${prefix}: ${error instanceof Error ? error.message : String(error)}` })
     }
 }
 
@@ -504,13 +504,13 @@ function discoverMsvcCandidatesByVswhere(): string[] {
         "-products", "*",
         "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
         "-format", "json",
-    ], {label: "vswhere"})
+    ], { label: "vswhere" })
     if (!output) return []
     try {
         const entries = JSON.parse(output) as unknown
         if (!Array.isArray(entries)) return []
         return unique(entries
-            .map((entry) => typeof entry === "object" && entry !== null && "installationPath" in entry ? (entry as {installationPath?: unknown}).installationPath : undefined)
+            .map((entry) => typeof entry === "object" && entry !== null && "installationPath" in entry ? (entry as { installationPath?: unknown }).installationPath : undefined)
             .filter((value): value is string => typeof value === "string" && value.length > 0)
             .map((installationPath) => join(installationPath, "Common7", "Tools", "VsDevCmd.bat"))
             .filter(validExecutable))

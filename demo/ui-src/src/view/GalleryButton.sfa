@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import {M} from '@arrange/framework'
+import { M } from '@arrange/framework/ui'
 
-defineProps<{text: string; active?: boolean; onClick: () => void}>()
+defineProps<{ text: string; active?: boolean; onClick: () => void }>()
 </script>

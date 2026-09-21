@@ -8,7 +8,9 @@ namespace arrange::core {
         constexpr std::size_t maxUndoStackDepth = 128;
 
         std::string encodeUtf8(char32_t codepoint) {
-            if (codepoint <= 0x7fu) { return std::string(1, static_cast<char>(codepoint)); }
+            if (codepoint <= 0x7fu) {
+                return std::string(1, static_cast<char>(codepoint));
+            }
             if (codepoint <= 0x7ffu) {
                 return {
                     static_cast<char>(0xc0u | ((codepoint >> 6u) & 0x1fu)),
@@ -36,7 +38,9 @@ namespace arrange::core {
             return !(codepoint >= 0xd800u && codepoint <= 0xdfffu);
         }
 
-        bool isUtf8Continuation(unsigned char ch) { return (ch & 0xc0u) == 0x80u; }
+        bool isUtf8Continuation(unsigned char ch) {
+            return (ch & 0xc0u) == 0x80u;
+        }
 
         std::size_t previousUtf8Boundary(const std::string& text, std::size_t cursor) {
             if (cursor == 0 || text.empty()) return 0;
@@ -51,7 +55,7 @@ namespace arrange::core {
             while (pos < text.size() && isUtf8Continuation(static_cast<unsigned char>(text[pos]))) ++pos;
             return pos;
         }
-    } // namespace
+    }  // namespace
 
     void TextInputState::begin(std::string value, bool selectAll) {
         text_ = std::move(value);
@@ -251,9 +255,13 @@ namespace arrange::core {
         return {true, true, false};
     }
 
-    InputEditResult TextInputState::submit() const noexcept { return {true, false, true}; }
+    InputEditResult TextInputState::submit() const noexcept {
+        return {true, false, true};
+    }
 
-    TextInputState::Snapshot TextInputState::snapshot() const { return {text_, cursorIndex_, selectionStart_, selectionEnd_}; }
+    TextInputState::Snapshot TextInputState::snapshot() const {
+        return {text_, cursorIndex_, selectionStart_, selectionEnd_};
+    }
 
     void TextInputState::restoreSnapshot(const Snapshot& snapshot) {
         text_ = snapshot.text;
@@ -274,10 +282,7 @@ namespace arrange::core {
     }
 
     bool TextInputState::sameSnapshot(const Snapshot& left, const Snapshot& right) {
-        return left.text == right.text &&
-            left.cursorIndex == right.cursorIndex &&
-            left.selectionStart == right.selectionStart &&
-            left.selectionEnd == right.selectionEnd;
+        return left.text == right.text && left.cursorIndex == right.cursorIndex && left.selectionStart == right.selectionStart && left.selectionEnd == right.selectionEnd;
     }
 
     std::size_t TextInputState::clampToBoundary(std::size_t index) const {
@@ -300,4 +305,4 @@ namespace arrange::core {
         clearSelection();
         return true;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

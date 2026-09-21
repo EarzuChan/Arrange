@@ -22,4 +22,4 @@ namespace arrange {
         state_ = HeadlessEditorState::Loaded;
         return true;
     }
-} // namespace arrange
+}  // namespace arrange

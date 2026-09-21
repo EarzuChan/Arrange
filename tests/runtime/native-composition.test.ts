@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { painter, Column, Icon, Text, createApp, defineArrangable, diagnostics, logger, M, nextTick, ref, createScrollState, onScopeDispose } from '../../packages/runtime/src/index.ts'
-import type { NativeTransactionTarget, Modifier } from '../../packages/runtime/src/index.ts'
+import { painter, M } from '../../packages/framework/src/ui.ts'
+import { Column, Icon, Text } from '../../packages/framework/src/foundation.ts'
+import { createApp, diagnostics, logger, nextTick, ref, createScrollState, onScopeDispose } from '../../packages/framework/src/index.ts'
+import { defineArrangable } from '../../packages/framework/src/internal.ts'
+import type { NativeTransactionTarget } from '../../packages/framework/src/internal.ts'
+import type { Modifier } from '../../packages/framework/src/ui.ts'
 import { recordingNative } from './recordingNative.ts'
 
 function diagnosticNative(): NativeTransactionTarget & { calls: (readonly [string, ...unknown[]])[] } {
@@ -49,10 +53,12 @@ test('同批多受体值变化只产生一次候选，等待 apply 期间的新�
     const first = ref('甲')
     const second = ref('乙')
     const native = recordingNative(false)
-    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => {
-        call(0, Text, { text: () => first.value })
-        call(1, Text, { text: () => second.value })
-    } }))
+    const app = createApp(defineArrangable({
+        setup: (_props, { call }) => () => {
+            call(0, Text, { text: () => first.value })
+            call(1, Text, { text: () => second.value })
+        }
+    }))
     app.mount(native.target)
     native.finish()
     const initialSubmissions = native.submissions
@@ -82,12 +88,16 @@ test('父范围退出时取消同批旧子参数求值，候选内替换的 Layo
     const shown = ref(true)
     const invalid = ref(false)
     const native = recordingNative()
-    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => {
-        if (shown.value) call(0, Text, { text: () => {
-            if (invalid.value) throw new Error('已退出的参数不应求值')
-            return '旧内容'
-        } })
-    } }))
+    const app = createApp(defineArrangable({
+        setup: (_props, { call }) => () => {
+            if (shown.value) call(0, Text, {
+                text: () => {
+                    if (invalid.value) throw new Error('已退出的参数不应求值')
+                    return '旧内容'
+                }
+            })
+        }
+    }))
     app.mount(native.target)
     invalid.value = true
     shown.value = false
@@ -97,11 +107,13 @@ test('父范围退出时取消同批旧子参数求值，候选内替换的 Layo
 
     const phase = ref(0)
     const Trigger = defineArrangable({ setup: () => () => { if (phase.value === 0) phase.value = 1 } })
-    const replacement = createApp(defineArrangable({ setup: (_props, { call }) => () => {
-        if (phase.value === 0) call(0, Text, { text: () => '未提交内容' })
-        else call(1, Text, { text: () => '最终内容' })
-        call(2, Trigger, {})
-    } }))
+    const replacement = createApp(defineArrangable({
+        setup: (_props, { call }) => () => {
+            if (phase.value === 0) call(0, Text, { text: () => '未提交内容' })
+            else call(1, Text, { text: () => '最终内容' })
+            call(2, Trigger, {})
+        }
+    }))
     replacement.mount(native.target)
     assert.equal(native.nodes.size, 2)
     assert.deepEqual(native.textNodes().map(node => node.text), ['最终内容'])
@@ -120,10 +132,12 @@ test('原生宿主拒绝双 App，清理异常仍释放宿主以便重新挂载'
     assert.deepEqual(native.textNodes().map(node => node.text), ['第二份'])
     second.unmount()
 
-    const failing = createApp(defineArrangable({ setup() {
-        onScopeDispose(() => { throw new Error('清理失败') })
-        return () => {}
-    } }))
+    const failing = createApp(defineArrangable({
+        setup() {
+            onScopeDispose(() => { throw new Error('清理失败') })
+            return () => { }
+        }
+    }))
     failing.mount(native.target)
     assert.throws(() => failing.unmount(), AggregateError)
     assert.equal(native.nodes.size, 0)
@@ -193,13 +207,15 @@ test('Icon 未指定 tint 保留 Painter 原色，指定 tint 只增加 colorFil
     const previous = globalThis.__ARRANGE_NATIVE__
     globalThis.__ARRANGE_NATIVE__ = native.target
     try {
-        const app = createApp(defineArrangable({ setup(_props, { call }) {
-            const image = painter('icons/play.svg')
-            return () => {
-                call(0, Icon, { painter: () => image })
-                call(1, Icon, { painter: () => image, tint: () => 0xffe8eaed })
+        const app = createApp(defineArrangable({
+            setup(_props, { call }) {
+                const image = painter('icons/play.svg')
+                return () => {
+                    call(0, Icon, { painter: () => image })
+                    call(1, Icon, { painter: () => image, tint: () => 0xffe8eaed })
+                }
             }
-        } }))
+        }))
         app.mount(native.target)
         const paints = [...native.nodes.values()].flatMap(node => (node.inputs.get('modifier') as Modifier | undefined)?.elements ?? []).filter(element => element.type === 'paint')
         assert.equal(paints.length, 2)

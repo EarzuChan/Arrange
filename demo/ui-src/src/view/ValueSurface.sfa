@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import { M } from '@arrange/framework'
+import { M } from '@arrange/framework/ui'
 
 defineProps<{ tone: number; offset: number }>()
 </script>

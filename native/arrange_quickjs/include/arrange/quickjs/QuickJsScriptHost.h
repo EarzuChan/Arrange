@@ -82,7 +82,7 @@ namespace arrange::quickjs {
     };
 
     class QuickJsScriptHost final : public ScriptHost {
-    public:
+       public:
         QuickJsScriptHost();
         ~QuickJsScriptHost() override;
         void setPainterLoader(arrange::core::PainterLoader loader);
@@ -91,8 +91,14 @@ namespace arrange::quickjs {
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll);
 
-        bool hasPendingTransactions() const noexcept { return pendingTransactions_.hasPending(); }
-        const std::optional<arrange::core::MutationTransaction>& pendingTransactions() const noexcept { return pendingTransactions_.pending(); }
+        bool hasPendingTransactions() const noexcept {
+            return pendingTransactions_.hasPending();
+        }
+
+        const std::optional<arrange::core::MutationTransaction>& pendingTransactions() const noexcept {
+            return pendingTransactions_.pending();
+        }
+
         std::optional<arrange::core::MutationTransaction> takePendingTransaction() noexcept;
         void clearPendingTransactions() noexcept;
         void setFrameTimeMillis(double nowMillis) noexcept;
@@ -109,11 +115,11 @@ namespace arrange::quickjs {
         void publishScene(const arrange::core::NativeScene& scene);
         CallbackInvokeResult completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error = {});
 
-    private:
+       private:
         struct Impl;
         std::unique_ptr<Impl> impl_;
         arrange::core::MutationTransactionQueue pendingTransactions_;
     };
 
 #endif
-} // namespace arrange::quickjs
+}  // namespace arrange::quickjs

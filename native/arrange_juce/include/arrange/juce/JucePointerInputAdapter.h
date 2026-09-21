@@ -16,41 +16,15 @@ namespace arrange::juce {
     class RuntimeSessionState;
 
     class JucePointerInputAdapter final {
-    public:
-        void pointerDown(
-            ArrangeRuntime& runtime,
-            const RuntimeSessionState& session,
-            const DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            arrange::core::NodeId root,
-            const ::juce::MouseEvent& event,
-            const TextInputCallbacks& inputCallbacks) const;
+       public:
+        void pointerDown(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const;
 
-        [[nodiscard]] bool pointerDrag(
-            ArrangeRuntime& runtime,
-            const RuntimeSessionState& session,
-            const DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            const ::juce::MouseEvent& event,
-            const TextInputCallbacks& inputCallbacks) const;
+        [[nodiscard]] bool pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const;
 
-        [[nodiscard]] bool pointerUp(
-            ArrangeRuntime& runtime,
-            const RuntimeSessionState& session,
-            const DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            arrange::core::NodeId root,
-            const ::juce::MouseEvent& event) const;
+        [[nodiscard]] bool pointerUp(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event) const;
 
-        [[nodiscard]] bool wheelMove(
-            ArrangeRuntime& runtime,
-            const RuntimeSessionState& session,
-            const DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            arrange::core::NodeId root,
-            const ::juce::MouseEvent& event,
-            const ::juce::MouseWheelDetails& wheel) const;
+        [[nodiscard]] bool wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) const;
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

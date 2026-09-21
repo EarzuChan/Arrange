@@ -1,5 +1,5 @@
-import type { NativeTransactionTarget, NativeModifierHandle } from '../../packages/runtime/src/native.ts'
-import { Modifier, type ModifierElement } from '../../packages/runtime/src/modifier.ts'
+import type { NativeTransactionTarget, NativeModifierHandle } from '../../packages/framework/src/native.ts'
+import { Modifier, type ModifierElement } from '../../packages/framework/src/modifier.ts'
 
 export interface RecordedLayoutNode {
     readonly id: number
@@ -50,7 +50,11 @@ export function recordingNative(autoApply = true) {
             completion = callback
             if (autoApply) finish()
         },
-        abortRearrange() { candidate = undefined; candidateBindings = undefined; completion = undefined },
+        abortRearrange() {
+            candidate = undefined
+            candidateBindings = undefined
+            completion = undefined
+        },
         createNode(id, type) {
             if (live().has(id)) throw new Error(`布局节点身份重复：${id}`)
             live().set(id, { id, type, inputs: new Map(), children: [], modifiers: [] })
@@ -113,7 +117,11 @@ export function recordingNative(autoApply = true) {
             return handle
         },
         releaseBinding(handle) { candidateBindings!.delete(handle.identity) },
-        unmount() { nodes.clear(); bindings.clear(); target.abortRearrange() },
+        unmount() {
+            nodes.clear()
+            bindings.clear()
+            target.abortRearrange()
+        },
     }
     return {
         target,

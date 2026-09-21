@@ -8,10 +8,9 @@ namespace arrange::juce {
     class ArrangeRuntime;
 
     class TextInputMutationSink final {
-    public:
+       public:
         [[nodiscard]] TextInputCallbacks callbacks(ArrangeRuntime& runtime) const;
     };
 
 #endif
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

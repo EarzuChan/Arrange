@@ -33,12 +33,14 @@ namespace arrange::quickjs {
         QuickJsEventRegistry events;
         std::vector<std::pair<JSValue, JSValue>> unhandledRejections;
         std::unordered_map<std::uint64_t, arrange::core::RegisterBinding> bindings;
+
         struct PublishedModifier {
             arrange::core::NodeHandle node;
             arrange::core::ModifierHandle handle;
             arrange::core::ModifierDescriptor descriptor;
             std::size_t position = 0;
         };
+
         std::unordered_map<std::uint64_t, PublishedModifier> publishedModifiers;
         // 已接收的类型化输入，提交期间包含候选；不创建 Modifier 实例或预测原生 handle
         std::unordered_map<arrange::core::NodeId, std::vector<PublishedModifier>> modifierInputs;
@@ -69,6 +71,7 @@ namespace arrange::quickjs {
             decltype(childrenByNode) savedChildrenByNode;
             decltype(parentByNode) savedParentByNode;
         };
+
         std::optional<RearrangeCheckpoint> rearrangeCheckpoint;
         std::shared_ptr<arrange::core::RearrangeSubmission> rearrangeSubmission;
         JSValue rearrangeCompletion = JS_UNDEFINED;
@@ -90,6 +93,6 @@ namespace arrange::quickjs {
         void recordDiagnostic(QuickJsDiagnosticEventInput event);
         void recordDiagnosticAction(QuickJsDiagnosticAction action);
     };
-}
+}  // namespace arrange::quickjs
 
 #endif

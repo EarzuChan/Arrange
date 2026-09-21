@@ -11,4 +11,4 @@ namespace arrange::test {
 
     void beginAllocationProbe() noexcept;
     AllocationStats endAllocationProbe() noexcept;
-}
+}  // namespace arrange::test

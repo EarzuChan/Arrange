@@ -15,7 +15,7 @@ return new arrange::juce::ArrangeEditor(*this, std::move(config));
 
 `useLive(...)` 与 `useDist(...)` 是 App source 配置。若用户没有配置任何 source，Arrange 必须进入错误屏并说明没有可加载 App，核心文案固定包含：`你啥也没给我给你加载啥app（笑）`。
 
-# 两个 ui 概念
+# 两个`ui/`概念（怕混淆故提一嘴，实际上认真看的人决不会把这俩混淆）
 
 ## UI 源码项目
 
@@ -68,7 +68,7 @@ import App from "./App.sfa"
 createApp(App).mount()
 ```
 
-正式 authoring 路径为 SFA / template / render function，经 Arrange Vue compiler / runtime 进入 Composition mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
+正式编写路径为 SFA 模板，经 Arrange 编译器与运行时进入 Rearrange mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
 
 # 路径约定
 

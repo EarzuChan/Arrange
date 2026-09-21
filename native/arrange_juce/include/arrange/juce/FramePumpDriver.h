@@ -15,27 +15,12 @@ namespace arrange::juce {
     class RuntimeSessionState;
 
     class FramePumpDriver final {
-    public:
-        [[nodiscard]] bool pumpFrame(
-            ArrangeRuntime& runtime,
-            RuntimeSessionState& session,
-            DiagnosticsState& diagnostics,
-            InteractionStateOwner& interaction,
-            PassivePaintRenderer& paint,
-            arrange::core::NodeId root,
-            const std::filesystem::path& frameErrorPath,
-            ::juce::Rectangle<int> diagnosticsBounds,
-            bool detailedErrorScreen,
-            const DiagnosticsBadgeModel& badgeModel,
-            double nowMillis) const;
+       public:
+        [[nodiscard]] bool pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const;
 
-    private:
-        [[nodiscard]] static bool tickDiagnostics(
-            DiagnosticsState& diagnostics,
-            ArrangeRuntime& runtime,
-            double nowMillis);
-
+       private:
+        [[nodiscard]] static bool tickDiagnostics(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, double nowMillis);
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

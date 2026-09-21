@@ -17,15 +17,20 @@ namespace arrange::juce {
         EditorFramePlan plan;
         plan.runEvents = state.hasQueuedEvents;
         plan.runAnimation = state.wantsAnimation;
-        plan.drainComposition = plan.runEvents || plan.runAnimation;
+        plan.drainRearrange = plan.runEvents || plan.runAnimation;
         plan.applyMutations = state.hasPendingIntents || state.hasPendingTransactions;
         plan.runPipeline = framePipelineRunRequested_ || plan.applyMutations;
         plan.hasTickWork = plan.runEvents || plan.runAnimation || plan.runPipeline;
-        if (plan.runEvents) plan.reason = "queued input events";
-        else if (plan.runAnimation) plan.reason = "animation frame";
-        else if (state.hasPendingIntents) plan.reason = "pending InputIntent";
-        else if (state.hasPendingTransactions) plan.reason = "pending MutationTransaction";
-        else if (framePipelineRunRequested_) plan.reason = "explicit frame pipeline request";
+        if (plan.runEvents)
+            plan.reason = "queued input events";
+        else if (plan.runAnimation)
+            plan.reason = "animation frame";
+        else if (state.hasPendingIntents)
+            plan.reason = "pending InputIntent";
+        else if (state.hasPendingTransactions)
+            plan.reason = "pending MutationTransaction";
+        else if (framePipelineRunRequested_)
+            plan.reason = "explicit frame pipeline request";
         return plan;
     }
 
@@ -34,10 +39,7 @@ namespace arrange::juce {
         return plan.hasTickWork;
     }
 
-
-
     void FramePlanner::reset() noexcept {
         framePipelineRunRequested_ = false;
     }
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

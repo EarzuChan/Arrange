@@ -6,11 +6,7 @@ export interface AdoptCommandOptions {
 }
 
 export function registerAdoptCommand(program: Command): void {
-    program
-        .command("adopt")
-        .description("Adopt an existing project into Arrange")
-        .option("--registry <url>", "Framework npm registry URL")
-        .option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
+    program.command("adopt").description("Adopt an existing project into Arrange").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: AdoptCommandOptions) => {
             void options
             // TODO：调用 AdoptWizard 等

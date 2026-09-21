@@ -106,24 +106,7 @@ namespace {
         editor.onSubmit = makeEventSlotId(6, EventSlotKind::InputSubmit);
         fieldModifier.push_back({editor, {}});
         transaction.operations = {
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
-            SetModifierMutation{1, background(320.0f, 180.0f, 0xff000000u)},
-            arrange::core::SetPropMutation{1, "measurePolicy", object({field("kind", PropValue::stringValue("Column")), field("verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))}))})},
-            CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
-            SetModifierMutation{2, title},
-            InsertChildMutation{1, 2, 0},
-            CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
-            SetModifierMutation{3, clickableBox(80.0f, 40.0f, makeEventSlotId(3, EventSlotKind::Click))},
-            InsertChildMutation{1, 3, 1},
-            CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
-            SetModifierMutation{4, verticalScroll(100.0f, 40.0f, 0.0f, makeEventSlotId(4, EventSlotKind::VerticalScroll))},
-            InsertChildMutation{1, 4, 2},
-            CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
-            SetModifierMutation{5, background(100.0f, 80.0f, 0xffffb020u)},
-            InsertChildMutation{4, 5, 0},
-            CreateNodeMutation{6, arrange::core::NodeType::Layout}, SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
-            SetModifierMutation{6, fieldModifier},
-            InsertChildMutation{1, 6, 3},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{1, background(320.0f, 180.0f, 0xff000000u)}, arrange::core::SetPropMutation{1, "measurePolicy", object({field("kind", PropValue::stringValue("Column")), field("verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8.0))}))})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{2, title}, InsertChildMutation{1, 2, 0}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{3, clickableBox(80.0f, 40.0f, makeEventSlotId(3, EventSlotKind::Click))}, InsertChildMutation{1, 3, 1}, CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{4, verticalScroll(100.0f, 40.0f, 0.0f, makeEventSlotId(4, EventSlotKind::VerticalScroll))}, InsertChildMutation{1, 4, 2}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{5, background(100.0f, 80.0f, 0xffffb020u)}, InsertChildMutation{4, 5, 0}, CreateNodeMutation{6, arrange::core::NodeType::Layout}, SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{6, fieldModifier}, InsertChildMutation{1, 6, 3},
         };
         transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(3, EventSlotKind::Click)});
         transaction.operations.emplace_back(RegisterEventSlot{makeEventSlotId(4, EventSlotKind::VerticalScroll)});
@@ -201,7 +184,9 @@ namespace {
     int verifyEventPropIsNotCoreEventSlot() {
         arrange::core::LayoutTree tree;
         tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, });
+            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout},
+            arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+        });
         tree.clearDirty();
         (void)tree.takeInvalidation();
 
@@ -225,15 +210,26 @@ namespace {
         for (const auto* key : {"unknownProp", "tint", "source", "testTag", "verticalArrangement"}) {
             if (validateSetPropMutation(NodeType::Layout, key, PropValue::stringValue("非法输入"), error)) return 103;
         }
-        struct PolicyCase { const char* kind; const char* key; const char* valid; const char* invalid; };
+
+        struct PolicyCase {
+            const char* kind;
+            const char* key;
+            const char* valid;
+            const char* invalid;
+        };
+
         for (const auto& input : std::vector<PolicyCase>{{"Box", "contentAlignment", "CenterEnd", "Centre"}, {"Row", "verticalAlignment", "Baseline", "End"}, {"Column", "horizontalAlignment", "CenterHorizontally", "Bottom"}, {"Row", "horizontalArrangement", "SpaceBetween", "Bottom"}, {"Column", "verticalArrangement", "Bottom", "End"}}) {
-            const auto policy = [&](const char* value) { return object({field("kind", PropValue::stringValue(input.kind)), field(input.key, PropValue::stringValue(value))}); };
+            const auto policy = [&](const char* value) {
+                return object({field("kind", PropValue::stringValue(input.kind)), field(input.key, PropValue::stringValue(value))});
+            };
             if (!validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(input.valid), error)) return 206;
             if (validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(input.invalid), error)) return 207;
         }
         for (const auto* kind : {"Row", "Column"}) {
             const auto horizontal = std::string(kind) == "Row";
-            const auto policy = [&](const char* alignment) { return object({field("kind", PropValue::stringValue(kind)), field(horizontal ? "horizontalArrangement" : "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8)), field("alignment", PropValue::stringValue(alignment))}))}); };
+            const auto policy = [&](const char* alignment) {
+                return object({field("kind", PropValue::stringValue(kind)), field(horizontal ? "horizontalArrangement" : "verticalArrangement", object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(8)), field("alignment", PropValue::stringValue(alignment))}))});
+            };
             if (!validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "CenterHorizontally" : "Bottom"), error)) return 208;
             if (validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "Top" : "End"), error)) return 209;
         }
@@ -246,7 +242,13 @@ namespace {
         LayoutEngine layout;
         LayoutTree box;
         box.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}});
-        struct AlignmentCase { const char* name; float x; float y; };
+
+        struct AlignmentCase {
+            const char* name;
+            float x;
+            float y;
+        };
+
         for (const auto& alignment : std::vector<AlignmentCase>{{"TopStart", 0, 0}, {"TopCenter", 45, 0}, {"TopEnd", 90, 0}, {"CenterStart", 0, 45}, {"Center", 45, 45}, {"CenterEnd", 90, 45}, {"BottomStart", 0, 90}, {"BottomCenter", 45, 90}, {"BottomEnd", 90, 90}}) {
             box.setHostInput(1, HostInput::MeasurePolicy, object({field("kind", PropValue::stringValue("Box")), field("contentAlignment", PropValue::stringValue(alignment.name))}));
             layout.layout(box, 1, {0, 100, 0, 100});
@@ -258,17 +260,23 @@ namespace {
             LayoutTree tree;
             tree.apply({CreateNodeMutation{1, NodeType::Layout}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}, SetModifierMutation{1, size(100, 100)}, SetModifierMutation{2, size(10, 10)}, SetModifierMutation{3, size(10, 10)}});
             const auto* input = horizontal ? "horizontalArrangement" : "verticalArrangement";
-            struct PlacementCase { PropValue value; float first; float second; };
+
+            struct PlacementCase {
+                PropValue value;
+                float first;
+                float second;
+            };
+
             for (const auto& arrangement : std::vector<PlacementCase>{
-                {PropValue::stringValue(horizontal ? "Start" : "Top"), 0, 10},
-                {PropValue::stringValue("Center"), 40, 50},
-                {PropValue::stringValue(horizontal ? "End" : "Bottom"), 80, 90},
-                {PropValue::stringValue("SpaceBetween"), 0, 90},
-                {PropValue::stringValue("SpaceAround"), 20, 70},
-                {PropValue::stringValue("SpaceEvenly"), 80.0f / 3.0f, 190.0f / 3.0f},
-                {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue("Center"))}), 35, 55},
-                {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue(horizontal ? "End" : "Bottom"))}), 70, 90},
-            }) {
+                     {PropValue::stringValue(horizontal ? "Start" : "Top"), 0, 10},
+                     {PropValue::stringValue("Center"), 40, 50},
+                     {PropValue::stringValue(horizontal ? "End" : "Bottom"), 80, 90},
+                     {PropValue::stringValue("SpaceBetween"), 0, 90},
+                     {PropValue::stringValue("SpaceAround"), 20, 70},
+                     {PropValue::stringValue("SpaceEvenly"), 80.0f / 3.0f, 190.0f / 3.0f},
+                     {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue("Center"))}), 35, 55},
+                     {object({field("kind", PropValue::stringValue("spacedBy")), field("space", PropValue::numberValue(10)), field("alignment", PropValue::stringValue(horizontal ? "End" : "Bottom"))}), 70, 90},
+                 }) {
                 tree.setHostInput(1, HostInput::MeasurePolicy, object({field("kind", PropValue::stringValue(horizontal ? "Row" : "Column")), field(input, arrangement.value)}));
                 layout.layout(tree, 1, {0, 100, 0, 100});
                 if (!near(horizontal ? tree.node(2).bounds.x : tree.node(2).bounds.y, arrangement.first)) return 212;
@@ -356,7 +364,7 @@ namespace {
     }
 
     class ExactTextMeasurer final : public arrange::core::ApproximateTextMeasurer {
-    public:
+       public:
         float advance(std::string_view, char32_t, const arrange::core::TextStyle& style) const override {
             return style.fontSize * 0.5f;
         }
@@ -394,9 +402,11 @@ namespace {
         using namespace arrange::core;
         LayoutTree tree;
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout},
+            arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{1, size(80.0f, 40.0f)},
-            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
+            CreateNodeMutation{2, arrange::core::NodeType::Layout},
+            arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
             SetModifierMutation{2, background(120.0f, 20.0f, 0xffabcdefu)},
             InsertChildMutation{1, 2, 0},
         });
@@ -419,7 +429,16 @@ namespace {
 
         tree = {};
         tree.apply(std::vector<TreeMutation>{
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, [&] { auto chain = size(40, 12); auto text = test_support::text("overflow text"); text.overflow = "visible"; chain.push_back({text, {}}); return chain; }()},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout},
+            arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+            SetModifierMutation{1,
+                                [&] {
+                                    auto chain = size(40, 12);
+                                    auto text = test_support::text("overflow text");
+                                    text.overflow = "visible";
+                                    chain.push_back({text, {}});
+                                    return chain;
+                                }()},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
         const auto visibleOps = DrawOpsBuilder{}.exportScene(tree, 1);
@@ -427,7 +446,12 @@ namespace {
             if (op.type == DrawOpType::PushClip) return 113;
         }
         tree.apply(std::vector<TreeMutation>{
-            SetModifierMutation{1, [&] { auto chain = size(40, 12); chain.push_back({test_support::text("overflow text"), {}}); return chain; }()},
+            SetModifierMutation{1,
+                                [&] {
+                                    auto chain = size(40, 12);
+                                    chain.push_back({test_support::text("overflow text"), {}});
+                                    return chain;
+                                }()},
         });
         LayoutEngine{}.layout(tree, 1, {0.0f, 40.0f, 0.0f, 12.0f});
         const auto clipOps = DrawOpsBuilder{}.exportScene(tree, 1);
@@ -460,7 +484,7 @@ namespace {
     }
 
     class MockScriptHost final : public arrange::quickjs::ScriptHost {
-    public:
+       public:
         arrange::quickjs::ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override {
             lastModulePath = modulePath;
             lastSource = std::string(source);
@@ -553,10 +577,16 @@ namespace {
         if (result.ran || pipelineState.publishedFrame().revision != resizedRevision || pipelineState.publishedFrame().content.hitTest != resizedHit) return 98;
         return 0;
     }
-}
+}  // namespace
 
 int main() {
-#define RUN_SMOKE(name) do { if (const auto result = name(); result != 0) { std::cerr << #name << " failed: " << result << '\n'; return result; } } while (false)
+#define RUN_SMOKE(name)                                          \
+    do {                                                         \
+        if (const auto result = name(); result != 0) {           \
+            std::cerr << #name << " failed: " << result << '\n'; \
+            return result;                                       \
+        }                                                        \
+    } while (false)
     RUN_SMOKE(verifyTypedLayoutTreePipeline);
     RUN_SMOKE(verifyTypedDirtyPrecision);
     RUN_SMOKE(verifyEventPropIsNotCoreEventSlot);

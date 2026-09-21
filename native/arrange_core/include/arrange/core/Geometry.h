@@ -1,4 +1,5 @@
 #pragma once
+
 namespace arrange::core {
     struct Size {
         float width = 0.0f;
@@ -27,4 +28,4 @@ namespace arrange::core {
         float maxHeight = 0.0f;
         bool operator==(const Constraints&) const = default;
     };
-}
+}  // namespace arrange::core

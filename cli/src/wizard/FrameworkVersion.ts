@@ -1,9 +1,9 @@
-import {confirm, isCancel, log, select, spinner} from "@clack/prompts"
-import {cliCompatibility, frameworkPackageName} from "../CliMetadata.ts"
-import {type FrameworkRegistryClient, normalizeRegistryUrl} from "../framework/FrameworkRegistryClient.ts"
-import {assertFrameworkCompatible, addIncompatibilityIfPresenceFor, type FrameworkVersionSelectionCandidate, type FrameworkVersionCandidate} from "../framework/FrameworkMamba.ts"
-import {PromptCancelled, requiredText, validateSemver} from "../util/PromptUtils.ts"
-import {formatTimestampToDate} from "../util/Utils.ts"
+import { confirm, isCancel, log, select, spinner } from "@clack/prompts"
+import { cliCompatibility, frameworkPackageName } from "../CliMetadata.ts"
+import { type FrameworkRegistryClient, normalizeRegistryUrl } from "../framework/FrameworkRegistryClient.ts"
+import { assertFrameworkCompatible, addIncompatibilityIfPresenceFor, type FrameworkVersionSelectionCandidate, type FrameworkVersionCandidate } from "../framework/FrameworkMamba.ts"
+import { PromptCancelled, requiredText, validateSemver } from "../util/PromptUtils.ts"
+import { formatTimestampToDate } from "../util/Utils.ts"
 
 export interface FrameworkVersionWizardInput {
     readonly registryUrl?: string
@@ -41,7 +41,7 @@ export async function selectFrameworkVersion(registryClient: FrameworkRegistryCl
             message: `Arrange framework version (CLI compatibility ${cliCompatibility})`,
             options: [
                 ...toCandidateOptions([...tryLoadCandidatesResult, ...customCandidates]),
-                {label: "Custom version", value: customVersionValue},
+                { label: "Custom version", value: customVersionValue },
             ],
             maxItems: 8, // TIPS：多了会有得滚动
         })
@@ -59,7 +59,7 @@ export async function selectFrameworkVersion(registryClient: FrameworkRegistryCl
     }
 }
 
-async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient, registryUrl: string,): Promise<FrameworkVersionSelectionCandidate[] | false> {
+async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate[] | false> {
     while (true) {
         const loading = spinner()
         loading.start("Reading Arrange framework versions...")
@@ -74,9 +74,9 @@ async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient
             const action = await select({
                 message: "Cannot read the framework version list.",
                 options: [
-                    {label: "Retry", value: retryValue},
-                    {label: "Enter custom version", value: customVersionValue},
-                    {label: "Cancel create", value: cancelValue},
+                    { label: "Retry", value: retryValue },
+                    { label: "Enter custom version", value: customVersionValue },
+                    { label: "Cancel create", value: cancelValue },
                 ],
             })
 
@@ -86,7 +86,7 @@ async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient
     }
 }
 
-async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryClient, registryUrl: string,): Promise<FrameworkVersionSelectionCandidate | false> {
+async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate | false> {
     while (true) {
         let version
         try {
@@ -112,7 +112,7 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 assertFrameworkCompatible(candidate)
 
                 checking.stop(`${candidate.version} is compatible.`)
-                return {...candidate, incompatibility: null}
+                return { ...candidate, incompatibility: null }
             } catch (error) {
                 checking.error(`Cannot verify ${version}.`)
                 log.error(formatError(error))
@@ -120,10 +120,10 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 const action = await select({
                     message: "How should this custom version be handled?",
                     options: [
-                        {label: "Retry checking this version", value: retryValue},
-                        {label: "Enter another version", value: enterAnotherVersionValue},
-                        {label: "Skip verification and use this version", value: skipVerificationValue},
-                        {label: "Cancel custom version", value: cancelValue},
+                        { label: "Retry checking this version", value: retryValue },
+                        { label: "Enter another version", value: enterAnotherVersionValue },
+                        { label: "Skip verification and use this version", value: skipVerificationValue },
+                        { label: "Cancel custom version", value: cancelValue },
                     ],
                 })
 
@@ -152,7 +152,7 @@ function toCandidateOptions(candidates: readonly FrameworkVersionSelectionCandid
         if (candidate.incompatibility !== null) hint = candidate.incompatibility
         else if (candidate.publishedAt) hint = formatTimestampToDate(candidate.publishedAt)
 
-        return {label, value: candidate.incompatibility === null ? candidate.version : `disabled:${index}`, hint, disabled: candidate.incompatibility !== null,}
+        return { label, value: candidate.incompatibility === null ? candidate.version : `disabled:${index}`, hint, disabled: candidate.incompatibility !== null, }
     })
 }
 

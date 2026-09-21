@@ -9,7 +9,7 @@
 #include <arrange/core/Paint.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/core/Scroll.h>
-#include <arrange/juce/CompositionHost.h>
+#include <arrange/juce/RearrangeHost.h>
 #include <arrange/juce/FramePlanner.h>
 #include <arrange/juce/ScenePipelineState.h>
 
@@ -53,13 +53,20 @@ namespace arrange::juce {
     };
 
     class ArrangeRuntime final {
-    public:
+       public:
         explicit ArrangeRuntime(arrange::core::SceneFramePipeline pipeline = arrange::core::SceneFramePipeline());
 
         void reset();
-        void requestReload() noexcept { reloadRequested_ = true; }
+
+        void requestReload() noexcept {
+            reloadRequested_ = true;
+        }
+
         [[nodiscard]] bool consumeReloadRequest() noexcept;
-        void suspend() noexcept { suspended_ = true; }
+
+        void suspend() noexcept {
+            suspended_ = true;
+        }
 
 #if ARRANGE_WITH_QUICKJS_NG
         void setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept;
@@ -75,9 +82,7 @@ namespace arrange::juce {
         void clearPendingTransactions() noexcept;
 
         void enqueueEvent(const arrange::core::EventSlotId& slot);
-        void enqueueScrollSnapshotEvent(
-            const arrange::core::EventSlotId& slot,
-            const arrange::core::ScrollResult& result);
+        void enqueueScrollSnapshotEvent(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& result);
         void enqueueStringEvent(const arrange::core::EventSlotId& slot, std::string value);
 
         [[nodiscard]] bool hasPendingEvents() const noexcept;
@@ -85,16 +90,24 @@ namespace arrange::juce {
         [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;
         [[nodiscard]] bool hasPendingFrameWork() const noexcept;
 
-        [[nodiscard]] RuntimeFramePumpResult pumpFrame(
-            arrange::core::NodeId root,
-            arrange::core::Constraints constraints,
-            double nowMillis,
-            const arrange::core::FrameFinalizer& finalize = {});
+        [[nodiscard]] RuntimeFramePumpResult pumpFrame(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize = {});
 
-        [[nodiscard]] arrange::core::NativeScene& scene() noexcept { return pipelineState_.scene(); }
-        [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept { return pipelineState_.scene(); }
-        [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept { return pipelineState_.publishedFrame(); }
-        const arrange::core::FrameExecutionCounters& frameCounters() const noexcept { return pipelineState_.counters(); }
+        [[nodiscard]] arrange::core::NativeScene& scene() noexcept {
+            return pipelineState_.scene();
+        }
+
+        [[nodiscard]] const arrange::core::NativeScene& scene() const noexcept {
+            return pipelineState_.scene();
+        }
+
+        [[nodiscard]] const arrange::core::PublishedFrame& publishedFrame() const noexcept {
+            return pipelineState_.publishedFrame();
+        }
+
+        const arrange::core::FrameExecutionCounters& frameCounters() const noexcept {
+            return pipelineState_.counters();
+        }
+
         bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
             return pipelineState_.publishRetained(finalize);
         }
@@ -103,7 +116,7 @@ namespace arrange::juce {
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
 #endif
 
-    private:
+       private:
         enum class QueuedEventKind {
             Invoke,
             InvokeString,
@@ -118,22 +131,18 @@ namespace arrange::juce {
         };
 
         [[nodiscard]] FrameWorkState frameWorkState() const noexcept;
-        [[nodiscard]] bool captureCompositionTransactions();
+        [[nodiscard]] bool captureRearrangeTransactions();
         [[nodiscard]] RuntimeStepResult dispatchQueuedEvents(double nowMillis);
         [[nodiscard]] RuntimeStepResult pumpAnimationFrame(double nowMillis);
-        [[nodiscard]] RuntimePipelineRunResult runPipeline(
-            arrange::core::NodeId root,
-            arrange::core::Constraints constraints,
-            const arrange::core::FrameFinalizer& finalize);
+        [[nodiscard]] RuntimePipelineRunResult runPipeline(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize);
 
         bool suspended_ = false;
         bool reloadRequested_ = false;
-        CompositionHost composition_;
+        RearrangeHost rearrangeHost_;
         ScenePipelineState pipelineState_;
         FramePlanner frame_;
         std::deque<QueuedEvent> events_;
     };
 
 #endif
-} // namespace arrange::juce
-
+}  // namespace arrange::juce

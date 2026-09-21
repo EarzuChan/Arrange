@@ -1,8 +1,8 @@
-import {randomUUID} from "node:crypto"
-import {mkdir, readFile, rename, rm, writeFile, stat, link} from "node:fs/promises"
-import {dirname, join} from "node:path"
-import {assertSnapshots, readSnapshot, type FileSnapshot} from "../util/FileUtils.ts"
-import {hashText} from "../util/Utils.ts"
+import { randomUUID } from "node:crypto"
+import { mkdir, readFile, rename, rm, writeFile, stat, link } from "node:fs/promises"
+import { dirname, join } from "node:path"
+import { assertSnapshots, readSnapshot, type FileSnapshot } from "../util/FileUtils.ts"
+import { hashText } from "../util/Utils.ts"
 
 export interface FileChange {
     readonly before: FileSnapshot,
@@ -24,11 +24,11 @@ export class ConfigWriter {
 
         const id = randomUUID()
         const journalPath = join(rootDir, ".arrange", "transactions", `${id}.json`)
-        const journal: WriteJournal = {id, status: "writing", files: changes.map(change => ({path: change.before.path, originalHash: change.before.content === null ? null : hashText(change.before.content), expectedHash: hashText(change.after), original: change.before.content, expected: change.after, written: false}))}
-        await mkdir(join(rootDir, ".arrange"), {recursive: true})
+        const journal: WriteJournal = { id, status: "writing", files: changes.map(change => ({ path: change.before.path, originalHash: change.before.content === null ? null : hashText(change.before.content), expectedHash: hashText(change.after), original: change.before.content, expected: change.after, written: false })) }
+        await mkdir(join(rootDir, ".arrange"), { recursive: true })
 
         try {
-            await writeFile(join(rootDir, ".arrange", ".gitignore"), "*\n", {flag: "wx"})
+            await writeFile(join(rootDir, ".arrange", ".gitignore"), "*\n", { flag: "wx" })
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
         }
@@ -52,29 +52,29 @@ export class ConfigWriter {
 
             await this.saveJournal(journalPath, journal)
 
-            throw new Error(`写入未完成，原文、目标内容及进度保存在 ${journalPath}：${journal.error}`, {cause: error})
+            throw new Error(`写入未完成，原文、目标内容及进度保存在 ${journalPath}：${journal.error}`, { cause: error })
         }
     }
 
     protected async replaceFile(before: FileSnapshot, after: string, id: string): Promise<void> {
-        await mkdir(dirname(before.path), {recursive: true})
+        await mkdir(dirname(before.path), { recursive: true })
 
         const temporary = join(dirname(before.path), `.arrange-${id}.tmp`)
 
         try {
             const mode = before.content === null ? undefined : (await stat(before.path)).mode
-            await writeFile(temporary, after, {encoding: "utf8", flag: "wx", mode})
+            await writeFile(temporary, after, { encoding: "utf8", flag: "wx", mode })
             await assertSnapshots([before])
 
             if (before.content === null) await link(temporary, before.path) // 原子发布已写好的新文件；同名目标出现时 link 失败，不覆盖
             else await rename(temporary, before.path)
         } finally {
-            await rm(temporary, {force: true})
+            await rm(temporary, { force: true })
         }
     }
 
     private async saveJournal(path: string, journal: WriteJournal): Promise<void> {
-        await mkdir(dirname(path), {recursive: true})
+        await mkdir(dirname(path), { recursive: true })
 
         const temporary = `${path}.tmp`
 
@@ -93,6 +93,6 @@ export class ConfigWriter {
             states.push(content === file.expected ? "expected" : content === file.original ? "original" : "conflict")
         }
 
-        return {journal, states}
+        return { journal, states }
     }
 }

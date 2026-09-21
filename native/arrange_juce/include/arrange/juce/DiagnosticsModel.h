@@ -9,7 +9,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class DiagnosticsModel final {
-    public:
+       public:
         void configure(DiagnosticsConfig config);
 
         bool emit(DiagnosticEventInput input);
@@ -17,21 +17,33 @@ namespace arrange::juce {
         bool tick(double nowMillis);
         bool hasActiveToasts() const noexcept;
         [[nodiscard]] std::vector<DiagnosticsToastModel> activeToastModels() const;
-        [[nodiscard]] DiagnosticVisibility badgeVisibility() const noexcept { return config_.badge; }
-        [[nodiscard]] DiagnosticVisibility toastVisibility() const noexcept { return config_.toasts; }
+
+        [[nodiscard]] DiagnosticVisibility badgeVisibility() const noexcept {
+            return config_.badge;
+        }
+
+        [[nodiscard]] DiagnosticVisibility toastVisibility() const noexcept {
+            return config_.toasts;
+        }
 
         void setLogLevel(LogLevel level) noexcept;
         void setCategoryEnabled(DiagnosticCategory category, bool enabled);
         void setToastsEnabled(bool enabled) noexcept;
         [[nodiscard]] bool categoryEnabled(DiagnosticCategory category) const;
-        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept { return store_.recentEvents(); }
+
+        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept {
+            return store_.recentEvents();
+        }
 
         std::string diagnosticsText(const DiagnosticsTextContext& context) const;
 
         static std::string currentLocalTimeLabel();
-        static bool visibilityEnabled(DiagnosticVisibility visibility) noexcept { return diagnosticVisibilityEnabled(visibility); }
 
-    private:
+        static bool visibilityEnabled(DiagnosticVisibility visibility) noexcept {
+            return diagnosticVisibilityEnabled(visibility);
+        }
+
+       private:
         struct Toast {
             std::uint64_t eventId = 0;
             LogLevel level = LogLevel::Info;
@@ -49,4 +61,4 @@ namespace arrange::juce {
     };
 
 #endif
-} // namespace arrange::juce
+}  // namespace arrange::juce

@@ -13,18 +13,28 @@ namespace arrange {
     };
 
     class HeadlessArrangeEditor {
-    public:
-        HeadlessArrangeEditor(App app, quickjs::ScriptHost& scriptHost)
-            : app_(std::move(app)), scriptHost_(scriptHost) {}
+       public:
+        HeadlessArrangeEditor(App app, quickjs::ScriptHost& scriptHost) : app_(std::move(app)), scriptHost_(scriptHost) {}
 
-        HeadlessEditorState state() const noexcept { return state_; }
-        const ResolvedApp& resolvedApp() const noexcept { return resolved_; }
-        const ErrorScreenModel& error() const noexcept { return error_; }
+        HeadlessEditorState state() const noexcept {
+            return state_;
+        }
+
+        const ResolvedApp& resolvedApp() const noexcept {
+            return resolved_;
+        }
+
+        const ErrorScreenModel& error() const noexcept {
+            return error_;
+        }
 
         bool loadRelease();
-        bool retryRelease() { return loadRelease(); }
 
-    private:
+        bool retryRelease() {
+            return loadRelease();
+        }
+
+       private:
         App app_;
         quickjs::ScriptHost& scriptHost_;
         AppResolver resolver_;
@@ -32,4 +42,4 @@ namespace arrange {
         ResolvedApp resolved_;
         ErrorScreenModel error_;
     };
-} // namespace arrange
+}  // namespace arrange

@@ -18,7 +18,11 @@ namespace {
     void check(bool condition, const char* message) {
         if (!condition) throw std::runtime_error(message);
     }
-    bool near(float a, float b) { return std::fabs(a - b) < 0.001f; }
+
+    bool near(float a, float b) {
+        return std::fabs(a - b) < 0.001f;
+    }
+
     LayoutModifierSemantics size(float width, float height) {
         LayoutModifierSemantics value;
         value.kind = LayoutModifierKind::Size;
@@ -26,20 +30,83 @@ namespace {
         value.height = height;
         return value;
     }
+
     PaintStyleSemantics background(std::uint32_t color) {
         PaintStyleSemantics value;
         value.color = color;
         return value;
     }
+
     InputModifierSemantics click(const char* path) {
         InputModifierSemantics value;
         value.eventSlot = makeEventSlotId(1, EventSlotKind::Click, path);
         return value;
     }
-    template<class F> void rejects(F function, const char* message) {
+
+    template <class F>
+    void rejects(F function, const char* message) {
         bool rejected = false;
-        try { function(); } catch (const std::invalid_argument&) { rejected = true; }
+        try {
+            function();
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
         check(rejected, message);
+    }
+
+    void verifyViewportAndScrollDependencies() {
+        for (const auto vertical : {true, false}) {
+            NativeScene scene;
+            PublishedFrame frame;
+            SceneFramePipeline pipeline;
+            LayoutModifierSemantics fill;
+            fill.kind = LayoutModifierKind::FillMaxSize;
+            LayoutModifierSemantics scroll;
+            scroll.kind = vertical ? LayoutModifierKind::VerticalScroll : LayoutModifierKind::HorizontalScroll;
+            scroll.scrollValue = 450;
+            scroll.eventSlot = makeEventSlotId(1, vertical ? EventSlotKind::VerticalScroll : EventSlotKind::HorizontalScroll);
+            auto content = size(600, 600);
+            content.kind = LayoutModifierKind::RequiredSize;
+            MutationTransaction initial;
+            initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Box")}})}, CreateNodeMutation{2, NodeType::Layout}, InsertChildMutation{1, 2, 0}, SetModifierMutation{1, {{fill, {}}, {scroll, {}}}}, SetModifierMutation{2, {{content, {}}, {background(0xff336699), {}}}}};
+            const auto first = pipeline.run(scene, 1, {0, 100, 0, 100}, &initial, true, frame);
+            check(!first.error && first.scrollUpdates.size() == 1, "首次布局没有发布滚动范围");
+            check(first.scrollUpdates[0].maxValue == 500 && first.scrollUpdates[0].value == 450, "首次滚动范围或偏移错误");
+            const auto handle = scene.node(1).modifier.elements()[1].handle;
+
+            for (const float extent : {200, 700, 150}) {
+                const auto result = pipeline.run(scene, 1, {0, extent, 0, extent}, nullptr, true, frame);
+                check(!result.error && result.plan.measure && result.plan.layout && result.plan.passivePaint, "纯约束变化没有更新测量、放置与绘制");
+                check(result.scrollUpdates.size() == 1, "视口变化没有交付滚动快照");
+                const auto& update = result.scrollUpdates[0];
+                check(update.modifier == handle && update.viewportSize == extent, "视口变化丢失实例身份或沿用旧尺寸");
+                check(update.maxValue == std::max(0.0f, 600 - extent) && update.value == std::min(450.0f, update.maxValue), "滚动越界没有在当前布局中修正");
+                const auto& instance = scene.node(1).modifier.elements()[1];
+                check((vertical ? instance.bounds.height : instance.bounds.width) == extent, "放置缓存保留了旧视口");
+                check((vertical ? scene.node(1).contentBounds.y : scene.node(1).contentBounds.x) == -update.value, "内容位置没有使用修正后的滚动偏移");
+
+                auto full = scene.tree();
+                for (const auto id : full.nodeIds()) {
+                    full.node(id).measurementValid = false;
+                    full.node(id).placementValid = false;
+                    full.markInputDirty(id, dirtyMask(DirtyFlag::Structure));
+                }
+                LayoutEngine{}.layout(full, 1, {0, extent, 0, extent});
+                check(exportDrawOps(frame.content.scenePaint) == DrawOpsBuilder{}.exportScene(full, 1), "局部约束更新的绘制与完整计算不同");
+                const auto reference = buildHitTestSnapshot(full, 1);
+                for (const auto point : {Point{1, 1}, Point{extent - 1, extent - 1}, Point{extent + 1, extent + 1}}) {
+                    const auto actual = HitTester{}.hitTest(*frame.content.hitTest, point);
+                    const auto expected = HitTester{}.hitTest(reference, point);
+                    check(actual.hit == expected.hit && actual.node == expected.node, "视口变化后命中区域仍使用旧几何");
+                }
+            }
+
+            const auto before = frame.revision;
+            const auto failed = pipeline.run(scene, 1, {0, 300, 0, 300}, nullptr, true, frame, [](const auto&, auto&) { throw std::runtime_error("拒绝候选"); });
+            check(failed.error && failed.scrollUpdates.empty() && frame.revision == before, "失败候选泄漏滚动快照或视觉状态");
+            const auto retried = pipeline.run(scene, 1, {0, 300, 0, 300}, nullptr, true, frame);
+            check(!retried.error && retried.scrollUpdates.size() == 1 && retried.scrollUpdates[0].viewportSize == 300, "失败后的重试没有交付新滚动范围");
+        }
     }
 
     void verifyIdentity() {
@@ -130,18 +197,13 @@ namespace {
         PaintStyleSemantics circle;
         circle.shapeType = "circle";
         ModifierDescriptors wrappers{
-            {size(120, 100), {}}, {background(1), {}}, {outerPadding, {}},
-            {ClipModifier{}, {}}, {outerLayer, {}}, {innerPadding, {}},
-            {background(2), {}}, {ClipModifier{circle}, {}}, {innerLayer, {}},
-            {click("deep"), {}},
+            {size(120, 100), {}}, {background(1), {}}, {outerPadding, {}}, {ClipModifier{}, {}}, {outerLayer, {}}, {innerPadding, {}}, {background(2), {}}, {ClipModifier{circle}, {}}, {innerLayer, {}}, {click("deep"), {}},
         };
         tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, wrappers}});
         layout.layout(tree, 1, {0, 500, 0, 500});
-        check(tree.node(1).modifier.elements()[6].bounds == Rect{15, 15, 90, 70}, "repeated padding did not compose by layer");
+        check(tree.node(1).modifier.elements()[6].bounds == Rect{15, 15, 90, 70}, "重复 padding 未按层叠加");
         const auto ops = DrawOpsBuilder{}.exportScene(tree, 1);
-        check(std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; }) == 2 &&
-              std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; }) == 2,
-              "repeated clips or graphics layers collapsed");
+        check(std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; }) == 2 && std::count_if(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; }) == 2, "repeated clips or graphics layers collapsed");
         const auto snapshot = buildHitTestSnapshot(tree, 1);
         check(HitTester{}.hitTestClickable(snapshot, {55, 40}).eventSlot.path == "deep", "nested transform inverse mapping failed");
         check(!HitTester{}.hitTestClickable(snapshot, {40, 10}).hit, "nested clip failed to reject an outside point");
@@ -151,27 +213,23 @@ namespace {
         outerScroll.eventSlot = makeEventSlotId(1, EventSlotKind::VerticalScroll, "outer");
         innerScroll.eventSlot = makeEventSlotId(1, EventSlotKind::VerticalScroll, "inner");
         ModifierDescriptors scrolling{
-            {size(100, 100), "viewport"}, {outerScroll, "outer"},
-            {size(100, 200), "inner-viewport"}, {innerScroll, "inner"},
-            {size(100, 400), "content"}, {background(3), {}}, {click("content"), {}},
+            {size(100, 100), "viewport"}, {outerScroll, "outer"}, {size(100, 200), "inner-viewport"}, {innerScroll, "inner"}, {size(100, 400), "content"}, {background(3), {}}, {click("content"), {}},
         };
         tree.apply({SetModifierMutation{1, scrolling}});
         layout.layout(tree, 1, {0, 500, 0, 500});
         auto wheel = ScrollDispatcher{}.verticalWheel(tree, 1, {30, 30}, -1, 40);
-        check(wheel.consumed && wheel.eventSlot.path == "inner" && near(wheel.value, 40) && near(wheel.maxValue, 200),
-              "repeated scroll did not route to the inner instance");
+        check(wheel.consumed && wheel.eventSlot.path == "inner" && near(wheel.value, 40) && near(wheel.maxValue, 200), "repeated scroll did not route to the inner instance");
         innerScroll.scrollValue = 200;
         scrolling[3].value = innerScroll;
         tree.apply({SetModifierMutation{1, scrolling}});
         layout.place(tree, 1);
         wheel = ScrollDispatcher{}.verticalWheel(tree, 1, {30, 30}, -1, 40);
-        check(wheel.consumed && wheel.eventSlot.path == "outer" && near(wheel.value, 40) && near(wheel.maxValue, 100),
-              "inner scroll boundary did not yield to the outer instance");
+        check(wheel.consumed && wheel.eventSlot.path == "outer" && near(wheel.value, 40) && near(wheel.maxValue, 100), "inner scroll boundary did not yield to the outer instance");
         outerScroll.scrollValue = 20;
         scrolling[1].value = outerScroll;
         tree.apply({SetModifierMutation{1, scrolling}});
         layout.place(tree, 1);
-        check(near(tree.node(1).modifier.elements()[5].bounds.y, -220), "nested scrolling offsets did not compose");
+        check(near(tree.node(1).modifier.elements()[5].bounds.y, -220), "嵌套滚动偏移未叠加");
         check(!HitTester{}.hitTestClickable(tree, 1, {30, 101}).hit, "outer scroll viewport did not clip inner interaction");
     }
 
@@ -183,7 +241,7 @@ namespace {
         initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}};
         for (NodeId id = 2; id < 52; ++id) {
             initial.operations.push_back(CreateNodeMutation{id, arrange::core::NodeType::Layout});
-        initial.operations.push_back(arrange::core::SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})});
+            initial.operations.push_back(arrange::core::SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})});
             initial.operations.push_back(SetModifierMutation{id, {{size(100, 20), {}}, {OffsetModifier{}, {}}, {background(0xff123456), {}}, {click("row"), {}}}});
             initial.operations.push_back(InsertChildMutation{1, id, id - 2});
         }
@@ -250,29 +308,29 @@ namespace {
         LayoutEngine layout;
         ParentDataModifierSemantics weight;
         weight.weight = 1;
-        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Row")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
-            SetModifierMutation{1, {{size(240, 40), {}}}}, SetModifierMutation{2, {{weight, {}}}}, SetModifierMutation{3, {{weight, {}}}},
-            InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}});
-        layout.layout(tree, 1, {0, 500, 0, 500}); tree.clearDirty();
+        tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Row")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{size(240, 40), {}}}}, SetModifierMutation{2, {{weight, {}}}}, SetModifierMutation{3, {{weight, {}}}}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}});
+        layout.layout(tree, 1, {0, 500, 0, 500});
+        tree.clearDirty();
         check(near(tree.node(2).bounds.width, 120), "initial weighted constraint failed");
         weight.weight = 2;
         tree.setModifierChain(2, {{weight, {}}});
-        layout.layout(tree, 1, {0, 500, 0, 500}); tree.clearDirty();
+        layout.layout(tree, 1, {0, 500, 0, 500});
+        tree.clearDirty();
         check(near(tree.node(2).bounds.width, 160) && near(tree.node(3).bounds.width, 80), "parent data did not invalidate sibling constraints");
         layout.resetCounters();
-        layout.layout(tree, 1, {0, 600, 0, 500}); tree.clearDirty();
+        layout.layout(tree, 1, {0, 600, 0, 500});
+        tree.clearDirty();
         check(layout.counters().measuredNodes == 1 && layout.counters().measureCacheHits == 2, "unchanged descendant constraints missed resize cache");
         LayoutModifierSemantics padding;
         padding.padding.top = 7;
-        tree.apply({CreateNodeMutation{4, arrange::core::NodeType::Layout}, SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3},
-            SetModifierMutation{1, {}}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Row")}, {"verticalAlignment", PropValue::stringValue("Baseline")}})},
-            SetModifierMutation{4, {{padding, {}}, {test_support::text("小字"), {}}}}, SetModifierMutation{5, {{test_support::text("大字", 0xff000000u, 30, 36), {}}}},
-            InsertChildMutation{1, 4, 0}, InsertChildMutation{1, 5, 1}});
-        layout.layout(tree, 1, {0, 600, 0, 500}); tree.clearDirty();
+        tree.apply({CreateNodeMutation{4, arrange::core::NodeType::Layout}, SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, CreateNodeMutation{5, arrange::core::NodeType::Layout}, SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, RemoveChildMutation{1, 2}, RemoveChildMutation{1, 3}, SetModifierMutation{1, {}}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Row")}, {"verticalAlignment", PropValue::stringValue("Baseline")}})}, SetModifierMutation{4, {{padding, {}}, {test_support::text("小字"), {}}}}, SetModifierMutation{5, {{test_support::text("大字", 0xff000000u, 30, 36), {}}}}, InsertChildMutation{1, 4, 0}, InsertChildMutation{1, 5, 1}});
+        layout.layout(tree, 1, {0, 600, 0, 500});
+        tree.clearDirty();
         check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "row baselines ignored Modifier padding");
         const auto previousBaseline = tree.node(1).baseline;
         tree.setModifierChain(5, {{test_support::text("大字", 0xff000000u, 40, 48), {}}});
-        layout.resetCounters(); layout.layout(tree, 1, {0, 600, 0, 500});
+        layout.resetCounters();
+        layout.layout(tree, 1, {0, 600, 0, 500});
         check(tree.node(1).baseline > previousBaseline && layout.counters().measureCacheHits == 1, "baseline input failed to propagate while retaining sibling measurement");
         check(near(tree.node(4).bounds.y + tree.node(4).baseline, tree.node(5).bounds.y + tree.node(5).baseline), "baseline update left stale sibling placement");
     }
@@ -287,10 +345,7 @@ namespace {
         animated.animationSpec.bezier = {0, 0, 1, 1};
         MutationTransaction initial;
         initial.operations = {
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
-            SetModifierMutation{2, {{animated, "animation"}}}, SetModifierMutation{3, {{size(100, 20), {}}, {background(0xff123456), {}}, {click("animated"), {}}}},
-            SetModifierMutation{4, {{size(100, 20), {}}, {background(0xff654321), {}}}},
-            InsertChildMutation{1, 2, 0}, InsertChildMutation{2, 3, 0}, InsertChildMutation{1, 4, 1},
+            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{3, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{2, {{animated, "animation"}}}, SetModifierMutation{3, {{size(100, 20), {}}, {background(0xff123456), {}}, {click("animated"), {}}}}, SetModifierMutation{4, {{size(100, 20), {}}, {background(0xff654321), {}}}}, InsertChildMutation{1, 2, 0}, InsertChildMutation{2, 3, 0}, InsertChildMutation{1, 4, 1},
         };
         const auto run = [&](MutationTransaction* transaction, double time, const FrameFinalizer& finalize = {}) {
             return pipeline.run(scene, 1, {0, 500, 0, 500}, transaction, true, frame, finalize, time);
@@ -342,11 +397,12 @@ namespace {
         resized.operations = {SetModifierMutation{1, chain}};
         check(pipeline.run(scene, 1, {0, 500, 0, 500}, &resized, true, frame).plan.measure, "size update skipped measure");
     }
-}
+}  // namespace
 
 int main() {
     try {
         verifyIdentity();
+        verifyViewportAndScrollDependencies();
         verifyOnionGeometry();
         verifyClipRequiredAndOffset();
         verifyRepeatedWrappersAndScroll();

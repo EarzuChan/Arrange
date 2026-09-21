@@ -25,14 +25,10 @@ namespace arrange::quickjs {
         std::filesystem::path resolved;
         if (std::filesystem::path(moduleName).is_absolute()) {
             resolved = moduleName;
-        }
-        else if (startsWithDotSpecifier(specifier)) {
-            const std::filesystem::path base = moduleBaseName != nullptr && *moduleBaseName != '\0'
-                                                   ? std::filesystem::path(moduleBaseName).parent_path()
-                                                   : loader->moduleRoot_;
+        } else if (startsWithDotSpecifier(specifier)) {
+            const std::filesystem::path base = moduleBaseName != nullptr && *moduleBaseName != '\0' ? std::filesystem::path(moduleBaseName).parent_path() : loader->moduleRoot_;
             resolved = base / moduleName;
-        }
-        else {
+        } else {
             JS_ThrowReferenceError(context, "unsupported bare module specifier '%s' in Arrange UI package", moduleName);
             return nullptr;
         }
@@ -52,6 +48,6 @@ namespace arrange::quickjs {
         if (JS_IsException(compiled.get())) return nullptr;
         return static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(compiled.get()));
     }
-}
+}  // namespace arrange::quickjs
 
 #endif

@@ -1,6 +1,6 @@
-﻿import {existsSync, readFileSync, writeFileSync} from "node:fs"
-import {resolve} from "node:path"
-import {parse as parseYamlSource, stringify as stringifyYamlValue} from "yaml"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { parse as parseYamlSource, stringify as stringifyYamlValue } from "yaml"
 
 export type PluginType = "effect" | "instrument"
 export type Product = "standalone" | "vst3"
@@ -8,7 +8,7 @@ export type PackageManager = "pnpm" | "npm"
 export type Flavor = "debug" | "release"
 
 export type ArrangeConfig = {
-    arrange: {version: string}
+    arrange: { version: string }
     project: {
         name: string
         version: string
@@ -75,7 +75,7 @@ export function defaultConfig(args: {
     artifactsPath?: string
 }): ArrangeConfig {
     return {
-        arrange: {version: args.frameworkVersion},
+        arrange: { version: args.frameworkVersion },
         project: {
             name: args.projectName,
             version: args.projectVersion,
@@ -136,7 +136,7 @@ function normalizeConfig(raw: unknown, path: string): ArrangeConfig {
     if (!packageManagers.has(packageManager)) throw new Error(`ui.packageManager only supports pnpm or npm; received ${packageManager}`)
 
     return {
-        arrange: {version: arrangeVersion},
+        arrange: { version: arrangeVersion },
         project: {
             name: expectString(project.name, "project.name"),
             version: projectVersion,
@@ -176,7 +176,7 @@ export function parseYaml(source: string): unknown {
 }
 
 export function stringifyYaml(value: unknown): string {
-    return stringifyYamlValue(value, {lineWidth: 0})
+    return stringifyYamlValue(value, { lineWidth: 0 })
 }
 
 export function expectRecord(value: unknown, label: string): Record<string, unknown> {

@@ -13,14 +13,16 @@ extern "C" {
 
 namespace arrange::quickjs {
     class QuickJsModifierReader {
-    public:
-        QuickJsModifierReader(JSContext* context, QuickJsEventRegistry& events, arrange::core::MutationTransaction* transaction)
-            : context_(context), reader_(context), events_(events), transaction_(transaction) {}
+       public:
+        QuickJsModifierReader(JSContext* context, QuickJsEventRegistry& events, arrange::core::MutationTransaction* transaction) : context_(context), reader_(context), events_(events), transaction_(transaction) {}
 
         [[nodiscard]] arrange::core::ModifierDescriptors read(arrange::core::NodeId id, JSValueConst modifier, const arrange::core::ModifierValue* instanceInput = nullptr, std::span<const arrange::core::ModifierDescriptor* const> previous = {});
-        [[nodiscard]] bool failed() const noexcept { return failed_; }
 
-    private:
+        [[nodiscard]] bool failed() const noexcept {
+            return failed_;
+        }
+
+       private:
         [[nodiscard]] JSValue throwTypeError(const char* message);
         [[nodiscard]] JSValue throwUnknownModifier(std::string_view type);
         [[nodiscard]] JSValueConst payloadFor(JSValueConst element, ScopedValue& value, std::string_view type);
@@ -39,6 +41,6 @@ namespace arrange::quickjs {
         arrange::core::MutationTransaction* transaction_ = nullptr;
         bool failed_ = false;
     };
-}
+}  // namespace arrange::quickjs
 
 #endif

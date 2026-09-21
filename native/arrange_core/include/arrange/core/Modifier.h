@@ -1,4 +1,5 @@
 #pragma once
+#include "ScrollSnapshot.h"
 
 #include "EventSlot.h"
 #include "Animation.h"
@@ -27,7 +28,9 @@ namespace arrange::core {
         Placement = 512,
     };
 
-    inline constexpr std::uint32_t dirtyMask(DirtyFlag flag) noexcept { return static_cast<std::uint32_t>(flag); }
+    inline constexpr std::uint32_t dirtyMask(DirtyFlag flag) noexcept {
+        return static_cast<std::uint32_t>(flag);
+    }
 
     struct ModifierPadding {
         float start = 0.0f;
@@ -38,9 +41,22 @@ namespace arrange::core {
     };
 
     enum class LayoutModifierKind {
-        Padding, Width, Height, Size, RequiredWidth, RequiredHeight, RequiredSize,
-        FillMaxWidth, FillMaxHeight, FillMaxSize, WidthIn, HeightIn, SizeIn,
-        DefaultMinSize, VerticalScroll, HorizontalScroll,
+        Padding,
+        Width,
+        Height,
+        Size,
+        RequiredWidth,
+        RequiredHeight,
+        RequiredSize,
+        FillMaxWidth,
+        FillMaxHeight,
+        FillMaxSize,
+        WidthIn,
+        HeightIn,
+        SizeIn,
+        DefaultMinSize,
+        VerticalScroll,
+        HorizontalScroll,
     };
 
     struct LayoutModifierSemantics {
@@ -61,6 +77,7 @@ namespace arrange::core {
     };
 
     enum class ParentDataKind { Weight, Align };
+
     struct ParentDataModifierSemantics {
         ParentDataKind kind = ParentDataKind::Weight;
         float weight = 0.0f;
@@ -70,6 +87,7 @@ namespace arrange::core {
     };
 
     enum class PaintStyleKind { Background, Border, Alpha };
+
     struct PaintStyleSemantics {
         PaintStyleKind kind = PaintStyleKind::Background;
         std::uint32_t color = 0;
@@ -86,6 +104,7 @@ namespace arrange::core {
     };
 
     enum class InputModifierKind { Clickable, Hoverable, Focusable };
+
     struct InputModifierSemantics {
         InputModifierKind kind = InputModifierKind::Clickable;
         bool enabled = true;
@@ -171,12 +190,17 @@ namespace arrange::core {
         std::string key;
         bool operator==(const ModifierDescriptor&) const = default;
     };
+
     using ModifierDescriptors = std::vector<ModifierDescriptor>;
 
     struct ModifierHandle {
         std::uint64_t identity = 0;
         std::uint64_t generation = 0;
-        bool valid() const noexcept { return identity != 0 && generation != 0; }
+
+        bool valid() const noexcept {
+            return identity != 0 && generation != 0;
+        }
+
         bool operator==(const ModifierHandle&) const = default;
     };
 
@@ -194,6 +218,7 @@ namespace arrange::core {
         std::shared_ptr<const PaintFragment> fragmentCache;
         SizeAnimation sizeAnimation;
         std::shared_ptr<const TextLayout> textLayout;
+        std::optional<ScrollSnapshot> scrollSnapshot;
     };
 
     struct ModifierReconcileResult {
@@ -202,9 +227,15 @@ namespace arrange::core {
     };
 
     class ModifierChain {
-    public:
-        const std::vector<ModifierInstance>& elements() const noexcept { return elements_; }
-        std::vector<ModifierInstance>& elements() noexcept { return elements_; }
+       public:
+        const std::vector<ModifierInstance>& elements() const noexcept {
+            return elements_;
+        }
+
+        std::vector<ModifierInstance>& elements() noexcept {
+            return elements_;
+        }
+
         ModifierReconcileResult reconcile(const ModifierDescriptors& descriptors);
         ModifierInstance* find(ModifierHandle handle);
         const ModifierInstance* find(ModifierHandle handle) const;
@@ -212,7 +243,7 @@ namespace arrange::core {
         ParentDataModifierSemantics parentData() const;
         float zIndex() const;
 
-    private:
+       private:
         std::vector<ModifierInstance> elements_;
     };
 
@@ -249,4 +280,4 @@ namespace arrange::core {
     void validateModifierDescriptors(const ModifierDescriptors& descriptors);
     void validateModifierValue(const ModifierValue& value);
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after);
-} // namespace arrange::core
+}  // namespace arrange::core

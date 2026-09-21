@@ -34,9 +34,10 @@ namespace {
     void compare(arrange::juce::PassivePaintRenderer& painter, const PublishedFrame& frame) {
         const auto reference = render(painter, frame, false);
         const auto optimized = render(painter, frame, true);
-        for (int y = 0; y < reference.getHeight(); ++y) for (int x = 0; x < reference.getWidth(); ++x) {
-            if (reference.getPixelAt(x, y) != optimized.getPixelAt(x, y)) throw std::runtime_error("可见性剔除改变了图像，坐标：" + std::to_string(x) + "," + std::to_string(y));
-        }
+        for (int y = 0; y < reference.getHeight(); ++y)
+            for (int x = 0; x < reference.getWidth(); ++x) {
+                if (reference.getPixelAt(x, y) != optimized.getPixelAt(x, y)) throw std::runtime_error("可见性剔除改变了图像，坐标：" + std::to_string(x) + "," + std::to_string(y));
+            }
     }
 
     void verifyTextResources() {
@@ -82,11 +83,12 @@ namespace {
             painter.paint(graphics, std::vector<DrawOp>{red, blue});
         }
         bool sawRed = false, sawBlue = false;
-        for (int y = 0; y < 100; ++y) for (int x = 0; x < 240; ++x) {
-            const auto pixel = colors.getPixelAt(x, y);
-            sawRed = sawRed || (y < 40 && pixel.getAlpha() > 128 && pixel.getRed() > pixel.getBlue());
-            sawBlue = sawBlue || (y >= 40 && pixel.getAlpha() > 128 && pixel.getBlue() > pixel.getRed());
-        }
+        for (int y = 0; y < 100; ++y)
+            for (int x = 0; x < 240; ++x) {
+                const auto pixel = colors.getPixelAt(x, y);
+                sawRed = sawRed || (y < 40 && pixel.getAlpha() > 128 && pixel.getRed() > pixel.getBlue());
+                sawBlue = sawBlue || (y >= 40 && pixel.getAlpha() > 128 && pixel.getBlue() > pixel.getRed());
+            }
         check(sawRed && sawBlue && service.counters().layoutsCreated == count, "共享文字资源串色或绘制时重新排版");
         service.clearCache();
         check(service.counters().liveResources >= 5 && mixed->resource, "淘汰缓存错误释放了外部持有的资源");
@@ -103,7 +105,9 @@ namespace {
     void verifyTextInputGeometry() {
         arrange::juce::JuceTextMeasurer backend;
         TextLayoutService service(backend);
-        const auto near = [](float left, float right) { return std::abs(left - right) < 0.01f; };
+        const auto near = [](float left, float right) {
+            return std::abs(left - right) < 0.01f;
+        };
         const auto wrapped = service.layout("a b c d e f", {18, 24}, {0, 35});
         const auto selection = service.boundsForRange(*wrapped, 0, wrapped->text.size(), {10, 20});
         check(wrapped->lines.size() > 1 && selection.size() == wrapped->lines.size(), "自动换行的全选没有覆盖全部行");
@@ -148,9 +152,16 @@ namespace {
             auto second = first;
             second.rect.y += multiline.textLayout->lines[1].y;
             ::juce::Image actual(::juce::Image::ARGB, 200, 100, true), expected(::juce::Image::ARGB, 200, 100, true);
-            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{multiline}); }
-            { ::juce::Graphics graphics(expected); painter.paint(graphics, std::vector<DrawOp>{first, second}); }
-            for (int y = 0; y < 100; ++y) for (int x = 0; x < 200; ++x) check(actual.getPixelAt(x, y) == expected.getPixelAt(x, y), "显式换行改变了居中或末端对齐的绘制位置");
+            {
+                ::juce::Graphics graphics(actual);
+                painter.paint(graphics, std::vector<DrawOp>{multiline});
+            }
+            {
+                ::juce::Graphics graphics(expected);
+                painter.paint(graphics, std::vector<DrawOp>{first, second});
+            }
+            for (int y = 0; y < 100; ++y)
+                for (int x = 0; x < 200; ++x) check(actual.getPixelAt(x, y) == expected.getPixelAt(x, y), "显式换行改变了居中或末端对齐的绘制位置");
         }
 
         const auto font = ::juce::Font(::juce::FontOptions(18));
@@ -176,7 +187,10 @@ namespace {
             op.rect = {10, 10, 180, 30};
             op.textLayout = layout;
             op.color = 0xffffffff;
-            { ::juce::Graphics graphics(actual); painter.paint(graphics, std::vector<DrawOp>{op}); }
+            {
+                ::juce::Graphics graphics(actual);
+                painter.paint(graphics, std::vector<DrawOp>{op});
+            }
             {
                 ::juce::GlyphArrangement glyphs;
                 glyphs.addLineOfText(font, ::juce::String::fromUTF8(text.c_str()), 10, 10 + layout->baseline);
@@ -184,9 +198,10 @@ namespace {
                 graphics.setColour(::juce::Colours::white);
                 glyphs.draw(graphics);
             }
-            for (int y = 0; y < 50; ++y) for (int x = 0; x < 200; ++x) {
-                if (actual.getPixelAt(x, y) != expected.getPixelAt(x, y)) throw std::runtime_error("字形绘制与后端不同，文本：" + text + "，坐标：" + std::to_string(x) + "," + std::to_string(y));
-            }
+            for (int y = 0; y < 50; ++y)
+                for (int x = 0; x < 200; ++x) {
+                    if (actual.getPixelAt(x, y) != expected.getPixelAt(x, y)) throw std::runtime_error("字形绘制与后端不同，文本：" + text + "，坐标：" + std::to_string(x) + "," + std::to_string(y));
+                }
         }
     }
 
@@ -203,12 +218,15 @@ namespace {
         initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{1, {{size(320, 240), {}}, {scroll, "scroll"}}}};
         for (NodeId id = 2; id < 82; ++id) {
             initial.operations.push_back(CreateNodeMutation{id, arrange::core::NodeType::Layout});
-        initial.operations.push_back(SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
+            initial.operations.push_back(SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
             initial.operations.push_back(SetModifierMutation{id, {{size(300, 30), {}}, {test_support::text("音轨 " + std::to_string(id) + " English 🙂", 0xffabcdef, 18), {}}}});
             initial.operations.push_back(InsertChildMutation{1, id, id - 2});
         }
         const auto publish = [&](const MutationTransaction* transaction, const FrameFinalizer& extra = {}) {
-            return pipeline.run(scene, 1, {0, 320, 0, 240}, transaction, true, frame, [&](const auto& candidate, auto& next) { painter.prepareResources(next.content); if (extra) extra(candidate, next); });
+            return pipeline.run(scene, 1, {0, 320, 0, 240}, transaction, true, frame, [&](const auto& candidate, auto& next) {
+                painter.prepareResources(next.content);
+                if (extra) extra(candidate, next);
+            });
         };
         check(!publish(&initial).error, "初始列表发布失败");
         const auto warmedLayouts = service.counters().layoutsCreated;
@@ -279,7 +297,9 @@ namespace {
         auto field = test_support::textField("English 中文 e\xcc\x81 🙂 很长的输入文字", "输入占位符", 0xffeeeeee, 20);
         field.presentation.singleLine = true;
         initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetModifierMutation{1, {{size(180, 40), {}}, {field, {}}}}};
-        auto publish = [&](const MutationTransaction* transaction) { return pipeline.run(scene, 1, {0, 320, 0, 240}, transaction, true, frame); };
+        auto publish = [&](const MutationTransaction* transaction) {
+            return pipeline.run(scene, 1, {0, 320, 0, 240}, transaction, true, frame);
+        };
         check(!publish(&initial).error, "输入节点准备失败");
         const auto& node = *test_support::editable(scene.node(1));
         arrange::juce::TextInputLayoutModel model(service);
@@ -355,17 +375,44 @@ namespace {
         scroll.kind = LayoutModifierKind::VerticalScroll;
         scroll.scrollValue = 18;
         MutationTransaction create;
-        create.operations = {
-            CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{size(320, 240), {}}, {rounded, {}}, {outer, {}}}},
-            CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{2, {{size(160, 100), {}}, {OffsetModifier{90, 15}, {}}, {circle, {}}, {scroll, {}}}}, InsertChildMutation{1, 2, 0},
-            CreateNodeMutation{3, arrange::core::NodeType::Layout}, SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{3, {{size(25, 45), {}}, {OffsetModifier{-140, 20}, {}}, {[] { auto value = test_support::text("VISIBLE 中文溢出 English", 0xffff0000, 30); value.overflow = "visible"; value.maxLines = 1; return value; }(), {}}}}, InsertChildMutation{2, 3, 0},
-            CreateNodeMutation{4, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{4, {{size(25, 50), {}}, {OffsetModifier{230, 130}, {}}, {border, {}}}}, InsertChildMutation{1, 4, 1},
-            CreateNodeMutation{5, arrange::core::NodeType::Layout}, SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{5, {{size(160, 30), {}}, {OffsetModifier{20, 170}, {}}, {test_support::text("同资源不同颜色", 0xff00ff00, 18), {}}}}, InsertChildMutation{1, 5, 2},
-            CreateNodeMutation{6, arrange::core::NodeType::Layout}, SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})}, SetModifierMutation{6, {{size(160, 30), {}}, {OffsetModifier{20, 195}, {}}, {test_support::text("同资源不同颜色", 0xff0000ff, 18), {}}}}, InsertChildMutation{1, 6, 3}
-        };
+        create.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout},
+                             arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
+                             SetModifierMutation{1, {{size(320, 240), {}}, {rounded, {}}, {outer, {}}}},
+                             CreateNodeMutation{2, arrange::core::NodeType::Layout},
+                             arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})},
+                             SetModifierMutation{2, {{size(160, 100), {}}, {OffsetModifier{90, 15}, {}}, {circle, {}}, {scroll, {}}}},
+                             InsertChildMutation{1, 2, 0},
+                             CreateNodeMutation{3, arrange::core::NodeType::Layout},
+                             SetPropMutation{3, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+                             SetModifierMutation{3,
+                                                 {{size(25, 45), {}},
+                                                  {OffsetModifier{-140, 20}, {}},
+                                                  {[] {
+                                                       auto value = test_support::text("VISIBLE 中文溢出 English", 0xffff0000, 30);
+                                                       value.overflow = "visible";
+                                                       value.maxLines = 1;
+                                                       return value;
+                                                   }(),
+                                                   {}}}},
+                             InsertChildMutation{2, 3, 0},
+                             CreateNodeMutation{4, arrange::core::NodeType::Layout},
+                             arrange::core::SetPropMutation{4, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})},
+                             SetModifierMutation{4, {{size(25, 50), {}}, {OffsetModifier{230, 130}, {}}, {border, {}}}},
+                             InsertChildMutation{1, 4, 1},
+                             CreateNodeMutation{5, arrange::core::NodeType::Layout},
+                             SetPropMutation{5, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+                             SetModifierMutation{5, {{size(160, 30), {}}, {OffsetModifier{20, 170}, {}}, {test_support::text("同资源不同颜色", 0xff00ff00, 18), {}}}},
+                             InsertChildMutation{1, 5, 2},
+                             CreateNodeMutation{6, arrange::core::NodeType::Layout},
+                             SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
+                             SetModifierMutation{6, {{size(160, 30), {}}, {OffsetModifier{20, 195}, {}}, {test_support::text("同资源不同颜色", 0xff0000ff, 18), {}}}},
+                             InsertChildMutation{1, 6, 3}};
         {
             ::juce::Image source(::juce::Image::ARGB, 100, 10, true);
-            { ::juce::Graphics graphics(source); graphics.fillAll(::juce::Colour(0x999922aa)); }
+            {
+                ::juce::Graphics graphics(source);
+                graphics.fillAll(::juce::Colour(0x999922aa));
+            }
             auto stream = ::juce::File::getCurrentWorkingDirectory().getChildFile("m23-crop-source.png").createOutputStream();
             check(stream != nullptr, "无法打开绘制验收图像文件");
             stream->setPosition(0);
@@ -427,7 +474,7 @@ namespace {
         }
         check(draw.counters().opsSkipped == 1 && image.getPixelAt(155, 155) == ::juce::Colour(0xff00ff00), "操作剔除破坏了相邻片段的状态");
     }
-}
+}  // namespace
 
 int main() {
     try {

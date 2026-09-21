@@ -38,7 +38,7 @@ namespace arrange {
 #if ARRANGE_JUCE_WITH_JUCE
 
     class DevServerReloadClient final : private ::juce::Thread {
-    public:
+       public:
         using ReloadCallback = std::function<void(DevReloadEvent)>;
 
         DevServerReloadClient();
@@ -47,10 +47,13 @@ namespace arrange {
         void start(std::string devServerUrl, ReloadCallback callback);
         void stop();
 
-        bool isClientRunning() const noexcept { return running_.load(); }
+        bool isClientRunning() const noexcept {
+            return running_.load();
+        }
+
         std::string lastError() const;
 
-    private:
+       private:
         void run() override;
         bool connectAndPump(const DevServerEndpoint& endpoint);
 
@@ -63,4 +66,4 @@ namespace arrange {
     };
 
 #endif
-} // namespace arrange
+}  // namespace arrange

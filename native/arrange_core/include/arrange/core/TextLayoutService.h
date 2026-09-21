@@ -44,7 +44,7 @@ namespace arrange::core {
     };
 
     class TextDrawResource {
-    public:
+       public:
         virtual ~TextDrawResource() = default;
         virtual std::size_t estimatedBytes() const noexcept = 0;
     };
@@ -67,17 +67,17 @@ namespace arrange::core {
     };
 
     class TextMeasurer {
-    public:
+       public:
         virtual ~TextMeasurer() = default;
         virtual TextLayout createLayout(std::string_view text, TextStyle style, TextLayoutOptions options) const = 0;
     };
 
     // 无后端的确定性测试实现，不向正式 JUCE paint 提供兼容兜底
     class ApproximateTextMeasurer : public TextMeasurer {
-    public:
+       public:
         TextLayout createLayout(std::string_view text, TextStyle style, TextLayoutOptions options) const override;
 
-    protected:
+       protected:
         virtual float advance(std::string_view utf8Cluster, char32_t codepoint, const TextStyle& style) const;
         float lineWidth(std::string_view utf8Text, const TextStyle& style) const;
     };
@@ -96,7 +96,7 @@ namespace arrange::core {
     };
 
     class TextLayoutService {
-    public:
+       public:
         explicit TextLayoutService(const TextMeasurer& measurer, std::size_t maxEntries = 256, std::size_t maxBytes = 8 * 1024 * 1024);
         TextLayoutService(const TextLayoutService&) = delete;
         TextLayoutService& operator=(const TextLayoutService&) = delete;
@@ -104,14 +104,18 @@ namespace arrange::core {
         std::shared_ptr<const TextLayout> layout(std::string_view text, TextStyle style = {}, TextLayoutOptions options = {}, const std::shared_ptr<const TextLayout>& previous = {}) const;
         void invalidateFontEnvironment();
         void clearCache() const;
-        TextLayoutCounters counters() const noexcept { return *counters_; }
+
+        TextLayoutCounters counters() const noexcept {
+            return *counters_;
+        }
+
         Size measure(std::string_view text, TextStyle style = {}, TextLayoutOptions options = {}) const;
         float xForByteIndex(const TextLayout& layout, std::size_t index) const;
         std::size_t byteIndexAtPoint(const TextLayout& layout, Point point) const;
         Rect caretRect(const TextLayout& layout, std::size_t index, Point origin = {}) const;
         std::vector<Rect> boundsForRange(const TextLayout& layout, std::size_t start, std::size_t end, Point origin = {}) const;
 
-    private:
+       private:
         const TextLineLayout& lineForByteIndex(const TextLayout& layout, std::size_t index) const;
 
         struct Key {
@@ -120,7 +124,11 @@ namespace arrange::core {
             TextLayoutOptions options;
             bool operator==(const Key&) const = default;
         };
-        struct KeyHash { std::size_t operator()(const Key& key) const noexcept; };
+
+        struct KeyHash {
+            std::size_t operator()(const Key& key) const noexcept;
+        };
+
         struct Entry {
             Key key;
             std::shared_ptr<const TextLayout> layout;
@@ -137,4 +145,4 @@ namespace arrange::core {
     };
 
     const TextLayoutService& defaultTextLayoutService();
-} // namespace arrange::core
+}  // namespace arrange::core

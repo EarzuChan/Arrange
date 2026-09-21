@@ -1,0 +1,66 @@
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+[0/2] Re-checking globbed directories...
+[1/13] 编译 Arrange SFA 原生运行夹具
+vite v8.0.11 building client environment for production...
+
+transforming...✓ 75 modules transformed.
+rendering chunks...
+computing gzip size...
+build/vue-runtime-fixture/app.js  118.18 kB │ gzip: 32.19 kB
+
+✓ built in 92ms
+vite v8.0.11 building client environment for production...
+
+transforming...✓ 65 modules transformed.
+rendering chunks...
+computing gzip size...
+build/viewport-runtime-fixture/app.js  66.02 kB │ gzip: 20.95 kB
+
+✓ built in 26ms
+[2/13] Building CXX object native\arrange_juce\CMakeFiles\arrange_juce.dir\src\ArrangeEditor.cpp.obj
+[3/13] Building CXX object native\arrange_juce\CMakeFiles\arrange_juce.dir\src\JucePointerInputAdapter.cpp.obj
+[4/13] Linking CXX static library native\arrange_juce\arrange_juce.lib
+[5/13] Linking CXX executable cpp_tests\arrange_core_smoke.exe
+[6/13] Linking CXX executable cpp_tests\arrange_m24_contract.exe
+[7/13] Linking CXX executable cpp_tests\arrange_quickjs_app_smoke.exe
+[8/13] Linking CXX executable cpp_tests\arrange_juce_runtime_smoke.exe
+[9/13] Linking CXX executable cpp_tests\arrange_vue_runtime.exe
+[10/13] Linking CXX executable cpp_tests\arrange_frame_submission.exe
+[11/13] Linking CXX executable cpp_tests\arrange_retained_paint.exe
+[12/13] Linking CXX executable cpp_tests\arrange_viewport_runtime.exe
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+Test project E:/a_dev/proj/Arrange/build/m23-final-debug
+      Start  1: arrange_core_smoke
+ 1/12 Test  #1: arrange_core_smoke ...............   Passed    0.07 sec
+      Start  2: arrange_local_work
+ 2/12 Test  #2: arrange_local_work ...............   Passed    2.74 sec
+      Start  3: arrange_m24_contract
+ 3/12 Test  #3: arrange_m24_contract .............   Passed    0.06 sec
+      Start  4: arrange_quickjs_app_smoke
+ 4/12 Test  #4: arrange_quickjs_app_smoke ........   Passed    0.89 sec
+      Start  5: arrange_juce_runtime_smoke
+ 5/12 Test  #5: arrange_juce_runtime_smoke .......   Passed    1.23 sec
+      Start  6: arrange_modifier_runtime
+ 6/12 Test  #6: arrange_modifier_runtime .........   Passed    0.09 sec
+      Start  7: arrange_quickjs_modifier
+ 7/12 Test  #7: arrange_quickjs_modifier .........   Passed    0.07 sec
+      Start  8: arrange_slot_runtime
+ 8/12 Test  #8: arrange_slot_runtime .............   Passed    0.01 sec
+      Start  9: arrange_frame_submission
+ 9/12 Test  #9: arrange_frame_submission .........   Passed    1.25 sec
+      Start 10: arrange_vue_runtime
+10/12 Test #10: arrange_vue_runtime ..............   Passed    8.54 sec
+      Start 11: arrange_viewport_runtime
+11/12 Test #11: arrange_viewport_runtime .........   Passed    0.13 sec
+      Start 12: arrange_retained_paint
+12/12 Test #12: arrange_retained_paint ...........   Passed   10.13 sec
+
+100% tests passed, 0 tests failed out of 12
+
+Total Test time (real) =  25.23 sec

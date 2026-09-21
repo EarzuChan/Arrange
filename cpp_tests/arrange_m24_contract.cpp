@@ -14,7 +14,9 @@ namespace {
         if (!condition) throw std::runtime_error(message);
     }
 
-    PropValue policy(const char* kind) { return PropValue::objectValue({{"kind", PropValue::stringValue(kind)}}); }
+    PropValue policy(const char* kind) {
+        return PropValue::objectValue({{"kind", PropValue::stringValue(kind)}});
+    }
 
     ModifierDescriptor size(float width, float height) {
         LayoutModifierSemantics input;
@@ -44,7 +46,6 @@ namespace {
         tree.setHostInput(1, HostInput::MeasurePolicy, policy("MinSize"));
         engine.layout(tree, 1, {17, 200, 19, 200});
         require(tree.node(1).bounds.width == 17 && tree.node(1).bounds.height == 19, "MinSizeMeasurePolicy 必须严格采用最小约束");
-
     }
 
     void painterModifier() {
@@ -88,8 +89,11 @@ namespace {
         require(firstValue.x == 12 && secondValue.x == 2, "一个受体的实例更新不得污染另一个受体");
 
         bool rejected = false;
-        try { tree.setModifierInput(2, first, OffsetModifier{20, 30}); }
-        catch (const std::invalid_argument&) { rejected = true; }
+        try {
+            tree.setModifierInput(2, first, OffsetModifier{20, 30});
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
         require(rejected, "Modifier 实例不能跨受体更新");
         tree.apply({DeleteNodeMutation{1}});
         tree.setModifierInput(2, second, OffsetModifier{22, 23});
@@ -310,7 +314,7 @@ const handle = native.acquirePainter('失败', completion => {
         }
         late->set_value({content, {}});
     }
-}
+}  // namespace
 
 int main() {
     try {

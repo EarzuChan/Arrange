@@ -30,4 +30,4 @@ namespace arrange::core {
     };
 
     using PainterLoader = std::function<std::future<PainterLoadResult>(const std::string&)>;
-}
+}  // namespace arrange::core

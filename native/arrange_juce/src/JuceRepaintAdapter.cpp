@@ -6,5 +6,5 @@ namespace arrange::juce {
         // Published DrawOps cover the full scene, including transformed overlays and previous positions.
         if (frame.plan.passivePaint) owner.repaint();
     }
-}
+}  // namespace arrange::juce
 #endif

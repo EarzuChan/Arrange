@@ -10,7 +10,10 @@ using namespace arrange::core;
 using arrange::quickjs::QuickJsScriptHost;
 
 namespace {
-    void check(bool condition, const char* message) { if (!condition) throw std::runtime_error(message); }
+    void check(bool condition, const char* message) {
+        if (!condition) throw std::runtime_error(message);
+    }
+
     void frame(QuickJsScriptHost& host, NativeScene& scene, SceneFramePipeline& pipeline, PublishedFrame& published) {
         auto submission = host.takePendingTransaction();
         check(submission.has_value(), "QuickJS did not submit changes");
@@ -20,6 +23,7 @@ namespace {
         const auto receipt = host.completeRearrange(submission->rearrange);
         if (!receipt.ok) throw std::runtime_error(receipt.error);
     }
+
     void verifyExplicitBindings() {
         QuickJsScriptHost host;
         NativeScene scene;
@@ -116,9 +120,7 @@ namespace {
             frame(host, scene, pipeline, published);
         };
         send("bind");
-        check(scene.node(1).modifier.elements()[0].handle == original &&
-              std::get<PaintStyleSemantics>(scene.node(1).modifier.elements()[0].descriptor.value).color == 0xff112233,
-              "instance input did not preserve target identity");
+        check(scene.node(1).modifier.elements()[0].handle == original && std::get<PaintStyleSemantics>(scene.node(1).modifier.elements()[0].descriptor.value).color == 0xff112233, "instance input did not preserve target identity");
         check(host.eventSlotCount() == 3 && scene.eventSlotCount() == 3, "direct callback updates leaked or retired a sibling");
         check(host.rejectedBindingUpdates() == 1, "QuickJS early stale rejection was not counted");
         const auto inner = modifierEventSlot(scene.node(1).modifier.elements()[2].descriptor.value);
@@ -128,11 +130,9 @@ namespace {
         send("reorder");
         check(scene.node(1).modifier.elements()[1].handle == original, "keyed reorder changed instance handle");
         send("write");
-        check(std::get<PaintStyleSemantics>(scene.node(1).modifier.elements()[1].descriptor.value).color == 0xffabcdef,
-              "instance binding followed old chain index");
+        check(std::get<PaintStyleSemantics>(scene.node(1).modifier.elements()[1].descriptor.value).color == 0xffabcdef, "instance binding followed old chain index");
         send("remove");
-        check(host.modifierInstanceCount() == 1 && host.bindingCount() == scene.bindingCount() && host.eventSlotCount() == 1,
-              "retired instance retained JS/native resources");
+        check(host.modifierInstanceCount() == 1 && host.bindingCount() == scene.bindingCount() && host.eventSlotCount() == 1, "retired instance retained JS/native resources");
         send("late");
         check(scene.node(1).props.at("contentDescription").stringOr() == "retired" && host.rejectedBindingUpdates() == 2, "late instance input accepted");
     }
@@ -221,14 +221,16 @@ namespace {
         check(loaded.ok, "回调发布夹具执行失败");
         auto initial = host.takePendingTransaction();
         EventSlotId original;
-        for (const auto& op : initial->operations) if (const auto* registration = std::get_if<RegisterEventSlot>(&op)) original = registration->slot;
+        for (const auto& op : initial->operations)
+            if (const auto* registration = std::get_if<RegisterEventSlot>(&op)) original = registration->slot;
         check(original.valid() && !host.invokeEventSlot(original).ok, "未发布回调提前可调用");
         check(!pipeline.run(scene, 1, {0, 400, 0, 300}, &*initial, true, published).error, "首轮发布失败");
         host.publishScene(scene);
         check(host.completeRearrange(initial->rearrange).ok, "首轮回执失败");
         auto replacement = host.takePendingTransaction();
         EventSlotId next;
-        for (const auto& op : replacement->operations) if (const auto* registration = std::get_if<RegisterEventSlot>(&op)) next = registration->slot;
+        for (const auto& op : replacement->operations)
+            if (const auto* registration = std::get_if<RegisterEventSlot>(&op)) next = registration->slot;
         check(next.valid() && next != original && !host.invokeEventSlot(next).ok, "候选回调身份或调用资格错误");
         replacement->operations.emplace_back(InsertChildMutation{1, 1, 0});
         const auto revision = published.revision;
@@ -241,7 +243,7 @@ namespace {
         check(scene.node(1).props.at("contentDescription").stringOr() == "旧回调" && host.eventSlotCount() == 1, "回滚没有保留旧回调或泄漏候选");
     }
 
-}
+}  // namespace
 
 int main() {
     try {
@@ -308,7 +310,8 @@ int main() {
             const auto bindings = scene.bindingCount();
 
             EventSlotId submit;
-            for (const auto& slot : scene.activeEventSlots()) if (slot.kind == EventSlotKind::InputSubmit) submit = slot;
+            for (const auto& slot : scene.activeEventSlots())
+                if (slot.kind == EventSlotKind::InputSubmit) submit = slot;
             const auto invalid = host.invokeEventSlot(submit, {true, "middel"});
             if (invalid.ok || invalid.error.find("textAlign") == std::string::npos || invalid.error.find("middel") == std::string::npos || invalid.error.find("enum-schema.js") == std::string::npos) throw std::runtime_error("枚举错误必须包含字段、输入值和脚本来源：" + invalid.error);
             check(std::get<TextModifier>(scene.node(2).modifier.elements()[0].descriptor.value).textAlign == "Start" && published.revision == revision, "非法枚举污染了已发布状态");
@@ -325,8 +328,7 @@ int main() {
                 const again = () => Promise.resolve().then(again)
                 again()
             )JS");
-            check(!result.ok && result.error.find("did not stabilize") != std::string::npos,
-                  "unbounded microtask loop escaped the frame work budget");
+            check(!result.ok && result.error.find("did not stabilize") != std::string::npos, "unbounded microtask loop escaped the frame work budget");
         }
         QuickJsScriptHost host;
         NativeScene scene;

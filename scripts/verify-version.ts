@@ -1,4 +1,4 @@
-import {assertArrangeVersionContract, readArrangeVersionContract} from "./version-contract.ts"
+import { assertArrangeVersionContract, readArrangeVersionContract } from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
 assertArrangeVersionContract()

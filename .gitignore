@@ -23,7 +23,7 @@ build/
 dist/
 cmake-build-*/
 tmp-refs/
-/artifacts/npm/
+artifacts/
 
 # CMake accidental in-source configure outputs
 CMakeCache.txt

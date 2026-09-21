@@ -1,25 +1,25 @@
 ﻿# 基本分工
 
-在 `Arrange UI Pipeline` 中，Arrange Vue 负责 authoring、composition、phase-aware reactivity、host target lowering 与 typed UI slot scheduling；QuickJS host 负责把 Arrange Vue 产生的 typed mutation、event slot update 与 slot update 直接接入 native boundary；C++ core 负责 scene state、LayoutTree、布局、绘制准备、命中测试与 dirty 归因。
+在 `Arrange UI Pipeline` 中，Arrange Ts Runtime 负责 authoring、rearrange、phase-aware reactivity、host target lowering 与 typed UI slot scheduling；Arrange Framework Native Part 负责把 Arrange Ts Runtime 产生的 typed mutation、event slot update 与 slot update 直接接入 native boundary；C++ core 负责 scene state、LayoutTree、布局、绘制准备、命中测试与 dirty 归因。
 
-Arrange 的 QuickJS 与 C++ 是同进程关系，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON、二进制 buffer、字符串 value 编码或 command buffer 协议。QuickJS host 必须直接读取 `JSValue`、primitive、callback function 与稳定 runtime object shape，并构造 native typed `MutationTransaction` 与 `SlotUpdateBatch`。
+Arrange 的 QuickJS 与 C++ 是直接就在一起的，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON、二进制 buffer、字符串 value 编码或 command buffer 协议。Arrange Framework Native Part 必须直接读取 `JSValue`、primitive、callback function 与稳定 runtime object shape，并构造 native typed `MutationTransaction` 与 `SlotUpdateBatch`。
 
 # 性能原则
 
 - JS 到 C++ 只提交变化，不传整棵树快照。
-- Composition Phase 的离散界面变化进入 `MutationTransaction`。
+- Rearrange Phase 的离散界面变化进入 `MutationTransaction`。
 - JS Value Phase 的 UI value 变化进入 `SlotUpdateBatch`。
 - 批处理是 transaction / slot update 优化，不是序列化协议。
 - Canvas、动画、高频绘制不通过结构重排 传大对象。
 - QuickJS host 不做泛用 serializer；只按稳定 TS object shape / native API 参数读取字段。
 - core 不解析 JSON、不解析 encoded string、不知道 QuickJS 业务对象。
 
-# Arrange Vue lowering
+# Arrange Ts 玩意儿 lowering
 
-Arrange Vue compiler / runtime 产生两类生产更新：
+Arrange compiler / runtime 产生两类生产更新：
 
 ```txt
-Composition mutations:
+Rearrange mutations:
   create / delete / insert / remove node
   update measure policy
   set modifier
@@ -113,6 +113,7 @@ JSON 只允许用于旁路诊断和人类可读输出：
 - 人类可读日志。
 
 JSON 不允许作为 JS 到 C++ 的生产提交事实源，也不允许作为 Modifier、Prop、Event、Slot、Reload 或 Scroll 的生产编码。测试快照可以是 JSON 文件格式，但快照内容必须来自真实 native pipeline 的结果，不能反过来定义生产语义。
+
 # C++ scene state 与 LayoutTree
 
 长期概念上，C++ 侧生产状态分为：
@@ -142,7 +143,7 @@ Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、
 要求：
 
 - QuickJS host 按 prop schema 直接读取 JSValue。
-- Arrange Vue compiler / runtime 按 prop schema 建立 typed prop op 或 reactive slot binding。
+- Arrange UI App compiler / runtime 按 prop schema 建立 typed prop op 或 reactive slot binding。
 - core 接收 typed prop value。
 - unknown prop 默认拒绝并诊断；若未来需要 extension / custom bucket，必须先为该 bucket 设计独立 schema、命名空间、dirty 影响与测试，不能把它变成任意对象后门。
 - event prop 必须基于明确 schema，不得靠任意 `on*` 或包含 `EventSlot` 的字符串猜测。
@@ -281,14 +282,14 @@ insert / remove / delete subtree 时必须同步维护 parent index 与 order in
 - Canvas 与最终绘制在 JUCE。
 - 性能与线程边界更清晰。
 
-生产事实源在 `arrange_core` 与 Arrange Vue runtime 的明确边界内。Arrange Vue 负责 authoring、composition、phase-aware reactivity 与 typed slot scheduling；C++ core 负责生产布局、绘制、命中与文本测量事实源。
+生产事实源在 `arrange_core` 与 Arrange Ts runtime 的明确边界内。Arrange Ts Side Runtime 负责 authoring、rearrange、phase-aware reactivity 与 typed slot scheduling；C++ Side Framework/Runtime 负责生产布局、绘制、命中与文本测量事实源。
 
 # 生命周期
 
 每个 `ArrangeEditor` 拥有：
 
 - 一个 QuickJS runtime/context。
-- 一个 Arrange Vue App instance。
+- 一个 Arrange UI App instance。
 - 一个 `NativeScene` 或等价 scene state，其中包含 LayoutTree、event slots、dirty state 与渲染状态。
 - 一个 scene host。
 

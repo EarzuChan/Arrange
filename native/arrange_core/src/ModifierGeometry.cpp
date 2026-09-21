@@ -106,4 +106,4 @@ namespace arrange::core {
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value); layout && (layout->kind == LayoutModifierKind::VerticalScroll || layout->kind == LayoutModifierKind::HorizontalScroll) && !containsRect(instance.bounds, point)) return false;
         return true;
     }
-} // namespace arrange::core
+}  // namespace arrange::core

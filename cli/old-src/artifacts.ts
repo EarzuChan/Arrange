@@ -1,27 +1,27 @@
-﻿import {cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync} from "node:fs"
-import {basename, extname, join, relative, resolve} from "node:path"
-import type {ArrangeConfig, Flavor, Product} from "./config.ts"
-import {cmakeBuildDir} from "./project.ts"
-import {platformArch} from "./process.ts"
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
+import { basename, extname, join, relative, resolve } from "node:path"
+import type { ArrangeConfig, Flavor, Product } from "./config.ts"
+import { cmakeBuildDir } from "./project.ts"
+import { platformArch } from "./process.ts"
 
-export function packageArtifacts(config: ArrangeConfig, root: string, args: {flavor: Flavor; products: Product[]; clean?: boolean}): string[] {
+export function packageArtifacts(config: ArrangeConfig, root: string, args: { flavor: Flavor; products: Product[]; clean?: boolean }): string[] {
     const written: string[] = []
     for (const product of args.products) {
         const destination = artifactProductDir(config, root, args.flavor, product)
-        if (args.clean) rmSync(destination, {recursive: true, force: true})
-        mkdirSync(destination, {recursive: true})
+        if (args.clean) rmSync(destination, { recursive: true, force: true })
+        mkdirSync(destination, { recursive: true })
         const nativeArtifact = findNativeArtifact(config, root, args.flavor, product)
         if (!nativeArtifact) throw missingArtifactError(config, root, args.flavor, product)
         const nativeDestination = resolve(destination, basename(nativeArtifact))
-        cpSync(nativeArtifact, nativeDestination, {recursive: true})
+        cpSync(nativeArtifact, nativeDestination, { recursive: true })
         written.push(relative(root, nativeDestination))
 
         const uiDist = resolve(root, config.ui.path, "dist")
         if (existsSync(uiDist)) {
             const uiDestination = productUiDestination(destination, product, nativeDestination)
-            rmSync(uiDestination, {recursive: true, force: true})
-            mkdirSync(uiDestination, {recursive: true})
-            cpSync(uiDist, uiDestination, {recursive: true})
+            rmSync(uiDestination, { recursive: true, force: true })
+            mkdirSync(uiDestination, { recursive: true })
+            cpSync(uiDist, uiDestination, { recursive: true })
             written.push(relative(root, uiDestination))
         }
     }

@@ -1,7 +1,7 @@
-import {spawn} from "node:child_process"
-import type {SpawnOptions} from "node:child_process"
-import {existsSync, mkdirSync, writeFileSync} from "node:fs"
-import {resolve} from "node:path"
+import { spawn } from "node:child_process"
+import type { SpawnOptions } from "node:child_process"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
 
 export const repoRoot = resolve(import.meta.dirname, "..")
 
@@ -47,7 +47,7 @@ export function run(command: string, args: readonly string[] = [], options: Spaw
 }
 
 export function npmSubprocessEnv(): NodeJS.ProcessEnv {
-    const env = {...process.env}
+    const env = { ...process.env }
     const noisyPnpmForwardedKeys = new Set([
         "npm_config__jsr_registry",
         "npm_config_catalog",
@@ -61,7 +61,7 @@ export function npmSubprocessEnv(): NodeJS.ProcessEnv {
     }
     const emptyGlobalConfig = resolve(repoRoot, "build", "npm-empty-global.npmrc")
     if (!existsSync(emptyGlobalConfig)) {
-        mkdirSync(resolve(repoRoot, "build"), {recursive: true})
+        mkdirSync(resolve(repoRoot, "build"), { recursive: true })
         writeFileSync(emptyGlobalConfig, "")
     }
     env.npm_config_globalconfig = emptyGlobalConfig
@@ -74,20 +74,13 @@ export function runInVsDev(command: string): Promise<void> {
     const ninjaDir = resolve(ninjaExe(), "..")
     const windowsKitBin = "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64"
     const toolPath = [nmakeDir, ninjaDir, windowsKitBin].filter((candidate) => existsSync(candidate)).join(";")
-    const commandLine = devCmd
-        ? `call ${quoteCmd(devCmd)} -arch=x64 -host_arch=x64 && set "PATH=${toolPath};%PATH%" && ${command}`
-        : command
-    return run("cmd.exe", ["/d", "/c", commandLine], {windowsVerbatimArguments: true})
+    const commandLine = devCmd ? `call ${quoteCmd(devCmd)} -arch=x64 -host_arch=x64 && set "PATH=${toolPath};%PATH%" && ${command}` : command
+    return run("cmd.exe", ["/d", "/c", commandLine], { windowsVerbatimArguments: true })
 }
 
 export function configureSmokeBuild(buildDir: string): Promise<void> {
-    const quickJsDirArg = process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR
-        ? ` -DARRANGE_QUICKJS_NG_SOURCE_DIR="${process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR}"`
-        : ""
-    return runInVsDev(
-        `"${cmakeExe()}" -S . -B ${buildDir} -G Ninja -DCMAKE_MAKE_PROGRAM="${ninjaExe()}" `
-        + `-DCMAKE_BUILD_TYPE=Debug -DARRANGE_BUILD_TESTS=ON${quickJsDirArg}`,
-    )
+    const quickJsDirArg = process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR ? ` -DARRANGE_QUICKJS_NG_SOURCE_DIR="${process.env.ARRANGE_QUICKJS_NG_SOURCE_DIR}"` : ""
+    return runInVsDev(`"${cmakeExe()}" -S . -B "${buildDir}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninjaExe()}" ` + `-DCMAKE_BUILD_TYPE=Debug -DARRANGE_BUILD_TESTS=ON${quickJsDirArg}`)
 }
 
 function quoteCmd(value: string): string {

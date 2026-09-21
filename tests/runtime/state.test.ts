@@ -1,6 +1,30 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { createScrollState } from "../../packages/runtime/src/index.ts"
+import { createScrollState, watch } from '../../packages/framework/src/index.ts'
+import { M } from '@arrange/framework/ui'
+
+test('布局输出的范围变化不重新求值滚动 Modifier，偏移变化仍正常订阅', () => {
+    const state = createScrollState()
+    let evaluations = 0
+    const stop = watch(() => M.verticalScroll(state), () => { evaluations++ }, { flush: 'sync' })
+
+    state.__arrangeNativeScroll({ value: 0, maxValue: 200, viewportSize: 100, contentSize: 300 })
+    assert.equal(evaluations, 0)
+    state.scrollTo(30)
+    assert.equal(evaluations, 1)
+    stop()
+})
+
+test('滚动布局快照整组发布，同步观察者只读取完整的新状态', () => {
+    const state = createScrollState()
+    const observed: number[][] = []
+    const stop = watch(() => [state.value, state.maxValue, state.viewportSize, state.contentSize, Number(state.canScrollForward), Number(state.canScrollBackward)], value => observed.push(value), { flush: 'sync' })
+
+    state.__arrangeNativeScroll({ value: 20, maxValue: 20, viewportSize: 80, contentSize: 100 })
+    state.__arrangeNativeScroll({ value: 0, maxValue: 0, viewportSize: 120, contentSize: 100 })
+    assert.deepEqual(observed, [[20, 20, 80, 100, 0, 1], [0, 0, 120, 100, 0, 0]])
+    stop()
+})
 
 test("ScrollState mirrors native typed scroll snapshots", () => {
     const state = createScrollState({ initial: 4 })

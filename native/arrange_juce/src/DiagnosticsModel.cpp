@@ -33,7 +33,7 @@ namespace arrange::juce {
             if (!event.pathOrUrl.empty()) line += " (" + event.pathOrUrl + ")";
             return line;
         }
-    } // namespace
+    }  // namespace
 
     void DiagnosticsModel::configure(DiagnosticsConfig config) {
         config_ = std::move(config);
@@ -64,16 +64,13 @@ namespace arrange::juce {
     bool DiagnosticsModel::tick(double nowMillis) {
         if (toasts_.empty()) return false;
         const auto before = toasts_.size();
-        toasts_.erase(
-            std::remove_if(
-                toasts_.begin(),
-                toasts_.end(),
-                [nowMillis](const Toast& toast) { return toast.expiresAtMs <= nowMillis; }),
-            toasts_.end());
+        toasts_.erase(std::remove_if(toasts_.begin(), toasts_.end(), [nowMillis](const Toast& toast) { return toast.expiresAtMs <= nowMillis; }), toasts_.end());
         return before != toasts_.size();
     }
 
-    bool DiagnosticsModel::hasActiveToasts() const noexcept { return !toasts_.empty(); }
+    bool DiagnosticsModel::hasActiveToasts() const noexcept {
+        return !toasts_.empty();
+    }
 
     std::vector<DiagnosticsToastModel> DiagnosticsModel::activeToastModels() const {
         std::vector<DiagnosticsToastModel> models;
@@ -146,6 +143,6 @@ namespace arrange::juce {
         while (toasts_.size() > 3) toasts_.erase(toasts_.begin());
         return true;
     }
-} // namespace arrange::juce
+}  // namespace arrange::juce
 
 #endif
