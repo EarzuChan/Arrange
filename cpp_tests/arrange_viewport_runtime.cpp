@@ -3,6 +3,9 @@
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/ArrangeEditor.h>
 #include <arrange/juce/EditorSceneHost.h>
+#include <arrange/juce/TextInputOwner.h>
+#include <arrange/juce/JuceTextServices.h>
+#include <arrange/core/ModifierGeometry.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <iostream>
@@ -30,11 +33,13 @@ int main(int argc, char** argv) {
         const auto loaded = arrange::quickjs::AppScriptLoader(*script).loadEntry(argv[1]);
         check(loaded.ok, "视口夹具加载失败");
         auto initial = script->takePendingTransaction();
-        check(initial.has_value(), "视口夹具未提交初始结构");
-        arrange::juce::ArrangeRuntime runtime;
+        check(!initial.has_value(), "视口夹具绕过首帧授权");
+        arrange::juce::JuceTextMeasurer measurer;
+        TextLayoutService textService(measurer);
+        arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{textService}}};
         arrange::juce::RuntimeSessionState session;
         runtime.setScriptHost(std::move(script));
-        runtime.enqueue(std::move(*initial));
+        if (initial) runtime.enqueue(std::move(*initial));
         session.resize(200, 100, runtime);
         double time = 0;
         const auto tick = [&] {
@@ -84,6 +89,25 @@ int main(int argc, char** argv) {
         runtime.enqueueStringEvent(submit, "越界");
         settle();
         check(hasText(runtime.scene(), "0/0/100/100"), "代码设置的越界滚动没有经过统一布局反馈修正");
+
+        runtime.enqueueStringEvent(submit, "密度");
+        settle();
+        check(hasText(runtime.scene(), "0/500/100/600"), "DP 转换后的滚动范围没有以 PX 回传");
+        NodeId inputNode = 0;
+        for (const auto id : runtime.scene().tree().nodeIds())
+            if (test_support::editable(runtime.scene().node(id))) inputNode = id;
+        const auto& node = runtime.scene().node(inputNode);
+        const auto* field = test_support::editable(node);
+        const auto& descriptor = std::get<TextFieldModifier>(field->descriptor.value);
+        check(node.bounds.width == 160 && node.bounds.height == 60 && descriptor.presentation.style.fontSize == 30, "DP 与 SP 未分别转换到原生 PX");
+        auto& tree = runtime.scene().tree();
+        const auto point = nodeContentToRoot(tree, inputNode, {node.contentBounds.x + 1, node.contentBounds.y + 1});
+        const auto hit = HitTester{}.hitTest(*runtime.publishedFrame().content.hitTest, point);
+        check(hit.hit && hit.node == inputNode, "非恒等 Density 的输入命中坐标不一致");
+        arrange::juce::TextInputOwner input(textService);
+        input.pointerDown(tree, hit, point.x, point.y, {});
+        const auto caret = input.caretRectangleForCharIndex(tree, true, 1);
+        check(input.charIndexForPoint(tree, true, caret.getCentre()) == 1, "非恒等 Density 的 IME 与文字几何不一致");
 
         arrange::juce::EditorSceneHost editor;
         arrange::juce::EditorConfig config;

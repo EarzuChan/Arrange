@@ -419,7 +419,7 @@ namespace {
             stream->truncate();
             check(::juce::PNGImageFormat{}.writeImageToStream(source, *stream), "无法创建图片边界验收资源");
         }
-        const auto loaded = arrange::juce::packagePainterLoader(std::filesystem::current_path())("m23-crop-source.png").get();
+        const auto loaded = arrange::juce::packagePainterLoader(std::filesystem::current_path())("m23-crop-source.png", {}).get();
         check(loaded.content != nullptr, "绘制验收图片加载失败");
         PaintModifier imagePaint;
         imagePaint.painter = {1, 1, 1, loaded.content};

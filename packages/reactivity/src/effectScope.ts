@@ -22,6 +22,9 @@ export class EffectScope {
      */
     cleanups: (() => void)[] = []
 
+    readonly pauseCallbacks = new Set<() => void>()
+    readonly resumeCallbacks = new Set<() => void>()
+
     private _isPaused = false
     private _warnOnRun = true
 
@@ -65,9 +68,12 @@ export class EffectScope {
         return this._active
     }
 
+    get paused(): boolean { return this._isPaused }
+
     pause(): void {
-        if (this._active) {
+        if (this._active && !this._isPaused) {
             this._isPaused = true
+            for (const callback of this.pauseCallbacks) callback()
             let i, l
             if (this.scopes) {
                 for (i = 0, l = this.scopes.length; i < l; i++) {
@@ -87,6 +93,7 @@ export class EffectScope {
         if (this._active) {
             if (this._isPaused) {
                 this._isPaused = false
+                for (const callback of this.resumeCallbacks) callback()
                 let i, l
                 if (this.scopes) for (i = 0, l = this.scopes.length; i < l; i++) this.scopes[i].resume()
                 for (i = 0, l = this.effects.length; i < l; i++) this.effects[i].resume()
@@ -174,6 +181,8 @@ export class EffectScope {
             }
         }
 
+        this.pauseCallbacks.clear()
+        this.resumeCallbacks.clear()
         this.parent = undefined
 
         if (errors.length) throw new AggregateError(errors, '反应式作用域停止时发生清理错误')

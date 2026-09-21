@@ -21,7 +21,6 @@ export class ValueBinding {
         this.job = () => {
             if (!this.stopped && !owner.isDeactivated && !owner.isUnmounted) callWithErrorHandling(() => owner.rearrangeSession.runValue(this.update), owner, ErrorCodes.ARRANGABLE_UPDATE)
         }
-        this.job.id = owner.uid
         this.job.i = owner
         this.effect = this.createEffect()
         this.scope.cleanups.push(this.cleanup)

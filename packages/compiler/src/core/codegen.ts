@@ -238,7 +238,7 @@ export function generate(ast: RootNode, options: CompilerOptions = {}): CodegenR
         if (options.arrangeTypecheck) {
             if (dynamicShape) inputs = `{${checkParameters.join(', ')}}`
             inputs = `__arrangeCheck(${definition}, ${inputs}, ${node.loc.start.line}, ${node.loc.start.column})`
-            contents = `__arrangeCheckSlots(${definition}, ${contents}, ${node.loc.start.line}, ${node.loc.start.column})`
+            contents = `__arrangeCheckSlots(${definition}, ${contents}, ${node.loc.start.line}, ${node.loc.start.column}, ${inputs})`
         }
 
         let plan = ''

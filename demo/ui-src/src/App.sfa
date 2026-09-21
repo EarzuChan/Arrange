@@ -1,9 +1,9 @@
 <template>
-    <Column :modifier="M.fillMaxSize().background(0xff0e1722).verticalScroll(pageScroll).padding(dp(18))" :vertical-arrangement="Arrangement.spacedBy(dp(12))">
+    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).verticalScroll(pageScroll).padding(dp(18))" :vertical-arrangement="Arrangement.spacedBy(dp(12))">
         <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
             <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(dp(20), dp(20))"/>
 
-            <Text :text="preset" :text-style="{ fontSize: sp(28), color: presetColor }" :modifier="M"/>
+            <Text :text="preset" :style="{ fontSize: sp(28), color: presetColor }" :modifier="M"/>
 
             <Image :painter="logoPainter" :modifier="M.size(dp(96), dp(40))"/>
         </Row>
@@ -27,19 +27,19 @@
 
         <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }" :modifier="M.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"/>
 
-        <Text :text="inputStatus" :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(16))"/>
+        <Text :text="inputStatus" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(16))"/>
 
         <Column :modifier="M.size(dp(260), dp(58)).verticalScroll(scrollState).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(dp(4))">
-            <Text text="才不想当你的滚动视口呢，哼" :text-style="{ fontSize: sp(12), color: Color(0xFFE8EAED) }" :modifier="M.height(dp(14))"/>
+            <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: sp(12), color: Color(0xFFE8EAED) }" :modifier="M.height(dp(14))"/>
 
-            <Text text="滚动modifier逛遍本地状态（意味不明）" :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="滚动modifier逛遍本地状态（意味不明）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
 
-            <Text text="滚轮也可以触发啊一个" :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="滚轮也可以触发啊一个" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
 
-            <Text text="这个你滚动后才能看见嘛（喜）" :text-style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
         </Column>
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(16)">
+        <Row :horizontal-arrangement="Arrangement.spacedBy(dp(16))">
             <ShowcaseGallery/>
 
             <Text text="南下"/>
@@ -47,7 +47,7 @@
             <AnimationGallery/>
         </Row>
 
-        <Text text="Arrangeの本格界面" :text-style="{fontSize: 12, color: 0xff91a6b8}"/> // 以后颜色、尺寸单位不得裸写
+        <Text text="Arrangeの本格界面" :style="{fontSize: sp(12), color: Color(0xff91a6b8)}"/> // 以后颜色、尺寸单位不得裸写
     </Column>
 </template>
 
@@ -56,7 +56,7 @@ import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
 import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef } from "@arrange/framework/animation"
 import { Icon } from "@arrange/framework/foundation"
 import { logger } from "@arrange/framework/internal"
-import { onMounted, onUnmounted, ref, createScrollState, shallowRef } from '@arrange/framework'
+import { onMounted, ref, createScrollState, shallowRef } from '@arrange/framework'
 
 import CounterPanel from './view/CounterPanel.sfa'
 import AnimationGallery from './view/AnimationGallery.sfa'
@@ -74,33 +74,19 @@ const playPainter = painter('icons/play.svg')
 const logoPainter = painter('logo.png')
 
 const preset = ref("Arrangable与动画发廊")
-const rainbow = [0xFFFF3030, 0xFFFFFF30, 0xFF30FF30, 0xFF30FFFF, 0xFF3030FF, 0xFFFF30FF]
+const rainbow = [Color(0xFFFF3030), Color(0xFFFFFF30), Color(0xFF30FF30), Color(0xFF30FFFF), Color(0xFF3030FF), Color(0xFFFF30FF)]
 const presetColorTarget = ref(Color(rainbow[0]))
-const presetColor = animatedColorAsRef(presetColorTarget, { animationSpec: tween({ durationMillis: 700, easing: linearEasing }) })
-let rainbowFrame = 0
-let rainbowStartedAt
-let rainbowSegment = -1
-
-function advanceRainbow(now: number) {
-    rainbowStartedAt ??= now
-
-    const segment = Math.floor((now - rainbowStartedAt) / 700)
-
-    if (segment !== rainbowSegment) {
-        rainbowSegment = segment
-        presetColorTarget.value = Color(rainbow[(segment + 1) % rainbow.length])
-    }
-
-    // rainbowFrame = requestAnimationFrame(advanceRainbow) 还是他妈的很卡，不知道第三趴搞完（换动画API）能不能缓解。你妈的，这个动画导致3的CPU占用，何意味？
-}
-
-onMounted(() => {
-    rainbowFrame = requestAnimationFrame(advanceRainbow) // 第三趴将手工帧回调迁入 Transition
+let rainbowSegment = 0
+const presetColor = animatedColorAsRef(presetColorTarget, {
+    animationSpec: tween({ durationMillis: 700, easing: linearEasing }),
+    finished() {
+        rainbowSegment = (rainbowSegment + 1) % rainbow.length
+        presetColorTarget.value = Color(rainbow[rainbowSegment])
+    },
 })
-
-onUnmounted(() => {
-    cancelAnimationFrame(rainbowFrame)
-    presetColor.stop()
+onMounted(() => {
+    rainbowSegment = 1
+    presetColorTarget.value = Color(rainbow[rainbowSegment])
 })
 
 const inputStatus = ref("你来和我（指输入框↑）搞一下嘛")

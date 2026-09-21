@@ -60,13 +60,7 @@ namespace arrange::juce {
             return result;
         }
         auto initialTransaction = scriptHost->takePendingTransaction();
-        if (!initialTransaction) {
-            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange dev bundle executed but did not mount a UI tree.", {}, bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live mount missing", bundleUrl, true);
-            return result;
-        }
-
-        result.initialTransaction = std::move(*initialTransaction);
+        result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
         setDiagnostic(result, LogLevel::Info, "Loaded live app", bundleUrl, true);
@@ -99,13 +93,7 @@ namespace arrange::juce {
             return result;
         }
         auto initialTransaction = scriptHost->takePendingTransaction();
-        if (!initialTransaction) {
-            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange app executed but did not mount a UI tree.", {}, resolved.entryPath);
-            setDiagnostic(result, LogLevel::Error, "Dist mount missing", resolved.entryPath.string(), true);
-            return result;
-        }
-
-        result.initialTransaction = std::move(*initialTransaction);
+        result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
         setDiagnostic(result, LogLevel::Info, "Loaded dist app", resolved.entryPath.string(), false);

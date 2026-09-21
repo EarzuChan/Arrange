@@ -2,6 +2,7 @@ import { reactive, batchUpdates } from "@arrange/reactivity"
 
 type ScrollSnapshot = Partial<Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "isScrollInProgress">>
 
+/** @arrangeFields scroll */
 export type ScrollState = {
     value: number
     maxValue: number
@@ -10,10 +11,12 @@ export type ScrollState = {
     isScrollInProgress: boolean
     canScrollBackward: boolean
     canScrollForward: boolean
+    /** @arrangeArguments px */
     scrollTo: (value: number) => void
     __arrangeNativeScroll: (payload: ScrollSnapshot) => void
 }
 
+/** @arrangeArguments scrollOptions */
 export function createScrollState(args: { initial?: number } = {}): ScrollState {
     let state: ScrollState
 

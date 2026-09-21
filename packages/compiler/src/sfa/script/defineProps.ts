@@ -155,14 +155,10 @@ function resolveRuntimePropsFromType(ctx: TypeResolveContext, node: Node): PropT
         const refKind = inferRefContract(ctx, annotation, e._ownerScope)
         let type = refKind ? ['Object'] : inferRuntimeType(ctx, e)
         let skipCheck = false
-        // skip check for result containing unknown types
+        // 显式 any/unknown 是作者声明的开放边界，无法解析的类型不能偷偷退化
         if (type.includes(UNKNOWN_TYPE)) {
-            if (type.includes('Boolean') || type.includes('Function')) {
-                type = type.filter(t => t !== UNKNOWN_TYPE)
-                skipCheck = true
-            } else {
-                type = ['null']
-            }
+            if (annotation?.type === 'TSAnyKeyword' || annotation?.type === 'TSUnknownKeyword') type = ['null']
+            else ctx.error(`参数 ${key} 的运行时类型无法从声明提取，请提供可解析的明确契约`, e)
         }
         props.push({
             key,

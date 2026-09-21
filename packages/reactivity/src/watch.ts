@@ -187,7 +187,7 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
 
     const job = (immediateFirstRun?: boolean) => {
         if (
-            !(effect.flags & EffectFlags.ACTIVE) || (!effect.dirty && !immediateFirstRun)
+            !(effect.flags & EffectFlags.ACTIVE) || (effect.flags & EffectFlags.PAUSED) || (!effect.dirty && !immediateFirstRun)
         ) {
             return
         }
@@ -264,7 +264,9 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
             oldValue = effect.run()
         }
     } else if (scheduler) {
-        scheduler(job.bind(null, true), true)
+        const initialJob = job.bind(null, true)
+        augmentJob?.(initialJob)
+        scheduler(initialJob, true)
     } else {
         effect.run()
     }

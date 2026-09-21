@@ -25,7 +25,12 @@ namespace arrange::quickjs {
         JSRuntime* runtime = nullptr;
         JSContext* context = nullptr;
         arrange::core::NodeId rootNodeId = 0;
-        std::uint32_t nextAnimationFrameHandle = 1;
+        std::function<void()> wakeOwner;
+        bool frameRequested = false;
+        bool framePrepared = false;
+        JSValue prepareFrame = JS_UNDEFINED;
+        JSValue completeFrame = JS_UNDEFINED;
+        JSValue disposeApp = JS_UNDEFINED;
         double frameTimeMillis = 0.0;
         static constexpr std::size_t maxJobsPerFrame = 10000;
         std::size_t remainingFrameJobs = maxJobsPerFrame;
@@ -48,7 +53,6 @@ namespace arrange::quickjs {
         QuickJsModuleLoader moduleLoader;
         arrange::core::PainterLoader painterLoader;
         std::unique_ptr<QuickJsPainterResources> painters;
-        std::unordered_map<std::uint32_t, JSValue> animationFrameCallbacks;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeType> nodeTypes;
         std::unordered_map<arrange::core::NodeId, std::uint64_t> nodeGenerations;
         std::unordered_map<arrange::core::NodeId, std::unordered_map<arrange::core::HostInput, arrange::core::BindingHandle>> hostBindings;

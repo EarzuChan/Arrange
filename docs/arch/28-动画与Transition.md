@@ -21,7 +21,7 @@ VBlankTick
 -> SceneFramePipeline
 ```
 
-Promise、microtask、JS timer、production timer fallback 或 synthetic production frame source 都不能表达动画帧。
+Promise、microtask、JS timer、production timer fallback 或 synthetic production frame source 都不能表达动画帧。rAF、cancelRAF、公开 AnimationClock 和手动时钟均已删除；测试控制宿主帧源并使用生产调度器。每个 Owner 的动画通道在同一时间戳下批量采样，完成回调在整批值更新之后执行。
 
 # animatedXAsRef
 
@@ -45,9 +45,9 @@ animatedRectAsRef(...)
 - `Number`：普通 JS number。
 - `NumberArray`：按固定长度 number group 处理；长度变化属于结构或 schema 变化，不属于普通动画 tick。
 
-- `Dp`：authoring 上是 Dp，runtime typed slot 中按布局数值处理。
+- `Dp`：在 DP 声明域采样，Layout 随后按 Density 转 PX；改变 Density 不重启动画。
 - `Color`：按 Arrange color typed value 处理。
-- `Offset` / `Size` / `Rect`：按固定字段的 typed number group 处理。
+- `Offset` / `Size` / `Rect`：固定字段的 DP 数值组；原生几何动画使用 PX。弹簧 visibilityThreshold 使用被采样通道的数值单位，stiffness、dampingRatio 与时间参数不当作长度。
 
 # Transition
 
@@ -74,7 +74,7 @@ snap(...)
 easing(...)
 ```
 
-`tween` 表达固定 duration、delay 与 easing。`spring` 表达弹簧系统。`snap` 表达立即到达目标值。`easing` 提供常用曲线。
+`tween` 表达固定 duration、delay 与 easing。`spring` 表达弹簧系统。`snap` 表达在下一授权采样中到达目标值。`easing` 提供常用曲线。
 
 自定义曲线、keyframesWithSpline、复杂 path-based animation 与命令式 animation controller 不属于基础语义；进入里程碑前必须单独设计 API、生命周期、可测试性与 lowering 规则。
 
@@ -107,6 +107,8 @@ AnimatedVisibility
 - error recovery。
 - source switch。
 - QuickJS context reset。
+
+KeepAlive 停用时保留最近采样值并冻结动画进度，不申请持续帧；恢复首个采样保持该值，之后按剩余进度继续。恢复时目标已经变化则从保留值重新定向。最终销毁取消目标订阅、完成回调及帧需求。
 
 退休后的动画不得继续产出 SlotUpdateBatch，不得调用旧 callback，不得持有旧 node id 或旧 JS function。
 

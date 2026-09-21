@@ -146,7 +146,6 @@ export class PropStore {
         this.job = () => {
             if (!owner.isUnmounted && !owner.isDeactivated) callWithErrorHandling(() => owner.rearrangeSession.runValue(this.updateTask), owner, ErrorCodes.ARRANGABLE_UPDATE)
         }
-        this.job.id = owner.uid
         this.job.i = owner
         for (const name of Object.keys(this.declarations)) {
             const cell = shallowRef<unknown>()
@@ -185,7 +184,7 @@ export class PropStore {
         for (const [name, declaration] of Object.entries(this.declarations)) {
             try { validateProp(name, values[name], declaration, values, this.absent.has(name)) } catch (error) {
                 const source = this.source(name)
-                if (error instanceof Error && source) error.message += `\n来源：${source}`
+                if (error instanceof Error) error.message += `\nArrangable：${this.owner.type.name ?? this.owner.type.__name ?? '匿名定义'}${source ? `\n来源：${source}` : ''}`
                 throw error
             }
         }
@@ -268,7 +267,7 @@ function validateProp(name: string, value: unknown, declaration: PropOptions, pr
     const { type, validator } = declaration
     if (type != null && type !== true) {
         const types = isArray(type) ? type : [type]
-        if (!types.some(candidate => matchesType(value, candidate))) throw new TypeError(`参数 ${name} 类型错误：要求 ${types.map(candidate => candidate?.name ?? 'null').join(' | ')}`)
+        if (!types.some(candidate => matchesType(value, candidate))) throw new TypeError(`参数 ${name} 类型错误：要求 ${types.map(candidate => candidate?.name ?? 'null').join(' | ')}，实际为 ${value === null ? 'null' : isArray(value) ? 'Array' : typeof value}`)
     }
     if (validator && !validator(value, shallowReadonly(props))) throw new TypeError(`参数 ${name} 未通过声明校验`)
 }

@@ -4,4 +4,4 @@ namespace arrange::core {
     const char* version() noexcept {
         return PackageVersion;
     }
-}  // namespace arrange::core
+}

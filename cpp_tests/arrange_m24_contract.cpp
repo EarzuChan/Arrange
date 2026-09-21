@@ -241,7 +241,7 @@ native.submitRearrange(error => {
     void painterRequests() {
         arrange::quickjs::QuickJsScriptHost host;
         std::vector<std::shared_ptr<std::promise<PainterLoadResult>>> requests;
-        host.setPainterLoader([&](const std::string&) {
+        host.setPainterLoader([&](const std::string&, std::function<void()>) {
             auto request = std::make_shared<std::promise<PainterLoadResult>>();
             requests.push_back(request);
             return request->get_future();
@@ -268,14 +268,14 @@ const handle = native.acquirePainter('成功', completion => {
 })
 )JS");
         require(started.ok, started.error.c_str());
-        require(requests.size() == 2 && host.hasPendingAnimationFrame(), "资源请求没有进入 Owner 完成入口");
+        require(requests.size() == 2 && host.hasPendingSemanticWork(), "资源请求没有进入 Owner 完成入口");
         auto content = std::make_shared<PainterContent>();
         content->intrinsicSize = Size{18, 12};
         requests[0]->set_value({content, {}});
         requests[1]->set_value({content, {}});
-        const auto completed = host.pumpAnimationFrame(16);
+        const auto completed = host.semanticCheckpoint(16);
         require(completed.ok, completed.error.c_str());
-        require(!host.hasPendingAnimationFrame(), "完成或取消后仍有资源工作存活");
+        require(!host.hasPendingSemanticWork(), "完成或取消后仍有资源工作存活");
         const auto transaction = host.takePendingTransaction();
         require(transaction.has_value(), "Painter 完成没有提交类型化操作");
 
@@ -284,12 +284,12 @@ const native = globalThis.__ARRANGE_NATIVE__
 native.createNode(1, 'Root')
 native.acquirePainter('旧上下文', () => { throw new Error('reset 后不得执行旧回调') })
 )JS");
-        require(waiting.ok && host.hasPendingAnimationFrame(), "未完成资源请求没有登记");
+        require(waiting.ok && host.hasPendingSemanticWork(), "未完成资源请求没有登记");
         const auto reset = host.executeModule("m24-painter-new.js", "globalThis.__ARRANGE_NATIVE__.createNode(1, 'Root')");
         require(reset.ok, reset.error.c_str());
         requests[2]->set_value({content, {}});
-        require(!host.hasPendingAnimationFrame(), "reset 后旧资源仍在等待队列");
-        require(host.pumpAnimationFrame(32).ok, "reset 后迟到结果执行了旧回调");
+        require(!host.hasPendingSemanticWork(), "reset 后旧资源仍在等待队列");
+        require(host.semanticCheckpoint(32).ok, "reset 后迟到结果执行了旧回调");
 
         const auto failing = host.executeModule("m24-painter-failure.js", R"JS(
 const native = globalThis.__ARRANGE_NATIVE__
@@ -301,20 +301,40 @@ const handle = native.acquirePainter('失败', completion => {
 )JS");
         require(failing.ok, failing.error.c_str());
         requests[3]->set_exception(std::make_exception_ptr(std::runtime_error("解码失败")));
-        const auto failure = host.pumpAnimationFrame(48);
+        const auto failure = host.semanticCheckpoint(48);
         require(failure.ok, failure.error.c_str());
-        require(!host.hasPendingAnimationFrame(), "失败完成后未释放资源请求");
+        require(!host.hasPendingSemanticWork(), "失败完成后未释放资源请求");
 
         auto late = std::make_shared<std::promise<PainterLoadResult>>();
         {
             arrange::quickjs::QuickJsScriptHost temporary;
-            temporary.setPainterLoader([late](const std::string&) { return late->get_future(); });
+            temporary.setPainterLoader([late](const std::string&, std::function<void()>) { return late->get_future(); });
             const auto pending = temporary.executeModule("m24-painter-destroy.js", "const n = globalThis.__ARRANGE_NATIVE__; n.createNode(1, 'Root'); n.acquirePainter('销毁', () => { throw new Error('销毁后不得回调') })");
-            require(pending.ok && temporary.hasPendingAnimationFrame(), "销毁用例未创建待完成请求");
+            require(pending.ok && temporary.hasPendingSemanticWork(), "销毁用例未创建待完成请求");
         }
         late->set_value({content, {}});
     }
 }  // namespace
+
+void scriptExecutionBudgets() {
+    arrange::quickjs::QuickJsScriptHost host({10, 10, 10});
+    const auto runaway = host.executeModule("m24-budget-module.js", "while (true) {}");
+    require(!runaway.ok && runaway.error.find("interrupted") != std::string::npos, "长脚本未被耗时预算终止");
+
+    const auto source = R"JS(
+const native = globalThis.__ARRANGE_NATIVE__
+native.installFrameDriver(() => { while (true) {} }, () => {}, () => {})
+native.requestFrame(true)
+)JS";
+    require(host.executeModule("m24-budget-frame.js", source).ok, "预算错误后无法重新加载应用");
+    const auto frame = host.prepareVisualFrame(16);
+    require(!frame.ok && frame.error.find("interrupted") != std::string::npos, "视觉回调未被耗时预算终止");
+    require(!host.hasPendingTransactions(), "中断帧泄漏了候选事务");
+
+    const auto microtask = host.executeModule("m24-budget-microtask.js", "const n = globalThis.__ARRANGE_NATIVE__; n.installFrameDriver(() => {}, () => {}, () => {}); Promise.resolve().then(() => { while (true) {} })");
+    require(!microtask.ok && microtask.error.find("interrupted") != std::string::npos, "单个长微任务逃过耗时预算");
+    require(host.executeModule("m24-budget-recover.js", "globalThis.__ARRANGE_NATIVE__.installFrameDriver(() => {}, () => {}, () => {})").ok, "中断后重新加载未恢复");
+}
 
 int main() {
     try {
@@ -325,6 +345,7 @@ int main() {
         textModifiers();
         rearrangeReceipts();
         cancelledReceipts();
+        scriptExecutionBudgets();
         std::cout << "M2.4 原生布局、基础呈现与 Painter 契约通过\n";
         return 0;
     } catch (const std::exception& error) {

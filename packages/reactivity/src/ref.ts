@@ -131,6 +131,7 @@ export type MaybeRef<T = any> = | T | Ref<T> | ShallowRef<T> | WritableComputedR
 
 export type MaybeRefOrGetter<T = any> = MaybeRef<T> | ComputedRef<T> | (() => T)
 
+/** @arrangeUnref */
 export function unref<T>(ref: MaybeRef<T> | ComputedRef<T>): T {
     return isRef(ref) ? ref.value : ref
 }

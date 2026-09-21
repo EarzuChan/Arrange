@@ -11,6 +11,7 @@ import { DEFINE_PROPS, WITH_DEFAULTS, genRuntimeProps, processDefineProps } from
 import { transformDestructuredProps } from './script/definePropsDestructure.ts'
 import { getImportedName, isCallOf, isLiteralNode } from './script/utils.ts'
 import { warnOnce } from './warn.ts'
+import { lowerSfaValues } from './lowerValues.ts'
 
 export interface SFAScriptCompileOptions {
     isProd?: boolean
@@ -42,6 +43,13 @@ const MACROS = [
 
 // 唯一的 TS setup 脚本模式，模板直接共享实例词法作用域
 export function compileScript(sfa: SFADescriptor, options: SFAScriptCompileOptions): SFAScriptBlock {
+    const script = generateSfaScript(sfa, options)
+    const lowered = lowerSfaValues(script.content, sfa.filename, script.map)
+    return { ...script, content: lowered.content, map: lowered.map, deps: [...new Set([...script.deps ?? [], ...lowered.deps])] }
+}
+
+// 生成保有单位声明的中间 TS，供当前文件及跨 SFA 契约分析共同使用
+export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileOptions): SFAScriptBlock {
     const { script, source, filename } = sfa
     if (!script) throw new Error('SFA 没有可编译的 script 区块')
     const hoistStatic = options.hoistStatic !== false
@@ -258,7 +266,7 @@ export function compileScript(sfa: SFADescriptor, options: SFAScriptCompileOptio
     }
 
     // 整理 setup 参数
-    let args = `__props`
+    let args = ctx.propsTypeDecl ? `__props: ${ctx.getString(ctx.propsTypeDecl)}` : '__props'
     // inject user assignment of props
     // we use a default __props so that template expressions referencing props
     // can use it directly

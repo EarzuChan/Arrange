@@ -5,16 +5,16 @@ import * as animation from '../../packages/framework/src/animation/index.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as runtime from '../../packages/framework/src/index.ts'
-import { recordingNative } from './recordingNative.ts'
+import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
-const flush = () => runtime.nextTick()
+const flush = () => advanceFrames()
 
 test('定义拒绝 Options 配置，setup 必须返回结构程序', () => {
     for (const key of ['data', 'computed', 'methods', 'watch', 'created', 'mounted', 'mixins', 'extends', 'inject', 'provide', 'expose', 'template', 'render', 'compilerOptions']) {
         assert.throws(() => internal.defineArrangable({ [key]: {}, setup: () => () => { } }), new RegExp(key))
     }
     const invalid = internal.defineArrangable({ setup: (() => ({})) as never })
-    assert.throws(() => runtime.createApp(invalid).mount(recordingNative().target), /结构执行函数/)
+    assert.throws(() => mountFrame(runtime.createApp(invalid), recordingNative().target), /结构执行函数/)
 })
 
 test('内部 Arrangable 调用只接受 prop getter，裸值不会进入兼容分支', () => {
@@ -22,7 +22,7 @@ test('内部 Arrangable 调用只接受 prop getter，裸值不会进入兼容�
         props: { text: String },
         setup: (props, { call }) => () => call(0, foundation.Text, { text: props.text as never }),
     })
-    assert.throws(() => runtime.createApp(Broken).mount(recordingNative().target), /必须提供求值函数/)
+    assert.throws(() => mountFrame(runtime.createApp(Broken), recordingNative().target), /必须提供求值函数/)
 })
 
 test('默认参数、显式函数参数和 setup 局部状态参与统一生命周期', async () => {
@@ -44,7 +44,7 @@ test('默认参数、显式函数参数和 setup 局部状态参与统一生命�
         },
     })
     const app = runtime.createApp(Counter, { onChange: (value: number) => events.push(value) })
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(native.textNodes()[0].text, '2')
     increment!()
     await flush()
@@ -64,7 +64,7 @@ test('setup 中的 watch 随逻辑生命退休', async () => {
         }
     })
     const app = runtime.createApp(App)
-    app.mount(recordingNative().target)
+    mountFrame(app, recordingNative().target)
     count.value = 1
     await flush()
     app.unmount()
@@ -85,7 +85,7 @@ test('style 和 class 只是用户显式声明的普通参数，跨层 computed 
     const App = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Styled, { style: () => style.value, class: () => '自定义分类' }) })
     const native = recordingNative()
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const runs = internal.getArrangeExecutionStats().structureRuns
     style.value = '更新'
     await flush()
@@ -98,7 +98,7 @@ test('Modifier 未被内部使用时没有隐式受体，显式交付多个 Layo
     const Wrapper = internal.defineArrangable({ props: { modifier: ui.Modifier }, setup: () => () => { } })
     const native = recordingNative()
     const empty = runtime.createApp(Wrapper, { modifier: ui.M.width(20) })
-    empty.mount(native.target)
+    mountFrame(empty, native.target)
     assert.equal(native.nodes.size, 1)
     empty.unmount()
 
@@ -109,7 +109,7 @@ test('Modifier 未被内部使用时没有隐式受体，显式交付多个 Layo
         }
     })
     const app = runtime.createApp(Shared)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const nodes = [...native.nodes.values()].filter(node => node.type === 'LayoutNode')
     assert.equal(nodes.length, 2)
     assert.notEqual(nodes[0].modifiers[0].identity, nodes[1].modifiers[0].identity)
@@ -133,7 +133,7 @@ test('分支退出取消其待处理值任务，反复建立和退休不累积�
     const before = internal.getArrangeExecutionStats().activeValueBindings
     const native = recordingNative()
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     for (let index = 0; index < 20; index++) {
         value.value++
         visible.value = false
@@ -167,7 +167,7 @@ test('同一 Ref 同时驱动结构和值时保留 keyed 实例并交付最终�
     })
     const native = recordingNative()
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const id = native.textNodes()[0].id
     value.value = 2
     await flush()
@@ -191,7 +191,7 @@ test('显式函数参数作为值更新，调用次数完全由接收方决定',
     })
     const App = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Receiver, { onConfirm: () => callback.value }) })
     const app = runtime.createApp(App)
-    app.mount(recordingNative().target)
+    mountFrame(app, recordingNative().target)
     const runs = internal.getArrangeExecutionStats().structureRuns
     invoke!()
     callback.value = () => events.push('新回调')
@@ -208,7 +208,7 @@ test('动态目标替换退休旧任务，参数经过目标声明校验', async
     const App = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, foundation.DynamicArrangable, { is: () => selected.value, props: () => params.value }) })
     const native = recordingNative()
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     selected.value = foundation.Spacer
     params.value = {}
     await flush()
@@ -231,7 +231,7 @@ test('值求值异常保留已提交文本，后续依赖变化可重试', async
     const native = recordingNative()
     const app = runtime.createApp(App)
     app.config.errorHandler = error => errors.push(error)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     value.value = 1
     await flush()
     assert.equal(errors.length, 1)
@@ -247,7 +247,7 @@ test('相等结果抑制原生写入且不重排', async () => {
     const native = recordingNative()
     const App = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, foundation.Text, { text: () => String(value.value % 2) }) })
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const writes = native.writes
     const runs = internal.getArrangeExecutionStats().structureRuns
     value.value = 2
@@ -257,31 +257,35 @@ test('相等结果抑制原生写入且不重排', async () => {
     app.unmount()
 })
 
-test('递归 watcher 中止当前刷新而不无限占用帧', async () => {
+test('递归 watcher 中止当前视觉帧而不无限占用 Owner', () => {
     const value = runtime.ref(0)
-    const stop = runtime.watch(value, () => { value.value++ })
+    const native = recordingNative()
+    const app = runtime.createApp(internal.defineArrangable({
+        setup() {
+            runtime.watch(value, () => { value.value++ })
+            return () => { }
+        }
+    }))
+    mountFrame(app, native.target)
     value.value++
-    try {
-        await assert.rejects(flush(), /超过调度执行上限/)
-        assert.ok(value.value < 200)
-    } finally { stop() }
-    await flush()
+    assert.throws(() => native.frame(), /超过帧内执行上限/)
+    assert.ok(value.value < 200)
+    app.unmount()
 })
 
 test('AnimatedVisibility 保留退出结构、禁用交互并在卸载时取消动画', async () => {
     const native = recordingNative()
-    const clock = animation.createManualAnimationClock()
+    const clock = { advanceBy: (delay: number) => native.frame(native.time + delay) }
     const visible = runtime.ref(true)
     const baseline = animation.animationStats.activeAnimations
     const App = internal.defineArrangable({
         setup: (_props, { call }) => () => call(0, animation.AnimatedVisibility, {
             visible: () => visible.value,
-            clock: () => clock,
             animationSpec: () => animation.tween({ durationMillis: 100, easing: animation.linearEasing }),
         }, { default: () => call(0, foundation.Text, { text: () => '退出内容' }) })
     })
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const count = native.nodes.size
     visible.value = false
     await flush()
@@ -303,25 +307,24 @@ test('AnimatedVisibility 保留退出结构、禁用交互并在卸载时取消�
     visible.value = true
     await flush()
     app.unmount()
-    assert.equal(clock.pendingFrames, 0)
+    assert.equal(native.pendingFrame, false)
     assert.equal(animation.animationStats.activeAnimations, baseline)
 })
 
 test('Crossfade 保留退出页参数，中断恢复旧页不重复创建逻辑实例', async () => {
     const native = recordingNative()
-    const clock = animation.createManualAnimationClock()
+    const clock = { advanceBy: (delay: number) => native.frame(native.time + delay) }
     const selected = runtime.ref('A')
     const App = internal.defineArrangable({
         setup: (_props, { call }) => () => call(0, animation.Crossfade, {
             is: () => foundation.Text,
             props: () => ({ text: selected.value }),
             targetState: () => selected.value,
-            clock: () => clock,
             animationSpec: () => animation.tween({ durationMillis: 100, easing: animation.linearEasing }),
         })
     })
     const app = runtime.createApp(App)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     await flush()
     const first = native.textNodes()[0]
     selected.value = 'B'
@@ -338,5 +341,5 @@ test('Crossfade 保留退出页参数，中断恢复旧页不重复创建逻辑�
     selected.value = 'C'
     await flush()
     app.unmount()
-    assert.equal(clock.pendingFrames, 0)
+    assert.equal(native.pendingFrame, false)
 })

@@ -1,6 +1,7 @@
 import { currentInstance, type ArrangableDefinition } from '../arrangable.ts'
 import { isArrangableDefinition } from '../apiDefineArrangable.ts'
 
+/** @arrangeResolve */
 export function resolveArrangable(name: string): ArrangableDefinition {
     const definition = currentInstance?.appContext.definitions[name]
     if (!definition) throw new TypeError(`未找到 Arrangable 定义：${name}`)

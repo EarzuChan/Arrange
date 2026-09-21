@@ -1,14 +1,14 @@
 <template>
-    <Column :modifier="M.padding(8).background(0xff202633)" :vertical-arrangement="Arrangement.spacedBy(4)">
-        <Text :text="`原样 Ref：${name}`" :text-style="{ fontSize: 11, color: 0xff61d6bb }" />
-        <Text :text="`子层读取 state：` + state.value" :text-style="{ fontSize: 11, color: 0xffedf4fa }" />
-        <Text :text="`点击切换 Ref（当前 ${name}）`" :modifier="M.padding(5).background(0xff374866).clickable(onToggle)" :text-style="{ fontSize: 10, color: 0xffffffff }" />
+    <Column :modifier="M.padding(dp(8)).background(Color(0xff202633))" :vertical-arrangement="Arrangement.spacedBy(dp(4))">
+        <Text :text="`原样 Ref：${name}`" :style="{ fontSize: sp(11), color: Color(0xff61d6bb) }" />
+        <Text :text="`子层读取 state：` + state.value" :style="{ fontSize: sp(11), color: Color(0xffedf4fa) }" />
+        <Text :text="`点击切换 Ref（当前 ${name}）`" :modifier="M.padding(dp(5)).background(Color(0xff374866)).clickable(onToggle)" :style="{ fontSize: sp(10), color: Color(0xffffffff) }" />
     </Column>
 </template>
 
 <script>
 import type { Ref } from '@arrange/framework'
-import { Arrangement, M } from '@arrange/framework/ui'
+import { Arrangement, M, dp, sp, Color } from '@arrange/framework/ui'
 import { Column, Text } from '@arrange/framework/foundation'
 
 const { state, name, onToggle } = defineProps<{ state: Ref<number>; name: string; onToggle: () => void }>()

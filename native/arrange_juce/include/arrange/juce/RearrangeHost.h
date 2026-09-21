@@ -34,11 +34,14 @@ namespace arrange::juce {
 #endif
 
         [[nodiscard]] bool hasScriptHost() const noexcept;
-        [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;
+        [[nodiscard]] bool hasPendingVisualWork() const noexcept;
         [[nodiscard]] bool hasPendingDiagnostics() const noexcept;
         [[nodiscard]] std::optional<arrange::core::MutationTransaction> takePendingTransaction() noexcept;
 
-        [[nodiscard]] RearrangeInvokeResult pumpAnimationFrame(double nowMillis);
+        void setOwnerWake(std::function<void()> wake);
+        RearrangeInvokeResult semanticCheckpoint(double nowMillis);
+        [[nodiscard]] RearrangeInvokeResult prepareVisualFrame(double nowMillis);
+        RearrangeInvokeResult completeVisualFrame(bool success);
         [[nodiscard]] RearrangeInvokeResult invoke(const arrange::core::EventSlotId& slot, double nowMillis);
         [[nodiscard]] RearrangeInvokeResult invokeString(const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value);
 

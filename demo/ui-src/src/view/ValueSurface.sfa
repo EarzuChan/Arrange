@@ -5,7 +5,8 @@
 </template>
 
 <script>
+import type { Dp, ColorValue } from '@arrange/framework/ui'
 import { M } from '@arrange/framework/ui'
 
-defineProps<{ tone: number; offset: number }>()
+defineProps<{ tone: ColorValue; offset: Dp }>()
 </script>

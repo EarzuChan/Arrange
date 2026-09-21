@@ -28,12 +28,12 @@ namespace arrange::juce {
     }  // namespace
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir) {
-        return [packageDir = std::move(packageDir)](const std::string& resource) {
+        return [packageDir = std::move(packageDir)](const std::string& resource, std::function<void()> wake) {
             // 工作线程只持有不可变地址和完成结果，不持有 QuickJS 上下文或 UI 树
             static ::juce::ThreadPool workers(2);
             auto result = std::make_shared<std::promise<arrange::core::PainterLoadResult>>();
             auto future = result->get_future();
-            workers.addJob([result, packageDir, resource] {
+            workers.addJob([result, packageDir, resource, wake = std::move(wake)] {
                 arrange::core::PainterLoadResult loaded;
                 try {
                     const auto resolved = arrange::resolvePackageResource(packageDir, resource);
@@ -63,6 +63,7 @@ namespace arrange::juce {
                     loaded.error = error.what();
                 }
                 result->set_value(std::move(loaded));
+                if (wake) wake();
             });
             return future;
         };

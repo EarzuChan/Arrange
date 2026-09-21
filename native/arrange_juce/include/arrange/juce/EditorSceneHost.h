@@ -21,6 +21,7 @@ namespace arrange::juce {
         EditorSceneHost(const EditorSceneHost&) = delete;
         EditorSceneHost& operator=(const EditorSceneHost&) = delete;
 
+        void setWorkAvailable(std::function<void()> callback);
         void configure(const EditorConfig& config);
         void reload();
         void reloadFromDevServer();

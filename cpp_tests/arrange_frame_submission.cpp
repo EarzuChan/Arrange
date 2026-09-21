@@ -44,6 +44,59 @@ namespace {
         return value;
     }
 
+    void verifySemanticOwnerWithoutFrames() {
+        auto request = std::make_shared<std::promise<PainterLoadResult>>();
+        std::function<void()> wake;
+        auto script = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
+        script->setPainterLoader([&](const std::string&, std::function<void()> notify) {
+            wake = std::move(notify);
+            return request->get_future();
+        });
+        const auto loaded = script->executeModule("语义检查点.js", R"JS(
+const n = globalThis.__ARRANGE_NATIVE__
+let count = 0
+n.createNode(1, 'LayoutNode')
+n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
+    console.log(`操作 ${++count}`)
+    if (count === 3) {
+        const handle = n.acquirePainter('资源', () => {
+            console.log('资源完成')
+            n.releasePainter(handle)
+        })
+    }
+} } }] })
+)JS");
+        check(loaded.ok, "语义测试脚本加载失败");
+        auto transaction = script->takePendingTransaction();
+        arrange::juce::ArrangeRuntime runtime;
+        runtime.setScriptHost(std::move(script));
+        runtime.enqueue(std::move(*transaction));
+        check(runtime.pumpFrame(1, {0, 200, 0, 100}, 0).ok, "语义测试初始帧失败");
+        const auto revision = runtime.publishedFrame().revision;
+        const auto slot = *runtime.scene().activeEventSlots().begin();
+        for (int i = 0; i < 3; ++i) runtime.enqueueEvent(slot);
+        check(runtime.semanticCheckpoint(16).ok, "输入语义检查点失败");
+        auto diagnostics = runtime.takeDiagnosticEvents();
+        check(diagnostics.size() == 3 && diagnostics[0].message == "操作 1" && diagnostics[1].message == "操作 2" && diagnostics[2].message == "操作 3", "同帧前三次操作未保序交付");
+        check(runtime.publishedFrame().revision == revision, "语义任务自行发布了视觉帧");
+
+        request->set_value({std::make_shared<PainterContent>(), {}});
+        check(static_cast<bool>(wake), "资源请求未接入 Owner 唤醒");
+        wake();
+        ::juce::MessageManager::callAsync([] { ::juce::MessageManager::getInstance()->stopDispatchLoop(); });
+        ::juce::MessageManager::getInstance()->runDispatchLoop();
+        diagnostics = runtime.takeDiagnosticEvents();
+        check(diagnostics.size() == 1 && diagnostics[0].message == "资源完成", "无 peer 和帧时资源完成未通过 message thread 执行");
+        check(runtime.publishedFrame().revision == revision, "资源语义完成绕过了视觉授权");
+
+        for (int i = 0; i < 4097; ++i) runtime.enqueueEvent(slot);
+        const auto overload = runtime.semanticCheckpoint(32);
+        check(!overload.ok && overload.error.find("4096") != std::string::npos, "邮箱过载未明确报错");
+        runtime.reset();
+        runtime.enqueueEvent(slot);
+        check(runtime.semanticCheckpoint(48).ok && runtime.takeDiagnosticEvents().empty(), "旧代际事件命中了新上下文");
+    }
+
     void verifyInputGeometryAndRetirement() {
         arrange::juce::JuceTextMeasurer measurer;
         TextLayoutService text(measurer);
@@ -150,9 +203,10 @@ namespace {
             let ticks = 0
             const sample = () => {
                 n.setModifier(1, {elements: [{type: 'text', value: {text: String(++ticks)}}]})
-                requestAnimationFrame(sample)
+                n.requestFrame(true)
             }
-            requestAnimationFrame(sample)
+            n.installFrameDriver(sample, () => {}, () => {})
+            n.requestFrame(true)
         )JS");
         check(loaded.ok, "manual VBlank script failed");
         arrange::juce::ArrangeRuntime runtime;
@@ -262,15 +316,13 @@ namespace {
         const auto pulse = [&] {
             (void)host.pumpFrame(timestamp += 16);
         };
-        writePackage("0xffff0000", "requestAnimationFrame(() => n.reload({path: 'app.js'}));");
+        writePackage("0xffff0000", "Promise.resolve().then(() => n.reload({path: 'app.js'}));");
         host.configure(config);
         host.resized(100, 100);
         pulse();
         check(pixel() == 0xffff0000, "initial reload package did not publish");
         check(host.wantsVBlank(), "post-evaluation script reload did not retain the frame clock");
         writePackage("0xff0000ff", "");
-        pulse();  // Drain script actions; the request remains pending for the next frame boundary.
-        check(pixel() == 0xffff0000 && host.wantsVBlank(), "script reload escaped its frame boundary");
         pulse();
         check(pixel() == 0xff0000ff && !host.wantsVBlank(), "script reload did not load or settle");
         writePackage("0xff00ff00", "");
@@ -278,7 +330,7 @@ namespace {
         check(pixel() == 0xff0000ff && host.wantsVBlank(), "manual reload replaced published content before VBlank");
         pulse();
         check(pixel() == 0xff00ff00, "manual reload failed to load the new package");
-        writePackage("0xffff0000", "requestAnimationFrame(() => n.diagnosticsRequestReload({}));");
+        writePackage("0xffff0000", "Promise.resolve().then(() => n.diagnosticsRequestReload({}));");
         host.reloadFromDevServer();
         pulse();
         check(pixel() == 0xffff0000, "HMR request did not use the package load boundary");
@@ -384,6 +436,7 @@ int main() {
         verifyFinalPublication();
         verifyHostResourceFailureAndPassivePaint();
         verifyReloadAtFrameBoundary();
+        verifySemanticOwnerWithoutFrames();
         std::cout << "帧提交：失败的测量。候选撤销、显式重新提交与上下文重置通过\n";
         return 0;
     } catch (const std::exception& error) {

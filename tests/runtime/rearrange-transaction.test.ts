@@ -11,19 +11,29 @@ import type { ArrangableDefinition } from '../../packages/framework/src/runtime/
 function controlledHost() {
     let complete: ((error?: Error) => void) | undefined
     const errors: unknown[] = []
+    let session: RearrangeSession
+    let time = 0
     const host: RearrangeHost = {
+        currentTime: () => 0,
+        requestFrame() { },
         begin() { },
         reconcileRoots() { },
         apply(callback) { complete = callback },
         rollback() { complete = undefined },
     }
     return {
-        create(definition: ArrangableDefinition) { return new RearrangeSession({ host, config: { errorHandler(error) { errors.push(error) } }, provides: {}, definitions: {} }, definition, {}) },
+        create(definition: ArrangableDefinition) { return session = new RearrangeSession({ host, config: { errorHandler(error) { errors.push(error) } }, provides: {}, definitions: {} }, definition, {}) },
+        frame() {
+            if (complete) return
+            session.scheduler.prepare(++time)
+            if (!complete) session.scheduler.complete(false)
+        },
         finish(error?: Error) {
             assert.ok(complete, '必须存在待应用事务')
             const callback = complete
             complete = undefined
             callback(error)
+            session.scheduler.complete(!error)
         },
         errors,
     }
@@ -57,10 +67,11 @@ test('AB 到 AC 等待 apply 成功后才释放 B，准备阶段不发送成功�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     selected.value = true
-    await nextTick()
+    native.frame()
     assert.deepEqual(events, ['创建 C'])
     native.finish()
     assert.deepEqual(events, ['创建 C', '释放 B', '挂载 C'])
@@ -97,16 +108,17 @@ test('创建 C 失败且被接住时保留 B 的实例与旧作用域，修正�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     selected.value = true
-    await nextTick()
+    native.frame()
     assert.equal(native.errors.length, 1)
     assert.deepEqual(events, ['创建 B', '清理 C'])
 
     fail = false
     revision.value++
-    await nextTick()
+    native.frame()
     assert.deepEqual(events, ['创建 B', '清理 C'])
     native.finish()
     assert.deepEqual(events, ['创建 B', '清理 C', '释放 B'])
@@ -134,10 +146,11 @@ test('后端 apply 失败不释放旧实例，只清理候选，不触发候选�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     selected.value = true
-    await nextTick()
+    native.frame()
     native.finish(new Error('应用失败'))
     assert.equal(native.errors.length, 1)
     assert.deepEqual(events, ['清理 C'])
@@ -161,11 +174,12 @@ test('独立参数同时变化先完成整组校验，观察者不读取半套�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     lower.value = 3
     upper.value = 4
-    await nextTick()
+    native.frame()
     assert.deepEqual(native.errors, [])
     assert.deepEqual(observed, [[3, 4]])
     native.finish()
@@ -185,16 +199,17 @@ test('纯值 apply 失败恢复旧参数和求值缓存，再次变化能够正�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     value.value = 2
-    await nextTick()
+    native.frame()
     native.finish(new Error('拒绝此次参数更新'))
     assert.equal(props!.value, 1)
     assert.equal(native.errors.length, 1)
 
     value.value = 3
-    await nextTick()
+    native.frame()
     native.finish()
     assert.equal(props!.value, 3)
     rearrangeSession.dispose()
@@ -215,10 +230,11 @@ test('候选嵌套调用回滚不发送任何成功卸载通知，深层退出�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     visible.value = true
-    await nextTick()
+    native.frame()
     native.finish(new Error('拒绝候选分支'))
     assert.deepEqual(events, ['清理叶子'])
     rearrangeSession.dispose()
@@ -238,6 +254,7 @@ test('两千层结构建立和退休不依赖递归调用栈', () => {
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
     rearrangeSession.dispose()
     assert.equal(disposed, 2001)
@@ -262,10 +279,11 @@ test('结构代码自行捕获创建异常也不能把失败候选提交成空�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
 
     selected.value = true
-    await nextTick()
+    native.frame()
     assert.deepEqual(events, ['业务接住异常'])
     assert.equal(native.errors.length, 1)
     assert.throws(() => native.finish(), /必须存在待应用事务/)
@@ -298,6 +316,7 @@ test('同一事务内二次失效复用候选实例，并只发送一次成功�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
     assert.equal(evaluations, 2)
     assert.equal(setups, 1)
@@ -322,12 +341,13 @@ test('成功回调抛错不撤销已提交状态，后续通知和更新继续�
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
     assert.equal(native.errors.length, 1)
     assert.deepEqual(events, ['挂载', '第二个挂载通知'])
 
     value.value++
-    await nextTick()
+    native.frame()
     native.finish()
     assert.deepEqual(events, ['挂载', '第二个挂载通知', '更新'])
     rearrangeSession.dispose()
@@ -362,16 +382,17 @@ test('候选清理抛错仍释放其余资源，保留旧生命且允许重试',
     const native = controlledHost()
     const rearrangeSession = native.create(App)
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     native.finish()
     selected.value = true
-    await nextTick()
+    native.frame()
     native.finish(new Error('拒绝应用'))
     assert.deepEqual(events, ['清理一', '清理二'])
     assert.equal(native.errors.length, 1)
 
     selected.value = false
     revision.value++
-    await nextTick()
+    native.frame()
     native.finish()
     rearrangeSession.dispose()
     assert.deepEqual(events, ['清理一', '清理二', '释放 B'])
@@ -381,6 +402,8 @@ test('开启事务失败能清理运行状态，之后可以重新挂载', () =>
     let fail = true
     let rollbacks = 0
     const host: RearrangeHost = {
+        currentTime: () => 0,
+        requestFrame() { },
         begin() { if (fail) throw new Error('开启事务失败') },
         reconcileRoots() { },
         apply(complete) { complete() },
@@ -388,10 +411,12 @@ test('开启事务失败能清理运行状态，之后可以重新挂载', () =>
     }
     const App = defineArrangable({ setup: () => () => { } })
     const rearrangeSession = new RearrangeSession({ host, config: {}, provides: {}, definitions: {} }, App, {})
-    assert.throws(() => rearrangeSession.mount(), /开启事务失败/)
+    rearrangeSession.mount()
+    assert.throws(() => rearrangeSession.scheduler.prepare(0), /开启事务失败/)
     assert.equal(rollbacks, 1)
     fail = false
     rearrangeSession.mount()
+    rearrangeSession.scheduler.prepare(0)
     assert.equal(rearrangeSession.root.entries.length, 1)
     rearrangeSession.dispose()
 })

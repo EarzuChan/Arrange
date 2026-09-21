@@ -10,9 +10,11 @@ import * as __Foundation from '@arrange/framework/foundation'
 type __Parameters<D> = D extends __Arrange.ArrangableDefinition ? __Arrange.ArrangableProps<D> : never
 type __Values<D> = { [K in keyof __Parameters<D>]: () => __Parameters<D>[K] }
 declare function __arrangeGetters<D, P>(definition: D, parameters: P & Record<Exclude<keyof P, keyof __Parameters<D>>, never>): { [K in keyof P]: () => P[K] }
-declare function __arrangeCheck<D>(definition: D, parameters: __Values<D>, line: number, column: number): __Values<D>
-type __ContentNames<D> = D extends { readonly slotNames: readonly (infer N)[] } ? N : never
-declare function __arrangeCheckSlots<D, S>(definition: D, contents: S & Record<Exclude<keyof S, __ContentNames<D> | '_'>, never>, line: number, column: number): S
+type __Selected<D, P> = D extends { readonly contentTarget: infer K } ? K extends keyof P ? P[K] extends () => infer Target ? Target : never : never : never
+type __DynamicParameters<D, P> = D extends { readonly contentTarget: string } ? { props?: () => __Parameters<__Selected<D, P>> } : unknown
+declare function __arrangeCheck<D, P extends __Values<D>>(definition: D, parameters: P & __DynamicParameters<D, P>, line: number, column: number): P
+type __ContentNames<D, P> = D extends { readonly contentTarget: string } ? __ContentNames<__Selected<D, P>, {}> : D extends { readonly slotNames: readonly (infer N)[] } ? N : never
+declare function __arrangeCheckSlots<D, S, P>(definition: D, contents: S & Record<Exclude<keyof S, __ContentNames<D, P> | '_'>, never>, line: number, column: number, parameters: P): S
 `
 
 // 虚拟 TS 文件保留真实定义及参数类型，既检查 script，也检查模板调用

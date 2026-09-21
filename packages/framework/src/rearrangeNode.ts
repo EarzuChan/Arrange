@@ -1,3 +1,4 @@
+import type { PxModifier } from './resolveUnits.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
 import type { RearrangeHost, RearrangeNode } from './runtime/internal.ts'
 import type { NativeBindingHandle, NativeModifierHandle, NativeMutation, NativeTransactionTarget } from './native.ts'
@@ -18,6 +19,9 @@ export class NativeRearrangeHost implements RearrangeHost {
     private transaction: object | undefined
 
     constructor(readonly native: NativeTransactionTarget) { }
+
+    currentTime(): number { return this.native.currentTime() }
+    requestFrame(pending: boolean): void { this.native.requestFrame(pending) }
 
     allocateId(): number { return this.nextId++ }
 
@@ -161,7 +165,7 @@ export class LayoutRearrangeNode implements RearrangeNode {
         this.update('measurePolicy', policy)
     }
 
-    updateModifier(modifier: Modifier): void {
+    updateModifier(modifier: PxModifier): void {
         this.update('modifier', modifier)
     }
 
@@ -180,7 +184,7 @@ export class LayoutRearrangeNode implements RearrangeNode {
         this.host.stage(native => {
             if (this.retired) return
             const value = this.pendingInputs.get(name)
-            if (name === 'modifier' && this.writeModifier(native, value as Modifier)) return
+            if (name === 'modifier' && this.writeModifier(native, value as PxModifier)) return
             let binding = this.bindings.get(name)
             if (!binding) {
                 binding = native.registerBinding(this.id, name)
@@ -204,8 +208,8 @@ export class LayoutRearrangeNode implements RearrangeNode {
         }, () => { this.pendingInputs.delete(name) })
     }
 
-    private writeModifier(native: NativeTransactionTarget, next: Modifier): boolean {
-        const previous = this.inputs.get('modifier') as Modifier | undefined
+    private writeModifier(native: NativeTransactionTarget, next: PxModifier): boolean {
+        const previous = this.inputs.get('modifier') as PxModifier | undefined
         if (!previous) return false
         if (previous.elements.length === next.elements.length && previous.elements.every((element, index) => sameModifierElement(element, next.elements[index]))) {
             modifierStats.equalWritesSkipped++
@@ -288,7 +292,7 @@ function sameDescriptorFields(left: unknown, right: unknown): boolean {
 // 只比较正式 Modifier 的值字段，业务对象与回调仍按身份判断，不递归探测任意对象
 const descriptorFields: Readonly<Record<string, readonly string[]>> = {
     background: ['brush', 'shape'], border: ['brush', 'shape'], clip: ['shape'], graphicsLayer: ['transformOrigin'],
-    text: ['textStyle'], textField: ['textStyle'], paint: ['painter', 'colorFilter'],
+    text: ['style'], textField: ['textStyle'], paint: ['painter', 'colorFilter'],
     verticalScroll: ['state'], horizontalScroll: ['state'], animateContentSize: ['animationSpec'],
 }
 

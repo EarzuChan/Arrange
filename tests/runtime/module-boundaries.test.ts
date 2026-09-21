@@ -5,6 +5,7 @@ import * as foundation from '@arrange/framework/foundation'
 import * as ui from '@arrange/framework/ui'
 import * as animation from '@arrange/framework/animation'
 import * as internal from '@arrange/framework/internal'
+import { frameScope } from './frameScope.ts'
 import { requireSfaModule } from './sfaModules.ts'
 
 test('根入口只保留核心能力，分层入口与编译协议共享响应式身份', () => {
@@ -19,11 +20,11 @@ test('根入口只保留核心能力，分层入口与编译协议共享响应�
     assert.ok(ui.M instanceof ui.Modifier)
 
     const target = core.ref(1)
-    const clock = animation.createManualAnimationClock()
-    const value = animation.animatedNumberAsRef(target, { clock, animationSpec: animation.tween({ durationMillis: 10 }) })
+    const clock = frameScope()
+    const value = clock.run(() => animation.animatedNumberAsRef(target, { animationSpec: animation.tween({ durationMillis: 10 }) }))
     assert.ok(core.isRef(value))
     target.value = 2
     clock.advanceBy(10)
     assert.equal(value.value, 2)
-    value.stop()
+    clock.stop()
 })

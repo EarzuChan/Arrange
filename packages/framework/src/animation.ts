@@ -1,27 +1,27 @@
+import { animationScheduler } from './runtime/animationOwner.ts'
+import type { FrameScheduler, FrameParticipant } from './runtime/scheduler.ts'
 import { computed, getCurrentScope, isRef, onScopeDispose, readonly, shallowReadonly, shallowRef } from "@arrange/reactivity"
 import { batchUpdates } from "@arrange/reactivity"
 import { watch } from "./runtime/index.ts"
 import type { Ref } from "@arrange/reactivity"
 
-export type AnimationClock = {
-    now: () => number
-    requestFrame: (callback: (time: number) => void) => number
-    cancelFrame: (handle: number) => void
-}
 export type AnimationTarget<T> = T | Ref<T> | (() => T)
 
 export type Easing = (fraction: number) => number
 
 export type AnimationSpec = Readonly<{ kind: "tween"; durationMillis: number; delayMillis: number; easing: Easing }> | Readonly<{ kind: "spring"; stiffness: number; dampingRatio: number; visibilityThreshold: number }> | Readonly<{ kind: "snap"; delayMillis: number }>
 
-export type AnimationArgs = { clock?: AnimationClock; animationSpec?: AnimationSpec; label?: string; finished?: () => void }
+export type AnimationArgs = { animationSpec?: AnimationSpec; label?: string; finished?: () => void }
 
 export type AnimatedRef<T> = Readonly<Ref<T>> & { readonly isRunning: Readonly<Ref<boolean>>; readonly label: string; stop: () => void }
 
+/** @arrangeFields offset */
 export type Offset = Readonly<{ x: number; y: number }>
 
+/** @arrangeFields size */
 export type Size = Readonly<{ width: number; height: number }>
 
+/** @arrangeFields rect */
 export type Rect = Offset & Size
 
 function finite(value: number, name: string): number {
@@ -30,7 +30,7 @@ function finite(value: number, name: string): number {
     return value
 }
 function nonnegative(value: number, name: string): number {
-    if (finite(value, name) < 0) throw new RangeError(`${name}不可非负喵`)
+    if (finite(value, name) < 0) throw new RangeError(`${name}必须非负`)
 
     return value
 }
@@ -42,9 +42,9 @@ export const linearEasing: Easing = t => t
 nativeEasings.set(linearEasing, [0, 0, 1, 1])
 
 export function cubicBezierEasing(x1: number, y1: number, x2: number, y2: number): Easing {
-    for (const value of [x1, y1, x2, y2]) finite(value, "Bezier control point")
+    for (const value of [x1, y1, x2, y2]) finite(value, "贝塞尔控制点")
 
-    if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) throw new RangeError("Bezier x must be in [0, 1]")
+    if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) throw new RangeError("贝塞尔横坐标必须在 [0, 1] 之间")
 
     const curve = (t: number, a: number, b: number) => 3 * (1 - t) ** 2 * t * a + 3 * (1 - t) * t * t * b + t ** 3
 
@@ -81,7 +81,7 @@ export function spring(args: { stiffness?: number; dampingRatio?: number; visibi
     const stiffness = nonnegative(args.stiffness ?? 400, "stiffness")
     const dampingRatio = nonnegative(args.dampingRatio ?? 1, "damping ratio")
     const visibilityThreshold = nonnegative(args.visibilityThreshold ?? 0.01, "threshold")
-    if (!stiffness || !dampingRatio || !visibilityThreshold) throw new RangeError("Spring parameters must be positive")
+    if (!stiffness || !dampingRatio || !visibilityThreshold) throw new RangeError("弹簧参数必须为正数")
     return Object.freeze({ kind: "spring", stiffness, dampingRatio, visibilityThreshold })
 }
 
@@ -89,99 +89,50 @@ export function snap(delayMillis = 0): AnimationSpec {
     return Object.freeze({ kind: "snap", delayMillis: nonnegative(delayMillis, "delay") })
 }
 
-export const defaultAnimationClock: AnimationClock = Object.freeze({
-    now: () => {
-        if (typeof performance === "undefined" || typeof performance.now !== "function") throw new Error("Arrange animations require the native VBlank clock")
-        return performance.now()
-    },
-    requestFrame: callback => {
-        if (typeof requestAnimationFrame !== "function") throw new Error("Arrange animations require the native VBlank clock")
-        return requestAnimationFrame(callback)
-    },
-    cancelFrame: handle => cancelAnimationFrame(handle),
-})
-
-export function createManualAnimationClock(): AnimationClock & { advanceBy: (deltaMillis: number) => void; readonly pendingFrames: number } {
-    let time = 0, nextHandle = 1
-
-    const frames = new Map<number, (time: number) => void>()
-
-    return {
-        now: () => time,
-        requestFrame(callback) {
-            const handle = nextHandle++
-            frames.set(handle, callback)
-            return handle
-        },
-        cancelFrame(handle) { frames.delete(handle) },
-        get pendingFrames() { return frames.size },
-        advanceBy(deltaMillis) {
-            time += nonnegative(deltaMillis, "frame delta")
-            const callbacks = [...frames.values()]
-            frames.clear()
-            for (const callback of callbacks) callback(time)
-        }
-    }
-}
-
 export const animationStats = { activeAnimations: 0, sampledAnimations: 0, sampledFrames: 0 }
 
-type FrameParticipant = (time: number) => void
+type FrameParticipantCallback = (time: number) => void
 
-class AnimationTimeline {
-    private participants = new Set<FrameParticipant>()
-    private handle: number | undefined
-    private sampling = false
-    private completions: (() => void)[] = []
-    constructor(readonly clock: AnimationClock) { }
+class AnimationTimeline implements FrameParticipant {
+    private readonly participants = new Map<FrameParticipantCallback, () => boolean>()
+    private readonly completions: (() => void)[] = []
 
-    add(participant: FrameParticipant) {
-        if (!this.participants.has(participant)) {
-            this.participants.add(participant)
-            animationStats.activeAnimations++
-        }
-        this.request()
-    }
-    remove(participant: FrameParticipant) {
-        if (this.participants.delete(participant)) animationStats.activeAnimations--
-        if (!this.participants.size && this.handle !== undefined) {
-            this.clock.cancelFrame(this.handle)
-            this.handle = undefined
-        }
-    }
-    finish(callback: () => void) {
-        if (this.sampling) this.completions.push(callback)
-        else callback()
-    }
-    private request() {
-        if (this.sampling || this.handle !== undefined || !this.participants.size) return
-        this.handle = this.clock.requestFrame(time => {
-            this.handle = undefined
-            this.sampling = true
-            animationStats.sampledFrames++
-            try {
-                // Synchronous observers also see all channels at one timestamp.
-                batchUpdates(() => {
-                    for (const participant of [...this.participants]) if (this.participants.has(participant)) {
-                        animationStats.sampledAnimations++
-                        participant(time)
-                    }
-                    for (const complete of this.completions.splice(0)) complete()
-                })
-            } finally {
-                this.completions.length = 0
-                this.sampling = false
-                this.request()
+    constructor(readonly owner: FrameScheduler) { }
+
+    active = () => [...this.participants.values()].some(active => active())
+
+    sample(time: number): void {
+        animationStats.sampledFrames++
+        batchUpdates(() => {
+            for (const [sample, active] of [...this.participants]) if (this.participants.has(sample) && active()) {
+                animationStats.sampledAnimations++
+                sample(time)
             }
         })
+        for (const complete of this.completions.splice(0)) complete()
     }
+
+    add(sample: FrameParticipantCallback, active: () => boolean): void {
+        if (this.participants.has(sample)) return
+        if (!this.participants.size) this.owner.add(this)
+        this.participants.set(sample, active)
+        animationStats.activeAnimations++
+        this.owner.wake()
+    }
+
+    remove(sample: FrameParticipantCallback): void {
+        if (!this.participants.delete(sample)) return
+        animationStats.activeAnimations--
+        if (!this.participants.size) this.owner.remove(this)
+    }
+
+    finish(callback: () => void): void { this.completions.push(callback) }
 }
 
-const timelines = new WeakMap<AnimationClock, AnimationTimeline>()
-
-function timeline(clock: AnimationClock) {
-    let value = timelines.get(clock)
-    if (!value) timelines.set(clock, value = new AnimationTimeline(clock))
+const timelines = new WeakMap<FrameScheduler, AnimationTimeline>()
+function timeline(owner: FrameScheduler) {
+    let value = timelines.get(owner)
+    if (!value) timelines.set(owner, value = new AnimationTimeline(owner))
     return value
 }
 
@@ -191,9 +142,9 @@ function read<T>(target: AnimationTarget<T>): T {
 
 type Converter<T> = { to: (value: T) => number[]; from: (vector: number[]) => T }
 
-const numberConverter: Converter<number> = { to: value => [finite(value, "animation value")], from: vector => vector[0] }
+const numberConverter: Converter<number> = { to: value => [finite(value, "动画数值")], from: vector => vector[0] }
 
-const arrayConverter: Converter<readonly number[]> = { to: value => value.map(item => finite(item, "animation channel")), from: vector => Object.freeze([...vector]) }
+const arrayConverter: Converter<readonly number[]> = { to: value => value.map(item => finite(item, "动画通道")), from: vector => Object.freeze([...vector]) }
 
 const colorConverter: Converter<number> = {
     to(value) {
@@ -221,7 +172,7 @@ const sizeConverter = objectConverter<Size>(["width", "height"])
 
 const rectConverter = objectConverter<Rect>(["x", "y", "width", "height"])
 
-// Analytic oscillator: independent of frame rate, including long or skipped frames.
+// 解析振子独立于帧率，跳帧后按实际经过的时间采样
 function springChannel(displacement: number, velocity: number, seconds: number, spec: Extract<AnimationSpec, { kind: "spring" }>): [number, number] {
     const omega = Math.sqrt(spec.stiffness), zeta = spec.dampingRatio
 
@@ -243,13 +194,20 @@ function springChannel(displacement: number, velocity: number, seconds: number, 
 }
 
 function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
-    const clock = args.clock ?? defaultAnimationClock, scheduler = timeline(clock)
+    const clock = animationScheduler(), scheduler = timeline(clock)
+    const scope = getCurrentScope()
     let current = converter.to(initial), from = current, target = current, velocity = current.map(() => 0), initialVelocity = velocity
     const state = shallowRef(converter.from(current)) as Ref<T>, running = shallowRef(false)
     let startTime = 0, stopped = false
+    let pausedAt = 0
+    let resumed = false
     const spec = args.animationSpec ?? spring()
 
     const sample = (time: number) => {
+        if (resumed) {
+            startTime += time - pausedAt
+            resumed = false
+        }
         const elapsed = Math.max(0, time - startTime)
         let done = true
         if (spec.kind === "spring") {
@@ -263,7 +221,7 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
             if (elapsed < spec.delayMillis) return
             const duration = spec.kind === "tween" ? spec.durationMillis : 0
             const fraction = duration ? Math.min(1, (elapsed - spec.delayMillis) / duration) : 1
-            const progress = spec.kind === "tween" ? finite(spec.easing(fraction), "easing result") : 1
+            const progress = spec.kind === "tween" ? finite(spec.easing(fraction), "缓动结果") : 1
             done = fraction >= 1
             current = from.map((value, index) => value + (target[index] - value) * progress)
             velocity = current.map(() => 0)
@@ -281,22 +239,38 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
     const retarget = (value: T, time = clock.now()) => {
         if (stopped) return
         const next = converter.to(value)
-        if (next.length !== target.length) throw new RangeError("Animated number groups have a fixed length")
+        if (next.length !== target.length) throw new RangeError("动画数值数组的长度不能改变")
         if (next.every((item, index) => item === target[index])) return
-        // Retarget from the last presented sample; preserve spring momentum.
+        // 从最近采样值重定向，保留弹簧动量
         from = converter.to(state.value)
         target = next
         initialVelocity = [...velocity]
         startTime = time
+        resumed = false
         if (from.every((item, index) => item === target[index]) && velocity.every(value => value === 0)) return
         running.value = true
-        if (spec.kind === "snap" && spec.delayMillis === 0 || spec.kind === "tween" && spec.durationMillis === 0 && spec.delayMillis === 0) sample(time)
-        else scheduler.add(sample)
+        scheduler.add(sample, () => !scope || scope.active && !scope.paused)
     }
+
+    const pause = () => {
+        pausedAt = clock.now()
+        clock.refresh()
+    }
+    const resume = () => {
+        resumed = true
+        if (running.value) clock.wake()
+    }
+    scope?.pauseCallbacks.add(pause)
+    scope?.resumeCallbacks.add(resume)
+    if (scope) onScopeDispose(() => {
+        scope.pauseCallbacks.delete(pause)
+        scope.resumeCallbacks.delete(resume)
+        scheduler.remove(sample)
+    })
 
     const output = shallowReadonly(state) as AnimatedRef<T>
 
-    // Attach controls to the underlying ref before readonly proxying its reads.
+    // 控制成员注册到原 Ref，由只读代理保护值读取
     Object.defineProperties(state, {
         label: { value: args.label ?? "" },
         isRunning: { configurable: true, value: readonly(running) },
@@ -321,26 +295,33 @@ function animated<T>(target: AnimationTarget<T>, converter: Converter<T>, args: 
         controller.output.stop()
     }
     if (getCurrentScope()) onScopeDispose(stop)
-    // A proxy override keeps stop() responsible for the target subscription too.
+    // 停止通道时一并取消目标订阅
     return new Proxy(controller.output, { get: (value, key, receiver) => key === "stop" ? stop : Reflect.get(value, key, receiver) })
 }
 
 export const animatedNumberAsRef = (target: AnimationTarget<number>, args: AnimationArgs = {}) => animated(target, numberConverter, args)
 
+/** @arrangeArguments dp
+ * @arrangeResult dp */
 export const animatedDpAsRef = animatedNumberAsRef
 
+/** @arrangeArguments color
+ * @arrangeResult color */
 export const animatedColorAsRef = (target: AnimationTarget<number>, args: AnimationArgs = {}) => animated(target, colorConverter, args)
 
 export const animatedNumberArrayAsRef = (target: AnimationTarget<readonly number[]>, args: AnimationArgs = {}) => animated(target, arrayConverter, args)
 
+/** @arrangeArguments offset */
 export const animatedOffsetAsRef = (target: AnimationTarget<Offset>, args: AnimationArgs = {}) => animated(target, offsetConverter, args)
 
+/** @arrangeArguments size */
 export const animatedSizeAsRef = (target: AnimationTarget<Size>, args: AnimationArgs = {}) => animated(target, sizeConverter, args)
 
+/** @arrangeArguments rect */
 export const animatedRectAsRef = (target: AnimationTarget<Rect>, args: AnimationArgs = {}) => animated(target, rectConverter, args)
 
 export function createTransition<S>(target: AnimationTarget<S>, args: AnimationArgs = {}) {
-    const clock = args.clock ?? defaultAnimationClock
+    const clock = animationScheduler()
     const currentState = shallowRef(read(target)) as Ref<S>
     const targetState = shallowRef(currentState.value) as Ref<S>
     const running = shallowRef(false)
@@ -350,10 +331,10 @@ export function createTransition<S>(target: AnimationTarget<S>, args: AnimationA
         running.value = [...children.values()].some(child => child.value.isRunning.value)
         if (!running.value) currentState.value = targetState.value
     }
-    const register = <T>(label: string, mapping: (state: S) => T, converter: Converter<T>, childArgs: Omit<AnimationArgs, "clock"> = {}): AnimatedRef<T> => {
-        if (stopped || children.has(label)) throw new Error(`Transition child '${label}' is retired or already registered`)
+    const register = <T>(label: string, mapping: (state: S) => T, converter: Converter<T>, childArgs: AnimationArgs = {}): AnimatedRef<T> => {
+        if (stopped || children.has(label)) throw new Error(`Transition 子通道 '${label}' 已退休或重复注册`)
         const control = channel(mapping(currentState.value), converter, {
-            ...args, ...childArgs, label, clock, finished() {
+            ...args, ...childArgs, label, finished() {
                 childArgs.finished?.()
                 settle()
             }
@@ -399,22 +380,28 @@ export function createTransition<S>(target: AnimationTarget<S>, args: AnimationA
     if (getCurrentScope()) onScopeDispose(stop)
     return {
         currentState: readonly(currentState), targetState: readonly(targetState), isRunning: readonly(running), stop,
-        animatedNumber: (label: string, map: (state: S) => number, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, numberConverter, childArgs),
-        animatedDp: (label: string, map: (state: S) => number, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, numberConverter, childArgs),
-        animatedColor: (label: string, map: (state: S) => number, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, colorConverter, childArgs),
-        animatedNumberArray: (label: string, map: (state: S) => readonly number[], childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, arrayConverter, childArgs),
-        animatedOffset: (label: string, map: (state: S) => Offset, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, offsetConverter, childArgs),
-        animatedSize: (label: string, map: (state: S) => Size, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, sizeConverter, childArgs),
-        animatedRect: (label: string, map: (state: S) => Rect, childArgs: Omit<AnimationArgs, "clock"> = {}) => register(label, map, rectConverter, childArgs),
+        animatedNumber: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, numberConverter, childArgs),
+        /** @arrangeArguments none dp
+         * @arrangeResult dp */
+        animatedDp: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, numberConverter, childArgs),
+        /** @arrangeArguments none color
+         * @arrangeResult color */
+        animatedColor: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, colorConverter, childArgs),
+        animatedNumberArray: (label: string, map: (state: S) => readonly number[], childArgs: AnimationArgs = {}) => register(label, map, arrayConverter, childArgs),
+        /** @arrangeArguments none offset */
+        animatedOffset: (label: string, map: (state: S) => Offset, childArgs: AnimationArgs = {}) => register(label, map, offsetConverter, childArgs),
+        /** @arrangeArguments none size */
+        animatedSize: (label: string, map: (state: S) => Size, childArgs: AnimationArgs = {}) => register(label, map, sizeConverter, childArgs),
+        /** @arrangeArguments none rect */
+        animatedRect: (label: string, map: (state: S) => Rect, childArgs: AnimationArgs = {}) => register(label, map, rectConverter, childArgs),
     }
 }
 
-// Native measurement cannot call an arbitrary JS curve. Built-in and cubic Bezier
-// curves carry a lossless numeric representation, rather than sampled approximations.
+// 原生测量不调用任意 JS 曲线，内建及贝塞尔曲线携带无损数值描述
 export function nativeAnimationSpec(spec: AnimationSpec): Readonly<Record<string, unknown>> {
     if (spec.kind !== "tween") return spec
     const points = nativeEasings.get(spec.easing)
-    if (!points) throw new TypeError("animateContentSize requires a built-in or cubicBezier easing")
+    if (!points) throw new TypeError("animateContentSize 需要内建或贝塞尔缓动曲线")
     return Object.freeze({ kind: spec.kind, durationMillis: spec.durationMillis, delayMillis: spec.delayMillis, x1: points[0], y1: points[1], x2: points[2], y2: points[3] })
 }
 

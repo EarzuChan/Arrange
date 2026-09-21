@@ -17,6 +17,8 @@ M.padding(dp(8)).background(red)
 
 文本显示和编辑也是正式 Modifier 元素，使用同一顺序、协调、精确更新与退休机制。文本元素的测量和绘制几何在链条所在层确定，外部 padding、clip、transform 等正常包裹它；不能将文本元素展开成 Layout 的 textPresentation/text/value 特殊字段。文本与输入职责见 [文本输入与绘制](18-文本输入与绘制.md)。
 
+声明单位在 Layout 的受追踪读取中解析为原生 PX 输入，共享声明不修改；解析缓存与 Modifier 实例协调分别承担数值复用和原生身份职责。具体单位、响应式 Density 与 SFA 消融见 [基础类型](10-基础类型.md)。
+
 # 生产事实源
 
 Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型化输入。原生协调器维护每层实例的身份、绑定、阶段数据与退休；measure、place、paint、hit-test 消费同一条实例链。相等输入不触发无关阶段，事件回调替换只失效输入相关数据。

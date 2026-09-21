@@ -37,9 +37,9 @@ namespace arrange::juce {
 #endif
     }
 
-    bool RearrangeHost::hasPendingAnimationFrame() const noexcept {
+    bool RearrangeHost::hasPendingVisualWork() const noexcept {
 #if ARRANGE_WITH_QUICKJS_NG
-        return scriptHost_ && scriptHost_->hasPendingAnimationFrame();
+        return scriptHost_ && scriptHost_->hasPendingVisualWork();
 #else
         return false;
 #endif
@@ -54,16 +54,42 @@ namespace arrange::juce {
 #endif
     }
 
-    RearrangeInvokeResult RearrangeHost::pumpAnimationFrame(double nowMillis) {
+    void RearrangeHost::setOwnerWake(std::function<void()> wake) {
 #if ARRANGE_WITH_QUICKJS_NG
-        if (!scriptHost_ || !scriptHost_->hasPendingAnimationFrame()) return {};
-        const auto pumped = scriptHost_->pumpAnimationFrame(nowMillis);
+        if (scriptHost_) scriptHost_->setOwnerWake(std::move(wake));
+#endif
+    }
+
+    RearrangeInvokeResult RearrangeHost::semanticCheckpoint(double nowMillis) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) {
+            const auto result = scriptHost_->semanticCheckpoint(nowMillis);
+            return {true, result.ok, result.error};
+        }
+#endif
+        return {false, true, {}};
+    }
+
+    RearrangeInvokeResult RearrangeHost::prepareVisualFrame(double nowMillis) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (!scriptHost_ || !scriptHost_->hasPendingVisualWork()) return {};
+        const auto pumped = scriptHost_->prepareVisualFrame(nowMillis);
         if (!pumped.ok) return {true, false, pumped.error};
         return {true, true, {}};
 #else
         (void)nowMillis;
         return {};
 #endif
+    }
+
+    RearrangeInvokeResult RearrangeHost::completeVisualFrame(bool success) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) {
+            const auto result = scriptHost_->completeVisualFrame(success);
+            return {true, result.ok, result.error};
+        }
+#endif
+        return {false, true, {}};
     }
 
     RearrangeInvokeResult RearrangeHost::invoke(const arrange::core::EventSlotId& slot, double nowMillis) {

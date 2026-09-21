@@ -131,6 +131,7 @@ export class ReactiveEffect<T = any>
     }
 
     pause(): void {
+        if (this.dirty) pausedQueueEffects.add(this)
         this.flags |= EffectFlags.PAUSED
     }
 

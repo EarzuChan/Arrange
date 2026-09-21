@@ -22,16 +22,16 @@
 
 
 <script>
-import { painter } from '@arrange/framework/ui'
-import { ref, shallowRef, onScopeDispose } from '@arrange/framework'
-import { defaultAnimationClock } from '@arrange/framework/animation'
+import { painter, Color, dp } from '@arrange/framework/ui'
+import { ref, shallowRef, onScopeDispose, watch, getCurrentScope, effectScope } from '@arrange/framework'
+import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
 import { getArrangeExecutionStats } from '@arrange/framework/internal'
 import AnimationGallery from '../../../demo/ui-src/src/view/AnimationGallery.sfa'
 import CounterPanel from '../../../demo/ui-src/src/view/CounterPanel.sfa'
 import ShowcaseGallery from '../../../demo/ui-src/src/view/ShowcaseGallery.sfa'
 
-const color = ref(0xff336699)
-const offset = ref(0)
+const color = ref(Color(0xff336699))
+const offset = ref(dp(0))
 const clicks = ref(0)
 const shown = ref(true)
 const rows = ref([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }])
@@ -47,40 +47,41 @@ let performanceBaseline: ReturnType<typeof getArrangeExecutionStats> | undefined
 let lifetimeBaseline: number | undefined
 const asyncStatus = ref<'idle' | 'pending' | 'loading' | 'ready' | 'failed'>('idle')
 let asyncRequest = 0
-let asyncFrame: number | undefined
+const ownerScope = getCurrentScope()!
+let asyncScope: ReturnType<typeof effectScope> | undefined
 let finishAsync: (() => void) | undefined
 
 function cancelAsyncProbe() {
     asyncRequest++
-    if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
-    asyncFrame = undefined
+    asyncScope?.stop()
+    asyncScope = undefined
     asyncStatus.value = 'idle'
 }
 
 function startAsyncProbe() {
     cancelAsyncProbe()
     const request = asyncRequest
-    const started = defaultAnimationClock.now()
+    asyncScope = ownerScope.run(() => effectScope())
+    asyncScope!.run(() => {
+        const target = ref(0)
+        const progress = animatedNumberAsRef(target, { animationSpec: tween({ durationMillis: 96, easing: linearEasing }) })
+        watch(() => progress.value, value => {
+            if (value >= 1) {
+                asyncRequest++
+                asyncStatus.value = 'failed'
+            } else if (value >= 1 / 3) asyncStatus.value = 'loading'
+        }, { flush: 'sync' })
+        target.value = 1
+    })
     asyncStatus.value = 'pending'
     const pending = new Promise<void>(resolve => { finishAsync = resolve })
     pending.then(() => {
         if (request !== asyncRequest) return
-        if (asyncFrame !== undefined) defaultAnimationClock.cancelFrame(asyncFrame)
-        asyncFrame = undefined
+        asyncScope?.stop()
+        asyncScope = undefined
         asyncStatus.value = 'ready'
     })
-    const sample = (time: number) => {
-        asyncFrame = undefined
-        if (request !== asyncRequest) return
-        if (time - started >= 96) {
-            asyncRequest++
-            asyncStatus.value = 'failed'
-            return
-        }
-        if (time - started >= 32) asyncStatus.value = 'loading'
-        asyncFrame = defaultAnimationClock.requestFrame(sample)
-    }
-    asyncFrame = defaultAnimationClock.requestFrame(sample)
+
 }
 
 onScopeDispose(cancelAsyncProbe)
@@ -114,7 +115,7 @@ function command(value: string) {
     else if (value === 'gallery-remove') gallery.value = false
     else if (value.startsWith('gallery:')) galleryCommand.value = value.slice(8)
     else if (value === 'baseline') baseline = getArrangeExecutionStats()
-    else if (value === 'color') color.value = color.value === 0xff336699 ? 0xff993366 : 0xff336699
+    else if (value === 'color') color.value = color.value === Color(0xff336699) ? Color(0xff993366) : Color(0xff336699)
     else if (value === 'offset') offset.value += 5
     else if (value === 'text') clicks.value++
     else if (value === 'remove') shown.value = false

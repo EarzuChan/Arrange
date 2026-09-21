@@ -470,6 +470,12 @@ namespace arrange::quickjs {
             self->bindings.clear();
             self->modifierBindings.clear();
             self->rootNodeId = 0;
+            self->frameRequested = false;
+            self->framePrepared = false;
+            JS_FreeValue(context, self->prepareFrame);
+            JS_FreeValue(context, self->completeFrame);
+            JS_FreeValue(context, self->disposeApp);
+            self->prepareFrame = self->completeFrame = self->disposeApp = JS_UNDEFINED;
             return JS_UNDEFINED;
         }
 
@@ -638,30 +644,30 @@ namespace arrange::quickjs {
             return JS_NewFloat64(context, self == nullptr ? 0.0 : self->frameTimeMillis);
         }
 
-        JSValue requestAnimationFrame(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        JSValue nativeInstallFrameDriver(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
-            if (self == nullptr) return JS_NewUint32(context, 0);
-            if (argc < 1 || !JS_IsFunction(context, argv[0])) return JS_ThrowTypeError(context, "requestAnimationFrame expects a callback");
-            const auto handle = self->nextAnimationFrameHandle++;
-            self->animationFrameCallbacks.emplace(handle, JS_DupValue(context, argv[0]));
-            return JS_NewUint32(context, handle);
+            if (!self || argc != 3) return JS_ThrowTypeError(context, "帧驱动需要准备、完成和销毁回调");
+            if (!JS_IsUndefined(self->prepareFrame)) return JS_ThrowTypeError(context, "一个 Owner 只能安装一个帧驱动");
+            for (int i = 0; i < argc; ++i)
+                if (!JS_IsFunction(context, argv[i])) return JS_ThrowTypeError(context, "帧驱动参数必须是函数");
+
+            self->prepareFrame = JS_DupValue(context, argv[0]);
+            self->completeFrame = JS_DupValue(context, argv[1]);
+            self->disposeApp = JS_DupValue(context, argv[2]);
+            return JS_UNDEFINED;
         }
 
-        JSValue cancelAnimationFrame(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr || argc < 1) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            const auto handle = readIndex(context, argv[0]);
-            if (JS_HasException(context)) return JS_EXCEPTION;
-            if (const auto it = self->animationFrameCallbacks.find(handle); it != self->animationFrameCallbacks.end()) {
-                JS_FreeValue(context, it->second);
-                self->animationFrameCallbacks.erase(it);
+        JSValue nativeRequestFrame(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            if (auto* self = runtime(context)) {
+                if (argc != 1 || !JS_IsBool(argv[0])) return JS_ThrowTypeError(context, "帧需求必须是布尔值");
+                self->frameRequested = JS_ToBool(context, argv[0]);
+                if (self->frameRequested && self->wakeOwner) self->wakeOwner();
             }
             return JS_UNDEFINED;
         }
 
         const JSCFunctionListEntry nativeApiFunctions[] = {
-            JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog), JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics), JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents), JS_CFUNC_DEF("diagnosticsSetLogLevel", 1, nativeDiagnosticsSetLogLevel), JS_CFUNC_DEF("diagnosticsSetCategoryEnabled", 2, nativeDiagnosticsSetCategoryEnabled), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
+            JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog), JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics), JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents), JS_CFUNC_DEF("diagnosticsSetLogLevel", 1, nativeDiagnosticsSetLogLevel), JS_CFUNC_DEF("diagnosticsSetCategoryEnabled", 2, nativeDiagnosticsSetCategoryEnabled), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
         };
     }  // namespace
 
@@ -673,8 +679,6 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(context, native.get(), "runtimeVersion", JS_NewUint32(context, arrange::core::RuntimeVersion));
         JS_SetPropertyStr(context, global.get(), "__ARRANGE_NATIVE__", native.release());
 
-        JS_SetPropertyStr(context, global.get(), "requestAnimationFrame", JS_NewCFunction(context, requestAnimationFrame, "requestAnimationFrame", 1));
-        JS_SetPropertyStr(context, global.get(), "cancelAnimationFrame", JS_NewCFunction(context, cancelAnimationFrame, "cancelAnimationFrame", 1));
         ScopedValue performance(context, JS_NewObject(context));
         JS_SetPropertyStr(context, performance.get(), "now", JS_NewCFunction(context, performanceNow, "now", 0));
         JS_SetPropertyStr(context, performance.get(), "measureNow", JS_NewCFunction(context, performanceMeasureNow, "measureNow", 0));

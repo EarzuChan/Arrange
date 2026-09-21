@@ -6,7 +6,7 @@ import { createApp, diagnostics, logger, nextTick, ref, createScrollState, onSco
 import { defineArrangable } from '../../packages/framework/src/internal.ts'
 import type { NativeTransactionTarget } from '../../packages/framework/src/internal.ts'
 import type { Modifier } from '../../packages/framework/src/ui.ts'
-import { recordingNative } from './recordingNative.ts'
+import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
 function diagnosticNative(): NativeTransactionTarget & { calls: (readonly [string, ...unknown[]])[] } {
     const calls: (readonly [string, ...unknown[]])[] = []
@@ -28,7 +28,7 @@ test('App 经 Layout 结构调用提交原生父子关系、Policy 与 Modifier'
     const native = recordingNative()
     const Root = defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.padding(8) }, { default: () => call(0, Text, { text: () => '正文' }) }) })
     const app = createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.deepEqual(native.nodes.get(1)!.children, [2])
     assert.deepEqual(native.nodes.get(2)!.children, [3])
     assert.deepEqual(native.textNodes(), [{ id: 3, text: '正文' }])
@@ -41,10 +41,10 @@ test('反应式文字通过文本 Modifier 更新既有受体', async () => {
     const text = ref('原文')
     const native = recordingNative()
     const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, Text, { text: () => text.value }) }))
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const id = native.textNodes()[0].id
     text.value = '新文'
-    await nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), [{ id, text: '新文' }])
     app.unmount()
 })
@@ -59,26 +59,26 @@ test('同批多受体值变化只产生一次候选，等待 apply 期间的新�
             call(1, Text, { text: () => second.value })
         }
     }))
-    app.mount(native.target)
+    mountFrame(app, native.target)
     native.finish()
     const initialSubmissions = native.submissions
 
     first.value = '丙'
     second.value = '丁'
-    await nextTick()
+    advanceFrames()
     assert.equal(native.submissions, initialSubmissions + 1)
     assert.deepEqual(native.textNodes().map(node => node.text), ['甲', '乙'])
 
     first.value = '戊'
     second.value = '己'
-    await nextTick()
+    advanceFrames()
     assert.equal(native.submissions, initialSubmissions + 1)
     native.finish()
     assert.deepEqual(native.textNodes().map(node => node.text), ['丙', '丁'])
-    await nextTick()
+    advanceFrames()
     assert.equal(native.submissions, initialSubmissions + 2)
     native.finish()
-    await nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes().map(node => node.text), ['戊', '己'])
     assert.equal(native.submissions, initialSubmissions + 2)
     app.unmount()
@@ -98,10 +98,10 @@ test('父范围退出时取消同批旧子参数求值，候选内替换的 Layo
             })
         }
     }))
-    app.mount(native.target)
+    mountFrame(app, native.target)
     invalid.value = true
     shown.value = false
-    await nextTick()
+    advanceFrames()
     assert.equal(native.nodes.size, 1)
     app.unmount()
 
@@ -114,7 +114,7 @@ test('父范围退出时取消同批旧子参数求值，候选内替换的 Layo
             call(2, Trigger, {})
         }
     }))
-    replacement.mount(native.target)
+    mountFrame(replacement, native.target)
     assert.equal(native.nodes.size, 2)
     assert.deepEqual(native.textNodes().map(node => node.text), ['最终内容'])
     replacement.unmount()
@@ -124,11 +124,11 @@ test('原生宿主拒绝双 App，清理异常仍释放宿主以便重新挂载'
     const native = recordingNative()
     const first = createApp(Text, { text: '第一份' })
     const second = createApp(Text, { text: '第二份' })
-    first.mount(native.target)
-    assert.throws(() => second.mount(native.target), /已经|占用/)
+    mountFrame(first, native.target)
+    assert.throws(() => mountFrame(second, native.target), /已经|占用/)
     assert.deepEqual(native.textNodes().map(node => node.text), ['第一份'])
     first.unmount()
-    second.mount(native.target)
+    mountFrame(second, native.target)
     assert.deepEqual(native.textNodes().map(node => node.text), ['第二份'])
     second.unmount()
 
@@ -138,10 +138,10 @@ test('原生宿主拒绝双 App，清理异常仍释放宿主以便重新挂载'
             return () => { }
         }
     }))
-    failing.mount(native.target)
+    mountFrame(failing, native.target)
     assert.throws(() => failing.unmount(), AggregateError)
     assert.equal(native.nodes.size, 0)
-    second.mount(native.target)
+    mountFrame(second, native.target)
     second.unmount()
 })
 
@@ -149,9 +149,9 @@ test('ScrollState 接收原生对象快照并更新文本和滚动 Modifier', as
     const native = recordingNative()
     const scroll = createScrollState()
     const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.verticalScroll(scroll) }, { default: () => call(0, Text, { text: () => `滚动 ${scroll.value}` }) }) }))
-    app.mount(native.target)
+    mountFrame(app, native.target)
     scroll.__arrangeNativeScroll({ value: 12, maxValue: 40, viewportSize: 80, contentSize: 120 })
-    await nextTick()
+    advanceFrames()
     assert.equal(native.textNodes()[0].text, '滚动 12')
     assert.equal(scroll.maxValue, 40)
     assert.equal(((native.nodes.get(2)!.inputs.get('modifier') as Modifier).elements[0].value.state as { value: number }).value, 12)
@@ -159,7 +159,7 @@ test('ScrollState 接收原生对象快照并更新文本和滚动 Modifier', as
 })
 
 test('App 拒绝不一致的协议版本', () => {
-    assert.throws(() => createApp(Text).mount({ ...recordingNative().target, runtimeVersion: 999 }), /脚本与原生协议版本不一致/)
+    assert.throws(() => mountFrame(createApp(Text), { ...recordingNative().target, runtimeVersion: 999 }), /脚本与原生协议版本不一致/)
 })
 
 test("诊断 API 交付明确原生入口", () => {
@@ -216,7 +216,7 @@ test('Icon 未指定 tint 保留 Painter 原色，指定 tint 只增加 colorFil
                 }
             }
         }))
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const paints = [...native.nodes.values()].flatMap(node => (node.inputs.get('modifier') as Modifier | undefined)?.elements ?? []).filter(element => element.type === 'paint')
         assert.equal(paints.length, 2)
         assert.equal(paints[0].value.colorFilter, undefined)

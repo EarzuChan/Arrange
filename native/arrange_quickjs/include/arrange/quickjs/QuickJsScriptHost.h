@@ -81,9 +81,16 @@ namespace arrange::quickjs {
         std::size_t peakBytes = 0;
     };
 
+    // 超时是终止整个脚本任务的保护边界，不是帧率目标或可恢复时间片
+    struct ScriptExecutionLimits {
+        int semanticMillis = 100;
+        int visualMillis = 1000;
+        int moduleMillis = 1000;
+    };
+
     class QuickJsScriptHost final : public ScriptHost {
        public:
-        QuickJsScriptHost();
+        explicit QuickJsScriptHost(ScriptExecutionLimits limits = {});
         ~QuickJsScriptHost() override;
         void setPainterLoader(arrange::core::PainterLoader loader);
 
@@ -102,8 +109,12 @@ namespace arrange::quickjs {
         std::optional<arrange::core::MutationTransaction> takePendingTransaction() noexcept;
         void clearPendingTransactions() noexcept;
         void setFrameTimeMillis(double nowMillis) noexcept;
-        bool hasPendingAnimationFrame() const noexcept;
-        CallbackInvokeResult pumpAnimationFrame(double nowMillis);
+        void setOwnerWake(std::function<void()> wake);
+        CallbackInvokeResult semanticCheckpoint(double nowMillis);
+        bool hasPendingSemanticWork() const noexcept;
+        bool hasPendingVisualWork() const noexcept;
+        CallbackInvokeResult prepareVisualFrame(double nowMillis);
+        CallbackInvokeResult completeVisualFrame(bool success);
         bool hasPendingDiagnostics() const noexcept;
         std::vector<QuickJsDiagnosticEventInput> takeDiagnosticEvents();
         std::vector<QuickJsDiagnosticAction> takeDiagnosticActions();

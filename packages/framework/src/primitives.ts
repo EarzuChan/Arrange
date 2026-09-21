@@ -1,54 +1,16 @@
-export type Dp = number
-export type Sp = number
-export type Px = number
-export type ColorValue = number
+export { Dp, Sp, Px, ColorValue, dp, sp, px, Color } from './unit.ts'
+export type { ColorChannels } from './unit.ts'
 
-export type ColorChannels = {
-    red: number
-    green: number
-    blue: number
-    alpha?: number
-}
-
+/** @arrangeFields shape */
 export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radius: number }>
+/** @arrangeFields brush */
 export type Brush = Readonly<{ type: "solidColor"; color: number }>
+/** @arrangeFields padding */
 export type PaddingValue = number | { start?: number; top?: number; end?: number; bottom?: number; horizontal?: number; vertical?: number }
+/** @arrangeFields padding */
 export type Padding = Readonly<{ start: number; top: number; end: number; bottom: number }>
 
-export function dp(value: number): Dp {
-    return numberUnit(value, "dp")
-}
-
-export function sp(value: number): Sp {
-    return numberUnit(value, "sp")
-}
-
-export function px(value: number): Px {
-    return numberUnit(value, "px")
-}
-
-function numberUnit(value: number, name: string): number {
-    if (typeof value !== "number" || !Number.isFinite(value)) throw new TypeError(`${name}(...) 需要有限数值`)
-    return value
-}
-
-export function Color(value: number | ColorChannels): ColorValue {
-    if (typeof value === "number") return value >>> 0
-    if (value && typeof value === "object") {
-        const red = channel(value.red, "red")
-        const green = channel(value.green, "green")
-        const blue = channel(value.blue, "blue")
-        const alpha = channel(value.alpha ?? 1, "alpha")
-        return (((alpha * 255) & 0xff) << 24 | ((red * 255) & 0xff) << 16 | ((green * 255) & 0xff) << 8 | ((blue * 255) & 0xff)) >>> 0
-    }
-    throw new TypeError("Color 需要 0xAARRGGBB 或 { red, green, blue, alpha }")
-}
-
-function channel(value: number, name: string): number {
-    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(`Color 通道 ${name} 必须在 0..1 之间`)
-    return Math.round(value * 255) / 255
-}
-
+/** @arrangeArguments color */
 export function colorToHex(color: number): string {
     return `0x${(color >>> 0).toString(16).toUpperCase().padStart(8, "0")}`
 }
@@ -56,11 +18,13 @@ export function colorToHex(color: number): string {
 export const RectangleShape = Object.freeze({ type: "rectangle" })
 export const CircleShape = Object.freeze({ type: "circle" })
 
+/** @arrangeArguments dp */
 export function rounded(radius: number): Shape {
     if (!Number.isFinite(radius) || radius < 0) throw new RangeError("圆角半径必须是非负有限数值")
     return Object.freeze({ type: "rounded", radius })
 }
 
+/** @arrangeArguments color */
 export function solidColor(color: number): Brush {
     return Object.freeze({ type: "solidColor", color })
 }
@@ -83,7 +47,11 @@ export type AxisAlignment = HorizontalAlignment | VerticalAlignment
 export type ArrangementName = 'Start' | 'Top' | 'Center' | 'End' | 'Bottom' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly'
 export type TextAlignment = 'left' | 'start' | 'Start' | 'center' | 'Center' | 'right' | 'end' | 'End'
 
-function spacedBy<A extends AxisAlignment = never>(space: number, alignment?: A) {
+/** @arrangeFields arrangement */
+type SpacedArrangement<A extends AxisAlignment> = Readonly<{ kind: 'spacedBy'; space: number; alignment?: A }>
+
+/** @arrangeArguments dp */
+function spacedBy<A extends AxisAlignment = never>(space: number, alignment?: A): SpacedArrangement<A> {
     return Object.freeze({ kind: "spacedBy", space, alignment })
 }
 
@@ -92,6 +60,7 @@ export const Arrangement = Object.freeze({
     SpaceBetween: "SpaceBetween", SpaceAround: "SpaceAround", SpaceEvenly: "SpaceEvenly", spacedBy,
 })
 
+/** @arrangeArguments padding */
 export function PaddingValues(value: PaddingValue): Padding {
     if (typeof value === "number") return Object.freeze({ start: value, top: value, end: value, bottom: value })
     const horizontal = value.horizontal ?? 0

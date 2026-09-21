@@ -51,6 +51,7 @@ namespace arrange::juce {
     ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor) : ArrangeEditor(processor, EditorConfig{}) {}
 
     ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig config) : ::juce::AudioProcessorEditor(processor), sceneHost_(std::make_unique<EditorSceneHost>()) {
+        sceneHost_->setWorkAvailable([this] { updateFrameClockState(); });
         configure(std::move(config));
     }
 

@@ -1,0 +1,55 @@
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+[0/2] Re-checking globbed directories...
+[1/2] 编译 Arrange SFA 原生运行夹具
+vite v8.0.11 building client environment for production...
+
+transforming...✓ 83 modules transformed.
+rendering chunks...
+computing gzip size...
+build/rearrange-runtime-fixture/app.js  125.31 kB │ gzip: 34.53 kB
+
+✓ built in 2.85s
+vite v8.0.11 building client environment for production...
+
+transforming...✓ 69 modules transformed.
+rendering chunks...
+computing gzip size...
+build/viewport-runtime-fixture/app.js  76.92 kB │ gzip: 24.76 kB
+
+✓ built in 285ms
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+Test project E:/a_dev/proj/Arrange/build/m23-final-debug
+      Start  1: arrange_core_smoke
+ 1/12 Test  #1: arrange_core_smoke ...............   Passed    0.04 sec
+      Start  2: arrange_local_work
+ 2/12 Test  #2: arrange_local_work ...............   Passed    3.14 sec
+      Start  3: arrange_m24_contract
+ 3/12 Test  #3: arrange_m24_contract .............   Passed    0.06 sec
+      Start  4: arrange_quickjs_app_smoke
+ 4/12 Test  #4: arrange_quickjs_app_smoke ........   Passed    1.04 sec
+      Start  5: arrange_juce_runtime_smoke
+ 5/12 Test  #5: arrange_juce_runtime_smoke .......   Passed    1.46 sec
+      Start  6: arrange_modifier_runtime
+ 6/12 Test  #6: arrange_modifier_runtime .........   Passed    0.10 sec
+      Start  7: arrange_quickjs_modifier
+ 7/12 Test  #7: arrange_quickjs_modifier .........   Passed    0.08 sec
+      Start  8: arrange_slot_runtime
+ 8/12 Test  #8: arrange_slot_runtime .............   Passed    0.01 sec
+      Start  9: arrange_frame_submission
+ 9/12 Test  #9: arrange_frame_submission .........   Passed    1.13 sec
+      Start 10: arrange_rearrange_runtime
+10/12 Test #10: arrange_rearrange_runtime ........   Passed    9.30 sec
+      Start 11: arrange_viewport_runtime
+11/12 Test #11: arrange_viewport_runtime .........   Passed    0.10 sec
+      Start 12: arrange_retained_paint
+12/12 Test #12: arrange_retained_paint ...........   Passed   10.25 sec
+
+100% tests passed, 0 tests failed out of 12
+
+Total Test time (real) =  26.74 sec

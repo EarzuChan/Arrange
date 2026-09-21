@@ -199,6 +199,7 @@ int main(int argc, char** argv) {
         return 3;
     }
 
+    if (const auto prepared = host.prepareVisualFrame(0); !prepared.ok) throw std::runtime_error(prepared.error);
     auto initialTransaction = host.takePendingTransaction();
     if (!initialTransaction || !initialTransaction->hasTreeMutations()) return 4;
     const auto initialEventSlotUpdates = std::count_if(initialTransaction->operations.begin(), initialTransaction->operations.end(), [](const auto& op) { return std::holds_alternative<arrange::core::RegisterEventSlot>(op); });
@@ -218,6 +219,8 @@ int main(int argc, char** argv) {
 
     host.publishScene(scene);
     if (const auto result = host.completeRearrange(initialTransaction->rearrange); !result.ok) throw std::runtime_error(result.error);
+
+    if (const auto completed = host.completeVisualFrame(true); !completed.ok) throw std::runtime_error(completed.error);
 
     std::cout << "QuickJS 应用加载与类型化事务验证通过，操作数=" << initialTransaction->operations.size() << "\n";
     return 0;

@@ -36,7 +36,7 @@ namespace arrange::quickjs {
             const auto check = [&](std::initializer_list<std::string_view> fields) {
                 return fieldsMatch(context, value, fields, type);
             };
-            if (type == "text") return check({"text", "textStyle", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
+            if (type == "text") return check({"text", "style", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
             if (type == "textField") return check({"value", "textStyle", "singleLine", "minLines", "maxLines", "placeholder", "enabled", "selectAllOnFocus", "onValueChange", "onSubmit", "onChange", "onBlur"});
             if (type == "paint") return check({"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"});
             if (type == "padding") return check({"start", "top", "end", "bottom"});
@@ -375,10 +375,11 @@ namespace arrange::quickjs {
                 const auto overflow = reader_.stringField(payload, "overflow");
                 if (!overflow.empty()) text.overflow = overflow;
 
-                ScopedValue style(context_, JS_GetPropertyStr(context_, payload, "textStyle"));
+                const auto styleName = editable ? "textStyle" : "style";
+                ScopedValue style(context_, JS_GetPropertyStr(context_, payload, styleName));
                 if (!JS_IsUndefined(style.get())) {
-                    if (!JS_IsObject(style.get()) || JS_IsArray(style.get()) || !fieldsMatch(context_, style.get(), {"fontSize", "lineHeight", "color"}, "textStyle")) {
-                        (void)throwTypeError("textStyle 需要正式文本样式对象");
+                    if (!JS_IsObject(style.get()) || JS_IsArray(style.get()) || !fieldsMatch(context_, style.get(), {"fontSize", "lineHeight", "color"}, styleName)) {
+                        (void)throwTypeError((std::string(styleName) + " 需要正式文本样式对象").c_str());
                         return {};
                     }
                     text.style.fontSize = numberField(style.get(), "fontSize", 14);

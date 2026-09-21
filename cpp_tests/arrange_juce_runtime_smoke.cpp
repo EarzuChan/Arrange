@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
     }
 
     auto initial = host->takePendingTransaction();
-    if (!initial || !initial->hasTreeMutations()) return 4;
+    if (initial) return 4;
 
     arrange::juce::JuceTextMeasurer textMeasurer;
     arrange::core::TextLayoutService textLayoutService(textMeasurer);
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
         arrange::core::SceneFramePipeline(arrange::core::LayoutEngine(textLayoutService)),
     };
     runtime.setScriptHost(std::move(host));
-    runtime.enqueue(std::move(*initial));
+    if (initial) runtime.enqueue(std::move(*initial));
 
     const arrange::core::Constraints constraints{0.0f, 520.0f, 0.0f, 380.0f};
     const auto firstFrame = runtime.pumpFrame(1, constraints, 0.0);
@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
     const auto resourceDir = std::filesystem::temp_directory_path() / "arrange-resource-prepare-smoke";
     std::filesystem::create_directories(resourceDir);
     const auto acquire = arrange::juce::packagePainterLoader(resourceDir);
-    const auto missing = acquire("missing.png").get();
+    const auto missing = acquire("missing.png", {}).get();
     if (missing.error.empty() || missing.content) return 21;
     const auto validPath = resourceDir / "valid.png";
     {
@@ -270,7 +270,7 @@ int main(int argc, char** argv) {
 
     arrange::juce::JuceDrawOpsPainter painter;
     ::juce::Image canvas(::juce::Image::RGB, 16, 16, true);
-    const auto prepared = acquire("valid.png").get();
+    const auto prepared = acquire("valid.png", {}).get();
     if (!prepared.error.empty() || !prepared.content || prepared.content->intrinsicSize != arrange::core::Size{2, 2}) return 24;
     const std::vector validOps{painterOp(prepared.content)};
     {
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
         std::ofstream svg(validSvg);
         svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
     }
-    const auto iconPrepared = acquire("play.svg").get();
+    const auto iconPrepared = acquire("play.svg", {}).get();
     if (!iconPrepared.error.empty() || !iconPrepared.content || iconPrepared.content->intrinsicSize != arrange::core::Size{24, 24}) return 31;
     const std::vector iconOps{painterOp(iconPrepared.content, true)};
     ::juce::Graphics graphics(canvas);

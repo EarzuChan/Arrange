@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import ts from 'typescript'
 import * as runtime from '../../packages/framework/src/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
-import { recordingNative } from './recordingNative.ts'
+import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
 function evaluateSfa(source: string, state: object = {}) {
     const { code } = compileArrangeSfa(source, '重排验收.sfa')
@@ -23,25 +23,25 @@ test('真实 SFA 纯值变化只更新文本 Modifier，不执行结构且保留
     const Root = evaluateSfa("<template><Text :text=\"title\" /></template><script>import { title } from \"./state\"\n</script>", { title })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const initial = native.textNodes()
     assert.equal(initial[0].text, '旧值')
     const structures = internal.getArrangeExecutionStats().structureRuns
 
     title.value = '新值'
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), [{ id: initial[0].id, text: '新值' }])
     assert.equal(internal.getArrangeExecutionStats().structureRuns, structures)
     app.unmount()
 })
 
 test('用户 SFA 直接组合 Layout、Policy 与文本 Modifier，结果等同代码 FA', () => {
-    const Page = evaluateSfa("<template><Layout :measurePolicy=\"BoxMeasurePolicy()\" :modifier=\"M.padding(8)\"><Layout :measurePolicy=\"MinSizeMeasurePolicy\" :modifier=\"M.text('正文')\" /></Layout></template><script>import { Layout } from '@arrange/framework/foundation'\n\nimport { BoxMeasurePolicy, MinSizeMeasurePolicy, M } from '@arrange/framework/ui'\n</script>")
+    const Page = evaluateSfa("<template><Layout :measurePolicy=\"BoxMeasurePolicy()\" :modifier=\"M.padding(dp(8))\"><Layout :measurePolicy=\"MinSizeMeasurePolicy\" :modifier=\"M.text('正文')\" /></Layout></template><script>import { Layout } from '@arrange/framework/foundation'\n\nimport { BoxMeasurePolicy, MinSizeMeasurePolicy, M, dp } from '@arrange/framework/ui'\n</script>")
     const Code = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, foundation.Box, { modifier: () => ui.M.padding(8) }, { default: () => call(0, foundation.Text, { text: () => '正文' }) }) })
     const collect = (definition: runtime.ArrangableDefinition) => {
         const native = recordingNative()
         const app = runtime.createApp(definition)
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const result = JSON.parse(JSON.stringify([...native.nodes.values()].map(node => ({ id: node.id, children: node.children, policy: node.inputs.get('measurePolicy'), modifier: node.inputs.get('modifier') }))))
         app.unmount()
         return result
@@ -63,15 +63,15 @@ test('退出未再访问的对象参数绑定取消订阅，恢复后重新读�
     })
     const native = recordingNative()
     const app = runtime.createApp(Page)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     shown.value = false
-    await runtime.nextTick()
+    advanceFrames()
     const stoppedReads = reads
     text.value = '新内容'
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(reads, stoppedReads)
     shown.value = true
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(native.textNodes()[0].text, '新内容')
     app.unmount()
 })
@@ -81,12 +81,12 @@ test('真实 SFA keyed 列表移动刷新索引并保留各项 Layout 身份', a
     const Root = evaluateSfa("<template><Column><Text a-for=\"(item, index) in items\" :key=\"item.id\" :text=\"item.id + index\" /></Column></template><script>import { items } from \"./state\"\n</script>", { items })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const initial = native.textNodes()
     assert.deepEqual(initial.map(node => node.text), ['A0', 'B1'])
 
     items.value = [items.value[1], items.value[0]]
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), [{ id: initial[1].id, text: 'B0' }, { id: initial[0].id, text: 'A1' }])
     app.unmount()
 })
@@ -112,21 +112,21 @@ test('真实 SFA 中间条件与单条目条件独立重启，根及无关兄弟
     const Page = evaluateSfa("<template><Text :key=\"rootKey()\" text=\"固定\"/><Spacer a-if=\"middleShown\"/><Template a-for=\"row in readRows()\" :key=\"row.id\"><Text a-if=\"visible(row)\" :text=\"row.title\"/></Template></template><script>import { rootKey, readRows, visible, middleShown } from \"./state\"\n</script>", { rootKey, readRows, visible, middleShown })
     const native = recordingNative()
     const app = runtime.createApp(Page)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const before = internal.getArrangeExecutionStats()
     assert.deepEqual([rootRuns, listRuns, ...conditionRuns.values()], [1, 1, 1, 1])
 
     middleShown.value = false
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(internal.getArrangeExecutionStats().structureRuns - before.structureRuns, 1)
     assert.deepEqual([rootRuns, listRuns, ...conditionRuns.values()], [1, 1, 1, 1])
 
     rows.value[0].shown = false
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(internal.getArrangeExecutionStats().structureRuns - before.structureRuns, 2)
     assert.deepEqual([rootRuns, listRuns, ...conditionRuns.values()], [1, 1, 2, 1])
     rows.value[1].title = '乙更新'
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(internal.getArrangeExecutionStats().structureRuns - before.structureRuns, 2)
     assert.deepEqual(native.textNodes().map(node => node.text), ['固定', '乙更新'])
     app.unmount()
@@ -138,13 +138,13 @@ test('真实 SFA 空分支、多根与重复内容调用维护插入顺序及独
     const Root = evaluateSfa("<template><Text text=\"前\"/><Template a-if=\"show\"><Text text=\"中一\"/><Text text=\"中二\"/></Template><Content><Text text=\"内容\"/></Content><Text text=\"后\"/></template><script>import { show, Content } from \"./state\"\n</script>", { show, Content })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const initial = native.textNodes()
     assert.deepEqual(initial.map(node => node.text), ['前', '内容', '内容', '后'])
     assert.notEqual(initial[1].id, initial[2].id)
 
     show.value = true
-    await runtime.nextTick()
+    advanceFrames()
     const next = native.textNodes()
     assert.deepEqual(next.map(node => node.text), ['前', '中一', '中二', '内容', '内容', '后'])
     assert.deepEqual(next.filter(node => node.text === '内容'), initial.filter(node => node.text === '内容'))
@@ -153,20 +153,20 @@ test('真实 SFA 空分支、多根与重复内容调用维护插入顺序及独
 
 
 test('对象绑定区分形状和值，字段变化不唤醒结构，移除字段恢复声明默认值', async () => {
-    const values = runtime.ref<Record<string, unknown>>({ text: '正文', textStyle: { color: 1 } })
-    const Root = evaluateSfa("<template><Text a-bind=\"values\" /></template><script>import { values } from \"./state\"\n</script>", { values })
+    const values = runtime.ref<Record<string, unknown>>({ text: '正文', style: { color: 1 } })
+    const Root = evaluateSfa("<template><Text a-bind=\"inputs\" /></template><script>import { computed } from '@arrange/framework'\nimport type { TextStyleProp } from '@arrange/framework/ui'\nimport { values } from \"./state\"\nconst inputs = computed(() => values.value as { text?: string; style?: TextStyleProp })\n</script>", { values })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const runs = internal.getArrangeExecutionStats().structureRuns
 
-    values.value = { text: '更新', textStyle: { color: 2 } }
-    await runtime.nextTick()
+    values.value = { text: '更新', style: { color: 2 } }
+    advanceFrames()
     assert.equal(native.textNodes()[0].text, '更新')
     assert.equal(internal.getArrangeExecutionStats().structureRuns, runs)
 
-    values.value = { textStyle: { color: 3 } }
-    await runtime.nextTick()
+    values.value = { style: { color: 3 } }
+    advanceFrames()
     assert.equal(native.textNodes()[0].text, '')
     app.unmount()
 })
@@ -185,17 +185,17 @@ test('固定 Modifier 链只重新求值失效分段并精确写入既有实例'
         colors++
         return color.value
     }
-    const Root = evaluateSfa("<template><Box :modifier=\"M.width(readWidth()).background(readColor())\" /></template><script>import { M } from '@arrange/framework/ui'\n\nimport { readWidth, readColor } from \"./state\"\n</script>", { readWidth, readColor })
+    const Root = evaluateSfa("<template><Box :modifier=\"M.width(dp(readWidth())).background(Color(readColor()))\" /></template><script>import { M, dp, Color } from '@arrange/framework/ui'\n\nimport { readWidth, readColor } from \"./state\"\n</script>", { readWidth, readColor })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const chains = ui.modifierStats.chainWrites
     const instances = ui.modifierStats.instanceWrites
     assert.equal(widths, 1)
     assert.equal(colors, 1)
 
     color.value = 2
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(widths, 1)
     assert.equal(colors, 2)
     assert.equal(ui.modifierStats.chainWrites, chains)
@@ -212,18 +212,18 @@ test('固定 Modifier 链相较完整表达式减少求值及分配，保持相�
             return 20
         }
         const makeModifier = () => ui.M.width(readWidth()).height(30).padding(4).background(color.value)
-        const Page = evaluateSfa(`<template><Spacer :modifier="${expression}"/></template><script>import { M } from '@arrange/framework/ui'
+        const Page = evaluateSfa(`<template><Spacer :modifier="${expression}"/></template><script>import { M, dp, Color } from '@arrange/framework/ui'
  import { color, readWidth, makeModifier } from "./state"
 </script>`, { color, readWidth, makeModifier })
         const native = recordingNative()
         const app = runtime.createApp(Page)
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const initialAllocations = { ...ui.modifierAllocationStats }
         const initialExecutions = internal.getArrangeExecutionStats()
         const initialWidths = widths
         for (let index = 2; index <= 21; index++) {
             color.value = index
-            await runtime.nextTick()
+            advanceFrames()
         }
         const result = {
             chains: ui.modifierAllocationStats.chains - initialAllocations.chains,
@@ -235,7 +235,7 @@ test('固定 Modifier 链相较完整表达式减少求值及分配，保持相�
         app.unmount()
         return { result, modifier }
     }
-    const fixed = await run('M.width(readWidth()).height(30).padding(4).background(color)')
+    const fixed = await run('M.width(dp(readWidth())).height(dp(30)).padding(dp(4)).background(Color(color))')
     const dynamic = await run('makeModifier()')
     assert.deepEqual(fixed.modifier, dynamic.modifier)
     assert.equal(fixed.result.structures, 0)
@@ -255,16 +255,16 @@ test('列表词法环境中的固定 Modifier 链保持分段缓存，重排后�
         widths++
         return value
     }
-    const Page = evaluateSfa("<template><Spacer a-for=\"row in rows\" :key=\"row.id\" :modifier=\"M.width(readWidth(row.width)).background(color)\" /></template><script>import { M } from '@arrange/framework/ui'\n import { rows, color, readWidth } from \"./state\"\n</script>", { rows, color, readWidth })
+    const Page = evaluateSfa("<template><Spacer a-for=\"row in rows\" :key=\"row.id\" :modifier=\"M.width(dp(readWidth(row.width))).background(Color(color))\" /></template><script>import { M, dp, Color } from '@arrange/framework/ui'\n import { rows, color, readWidth } from \"./state\"\n</script>", { rows, color, readWidth })
     const native = recordingNative()
     const app = runtime.createApp(Page)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(widths, 2)
     color.value = 2
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(widths, 2)
     rows.value = [{ id: '乙', width: 40 }, { id: '甲', width: 50 }]
-    await runtime.nextTick()
+    advanceFrames()
     const children = native.nodes.get(1)!.children
     assert.deepEqual(children.map(id => (native.nodes.get(id)!.inputs.get('modifier') as ui.Modifier).elements[0].value.value), [40, 50])
     app.unmount()
@@ -286,19 +286,19 @@ test('KeepAlive 保留调用生命，停用释放原生受体，恢复交付最�
     const Root = evaluateSfa("<template><KeepAlive :cacheKey=\"selected\"><Child a-if=\"selected === 'A'\"/></KeepAlive></template><script>import { KeepAlive } from '@arrange/framework/foundation'\n import { selected, Child } from \"./state\"\n</script>", { selected, Child })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     const oldId = native.textNodes()[0].id
 
     selected.value = '空'
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), [])
     assert.equal(disposals, 0)
     value.value = '停用后更新'
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), [])
 
     selected.value = 'A'
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(native.textNodes()[0].text, '停用后更新')
     assert.notEqual(native.textNodes()[0].id, oldId)
     assert.equal(setups, 1)
@@ -324,11 +324,11 @@ test('KeepAlive 多根内容按 LRU 淘汰，隐藏项与活动项卸载均只�
     const Root = evaluateSfa("<template><KeepAlive :cacheKey=\"selected\" :max=\"2\"><Child /></KeepAlive></template><script>import { KeepAlive } from '@arrange/framework/foundation'\n import { selected, Child } from \"./state\"\n</script>", { selected, Child })
     const native = recordingNative()
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
 
     for (const key of ['B', 'A', 'C', 'B']) {
         selected.value = key
-        await runtime.nextTick()
+        advanceFrames()
         assert.deepEqual(native.textNodes().map(node => node.text), [`${key} 一`, `${key} 二`])
     }
     assert.deepEqual(events, ['创建 A', '创建 B', '创建 C', '释放 B', '创建 B', '释放 A'])
@@ -356,16 +356,16 @@ test('KeepAlive 恢复失败保留已提交页面，重试恢复同一逻辑实�
     const native = recordingNative(false)
     const app = runtime.createApp(Root)
     app.config.errorHandler = error => errors.push(error)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     native.finish()
     selected.value = 'B'
-    await runtime.nextTick()
+    advanceFrames()
     native.finish()
     const before = native.textNodes()
 
     selected.value = 'A'
     value.value = '最新'
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(native.textNodes(), before)
     native.finish('拒绝恢复')
     assert.deepEqual(native.textNodes(), before)
@@ -373,10 +373,10 @@ test('KeepAlive 恢复失败保留已提交页面，重试恢复同一逻辑实�
     assert.equal(errors.length, 1)
 
     selected.value = 'B'
-    await runtime.nextTick()
+    advanceFrames()
     native.finish()
     selected.value = 'A'
-    await runtime.nextTick()
+    advanceFrames()
     native.finish()
     assert.deepEqual(native.textNodes().map(node => node.text), ['A 最新'])
     assert.deepEqual(events, ['创建 A', '创建 B', '停用 A', '停用 B', '恢复 A'])
@@ -393,7 +393,7 @@ test('卸载尚未应用的候选会取消原生提交并释放候选资源', ()
     })
     const native = recordingNative(false)
     const app = runtime.createApp(Root)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     app.unmount()
     assert.equal(disposed, 1)
     assert.deepEqual(native.textNodes(), [])

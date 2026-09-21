@@ -44,7 +44,7 @@ export function prepareParameters(definition: ArrangableDefinition, names: reado
         if (positions.has(name)) fail(`重复参数：${name}`)
         positions.set(name, position)
     }
-    for (const slot of slots) if (!definition.slotNames.includes(slot)) fail(`Arrangable 未声明内容：${slot}`)
+    for (const slot of slots) if (!definition.contentTarget && !definition.slotNames.includes(slot)) fail(`Arrangable 未声明内容：${slot}`)
     const fields = Object.entries(declarations).map(([name, declaration]) => {
         const position = positions.get(name) ?? -1
         if (position < 0 && declaration.required && !hasOwn(declaration, 'default')) fail(`缺少必需参数：${name}`)

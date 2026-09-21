@@ -17,6 +17,8 @@
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #endif
 
+#include <juce_events/juce_events.h>
+#include <mutex>
 #include <deque>
 #include <memory>
 #include <optional>
@@ -52,11 +54,17 @@ namespace arrange::juce {
         std::string error;
     };
 
-    class ArrangeRuntime final {
+    class ArrangeRuntime final : private ::juce::AsyncUpdater {
        public:
         explicit ArrangeRuntime(arrange::core::SceneFramePipeline pipeline = arrange::core::SceneFramePipeline());
 
+        ~ArrangeRuntime();
         void reset();
+        RuntimeStepResult semanticCheckpoint(double nowMillis);
+
+        void setWorkAvailable(std::function<void()> callback) {
+            workAvailable_ = std::move(callback);
+        }
 
         void requestReload() noexcept {
             reloadRequested_ = true;
@@ -87,7 +95,7 @@ namespace arrange::juce {
 
         [[nodiscard]] bool hasPendingEvents() const noexcept;
 
-        [[nodiscard]] bool hasPendingAnimationFrame() const noexcept;
+        [[nodiscard]] bool hasPendingVisualWork() const noexcept;
         [[nodiscard]] bool hasPendingFrameWork() const noexcept;
 
         [[nodiscard]] RuntimeFramePumpResult pumpFrame(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize = {});
@@ -124,6 +132,10 @@ namespace arrange::juce {
         };
 
         struct QueuedEvent {
+            std::uint64_t sequence = 0;
+            std::uint64_t ownerGeneration = 0;
+            std::uint64_t publishedRevision = 0;
+            double timestampMillis = 0;
             QueuedEventKind kind = QueuedEventKind::Invoke;
             arrange::core::EventSlotId slot;
             std::string value;
@@ -133,9 +145,23 @@ namespace arrange::juce {
         [[nodiscard]] FrameWorkState frameWorkState() const noexcept;
         [[nodiscard]] bool captureRearrangeTransactions();
         [[nodiscard]] RuntimeStepResult dispatchQueuedEvents(double nowMillis);
-        [[nodiscard]] RuntimeStepResult pumpAnimationFrame(double nowMillis);
+        [[nodiscard]] RuntimeStepResult prepareVisualFrame(double nowMillis);
         [[nodiscard]] RuntimePipelineRunResult runPipeline(arrange::core::NodeId root, arrange::core::Constraints constraints, double nowMillis, const arrange::core::FrameFinalizer& finalize);
 
+        struct OwnerWake {
+            std::mutex mutex;
+            ArrangeRuntime* owner = nullptr;
+        };
+
+        void handleAsyncUpdate() override;
+        void postEvent(QueuedEvent event);
+        std::shared_ptr<OwnerWake> wake_ = std::make_shared<OwnerWake>();
+        std::function<void()> workAvailable_;
+        std::uint64_t ownerGeneration_ = 1;
+        std::uint64_t nextSequence_ = 1;
+        bool inFrame_ = false;
+        bool inSemantic_ = false;
+        std::optional<std::string> semanticError_;
         bool suspended_ = false;
         bool reloadRequested_ = false;
         RearrangeHost rearrangeHost_;

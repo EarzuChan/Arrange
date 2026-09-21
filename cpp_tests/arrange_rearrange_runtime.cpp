@@ -63,12 +63,12 @@ int main(int argc, char** argv) {
         const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         auto initialSubmission = host->takePendingTransaction();
-        check(initialSubmission.has_value(), "SFA 挂载没有提交场景");
+        check(!initialSubmission.has_value(), "首次挂载不能在帧授权之前提交");
         arrange::juce::JuceTextMeasurer measurer;
         TextLayoutService textService(measurer);
         arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{textService}}};
         runtime.setScriptHost(std::move(host));
-        runtime.enqueue(std::move(*initialSubmission));
+        if (initialSubmission) runtime.enqueue(std::move(*initialSubmission));
         double timestamp = 0;
         const Constraints constraints{0, 520, 0, 380};
         const auto initial = runtime.pumpFrame(1, constraints, timestamp);
@@ -141,23 +141,23 @@ int main(int argc, char** argv) {
         const auto galleryBaselineNodes = runtime.scene().tree().size();
         command("lifetime-baseline");
         command("async-start");
-        check(runtime.hasPendingAnimationFrame(), "异步加载延迟没有请求宿主帧");
+        check(runtime.hasPendingVisualWork(), "异步加载延迟没有请求宿主帧");
         command("baseline");
         command("baseline");
         findText(runtime.scene(), "延迟加载提示");
         command("async-finish");
         findText(runtime.scene(), "延迟加载完成");
-        check(!runtime.hasPendingAnimationFrame(), "加载完成后保留了延迟帧需求");
+        check(!runtime.hasPendingVisualWork(), "加载完成后保留了延迟帧需求");
         command("async-remove");
         command("async-start");
         for (int index = 0; index < 7; ++index) command("baseline");
         findText(runtime.scene(), "延迟加载超时");
-        check(!runtime.hasPendingAnimationFrame(), "加载超时后保留了延迟帧需求");
+        check(!runtime.hasPendingVisualWork(), "加载超时后保留了延迟帧需求");
         command("async-remove");
         command("async-start");
         command("async-remove");
         command("async-finish");
-        check(runtime.scene().bindingCount() == galleryBaselineBindings && !runtime.hasPendingAnimationFrame(), "卸载后的迟到加载重新挂载或保留了帧需求");
+        check(runtime.scene().bindingCount() == galleryBaselineBindings && !runtime.hasPendingVisualWork(), "卸载后的迟到加载重新挂载或保留了帧需求");
 
         command("gallery");
         command("gallery:baseline");
@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
             if (!sample.ok) throw std::runtime_error(sample.error);
         }
         command("gallery:validate-settled");
-        check(!runtime.hasPendingAnimationFrame() && runtime.scene().tree().activeAnimationCount() == 0, "gallery did not release animation frame demand");
+        check(!runtime.hasPendingVisualWork() && runtime.scene().tree().activeAnimationCount() == 0, "gallery did not release animation frame demand");
         command("gallery:all");
         command("gallery-remove");
         // 上一候选 apply 后才能提交整页退出，不能在等待回执时提前 dispose
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
             const auto removal = runtime.pumpFrame(1, constraints, timestamp += 16);
             check(removal.ok && removal.pipelineRan, "下一帧没有提交整页退出");
         }
-        check(!runtime.hasPendingAnimationFrame(), "removing gallery retained animated scopes");
+        check(!runtime.hasPendingVisualWork(), "removing gallery retained animated scopes");
         check(runtime.scene().bindingCount() == galleryBaselineBindings && runtime.scene().eventSlotCount() == galleryBaselineCallbacks, "gallery removal leaked binding or callback resources");
 
         command("showcase");
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
         findText(runtime.scene(), "详情正在等待，点击完成加载");
         command("showcase:resolve");
         // 命令参数先提交，Promise 完成产生的新候选仍须获得下一次宿主帧
-        if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+        if (runtime.hasPendingVisualWork()) {
             check(runtime.hasPendingFrameWork(), "Promise 完成后的候选丢失了帧需求");
             const auto resolved = runtime.pumpFrame(1, constraints, timestamp += 16);
             check(resolved.ok && resolved.pipelineRan, "Promise 完成后的候选未提交");
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
         command("showcase:async");
         command("showcase-remove");
         check(runtime.scene().bindingCount() == galleryBaselineBindings && runtime.scene().eventSlotCount() == galleryBaselineCallbacks, "整页删除后绑定和回调未回落");
-        check(runtime.scene().tree().activeAnimationCount() == 0 && !runtime.hasPendingAnimationFrame(), "整页删除后动画仍请求下一帧");
+        check(runtime.scene().tree().activeAnimationCount() == 0 && !runtime.hasPendingVisualWork(), "整页删除后动画仍请求下一帧");
         check(runtime.scene().tree().size() == galleryBaselineNodes, "整页删除后原生节点及其 Modifier 实例未退休");
         command("lifetime-check");
         const auto performance = runtime.frameCounters();
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
             runtime.enqueueStringEvent(oldSubmit, "gallery:all");
             running = runtime.pumpFrame(1, constraints, timestamp += 16);
             if (!running.ok) throw std::runtime_error(running.error);
-            check(runtime.hasPendingAnimationFrame(), "HMR setup did not start animation");
+            check(runtime.hasPendingVisualWork(), "HMR setup did not start animation");
             for (const auto* operation : {"showcase", "showcase:tone", "showcase:async", "async-start"}) {
                 runtime.enqueueStringEvent(oldSubmit, operation);
                 running = runtime.pumpFrame(1, constraints, timestamp += 16);

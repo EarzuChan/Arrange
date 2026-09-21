@@ -29,5 +29,5 @@ namespace arrange::core {
         std::string error;
     };
 
-    using PainterLoader = std::function<std::future<PainterLoadResult>(const std::string&)>;
+    using PainterLoader = std::function<std::future<PainterLoadResult>(const std::string&, std::function<void()>)>;
 }  // namespace arrange::core

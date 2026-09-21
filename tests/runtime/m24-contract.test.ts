@@ -11,7 +11,7 @@ import { checkSfaProject } from '../../packages/vite-plugin/src/typecheck.ts'
 import { compile } from '../../packages/compiler/src/template/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import * as runtime from '../../packages/framework/src/index.ts'
-import { recordingNative } from './recordingNative.ts'
+import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
 function evaluateSfa(source: string, imports: Record<string, unknown> = {}) {
     const { code } = compileArrangeSfa(source, '契约.sfa')
@@ -29,7 +29,7 @@ test('模板内容和指令只接受正式语法，空白不改变结构', () =>
     assert.match(compile('<Xxx enabled="" />', options).code, /"enabled": \(\) => ""/)
 
     const legacyDirective = evaluateSfa('<template><Box v-if="false" /></template>')
-    assert.throws(() => runtime.createApp(legacyDirective).mount(recordingNative().target), /未声明参数：vIf/)
+    assert.throws(() => mountFrame(runtime.createApp(legacyDirective), recordingNative().target), /未声明参数：vIf/)
 })
 
 test('SFA 只接受无属性的 TS setup，原样 Ref 与普通绑定明确分开', () => {
@@ -92,7 +92,7 @@ test('真实 SFA 命令行类型检查保留脚本和跨文件参数契约', () 
 
 test('内建 Arrangable 各自声明参数，不给 Spacer 和文本补充通用输入', () => {
     for (const [definition, props] of [[foundation.Spacer, { enabled: true }], [foundation.Text, { contentDescription: '误传' }], [foundation.Row, { role: '误传' }]] as const) {
-        assert.throws(() => runtime.createApp(definition, props).mount(recordingNative().target), /未声明参数/)
+        assert.throws(() => mountFrame(runtime.createApp(definition, props), recordingNative().target), /未声明参数/)
     }
 })
 
@@ -131,12 +131,12 @@ test('声明位置计划保留列表闭包与默认时机，固定调用减少�
 </script>`, { harness: { rows } })
         const native = recordingNative()
         const app = runtime.createApp(Page)
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const identities = native.textNodes().map(node => node.id)
         const before = internal.getArrangeExecutionStats()
         for (let index = 1; index <= 12; index++) {
             rows.value = [{ id: '乙', value: index + 1 }, { id: '甲', value: index }]
-            await runtime.nextTick()
+            advanceFrames()
         }
         assert.deepEqual(native.textNodes(), [{ id: identities[1], text: '13' }, { id: identities[0], text: '12' }])
         const after = internal.getArrangeExecutionStats()
@@ -175,10 +175,10 @@ test('声明位置计划保留列表闭包与默认时机，固定调用减少�
             }, {}, { parameters, constants: ['text'] })
         }
     }))
-    app.mount(recordingNative().target)
+    mountFrame(app, recordingNative().target)
     for (let index = 0; index < 4; index++) {
         revision.value++
-        await runtime.nextTick()
+        advanceFrames()
     }
     assert.equal(defaults, 1)
     assert.equal(constants, 1)
@@ -189,7 +189,7 @@ test('声明位置计划保留列表闭包与默认时机，固定调用减少�
 test('手写结构不能返回文本或节点数组，也不能使用未声明定义', () => {
     for (const result of ['正文', []]) {
         const definition = internal.defineArrangable({ setup: () => (() => result) as () => void })
-        assert.throws(() => runtime.createApp(definition).mount(recordingNative().target), /不能返回/)
+        assert.throws(() => mountFrame(runtime.createApp(definition), recordingNative().target), /不能返回/)
     }
     assert.throws(() => runtime.createApp({ setup: () => () => { } } as unknown as runtime.ArrangableDefinition), /Arrangable 定义/)
 })
@@ -222,20 +222,20 @@ test('SFA Slot 声明约束内容名称，多次调用拥有独立实例和结�
             })
         },
     }))
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(created, 2)
     assert.equal(parentRuns, 1)
     assert.equal(contentRuns, 2)
     assert.equal(native.textNodes().length, 2)
 
     label.value = '更新文字'
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(contentRuns, 2)
     assert.equal(parentRuns, 1)
     assert.deepEqual(native.textNodes().map(node => node.text), ['1：更新文字', '2：更新文字'])
 
     visible.value = false
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(contentRuns, 4)
     assert.equal(parentRuns, 1)
     assert.equal(disposed, 2)
@@ -244,13 +244,13 @@ test('SFA Slot 声明约束内容名称，多次调用拥有独立实例和结�
     app.unmount()
     visible.value = true
     label.value = '卸载后的更新'
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(contentRuns, 4)
     assert.equal(created, 2)
 
-    assert.throws(() => runtime.createApp(internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Consumer, {}, { header: () => { } }) })).mount(recordingNative().target), /未声明内容：header/)
+    assert.throws(() => mountFrame(runtime.createApp(internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Consumer, {}, { header: () => { } }) })), recordingNative().target), /未声明内容：header/)
     const Empty = evaluateSfa('<template></template>')
-    assert.throws(() => runtime.createApp(internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Empty, {}, { default: () => { } }) })).mount(recordingNative().target), /未声明内容：default/)
+    assert.throws(() => mountFrame(runtime.createApp(internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Empty, {}, { default: () => { } }) })), recordingNative().target), /未声明内容：default/)
 })
 
 
@@ -345,7 +345,7 @@ test('深层 Arrangable 挂载和退休不依赖递归调用栈，生命周期�
     }
     const before = internal.getArrangeExecutionStats().activeValueBindings
     const app = runtime.createApp(definition)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(events.length, depth)
     assert.equal(events[0], '挂载0')
     assert.equal(events[depth - 1], '挂载' + (depth - 1))
@@ -374,8 +374,8 @@ test('挂载后续分支失败时取消成功通知并退休已创建的作用�
             call(1, foundation.Spacer, { unknown: () => 1 } as never)
         }
     }))
-    assert.throws(() => app.mount(native.target), /未声明参数/)
-    await runtime.nextTick()
+    assert.throws(() => mountFrame(app, native.target), /未声明参数/)
+    advanceFrames()
     assert.deepEqual(events, ['清理'])
     assert.equal(internal.getArrangeExecutionStats().activeValueBindings, before)
     assert.equal(native.nodes.size, 0)
@@ -401,11 +401,11 @@ test('固定参数和对象参数纯值更新均不重排，默认值工厂按�
         const native = recordingNative()
         const app = runtime.createApp(internal.defineArrangable({ setup: (_props, { call }) => () => call(0, Wrapper, { amount: () => amount.value }) }))
         app.arrangable('Probe', Probe)
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const baseline = internal.getArrangeExecutionStats()
         for (let index = 1; index <= 40; index++) {
             amount.value = index
-            await runtime.nextTick()
+            advanceFrames()
         }
         const after = internal.getArrangeExecutionStats()
         assert.equal(defaults, 1)
@@ -433,33 +433,33 @@ test('真实 SFA 原样 Ref 保留身份，切换本体退订旧值，只读状�
     const Page = evaluateSfa("<template><Editor a-bind:ori-ref.camel=\"<selected.value ? second : first>\" /></template><script>import Editor from \"./Editor.sfa\";\n import { selected, first, second } from \"harness\"\n</script>", { './Editor.sfa': { default: Editor }, harness: { selected, first, second } })
     const native = recordingNative()
     const app = runtime.createApp(Page)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(observed[0], first)
     const before = internal.getArrangeExecutionStats()
     first.value = 2
-    await runtime.nextTick()
+    advanceFrames()
     assert.ok(native.textNodes().some(node => node.text === '2'))
     assert.equal(internal.getArrangeExecutionStats().structureRuns, before.structureRuns)
 
     selected.value = true
-    await runtime.nextTick()
+    advanceFrames()
     assert.ok(native.textNodes().some(node => node.text === '10'))
     const switched = internal.getArrangeExecutionStats()
     first.value = 3
-    await runtime.nextTick()
+    advanceFrames()
     assert.equal(internal.getArrangeExecutionStats().valueEvaluations, switched.valueEvaluations)
     second.value = 11
-    await runtime.nextTick()
+    advanceFrames()
     assert.ok(native.textNodes().some(node => node.text === '11'))
     assert.equal(internal.getArrangeExecutionStats().structureRuns, before.structureRuns)
     app.unmount()
 
-    assert.throws(() => runtime.createApp(Editor, { oriRef: runtime.readonly(first) }).mount(recordingNative().target), /可写.*Ref/)
-    assert.throws(() => runtime.createApp(Editor, { oriRef: { value: 1 } }).mount(recordingNative().target), /Ref 本体/)
+    assert.throws(() => mountFrame(runtime.createApp(Editor, { oriRef: runtime.readonly(first) }), recordingNative().target), /可写.*Ref/)
+    assert.throws(() => mountFrame(runtime.createApp(Editor, { oriRef: { value: 1 } }), recordingNative().target), /Ref 本体/)
     const ReadOnlyEditor = evaluateSfa("<template><Text :text=\"String(oriRef.value)\" /></template><script>import type { Ref } from '@arrange/framework'\n defineProps<{ oriRef: Readonly<Ref<number>> }>()</script>")
     const readOnly = runtime.readonly(second)
     const readApp = runtime.createApp(ReadOnlyEditor, { oriRef: readOnly })
-    readApp.mount(recordingNative().target)
+    mountFrame(readApp, recordingNative().target)
     assert.ok(runtime.isReadonly(readOnly))
     readApp.unmount()
 })
@@ -475,7 +475,7 @@ test('深层实际 LayoutNode 账本按任务栈创建和退休', () => {
     const native = recordingNative()
     const before = internal.getArrangeExecutionStats().activeValueBindings
     const app = runtime.createApp(definition)
-    app.mount(native.target)
+    mountFrame(app, native.target)
     assert.equal(native.nodes.size, depth + 2)
     app.unmount()
     assert.equal(native.nodes.size, 0)
@@ -518,10 +518,10 @@ test('同一参数组同时改变时校验完整新值，无关表达式保留�
         })
     }))
     const native = recordingNative()
-    app.mount(native.target)
+    mountFrame(app, native.target)
     lower.value = 10
     upper.value = 20
-    await runtime.nextTick()
+    advanceFrames()
     assert.deepEqual(snapshots, ['10/20'])
     assert.equal(otherReads, 1)
     assert.ok(native.textNodes().some(node => node.text === '10/20'))
@@ -535,14 +535,14 @@ test('稳定参数与内容描述跨外层重排复用，动态调用保持同�
         const Page = evaluateSfa('<template><Text ' + attributes + " /><Box><Text text=\"内容\" /></Box><Spacer a-if=\"visible\" /></template><script>import { amount, visible } from \"harness\"\n</script>", { harness: { amount, visible } })
         const native = recordingNative()
         const app = runtime.createApp(Page)
-        app.mount(native.target)
+        mountFrame(app, native.target)
         const before = internal.getArrangeExecutionStats()
         for (let index = 0; index < 12; index++) {
             visible.value = !visible.value
-            await runtime.nextTick()
+            advanceFrames()
         }
         amount.value = 2
-        await runtime.nextTick()
+        advanceFrames()
         assert.ok(native.textNodes().some(node => node.text === '2'))
         const after = internal.getArrangeExecutionStats()
         app.unmount()
@@ -634,12 +634,12 @@ test('错误处理器接收挂载失败后不产生成功生命周期，后续�
         })
         const app = runtime.createApp(Broken)
         app.config.errorHandler = () => events.push('已报告')
-        assert.throws(() => app.mount(recordingNative().target), new RegExp(phase))
+        mountFrame(app, recordingNative().target)
         assert.ok(events.includes('已清理'))
         assert.ok(!events.includes('不应成功'))
         const healthy = runtime.createApp(foundation.Text, { text: '恢复' })
         const native = recordingNative()
-        healthy.mount(native.target)
+        mountFrame(healthy, native.target)
         assert.ok(native.textNodes().some(node => node.text === '恢复'))
         healthy.unmount()
     }
@@ -649,6 +649,6 @@ test('错误处理器接收挂载失败后不产生成功生命周期，后续�
 test('固定参数及动态参数组拒绝时保留真实 SFA 位置', () => {
     for (const parameters of ['unknown="误传"', 'text="文字" :singleLine="123"', 'a-bind="{ text: 123 }"', 'a-bind="{ text: 1, Text: 2 }"']) {
         const Page = evaluateSfa('<template>\n    <Text ' + parameters + ' />\n</template>')
-        assert.throws(() => runtime.createApp(Page).mount(recordingNative().target), error => error instanceof Error && /契约.sfa:2:/.test(error.message))
+        assert.throws(() => mountFrame(runtime.createApp(Page), recordingNative().target), error => error instanceof Error && /契约.sfa:2:/.test(error.message))
     }
 })

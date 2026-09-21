@@ -46,7 +46,7 @@ namespace {
             rejects(() => n.updateBinding({...current, generation: -1n}, text('负代际')))
             rejects(() => n.updateBinding({...current, identity: Number(current.identity)}, text('数字身份')))
             rejects(() => n.updateBinding(current, {elements: [{type: 'text', value: {text: 5}}]}))
-            rejects(() => n.updateBinding(current, {elements: [{type: 'text', value: {text: '内容', textStyle: {fontSize: Infinity}}}]}))
+            rejects(() => n.updateBinding(current, {elements: [{type: 'text', value: {text: '内容', style: {fontSize: Infinity}}}]}))
             n.updateBinding(current, text('修改后'))
             n.createNode(3, 'LayoutNode')
             n.insertChild(1, 3, 1)
@@ -328,7 +328,7 @@ int main() {
                 const again = () => Promise.resolve().then(again)
                 again()
             )JS");
-            check(!result.ok && result.error.find("did not stabilize") != std::string::npos, "unbounded microtask loop escaped the frame work budget");
+            check(!result.ok && result.error.find("超过检查点数量预算") != std::string::npos, "unbounded microtask loop escaped the frame work budget");
         }
         QuickJsScriptHost host;
         NativeScene scene;

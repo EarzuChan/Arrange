@@ -5,10 +5,11 @@ import { isArrangableDefinition } from './apiDefineArrangable.ts'
 import { PropStore, type PropInputs } from './arrangableProps.ts'
 import type { RearrangeNode } from './rearrangeNode.ts'
 import { LifecycleHooks } from './enums.ts'
-import { queueJob, queueRearrangeJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
+import { FrameScheduler, queueJob, queueRearrangeJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
 import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 import { ValueBinding } from './valueBinding.ts'
+import { bindFrameScheduler } from './animationOwner.ts'
 
 interface CallEntry {
     readonly kind: 'call'
@@ -57,8 +58,8 @@ export class RearrangeScope {
             if (this.retired || this.paused || this.owner?.isUnmounted || !this.effect.dirty) return
             rearrangeSession.schedule(this)
         }
-        this.job.id = this.identity
         this.job.i = owner ?? undefined
+        this.job.scheduler = rearrangeSession.scheduler
 
     }
 
@@ -210,6 +211,7 @@ export class RearrangeScope {
 }
 
 export class RearrangeSession {
+    readonly scheduler: FrameScheduler
     readonly root: RearrangeScope
     private readonly work = new Map<RearrangeScope, boolean>()
     private readonly dirtyParents = new Set<ArrangableInstance | null>()
@@ -235,6 +237,8 @@ export class RearrangeSession {
     }
 
     constructor(readonly context: AppContext, definition: ArrangableDefinition, inputs: PropInputs<Data>) {
+        this.scheduler = new FrameScheduler(pending => context.host.requestFrame(pending), () => context.host.currentTime())
+        this.job.scheduler = this.scheduler
         this.root = new RearrangeScope(this, null, null, () => callArrangable(0, definition, inputs))
     }
 
@@ -245,7 +249,7 @@ export class RearrangeSession {
     get preparing(): boolean { return this.running && !this.applying }
 
     mount(): void {
-        this.run(this.root, true)
+        this.schedule(this.root, true)
     }
 
     enqueue(scope: RearrangeScope, force = false): void {
@@ -374,7 +378,8 @@ export class RearrangeSession {
                 if (count > 100) throw new Error(`重排候选反复失效，未能稳定${target instanceof RearrangeScope && target.source ? `\n来源：${target.source}` : ''}`)
                 executions.set(target, count)
             }
-            while (this.values.size || this.work.size) {
+            while (this.values.size || this.work.size || this.scheduler.hasPreWork) {
+                this.scheduler.drainPre()
                 let scope: RearrangeScope | undefined
                 for (const candidate of this.work.keys()) if (!scope || candidate.identity < scope.identity) scope = candidate
                 let update: ValueTask | undefined
@@ -475,6 +480,7 @@ export class RearrangeSession {
     }
 
     private abort(): void {
+        this.scheduler.reject()
         this.transaction = undefined
         this.reverting = true
         const errors: unknown[] = []
@@ -518,6 +524,7 @@ export class RearrangeSession {
     dispose(): void {
         if (this.disposed || this.reverting) return
         this.disposed = true
+        this.scheduler.dispose()
         this.job.flags = SchedulerJobFlags.DISPOSED
         const errors: unknown[] = []
         try { if (this.transaction) this.abort() } catch (error) { errors.push(error) }
@@ -530,6 +537,7 @@ export class RearrangeSession {
     }
 }
 
+/** @arrangeCall */
 export function callArrangable<D extends ArrangableDefinition>(position: CallPosition, definition: D, inputs: PropInputs<ArrangableProps<D>>, contents: Contents = {}, metadata: CallMetadata = {}): void {
     const scope = requireScope()
     pauseTracking()
@@ -564,6 +572,7 @@ export function callArrangable<D extends ArrangableDefinition>(position: CallPos
 
 function initializeInstance(instance: ArrangableInstance, parent: RearrangeScope, inputs: PropInputs<Data>, contents: Contents, metadata: CallMetadata): void {
     instance.rearrangeSession = parent.rearrangeSession
+    bindFrameScheduler(instance.scope, parent.rearrangeSession.scheduler)
     const restore = setCurrentInstance(instance)
     try {
         instance.propStore = new PropStore(instance)
@@ -576,11 +585,24 @@ function initializeInstance(instance: ArrangableInstance, parent: RearrangeScope
             if (instance.contents[name]?.() !== undefined) throw new TypeError('内容函数只能执行 Arrangable 调用，不能返回文本或节点描述')
         }
         contentVersions.set(instance, contentVersion)
+        const slotFunctions = new Map<string, Content>()
+        const slots = new Proxy(Object.create(null) as Record<string, Content>, {
+            ownKeys: () => {
+                contentVersion.value
+                return instance.type.contentTarget ? Object.keys(instance.contents) : [...instance.type.slotNames]
+            },
+            getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+            get: (_target, name) => {
+                if (typeof name !== 'string') return undefined
+                if (!slotFunctions.has(name)) slotFunctions.set(name, () => invoke(name))
+                return slotFunctions.get(name)
+            },
+        })
         instance.setupContext = {
-            slots: Object.freeze(Object.fromEntries(instance.type.slotNames.map(name => [name, () => invoke(name)]))),
+            slots,
             call: callArrangable,
             slot: (name = 'default') => {
-                if (!instance.type.slotNames.includes(name)) throw new TypeError(`Arrangable 未声明内容：${name}`)
+                if (!instance.type.contentTarget && !instance.type.slotNames.includes(name)) throw new TypeError(`Arrangable 未声明内容：${name}`)
                 return instance.setupContext.slots[name]!
             },
             source: name => instance.propStore.source(name),
@@ -655,9 +677,9 @@ class RetainedContents {
     }
 }
 
-export function retainContent(position: CallPosition, key: RearrangeKey, content: Content, max = Infinity): void {
+export function retainContent(position: CallPosition, key: RearrangeKey, content: Content, max: number): void {
     const parent = requireScope()
-    if (!(max > 0) || max !== Infinity && !Number.isInteger(max)) throw new TypeError('内容保留上限必须是正整数')
+    if (!(max > 0) || !Number.isInteger(max)) throw new TypeError('内容保留上限必须是正整数')
     let cache = parent.retainedContents.get(position)
     if (!cache) {
         cache = new RetainedContents()
@@ -802,7 +824,7 @@ function normalizeInputs(inputs: PropInputs<Data>): PropInputs<Data> {
 
 function validateContents(definition: ArrangableDefinition, contents: Contents): void {
     for (const [name, content] of Object.entries(contents)) {
-        if (!definition.slotNames.includes(name)) throw new TypeError(`Arrangable 未声明内容：${name}`)
+        if (!definition.contentTarget && !definition.slotNames.includes(name)) throw new TypeError(`Arrangable 未声明内容：${name}`)
         if (typeof content !== 'function') throw new TypeError(`内容 ${name} 必须是无参数结构函数`)
     }
 }
@@ -812,6 +834,7 @@ export function arrangeList<T>(position: CallPosition, collection: Iterable<T> |
     for (const [value, key, index] of values) arrangeScope(position, () => program(value, key, index), identity(value, key, index) ?? index)
 }
 
+/** @arrangeParameterInputs */
 export function parameterInputs(entries: readonly (readonly [string, () => unknown])[], source?: string): PropInputs<Data> {
     const inputs: Record<string, () => unknown> = Object.create(null)
     for (const [original, getter] of entries) {
@@ -842,6 +865,7 @@ class ObjectParameterBinding {
     }
 }
 
+/** @arrangeParameterObject */
 export function parameterObject(position: CallPosition, read: () => Record<string, unknown>): [string, () => unknown][] {
     const scope = requireScope()
     if (!scope.owner) throw new Error('对象参数绑定必须归属 Arrangable 调用')

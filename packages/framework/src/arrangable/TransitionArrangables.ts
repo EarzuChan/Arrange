@@ -2,9 +2,10 @@ import { Box } from './LayoutingArrangables.ts'
 import { arrangeScope, defineArrangable, onMounted, shallowRef, watch } from "../runtime/index.ts"
 import type { Arrangable, ArrangableProps, PropType } from "../runtime/index.ts"
 import { animatedNumberAsRef, tween } from "../animation.ts"
-import type { AnimationClock, AnimationSpec } from "../animation.ts"
+import type { AnimationSpec } from "../animation.ts"
 import { M } from "../modifier.ts"
 
+/** @arrangeFields graphics */
 export type VisibilityTransform = Readonly<{ alpha?: number; translationX?: number; translationY?: number; scaleX?: number; scaleY?: number }>
 const clampAlpha = (value: number) => Math.max(0, Math.min(1, value))
 
@@ -16,14 +17,13 @@ export const AnimatedVisibility = defineArrangable({
         visible: { type: Boolean, required: true },
         appear: Boolean,
         animationSpec: { type: Object as PropType<AnimationSpec>, default: () => tween() },
-        clock: Object as PropType<AnimationClock>,
         enterFrom: { type: Object as PropType<VisibilityTransform>, default: () => ({ alpha: 0 }) },
         exitTo: { type: Object as PropType<VisibilityTransform>, default: () => ({ alpha: 0 }) },
     },
     setup(props, { call, slot }) {
         const retained = shallowRef(props.visible)
         const target = shallowRef(props.visible && !props.appear ? 1 : 0)
-        const progress = animatedNumberAsRef(target, { animationSpec: props.animationSpec, clock: props.clock })
+        const progress = animatedNumberAsRef(target, { animationSpec: props.animationSpec })
         onMounted(() => { target.value = props.visible ? 1 : 0 })
         watch(() => props.visible, visible => {
             if (visible) retained.value = true
@@ -58,12 +58,11 @@ const CrossfadeLayer = defineArrangable({
         entry: { type: Object as PropType<CrossfadeEntry>, required: true },
         active: Boolean,
         animationSpec: { type: Object as PropType<AnimationSpec>, required: true },
-        clock: Object as PropType<AnimationClock>,
         retire: { type: Function as PropType<(entry: CrossfadeEntry) => void>, required: true },
     },
     setup(props, { call }) {
         const target = shallowRef(props.entry.initial ? 1 : 0)
-        const alpha = animatedNumberAsRef(target, { animationSpec: props.animationSpec, clock: props.clock })
+        const alpha = animatedNumberAsRef(target, { animationSpec: props.animationSpec })
         onMounted(() => { target.value = props.active ? 1 : 0 })
         watch(() => props.active, active => { target.value = active ? 1 : 0 }, { flush: "sync" })
         watch(() => [props.active, alpha.isRunning.value, alpha.value], () => {
@@ -84,7 +83,6 @@ export const Crossfade = defineArrangable({
         props: { type: Object as PropType<Record<string, unknown>>, default: () => ({}) },
         targetState: { required: true },
         animationSpec: { type: Object as PropType<AnimationSpec>, default: () => tween() },
-        clock: Object as PropType<AnimationClock>,
     },
     setup(props, { call }) {
         let nextId = 1
@@ -105,7 +103,6 @@ export const Crossfade = defineArrangable({
                     entry: () => item,
                     active: () => Object.is(item.value, props.targetState),
                     animationSpec: () => props.animationSpec,
-                    clock: () => props.clock,
                     retire: () => retire,
                 }), item.id)
             }

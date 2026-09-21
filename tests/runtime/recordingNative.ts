@@ -1,5 +1,21 @@
+import { afterEach } from 'node:test'
+import type { ArrangeApp } from '../../packages/framework/src/app.ts'
 import type { NativeTransactionTarget, NativeModifierHandle } from '../../packages/framework/src/native.ts'
 import { Modifier, type ModifierElement } from '../../packages/framework/src/modifier.ts'
+
+const frameSources = new Set<(time?: number) => void>()
+const drivers = new WeakMap<NativeTransactionTarget, (time?: number) => void>()
+afterEach(() => frameSources.clear())
+
+// 测试只控制宿主帧到达，阶段与任务选择仍由生产调度器执行
+export function advanceFrames(): void {
+    for (const frame of [...frameSources]) frame()
+}
+
+export function mountFrame(app: ArrangeApp, target: NativeTransactionTarget): void {
+    app.mount(target)
+    drivers.get(target)?.()
+}
 
 export interface RecordedLayoutNode {
     readonly id: number
@@ -10,6 +26,22 @@ export interface RecordedLayoutNode {
 }
 
 export function recordingNative(autoApply = true) {
+    let prepare: ((time: number) => void) | undefined
+    let completeFrame: ((success: boolean) => void) | undefined
+    let requested = false
+    let preparing = false
+    let time = 0
+    const frame = (timestamp = time + 16) => {
+        if (!requested || completion) return
+        requested = false
+        time = timestamp
+        preparing = true
+        try { prepare?.(time) } finally { preparing = false }
+        if (completion && autoApply) finish()
+        else if (!completion) completeFrame?.(true)
+    }
+    frameSources.add(frame)
+
     let nodes = new Map<number, RecordedLayoutNode>()
     let bindings = new Map<bigint, { id: number; input: string }>()
     let candidate: Map<number, RecordedLayoutNode> | undefined
@@ -38,8 +70,16 @@ export function recordingNative(autoApply = true) {
         candidate = undefined
         candidateBindings = undefined
         callback(error)
+        completeFrame?.(!error)
     }
     const target: NativeTransactionTarget = {
+        installFrameDriver(prepareCallback, completeCallback) {
+            prepare = prepareCallback
+            completeFrame = completeCallback
+            frameSources.add(frame)
+        },
+        currentTime: () => time,
+        requestFrame(pending) { requested = pending },
         beginRearrange() {
             if (candidate) throw new Error('候选事务不能重入')
             candidate = new Map([...nodes].map(([id, value]) => [id, { ...value, inputs: new Map(value.inputs), children: [...value.children], modifiers: [...value.modifiers] }]))
@@ -48,7 +88,7 @@ export function recordingNative(autoApply = true) {
         submitRearrange(callback) {
             submissions++
             completion = callback
-            if (autoApply) finish()
+            if (autoApply && !preparing) throw new Error('事务提交必须属于准备阶段')
         },
         abortRearrange() {
             candidate = undefined
@@ -118,13 +158,21 @@ export function recordingNative(autoApply = true) {
         },
         releaseBinding(handle) { candidateBindings!.delete(handle.identity) },
         unmount() {
+            frameSources.delete(frame)
+            requested = false
+            prepare = undefined
+            completeFrame = undefined
             nodes.clear()
             bindings.clear()
             target.abortRearrange()
         },
     }
+    drivers.set(target, frame)
     return {
         target,
+        frame,
+        get time() { return time },
+        get pendingFrame() { return requested },
         finish,
         get nodes() { return nodes },
         get submissions() { return submissions },

@@ -5,7 +5,7 @@ import { defineArrangable, callArrangable } from '@arrange/framework/internal'
 
 const text = ref('原生输入')
 const inputProps = { value: '初始内容', onSubmit: (value: string) => { text.value = value } } satisfies InputProps
-const textProps = { text: '标题', textStyle: { fontSize: 16, color: 0xff336699 } } satisfies TextProps
+const textProps = { text: '标题', style: { fontSize: 16, color: 0xff336699 } } satisfies TextProps
 const imageProps = { painter: painter({ path: 'logo.png' }) } satisfies ImageProps
 
 const rowProps = { horizontalArrangement: Arrangement.spacedBy(8, Alignment.End), verticalAlignment: Alignment.Baseline } satisfies RowProps
@@ -29,7 +29,7 @@ const invalidArrangementName: ColumnProps = { verticalArrangement: Arrangement.E
 // @ts-expect-error 文本对齐不接受拼写错误
 const invalidTextAlignment: TextProps = { textAlign: 'middel' }
 // @ts-expect-error 原生字体族尚无消费者
-const invalidFontStyle: TextProps = { textStyle: { fontFamily: '不存在的字体族' } }
+const invalidFontStyle: TextProps = { style: { fontFamily: '不存在的字体族' } }
 // @ts-expect-error Input 未实现文本对齐选项
 const invalidInputAlignment: InputProps = { textAlign: 'center' }
 // @ts-expect-error Modifier 对齐不接受任意字符串
@@ -70,7 +70,7 @@ const missingTitle: ArrangableProps<typeof TypedArrangable> = {}
 const wrongCount: ArrangableProps<typeof TypedArrangable> = { title: '标题', count: '错误' }
 
 // @ts-expect-error 字体大小必须是数值
-const invalidText: TextProps = { textStyle: { fontSize: '大' } }
+const invalidText: TextProps = { style: { fontSize: '大' } }
 // @ts-expect-error 图片必须提供来源
 const missingSource: ImageProps = {}
 // @ts-expect-error 受控输入回调接收文本
@@ -91,7 +91,7 @@ export const ManualPage = defineArrangable({
         return () => call(0, Column, { modifier: () => M.height(300).verticalScroll(scroll) }, {
             default: () => {
                 call(0, Input, { value: () => inputProps.value, onSubmit: () => inputProps.onSubmit })
-                call(1, Text, { textStyle: () => textProps.textStyle, text: () => text.value })
+                call(1, Text, { style: () => textProps.style, text: () => text.value })
                 call(2, Image, { painter: () => imageProps.painter })
             }
         })
@@ -106,6 +106,6 @@ callArrangable(0, TypedArrangable, {})
 // @ts-expect-error 内部调用不接受未声明参数
 callArrangable(0, TypedArrangable, { title: () => '标题', unknown: () => 1 })
 // @ts-expect-error 文本 Modifier 的样式保持正式类型
-M.text('正文', { textStyle: { fontSize: '错误' } })
+M.text('正文', { style: { fontSize: '错误' } })
 // @ts-expect-error 编辑 Modifier 的回调接收字符串
 M.textField('正文', { onValueChange: (value: number) => { } })

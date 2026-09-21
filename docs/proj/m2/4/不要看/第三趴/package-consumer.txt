@@ -1,0 +1,213 @@
+
+> arrange@0.0.0-m.2.2 verify:npm-package E:\a_dev\proj\Arrange
+> node --import tsx scripts/verify-npm-package.ts
+
+npm notice
+npm notice 📦  @arrange/framework@0.0.0-m.2.2
+npm notice Tarball Contents
+npm notice 1.5kB package.json
+npm notice 19.3kB src/animation.ts
+npm notice 149B src/animation/index.ts
+npm notice 4.4kB src/app.ts
+npm notice 2.0kB src/arrangable/ImageAndIcon.ts
+npm notice 2.3kB src/arrangable/Layout.ts
+npm notice 3.4kB src/arrangable/LayoutingArrangables.ts
+npm notice 2.9kB src/arrangable/TextAndInput.ts
+npm notice 1.4kB src/arrangable/ToolArrangables.ts
+npm notice 6.1kB src/arrangable/TransitionArrangables.ts
+npm notice 1.8kB src/density.ts
+npm notice 4.4kB src/diagnostics.ts
+npm notice 229B src/foundation.ts
+npm notice 1.2kB src/hmr.ts
+npm notice 1.6kB src/index.ts
+npm notice 404B src/internal.ts
+npm notice 2.2kB src/measurePolicy.ts
+npm notice 11.2kB src/modifier.ts
+npm notice 3.8kB src/native.ts
+npm notice 3.4kB src/painter.ts
+npm notice 4.9kB src/primitives.ts
+npm notice 13.7kB src/rearrangeNode.ts
+npm notice 3.6kB src/resolveUnits.ts
+npm notice 1.1kB src/runtime/animationOwner.ts
+npm notice 525B src/runtime/apiComputed.ts
+npm notice 2.8kB src/runtime/apiDefineArrangable.ts
+npm notice 1.2kB src/runtime/apiInject.ts
+npm notice 2.0kB src/runtime/apiLifecycle.ts
+npm notice 4.1kB src/runtime/apiSetupHelpers.ts
+npm notice 5.3kB src/runtime/apiWatch.ts
+npm notice 4.0kB src/runtime/arrangable.ts
+npm notice 13.5kB src/runtime/arrangableProps.ts
+npm notice 73B src/runtime/arrangableSlots.ts
+npm notice 358B src/runtime/enums.ts
+npm notice 2.0kB src/runtime/errorHandling.ts
+npm notice 701B src/runtime/executionStats.ts
+npm notice 1.3kB src/runtime/frameDeadline.ts
+npm notice 632B src/runtime/helpers/resolveAssets.ts
+npm notice 252B src/runtime/helpers/useId.ts
+npm notice 1.5kB src/runtime/index.ts
+npm notice 592B src/runtime/internal.ts
+npm notice 3.5kB src/runtime/propDeclarations.ts
+npm notice 39.3kB src/runtime/rearrange.ts
+npm notice 720B src/runtime/rearrangeNode.ts
+npm notice 8.2kB src/runtime/scheduler.ts
+npm notice 4.8kB src/runtime/valueBinding.ts
+npm notice 471B src/runtime/warning.ts
+npm notice 1.9kB src/state.ts
+npm notice 345B src/ui.ts
+npm notice 2.2kB src/unit.ts
+npm notice 95B src/version.ts
+npm notice 224B src/vite.ts
+npm notice Bundled Dependencies
+npm notice @arrange/compiler
+npm notice @arrange/reactivity
+npm notice @arrange/shared
+npm notice @arrange/vite-plugin
+npm notice Tarball Details
+npm notice name: @arrange/framework
+npm notice version: 0.0.0-m.2.2
+npm notice filename: arrange-framework-0.0.0-m.2.2.tgz
+npm notice package size: 164.4 kB
+npm notice unpacked size: 660.2 kB
+npm notice shasum: d96461808dfae6a320c34b830e9f8a093a0cbd6b
+npm notice integrity: sha512-aMbZg6OY5i9jA[...]xk98W8+NowUMg==
+npm notice bundled deps: 4
+npm notice bundled files: 0
+npm notice own files: 120
+npm notice total files: 120
+npm notice
+arrange-framework-0.0.0-m.2.2.tgz
+
+> @arrange/cli@1.0.1 prepack
+> npm run build
+
+
+> @arrange/cli@1.0.1 build
+> tsc -p tsconfig.build.json
+
+npm notice
+npm notice 📦  @arrange/cli@1.0.1
+npm notice Tarball Contents
+npm notice 298B dist/building/BuildService.js
+npm notice 36B dist/building/NativeBuildService.js
+npm notice 32B dist/building/UiBuildService.js
+npm notice 451B dist/CliMetadata.js
+npm notice 4.4kB dist/cmake/CmakeStuffs.js
+npm notice 468B dist/command/adopt.js
+npm notice 613B dist/command/build.js
+npm notice 1.5kB dist/command/create.js
+npm notice 462B dist/command/dev.js
+npm notice 473B dist/command/package.js
+npm notice 873B dist/command/sync.js
+npm notice 1.1kB dist/Entry.js
+npm notice 689B dist/framework/FrameworkMamba.js
+npm notice 3.3kB dist/framework/FrameworkRegistryClient.js
+npm notice 11B dist/managed/CheckResult.js
+npm notice 2.9kB dist/managed/JsonRegion.js
+npm notice 2.1kB dist/managed/ManagedFile.js
+npm notice 1.4kB dist/managed/ManageItems.js
+npm notice 857B dist/managed/TextCluster.js
+npm notice 1.3kB dist/managed/TextRegion.js
+npm notice 3.0kB dist/managed/Wrapper.js
+npm notice 2.1kB dist/node-js/NodeJsStuffs.js
+npm notice 156B dist/packing/ArtifactLocator.js
+npm notice 329B dist/packing/Packer.js
+npm notice 776B dist/platform/DevSupervisor.js
+npm notice 925B dist/platform/Executor.js
+npm notice 334B dist/platform/MacPlatformService.js
+npm notice 33B dist/platform/PlatformService.js
+npm notice 11B dist/platform/ProcessSpec.js
+npm notice 347B dist/platform/WindowsPlatformService.js
+npm notice 1.5kB dist/project/CreateProject.js
+npm notice 2.7kB dist/project/ProjectState.js
+npm notice 2.9kB dist/project/ProjectStateStore.js
+npm notice 2.6kB dist/sync/ConfigApplier.js
+npm notice 6.5kB dist/sync/ConfigResolver.js
+npm notice 5.8kB dist/sync/ConfigScanner.js
+npm notice 158B dist/sync/ConfigScanReport.js
+npm notice 3.5kB dist/sync/ConfigWriter.js
+npm notice 4.2kB dist/sync/SyncService.js
+npm notice 580B dist/util/FileUtils.js
+npm notice 1.0kB dist/util/promptUtils.js
+npm notice 858B dist/util/utils.js
+npm notice 8.1kB dist/wizard/create.js
+npm notice 7.2kB dist/wizard/frameworkVersion.js
+npm notice 1.8kB dist/wizard/Sync.js
+npm notice 800B package.json
+npm notice Tarball Details
+npm notice name: @arrange/cli
+npm notice version: 1.0.1
+npm notice filename: arrange-cli-1.0.1.tgz
+npm notice package size: 22.8 kB
+npm notice unpacked size: 81.7 kB
+npm notice shasum: bab4c82e4427546a4a30bee71872fe185b1548b7
+npm notice integrity: sha512-vsIFTZTfaW0nX[...]Cz2ucfP3mAZ1w==
+npm notice total files: 46
+npm notice
+arrange-cli-1.0.1.tgz
+packed @arrange/framework 0.0.0-m.2.2 and @arrange/cli 1.0.1 into E:\a_dev\proj\Arrange\artifacts\npm
+
+added 36 packages, and audited 41 packages in 3s
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (2 moderate, 1 high)
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+发布包 SFA 参数、内容与脚本类型检查通过
+
+> build
+> vite build --configLoader runner
+
+vite v8.0.11 building client environment for production...
+[2K
+transforming...✓ 83 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/app.js  147.26 kB │ gzip: 38.01 kB
+
+[PLUGIN_TIMINGS] Warning: Your build spent significant time in plugin `arrange-framework`. See https://rolldown.rs/options/checks#plugintimings for more details.
+
+✓ built in 3.15s
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+-- Using explicit clean QuickJS-NG checkout: E:/a_dev/proj/Arrange/third_party/quickjs-ng
+--   BUILD_SHARED_LIBS: OFF
+--   QJS_ENABLE_INSTALL: ON
+--   QJS_BUILD_WERROR: OFF
+--   QJS_BUILD_EXAMPLES: OFF
+--   QJS_BUILD_CLI_STATIC: OFF
+--   QJS_BUILD_CLI_WITH_MIMALLOC: OFF
+--   QJS_BUILD_CLI_WITH_STATIC_MIMALLOC: OFF
+--   QJS_DISABLE_PARSER: OFF
+--   QJS_ENABLE_ASAN: OFF
+--   QJS_ENABLE_MSAN: OFF
+--   QJS_ENABLE_TSAN: OFF
+--   QJS_ENABLE_UBSAN: OFF
+-- Building in Debug mode
+-- Building with MSVC 19.50.35728.0 on Windows-10.0.26200
+-- Performing Test COMPILER_SUPPORTS_Wformat=2
+-- Performing Test COMPILER_SUPPORTS_Wformat=2 - Failed
+--   QJS_BUILD_LIBC: OFF
+-- Fetching JUCE 8.0.12 from https://github.com/juce-framework/JUCE.git
+-- Configuring juceaide
+-- Building juceaide
+-- Exporting juceaide
+-- Testing juceaide
+-- Finished setting up juceaide
+-- Configuring done (2.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: E:/a_dev/proj/Arrange/build/native-smoke-ninja
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.4.3
+** Copyright (c) 2026 Microsoft Corporation
+**********************************************************************
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+ArrangeRuntime 计数、滚动与输入事件队列烟雾测试通过
+Framework 0.0.0-m.2.2 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI 1.0.1 已验证安装

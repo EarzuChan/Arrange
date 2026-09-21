@@ -33,6 +33,10 @@ namespace arrange::juce {
        public:
         Impl() : textLayoutService_(textMeasurer_), runtime_(arrange::core::SceneFramePipeline(arrange::core::LayoutEngine(textLayoutService_))), interaction_(textLayoutService_), paint_(textLayoutService_) {}
 
+        void setWorkAvailable(std::function<void()> callback) {
+            runtime_.setWorkAvailable(std::move(callback));
+        }
+
         void configure(const EditorConfig& config) {
             pendingReload_ = ReloadKind::None;
             config_ = config;
@@ -225,6 +229,10 @@ namespace arrange::juce {
     EditorSceneHost::EditorSceneHost() : impl_(std::make_unique<Impl>()) {}
 
     EditorSceneHost::~EditorSceneHost() = default;
+
+    void EditorSceneHost::setWorkAvailable(std::function<void()> callback) {
+        impl_->setWorkAvailable(std::move(callback));
+    }
 
     void EditorSceneHost::configure(const EditorConfig& config) {
         impl_->configure(config);

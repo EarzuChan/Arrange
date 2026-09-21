@@ -1,19 +1,17 @@
 <template>
     <ValueSurface :tone="tone" :offset="offset">
-        <Text :text="label" :text-style="{fontSize: sp(13), color: Color(0xFFE8EAED)}" :modifier="M.size(dp(160), dp(28)).clickable(onTap)"/>
+        <Text :text="label" :style="{fontSize: sp(13), color: Color(0xFFE8EAED)}" :modifier="M.size(dp(160), dp(28)).clickable(onTap)"/>
     </ValueSurface>
 </template>
 
 <script>
+import type { Dp, ColorValue } from '@arrange/framework/ui'
 import { computed } from '@arrange/framework'
 import { dp, M, sp, Color } from '@arrange/framework/ui'
 import ValueSurface from './ValueSurface.sfa'
 
-const props = defineProps<{ clicks: number; color: number; offset: number; onTap: () => void }>()
+const props = defineProps<{ clicks: number; color: ColorValue; offset: Dp; onTap: () => void }>()
 const label = computed(() => `撅了啊 ${props.clicks} 次`)
-const tone = computed(() => normalizeTone(props.color))
+const tone = computed(() => props.color)
 
-function normalizeTone(value: number) {
-    return Color(value)
-}
 </script>

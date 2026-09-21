@@ -149,7 +149,7 @@ Layout 接收必需的 measurePolicy: MeasurePolicy、modifier?: Modifier 及默
 
 预制策略为 BoxMeasurePolicy(options?)、RowMeasurePolicy(options?)、ColumnMeasurePolicy(options?)、MinSizeMeasurePolicy；前三者按显式参数构造值，后者为稳定策略值。文本测量归文本 Modifier，旧 TextMeasurePolicy 不作为 Layout 策略保留。策略语义见 [内建 Arrangable](12-内建Arrangable.md)。
 
-DynamicArrangable 接收必需的 is: Arrangable 及 props?: Record<string, unknown>，默认参数对象为空。KeepAlive 接收必需的 cacheKey: string | number | symbol、max?: number 和默认内容；max 默认为 10，须为正整数。
+DynamicArrangable 接收必需的 is: Arrangable 及 props?: Record<string, unknown>，默认参数对象为空。KeepAlive 接收必需的 cacheKey: string | number | bigint | symbol | null、max?: number 和默认内容；max 默认为 10，须为正整数。动态调用及缓存行为见 [运行时](04-运行时.md#动态调用与内容保留)。
 
 ## Spacer
 
@@ -165,7 +165,7 @@ interface SpacerProps {
 interface TextProps {
     modifier?: Modifier
     text?: string
-    textStyle?: TextStyleProp
+    style?: TextStyleProp
     singleLine?: boolean
     minLines?: number
     maxLines?: number
@@ -318,16 +318,18 @@ Lazy 行为见 [内建 Arrangable](12-内建Arrangable.md)。
 # 动画 API
 
 ```ts
-animatedNumberAsRef(...): Ref<number>
-animatedDpAsRef(...): Ref<Dp>
-animatedColorAsRef(...): Ref<ArrangeColor>
-animatedOffsetAsRef(...): Ref<Offset>
-animatedSizeAsRef(...): Ref<Size>
-animatedRectAsRef(...): Ref<Rect>
-animatedNumberArrayAsRef(...): Ref<number[]>
+animatedNumberAsRef(...): AnimatedRef<number>
+animatedDpAsRef(...): AnimatedRef<number>
+animatedColorAsRef(...): AnimatedRef<number>
+animatedOffsetAsRef(...): AnimatedRef<Offset>
+animatedSizeAsRef(...): AnimatedRef<Size>
+animatedRectAsRef(...): AnimatedRef<Rect>
+animatedNumberArrayAsRef(...): AnimatedRef<readonly number[]>
 
 transition(...): Transition
 ```
+
+AnimatedRef 为只读值，附带 isRunning、label 和 stop；DP、颜色及字段单位由正式参数契约确定，SFA 的值壳消融见 [基础类型](10-基础类型.md)。
 
 动画与 transition 行为见 [动画与Transition](28-动画与Transition.md)。调度语义见 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 

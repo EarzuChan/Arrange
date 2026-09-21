@@ -11,6 +11,8 @@ export interface RearrangeNode {
 }
 
 export interface RearrangeHost { // TODO：RearrangeSession？？？真该改你名了
+    currentTime(): number
+    requestFrame(pending: boolean): void
     begin(): void
     reconcileRoots(roots: readonly RearrangeNode[]): void
     apply(complete: (error?: Error) => void): void

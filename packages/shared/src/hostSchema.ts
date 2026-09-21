@@ -21,11 +21,7 @@ export function normalizeParameterObject(value: unknown): Record<string, unknown
     return result
 }
 
-// 内部 LayoutNode 输入，不参与按 FA 名称解析参数。CHECK：何意味
+// 原生节点输入与 Arrangable 参数分别由自身边界解释
 export const layoutNodeInputs = new Set(['modifier', 'measurePolicy', 'enabled', 'contentDescription', 'label', 'description', 'role'])
 
 export const canonicalHostInput = arrangeParameterName
-
-
-// Arrangable配置由编译器与运行时共用，内部标记也必须有明确消费者
-export const arrangableOptionNames = new Set(['setup', 'render', 'props', 'slots', 'slotNames', 'name', 'arrangables', '__name', '__file', '__hmrId', '__asyncLoader', '__asyncResolved'])

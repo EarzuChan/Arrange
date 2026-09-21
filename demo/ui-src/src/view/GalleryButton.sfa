@@ -1,9 +1,9 @@
 <template>
-    <Text :text="text" :text-style="{fontSize: 12, color: active ? 0xff101c26 : 0xffdae6f0}" :modifier="M.padding({horizontal: 10, vertical: 7}).background(active ? 0xff61d6bb : 0xff29394a).clickable(onClick)" />
+    <Text :text="text" :style="{fontSize: sp(12), color: active ? Color(0xff101c26) : Color(0xffdae6f0)}" :modifier="M.padding({horizontal: dp(10), vertical: dp(7)}).background(active ? Color(0xff61d6bb) : Color(0xff29394a)).clickable(onClick)" />
 </template>
 
 <script>
-import { M } from '@arrange/framework/ui'
+import { M, dp, sp, Color } from '@arrange/framework/ui'
 
 defineProps<{ text: string; active?: boolean; onClick: () => void }>()
 </script>

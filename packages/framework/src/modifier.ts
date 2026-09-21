@@ -13,13 +13,19 @@ export type ModifierValue = Readonly<Record<string, unknown>>
 export type ModifierElement = Readonly<{ type: string, key?: string, value: ModifierValue }>
 
 export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
+/** @arrangeFields sizeRange */
 export type SizeRange = { minWidth?: number; maxWidth?: number; minHeight?: number; maxHeight?: number }
+/** @arrangeFields border */
 export type BorderOptions = { width: number; brush: Brush | number; shape?: Shape }
 export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
+/** @arrangeFields paint */
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
-export type TextOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
+/** @arrangeFields text */
+export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
+/** @arrangeFields textField */
 export type TextFieldOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; placeholder?: string; enabled?: boolean; selectAllOnFocus?: boolean; onValueChange?: (value: string) => void; onSubmit?: (value: string) => void; onChange?: (value: string) => void; onBlur?: (value: string) => void }>
+/** @arrangeFields graphics */
 export type GraphicsLayerOptions = {
     translationX?: number
     translationY?: number
@@ -33,6 +39,7 @@ export type GraphicsLayerOptions = {
 
 export const modifierAllocationStats = { chains: 0, elementReferences: 0 }
 
+/** @arrangeModifier */
 export class Modifier {
     readonly elements: readonly ModifierElement[]
 
@@ -149,7 +156,7 @@ export class Modifier {
     }
 
     text(text: string, options: TextOptions = {}): Modifier {
-        return this.#add('text', { text, ...options, textStyle: options.textStyle && Object.freeze({ ...options.textStyle }) })
+        return this.#add('text', { text, ...options, style: options.style && Object.freeze({ ...options.style }) })
     }
 
     textField(value: string, options: TextFieldOptions = {}): Modifier {
@@ -225,6 +232,7 @@ export const modifierStats = { parameterEvaluations: 0, chainsAssembled: 0, inst
 const builtinMethods = new Map(Object.getOwnPropertyNames(Modifier.prototype).map(name => [name, (Modifier.prototype as unknown as Record<string, unknown>)[name]]))
 
 // 编译器仅拆分已经确认的固定原厂 Modifier 链
+/** @arrangeModifierCall */
 export function arrangeModifier(root: Modifier, segments: readonly (readonly [string, () => unknown[]])[], source?: string) {
     const invoke = (receiver: Modifier, method: string, args: unknown[]) => {
         const factory = (receiver as unknown as Record<string, (...args: unknown[]) => Modifier>)[method]

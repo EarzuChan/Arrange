@@ -13,7 +13,6 @@ export type { Arrangable, ArrangableDefinition, ArrangableProps, AppConfig } fro
 export type { PropType, ExtractPropTypes, ExtractPublicPropTypes } from './runtime/arrangableProps.ts'
 export { createApp } from './app.ts'
 export type { ArrangeApp } from './app.ts'
-export * from './local.ts'
 export { createScrollState } from './state.ts'
 export type { ScrollState } from './state.ts'
 

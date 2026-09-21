@@ -19,6 +19,7 @@ export interface ArrangableDefinition<P extends Data = any> {
     readonly __hmrId?: string
     readonly props: ArrangableObjectPropsOptions<P>
     readonly slotNames: readonly string[]
+    readonly contentTarget?: string
     readonly setup: (props: Readonly<P>, context: SetupContext) => StructureProgram
 }
 

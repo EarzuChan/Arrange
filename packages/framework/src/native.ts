@@ -1,5 +1,6 @@
+import type { PxModifier } from './resolveUnits.ts'
 import type { Modifier, ModifierElement } from "./modifier.ts"
-import type { ArrangementName, AxisAlignment, ColorValue, HorizontalAlignment, VerticalAlignment } from "./primitives.ts"
+import type { ArrangementName, AxisAlignment, HorizontalAlignment, VerticalAlignment } from "./primitives.ts"
 import { ARRANGE_PROTOCOL_VERSION } from "./version.ts"
 import type { PainterCompletion } from './painter.ts'
 export type { Painter } from './painter.ts'
@@ -22,12 +23,14 @@ export type NativeDiagnosticPayload = {
     toast?: boolean
 }
 
+/** @arrangeFields style */
 export type TextStyleProp = Readonly<{
     fontSize?: number
     lineHeight?: number
-    color?: ColorValue
+    color?: number
 }>
 
+/** @arrangeFields arrangement */
 export type ArrangementProp<A extends AxisAlignment = AxisAlignment, N extends ArrangementName = ArrangementName> = N | Readonly<{
     kind: "spacedBy"
     space: number
@@ -48,13 +51,16 @@ export type NativeBindingHandle = Readonly<{ identity: bigint; generation: bigin
 export type NativeModifierHandle = NativeBindingHandle & Readonly<{ key: string; kind: string }>
 
 export type NativeTransactionTarget = {
+    installFrameDriver: (prepare: (time: number) => void, complete: (success: boolean) => void, dispose: () => void) => void
+    currentTime: () => number
+    requestFrame: (pending: boolean) => void
     beginRearrange: () => void
     submitRearrange: (complete: (error?: string) => void) => void
     abortRearrange: () => void
     acquirePainter?: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
     releasePainter?: (handle: NativeBindingHandle) => void
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
-    updateBinding: (handle: NativeBindingHandle, value: NativePropValue | Modifier | ModifierElement | null) => void
+    updateBinding: (handle: NativeBindingHandle, value: NativePropValue | PxModifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void
     modifierInstances: (id: NodeId) => readonly NativeModifierHandle[]
     registerModifierBinding: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle

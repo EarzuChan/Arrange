@@ -45,6 +45,7 @@ namespace arrange::quickjs {
     JSValue QuickJsPainterResources::acquire(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsFunction(context, argv[1])) return JS_ThrowTypeError(context, "acquirePainter 需要资源地址与完成回调");
         auto& owner = resources(context);
+        if (owner.resources_.size() >= 4096) return JS_ThrowRangeError(context, "Painter 活动资源超过 4096 项预算");
         if (!owner.loader_) return JS_ThrowTypeError(context, "当前宿主未配置 Painter 资源加载器");
         QuickJsValueReader reader(context);
         const auto location = reader.toString(argv[0]);
@@ -53,7 +54,7 @@ namespace arrange::quickjs {
         resource.snapshot.identity = arrange::core::allocateRuntimeIdentity();
         resource.snapshot.generation = arrange::core::allocateRuntimeIdentity();
         try {
-            resource.pending = owner.loader_(location);
+            resource.pending = owner.loader_(location, static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(context))->wakeOwner);
         } catch (const std::exception& error) {
             return JS_ThrowInternalError(context, "Painter 请求失败：%s", error.what());
         }

@@ -7,6 +7,8 @@
 #include "QuickJsValueReader.h"
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -106,6 +108,11 @@ namespace arrange::quickjs {
     }  // namespace
 
     struct QuickJsScriptHost::Impl {
+        explicit Impl(ScriptExecutionLimits value) : limits(value) {
+            if (limits.semanticMillis <= 0 || limits.visualMillis <= 0 || limits.moduleMillis <= 0) throw std::invalid_argument("脚本任务预算必须为正数");
+        }
+
+        const ScriptExecutionLimits limits;
         ScriptMemoryStats memory;
         QuickJsRuntimeContext runtime;
 
@@ -115,6 +122,16 @@ namespace arrange::quickjs {
 
         void reset() {
             if (runtime.context != nullptr) {
+                TaskBudget budget(*this);
+                if (JS_IsFunction(runtime.context, runtime.disposeApp)) {
+                    ScopedValue callback(runtime.context, JS_DupValue(runtime.context, runtime.disposeApp));
+                    ScopedValue disposed(runtime.context, JS_Call(runtime.context, callback.get(), JS_UNDEFINED, 0, nullptr));
+                    if (JS_IsException(disposed.get())) (void)quickJsExceptionText(runtime.context);
+                }
+                JS_FreeValue(runtime.context, runtime.prepareFrame);
+                JS_FreeValue(runtime.context, runtime.completeFrame);
+                JS_FreeValue(runtime.context, runtime.disposeApp);
+                runtime.prepareFrame = runtime.completeFrame = runtime.disposeApp = JS_UNDEFINED;
                 runtime.painters.reset();
                 JS_FreeValue(runtime.context, runtime.rearrangeCompletion);
                 runtime.rearrangeCompletion = JS_UNDEFINED;
@@ -127,8 +144,6 @@ namespace arrange::quickjs {
                     JS_FreeValue(runtime.context, reason);
                 }
                 runtime.unhandledRejections.clear();
-                for (auto& [_, callback] : runtime.animationFrameCallbacks) JS_FreeValue(runtime.context, callback);
-                runtime.animationFrameCallbacks.clear();
                 JS_FreeContext(runtime.context);
                 runtime.context = nullptr;
             }
@@ -139,7 +154,8 @@ namespace arrange::quickjs {
             }
             memory = {};
             runtime.rootNodeId = 0;
-            runtime.nextAnimationFrameHandle = 1;
+            runtime.frameRequested = false;
+            runtime.framePrepared = false;
             runtime.frameTimeMillis = 0.0;
             runtime.publishedModifiers.clear();
             runtime.modifierInputs.clear();
@@ -166,6 +182,13 @@ namespace arrange::quickjs {
             // 给宿主输入、布局与异常处理保留栈空间，先由引擎报告脚本栈溢出
             if (!runtime.runtime) throw std::bad_alloc();
             JS_SetMaxStackSize(runtime.runtime, scriptStackBudget());
+            JS_SetInterruptHandler(
+                runtime.runtime,
+                [](JSRuntime*, void* opaque) {
+                    const auto& owner = *static_cast<Impl*>(opaque);
+                    return owner.taskDepth && std::chrono::steady_clock::now() >= owner.deadline ? 1 : 0;
+                },
+                this);
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
             runtime.context = JS_NewContext(runtime.runtime);
             if (!runtime.context) throw std::bad_alloc();
@@ -190,10 +213,30 @@ namespace arrange::quickjs {
             QuickJsNativeApi::install(runtime.context, runtime);
         }
 
+        struct TaskBudget {
+            Impl& owner;
+
+            explicit TaskBudget(Impl& value, int milliseconds = 0) : owner(value) {
+                if (owner.ownerThread != std::this_thread::get_id()) throw std::runtime_error("QuickJS 只能由创建它的 UI Owner 线程执行");
+                if (owner.taskDepth++ == 0) {
+                    owner.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds ? milliseconds : owner.limits.semanticMillis);
+                    owner.runtime.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
+                }
+            }
+
+            ~TaskBudget() {
+                --owner.taskDepth;
+            }
+        };
+
+        const std::thread::id ownerThread = std::this_thread::get_id();
+        unsigned taskDepth = 0;
+        std::chrono::steady_clock::time_point deadline;
+
         DrainJobsResult drainJobs() {
             JSContext* jobContext = nullptr;
             while (JS_IsJobPending(runtime.runtime)) {
-                if (runtime.remainingFrameJobs == 0) return {false, "Arrange JavaScript work did not stabilize within the frame job limit"};
+                if (runtime.remainingFrameJobs == 0) return {false, "JavaScript 语义任务超过检查点数量预算"};
                 --runtime.remainingFrameJobs;
                 if (JS_ExecutePendingJob(runtime.runtime, &jobContext) < 0) return {false, quickJsExceptionText(jobContext != nullptr ? jobContext : runtime.context)};
             }
@@ -205,7 +248,7 @@ namespace arrange::quickjs {
         }
     };
 
-    QuickJsScriptHost::QuickJsScriptHost() : impl_(std::make_unique<Impl>()) {}
+    QuickJsScriptHost::QuickJsScriptHost(ScriptExecutionLimits limits) : impl_(std::make_unique<Impl>(limits)) {}
 
     QuickJsScriptHost::~QuickJsScriptHost() = default;
 
@@ -234,6 +277,7 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {
+        Impl::TaskBudget budget(*impl_);
         if (!impl_) return {true, {}};
         auto& state = impl_->runtime;
         if (!submission || submission->cancelled || submission != state.rearrangeSubmission || JS_IsUndefined(state.rearrangeCompletion)) return {true, {}};
@@ -310,36 +354,61 @@ namespace arrange::quickjs {
         runtime.frameTimeMillis = timestamp;
     }
 
-    bool QuickJsScriptHost::hasPendingAnimationFrame() const noexcept {
-        return impl_ && (!impl_->runtime.animationFrameCallbacks.empty() || (impl_->runtime.painters && impl_->runtime.painters->hasPending()));
+    void QuickJsScriptHost::setOwnerWake(std::function<void()> wake) {
+        impl_->runtime.wakeOwner = std::move(wake);
     }
 
-    CallbackInvokeResult QuickJsScriptHost::pumpAnimationFrame(double nowMillis) {
-        if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
+    CallbackInvokeResult QuickJsScriptHost::semanticCheckpoint(double nowMillis) {
+        Impl::TaskBudget budget(*impl_);
+        auto& state = impl_->runtime;
+        if (!state.context) return {true, {}};
+        if (state.framePrepared) return {false, "语义检查点不能重入视觉提交"};
         setFrameTimeMillis(nowMillis);
-        if (impl_->runtime.painters && !impl_->runtime.painters->pump()) return {false, quickJsExceptionText(impl_->runtime.context)};
-        if (impl_->runtime.animationFrameCallbacks.empty()) {
-            const auto drained = impl_->drainJobs();
-            return {drained.ok, drained.error};
-        }
+        state.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
+        if (state.painters && !state.painters->pump()) return {false, quickJsExceptionText(state.context)};
+        const auto drained = impl_->drainJobs();
+        return {drained.ok, drained.error};
+    }
 
-        std::vector<std::pair<std::uint32_t, JSValue>> callbacks;
-        callbacks.reserve(impl_->runtime.animationFrameCallbacks.size());
-        for (auto& [handle, callback] : impl_->runtime.animationFrameCallbacks) callbacks.emplace_back(handle, callback);
-        impl_->runtime.animationFrameCallbacks.clear();
+    bool QuickJsScriptHost::hasPendingSemanticWork() const noexcept {
+        return impl_ && impl_->runtime.context && (JS_IsJobPending(impl_->runtime.runtime) || (impl_->runtime.painters && impl_->runtime.painters->hasPending()));
+    }
 
-        ScopedValue timestamp(impl_->runtime.context, JS_NewFloat64(impl_->runtime.context, impl_->runtime.frameTimeMillis));
-        JSValueConst argv[1] = {timestamp.get()};
-        for (std::size_t i = 0; i < callbacks.size(); ++i) {
-            JSValue callbackValue = callbacks[i].second;
-            callbacks[i].second = JS_UNDEFINED;
-            ScopedValue result(impl_->runtime.context, JS_Call(impl_->runtime.context, callbackValue, JS_UNDEFINED, 1, argv));
-            JS_FreeValue(impl_->runtime.context, callbackValue);
-            if (JS_IsException(result.get())) {
-                for (std::size_t j = i + 1; j < callbacks.size(); ++j) JS_FreeValue(impl_->runtime.context, callbacks[j].second);
-                return {false, quickJsExceptionText(impl_->runtime.context)};
-            }
+    bool QuickJsScriptHost::hasPendingVisualWork() const noexcept {
+        return impl_ && impl_->runtime.frameRequested;
+    }
+
+    CallbackInvokeResult QuickJsScriptHost::prepareVisualFrame(double nowMillis) {
+        Impl::TaskBudget budget(*impl_, impl_->limits.visualMillis);
+        auto& state = impl_->runtime;
+        if (!state.context) return {false, "QuickJS 运行时尚未初始化"};
+        if (state.framePrepared) return {false, "视觉帧不能重入"};
+        setFrameTimeMillis(nowMillis);
+        if (!state.frameRequested || JS_IsUndefined(state.prepareFrame)) return {true, {}};
+
+        state.frameRequested = false;
+        state.framePrepared = true;
+        ScopedValue timestamp(state.context, JS_NewFloat64(state.context, state.frameTimeMillis));
+        JSValueConst argv[] = {timestamp.get()};
+        ScopedValue result(state.context, JS_Call(state.context, state.prepareFrame, JS_UNDEFINED, 1, argv));
+        if (JS_IsException(result.get())) {
+            const auto error = quickJsExceptionText(state.context);
+            state.abortRearrange();
+            (void)completeVisualFrame(false);
+            return {false, error};
         }
+        return {true, {}};
+    }
+
+    CallbackInvokeResult QuickJsScriptHost::completeVisualFrame(bool success) {
+        Impl::TaskBudget budget(*impl_);
+        auto& state = impl_->runtime;
+        if (!state.framePrepared) return {true, {}};
+        state.framePrepared = false;
+        ScopedValue argument(state.context, JS_NewBool(state.context, success));
+        JSValueConst argv[] = {argument.get()};
+        ScopedValue result(state.context, JS_Call(state.context, state.completeFrame, JS_UNDEFINED, 1, argv));
+        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
@@ -348,16 +417,18 @@ namespace arrange::quickjs {
         pendingTransactions_.clear();
         const auto normalizedModulePath = std::filesystem::absolute(modulePath).lexically_normal();
         impl_->initialise(this, normalizedModulePath);
+        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
         ScopedValue result(impl_->runtime.context, JS_Eval(impl_->runtime.context, source.data(), source.size(), normalizedModulePath.generic_string().c_str(), JS_EVAL_TYPE_MODULE));
         if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
         const auto& pending = pendingTransactions_.pending();
-        if (!pending || !pending->hasTreeMutations()) return {false, "Arrange app did not mount. Expected createApp(App).mount() to commit native mutations."};
+        if ((!pending || !pending->hasTreeMutations()) && JS_IsUndefined(impl_->runtime.prepareFrame)) return {false, "应用未挂载：需要 createApp(App).mount() 安装帧驱动"};
         return {true, {}};
     }
 
     CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options) {
+        Impl::TaskBudget budget(*impl_);
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         if (!slot.valid()) return {false, "Arrange event slot is invalid"};
         const auto callbackValue = impl_->runtime.events.callback(slot);
@@ -381,6 +452,7 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll) {
+        Impl::TaskBudget budget(*impl_);
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         if (!slot.valid()) return {false, "Arrange event slot is invalid"};
         const auto callbackValue = impl_->runtime.events.callback(slot);

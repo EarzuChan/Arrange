@@ -1,10 +1,10 @@
 <template>
-    <Column :modifier="M.width(430).padding(16).background(0xff172331)" :vertical-arrangement="Arrangement.spacedBy(10)">
-        <Text text="交互实验室" :text-style="{fontSize: 21, color: 0xffedf4fa}" />
+    <Column :modifier="M.width(dp(430)).padding(dp(16)).background(Color(0xff172331))" :vertical-arrangement="Arrangement.spacedBy(dp(10))">
+        <Text text="交互实验室" :style="{fontSize: sp(21), color: Color(0xffedf4fa)}" />
 
-        <Text text="Arrangable封装、动态列表、页面保留与异步内容" :text-style="{fontSize: 11, color: 0xff91a6b8}" />
+        <Text text="Arrangable封装、动态列表、页面保留与异步内容" :style="{fontSize: sp(11), color: Color(0xff91a6b8)}" />
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
+        <Row :horizontal-arrangement="Arrangement.spacedBy(dp(6))">
             <GalleryButton text="列表" :active="page === '列表'" :on-click="() => run('list')" />
 
             <GalleryButton text="笔记" :active="page === '笔记'" :on-click="() => run('editor')" />
@@ -18,12 +18,12 @@
             <RetainedEditor a-if="page === '笔记'" />
         </KeepAlive>
 
-        <Text a-if="page === '详情'" :text="details" :textStyle="{ fontSize: 13, color: 0xff61d6bb }" :modifier="M.padding(8)" />
+        <Text a-if="page === '详情'" :text="details" :style="{ fontSize: sp(13), color: Color(0xff61d6bb) }" :modifier="M.padding(dp(8))" />
 
-        <Column a-if="page === '列表'" :vertical-arrangement="Arrangement.spacedBy(8)">
-            <Input :value="query" :onValueChange="value => query = value" placeholder="筛选音轨" :text-style="{color: 0xffedf4fa}" :modifier="M.width(320).height(30).background(0xff263443).padding(6)" />
+        <Column a-if="page === '列表'" :vertical-arrangement="Arrangement.spacedBy(dp(8))">
+            <Input :value="query" :onValueChange="value => query = value" placeholder="筛选音轨" :text-style="{color: Color(0xffedf4fa)}" :modifier="M.width(dp(320)).height(dp(30)).background(Color(0xff263443)).padding(dp(6))" />
 
-            <Row :horizontal-arrangement="Arrangement.spacedBy(6)">
+            <Row :horizontal-arrangement="Arrangement.spacedBy(dp(6))">
                 <GalleryButton text="重排" :on-click="() => run('reverse')" />
 
                 <GalleryButton text="删除选中" :on-click="() => run('remove')" />
@@ -33,25 +33,25 @@
                 <GalleryButton text="换色" :on-click="() => run('tone')" />
             </Row>
 
-            <Column :modifier="M.width(370).height(220).verticalScroll(scroll)" :vertical-arrangement="Arrangement.spacedBy(4)">
+            <Column :modifier="M.width(dp(370)).height(dp(220)).verticalScroll(scroll)" :vertical-arrangement="Arrangement.spacedBy(dp(4))">
                 <GalleryItem a-for="item in filtered" :key="item.id" :item="item" :selected="selected === item.id" :tone="tone" :on-select="select" />
             </Column>
 
-            <Text :text="`显示 ${filtered.length} 条 · 选中 ${selected}`" :text-style="{fontSize: 11, color: 0xff91a6b8}" />
+            <Text :text="`显示 ${filtered.length} 条 · 选中 ${selected}`" :style="{fontSize: sp(11), color: Color(0xff91a6b8)}" />
         </Column>
 
         <GalleryButton text="切换提示" :on-click="() => run('hide')" />
 
-        <AnimatedVisibility :visible="shown" :animation-spec="spec" :exit-to="{alpha: 0, translationX: 20}">
-            <Text text="动画期间仍可筛选、重排、删除与切页" :text-style="{fontSize: 12, color: 0xff61d6bb}" />
+        <AnimatedVisibility :visible="shown" :animation-spec="spec" :exit-to="{alpha: 0, translationX: px(20)}">
+            <Text text="动画期间仍可筛选、重排、删除与切页" :style="{fontSize: sp(12), color: Color(0xff61d6bb)}" />
         </AnimatedVisibility>
 
-        <Crossfade :is="Text" :props="{ text: `当前位置：${page}`, textStyle: { fontSize: 11, color: 0xff91a6b8 } }" :targetState="page" :animationSpec="spec" />
+        <Crossfade :is="Text" :props="{ text: `当前位置：${page}`, style: { fontSize: sp(11), color: Color(0xff91a6b8) } }" :targetState="page" :animationSpec="spec" />
     </Column>
 </template>
 
 <script>
-import { Arrangement, M } from '@arrange/framework/ui'
+import { Arrangement, M, dp, sp, px, Color } from '@arrange/framework/ui'
 import { Text, KeepAlive } from '@arrange/framework/foundation'
 import { AnimatedVisibility, Crossfade, tween } from '@arrange/framework/animation'
 import { computed, createScrollState, onScopeDispose, ref, watch } from '@arrange/framework'
@@ -63,7 +63,7 @@ const props = defineProps({ command: { type: String, default: '' } })
 const page = ref('列表')
 const query = ref('')
 const selected = ref(1)
-const tone = ref(0xff356b7a)
+const tone = ref(Color(0xff356b7a))
 const shown = ref(true)
 const scroll = createScrollState()
 const items = ref(Array.from({ length: 80 }, (_, index) => ({ id: index + 1, name: `音轨 ${index + 1}` })))
@@ -95,7 +95,7 @@ function run(command: string) {
             break
 
         case 'tone':
-            tone.value = tone.value === 0xff356b7a ? 0xff735a91 : 0xff356b7a
+            tone.value = tone.value === Color(0xff356b7a) ? Color(0xff735a91) : Color(0xff356b7a)
             break
 
         case 'reverse':
