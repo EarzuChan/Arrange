@@ -21,6 +21,7 @@ export const Layout = defineArrangable({
     setup(props, { slot, source }) {
         const instance = currentInstance!
 
+        // TIPS：唯一真豪组件，可以直撅NativeComposition
         const host = instance.appContext.host
         if (!(host instanceof NativeComposition)) throw new Error('Layout 需要正式原生应用宿主')
 

@@ -1,0 +1,11 @@
+<template>
+    <InnerBoundary/>
+</template>
+
+<script>
+import { logger } from '@arrange/framework'
+import InnerBoundary from './InnerBoundary.sfa'
+
+const props = defineProps<{ secret: string }>()
+logger.info(`PropBoundary 收到 secret：${props.secret}`)
+</script>

@@ -18,7 +18,11 @@
 
         <Spacer :modifier="M.height(dp(4))"/>
 
-        <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap" />
+        <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
+
+        <PropBoundary secret="App 传给 PropBoundary 的 secret" />
+
+        <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef" />
 
         <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }" :modifier="M.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"/>
 
@@ -35,30 +39,36 @@
         </Column>
 
         <Row :horizontal-arrangement="Arrangement.spacedBy(16)">
-            <ShowcaseGallery />
-            
-            <Text text="恩情" />
+            <ShowcaseGallery/>
 
-            <AnimationGallery />
+            <Text text="南下"/>
+
+            <AnimationGallery/>
         </Row>
 
-        <Text text="Arrangeの本格界面" :text-style="{fontSize: 12, color: 0xff91a6b8}" />
+        <Text text="Arrangeの本格界面" :text-style="{fontSize: 12, color: 0xff91a6b8}"/>
     </Column>
 </template>
 
 <script>
-import { painter, tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, M, onMounted, onUnmounted, ref, createScrollState, sp} from "@arrange/framework"
+import { painter, tween, linearEasing, animatedDpAsRef, animatedColorAsRef, Arrangement, Color, dp, Icon, logger, M, onMounted, onUnmounted, ref, createScrollState, shallowRef, sp} from "@arrange/framework"
 
 import CounterPanel from './views/CounterPanel.sfa'
 import AnimationGallery from './views/AnimationGallery.sfa'
 import ShowcaseGallery from './views/ShowcaseGallery.sfa'
+import PropBoundary from './views/PropBoundary.sfa'
+import RefRelay from './views/RefRelay.sfa'
 
 const clicks = ref(0)
+const firstRef = ref(11)
+const secondRef = ref(29)
+const selectedRefName = ref('firstRef')
+const selectedKey = ref(false)
 const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})
 const playPainter = painter('icons/play.svg')
 const logoPainter = painter('logo.png')
 
-const preset = ref("ArrangeのArrangable与动画发廊")
+const preset = ref("Arrangable与动画发廊")
 const rainbow = [0xFFFF3030, 0xFFFFFF30, 0xFF30FF30, 0xFF30FFFF, 0xFF3030FF, 0xFFFF30FF]
 const presetColorTarget = ref(Color(rainbow[0]))
 const presetColor = animatedColorAsRef(presetColorTarget, {animationSpec: tween({durationMillis: 700, easing: linearEasing})})
@@ -92,6 +102,16 @@ const inputStatus = ref("你来和我（指输入框↑）搞一下嘛")
 const scrollState = createScrollState()
 const pageScroll = createScrollState()
 const counterColor = animatedColorAsRef(() => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE), {animationSpec: tween({durationMillis: 240, easing: linearEasing})})
+
+function toggleSelectedRef() {
+    if (!selectedKey.value) {
+        selectedKey.value = true
+        selectedRefName.value = 'secondRef'
+    } else {
+        selectedKey.value = false
+        selectedRefName.value = 'firstRef'
+    }
+}
 
 function handleTap() {
     clicks.value += 1

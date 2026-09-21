@@ -10,7 +10,7 @@ export interface RearrangeNode {
     retire(): void
 }
 
-export interface CompositionHost {
+export interface CompositionHost { // TODO：Composition？？？真该改你名了
     begin(): void
     reconcileRoots(roots: readonly RearrangeNode[]): void
     apply(complete: (error?: Error) => void): void

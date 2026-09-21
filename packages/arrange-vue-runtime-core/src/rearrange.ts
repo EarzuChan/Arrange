@@ -522,6 +522,7 @@ export function callArrangable<D extends ArrangableDefinition>(position: CallPos
     pauseTracking()
     try {
         if (!isArrangableDefinition(definition)) throw new TypeError('调用目标必须是已声明的 Arrangable 定义')
+
         const normalized = metadata.parameters ? inputs : normalizeInputs(inputs)
         validateContents(definition, contents)
         const previous = scope.claim(position, metadata.key)
@@ -607,6 +608,7 @@ export function arrangeScope(position: CallPosition, program: StructureProgram, 
     const parent = requireScope()
     const previous = parent.claim(position, key)
     let entry: ScopeEntry
+
     if (previous?.kind === 'scope') {
         entry = previous
         entry.scope.refresh(program)
@@ -616,6 +618,7 @@ export function arrangeScope(position: CallPosition, program: StructureProgram, 
         parent.composition.createdEntry(entry)
         parent.composition.enqueue(scope, true)
     }
+
     parent.record(entry)
 }
 

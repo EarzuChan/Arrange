@@ -157,6 +157,7 @@ export interface SimpleExpressionNode extends Node {
      */
     identifiers?: string[]
     preserveRef?: boolean
+    rawRefRanges?: readonly [number, number][]
 }
 
 export interface InterpolationNode extends Node {

@@ -1,0 +1,14 @@
+<template>
+    <Column :modifier="M.padding(8).background(0xff202633)" :vertical-arrangement="Arrangement.spacedBy(4)">
+        <Text :text="`原样 Ref：${name}`" :text-style="{ fontSize: 11, color: 0xff61d6bb }" />
+        <Text :text="`子层读取 state：` + state.value" :text-style="{ fontSize: 11, color: 0xffedf4fa }" />
+        <Text :text="`点击切换 Ref（当前 ${name}）`" :modifier="M.padding(5).background(0xff374866).clickable(onToggle)" :text-style="{ fontSize: 10, color: 0xffffffff }" />
+    </Column>
+</template>
+
+<script>
+import type { Ref } from '@arrange/framework'
+import { Arrangement, Column, M, Text } from '@arrange/framework'
+
+const { state, name, onToggle } = defineProps<{ state: Ref<number>; name: string; onToggle: () => void }>()
+</script>

@@ -293,14 +293,16 @@ const tokenizer = new Tokenizer(stack, {
                     const preserveRef = currentProp.name === 'bind' && isRawRefExpression(trimmed)
                     const expressionStart = preserveRef ? currentAttrStartIndex + currentAttrValue.indexOf('<') + 1 : currentAttrStartIndex
                     const expressionEnd = preserveRef ? currentAttrStartIndex + currentAttrValue.lastIndexOf('>') : currentAttrEndIndex
+                    const sanitized = preserveRef ? { content: trimmed.slice(1, -1), ranges: [[0, trimmed.length - 2] as [number, number]] } : sanitizeRawRefMarkers(currentAttrValue)
                     currentProp.exp = createExp(
-                        preserveRef ? trimmed.slice(1, -1) : currentAttrValue,
+                        sanitized.content,
                         false,
                         getLoc(expressionStart, expressionEnd),
                         ConstantTypes.NOT_CONSTANT,
                         expParseMode,
                     )
                     currentProp.exp.preserveRef = preserveRef
+                    if (sanitized.ranges.length) currentProp.exp.rawRefRanges = sanitized.ranges
                     if (currentProp.name === 'for') {
                         currentProp.forParseResult = parseForExpression(currentProp.exp)
                     }
@@ -835,4 +837,32 @@ function isRawRefExpression(expression: string): boolean {
         // 外层不是合法 TS 时，仅剥离一对标记；内部仍由正式表达式解析器校验
         return true
     }
+}
+
+function sanitizeRawRefMarkers(expression: string): { content: string; ranges: [number, number][] } {
+    const output = expression.split('')
+    const ranges: [number, number][] = []
+    for (let index = 0; index < expression.length; index++) {
+        if (expression[index] !== '<') continue
+        let depth = 0
+        let quote = ''
+        let close = -1
+        for (let cursor = index + 1; cursor < expression.length; cursor++) {
+            const character = expression[cursor]
+            if (quote) { if (character === quote && expression[cursor - 1] !== '\\') quote = ''; continue }
+            if (character === '"' || character === "'" || character === '`') { quote = character; continue }
+            if (character === '(' || character === '[' || character === '{') depth++
+            else if (character === ')' || character === ']' || character === '}') depth--
+            else if (character === '>' && depth === 0) { close = cursor; break }
+        }
+        const inner = expression.slice(index + 1, close)
+        const previous = expression.slice(0, index).trimEnd().slice(-1)
+        const following = expression.slice(close + 1).trimStart()[0] ?? ''
+        if (close < 0 || !inner.trim() || /[<>]/.test(inner) || previous && /[\w$).\]]/.test(previous) || /[\w$.(\[]/.test(following)) continue
+        ranges.push([index + 1, close])
+        output[index] = ' '
+        output[close] = ' '
+        index = close
+    }
+    return { content: output.join(''), ranges }
 }

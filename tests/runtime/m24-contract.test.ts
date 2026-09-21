@@ -202,6 +202,14 @@ test('原样 Ref 标记保留泛型、比较与类型断言的 TS 边界', () =>
     assert.throws(() => compileBinding('<state><other>'))
 })
 
+test('原样 Ref 标记可以嵌入条件表达式并只跳过作用域内解包', () => {
+    const compileBinding = (expression: string) => compileArrangeSfa('<template><Editor :state="' + expression + '" /></template><script>import {ref} from "@arrange/framework"; const selectedKey=ref(false); const firstRef=ref(1); const secondRef=ref(2)</script>', '嵌套原样.sfa').code
+    const nested = compileBinding('selectedKey.value ? <secondRef> : <firstRef>')
+    assert.match(nested, /selectedKey\.value\s*\?\s*secondRef\s*:\s*firstRef/)
+    const outer = compileBinding('<selectedKey.value ? secondRef : firstRef>')
+    assert.match(outer, /selectedKey\.value\s*\?\s*secondRef\s*:\s*firstRef/)
+})
+
 test('SFA 类型检查按 paths 解析定义并拒绝未声明具名内容', () => {
     const directory = mkdtempSync(resolve('tmp-refs/sfa-alias-'))
     try {

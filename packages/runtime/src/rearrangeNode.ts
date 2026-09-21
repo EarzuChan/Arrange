@@ -24,6 +24,7 @@ export class NativeComposition implements CompositionHost {
     begin(): void {
         if (this.preparing || this.applying) throw new Error('原生候选提交不能重入')
         this.preparing = true
+
         if (!this.rootCreated) {
             this.operations.push(native => { native.createNode(1, 'Root'); arrangeExecutionStats.nativeCreateOperations++ })
             this.commits.push(() => { this.rootCreated = true })

@@ -1,0 +1,9 @@
+<template>
+    <Text :text="secret" :modifier="M.padding(6).background(0xff263443)" :text-style="{ fontSize: 11, color: 0xffedf4fa }" />
+</template>
+
+<script>
+import { M, Text } from '@arrange/framework'
+
+const { secret = 'InnerBoundary 的默认 secret（父层没有传入）' } = defineProps<{ secret?: string }>()
+</script>

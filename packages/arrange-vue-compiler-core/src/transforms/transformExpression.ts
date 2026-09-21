@@ -87,7 +87,7 @@ export function processExpression(
         id?: Identifier,
     ) => {
         const type = hasOwn(bindingMetadata, raw) && bindingMetadata[raw]
-        if (node.preserveRef && inline && type && type.startsWith('setup')) return raw
+        if (node.preserveRef && inline && type && type.startsWith('setup') || inRawRefScope(id?.start == null ? -1 : id.start - 1)) return raw
         if (inline) {
             // x = y
             const isAssignmentLVal =
@@ -111,6 +111,7 @@ export function processExpression(
             ) {
                 return raw
             } else if (type === BindingTypes.SETUP_REF) {
+                if (parent?.type === 'MemberExpression' && parent.object === id && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'value') return raw
                 return `${raw}.value`
             } else if (type === BindingTypes.SETUP_MAYBE_REF) {
                 // const binding that may or may not be ref
@@ -189,7 +190,9 @@ export function processExpression(
     }
 
     // fast path if expression is a simple identifier.
-    const rawExp = node.content
+    const rawExp = markRawRefScopes(node)
+    const rawRefRanges = node.rawRefRanges ?? []
+    const inRawRefScope = (offset: number) => rawRefRanges.some(([start, end]) => offset >= start && offset < end)
 
     let ast = node.ast
 
@@ -352,6 +355,45 @@ function canPrefix(id: Identifier) {
         return false
     }
     return true
+}
+
+// 把尖括号标记剥掉，保留其内部源码范围；真正跳过 Ref 解包由作用域判断完成
+function markRawRefScopes(node: SimpleExpressionNode): string {
+    const source = node.content
+    const output = source.split('')
+    const ranges: [number, number][] = [...(node.rawRefRanges ?? [])]
+    const previousSignificant = (index: number) => {
+        for (let cursor = index - 1; cursor >= 0; cursor--) if (!/\s/.test(source[cursor])) return source[cursor]
+        return ''
+    }
+    for (let index = 0; index < source.length; index++) {
+        if (source[index] !== '<') continue
+        const previous = previousSignificant(index)
+        if (previous && /[\w$).\]]/.test(previous)) continue
+        let depth = 0
+        let quote = ''
+        let close = -1
+        for (let cursor = index + 1; cursor < source.length; cursor++) {
+            const character = source[cursor]
+            if (quote) {
+                if (character === quote && source[cursor - 1] !== '\\') quote = ''
+                continue
+            }
+            if (character === '"' || character === "'" || character === '`') { quote = character; continue }
+            if (character === '(' || character === '[' || character === '{') depth++
+            else if (character === ')' || character === ']' || character === '}') depth--
+            else if (character === '>' && depth === 0) { close = cursor; break }
+        }
+        if (close < 0) continue
+        const inner = source.slice(index + 1, close).trim()
+        if (!inner || /[<>]/.test(inner)) continue
+        ranges.push([index + 1, close])
+        output[index] = ' '
+        output[close] = ' '
+        index = close
+    }
+    node.rawRefRanges = ranges
+    return output.join('')
 }
 
 export function stringifyExpression(exp: ExpressionNode | string): string {
