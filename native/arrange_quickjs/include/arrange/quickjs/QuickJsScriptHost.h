@@ -11,64 +11,29 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Painter.h>
+#include <arrange/Log.h>
 #include "ScriptHost.h"
 #include "LiveModule.h"
 
 namespace arrange::quickjs {
 #if ARRANGE_WITH_QUICKJS_NG
 
-    enum class QuickJsDiagnosticLevel {
-        Trace,
-        Debug,
-        Info,
-        Warn,
-        Error,
-    };
-
-    enum class QuickJsDiagnosticCategory {
-        App,
-        HostLive,
-        HostDist,
-        HostHmr,
-        RuntimeScript,
-        RuntimeTransaction,
-        PipelineFrame,
-        PipelineLayout,
-        PipelinePaint,
-        InputPointer,
-        InputKey,
-        InputIme,
-        InputScroll,
-        ResourcePackage,
-        ResourceImage,
-        ResourceIcon,
-        Diagnostics,
-    };
-
-    struct QuickJsDiagnosticEventInput {
-        QuickJsDiagnosticLevel level = QuickJsDiagnosticLevel::Info;
-        QuickJsDiagnosticCategory category = QuickJsDiagnosticCategory::RuntimeScript;
-        std::string code;
-        std::string message;
-        std::string detail;
-        std::string source;
-        std::string pathOrUrl;
-        bool toast = false;
-        bool coalesceToast = true;
+    struct QuickJsToastRequest {
+        arrange::LogLevel level = arrange::LogLevel::Info;
+        std::string tag;
+        std::string title;
+        std::string content;
+        bool coalesce = true;
     };
 
     enum class QuickJsDiagnosticActionKind {
         RequestReload,
         TriggerFakeError,
-        SetLogLevel,
-        SetCategoryEnabled,
         SetToastsEnabled,
     };
 
     struct QuickJsDiagnosticAction {
         QuickJsDiagnosticActionKind kind = QuickJsDiagnosticActionKind::RequestReload;
-        QuickJsDiagnosticLevel level = QuickJsDiagnosticLevel::Info;
-        QuickJsDiagnosticCategory category = QuickJsDiagnosticCategory::Diagnostics;
         std::string message;
         std::string path;
         double timestamp = 0.0;
@@ -120,7 +85,7 @@ namespace arrange::quickjs {
         CallbackInvokeResult prepareVisualFrame(double nowMillis);
         CallbackInvokeResult completeVisualFrame(bool success);
         bool hasPendingDiagnostics() const noexcept;
-        std::vector<QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        std::vector<QuickJsToastRequest> takeDiagnosticToasts();
         std::vector<QuickJsDiagnosticAction> takeDiagnosticActions();
         std::size_t eventSlotCount() const noexcept;
         std::size_t bindingCount() const noexcept;

@@ -54,4 +54,4 @@ await runInVsDev(`"${cmakeExe()}" --build "${buildDir}"`)
 await runInVsDev(`"${resolve(buildDir, "arrange_fetchcontent_consumer.exe")}"`)
 
 const sourceLabel = gitRepository && gitTag ? `${gitRepository}#${gitTag}` : arrangeSource
-console.log(`verified native FetchContent consumer for Arrange ${contract.frameworkVersion} from ${sourceLabel}`)
+console.log('[ArrangeNativeVerify]', `verified native FetchContent consumer for Arrange ${contract.frameworkVersion} from ${sourceLabel}`)

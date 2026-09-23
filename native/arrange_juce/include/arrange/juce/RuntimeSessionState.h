@@ -3,6 +3,7 @@
 #include <arrange/core/Geometry.h>
 
 #include <filesystem>
+#include <string_view>
 
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
@@ -28,6 +29,7 @@ namespace arrange::juce {
         [[nodiscard]] bool applyFrameError(const RuntimeFramePumpResult& frame, DiagnosticsState& diagnostics, ArrangeRuntime& runtime, const std::filesystem::path& relatedPath);
 
        private:
+        static constexpr std::string_view TAG = "RuntimeSessionState";
         bool loaded_ = false;
         int width_ = 0;
         int height_ = 0;

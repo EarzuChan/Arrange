@@ -21,7 +21,9 @@ export function isSfaModule(id: unknown): boolean {
 
 export function isSfaQueryModule(id: unknown): boolean {
     const text = String(id ?? "")
-    return text.includes("?") && isSfaModule(text)
+    if (!isSfaModule(text)) return false
+    const query = text.indexOf('?')
+    return query >= 0 && new URLSearchParams(text.slice(query + 1)).has('type')
 }
 
 function stripBom(code: string): string {

@@ -142,8 +142,8 @@ namespace arrange::juce {
     }
 
 #if ARRANGE_WITH_QUICKJS_NG
-    std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> RearrangeHost::takeDiagnosticEvents() {
-        return scriptHost_ ? scriptHost_->takeDiagnosticEvents() : std::vector<arrange::quickjs::QuickJsDiagnosticEventInput>{};
+    std::vector<arrange::quickjs::QuickJsToastRequest> RearrangeHost::takeDiagnosticToasts() {
+        return scriptHost_ ? scriptHost_->takeDiagnosticToasts() : std::vector<arrange::quickjs::QuickJsToastRequest>{};
     }
 
     std::vector<arrange::quickjs::QuickJsDiagnosticAction> RearrangeHost::takeDiagnosticActions() {

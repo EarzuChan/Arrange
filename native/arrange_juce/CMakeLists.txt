@@ -24,9 +24,9 @@ target_sources(arrange_juce PRIVATE
   src/ArrangeRuntime.cpp
   src/EditorChromeModel.cpp
   src/RearrangeHost.cpp
-  src/DiagnosticEvent.cpp
   src/DiagnosticsState.cpp
   src/DiagnosticsModel.cpp
+  src/DiagnosticsToast.cpp
   src/DiagnosticsScene.cpp
   src/EditorDebugActions.cpp
   src/EditorFrameClock.cpp

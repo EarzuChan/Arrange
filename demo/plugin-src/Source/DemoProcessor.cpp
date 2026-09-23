@@ -8,27 +8,6 @@
 #include <windows.h>
 
 namespace {
-    class DiagnosticConsoleSink final : public juce::Logger {
-       public:
-        void logMessage(const juce::String& message) override {
-            const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-            WORD attributes = FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
-            if (message.contains("[trace]")) attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
-            else if (message.contains("[debug]")) attributes = FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN;
-            else if (message.contains("[info]")) attributes = FOREGROUND_INTENSITY | FOREGROUND_GREEN;
-            else if (message.contains("[warn]")) attributes = FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN;
-            else if (message.contains("[error]")) attributes = FOREGROUND_INTENSITY | FOREGROUND_RED;
-            SetConsoleTextAttribute(handle, attributes);
-
-            std::fputs(message.toRawUTF8(), stdout);
-            std::fputc('\n', stdout);
-            std::fflush(stdout);
-
-            SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-        }
-    };
-
     void configureDebugConsole() {
         FreeConsole(); // 放走老控制台
 
@@ -38,9 +17,6 @@ namespace {
         FILE* stream = nullptr;
         freopen_s(&stream, "CONOUT$", "w", stdout);
         freopen_s(&stream, "CONOUT$", "w", stderr);
-
-        static DiagnosticConsoleSink sink;
-        juce::Logger::setCurrentLogger(&sink);
     }
 }
 #endif
@@ -76,8 +52,6 @@ juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
 #if !defined(NDEBUG)
     config.app.useLive();
     config.diagnostics.badge = arrange::juce::DiagnosticVisibility::Always;
-    config.diagnostics.logLevel = arrange::juce::LogLevel::Trace;
-    config.diagnostics.logFile.clear(); // 不需要每次调用
 #endif
 
     return new arrange::juce::ArrangeEditor(*this, std::move(config));

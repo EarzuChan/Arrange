@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <arrange/Log.h>
 #include "App.h"
 #include "EditorFrameClock.h"
 
@@ -28,26 +29,13 @@ namespace arrange::juce {
         Always,
     };
 
-    enum class LogLevel {
-        Trace,
-        Debug,
-        Info,
-        Warn,
-        Error,
-    };
+    using LogLevel = arrange::LogLevel;
 
     struct DiagnosticsConfig {
         DiagnosticVisibility badge = DiagnosticVisibility::DebugOnly;
         DiagnosticVisibility toasts = DiagnosticVisibility::DebugOnly;
         bool errorScreen = true;
-#if defined(NDEBUG)
-        LogLevel logLevel = LogLevel::Warn;
-#else
-        LogLevel logLevel = LogLevel::Info;
-#endif
-        std::string logFile;
         bool copyFullDiagnosticsInRelease = true;
-        std::size_t recentEventLimit = 64;
         bool allowScriptDiagnosticsControl = true;
     };
 

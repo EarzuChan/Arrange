@@ -113,15 +113,14 @@ namespace arrange::quickjs {
                           JS_NewCFunction(
                               context,
                               [](JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) -> JSValue {
-                                  QuickJsDiagnosticEventInput event;
-                                  event.level = QuickJsDiagnosticLevel::Error;
-                                  event.category = QuickJsDiagnosticCategory::HostHmr;
-                                  event.code = "hmr.update.failed";
+                                  QuickJsToastRequest toast;
+                                  toast.level = arrange::LogLevel::Error;
+                                  toast.tag = "HotTransport";
                                   const char* text = argc ? JS_ToCString(ctx, argv[0]) : nullptr;
-                                  event.message = text ? text : "HMR update failed";
+                                  toast.title = "热更新失败";
+                                  toast.content = text ? text : "热更新失败";
                                   JS_FreeCString(ctx, text);
-                                  event.toast = true;
-                                  static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(ctx))->recordDiagnostic(std::move(event));
+                                  static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(ctx))->recordToast(std::move(toast));
                                   return JS_UNDEFINED;
                               },
                               "report", 1));

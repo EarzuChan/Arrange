@@ -59,7 +59,7 @@ namespace arrange::quickjs {
         std::unordered_map<arrange::core::NodeId, arrange::core::BindingHandle> modifierBindings;
         std::unordered_map<arrange::core::NodeId, std::vector<arrange::core::NodeId>> childrenByNode;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeId> parentByNode;
-        std::vector<QuickJsDiagnosticEventInput> diagnosticEvents;
+        std::vector<QuickJsToastRequest> diagnosticToasts;
         std::vector<QuickJsDiagnosticAction> diagnosticActions;
         std::vector<HotMessage> hotMessages;
         std::string hotSession;
@@ -96,7 +96,7 @@ namespace arrange::quickjs {
         void attachChild(arrange::core::NodeId parent, arrange::core::NodeId child, std::uint32_t index);
         void detachChild(arrange::core::NodeId parent, arrange::core::NodeId child);
         void retireSubtree(arrange::core::NodeId id);
-        void recordDiagnostic(QuickJsDiagnosticEventInput event);
+        void recordToast(QuickJsToastRequest toast);
         void recordDiagnosticAction(QuickJsDiagnosticAction action);
     };
 }  // namespace arrange::quickjs

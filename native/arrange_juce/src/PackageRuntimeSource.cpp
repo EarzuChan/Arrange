@@ -7,8 +7,8 @@
 
 namespace arrange::juce {
     namespace {
-        RuntimeLoadDiagnostic makeDiagnostic(LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast = true) {
-            return RuntimeLoadDiagnostic{level, std::move(title), std::move(message), toast, coalesceToast};
+        RuntimeLoadToast makeToast(LogLevel level, std::string title, std::string message, bool coalesce = true) {
+            return RuntimeLoadToast{level, std::move(title), std::move(message), coalesce};
         }
 
         PackageLoadOutcome packageOutcomeFromRuntimeLoad(RuntimePackageLoadResult loaded, PackageSource source) {
@@ -18,9 +18,8 @@ namespace arrange::juce {
             outcome.activeSource = loaded.ok ? source : PackageSource::None;
             outcome.packageDir = std::move(loaded.packageDir);
             outcome.error = std::move(loaded.error);
-            if (loaded.diagnostic) {
-                outcome.diagnostics.push_back(std::move(*loaded.diagnostic));
-            }
+            if (loaded.log) outcome.logs.push_back(std::move(*loaded.log));
+            if (loaded.toast) outcome.toasts.push_back(std::move(*loaded.toast));
             outcome.initialTransaction = std::move(loaded.initialTransaction);
 #if ARRANGE_WITH_QUICKJS_NG
             outcome.scriptHost = std::move(loaded.scriptHost);
@@ -65,31 +64,31 @@ namespace arrange::juce {
     PackageLoadOutcome PackageRuntimeSource::reload() {
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::Reload;
-        prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Info, "Reload requested", "Reloading Arrange app package.", true)});
+        prependToasts(outcome, {makeToast(LogLevel::Info, "已请求重新加载", "正在重新加载 Arrange 应用包")});
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::reloadFromDevServer() {
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::HmrReload;
-        prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Info, "HMR reload", "Dev server requested Arrange reload.", true)});
+        prependToasts(outcome, {makeToast(LogLevel::Info, "收到热更新重载请求", "开发服务器请求重新加载 Arrange 应用")});
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::manualReload(bool toggleLive) {
-        std::vector<RuntimeLoadDiagnostic> prelude;
+        std::vector<RuntimeLoadToast> prelude;
         if (toggleLive && config_.app.hasLive()) {
             liveRuntimeEnabled_ = !liveRuntimeEnabled_;
             stopDevServerClient();
             startDevServerClientIfNeeded();
-            prelude.push_back(makeDiagnostic(LogLevel::Info, liveRuntimeEnabled_ ? "Live enabled" : "Live disabled", liveRuntimeEnabled_ ? "Manual reload will try live before dist." : "Manual reload will skip live and use dist.", true));
+            prelude.push_back(makeToast(LogLevel::Info, liveRuntimeEnabled_ ? "Live 已启用" : "Live 已关闭", liveRuntimeEnabled_ ? "手动重载将优先加载 Live" : "手动重载将跳过 Live 并加载 Dist"));
         } else {
-            prelude.push_back(makeDiagnostic(LogLevel::Info, "Manual reload", "F5 requested Arrange reload.", true));
+            prelude.push_back(makeToast(LogLevel::Info, "手动重新加载", "已按下 F5"));
         }
 
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::Reload;
-        prependDiagnostics(outcome, std::move(prelude));
+        prependToasts(outcome, std::move(prelude));
         return outcome;
     }
 
@@ -133,7 +132,7 @@ namespace arrange::juce {
         if (packet.unavailable && config_.app.hasDist()) {
             lastLiveUnavailable_ = true;
             auto outcome = loadDistPackage();
-            prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Warn, "Using dist fallback", packet.error, true)});
+            prependToasts(outcome, {makeToast(LogLevel::Warn, "Live 不可用，正在回退到 Dist", packet.error)});
             return outcome;
         }
         auto outcome = packageOutcomeFromRuntimeLoad(runtimeLoader_.loadLiveSnapshot(config_, resolver_, packet.snapshot, packet.error), PackageSource::Live);
@@ -153,25 +152,26 @@ namespace arrange::juce {
         }
 
         activeSource_ = PackageSource::Dist;
-        const auto message = !outcome.diagnostics.empty() && !outcome.diagnostics.front().message.empty() ? outcome.diagnostics.front().message : outcome.packageDir.string();
-        outcome.diagnostics.clear();
-        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Info, lastLiveUnavailable_ ? "Loaded dist fallback" : "Loaded dist app", message, lastLiveUnavailable_));
+        const auto message = !outcome.logs.empty() && !outcome.logs.front().message.empty() ? outcome.logs.front().message : outcome.packageDir.string();
+        outcome.logs.clear();
+        if (lastLiveUnavailable_) outcome.toasts.push_back(makeToast(LogLevel::Info, "已加载 Dist 回退包", message));
+        else outcome.logs.push_back({LogLevel::Info, "已加载 Dist 应用 " + message});
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::noSourceOutcome() const {
         PackageLoadOutcome outcome;
         outcome.activeSource = PackageSource::None;
-        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "你啥也没给我给你加载啥app（笑）Call config.app.useLive(...) or config.app.useDist(...).");
-        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Error, "No app source", "Call config.app.useLive(...) or config.app.useDist(...).", true));
+        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "没有配置可用的应用源，请调用 config.app.useLive(...) 或 config.app.useDist(...)");
+        outcome.toasts.push_back(makeToast(LogLevel::Error, "没有可加载的应用源", "请配置 config.app.useLive(...) 或 config.app.useDist(...)"));
         return outcome;
     }
 
     PackageLoadOutcome PackageRuntimeSource::disabledLiveWithoutDistOutcome() const {
         PackageLoadOutcome outcome;
         outcome.activeSource = PackageSource::None;
-        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "Live source is disabled and no dist package is configured.", "Enable live reload again or call config.app.useDist(...).", config_.app.distPath());
-        outcome.diagnostics.push_back(makeDiagnostic(LogLevel::Error, "No enabled app source", "Live source is disabled and no dist package is configured.", true));
+        outcome.error = makeErrorScreenModel(ErrorSource::AppPackage, "Live 已关闭，且没有配置 Dist 应用包", "请重新启用 Live，或配置 config.app.useDist(...)", config_.app.distPath());
+        outcome.toasts.push_back(makeToast(LogLevel::Error, "没有启用的应用源", "Live 已关闭，且没有配置 Dist 应用包"));
         return outcome;
     }
 
@@ -195,12 +195,12 @@ namespace arrange::juce {
         }
     }
 
-    void PackageRuntimeSource::prependDiagnostics(PackageLoadOutcome& outcome, std::vector<RuntimeLoadDiagnostic> diagnostics) const {
-        if (diagnostics.empty()) {
+    void PackageRuntimeSource::prependToasts(PackageLoadOutcome& outcome, std::vector<RuntimeLoadToast> toasts) const {
+        if (toasts.empty()) {
             return;
         }
-        diagnostics.insert(diagnostics.end(), std::make_move_iterator(outcome.diagnostics.begin()), std::make_move_iterator(outcome.diagnostics.end()));
-        outcome.diagnostics = std::move(diagnostics);
+        toasts.insert(toasts.end(), std::make_move_iterator(outcome.toasts.begin()), std::make_move_iterator(outcome.toasts.end()));
+        outcome.toasts = std::move(toasts);
     }
 }  // namespace arrange::juce
 

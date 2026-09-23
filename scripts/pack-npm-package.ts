@@ -91,4 +91,4 @@ const cliStageDir = resolve(stagingRoot, packageStageName(cliSourceDir))
 await runNpm(["pack", cliSourceDir, "--pack-destination", artifactsDir])
 
 const cliManifest = readJson(resolve(cliSourceDir, "package.json"))
-console.log(`packed @arrange/framework ${contract.frameworkVersion} and ${cliManifest.name} ${cliManifest.version} into ${artifactsDir}`)
+console.log('[ArrangePackagePack]', `packed @arrange/framework ${contract.frameworkVersion} and ${cliManifest.name} ${cliManifest.version} into ${artifactsDir}`)

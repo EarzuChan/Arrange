@@ -308,9 +308,6 @@ int main(int argc, char** argv) {
         const auto memoryAfter = hostView->memoryStats();
         const auto workAfter = runtime.frameCounters();
         command("perf-report");
-        for (const auto& event : hostView->takeDiagnosticEvents()) {
-            if (event.message.starts_with("M23_JS_PERF ")) std::cout << event.message << '\n';
-        }
         std::sort(durations.begin(), durations.end());
         std::cout << "M23_PERF {\"frames\":" << durations.size() << ",\"mean_ms\":" << std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size() << ",\"p95_ms\":" << durations[durations.size() * 95 / 100] << ",\"max_ms\":" << durations.back() << ",\"cpp_new_count\":" << nativeAllocations.count << ",\"cpp_new_bytes\":" << nativeAllocations.bytes << ",\"js_allocations\":" << memoryAfter.allocations - memoryBefore.allocations << ",\"js_allocated_bytes\":" << memoryAfter.allocatedBytes - memoryBefore.allocatedBytes << ",\"js_live_bytes\":" << memoryAfter.liveBytes << ",\"measure\":" << workAfter.measures - workBefore.measures << ",\"place\":" << workAfter.placements - workBefore.placements << ",\"paint\":" << workAfter.paintBuilds - workBefore.paintBuilds << ",\"hit\":" << workAfter.hitBuilds - workBefore.hitBuilds << ",\"copied_nodes\":" << workAfter.candidateNodesCopied - workBefore.candidateNodesCopied << "}\n";
 

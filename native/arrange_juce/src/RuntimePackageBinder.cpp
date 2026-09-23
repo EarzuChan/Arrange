@@ -46,9 +46,8 @@ namespace arrange::juce {
             diagnostics.setError(std::move(*outcome.error));
         }
 
-        for (auto& diagnostic : outcome.diagnostics) {
-            emitDiagnostic(diagnostics, runtime, std::move(diagnostic));
-        }
+        for (const auto& log : outcome.logs) arrange::Log::write(log.level, TAG, log.message);
+        for (auto& toast : outcome.toasts) deliverToast(diagnostics, runtime, std::move(toast));
 
         if (!outcome.loaded) {
             runtime.enqueueIntent(packageFailureIntent(outcome.intentKind));
@@ -69,18 +68,9 @@ namespace arrange::juce {
         paint.clearResources();
     }
 
-    void RuntimePackageBinder::emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadDiagnostic diagnostic) {
-        DiagnosticEventInput event;
-        event.level = diagnostic.level;
-        event.category = diagnostic.title.find("Live") != std::string::npos ? DiagnosticCategory::HostLive : diagnostic.title.find("Dist") != std::string::npos ? DiagnosticCategory::HostDist : DiagnosticCategory::ResourcePackage;
-        event.code = "package.load";
-        event.message = std::move(diagnostic.title);
-        event.detail = std::move(diagnostic.message);
-        event.toast = diagnostic.toast;
-        event.coalesceToast = diagnostic.coalesceToast;
-        if (diagnostics.emit(std::move(event))) {
-            runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package diagnostic event"));
-        }
+    void RuntimePackageBinder::deliverToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadToast toast) {
+        if (DiagnosticsToast::show(diagnostics, toast.level, TAG, std::move(toast.title), std::move(toast.message), toast.coalesce))
+            runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package toast"));
     }
 }  // namespace arrange::juce
 

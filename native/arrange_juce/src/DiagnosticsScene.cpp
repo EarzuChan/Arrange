@@ -9,7 +9,7 @@ namespace arrange::juce {
     namespace {
         std::uint32_t accentColour(LogLevel level) noexcept {
             switch (level) {
-                case LogLevel::Trace:
+                case LogLevel::Verbose:
                 case LogLevel::Debug:
                     return 0xff94a3b8u;
                 case LogLevel::Info:

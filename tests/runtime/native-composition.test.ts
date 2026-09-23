@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { painter, M } from '../../packages/framework/src/ui.ts'
 import { Column, Icon, Text } from '../../packages/framework/src/foundation.ts'
-import { createApp, diagnostics, logger, nextTick, ref, createScrollState, onScopeDispose } from '../../packages/framework/src/index.ts'
+import { createApp, diagnostics, DiagnosticsToast, Log, nextTick, ref, createScrollState, onScopeDispose } from '../../packages/framework/src/index.ts'
 import { defineArrangable } from '../../packages/framework/src/internal.ts'
 import type { NativeTransactionTarget } from '../../packages/framework/src/internal.ts'
 import type { Modifier } from '../../packages/framework/src/ui.ts'
@@ -13,13 +13,9 @@ function diagnosticNative(): NativeTransactionTarget & { calls: (readonly [strin
     return {
         ...recordingNative().target,
         calls,
-        diagnosticsLog: (level, payload) => calls.push(['diagnosticsLog', level, payload]),
+        log: (level, tag, args) => calls.push(['log', level, tag, args]),
         diagnosticsToast: payload => calls.push(['diagnosticsToast', payload]),
         diagnosticsRequestReload: payload => calls.push(['diagnosticsRequestReload', payload]),
-        diagnosticsCopyDiagnostics: () => 'copied',
-        diagnosticsCopyRecentEvents: () => 'recent',
-        diagnosticsSetLogLevel: level => calls.push(['diagnosticsSetLogLevel', level]),
-        diagnosticsSetCategoryEnabled: (category, enabled) => calls.push(['diagnosticsSetCategoryEnabled', category, enabled]),
         diagnosticsSetToastsEnabled: enabled => calls.push(['diagnosticsSetToastsEnabled', enabled]),
     }
 }
@@ -166,30 +162,31 @@ test("诊断 API 交付明确原生入口", () => {
     const native = diagnosticNative()
     globalThis.__ARRANGE_NATIVE__ = native
     try {
-        logger.warn({ category: "app", message: "测试警告", detail: "测试详情" })
-        diagnostics.toast("提示")
-        diagnostics.setLogLevel("error")
-        diagnostics.setCategoryEnabled("runtime.script", false)
+        Log.w("Demo", "测试警告", "测试详情")
+        Log.v("Demo", "详细")
+        Log.d("Demo", "调试")
+        Log.i("Demo", "信息")
+        Log.e("Demo", "错误")
+        DiagnosticsToast.e("Demo", "提示", "详情")
         diagnostics.setToastsEnabled(false)
         diagnostics.requestReload("src/App.sfa")
-        assert.equal(diagnostics.copyDiagnostics(), "copied")
-        assert.equal(diagnostics.copyRecentEvents(), "recent")
     } finally {
         delete globalThis.__ARRANGE_NATIVE__
     }
-    assert.ok(native.calls.some((call) => call[0] === "diagnosticsLog" && call[1] === "warn"))
-    assert.ok(native.calls.some((call) => call[0] === "diagnosticsToast"))
-    assert.ok(native.calls.some((call) => call[0] === "diagnosticsSetCategoryEnabled" && call[1] === "runtime.script" && call[2] === false))
+    assert.ok(native.calls.some((call) => call[0] === "log" && call[1] === "w" && call[2] === "Demo" && JSON.stringify(call[3]) === '["测试警告","测试详情"]'))
+    assert.deepEqual(native.calls.filter(call => call[0] === 'log').map(call => call[1]), ['w', 'v', 'd', 'i', 'e'])
+    assert.deepEqual(native.calls.find((call) => call[0] === "diagnosticsToast"), [
+        "diagnosticsToast",
+        { level: "e", tag: "Demo", title: "提示", args: ["详情"], coalesce: true },
+    ])
     assert.ok(native.calls.some((call) => call[0] === "diagnosticsRequestReload"))
 })
 
-test("诊断 API 在原生调用前拒绝非法级别与分类", () => {
+test("Log 在原生调用前拒绝空 TAG", () => {
     const native = diagnosticNative()
     globalThis.__ARRANGE_NATIVE__ = native
     try {
-        assert.throws(() => diagnostics.setLogLevel("verbose" as never), /log level/)
-        assert.throws(() => diagnostics.setCategoryEnabled("runtime.fake" as never, true), /category/)
-        assert.throws(() => logger.info({ category: "runtime.fake" as never, message: "bad" }), /category/)
+        assert.throws(() => Log.i(" ", "bad"), /Tag/)
     } finally {
         delete globalThis.__ARRANGE_NATIVE__
     }

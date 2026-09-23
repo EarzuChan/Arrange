@@ -1,10 +1,12 @@
 import { currentInstance } from './arrangable.ts'
-import { logger } from '../diagnostics.ts'
+import { Log } from '../diagnostics.ts'
+
+const TAG = 'Arrangable'
 
 export function warn(message: string, ...details: unknown[]): void {
     const handler = currentInstance?.appContext.config.warnHandler
     if (handler) handler(message)
-    else logger.warn({ category: 'runtime.script', message, detail: details.map(String).join(' ') || undefined })
+    else Log.w(TAG, message, ...details)
 }
 
 export function assertNumber(value: unknown, name: string): void {

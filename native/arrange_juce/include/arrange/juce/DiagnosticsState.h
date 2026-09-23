@@ -1,6 +1,8 @@
 #pragma once
 
 #include <arrange/core/Paint.h>
+#include <arrange/juce/DiagnosticsTypes.h>
+#include <arrange/juce/DiagnosticsToast.h>
 #include <arrange/juce/DiagnosticsModel.h>
 #include <arrange/juce/DiagnosticsScene.h>
 #include <arrange/juce/ErrorScreenModel.h>
@@ -26,19 +28,13 @@ namespace arrange::juce {
         void setError(ErrorScreenModel error);
         void clearError() noexcept;
 
-        bool emit(DiagnosticEventInput input);
-        bool emit(LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true);
+        bool addToast(arrange::LogLevel level, std::string title, std::string message, double nowMillis, bool coalesce = true);
         bool tick(double nowMillis);
         bool hasActiveToasts() const noexcept;
         [[nodiscard]] std::vector<DiagnosticsToastModel> activeToastModels() const;
         [[nodiscard]] DiagnosticVisibility badgeVisibility() const noexcept;
         [[nodiscard]] DiagnosticVisibility toastVisibility() const noexcept;
-        void setLogLevel(LogLevel level) noexcept;
-        void setCategoryEnabled(DiagnosticCategory category, bool enabled);
         void setToastsEnabled(bool enabled) noexcept;
-        [[nodiscard]] bool categoryEnabled(DiagnosticCategory category) const;
-        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept;
-
         void invalidatePreparedFrame() noexcept;
         [[nodiscard]] bool prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel);
 

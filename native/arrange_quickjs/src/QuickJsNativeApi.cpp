@@ -8,6 +8,7 @@
 
 #include <arrange/core/PropSchema.h>
 #include <arrange/core/Version.h>
+#include <arrange/Log.h>
 
 #include <iterator>
 #include <optional>
@@ -31,138 +32,29 @@ namespace arrange::quickjs {
             return reader.toString(value.get());
         }
 
-        std::optional<QuickJsDiagnosticLevel> diagnosticLevelFromName(std::string_view level) noexcept {
-            if (level == "trace") return QuickJsDiagnosticLevel::Trace;
-            if (level == "debug") return QuickJsDiagnosticLevel::Debug;
-            if (level == "info") return QuickJsDiagnosticLevel::Info;
-            if (level == "warn") return QuickJsDiagnosticLevel::Warn;
-            if (level == "error") return QuickJsDiagnosticLevel::Error;
-            return std::nullopt;
+        arrange::LogLevel readLogLevel(JSContext* context, QuickJsValueReader& reader, JSValueConst value) {
+            const auto level = reader.toString(value);
+            if (level == "v") return arrange::LogLevel::Verbose;
+            if (level == "d") return arrange::LogLevel::Debug;
+            if (level == "i") return arrange::LogLevel::Info;
+            if (level == "w") return arrange::LogLevel::Warn;
+            if (level == "e") return arrange::LogLevel::Error;
+            JS_ThrowTypeError(context, "Log 级别无效: %s", level.c_str());
+            return arrange::LogLevel::Info;
         }
 
-        std::optional<QuickJsDiagnosticCategory> diagnosticCategoryFromName(std::string_view category) noexcept {
-            if (category == "app") return QuickJsDiagnosticCategory::App;
-            if (category == "host.live") return QuickJsDiagnosticCategory::HostLive;
-            if (category == "host.dist") return QuickJsDiagnosticCategory::HostDist;
-            if (category == "host.hmr") return QuickJsDiagnosticCategory::HostHmr;
-            if (category == "runtime.script") return QuickJsDiagnosticCategory::RuntimeScript;
-            if (category == "runtime.transaction") return QuickJsDiagnosticCategory::RuntimeTransaction;
-            if (category == "pipeline.frame") return QuickJsDiagnosticCategory::PipelineFrame;
-            if (category == "pipeline.layout") return QuickJsDiagnosticCategory::PipelineLayout;
-            if (category == "pipeline.paint") return QuickJsDiagnosticCategory::PipelinePaint;
-            if (category == "input.pointer") return QuickJsDiagnosticCategory::InputPointer;
-            if (category == "input.key") return QuickJsDiagnosticCategory::InputKey;
-            if (category == "input.ime") return QuickJsDiagnosticCategory::InputIme;
-            if (category == "input.scroll") return QuickJsDiagnosticCategory::InputScroll;
-            if (category == "resource.package") return QuickJsDiagnosticCategory::ResourcePackage;
-            if (category == "resource.image") return QuickJsDiagnosticCategory::ResourceImage;
-            if (category == "resource.icon") return QuickJsDiagnosticCategory::ResourceIcon;
-            if (category == "diagnostics") return QuickJsDiagnosticCategory::Diagnostics;
-            return std::nullopt;
-        }
-
-        QuickJsDiagnosticEventInput diagnosticPayload(JSContext* context, QuickJsDiagnosticLevel level, JSValueConst payload, bool forceToast = false) {
-            QuickJsValueReader reader(context);
-            if (JS_IsString(payload)) {
-                QuickJsDiagnosticEventInput event;
-                event.level = level;
-                event.category = QuickJsDiagnosticCategory::RuntimeScript;
-                event.message = reader.toString(payload);
-                event.toast = forceToast;
-                return event;
+        std::string readArgs(JSContext* context, QuickJsValueReader& reader, JSValueConst value) {
+            if (!JS_IsArray(value)) return {};
+            ScopedValue length(context, JS_GetPropertyStr(context, value, "length"));
+            std::uint32_t count = 0;
+            if (JS_ToUint32(context, &count, length.get()) < 0) return {};
+            std::string result;
+            for (std::uint32_t i = 0; i < count; ++i) {
+                ScopedValue arg(context, JS_GetPropertyUint32(context, value, i));
+                if (i != 0) result.push_back(' ');
+                result += reader.toString(arg.get());
             }
-            const auto categoryName = payloadStringField(context, reader, payload, "category", "runtime.script");
-            auto category = diagnosticCategoryFromName(categoryName);
-            QuickJsDiagnosticEventInput event;
-            event.level = level;
-            event.category = category.value_or(QuickJsDiagnosticCategory::RuntimeScript);
-            event.code = payloadStringField(context, reader, payload, "code");
-            event.message = payloadStringField(context, reader, payload, "message");
-            if (event.message.empty()) event.message = reader.toString(payload);
-            event.detail = payloadStringField(context, reader, payload, "detail");
-            event.source = payloadStringField(context, reader, payload, "source");
-            event.pathOrUrl = payloadStringField(context, reader, payload, "pathOrUrl");
-            event.toast = forceToast || reader.boolField(payload, "toast", false);
-            event.coalesceToast = reader.boolField(payload, "coalesceToast", true);
-            if (!category && !categoryName.empty()) event.detail = event.detail.empty() ? "Unsupported diagnostics category '" + categoryName + "'; fell back to runtime.script." : event.detail + "\nUnsupported diagnostics category '" + categoryName + "'; fell back to runtime.script.";
-            return event;
-        }
-
-        std::optional<QuickJsDiagnosticEventInput> diagnosticPayload(JSContext* context, std::string_view level, JSValueConst payload, bool forceToast = false) {
-            const auto parsed = diagnosticLevelFromName(level);
-            if (!parsed) return std::nullopt;
-            return diagnosticPayload(context, *parsed, payload, forceToast);
-        }
-
-        std::optional<std::string> unsupportedPayloadCategory(JSContext* context, JSValueConst payload) {
-            if (!JS_IsObject(payload)) return std::nullopt;
-            QuickJsValueReader reader(context);
-            const auto categoryName = payloadStringField(context, reader, payload, "category");
-            if (categoryName.empty() || diagnosticCategoryFromName(categoryName)) return std::nullopt;
-            return "Arrange diagnostics category is unsupported: " + categoryName;
-        }
-
-        std::string diagnosticsTextLine(const QuickJsDiagnosticEventInput& event) {
-            const auto level = [event]() {
-                switch (event.level) {
-                    case QuickJsDiagnosticLevel::Trace:
-                        return "trace";
-                    case QuickJsDiagnosticLevel::Debug:
-                        return "debug";
-                    case QuickJsDiagnosticLevel::Info:
-                        return "info";
-                    case QuickJsDiagnosticLevel::Warn:
-                        return "warn";
-                    case QuickJsDiagnosticLevel::Error:
-                        return "error";
-                }
-                return "info";
-            }();
-            const auto category = [event]() {
-                switch (event.category) {
-                    case QuickJsDiagnosticCategory::App:
-                        return "app";
-                    case QuickJsDiagnosticCategory::HostLive:
-                        return "host.live";
-                    case QuickJsDiagnosticCategory::HostDist:
-                        return "host.dist";
-                    case QuickJsDiagnosticCategory::HostHmr:
-                        return "host.hmr";
-                    case QuickJsDiagnosticCategory::RuntimeScript:
-                        return "runtime.script";
-                    case QuickJsDiagnosticCategory::RuntimeTransaction:
-                        return "runtime.transaction";
-                    case QuickJsDiagnosticCategory::PipelineFrame:
-                        return "pipeline.frame";
-                    case QuickJsDiagnosticCategory::PipelineLayout:
-                        return "pipeline.layout";
-                    case QuickJsDiagnosticCategory::PipelinePaint:
-                        return "pipeline.paint";
-                    case QuickJsDiagnosticCategory::InputPointer:
-                        return "input.pointer";
-                    case QuickJsDiagnosticCategory::InputKey:
-                        return "input.key";
-                    case QuickJsDiagnosticCategory::InputIme:
-                        return "input.ime";
-                    case QuickJsDiagnosticCategory::InputScroll:
-                        return "input.scroll";
-                    case QuickJsDiagnosticCategory::ResourcePackage:
-                        return "resource.package";
-                    case QuickJsDiagnosticCategory::ResourceImage:
-                        return "resource.image";
-                    case QuickJsDiagnosticCategory::ResourceIcon:
-                        return "resource.icon";
-                    case QuickJsDiagnosticCategory::Diagnostics:
-                        return "diagnostics";
-                }
-                return "diagnostics";
-            }();
-            std::string line = std::string("[") + level + "][" + category + "]";
-            if (!event.code.empty()) line += "[" + event.code + "]";
-            line += " " + event.message;
-            if (!event.detail.empty()) line += " - " + event.detail;
-            if (!event.pathOrUrl.empty()) line += " (" + event.pathOrUrl + ")";
-            return line;
+            return result;
         }
 
         std::uint32_t readIndex(JSContext* context, JSValueConst value, bool allowZero = false) {
@@ -470,30 +362,33 @@ namespace arrange::quickjs {
             return JS_UNDEFINED;
         }
 
-        JSValue nativeDiagnosticsLog(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        JSValue nativeLog(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
-            if (self == nullptr || argc < 2) return JS_UNDEFINED;
+            if (self == nullptr || argc != 3 || !JS_IsArray(argv[2])) return JS_ThrowTypeError(context, "Log 需要级别、TAG 和参数数组");
             QuickJsValueReader reader(context);
-            const auto level = reader.toString(argv[0]);
-            auto event = diagnosticPayload(context, level, argv[1]);
-            if (!event) {
-                return JS_ThrowTypeError(context, "Arrange diagnostics log level is unsupported: %s", level.c_str());
-            }
-            if (auto categoryError = unsupportedPayloadCategory(context, argv[1])) {
-                return JS_ThrowTypeError(context, "%s", categoryError->c_str());
-            }
-            self->recordDiagnostic(std::move(*event));
+            const auto tag = reader.toString(argv[1]);
+            if (tag.empty()) return JS_ThrowTypeError(context, "Log TAG 不能为空");
+            const auto mapped = readLogLevel(context, reader, argv[0]);
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            arrange::Log::write(mapped, tag, readArgs(context, reader, argv[2]));
             return JS_UNDEFINED;
         }
 
         JSValue nativeDiagnosticsToast(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
-            if (self == nullptr || argc < 1) return JS_UNDEFINED;
-            if (auto categoryError = unsupportedPayloadCategory(context, argv[0])) {
-                return JS_ThrowTypeError(context, "%s", categoryError->c_str());
-            }
-            auto event = diagnosticPayload(context, QuickJsDiagnosticLevel::Info, argv[0], true);
-            self->recordDiagnostic(event);
+            if (self == nullptr || argc != 5 || !JS_IsArray(argv[3])) return JS_ThrowTypeError(context, "DiagnosticsToast 需要级别、TAG、标题、参数数组和合并选项");
+            QuickJsValueReader reader(context);
+            const auto level = readLogLevel(context, reader, argv[0]);
+            const auto tag = reader.toString(argv[1]);
+            if (tag.empty()) return JS_ThrowTypeError(context, "DiagnosticsToast TAG 不能为空");
+            QuickJsToastRequest toast;
+            toast.level = level;
+            toast.tag = tag;
+            toast.title = reader.toString(argv[2]);
+            if (toast.title.empty()) return JS_ThrowTypeError(context, "DiagnosticsToast 标题不能为空");
+            toast.content = readArgs(context, reader, argv[3]);
+            toast.coalesce = reader.toBool(argv[4]);
+            self->recordToast(std::move(toast));
             return JS_UNDEFINED;
         }
 
@@ -503,7 +398,6 @@ namespace arrange::quickjs {
             QuickJsValueReader reader(context);
             QuickJsDiagnosticAction action;
             action.kind = QuickJsDiagnosticActionKind::RequestReload;
-            action.category = QuickJsDiagnosticCategory::Diagnostics;
             action.message = "Script requested reload";
             const auto payload = argc > 0 ? argv[0] : JS_UNDEFINED;
             if (JS_IsObject(payload)) {
@@ -523,56 +417,9 @@ namespace arrange::quickjs {
             const auto message = argc > 0 ? payloadStringField(context, reader, argv[0], "Manual script diagnostic error") : std::string("Manual script diagnostic error");
             QuickJsDiagnosticAction action;
             action.kind = QuickJsDiagnosticActionKind::TriggerFakeError;
-            action.level = QuickJsDiagnosticLevel::Error;
-            action.category = QuickJsDiagnosticCategory::Diagnostics;
             action.message = message;
             self->recordDiagnosticAction(std::move(action));
             return JS_ThrowInternalError(context, "%s", message.c_str());
-        }
-
-        JSValue nativeDiagnosticsCopyDiagnostics(JSContext* context, JSValueConst, int, JSValueConst*) {
-            auto* self = runtime(context);
-            if (self == nullptr) return JS_NewString(context, "");
-            std::string text;
-            for (const auto& event : self->diagnosticEvents) text += diagnosticsTextLine(event) + "\n";
-            return JS_NewStringLen(context, text.data(), text.size());
-        }
-
-        JSValue nativeDiagnosticsCopyRecentEvents(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            return nativeDiagnosticsCopyDiagnostics(context, JS_UNDEFINED, argc, argv);
-        }
-
-        JSValue nativeDiagnosticsSetLogLevel(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr || argc < 1) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            QuickJsDiagnosticAction action;
-            action.kind = QuickJsDiagnosticActionKind::SetLogLevel;
-            const auto level = reader.toString(argv[0]);
-            const auto parsed = diagnosticLevelFromName(level);
-            if (!parsed) {
-                return JS_ThrowTypeError(context, "Arrange diagnostics log level is unsupported: %s", level.c_str());
-            }
-            action.level = *parsed;
-            self->recordDiagnosticAction(std::move(action));
-            return JS_UNDEFINED;
-        }
-
-        JSValue nativeDiagnosticsSetCategoryEnabled(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr || argc < 2) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            QuickJsDiagnosticAction action;
-            action.kind = QuickJsDiagnosticActionKind::SetCategoryEnabled;
-            const auto categoryName = reader.toString(argv[0]);
-            const auto category = diagnosticCategoryFromName(categoryName);
-            if (!category) {
-                return JS_ThrowTypeError(context, "Arrange diagnostics category is unsupported: %s", categoryName.c_str());
-            }
-            action.category = *category;
-            action.enabled = reader.toBool(argv[1]);
-            self->recordDiagnosticAction(std::move(action));
-            return JS_UNDEFINED;
         }
 
         JSValue nativeDiagnosticsSetToastsEnabled(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
@@ -619,7 +466,7 @@ namespace arrange::quickjs {
         }
 
         const JSCFunctionListEntry nativeApiFunctions[] = {
-            JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsLog", 2, nativeDiagnosticsLog), JS_CFUNC_DEF("diagnosticsToast", 1, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsCopyDiagnostics", 0, nativeDiagnosticsCopyDiagnostics), JS_CFUNC_DEF("diagnosticsCopyRecentEvents", 0, nativeDiagnosticsCopyRecentEvents), JS_CFUNC_DEF("diagnosticsSetLogLevel", 1, nativeDiagnosticsSetLogLevel), JS_CFUNC_DEF("diagnosticsSetCategoryEnabled", 2, nativeDiagnosticsSetCategoryEnabled), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
+            JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("log", 3, nativeLog), JS_CFUNC_DEF("diagnosticsToast", 5, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
         };
     }  // namespace
 

@@ -51,14 +51,8 @@ namespace arrange::juce {
         invalidatePreparedFrame();
     }
 
-    bool DiagnosticsState::emit(DiagnosticEventInput input) {
-        const auto changed = model_.emit(std::move(input));
-        invalidatePreparedFrame();
-        return changed;
-    }
-
-    bool DiagnosticsState::emit(LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast) {
-        const auto changed = model_.emit(level, std::move(title), std::move(message), toast, coalesceToast);
+    bool DiagnosticsState::addToast(arrange::LogLevel level, std::string title, std::string message, double nowMillis, bool coalesce) {
+        const auto changed = model_.addToast(level, std::move(title), std::move(message), nowMillis, coalesce);
         invalidatePreparedFrame();
         return changed;
     }
@@ -85,25 +79,9 @@ namespace arrange::juce {
         return model_.toastVisibility();
     }
 
-    void DiagnosticsState::setLogLevel(LogLevel level) noexcept {
-        model_.setLogLevel(level);
-    }
-
-    void DiagnosticsState::setCategoryEnabled(DiagnosticCategory category, bool enabled) {
-        model_.setCategoryEnabled(category, enabled);
-    }
-
     void DiagnosticsState::setToastsEnabled(bool enabled) noexcept {
         model_.setToastsEnabled(enabled);
         invalidatePreparedFrame();
-    }
-
-    bool DiagnosticsState::categoryEnabled(DiagnosticCategory category) const {
-        return model_.categoryEnabled(category);
-    }
-
-    const std::vector<DiagnosticEvent>& DiagnosticsState::recentEvents() const noexcept {
-        return model_.recentEvents();
     }
 
     void DiagnosticsState::invalidatePreparedFrame() noexcept {

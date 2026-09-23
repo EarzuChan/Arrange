@@ -42,9 +42,13 @@ test("vite plugin returns transformed ESM boundaries and native HMR without brow
         const client = snapshot.modules.find(module => module.url === '/@vite/client')!.source
         assert.match(client, /createHotContext/)
         assert.doesNotMatch(client, /document\.|window\.|WebSocket|updateStyle/)
-        const frameworkLogger = snapshot.modules.filter(module => module.url.includes('/packages/framework/src/diagnostics.ts'))
-        assert.equal(frameworkLogger.length, 1, 'App 与 HMR 必须共用同一个 framework logger 模块')
-        assert.match(client, new RegExp(`from ["']${frameworkLogger[0]!.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`))
+        assert.doesNotMatch(client, /import \{ importLiveModule as __arrangeImport \}/, 'HMR runtime must load accepted modules through QuickJS, not request their snapshots recursively')
+        const updatedApp = await createModuleSnapshot(server, 'src/main.ts', ['/src/App.sfa?t=1790156770640&import'])
+        const updatedAppModule = updatedApp.modules.find(module => module.url === '/src/App.sfa?t=1790156770640&import')
+        assert.ok(updatedAppModule?.source.includes('__registerHot'), 'timestamped SFA HMR modules must retain their compiled update boundary')
+        const frameworkLog = snapshot.modules.filter(module => module.url.includes('/packages/framework/src/diagnostics.ts'))
+        assert.equal(frameworkLog.length, 1, 'App 与 HMR 必须共用同一个 framework Log 模块')
+        assert.match(client, new RegExp(`from ["']${frameworkLog[0]!.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`))
         assert.ok(snapshot.modules.some(module => module.url.split('?')[0] === '/src/App.sfa'))
     } finally { await server.close() }
 })
@@ -149,7 +153,7 @@ test('SFA 仅接受 TS setup，模块导出及脚本属性在源码边界报错'
     }
     for (const source of ['<script>export default {}</script>', '<script setup>const count = 1</script>', '<script lang="ts">const count = 1</script>']) assert.throws(() => compile(source))
     assert.throws(() => compile('<script>const result = await Promise.resolve(1)</script>'), /初始化必须同步/)
-    assert.throws(() => compile('<script>for await (const item of source) { logger.info(item) }</script>'), /初始化必须同步/)
+    assert.throws(() => compile('<script>for await (const item of source) { Log.i("Test", item) }</script>'), /初始化必须同步/)
     assert.doesNotThrow(() => compile('<script>async function load() { return await Promise.resolve(1) }</script>'))
 
     const result = compile('<template><Text :text="title + count" /></template><script>defineProps<{ title: string }>()\nconst count = 1</script>')

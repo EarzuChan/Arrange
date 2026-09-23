@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/juce/DiagnosticEvent.h>
+#include <arrange/juce/DiagnosticsTypes.h>
 
 #include <string>
 #include <string_view>

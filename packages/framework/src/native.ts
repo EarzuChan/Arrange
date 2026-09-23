@@ -14,13 +14,17 @@ export type NativeReloadPayload = {
 }
 
 export type NativeDiagnosticPayload = {
-    category?: string
-    code?: string
+    tag?: string
     message?: string
     detail?: string
-    source?: string
-    pathOrUrl?: string
-    toast?: boolean
+}
+
+export type NativeToastPayload = {
+    level: string
+    tag: string
+    title: string
+    args: string[]
+    coalesce: boolean
 }
 
 /** @arrangeFields style */
@@ -70,14 +74,10 @@ export type NativeTransactionTarget = {
     insertChild: (parent: NodeId, child: NodeId, index: number) => void
     removeChild: (parent: NodeId, child: NodeId) => void
     unmount: () => void
-    diagnosticsLog?: (level: string, payload: NativeDiagnosticPayload) => void
-    diagnosticsToast?: (payload: NativeDiagnosticPayload) => void
+    log?: (level: string, tag: string, args: string[]) => void
+    diagnosticsToast?: (payload: NativeToastPayload) => void
     diagnosticsRequestReload?: (payload?: NativeReloadPayload) => void
     diagnosticsTriggerFakeError?: (payload?: { message?: string }) => void
-    diagnosticsCopyDiagnostics?: () => string
-    diagnosticsCopyRecentEvents?: () => string
-    diagnosticsSetLogLevel?: (level: string) => void
-    diagnosticsSetCategoryEnabled?: (category: string, enabled: boolean) => void
     diagnosticsSetToastsEnabled?: (enabled: boolean) => void
 }
 

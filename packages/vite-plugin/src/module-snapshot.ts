@@ -32,7 +32,7 @@ function moduleUrl(specifier: string, importer: string): string {
     return url.pathname + url.search
 }
 
-function imports(source: string, importer: string, map?: RawSourceMap | null, rewriteRelativeImports = false): { urls: string[]; code: string; map?: RawSourceMap | null } {
+function imports(source: string, importer: string, map?: RawSourceMap | null, rewriteRelativeImports = false, rewriteDynamicImports = true): { urls: string[]; code: string; map?: RawSourceMap | null } {
     const urls = new Set<string>()
     const output = new MagicString(source)
     let dynamic = false
@@ -44,9 +44,11 @@ function imports(source: string, importer: string, map?: RawSourceMap | null, re
     walk(ast as any, {
         enter(node: any) {
             if (node.type === 'ImportExpression') {
-                dynamic = true
-                output.overwrite(node.start, node.source.start, `${importHelper}(`)
-                output.overwrite(node.source.end, node.end, `, ${JSON.stringify(importer)})`)
+                if (rewriteDynamicImports) {
+                    dynamic = true
+                    output.overwrite(node.start, node.source.start, `${importHelper}(`)
+                    output.overwrite(node.source.end, node.end, `, ${JSON.stringify(importer)})`)
+                }
                 return
             }
             const literal = node.type === 'ImportDeclaration' || node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration' ? node.source : undefined
@@ -83,7 +85,7 @@ export async function createModuleSnapshot(server: ViteDevServer, entry: string,
         }
         if (!result) throw new Error(`Vite 未返回模块：${url}`)
         const importer = url === CLIENT_PATH ? hotRuntimePath() : url
-        const transformed = imports(result.code, importer, result.map as RawSourceMap | undefined, url === CLIENT_PATH)
+        const transformed = imports(result.code, importer, result.map as RawSourceMap | undefined, url === CLIENT_PATH, url !== CLIENT_PATH)
         modules.set(url, { url, source: transformed.code, map: transformed.map })
         pending.push(...transformed.urls)
     }

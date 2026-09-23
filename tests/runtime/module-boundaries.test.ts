@@ -10,8 +10,8 @@ import { requireSfaModule } from './sfaModules.ts'
 
 test('根入口只保留核心能力，分层入口与编译协议共享响应式身份', () => {
     for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'callArrangable', 'RearrangeSession', 'getArrangeExecutionStats']) assert.equal(Object.hasOwn(core, name), false, `根入口泄漏了 ${name}`)
-    assert.equal(typeof core.logger, 'object')
-    assert.equal(Object.hasOwn(internal, 'logger'), false, 'logger 只能从 framework 公共入口提供')
+    assert.equal(typeof core.Log, 'object')
+    assert.equal(Object.hasOwn(internal, 'Log'), false, 'Log 只能从 framework 公共入口提供')
     assert.equal(Object.hasOwn(internal, 'diagnostics'), false, 'diagnostics 只能从 framework 公共入口提供')
 
     assert.equal(requireSfaModule('@arrange/framework/foundation'), foundation)

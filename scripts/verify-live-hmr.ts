@@ -61,7 +61,7 @@ try {
         child!.once('exit', code => code === 0 ? resolve() : reject(new Error(`native exit ${code}: ${errors}`)))
         child!.once('error', reject)
     })
-    console.log('真实 Vite → 后台快照 → QuickJS：动态 import/TLA、dispose/data、同 context accept、编译失败恢复、invalidate/full reload 全部通过')
+    console.log('[ArrangeLiveHmrVerify]', '真实 Vite → 后台快照 → QuickJS：动态 import/TLA、dispose/data、同 context accept、编译失败恢复、invalidate/full reload 全部通过')
 } finally {
     child?.kill('SIGTERM')
     await server.close()

@@ -95,13 +95,7 @@ namespace arrange::juce {
                         if (!result.ok) packet.error = result.error;
                     }
                     if (!packet.error.empty()) {
-                        DiagnosticEventInput event;
-                        event.level = LogLevel::Error;
-                        event.category = DiagnosticCategory::HostHmr;
-                        event.code = "hmr.update.failed";
-                        event.message = packet.error;
-                        event.toast = true;
-                        (void)diagnostics_.emit(std::move(event));
+                        (void)DiagnosticsToast::e(diagnostics_, TAG, "Live 热更新失败", packet.error);
                     }
                 }
             }

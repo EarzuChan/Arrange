@@ -1,4 +1,5 @@
 #include <arrange/juce/LiveModuleClient.h>
+#include <arrange/Log.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 namespace arrange::juce {
@@ -60,6 +61,7 @@ namespace arrange::juce {
 
     void LiveModuleClient::start(std::string url) {
         url_ = std::move(url);
+        arrange::Log::i(TAG, "Live HMR 已连接", url_);
         startThread();
         // connected（包括断线重连）建立新快照，避免离线期间的编辑被遗漏
         websocket_.start(url_, [this](std::string message) { receive(std::move(message)); });
@@ -75,6 +77,7 @@ namespace arrange::juce {
             message.type = "full-reload";
             requests_.push_back(std::move(message));
         }
+        arrange::Log::i(TAG, "已请求 Live 模块快照");
         notify();
     }
 
@@ -82,6 +85,9 @@ namespace arrange::juce {
         const auto value = ::juce::JSON::parse(text);
         quickjs::HotMessage message;
         message.type = value["type"].toString().toStdString();
+        if (message.type == "update" || message.type == "full-reload" || message.type == "prune") {
+            arrange::Log::i(TAG, "已收到 Vite 更新事件", message.type);
+        }
         if (message.type == "connected") {
             bool reload;
             {
@@ -117,6 +123,7 @@ namespace arrange::juce {
 
     void LiveModuleClient::send(const quickjs::HotMessage& message) {
         if (message.event == "arrange:import") {
+            arrange::Log::i(TAG, "已收到动态模块请求");
             {
                 const std::lock_guard guard(mutex_);
                 const auto* data = std::get_if<quickjs::HotValue::Object>(&message.data.value);
@@ -162,7 +169,8 @@ namespace arrange::juce {
                 if (!packet.error.empty()) {
                     std::get<quickjs::HotValue::Object>(packet.message.data.value)["error"] = {std::exchange(packet.error, {})};
                     packet.unavailable = false;
-                }
+                } else
+                    arrange::Log::i(TAG, "已返回动态模块快照", packet.snapshot.modules.size(), "个模块");
             }
             const std::lock_guard guard(mutex_);
             if (packet.reload) {
@@ -200,12 +208,14 @@ namespace arrange::juce {
         if (!stream->connect(nullptr)) {
             packet.unavailable = true;
             packet.error = "Live server 不可用：" + url.toString(true).toStdString();
+            arrange::Log::e(TAG, "Live 快照请求失败", packet.error);
             return packet;
         }
         const auto status = stream->getStatusCode();
         const auto body = stream->readEntireStreamAsString();
         if (status != 200) {
             packet.error = "Live ESM 请求失败（HTTP " + std::to_string(status) + "）：" + body.toStdString();
+            arrange::Log::e(TAG, "Live 快照响应异常", status, body.toStdString());
             return packet;
         }
         ::juce::var snapshot;
@@ -223,6 +233,8 @@ namespace arrange::juce {
             }
             packet.snapshot.modules.push_back({module["url"].toString().toStdString(), module["source"].toString().toStdString(), ::juce::JSON::toString(module["map"]).toStdString()});
         }
+        if (!packet.error.empty()) arrange::Log::e(TAG, "Live 模块快照解析失败", packet.error);
+        else if (packet.reload) arrange::Log::i(TAG, "已收到 Live 模块快照", packet.snapshot.modules.size(), "个模块");
         return packet;
     }
 }  // namespace arrange::juce

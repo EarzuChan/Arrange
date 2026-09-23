@@ -37,7 +37,8 @@ namespace arrange::juce {
         PackageSource activeSource = PackageSource::None;
         std::filesystem::path packageDir;
         std::optional<ErrorScreenModel> error;
-        std::vector<RuntimeLoadDiagnostic> diagnostics;
+        std::vector<RuntimeLoadLog> logs;
+        std::vector<RuntimeLoadToast> toasts;
         std::optional<arrange::core::MutationTransaction> initialTransaction;
 #if ARRANGE_WITH_QUICKJS_NG
         std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost;
@@ -83,7 +84,7 @@ namespace arrange::juce {
 
         void startDevServerClientIfNeeded();
         void stopDevServerClient();
-        void prependDiagnostics(PackageLoadOutcome& outcome, std::vector<RuntimeLoadDiagnostic> diagnostics) const;
+        void prependToasts(PackageLoadOutcome& outcome, std::vector<RuntimeLoadToast> toasts) const;
 
         EditorConfig config_;
         AppResolver resolver_;

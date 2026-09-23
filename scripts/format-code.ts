@@ -272,9 +272,9 @@ for (const filename of files) {
 if (write) {
     for (const { file, source } of changes) writeFileSync(file, source)
 } else {
-    for (const { file } of changes) console.error(`格式待修正：${file}`)
+    for (const { file } of changes) console.error('[ArrangeFormat]', `格式待修正：${file}`)
     if (changes.length) process.exitCode = 1
 }
 
-console.log(`${write ? '已修正' : '已检查'} ${files.length} 个文件，${changes.length} 个文件${write ? '已更新' : '需要调整'}`)
+console.log('[ArrangeFormat]', `${write ? '已修正' : '已检查'} ${files.length} 个文件，${changes.length} 个文件${write ? '已更新' : '需要调整'}`)
 

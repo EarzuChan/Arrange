@@ -171,7 +171,7 @@ namespace arrange::quickjs {
             runtime.childrenByNode.clear();
             runtime.parentByNode.clear();
             runtime.moduleLoader.clear();
-            runtime.diagnosticEvents.clear();
+            runtime.diagnosticToasts.clear();
             runtime.diagnosticActions.clear();
             runtime.hotMessages.clear();
         }
@@ -323,14 +323,14 @@ namespace arrange::quickjs {
     }
 
     bool QuickJsScriptHost::hasPendingDiagnostics() const noexcept {
-        return !impl_->runtime.diagnosticEvents.empty() || !impl_->runtime.diagnosticActions.empty();
+        return !impl_->runtime.diagnosticToasts.empty() || !impl_->runtime.diagnosticActions.empty();
     }
 
-    std::vector<QuickJsDiagnosticEventInput> QuickJsScriptHost::takeDiagnosticEvents() {
+    std::vector<QuickJsToastRequest> QuickJsScriptHost::takeDiagnosticToasts() {
         if (!impl_) return {};
-        auto events = std::move(impl_->runtime.diagnosticEvents);
-        impl_->runtime.diagnosticEvents.clear();
-        return events;
+        auto toasts = std::move(impl_->runtime.diagnosticToasts);
+        impl_->runtime.diagnosticToasts.clear();
+        return toasts;
     }
 
     std::vector<QuickJsDiagnosticAction> QuickJsScriptHost::takeDiagnosticActions() {

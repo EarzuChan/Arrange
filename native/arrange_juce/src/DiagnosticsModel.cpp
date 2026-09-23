@@ -1,4 +1,5 @@
 #include <arrange/juce/DiagnosticsModel.h>
+#include <arrange/juce/ErrorScreenModel.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 
@@ -10,6 +11,20 @@
 #include <utility>
 
 namespace arrange::juce {
+    bool diagnosticVisibilityEnabled(DiagnosticVisibility visibility) noexcept {
+        switch (visibility) {
+            case DiagnosticVisibility::Hidden: return false;
+            case DiagnosticVisibility::Always: return true;
+            case DiagnosticVisibility::DebugOnly:
+#if defined(NDEBUG)
+                return false;
+#else
+                return true;
+#endif
+        }
+        return false;
+    }
+
     namespace {
         std::string formatTime(std::chrono::system_clock::time_point time) {
             const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()) % 1000;
@@ -25,40 +40,11 @@ namespace arrange::juce {
             return out.str();
         }
 
-        std::string recentEventLine(const DiagnosticEvent& event) {
-            std::string line = "#" + std::to_string(event.id) + " " + formatTime(event.timestamp) + " [" + logLevelName(event.level) + "][" + diagnosticCategoryName(event.category) + "]";
-            if (!event.code.empty()) line += "[" + event.code + "]";
-            line += " " + event.message;
-            if (!event.detail.empty()) line += " - " + event.detail;
-            if (!event.pathOrUrl.empty()) line += " (" + event.pathOrUrl + ")";
-            return line;
-        }
     }  // namespace
 
     void DiagnosticsModel::configure(DiagnosticsConfig config) {
         config_ = std::move(config);
-        store_.configure(config_.recentEventLimit);
-        logger_.configure(config_);
         toasts_.clear();
-    }
-
-    bool DiagnosticsModel::emit(DiagnosticEventInput input) {
-        const auto coalesceToast = input.coalesceToast;
-        const auto event = store_.append(std::move(input));
-        logger_.write(event);
-        if (!event.toastRequested) return false;
-        return pushToast(event, ::juce::Time::getMillisecondCounterHiRes(), coalesceToast);
-    }
-
-    bool DiagnosticsModel::emit(LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast) {
-        DiagnosticEventInput input;
-        input.level = level;
-        input.category = DiagnosticCategory::Diagnostics;
-        input.message = std::move(title);
-        input.detail = std::move(message);
-        input.toast = toast;
-        input.coalesceToast = coalesceToast;
-        return emit(std::move(input));
     }
 
     bool DiagnosticsModel::tick(double nowMillis) {
@@ -81,21 +67,8 @@ namespace arrange::juce {
         return models;
     }
 
-    void DiagnosticsModel::setLogLevel(LogLevel level) noexcept {
-        config_.logLevel = level;
-        logger_.setLogLevel(level);
-    }
-
-    void DiagnosticsModel::setCategoryEnabled(DiagnosticCategory category, bool enabled) {
-        logger_.setCategoryEnabled(category, enabled);
-    }
-
     void DiagnosticsModel::setToastsEnabled(bool enabled) noexcept {
         config_.toasts = enabled ? DiagnosticVisibility::Always : DiagnosticVisibility::Hidden;
-    }
-
-    bool DiagnosticsModel::categoryEnabled(DiagnosticCategory category) const {
-        return logger_.categoryEnabled(category);
     }
 
     std::string DiagnosticsModel::diagnosticsText(const DiagnosticsTextContext& context) const {
@@ -115,10 +88,6 @@ namespace arrange::juce {
             out << "\nerror:\n";
             out << context.error->diagnosticText();
         }
-        if (!store_.recentEvents().empty()) {
-            out << "\nrecentEvents:\n";
-            for (const auto& event : store_.recentEvents()) out << recentEventLine(event) << "\n";
-        }
         return out.str();
     }
 
@@ -126,20 +95,19 @@ namespace arrange::juce {
         return formatTime(std::chrono::system_clock::now());
     }
 
-    bool DiagnosticsModel::pushToast(const DiagnosticEvent& event, double nowMillis, bool coalesce) {
+    bool DiagnosticsModel::addToast(arrange::LogLevel level, std::string title, std::string message, double nowMillis, bool coalesce) {
         if (!visibilityEnabled(config_.toasts)) return false;
         if (coalesce) {
             for (auto& toast : toasts_) {
-                if (toast.title == event.message) {
-                    toast.eventId = event.id;
-                    toast.level = event.level;
-                    toast.message = event.detail;
+                if (toast.title == title) {
+                    toast.level = level;
+                    toast.message = message;
                     toast.expiresAtMs = nowMillis + 2500.0;
                     return true;
                 }
             }
         }
-        toasts_.push_back({event.id, event.level, event.message, event.detail, nowMillis + 2500.0});
+        toasts_.push_back({level, std::move(title), std::move(message), nowMillis + 2500.0});
         while (toasts_.size() > 3) toasts_.erase(toasts_.begin());
         return true;
     }

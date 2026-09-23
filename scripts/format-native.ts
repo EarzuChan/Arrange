@@ -7,4 +7,4 @@ const files = execFileSync('rg', ['--files', 'native', 'cpp_tests', 'demo', '-g'
 const formatter = process.env.CLANG_FORMAT ?? 'clang-format'
 
 execFileSync(formatter, ['--style=file', ...(write ? ['-i'] : ['--dry-run', '--Werror']), ...files], { cwd: root, stdio: 'inherit' })
-console.log(`${write ? '已修正' : '已检查'} ${files.length} 个 C++ 文件`)
+console.log('[ArrangeNativeFormat]', `${write ? '已修正' : '已检查'} ${files.length} 个 C++ 文件`)

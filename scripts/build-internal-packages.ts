@@ -72,7 +72,7 @@ function assertNoDistDirectory(pkgDir: string, pkgName: string): void {
     if (!existsSync(distPath)) return
     rmSync(distPath, { recursive: true, force: true })
     if (existsSync(distPath)) fail(`${pkgName} dist directory remains after removal`)
-    console.log(`removed forbidden package dist: ${pkgName}`)
+    console.log('[ArrangePackageBuild]', `removed forbidden package dist: ${pkgName}`)
 }
 
 function assertNoPublicDistFields(manifest: PackageManifest, pkgName: string): void {
@@ -226,4 +226,4 @@ for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
 
 assertNoMacrosInBuiltDemoBundle()
 assertCliPackageContract()
-console.log("verified TS-first package and publish boundary contract")
+console.log('[ArrangePackageBuild]', "verified TS-first package and publish boundary contract")

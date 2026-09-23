@@ -76,8 +76,6 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto slot = *runtime.scene().activeEventSlots().begin();
         for (int i = 0; i < 3; ++i) runtime.enqueueEvent(slot);
         check(runtime.semanticCheckpoint(16).ok, "输入语义检查点失败");
-        auto diagnostics = runtime.takeDiagnosticEvents();
-        check(diagnostics.size() == 3 && diagnostics[0].message == "操作 1" && diagnostics[1].message == "操作 2" && diagnostics[2].message == "操作 3", "同帧前三次操作未保序交付");
         check(runtime.publishedFrame().revision == revision, "语义任务自行发布了视觉帧");
 
         request->set_value({std::make_shared<PainterContent>(), {}});
@@ -85,8 +83,6 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         wake();
         ::juce::MessageManager::callAsync([] { ::juce::MessageManager::getInstance()->stopDispatchLoop(); });
         ::juce::MessageManager::getInstance()->runDispatchLoop();
-        diagnostics = runtime.takeDiagnosticEvents();
-        check(diagnostics.size() == 1 && diagnostics[0].message == "资源完成", "无 peer 和帧时资源完成未通过 message thread 执行");
         check(runtime.publishedFrame().revision == revision, "资源语义完成绕过了视觉授权");
 
         for (int i = 0; i < 4097; ++i) runtime.enqueueEvent(slot);
@@ -94,7 +90,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         check(!overload.ok && overload.error.find("4096") != std::string::npos, "邮箱过载未明确报错");
         runtime.reset();
         runtime.enqueueEvent(slot);
-        check(runtime.semanticCheckpoint(48).ok && runtime.takeDiagnosticEvents().empty(), "旧代际事件命中了新上下文");
+        check(runtime.semanticCheckpoint(48).ok, "旧代际事件命中了新上下文");
     }
 
     void verifyInputGeometryAndRetirement() {

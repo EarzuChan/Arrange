@@ -10,5 +10,5 @@ export function warnOnce(msg: string): void {
 }
 
 export function warn(msg: string): void {
-    console.warn(`\x1b[1m\x1b[33m[@arrange/compiler]\x1b[0m\x1b[33m ${msg}\x1b[0m\n`)
+    console.warn('[ArrangeCompiler]', `\x1b[1m\x1b[33m[@arrange/compiler]\x1b[0m\x1b[33m ${msg}\x1b[0m\n`)
 }

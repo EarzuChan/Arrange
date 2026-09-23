@@ -1,9 +1,10 @@
 #pragma once
 
-#include <arrange/juce/DiagnosticEvent.h>
+#include <arrange/juce/DiagnosticsTypes.h>
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
@@ -26,7 +27,8 @@ namespace arrange::juce {
         [[nodiscard]] bool copyDiagnosticsToClipboard(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, DiagnosticsTextContext context) const;
 
        private:
-        static void emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true);
+        static constexpr std::string_view TAG = "EditorDebugActions";
+        static void emitToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, LogLevel level, std::string title, std::string message = {}, bool coalesce = true);
     };
 
 #endif

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <arrange/core/LayoutNode.h>
-#include <arrange/juce/DiagnosticEvent.h>
+#include <arrange/juce/DiagnosticsTypes.h>
 
 #include <filesystem>
+#include <string_view>
 
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
@@ -19,6 +20,7 @@ namespace arrange::juce {
         [[nodiscard]] bool pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const;
 
        private:
+        static constexpr std::string_view TAG = "FramePumpDriver";
         [[nodiscard]] static bool tickDiagnostics(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, double nowMillis);
     };
 

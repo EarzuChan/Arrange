@@ -675,7 +675,7 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
 
     if (__DEV__) {
         if ((currentOptions.decodeEntities)) {
-            console.warn(`[@arrange/compiler/core] decodeEntities option is passed but will be ` + `ignored in non-browser builds.`)
+            console.warn('[ArrangeCompiler]', 'decodeEntities option is passed but will be ignored in non-browser builds')
         }
     }
 

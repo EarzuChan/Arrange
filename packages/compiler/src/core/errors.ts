@@ -14,7 +14,7 @@ export function defaultOnError(error: CompilerError): never {
 }
 
 export function defaultOnWarn(msg: CompilerError): void {
-    __DEV__ && console.warn(`[Arrange 警告] ${msg.message}`)
+    __DEV__ && console.warn('[ArrangeCompiler]', `[Arrange 警告] ${msg.message}`)
 }
 
 type InferCompilerError<T> = T extends ErrorCodes ? CoreCompilerError : CompilerError

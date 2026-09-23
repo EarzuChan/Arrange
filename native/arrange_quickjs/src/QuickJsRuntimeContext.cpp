@@ -171,9 +171,8 @@ namespace arrange::quickjs {
         }
     }
 
-    void QuickJsRuntimeContext::recordDiagnostic(QuickJsDiagnosticEventInput event) {
-        diagnosticEvents.push_back(std::move(event));
-        while (diagnosticEvents.size() > 64) diagnosticEvents.erase(diagnosticEvents.begin());
+    void QuickJsRuntimeContext::recordToast(QuickJsToastRequest toast) {
+        diagnosticToasts.push_back(std::move(toast));
     }
 
     void QuickJsRuntimeContext::recordDiagnosticAction(QuickJsDiagnosticAction action) {

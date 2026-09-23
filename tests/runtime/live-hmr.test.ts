@@ -67,10 +67,10 @@ test('模块执行失败保留旧 accept 边界，下一次修复能够接收更
     assert.equal(errors.length, 1)
 })
 
-test('HotRuntime 通过 Arrange logger 记录更新接收与应用', async () => {
+test('HotRuntime 通过 Arrange Log 记录更新接收与应用', async () => {
     const previous = globalThis.__ARRANGE_NATIVE__
     const events: unknown[][] = []
-    globalThis.__ARRANGE_NATIVE__ = { diagnosticsLog: (...args: unknown[]) => { events.push(args) } } as never
+    globalThis.__ARRANGE_NATIVE__ = { log: (...args: unknown[]) => { events.push(args) } } as never
     try {
         const runtime = new HotRuntime({
             send() { }, reload() { }, report: error => { throw error },
@@ -80,9 +80,9 @@ test('HotRuntime 通过 Arrange logger 记录更新接收与应用', async () =>
     } finally {
         globalThis.__ARRANGE_NATIVE__ = previous
     }
-    assert.deepEqual(events.map(event => [event[0], (event[1] as { code: string }).code]), [
-        ['info', 'hmr.update.received'],
-        ['info', 'hmr.update.applied'],
+    assert.deepEqual(events.map(event => [event[0], event[1], event[2]]), [
+        ['i', 'HotRuntime', ['收到热更新', '1', '个模块', '/logged']],
+        ['i', 'HotRuntime', ['热更新已应用', '1', '个模块', '/logged']],
     ])
 })
 
@@ -95,9 +95,8 @@ function evaluate(source: string, id: string, state: object = {}): ArrangableDef
     return exports.default!
 }
 
-test('SFA 拒绝 console API 并要求使用 Arrange logger', () => {
-    assert.throws(() => compileArrangeSfa('<script>console.log("禁止")</script>', 'console.sfa'), /禁止使用 console；请使用 Arrange logger/)
-    assert.throws(() => compileArrangeSfa('<script>console.warn("禁止")</script>', 'console.sfa'), /禁止使用 console；请使用 Arrange logger/)
+test('SFA 不增加对 console API 的额外编译期拦截', () => {
+    assert.doesNotThrow(() => compileArrangeSfa('<script>console.log("未定义 API 会在运行时自然失败")</script>', 'console.sfa'))
 })
 
 test('SFA 模板更新保留 ref、setup 生命周期与 native 节点，新增模板引用可读取既有局部变量', () => {

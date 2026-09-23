@@ -15,8 +15,12 @@
 
 namespace arrange::juce {
     namespace {
-        void setDiagnostic(RuntimePackageLoadResult& result, LogLevel level, std::string title, std::string message, bool toast, bool coalesceToast = true) {
-            result.diagnostic = RuntimeLoadDiagnostic{level, std::move(title), std::move(message), toast, coalesceToast};
+        void setLog(RuntimePackageLoadResult& result, LogLevel level, std::string message) {
+            result.log = RuntimeLoadLog{level, std::move(message)};
+        }
+
+        void setToast(RuntimePackageLoadResult& result, LogLevel level, std::string title, std::string message, bool coalesce = true) {
+            result.toast = RuntimeLoadToast{level, std::move(title), std::move(message), coalesce};
         }
     }  // namespace
 
@@ -27,15 +31,15 @@ namespace arrange::juce {
         result.packageDir = resolved.packageDir;
 
         if (!resolved.ok || bundleUrl.empty()) {
-            result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error.empty() ? "Arrange dev server URL is invalid." : resolved.error, {}, resolved.devServerUrl);
-            setDiagnostic(result, LogLevel::Error, "Live 源无效", result.error->summary, true);
+            result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error.empty() ? "Arrange 开发服务器地址无效" : resolved.error, {}, resolved.devServerUrl);
+            setToast(result, LogLevel::Error, "Live 源无效", result.error->summary);
             return result;
         }
 
 #if ARRANGE_WITH_QUICKJS_NG
         if (!error.empty()) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, error, {}, bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live ESM 失败（意味不明）", error, true);
+            setToast(result, LogLevel::Error, "Live 模块加载失败", error);
             return result;
         }
 
@@ -44,18 +48,18 @@ namespace arrange::juce {
         const auto executed = scriptHost->executeLiveModules(snapshot);
         if (!executed.ok) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, executed.error, {}, bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live 运行时失败（意味不明）", executed.error, true);
+            setToast(result, LogLevel::Error, "Live 运行时异常", executed.error);
             return result;
         }
         auto initialTransaction = scriptHost->takePendingTransaction();
         result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
-        setDiagnostic(result, LogLevel::Info, "Live App 已加载（喜）", bundleUrl, true);
+        setToast(result, LogLevel::Info, "Live App 已启动", bundleUrl);
         return result;
 #else
-        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Build through Arrange::framework.", {}, bundleUrl);
-        setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute live app.js.", true);
+        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor 需要 QuickJS-NG 才能运行开发服务器 app.js，请通过 Arrange::framework 构建", {}, bundleUrl);
+        setToast(result, LogLevel::Error, "QuickJS 不可用", "无法运行 Live app.js");
         return result;
 #endif
     }
@@ -65,7 +69,7 @@ namespace arrange::juce {
         const auto resolved = resolver.resolveRelease(config.app);
         if (!resolved.ok) {
             result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error, {}, resolved.entryPath);
-            setDiagnostic(result, LogLevel::Error, "Dist source invalid", resolved.error, true);
+            setToast(result, LogLevel::Error, "Dist 应用源无效", resolved.error);
             return result;
         }
         result.packageDir = resolved.packageDir;
@@ -77,18 +81,18 @@ namespace arrange::juce {
         const auto loaded = loader.loadEntry(resolved.entryPath);
         if (!loaded.ok) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, loaded.error, {}, loaded.modulePath);
-            setDiagnostic(result, LogLevel::Error, "Dist runtime failed", loaded.error, true);
+            setToast(result, LogLevel::Error, "Dist 运行时异常", loaded.error);
             return result;
         }
         auto initialTransaction = scriptHost->takePendingTransaction();
         result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
-        setDiagnostic(result, LogLevel::Info, "Loaded dist app", resolved.entryPath.string(), false);
+        setLog(result, LogLevel::Info, "Dist App 已启动 " + resolved.entryPath.string());
         return result;
 #else
-        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor requires QuickJS-NG to execute ui/app.js. Build through Arrange::framework.", "Arrange runtime has no serialized fallback path; the native transaction API requires QuickJS-NG.", resolved.entryPath);
-        setDiagnostic(result, LogLevel::Error, "QuickJS disabled", "Cannot execute dist ui/app.js.", true);
+        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor 需要 QuickJS-NG 才能运行 ui/app.js，请通过 Arrange::framework 构建", "Arrange 运行时没有序列化回退路径，原生事务 API 需要 QuickJS-NG", resolved.entryPath);
+        setToast(result, LogLevel::Error, "QuickJS 不可用", "无法运行 Dist ui/app.js");
         return result;
 #endif
     }

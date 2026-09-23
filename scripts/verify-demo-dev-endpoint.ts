@@ -45,7 +45,7 @@ function assertBundle(result: { status: number; body: string; headers: Record<st
     if (snapshot.entry !== '/@arrange/entry' || !snapshot.modules.some(module => module.url === '/src/main.ts')) throw new Error('live ESM snapshot missing entry')
     const client = snapshot.modules.find(module => module.url === '/@vite/client')
     if (!client || /document\.|window\.|WebSocket|updateStyle/.test(client.source)) throw new Error('live snapshot contains browser client')
-    console.log(`live ESM endpoint ok: ${snapshot.modules.length} modules, bytes=${result.body.length}`)
+    console.log('[ArrangeLiveVerify]', `live ESM endpoint ok: ${snapshot.modules.length} modules, bytes=${result.body.length}`)
 }
 
 const existing = await probeEndpoint()

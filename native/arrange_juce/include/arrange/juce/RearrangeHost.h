@@ -52,7 +52,7 @@ namespace arrange::juce {
         void publishScene(const arrange::core::NativeScene& scene);
         RearrangeInvokeResult completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error = {});
 #if ARRANGE_WITH_QUICKJS_NG
-        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsToastRequest> takeDiagnosticToasts();
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
 #endif
 

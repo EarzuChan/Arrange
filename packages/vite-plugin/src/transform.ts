@@ -12,7 +12,7 @@ export function createArrangeTransformPlugin(options: ArrangeTransformPluginOpti
         },
         transform(this: TransformThis, code: string, id: string) {
             if (!isSfaModule(id)) return null
-            if (String(id).includes("?")) return ""
+            if (isSfaQueryModule(id)) return ""
 
             const { code: transformed, warnings, map, dependencies } = compileArrangeSfa(code, id, options.hot())
             for (const message of warnings) this.warn({ id, message })

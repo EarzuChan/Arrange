@@ -4,6 +4,7 @@
 #include <arrange/quickjs/LiveModule.h>
 #include <deque>
 #include <mutex>
+#include <string_view>
 
 #if ARRANGE_JUCE_WITH_JUCE
 namespace arrange::juce {
@@ -26,6 +27,7 @@ namespace arrange::juce {
         std::vector<LiveModulePacket> takePackets();
 
        private:
+        static constexpr std::string_view TAG = "LiveModuleClient";
         void run() override;
         void receive(std::string message);
         LiveModulePacket fetch(quickjs::HotMessage message);

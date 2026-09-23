@@ -44,11 +44,6 @@ int main(int argc, char** argv) {
             }
             for (const auto& action : host->takeDiagnosticActions())
                 if (action.kind == arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload) client.requestReload();
-            for (const auto& diagnostic : host->takeDiagnosticEvents())
-                if (diagnostic.level == arrange::quickjs::QuickJsDiagnosticLevel::Error) {
-                    std::cerr << diagnostic.message << std::endl;
-                    return 1;
-                }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }

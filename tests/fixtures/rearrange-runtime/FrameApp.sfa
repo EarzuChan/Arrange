@@ -26,7 +26,7 @@ import { painter, Color, dp } from '@arrange/framework/ui'
 import { ref, shallowRef, onScopeDispose, watch, getCurrentScope, effectScope } from '@arrange/framework'
 import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
 import { getArrangeExecutionStats } from '@arrange/framework/internal'
-import { logger } from '@arrange/framework'
+import { Log } from '@arrange/framework'
 import AnimationGallery from '../../../demo/ui-src/src/view/AnimationGallery.sfa'
 import CounterPanel from '../../../demo/ui-src/src/view/CounterPanel.sfa'
 import ShowcaseGallery from '../../../demo/ui-src/src/view/ShowcaseGallery.sfa'
@@ -101,7 +101,7 @@ function command(value: string) {
     else if (value === 'perf-report') {
         const current = getArrangeExecutionStats()
         const delta = Object.fromEntries((Object.keys(current) as (keyof typeof current)[]).map(key => [key, current[key] - (performanceBaseline?.[key] ?? 0)]))
-        logger.info(`M23_JS_PERF ${JSON.stringify(delta)}`)
+        Log.i('FrameApp', '帧性能统计', JSON.stringify(delta))
     }
     else if (value === 'async-start') startAsyncProbe()
     else if (value === 'async-finish') finishAsync?.()

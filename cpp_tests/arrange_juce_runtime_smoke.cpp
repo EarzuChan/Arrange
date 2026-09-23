@@ -4,6 +4,7 @@
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/juce/ArrangeRuntime.h>
+#include <arrange/Log.h>
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/DiagnosticsScene.h>
 #include <arrange/juce/ErrorScreenModel.h>
@@ -17,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -74,6 +76,16 @@ namespace {
 }  // namespace
 
 int main(int argc, char** argv) {
+    {
+        std::ostringstream captured;
+        auto* previous = std::clog.rdbuf(captured.rdbuf());
+        arrange::Log::i("RuntimeSmoke", "日志正文", "多个参数");
+        arrange::Log::w("RuntimeSmoke", "换行", "已清理\n后续内容");
+        std::clog.rdbuf(previous);
+        const auto output = captured.str();
+        if (output.find(" - A - RuntimeSmoke \x1b[32m[I]\x1b[0m > \x1b[32m日志正文 多个参数\x1b[0m\n") == std::string::npos) return 39;
+        if (output.find(" - A - RuntimeSmoke \x1b[33m[W]\x1b[0m > \x1b[33m换行 已清理 后续内容\x1b[0m\n") == std::string::npos) return 40;
+    }
 #if !ARRANGE_WITH_QUICKJS_NG || !ARRANGE_JUCE_WITH_JUCE
     (void)argc;
     (void)argv;
@@ -225,26 +237,10 @@ int main(int argc, char** argv) {
     arrange::juce::DiagnosticsConfig diagnosticsConfig;
     diagnosticsConfig.badge = arrange::juce::DiagnosticVisibility::Always;
     diagnosticsConfig.toasts = arrange::juce::DiagnosticVisibility::Always;
-    diagnosticsConfig.logLevel = arrange::juce::LogLevel::Warn;
     DiagnosticsState.configure(std::move(diagnosticsConfig));
-    arrange::juce::DiagnosticEventInput debugEvent;
-    debugEvent.level = arrange::juce::LogLevel::Debug;
-    debugEvent.category = arrange::juce::DiagnosticCategory::RuntimeScript;
-    debugEvent.code = "debug.filtered";
-    debugEvent.message = "debug event still enters recent ring";
-    if (DiagnosticsState.emit(std::move(debugEvent))) return 33;
-    if (DiagnosticsState.recentEvents().empty() || DiagnosticsState.recentEvents().back().code != "debug.filtered") return 34;
-    DiagnosticsState.setCategoryEnabled(arrange::juce::DiagnosticCategory::RuntimeScript, false);
-    if (DiagnosticsState.categoryEnabled(arrange::juce::DiagnosticCategory::RuntimeScript)) return 35;
+    arrange::Log::d("RuntimeSmoke", "调试日志输出");
     DiagnosticsState.setToastsEnabled(false);
-    arrange::juce::DiagnosticEventInput toastDisabledEvent;
-    toastDisabledEvent.level = arrange::juce::LogLevel::Error;
-    toastDisabledEvent.category = arrange::juce::DiagnosticCategory::Diagnostics;
-    toastDisabledEvent.code = "toast.disabled";
-    toastDisabledEvent.message = "toast disabled still logged";
-    toastDisabledEvent.toast = true;
-    if (DiagnosticsState.emit(std::move(toastDisabledEvent))) return 36;
-    if (DiagnosticsState.recentEvents().back().code != "toast.disabled") return 37;
+    arrange::juce::DiagnosticsToast::e(DiagnosticsState, "RuntimeSmoke", "测试气泡", "气泡关闭仍应日志输出");
     if (DiagnosticsState.hasActiveToasts()) return 38;
     DiagnosticsState.setError(arrange::makeErrorScreenModel(arrange::ErrorSource::ScriptRuntime, "prepared diagnostics frame smoke", "details"));
     if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 26;

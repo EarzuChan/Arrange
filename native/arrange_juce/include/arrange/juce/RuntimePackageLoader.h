@@ -20,12 +20,16 @@ namespace arrange {
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
-    struct RuntimeLoadDiagnostic {
+    struct RuntimeLoadLog {
+        LogLevel level = LogLevel::Info;
+        std::string message;
+    };
+
+    struct RuntimeLoadToast {
         LogLevel level = LogLevel::Info;
         std::string title;
         std::string message;
-        bool toast = false;
-        bool coalesceToast = true;
+        bool coalesce = true;
     };
 
     struct RuntimePackageLoadResult {
@@ -33,7 +37,8 @@ namespace arrange::juce {
         bool serverUnavailable = false;
         std::filesystem::path packageDir;
         std::optional<ErrorScreenModel> error;
-        std::optional<RuntimeLoadDiagnostic> diagnostic;
+        std::optional<RuntimeLoadLog> log;
+        std::optional<RuntimeLoadToast> toast;
         std::optional<arrange::core::MutationTransaction> initialTransaction;
 #if ARRANGE_WITH_QUICKJS_NG
         std::unique_ptr<arrange::quickjs::QuickJsScriptHost> scriptHost;

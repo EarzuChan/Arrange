@@ -76,4 +76,4 @@ const source = readFileSync(appBundle, "utf8")
 const macro = source.match(macroPattern)
 if (macro) throw new Error(`npm registry consumer bundle contains unresolved Arrange macro ${macro[0]}`)
 
-console.log(`verified @arrange/framework registry consumer for Arrange ${contract.frameworkVersion} with @arrange/cli ${cliManifest.version}`)
+console.log('[ArrangePackageVerify]', `verified @arrange/framework registry consumer for Arrange ${contract.frameworkVersion} with @arrange/cli ${cliManifest.version}`)

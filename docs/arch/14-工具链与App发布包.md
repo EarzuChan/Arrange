@@ -99,7 +99,7 @@ Painter 获取层接收以下 package 内资源地址：
 
 位图与 SVG 均由 Painter 获取层解析。Image/Icon 只消费 Painter；固有尺寸、绘制、失败与退休规则见 [内建 Arrangable](12-内建Arrangable.md)。
 
-资源缺失、格式不支持、解码失败必须产生 `resource` 类别的 `DiagnosticEvent`，并进入日志、recent event ring 与必要错误屏。不得用硬编码占位图标或静默空绘制冒充加载成功。
+资源缺失、格式不支持、解码失败必须通过 `Log.e` 记录，并进入必要错误屏。不得用硬编码占位图标或静默空绘制冒充加载成功。
 
 # 插件数据、缓存与用户文件
 

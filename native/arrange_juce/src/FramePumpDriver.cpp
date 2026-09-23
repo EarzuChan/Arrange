@@ -23,75 +23,6 @@ namespace arrange::juce {
         }
 
 #if ARRANGE_WITH_QUICKJS_NG
-        [[nodiscard]] LogLevel toJuceLogLevel(arrange::quickjs::QuickJsDiagnosticLevel level) noexcept {
-            switch (level) {
-                case arrange::quickjs::QuickJsDiagnosticLevel::Trace:
-                    return LogLevel::Trace;
-                case arrange::quickjs::QuickJsDiagnosticLevel::Debug:
-                    return LogLevel::Debug;
-                case arrange::quickjs::QuickJsDiagnosticLevel::Info:
-                    return LogLevel::Info;
-                case arrange::quickjs::QuickJsDiagnosticLevel::Warn:
-                    return LogLevel::Warn;
-                case arrange::quickjs::QuickJsDiagnosticLevel::Error:
-                    return LogLevel::Error;
-            }
-            return LogLevel::Info;
-        }
-
-        [[nodiscard]] DiagnosticCategory toJuceDiagnosticCategory(arrange::quickjs::QuickJsDiagnosticCategory category) noexcept {
-            switch (category) {
-                case arrange::quickjs::QuickJsDiagnosticCategory::App:
-                    return DiagnosticCategory::App;
-                case arrange::quickjs::QuickJsDiagnosticCategory::HostLive:
-                    return DiagnosticCategory::HostLive;
-                case arrange::quickjs::QuickJsDiagnosticCategory::HostDist:
-                    return DiagnosticCategory::HostDist;
-                case arrange::quickjs::QuickJsDiagnosticCategory::HostHmr:
-                    return DiagnosticCategory::HostHmr;
-                case arrange::quickjs::QuickJsDiagnosticCategory::RuntimeScript:
-                    return DiagnosticCategory::RuntimeScript;
-                case arrange::quickjs::QuickJsDiagnosticCategory::RuntimeTransaction:
-                    return DiagnosticCategory::RuntimeTransaction;
-                case arrange::quickjs::QuickJsDiagnosticCategory::PipelineFrame:
-                    return DiagnosticCategory::PipelineFrame;
-                case arrange::quickjs::QuickJsDiagnosticCategory::PipelineLayout:
-                    return DiagnosticCategory::PipelineLayout;
-                case arrange::quickjs::QuickJsDiagnosticCategory::PipelinePaint:
-                    return DiagnosticCategory::PipelinePaint;
-                case arrange::quickjs::QuickJsDiagnosticCategory::InputPointer:
-                    return DiagnosticCategory::InputPointer;
-                case arrange::quickjs::QuickJsDiagnosticCategory::InputKey:
-                    return DiagnosticCategory::InputKey;
-                case arrange::quickjs::QuickJsDiagnosticCategory::InputIme:
-                    return DiagnosticCategory::InputIme;
-                case arrange::quickjs::QuickJsDiagnosticCategory::InputScroll:
-                    return DiagnosticCategory::InputScroll;
-                case arrange::quickjs::QuickJsDiagnosticCategory::ResourcePackage:
-                    return DiagnosticCategory::ResourcePackage;
-                case arrange::quickjs::QuickJsDiagnosticCategory::ResourceImage:
-                    return DiagnosticCategory::ResourceImage;
-                case arrange::quickjs::QuickJsDiagnosticCategory::ResourceIcon:
-                    return DiagnosticCategory::ResourceIcon;
-                case arrange::quickjs::QuickJsDiagnosticCategory::Diagnostics:
-                    return DiagnosticCategory::Diagnostics;
-            }
-            return DiagnosticCategory::Diagnostics;
-        }
-
-        [[nodiscard]] DiagnosticEventInput toJuceDiagnosticEvent(arrange::quickjs::QuickJsDiagnosticEventInput event) {
-            DiagnosticEventInput result;
-            result.level = toJuceLogLevel(event.level);
-            result.category = toJuceDiagnosticCategory(event.category);
-            result.code = std::move(event.code);
-            result.message = std::move(event.message);
-            result.detail = std::move(event.detail);
-            result.source = std::move(event.source);
-            result.pathOrUrl = std::move(event.pathOrUrl);
-            result.toast = event.toast;
-            result.coalesceToast = event.coalesceToast;
-            return result;
-        }
 #endif
     }  // namespace
 
@@ -149,65 +80,23 @@ namespace arrange::juce {
     bool FramePumpDriver::tickDiagnostics(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, double nowMillis) {
         auto changed = false;
 #if ARRANGE_WITH_QUICKJS_NG
-        for (auto event : runtime.takeDiagnosticEvents()) {
-            changed = diagnostics.emit(toJuceDiagnosticEvent(std::move(event))) || changed;
+        for (auto toast : runtime.takeDiagnosticToasts()) {
+            changed = DiagnosticsToast::show(diagnostics, toast.level, toast.tag, std::move(toast.title), std::move(toast.content), toast.coalesce) || changed;
         }
         for (const auto& action : runtime.takeDiagnosticActions()) {
             switch (action.kind) {
                 case arrange::quickjs::QuickJsDiagnosticActionKind::RequestReload: {
-                    DiagnosticEventInput event;
-                    event.level = LogLevel::Info;
-                    event.category = DiagnosticCategory::Diagnostics;
-                    event.code = "script.request_reload";
-                    event.message = "Script requested reload";
-                    event.detail = action.path.empty() ? std::string{} : "path=" + action.path;
-                    event.pathOrUrl = action.path;
-                    event.toast = true;
-                    changed = diagnostics.emit(std::move(event)) || changed;
+                    DiagnosticsToast::i(diagnostics, TAG, "脚本请求重新加载", action.path);
                     runtime.requestReload();
                     break;
                 }
                 case arrange::quickjs::QuickJsDiagnosticActionKind::TriggerFakeError: {
-                    DiagnosticEventInput event;
-                    event.level = LogLevel::Error;
-                    event.category = DiagnosticCategory::Diagnostics;
-                    event.code = "script.fake_error";
-                    event.message = action.message.empty() ? std::string("Manual script diagnostic error") : action.message;
-                    event.detail = "Script diagnostics requested a real error-screen path.";
-                    event.toast = true;
-                    changed = diagnostics.emit(std::move(event)) || changed;
-                    break;
-                }
-                case arrange::quickjs::QuickJsDiagnosticActionKind::SetLogLevel: {
-                    diagnostics.setLogLevel(toJuceLogLevel(action.level));
-                    DiagnosticEventInput event;
-                    event.level = LogLevel::Info;
-                    event.category = DiagnosticCategory::Diagnostics;
-                    event.code = "script.set_log_level";
-                    event.message = "Script changed diagnostics log level";
-                    changed = diagnostics.emit(std::move(event)) || changed;
-                    break;
-                }
-                case arrange::quickjs::QuickJsDiagnosticActionKind::SetCategoryEnabled: {
-                    diagnostics.setCategoryEnabled(toJuceDiagnosticCategory(action.category), action.enabled);
-                    DiagnosticEventInput event;
-                    event.level = LogLevel::Info;
-                    event.category = DiagnosticCategory::Diagnostics;
-                    event.code = "script.set_category";
-                    event.message = "Script changed diagnostics category filter";
-                    event.pathOrUrl = diagnosticCategoryName(toJuceDiagnosticCategory(action.category));
-                    changed = diagnostics.emit(std::move(event)) || changed;
+                    DiagnosticsToast::e(diagnostics, TAG, action.message.empty() ? std::string("脚本请求诊断错误") : action.message, "脚本诊断已触发错误屏路径");
                     break;
                 }
                 case arrange::quickjs::QuickJsDiagnosticActionKind::SetToastsEnabled: {
                     diagnostics.setToastsEnabled(action.enabled);
-                    DiagnosticEventInput event;
-                    event.level = LogLevel::Info;
-                    event.category = DiagnosticCategory::Diagnostics;
-                    event.code = "script.set_toasts";
-                    event.message = "Script changed diagnostics toast visibility";
-                    event.detail = action.enabled ? "enabled" : "disabled";
-                    changed = diagnostics.emit(std::move(event)) || changed;
+                    arrange::Log::i(TAG, "诊断提示显示状态已更新", action.enabled ? "已启用" : "已关闭");
                     break;
                 }
             }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arrange/juce/DiagnosticEvent.h>
+#include <arrange/juce/DiagnosticsTypes.h>
 
 #include <string>
 #include <vector>
@@ -12,8 +12,6 @@ namespace arrange::juce {
        public:
         void configure(DiagnosticsConfig config);
 
-        bool emit(DiagnosticEventInput input);
-        bool emit(LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true);
         bool tick(double nowMillis);
         bool hasActiveToasts() const noexcept;
         [[nodiscard]] std::vector<DiagnosticsToastModel> activeToastModels() const;
@@ -26,14 +24,8 @@ namespace arrange::juce {
             return config_.toasts;
         }
 
-        void setLogLevel(LogLevel level) noexcept;
-        void setCategoryEnabled(DiagnosticCategory category, bool enabled);
         void setToastsEnabled(bool enabled) noexcept;
-        [[nodiscard]] bool categoryEnabled(DiagnosticCategory category) const;
-
-        [[nodiscard]] const std::vector<DiagnosticEvent>& recentEvents() const noexcept {
-            return store_.recentEvents();
-        }
+        bool addToast(arrange::LogLevel level, std::string title, std::string message, double nowMillis, bool coalesce);
 
         std::string diagnosticsText(const DiagnosticsTextContext& context) const;
 
@@ -45,18 +37,13 @@ namespace arrange::juce {
 
        private:
         struct Toast {
-            std::uint64_t eventId = 0;
             LogLevel level = LogLevel::Info;
             std::string title;
             std::string message;
             double expiresAtMs = 0.0;
         };
 
-        bool pushToast(const DiagnosticEvent& event, double nowMillis, bool coalesce);
-
         DiagnosticsConfig config_;
-        DiagnosticEventStore store_;
-        DiagnosticLogger logger_;
         std::vector<Toast> toasts_;
     };
 

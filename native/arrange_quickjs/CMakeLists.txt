@@ -18,6 +18,7 @@ target_sources(arrange_quickjs PRIVATE
   src/QuickJsModuleLoader.cpp
   src/QuickJsHotTransport.cpp
   src/QuickJsNativeApi.cpp
+  src/Log.cpp
   src/QuickJsPainterResources.cpp
   src/QuickJsRuntimeContext.cpp
   src/QuickJsScriptHost.cpp

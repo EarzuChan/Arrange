@@ -37,7 +37,7 @@ writeFileSync(resolve(consumerDir, "check.mts"), [
     "import { checkSfaProject } from '@arrange/framework/vite'",
     "const diagnostics = checkSfaProject('tsconfig.json', ['src'])",
     "if (diagnostics.length) throw new Error(JSON.stringify(diagnostics, null, 4))",
-    "console.log('发布包 SFA 参数、内容与脚本类型检查通过')",
+    "console.log('[ArrangePackageConsumer]', '发布包 SFA 参数、内容与脚本类型检查通过')",
 ].join("\n"))
 writeFileSync(resolve(consumerDir, "package.json"), `${JSON.stringify({
     name: "arrange-npm-package-consumer",
@@ -73,4 +73,4 @@ if (process.platform === "win32") {
 }
 await run(resolve(repoRoot, nativeBuildDir, "cpp_tests", `arrange_juce_runtime_smoke${process.platform === "win32" ? ".exe" : ""}`), [appBundle])
 
-console.log(`Framework ${contract.frameworkVersion} 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI ${cliManifest.version} 已验证安装`)
+console.log('[ArrangePackageVerify]', `Framework ${contract.frameworkVersion} 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI ${cliManifest.version} 已验证安装`)

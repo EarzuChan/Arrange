@@ -122,7 +122,7 @@ namespace arrange::juce {
             return pipelineState_.publishRetained(finalize);
         }
 #if ARRANGE_WITH_QUICKJS_NG
-        [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticEventInput> takeDiagnosticEvents();
+        [[nodiscard]] std::vector<arrange::quickjs::QuickJsToastRequest> takeDiagnosticToasts();
         [[nodiscard]] std::vector<arrange::quickjs::QuickJsDiagnosticAction> takeDiagnosticActions();
 #endif
 

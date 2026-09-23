@@ -20,29 +20,23 @@ namespace arrange::juce {
         [[nodiscard]] const char* frameErrorTitle(RuntimeFrameErrorPhase phase) noexcept {
             switch (phase) {
                 case RuntimeFrameErrorPhase::Pipeline:
-                    return "Frame pipeline failed";
+                    return "帧管线执行失败";
+
                 case RuntimeFrameErrorPhase::Event:
-                    return "Runtime event failed";
+                    return "运行时事件处理失败";
+
                 case RuntimeFrameErrorPhase::Animation:
-                    return "Animation frame failed";
+                    return "动画帧执行失败";
+
                 case RuntimeFrameErrorPhase::None:
                     break;
             }
-            return "Runtime frame failed";
+
+            return "运行时帧执行失败";
         }
 
-        void emitDiagnostic(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, LogLevel level, std::string title, std::string message = {}, bool toast = false, bool coalesceToast = true) {
-            DiagnosticEventInput event;
-            event.level = level;
-            event.category = DiagnosticCategory::RuntimeTransaction;
-            event.code = "runtime.session";
-            event.message = std::move(title);
-            event.detail = std::move(message);
-            event.toast = toast;
-            event.coalesceToast = coalesceToast;
-            if (diagnostics.emit(std::move(event))) {
-                runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("runtime diagnostic event"));
-            }
+        void emitToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, std::string_view tag, LogLevel level, std::string title, std::string message = {}, bool coalesce = true) {
+            if (DiagnosticsToast::show(diagnostics, level, tag, std::move(title), std::move(message), coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("runtime toast"));
         }
     }  // namespace
 
@@ -73,9 +67,9 @@ namespace arrange::juce {
     }
 
     void RuntimeSessionState::setLayoutTreeEmptyError(DiagnosticsState& diagnostics, ArrangeRuntime& runtime) {
-        diagnostics.setError(makeErrorScreenModel(ErrorSource::NativeTransaction, "Arrange layout tree is empty after loading UI package."));
+        diagnostics.setError(makeErrorScreenModel(ErrorSource::NativeTransaction, "加载 UI 包后 Arrange 布局树为空"));
         loaded_ = false;
-        emitDiagnostic(diagnostics, runtime, LogLevel::Error, "Layout tree empty", "Arrange layout tree is empty after loading UI package.", true);
+        emitToast(diagnostics, runtime, TAG, LogLevel::Error, "Arrange 布局树为空", "加载 UI 包后没有创建任何节点");
     }
 
     bool RuntimeSessionState::loaded() const noexcept {
@@ -92,7 +86,7 @@ namespace arrange::juce {
         }
 
         diagnostics.setError(makeErrorScreenModel(frameErrorSource(frame.errorPhase), frame.error, {}, relatedPath));
-        emitDiagnostic(diagnostics, runtime, LogLevel::Error, frameErrorTitle(frame.errorPhase), frame.error, true);
+        emitToast(diagnostics, runtime, TAG, LogLevel::Error, frameErrorTitle(frame.errorPhase), frame.error);
         loaded_ = false;
         return true;
     }

@@ -32,7 +32,7 @@
         <Column :modifier="M.size(dp(260), dp(58)).verticalScroll(scrollState).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(dp(4))">
             <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: sp(12), color: Color(0xFFE8EAED) }" :modifier="M.height(dp(14))"/>
 
-            <Text text="滚动modifier逛遍本地状态（意味不明）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
 
             <Text text="滚轮也可以触发啊一个" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
 
@@ -55,7 +55,7 @@
 import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
 import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef } from "@arrange/framework/animation"
 import { Icon } from "@arrange/framework/foundation"
-import { logger } from "@arrange/framework"
+import { Log } from "@arrange/framework"
 import { onMounted, ref, createScrollState, shallowRef } from '@arrange/framework'
 
 import CounterPanel from './view/CounterPanel.sfa'
@@ -106,8 +106,8 @@ function toggleSelectedRef() {
 
 function handleTap() {
     clicks.value += 1
-    logger.info("恩情" + clicks.value)
-    logger.info("南下" + clicks.value)
+    Log.i("App", "点击次数", clicks.value)
+    Log.i("App", "南下", clicks.value)
 }
 
 function handleSubmit(value: string) {

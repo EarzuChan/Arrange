@@ -6,17 +6,17 @@ const labels: Record<ResolveChoice, string> = { create: "确认创建", wrap: "�
 
 export class SyncWizard {
     report(report: ConfigScanReport): void {
-        console.log(`CONFIG ${report.scope}`)
-        for (const issue of report.fatal) console.log(`  Fatal ${issue.path}: ${issue.cause} — ${issue.message}`)
-        for (const issue of report.resolvable) console.log(`  Resolvable ${targetLabel(issue.target)}: ${issue.cause} — ${issue.message}`)
-        for (const result of report.idle) console.log(`  Idle ${targetLabel(result.target)}`)
-        for (const update of report.applicable) console.log(`  Applicable ${targetLabel(update.target)}: outdated`)
-        console.log(`  Fatal ${report.fatal.length}, Resolvable ${report.resolvable.length}, Idle ${report.idle.length}, Applicable ${report.applicable.length}`)
+        console.log('[ArrangeCLI]', `CONFIG ${report.scope}`)
+        for (const issue of report.fatal) console.log('[ArrangeCLI]', `  Fatal ${issue.path}: ${issue.cause} — ${issue.message}`)
+        for (const issue of report.resolvable) console.log('[ArrangeCLI]', `  Resolvable ${targetLabel(issue.target)}: ${issue.cause} — ${issue.message}`)
+        for (const result of report.idle) console.log('[ArrangeCLI]', `  Idle ${targetLabel(result.target)}`)
+        for (const update of report.applicable) console.log('[ArrangeCLI]', `  Applicable ${targetLabel(update.target)}: outdated`)
+        console.log('[ArrangeCLI]', `  Fatal ${report.fatal.length}, Resolvable ${report.resolvable.length}, Idle ${report.idle.length}, Applicable ${report.applicable.length}`)
     }
 
     async choose(issue: ResolvableIssue, choices: readonly ResolveChoice[]): Promise<ResolveChoice> {
         if (!process.stdin.isTTY || !process.stdout.isTTY) {
-            console.error("需要交互处理，请在终端运行 sync --config。")
+            console.error('[ArrangeCLI]', "需要交互处理，请在终端运行 sync --config。")
             return "abort"
         }
         const result = await select({ message: `${targetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({ value, label: labels[value] })) })
@@ -29,5 +29,5 @@ export class SyncWizard {
         return !isCancel(result) && result
     }
 
-    message(message: string): void { console.log(message) }
+    message(message: string): void { console.log('[ArrangeCLI]', message) }
 }

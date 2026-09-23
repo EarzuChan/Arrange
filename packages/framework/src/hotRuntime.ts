@@ -1,4 +1,6 @@
-import { logger } from './diagnostics.ts'
+import { Log } from './diagnostics.ts'
+
+const HOT_RUNTIME_TAG = 'HotRuntime'
 
 // 与 Vite JavaScript HMR 协议对齐，不依赖页面、DOM 或 CSS
 export interface HotUpdate {
@@ -32,6 +34,7 @@ export interface HotTransport {
 }
 
 export class HotRuntime {
+    private static readonly TAG = HOT_RUNTIME_TAG
     readonly records = new Map<string, RecordEntry>()
     private pending: Promise<void> = Promise.resolve()
     private firstInvalidatedBy: string | undefined
@@ -60,6 +63,7 @@ export class HotRuntime {
             invalidate: (message?: string) => {
                 const data = { path: owner, message, firstInvalidatedBy: this.firstInvalidatedBy ?? owner }
                 void this.notify('vite:invalidate', data)
+                Log.i(HotRuntime.TAG, '已发送热更新失效通知', owner)
                 this.transport.send('vite:invalidate', data)
             },
             on: (event: string, callback: Listener) => {
@@ -71,13 +75,16 @@ export class HotRuntime {
                 const listeners = current.listeners.get(event)
                 if (listeners) current.listeners.set(event, listeners.filter(listener => listener !== callback))
             },
-            send: (event: string, data?: unknown) => this.transport.send(event, data),
+            send: (event: string, data?: unknown) => {
+                Log.i(HotRuntime.TAG, '已发送热更新事件', event, owner)
+                this.transport.send(event, data)
+            },
         }
     }
 
     receive(message: HotMessage): Promise<void> {
         this.pending = this.pending.then(() => this.apply(message)).catch(error => {
-            logger.error({ category: 'host.hmr', code: 'hmr.update.failed', message: '热更新处理失败', detail: String(error) })
+            Log.e(HotRuntime.TAG, '热更新处理失败', String(error))
             this.transport.report(error)
         })
         return this.pending
@@ -103,7 +110,7 @@ export class HotRuntime {
             }
         } else if (message.type === 'update') {
             const updates = (message.updates ?? []).filter(update => update.type === 'js-update')
-            logger.info({ category: 'host.hmr', code: 'hmr.update.received', message: `收到 ${updates.length} 个模块热更新`, detail: updates.map(update => update.path).join(', ') || undefined })
+            Log.i(HotRuntime.TAG, '收到热更新', updates.length, '个模块', ...updates.map(update => update.path))
             await this.notify('vite:beforeUpdate', message)
             // 先保存全部旧边界，避免新模块注册覆盖同批 accept 回调
             const boundaries = updates.map(update => ({ update, callbacks: this.records.get(update.path)?.callbacks.filter(callback => callback.deps.includes(update.acceptedPath)) ?? [] }))
@@ -123,7 +130,7 @@ export class HotRuntime {
                     failed = true
                     if (saved && old) Object.assign(old, saved)
                     else this.records.delete(update.acceptedPath)
-                    logger.error({ category: 'host.hmr', code: 'hmr.module.load.failed', message: `热更新模块加载失败：${update.acceptedPath}`, detail: String(error), pathOrUrl: update.acceptedPath })
+                    Log.e(HotRuntime.TAG, '热更新模块加载失败', update.acceptedPath, String(error))
                     this.transport.report(error)
                 }
             }
@@ -137,8 +144,8 @@ export class HotRuntime {
             }
             await this.notify('vite:afterUpdate', message)
             const detail = updates.map(update => update.path).join(', ') || undefined
-            if (failed) logger.warn({ category: 'host.hmr', code: 'hmr.update.partial', message: '热更新未能完整应用', detail })
-            else logger.info({ category: 'host.hmr', code: 'hmr.update.applied', message: `热更新已应用 ${updates.length} 个模块`, detail })
+            if (failed) Log.w(HotRuntime.TAG, '热更新未能完整应用', detail)
+            else Log.i(HotRuntime.TAG, '热更新已应用', updates.length, '个模块', detail)
         }
     }
 }
@@ -164,7 +171,10 @@ function ensureRuntime(): HotRuntime {
             if (!pending) return
             imports.delete(data.id)
             if (data.error) pending.reject(new Error(data.error))
-            else import(/* @vite-ignore */ pending.url).then(pending.resolve, pending.reject)
+            else {
+                Log.i(HOT_RUNTIME_TAG, '已收到动态模块快照', pending.url)
+                import(/* @vite-ignore */ pending.url).then(pending.resolve, pending.reject)
+            }
             return
         }
         await runtime!.receive(message)
@@ -194,6 +204,7 @@ export function importLiveModule(specifier: unknown, importer: string): Promise<
         const id = nextImport++
         imports.set(id, { resolve, reject, url })
         const transport = globalThis.__ARRANGE_HOT_TRANSPORT__!
+        Log.i(HOT_RUNTIME_TAG, '已发送动态模块请求', url)
         transport.send('arrange:import', { id, url, session: transport.session })
     })
 }

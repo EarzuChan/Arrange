@@ -354,33 +354,24 @@ useTransport(): TransportState
 # Diagnostics API
 
 ```ts
-type DiagnosticLevel = "trace" | "debug" | "info" | "warn" | "error"
-type DiagnosticCategory =
-    | "app"
-    | "live"
-    | "hmr"
-    | "dist"
-    | "transaction"
-    | "script"
-    | "layout"
-    | "paint"
-    | "input"
-    | "scroll"
-    | "resource"
-    | "host"
+Log.v(tag: string, ...args: unknown[]): void
+Log.d(tag: string, ...args: unknown[]): void
+Log.i(tag: string, ...args: unknown[]): void
+Log.w(tag: string, ...args: unknown[]): void
+Log.e(tag: string, ...args: unknown[]): void
 
-logger.trace(category: DiagnosticCategory, message: string, detail?: unknown): void
-logger.debug(category: DiagnosticCategory, message: string, detail?: unknown): void
-logger.info(category: DiagnosticCategory, message: string, detail?: unknown): void
-logger.warn(category: DiagnosticCategory, message: string, detail?: unknown): void
-logger.error(category: DiagnosticCategory, message: string, detail?: unknown): void
+DiagnosticsToast.v(tag: string, title: string, ...args: unknown[]): void
+DiagnosticsToast.d(tag: string, title: string, ...args: unknown[]): void
+DiagnosticsToast.i(tag: string, title: string, ...args: unknown[]): void
+DiagnosticsToast.w(tag: string, title: string, ...args: unknown[]): void
+DiagnosticsToast.e(tag: string, title: string, ...args: unknown[]): void
 
-diagnostics.toast(message: string, args?: DiagnosticToastArgs): void
-diagnostics.warn(message: string, detail?: unknown): void
-diagnostics.error(message: string, detail?: unknown): void
+diagnostics.requestReload(path?: string): void
+diagnostics.triggerFakeError(message?: string): void
+diagnostics.setToastsEnabled(enabled: boolean): void
 ```
 
-`logger` 与 `diagnostics.toast` 都进入 `DiagnosticEvent` 系统。行为见 [开发期诊断表层](25-开发期诊断表层.md)。
+`Log` 是 Arrange 自有 C++ 与 hosted JS 的唯一日志 API；`DiagnosticsToast` 是“气泡加日志”的独立 facade，详细格式和 sink 见 [开发期诊断表层](25-开发期诊断表层.md)。`diagnostics` 只提供 reload、fake error 和 Toast 显示开关。
 
 # 上下文能力
 

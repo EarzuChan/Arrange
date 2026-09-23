@@ -58,6 +58,7 @@ namespace arrange::juce {
         [[nodiscard]] bool keyPressed(const ::juce::KeyPress& key);
 
        private:
+        static constexpr std::string_view TAG = "EditorSceneHost";
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

@@ -24,14 +24,14 @@ export function registerCreateCommand(program: Command, store: ProjectStateStore
             // TODO：调用生成器生成文件
             await store.save(state)
 
-            console.log(`Project created:\n  root: ${state.rootDir}\n`)
+            console.log('[ArrangeCLI]', `Project created:\n  root: ${state.rootDir}\n`)
 
             // TODO：询问用户是否立即运行 sync；sync 模块后续专项落地后接入
 
             if (state.rootDir !== process.cwd()) {
-                console.log("")
-                console.log("To continue work:")
-                console.log(`  cd ${shellPath(displayPath(state.rootDir))}`)
+                console.log('[ArrangeCLI]', "")
+                console.log('[ArrangeCLI]', "To continue work:")
+                console.log('[ArrangeCLI]', `  cd ${shellPath(displayPath(state.rootDir))}`)
             }
         })
 }
