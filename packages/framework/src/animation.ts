@@ -13,6 +13,9 @@ export type AnimationSpec = Readonly<{ kind: "tween"; durationMillis: number; de
 
 export type AnimationArgs = { animationSpec?: AnimationSpec; label?: string; finished?: () => void }
 
+export type RepeatMode = 'restart' | 'reverse'
+export type InfiniteAnimationArgs = { animationSpec?: AnimationSpec; repeatMode?: RepeatMode }
+
 export type AnimatedRef<T> = Readonly<Ref<T>> & { readonly isRunning: Readonly<Ref<boolean>>; readonly label: string; stop: () => void }
 
 /** @arrangeFields offset */
@@ -193,10 +196,10 @@ function springChannel(displacement: number, velocity: number, seconds: number, 
     return [a * Math.exp(r1 * seconds) + b * Math.exp(r2 * seconds), a * r1 * Math.exp(r1 * seconds) + b * r2 * Math.exp(r2 * seconds)]
 }
 
-function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
+function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs, infinite?: { target: T; repeatMode: RepeatMode }) {
     const clock = animationScheduler(), scheduler = timeline(clock)
     const scope = getCurrentScope()
-    let current = converter.to(initial), from = current, target = current, velocity = current.map(() => 0), initialVelocity = velocity
+    let current = converter.to(initial), from = current, target = infinite ? converter.to(infinite.target) : current, velocity = current.map(() => 0), initialVelocity = velocity
     const state = shallowRef(converter.from(current)) as Ref<T>, running = shallowRef(false)
     let startTime = 0, stopped = false
     let pausedAt = 0
@@ -209,6 +212,19 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
             resumed = false
         }
         const elapsed = Math.max(0, time - startTime)
+        if (infinite) {
+            const spec = args.animationSpec as Extract<AnimationSpec, { kind: 'tween' }>
+            const cycleDuration = spec.delayMillis + spec.durationMillis
+            const cycle = Math.floor(elapsed / cycleDuration)
+            const cycleTime = elapsed - cycle * cycleDuration
+            if (cycleTime < spec.delayMillis) return
+            let progress = Math.min(1, (cycleTime - spec.delayMillis) / spec.durationMillis)
+            if (infinite.repeatMode === 'reverse' && cycle % 2 === 1) progress = 1 - progress
+            progress = finite(spec.easing(progress), "缓动结果")
+            current = from.map((value, index) => value + (target[index] - value) * progress)
+            state.value = converter.from(current)
+            return
+        }
         let done = true
         if (spec.kind === "spring") {
             current = from.map((value, index) => {
@@ -248,6 +264,15 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs) {
         startTime = time
         resumed = false
         if (from.every((item, index) => item === target[index]) && velocity.every(value => value === 0)) return
+        running.value = true
+        scheduler.add(sample, () => !scope || scope.active && !scope.paused)
+    }
+
+    if (infinite) {
+        const spec = args.animationSpec
+        if (!spec || spec.kind !== 'tween' || !spec.durationMillis) throw new RangeError('无限动画需要 durationMillis 大于 0 的 tween')
+        if (target.length !== current.length) throw new RangeError('动画数值数组的长度不能改变')
+        startTime = clock.now()
         running.value = true
         scheduler.add(sample, () => !scope || scope.active && !scope.paused)
     }
@@ -396,6 +421,56 @@ export function createTransition<S>(target: AnimationTarget<S>, args: AnimationA
         animatedRect: (label: string, map: (state: S) => Rect, childArgs: AnimationArgs = {}) => register(label, map, rectConverter, childArgs),
     }
 }
+
+export function createInfiniteTransition(args: { label?: string } = {}) {
+    const children = new Map<string, AnimatedRef<unknown>>()
+    const running = shallowRef(false)
+    let stopped = false
+
+    const register = <T>(label: string, initial: T, target: T, converter: Converter<T>, childArgs: InfiniteAnimationArgs = {}): AnimatedRef<T> => {
+        if (stopped || children.has(label)) throw new Error(`无限 Transition 子通道 '${label}' 已退休或重复注册`)
+        const animationSpec = childArgs.animationSpec ?? tween()
+        if (animationSpec.kind !== 'tween' || !animationSpec.durationMillis) throw new RangeError('无限动画需要 durationMillis 大于 0 的 tween')
+        const control = channel(initial, converter, { animationSpec, label: `${args.label ? `${args.label}/` : ''}${label}` }, {
+            target, repeatMode: childArgs.repeatMode ?? 'restart',
+        })
+        let retired = false
+        const retire = () => {
+            if (retired) return
+            retired = true
+            control.output.stop()
+            children.delete(label)
+            running.value = children.size > 0
+        }
+        const value = new Proxy(control.output, { get: (output, key, receiver) => key === 'stop' ? retire : Reflect.get(output, key, receiver) })
+        children.set(label, value as AnimatedRef<unknown>)
+        running.value = true
+        if (getCurrentScope()) onScopeDispose(retire)
+        return value
+    }
+
+    const stop = () => {
+        if (stopped) return
+        stopped = true
+        for (const child of [...children.values()]) child.stop()
+        running.value = false
+    }
+    if (getCurrentScope()) onScopeDispose(stop)
+
+    return {
+        isRunning: readonly(running),
+        stop,
+        animatedNumber: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, numberConverter, childArgs),
+        /** @arrangeArguments none dp
+         * @arrangeResult dp */
+        animatedDp: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, numberConverter, childArgs),
+        /** @arrangeArguments none color
+         * @arrangeResult color */
+        animatedColor: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, colorConverter, childArgs),
+    }
+}
+
+export const infiniteTransition = createInfiniteTransition
 
 // 原生测量不调用任意 JS 曲线，内建及贝塞尔曲线携带无损数值描述
 export function nativeAnimationSpec(spec: AnimationSpec): Readonly<Record<string, unknown>> {

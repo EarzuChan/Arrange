@@ -399,3 +399,22 @@ test('卸载尚未应用的候选会取消原生提交并释放候选资源', ()
     assert.deepEqual(native.textNodes(), [])
     assert.throws(() => native.finish(), /没有待应用事务/)
 })
+
+test('Color.hsl 在 SFA 模板颜色绑定中转换为 ARGB 并响应动画值', () => {
+    const hue = runtime.ref(0)
+    const source = `<template><Text text="彩虹" :style="{ color: Color.hsl(hue, 1, 0.5) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+import { hue } from "./state"
+</script>`
+    const compiled = compileArrangeSfa(source, '颜色.sfa')
+    assert.match(compiled.code, /__arrangeColorNumber\(_unref\(Color\)\.hsl\(/)
+    const Page = evaluateSfa(source, { hue })
+    const native = recordingNative()
+    const app = runtime.createApp(Page)
+    mountFrame(app, native.target)
+    assert.equal(native.textNodes()[0].text, '彩虹')
+    hue.value = 120
+    advanceFrames()
+    assert.equal(native.textNodes()[0].text, '彩虹')
+    app.unmount()
+})

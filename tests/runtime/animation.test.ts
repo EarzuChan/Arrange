@@ -4,6 +4,17 @@ import assert from "node:assert/strict"
 import { tween, linearEasing, animatedColorAsRef, animatedDpAsRef, animatedNumberAsRef, createTransition } from '../../packages/framework/src/animation/index.ts'
 import { frameScope } from './frameScope.ts'
 import { ref } from '../../packages/framework/src/index.ts'
+import { Color } from '../../packages/framework/src/unit.ts'
+
+test("Color.hsl converts normalized hue values to validated ARGB colors", () => {
+    assert.equal(Color.hsl(0, 1, 0.5).value, 0xffff0000)
+    assert.equal(Color.hsl(120, 1, 0.5).value, 0xff00ff00)
+    assert.equal(Color.hsl(240, 1, 0.5).value, 0xff0000ff)
+    assert.equal(Color.hsl(360, 1, 0.5).value, Color.hsl(0, 1, 0.5).value)
+    assert.equal(Color.hsl(-120, 1, 0.5).value, Color.hsl(240, 1, 0.5).value)
+    assert.throws(() => Color.hsl(0, 1.1, 0.5), /必须在 0\.\.1/)
+    assert.throws(() => Color.hsl(Number.NaN, 1, 0.5), /有限数值/)
+})
 
 test("animatedNumberAsRef follows target changes with a deterministic clock", () => {
     const clock = frameScope()
@@ -60,6 +71,42 @@ test("createTransition derives animated values from a reactive target state", ()
     assert.equal(width.value, 200)
 
     width.stop()
+})
+
+test("infinite transition repeats values on the owner frame clock and stop releases the frame", async () => {
+    const { createInfiniteTransition, animationStats } = await import('../../packages/framework/src/animation/index.ts')
+    const baseline = animationStats.activeAnimations
+    const clock = frameScope()
+    const transition = clock.run(() => createInfiniteTransition({ label: 'HueTransition' }))
+    const hue = clock.run(() => transition.animatedNumber('Hue', 0, 360, {
+        animationSpec: tween({ durationMillis: 100, easing: linearEasing }),
+    }))
+
+    clock.advanceBy(50)
+    assert.equal(hue.value, 180)
+    clock.advanceBy(50)
+    assert.equal(hue.value, 0)
+    assert.equal(transition.isRunning.value, true)
+    hue.stop()
+    assert.equal(transition.isRunning.value, false)
+    assert.equal(animationStats.activeAnimations, baseline)
+    transition.stop()
+})
+
+test("infinite transition supports reverse repeat mode and rejects zero duration", async () => {
+    const { createInfiniteTransition } = await import('../../packages/framework/src/animation/index.ts')
+    const clock = frameScope()
+    const transition = clock.run(() => createInfiniteTransition())
+    const value = clock.run(() => transition.animatedNumber('reverse', 0, 10, {
+        animationSpec: tween({ durationMillis: 100, easing: linearEasing }), repeatMode: 'reverse',
+    }))
+    clock.advanceBy(150)
+    assert.equal(value.value, 5)
+    value.stop()
+    assert.throws(() => clock.run(() => transition.animatedNumber('invalid', 0, 1, {
+        animationSpec: tween({ durationMillis: 0 }),
+    })), /durationMillis 大于 0/)
+    transition.stop()
 })
 
 test("all value groups animate on one clock and reject changing vector dimensions", async () => {

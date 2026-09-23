@@ -78,6 +78,13 @@ export function lowerSfaValues(content: string, filename: string, previousMap?: 
         if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
             const kind = expressionKind(node.expression)
             if (kind) {
+                if (kind === 'color' && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'hsl') {
+                    colorHelper ??= uniqueName(content, '__arrangeColorNumber')
+                    output.appendLeft(node.getStart(source), `${colorHelper}(`)
+                    output.appendLeft(node.end, ')')
+                    for (const argument of node.arguments ?? []) visit(argument)
+                    return
+                }
                 if (node.arguments?.length !== 1 || ts.isSpreadElement(node.arguments[0])) throw new Error(`${filename}：${kind} 值壳必须提供一个明确的参数`)
                 const argument = node.arguments[0]
                 if (kind === 'color') {

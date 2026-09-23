@@ -327,6 +327,7 @@ animatedRectAsRef(...): AnimatedRef<Rect>
 animatedNumberArrayAsRef(...): AnimatedRef<readonly number[]>
 
 transition(...): Transition
+createInfiniteTransition(args?: { label?: string }): InfiniteTransition
 ```
 
 AnimatedRef 为只读值，附带 isRunning、label 和 stop；DP、颜色及字段单位由正式参数契约确定，SFA 的值壳消融见 [基础类型](10-基础类型.md)。

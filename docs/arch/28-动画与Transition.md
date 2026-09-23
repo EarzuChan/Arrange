@@ -63,6 +63,8 @@ Transition 需要支持：
 - 同一 VBlankTick 内批量推进。
 - arrangable unmount、branch remove、reload、HMR 与 QuickJS context reset 时取消并退休 binding。
 
+`createInfiniteTransition` 为持续重复的 UI 值创建 Owner 作用域动画。数值、DP 和颜色 child 接收初始值、目标值及正时长 tween；`repeatMode` 支持 `restart` 与 `reverse`。所有 child 共用 Owner 的 VBlankSource 和动画时间轴，child 或 transition 停止、作用域销毁时释放帧需求。
+
 # Animation Spec
 
 内建 animation spec：

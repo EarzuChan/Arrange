@@ -3,7 +3,7 @@
         <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
             <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(dp(20), dp(20))"/>
 
-            <Text :text="preset" :style="{ fontSize: sp(28), color: presetColor }" :modifier="M"/>
+            <Text :text="preset" :style="{ fontSize: sp(28), color: Color.hsl(hue, 1, 0.5) }" :modifier="M"/>
 
             <Image :painter="logoPainter" :modifier="M.size(dp(96), dp(40))"/>
         </Row>
@@ -53,16 +53,17 @@
 
 <script>
 import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
-import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef } from "@arrange/framework/animation"
+import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef, createInfiniteTransition } from "@arrange/framework/animation"
 import { Icon } from "@arrange/framework/foundation"
 import { Log } from "@arrange/framework"
 import { onMounted, ref, createScrollState, shallowRef } from '@arrange/framework'
-
 import CounterPanel from './view/CounterPanel.sfa'
 import AnimationGallery from './view/AnimationGallery.sfa'
 import ShowcaseGallery from './view/ShowcaseGallery.sfa'
 import PropBoundary from './view/PropBoundary.sfa'
 import RefRelay from './view/RefRelay.sfa'
+
+const TAG = "App"
 
 const clicks = ref(0)
 const firstRef = ref(11)
@@ -74,19 +75,9 @@ const playPainter = painter('icons/play.svg')
 const logoPainter = painter('logo.png')
 
 const preset = ref("Arrangable与动画发廊")
-const rainbow = [Color(0xFFFF3030), Color(0xFFFFFF30), Color(0xFF30FF30), Color(0xFF30FFFF), Color(0xFF3030FF), Color(0xFFFF30FF)]
-const presetColorTarget = ref(Color(rainbow[0]))
-let rainbowSegment = 0
-const presetColor = animatedColorAsRef(presetColorTarget, {
-    animationSpec: tween({ durationMillis: 700, easing: linearEasing }),
-    finished() {
-        rainbowSegment = (rainbowSegment + 1) % rainbow.length
-        presetColorTarget.value = Color(rainbow[rainbowSegment])
-    },
-})
-onMounted(() => {
-    rainbowSegment = 1
-    presetColorTarget.value = Color(rainbow[rainbowSegment])
+const hueTransition = createInfiniteTransition({ label: 'HueTransition' })
+const hue = hueTransition.animatedNumber('Hue', 0, 360, {
+    animationSpec: tween({ durationMillis: 4000, easing: linearEasing }) // 没完全复刻api，之后再检查一下
 })
 
 const inputStatus = ref("你来和我（指输入框↑）搞一下嘛")
@@ -106,8 +97,8 @@ function toggleSelectedRef() {
 
 function handleTap() {
     clicks.value += 1
-    Log.i("App", "点击次数", clicks.value)
-    Log.i("App", "南下", clicks.value)
+    Log.i(TAG, "点击次数", clicks.value)
+    Log.i(TAG, "南下", clicks.value)
 }
 
 function handleSubmit(value: string) {
