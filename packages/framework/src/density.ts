@@ -11,7 +11,7 @@ export interface Density {
     pxToSp(value: number): number
 }
 
-export const DensityKey: InjectionKey<Density> = Symbol('Arrange.Density')
+export const DensityKey: InjectionKey<Density> = Symbol('Arrange.Density') // 建立一个单独内建keys文件，并移动这个过去
 
 export function createDensity(dpScale = 1, spScale = 1): Density & { dpScale: number; spScale: number } {
     const state = reactive({ dpScale: scale(dpScale), spScale: scale(spScale) })

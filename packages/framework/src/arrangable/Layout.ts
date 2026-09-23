@@ -16,8 +16,10 @@ export const Layout = defineArrangable({
     slotNames: ['default'],
     setup(props, { slot, source }) {
         const instance = currentInstance!
+
         const density = inject(DensityKey)
         if (!density) throw new Error('Layout 缺少 App 的 Density 服务')
+
         const units = new UnitResolver(density)
 
         // TIPS：唯一真豪组件，可以直撅NativeRearrangeHost

@@ -32,8 +32,10 @@ export function defineArrangable<const P extends ArrangableObjectPropsOptions = 
         if (value && typeof value === 'object') return [name, Object.freeze({ ...value, ...(Array.isArray(value.type) ? { type: Object.freeze([...value.type]) } : {}) })]
         return [name, value]
     }))
+
     const definition = Object.freeze({ ...options, props: Object.freeze(props), slotNames: Object.freeze([...names]) }) as unknown as Omit<ArrangableDefinition<ExtractPropTypes<P>>, 'props' | 'slotNames'> & { readonly props: P; readonly slotNames: S; readonly contentTarget: T }
     definitions.add(definition)
+
     return definition
 }
 

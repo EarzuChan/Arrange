@@ -5,8 +5,11 @@ import { callWithAsyncErrorHandling } from './errorHandling.ts'
 
 export function injectHook(type: LifecycleHooks, hook: Function, target: ArrangableInstance | null = currentInstance): void {
     if (!target || target.isUnmounted) throw new Error('生命周期钩子必须在存活 Arrangable 的 setup 中注册')
+
     let hooks = target.hooks.get(type)
+
     if (!hooks) target.hooks.set(type, hooks = [])
+
     hooks.push((...args: unknown[]) => {
         pauseTracking()
         const restore = setCurrentInstance(target)
