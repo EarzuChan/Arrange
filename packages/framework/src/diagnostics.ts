@@ -1,4 +1,5 @@
 import type { NativeTransactionTarget } from "./native.ts"
+import { setWarningHandler } from '@arrange/reactivity'
 
 declare global {
     var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
@@ -101,3 +102,5 @@ export const diagnostics = Object.freeze({
         native()?.diagnosticsSetToastsEnabled?.(enabled)
     }
 })
+
+setWarningHandler((message, details) => logger.warn({ category: 'runtime.script', message, detail: details.map(String).join(' ') || undefined }))

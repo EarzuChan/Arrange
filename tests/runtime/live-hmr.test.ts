@@ -67,6 +67,25 @@ test('模块执行失败保留旧 accept 边界，下一次修复能够接收更
     assert.equal(errors.length, 1)
 })
 
+test('HotRuntime 通过 Arrange logger 记录更新接收与应用', async () => {
+    const previous = globalThis.__ARRANGE_NATIVE__
+    const events: unknown[][] = []
+    globalThis.__ARRANGE_NATIVE__ = { diagnosticsLog: (...args: unknown[]) => { events.push(args) } } as never
+    try {
+        const runtime = new HotRuntime({
+            send() { }, reload() { }, report: error => { throw error },
+        }, async () => ({ value: 2 }))
+        runtime.context('/logged').accept(module => assert.equal(module?.value, 2))
+        await runtime.receive({ type: 'update', updates: [{ type: 'js-update', path: '/logged', acceptedPath: '/logged', timestamp: 1 }] })
+    } finally {
+        globalThis.__ARRANGE_NATIVE__ = previous
+    }
+    assert.deepEqual(events.map(event => [event[0], (event[1] as { code: string }).code]), [
+        ['info', 'hmr.update.received'],
+        ['info', 'hmr.update.applied'],
+    ])
+})
+
 function evaluate(source: string, id: string, state: object = {}): ArrangableDefinition {
     Object.defineProperty(state, '__esModule', { value: true, configurable: true })
     const { code } = compileArrangeSfa(source, id, true)
@@ -75,6 +94,11 @@ function evaluate(source: string, id: string, state: object = {}): ArrangableDef
     new Function('require', 'exports', output)((name: string) => name === './state' ? state : requireSfaModule(name), exports)
     return exports.default!
 }
+
+test('SFA 拒绝 console API 并要求使用 Arrange logger', () => {
+    assert.throws(() => compileArrangeSfa('<script>console.log("禁止")</script>', 'console.sfa'), /禁止使用 console；请使用 Arrange logger/)
+    assert.throws(() => compileArrangeSfa('<script>console.warn("禁止")</script>', 'console.sfa'), /禁止使用 console；请使用 Arrange logger/)
+})
 
 test('SFA 模板更新保留 ref、setup 生命周期与 native 节点，新增模板引用可读取既有局部变量', () => {
     const id = 'hmr-template.sfa'
@@ -100,6 +124,18 @@ test('SFA 模板更新保留 ref、setup 生命周期与 native 节点，新增�
     advanceFrames()
     assert.deepEqual(native.textNodes(), [{ id: initial.id, text: '9!' }])
     assert.equal(setups, 1)
+    app.unmount()
+})
+
+test('SFA 模板更新会刷新静态参数且复用 native 节点', () => {
+    const id = 'hmr-static-prop.sfa'
+    const app = createApp(evaluate('<template><Text text="旧文案" /></template>', id))
+    const native = recordingNative()
+    mountFrame(app, native.target)
+    const initial = native.textNodes()[0]
+    applyArrangableHmr(id, evaluate('<template><Text text="新文案" /></template>', id))
+    advanceFrames()
+    assert.deepEqual(native.textNodes(), [{ id: initial.id, text: '新文案' }])
     app.unmount()
 })
 

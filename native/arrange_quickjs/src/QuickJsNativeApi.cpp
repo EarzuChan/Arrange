@@ -94,15 +94,6 @@ namespace arrange::quickjs {
             return diagnosticPayload(context, *parsed, payload, forceToast);
         }
 
-        QuickJsDiagnosticEventInput consoleDiagnostic(QuickJsDiagnosticLevel level, std::string code, std::string message) {
-            QuickJsDiagnosticEventInput event;
-            event.level = level;
-            event.category = QuickJsDiagnosticCategory::RuntimeScript;
-            event.code = std::move(code);
-            event.message = std::move(message);
-            return event;
-        }
-
         std::optional<std::string> unsupportedPayloadCategory(JSContext* context, JSValueConst payload) {
             if (!JS_IsObject(payload)) return std::nullopt;
             QuickJsValueReader reader(context);
@@ -567,45 +558,6 @@ namespace arrange::quickjs {
             return JS_UNDEFINED;
         }
 
-        JSValue consoleLog(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            std::string message;
-            for (int i = 0; i < argc; ++i) {
-                if (!message.empty()) message += " ";
-                message += reader.toString(argv[i]);
-            }
-            self->recordDiagnostic(consoleDiagnostic(QuickJsDiagnosticLevel::Info, "console.log", message));
-            return JS_UNDEFINED;
-        }
-
-        JSValue consoleWarn(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            std::string message;
-            for (int i = 0; i < argc; ++i) {
-                if (!message.empty()) message += " ";
-                message += reader.toString(argv[i]);
-            }
-            self->recordDiagnostic(consoleDiagnostic(QuickJsDiagnosticLevel::Warn, "console.warn", message));
-            return JS_UNDEFINED;
-        }
-
-        JSValue consoleError(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-            auto* self = runtime(context);
-            if (self == nullptr) return JS_UNDEFINED;
-            QuickJsValueReader reader(context);
-            std::string message;
-            for (int i = 0; i < argc; ++i) {
-                if (!message.empty()) message += " ";
-                message += reader.toString(argv[i]);
-            }
-            self->recordDiagnostic(consoleDiagnostic(QuickJsDiagnosticLevel::Error, "console.error", message));
-            return JS_UNDEFINED;
-        }
-
         JSValue nativeDiagnosticsSetCategoryEnabled(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
             auto* self = runtime(context);
             if (self == nullptr || argc < 2) return JS_UNDEFINED;
@@ -683,11 +635,6 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(context, performance.get(), "now", JS_NewCFunction(context, performanceNow, "now", 0));
         JS_SetPropertyStr(context, performance.get(), "measureNow", JS_NewCFunction(context, performanceMeasureNow, "measureNow", 0));
         JS_SetPropertyStr(context, global.get(), "performance", performance.release());
-        ScopedValue console(context, JS_NewObject(context));
-        JS_SetPropertyStr(context, console.get(), "log", JS_NewCFunction(context, consoleLog, "log", 1));
-        JS_SetPropertyStr(context, console.get(), "warn", JS_NewCFunction(context, consoleWarn, "warn", 1));
-        JS_SetPropertyStr(context, console.get(), "error", JS_NewCFunction(context, consoleError, "error", 1));
-        JS_SetPropertyStr(context, global.get(), "console", console.release());
     }
 }  // namespace arrange::quickjs
 

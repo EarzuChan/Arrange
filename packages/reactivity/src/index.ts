@@ -3,6 +3,7 @@ export { type ComputedGetter, type ComputedRef, type ComputedRefImpl, type Compu
 export { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants.ts'
 export { ARRAY_ITERATE_KEY, ITERATE_KEY, MAP_KEY_ITERATE_KEY, track, trigger } from './dep.ts'
 export { type DebuggerEvent, type DebuggerEventExtraInfo, type DebuggerOptions, EffectFlags, type EffectScheduler, ReactiveEffect, type ReactiveEffectOptions, type ReactiveEffectRunner, batchUpdates, effect, enableTracking, onEffectCleanup, pauseTracking, resetTracking, stop } from './effect.ts'
+export { setWarningHandler } from './warning.ts'
 export { EffectScope, effectScope, getCurrentScope, onScopeDispose } from './effectScope.ts'
 export { type DeepReadonly, type Raw, type Reactive, type ReactiveMarker, type ShallowReactive, type UnwrapNestedRefs, isProxy, isReactive, isReadonly, isShallow, markRaw, reactive, readonly, shallowReactive, shallowReadonly, toRaw, toReactive, toReadonly } from './reactive.ts'
 export { type CustomRefFactory, type MaybeRef, type MaybeRefOrGetter, type Ref, type RefUnwrapBailTypes, type ShallowRef, type ShallowUnwrapRef, type ToRef, type ToRefs, type UnwrapRef, customRef, isRef, proxyRefs, ref, shallowRef, toRef, toRefs, toValue, triggerRef, unref } from './ref.ts'

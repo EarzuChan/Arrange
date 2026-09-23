@@ -42,7 +42,7 @@
         <Row :horizontal-arrangement="Arrangement.spacedBy(dp(16))">
             <ShowcaseGallery/>
 
-            <Text text="南下"/>
+            <Text text="润" :style="{ color: Color(0xFFAAAA00) }"/>
 
             <AnimationGallery/>
         </Row>
@@ -55,7 +55,7 @@
 import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
 import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef } from "@arrange/framework/animation"
 import { Icon } from "@arrange/framework/foundation"
-import { logger } from "@arrange/framework/internal"
+import { logger } from "@arrange/framework"
 import { onMounted, ref, createScrollState, shallowRef } from '@arrange/framework'
 
 import CounterPanel from './view/CounterPanel.sfa'
@@ -107,7 +107,7 @@ function toggleSelectedRef() {
 function handleTap() {
     clicks.value += 1
     logger.info("恩情" + clicks.value)
-    console.log("南下" + clicks.value)
+    logger.info("南下" + clicks.value)
 }
 
 function handleSubmit(value: string) {

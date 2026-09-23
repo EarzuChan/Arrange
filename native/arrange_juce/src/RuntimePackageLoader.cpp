@@ -28,14 +28,14 @@ namespace arrange::juce {
 
         if (!resolved.ok || bundleUrl.empty()) {
             result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error.empty() ? "Arrange dev server URL is invalid." : resolved.error, {}, resolved.devServerUrl);
-            setDiagnostic(result, LogLevel::Error, "Live source invalid", result.error->summary, true);
+            setDiagnostic(result, LogLevel::Error, "Live 源无效", result.error->summary, true);
             return result;
         }
 
 #if ARRANGE_WITH_QUICKJS_NG
         if (!error.empty()) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, error, {}, bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live ESM failed", error, true);
+            setDiagnostic(result, LogLevel::Error, "Live ESM 失败（意味不明）", error, true);
             return result;
         }
 
@@ -44,14 +44,14 @@ namespace arrange::juce {
         const auto executed = scriptHost->executeLiveModules(snapshot);
         if (!executed.ok) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, executed.error, {}, bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live runtime failed", executed.error, true);
+            setDiagnostic(result, LogLevel::Error, "Live 运行时失败（意味不明）", executed.error, true);
             return result;
         }
         auto initialTransaction = scriptHost->takePendingTransaction();
         result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
-        setDiagnostic(result, LogLevel::Info, "Loaded live app", bundleUrl, true);
+        setDiagnostic(result, LogLevel::Info, "Live App 已加载（喜）", bundleUrl, true);
         return result;
 #else
         result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor requires QuickJS-NG to execute dev server app.js. Build through Arrange::framework.", {}, bundleUrl);

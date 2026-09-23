@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { logger } from '@arrange/framework/internal'
+import { logger } from '@arrange/framework'
 import InnerBoundary from './InnerBoundary.sfa'
 
 const props = defineProps<{ secret: string }>()

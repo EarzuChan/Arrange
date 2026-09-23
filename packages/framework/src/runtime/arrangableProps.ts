@@ -202,6 +202,12 @@ export class PropStore {
         return this.sources[name] ?? this.owner.source ?? this.owner.type.__file
     }
 
+    invalidateConstants(): void {
+        if (!this.constants.size) return
+        this.preserve()
+        this.constants.clear()
+    }
+
     update(inputs: Record<string, PropGetter<unknown>>, metadata: CallMetadata = {}): void {
         if (metadata.parameters) checkParameterPlan(metadata.parameters, this.owner.type)
         if (inputs === this.inputs && Object.isFrozen(inputs)) {

@@ -177,9 +177,7 @@ namespace arrange::juce {
         // 同步 file sink 只能用于安全线程和低频诊断路径；禁止在 audio thread、paint、pointer move、逐帧 layout/paint 中依赖同步文件 I/O
         const auto file = ::juce::File(::juce::String(config_.logFile));
         const auto parent = file.getParentDirectory();
-        if (parent.exists() || parent.createDirectory()) {
-            if (file.appendText(::juce::String(line + "\n"), false, false, "\n")) return;
-        }
+        if (parent.exists() || parent.createDirectory()) if (file.appendText(::juce::String(line + "\n"), false, false, "\n")) return;
         ::juce::Logger::writeToLog("Arrange diagnostic log sink failed: " + file.getFullPathName());
     }
 }  // namespace arrange::juce

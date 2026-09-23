@@ -44,6 +44,15 @@ const MACROS = [
 // 唯一的 TS setup 脚本模式，模板直接共享实例词法作用域
 export function compileScript(sfa: SFADescriptor, options: SFAScriptCompileOptions): SFAScriptBlock {
     const script = generateSfaScript(sfa, options)
+    const descriptor = sfa.script
+    if (descriptor) {
+        const context = new ScriptCompileContext(sfa, options)
+        walk(context.scriptAst!, {
+            enter(node: any, parent: any) {
+                if (node.type === 'Identifier' && node.name === 'console' && parent?.type === 'MemberExpression' && parent.object === node) context.error('SFA 脚本禁止使用 console；请使用 Arrange logger', node)
+            }
+        })
+    }
     const lowered = lowerSfaValues(script.content, sfa.filename, script.map)
     return { ...script, content: lowered.content, map: lowered.map, deps: [...new Set([...script.deps ?? [], ...lowered.deps])] }
 }

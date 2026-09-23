@@ -1,3 +1,5 @@
+import { logger } from './diagnostics.ts'
+
 // 与 Vite JavaScript HMR 协议对齐，不依赖页面、DOM 或 CSS
 export interface HotUpdate {
     type: string
@@ -74,7 +76,10 @@ export class HotRuntime {
     }
 
     receive(message: HotMessage): Promise<void> {
-        this.pending = this.pending.then(() => this.apply(message)).catch(error => this.transport.report(error))
+        this.pending = this.pending.then(() => this.apply(message)).catch(error => {
+            logger.error({ category: 'host.hmr', code: 'hmr.update.failed', message: '热更新处理失败', detail: String(error) })
+            this.transport.report(error)
+        })
         return this.pending
     }
 
@@ -97,12 +102,14 @@ export class HotRuntime {
                 // 同 Vite：hot.data 保留，资源由 dispose/prune 负责释放
             }
         } else if (message.type === 'update') {
-            await this.notify('vite:beforeUpdate', message)
             const updates = (message.updates ?? []).filter(update => update.type === 'js-update')
+            logger.info({ category: 'host.hmr', code: 'hmr.update.received', message: `收到 ${updates.length} 个模块热更新`, detail: updates.map(update => update.path).join(', ') || undefined })
+            await this.notify('vite:beforeUpdate', message)
             // 先保存全部旧边界，避免新模块注册覆盖同批 accept 回调
             const boundaries = updates.map(update => ({ update, callbacks: this.records.get(update.path)?.callbacks.filter(callback => callback.deps.includes(update.acceptedPath)) ?? [] }))
             const modules = new Map<string, Namespace>()
             const attempted = new Set<string>()
+            let failed = false
             for (const { update, callbacks } of boundaries) {
                 if (!callbacks.length || attempted.has(update.acceptedPath)) continue
                 attempted.add(update.acceptedPath)
@@ -113,8 +120,10 @@ export class HotRuntime {
                 try {
                     modules.set(update.acceptedPath, await this.importModule(url))
                 } catch (error) {
+                    failed = true
                     if (saved && old) Object.assign(old, saved)
                     else this.records.delete(update.acceptedPath)
+                    logger.error({ category: 'host.hmr', code: 'hmr.module.load.failed', message: `热更新模块加载失败：${update.acceptedPath}`, detail: String(error), pathOrUrl: update.acceptedPath })
                     this.transport.report(error)
                 }
             }
@@ -127,6 +136,9 @@ export class HotRuntime {
                 }
             }
             await this.notify('vite:afterUpdate', message)
+            const detail = updates.map(update => update.path).join(', ') || undefined
+            if (failed) logger.warn({ category: 'host.hmr', code: 'hmr.update.partial', message: '热更新未能完整应用', detail })
+            else logger.info({ category: 'host.hmr', code: 'hmr.update.applied', message: `热更新已应用 ${updates.length} 个模块`, detail })
         }
     }
 }

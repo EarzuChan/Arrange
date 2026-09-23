@@ -23,14 +23,38 @@ export function applyArrangableHmr(id: string, definition: ArrangableDefinition)
     const record = records.get(id)
     const next = versions.get(definition)
     if (!record || !next) throw new Error(`Arrangable HMR 定义未注册：${id}`)
+
     const compatible = record.version.contract === next.contract
     record.version = next
     if (!compatible) record.identity = definition
     record.revision++
+
     for (const instance of record.instances) {
         if (instance.isUnmounted) continue
+
         const scope = compatible ? instance.structure : instance.structure.parent
-        if (scope) instance.rearrangeSession.schedule(scope, true)
+        if (scope) {
+            invalidateConstants(scope)
+            instance.rearrangeSession.schedule(scope, true)
+        }
+    }
+}
+
+function invalidateConstants(root: ArrangableInstance['structure']): void {
+    const scopes = [root]
+    const visited = new Set<ArrangableInstance>()
+
+    while (scopes.length) {
+        const scope = scopes.pop()!
+
+        for (const entry of scope.entries) if (entry.kind === 'call') {
+            if (visited.has(entry.instance)) continue
+            visited.add(entry.instance)
+            entry.instance.propStore.invalidateConstants()
+            scopes.push(entry.instance.structure)
+        } else scopes.push(entry.scope)
+
+        for (const retained of scope.retainedContents.values()) for (const entry of retained.entries.values()) scopes.push(entry.scope)
     }
 }
 
