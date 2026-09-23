@@ -26,6 +26,7 @@ export interface ArrangeApp {
     unmount(): void
 }
 
+// 这个滚木又有何意味！
 const foundationArrangables = { Layout, Box, Row, Column, Spacer, Text, Input, Image, Icon, DynamicArrangable }
 
 const mountedTargets = new WeakSet<NativeTransactionTarget>()
@@ -35,22 +36,27 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
 
     const config: AppConfig = {}
     const definitions = { ...foundationArrangables } as Record<string, ArrangableDefinition>
+    
     const provides = Object.create(null)
     provides[DensityKey] = createDensity()
+
     let rearrangeSession: RearrangeSession | undefined
     let native: NativeTransactionTarget | undefined
 
     const app: ArrangeApp = {
         config,
+
         arrangable(name, definition) {
             if (!isArrangableDefinition(definition)) throw new TypeError('注册目标必须是 Arrangable 定义')
             definitions[name] = definition
             return app
         },
+
         provide(key, value) {
             provides[key] = value
             return app
         },
+
         mount(target = globalThis.__ARRANGE_NATIVE__) {
             if (rearrangeSession) throw new Error('App 已经挂载')
 
@@ -83,6 +89,7 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
                 throw error
             }
         },
+
         unmount() {
             const target = native
 

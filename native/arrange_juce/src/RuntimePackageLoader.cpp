@@ -34,7 +34,7 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
         int statusCode = 0;
-        const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandling::inAddress).withConnectionTimeoutMs(800).withNumRedirectsToFollow(0).withStatusCode(&statusCode).withHttpRequestCmd("GET");
+        const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandling::inAddress).withConnectionTimeoutMs(5000).withNumRedirectsToFollow(0).withStatusCode(&statusCode).withHttpRequestCmd("GET");
         auto stream = ::juce::URL(bundleUrl).createInputStream(options);
         if (!stream) {
             result.serverUnavailable = true;
