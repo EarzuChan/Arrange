@@ -32,7 +32,6 @@ namespace arrange::juce {
         [[nodiscard]] bool copyDiagnosticsToClipboard();
 
         void repaintDirty(::juce::Component& owner);
-        [[nodiscard]] bool consumeDevReloadRequested();
         [[nodiscard]] bool wantsVBlank() const;
         [[nodiscard]] bool pumpFrame(double nowMillis);
         [[nodiscard]] std::string windowTitle(std::string_view baseTitle) const;

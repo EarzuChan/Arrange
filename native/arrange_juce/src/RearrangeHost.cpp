@@ -19,6 +19,14 @@ namespace arrange::juce {
     void RearrangeHost::setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept {
         scriptHost_ = std::move(host);
     }
+
+    quickjs::CallbackInvokeResult RearrangeHost::applyHotUpdate(const quickjs::LiveModuleSnapshot& snapshot, const quickjs::HotMessage& message) {
+        return scriptHost_ ? scriptHost_->applyHotUpdate(snapshot, message) : quickjs::CallbackInvokeResult{false, "没有 live script host"};
+    }
+
+    std::vector<quickjs::HotMessage> RearrangeHost::takeHotMessages() {
+        return scriptHost_ ? scriptHost_->takeHotMessages() : std::vector<quickjs::HotMessage>{};
+    }
 #endif
 
     bool RearrangeHost::hasScriptHost() const noexcept {

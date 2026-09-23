@@ -17,106 +17,6 @@ namespace arrange {
             return std::string(value);
         }
 
-        bool containsJsonString(std::string_view text, std::string_view key, std::string_view value) {
-            const auto keyToken = std::string("\"") + std::string(key) + "\"";
-            std::size_t pos = 0;
-            while ((pos = text.find(keyToken, pos)) != std::string_view::npos) {
-                pos += keyToken.size();
-                while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-                if (pos >= text.size() || text[pos] != ':') continue;
-                ++pos;
-                while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-                if (pos >= text.size() || text[pos] != '"') continue;
-                ++pos;
-                if (text.substr(pos, value.size()) == value && pos + value.size() < text.size() && text[pos + value.size()] == '"') return true;
-            }
-            return false;
-        }
-
-        std::optional<std::string> extractJsonString(std::string_view text, std::string_view key) {
-            const auto keyToken = std::string("\"") + std::string(key) + "\"";
-            const auto keyPos = text.find(keyToken);
-            if (keyPos == std::string_view::npos) return std::nullopt;
-            auto pos = keyPos + keyToken.size();
-            while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-            if (pos >= text.size() || text[pos] != ':') return std::nullopt;
-            ++pos;
-            while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-            if (pos >= text.size() || text[pos] != '"') return std::nullopt;
-            ++pos;
-
-            std::string result;
-            bool escaping = false;
-            for (; pos < text.size(); ++pos) {
-                const auto ch = text[pos];
-                if (escaping) {
-                    switch (ch) {
-                        case 'n':
-                            result.push_back('\n');
-                            break;
-                        case 'r':
-                            result.push_back('\r');
-                            break;
-                        case 't':
-                            result.push_back('\t');
-                            break;
-                        default:
-                            result.push_back(ch);
-                            break;
-                    }
-                    escaping = false;
-                    continue;
-                }
-                if (ch == '\\') {
-                    escaping = true;
-                    continue;
-                }
-                if (ch == '"') return result;
-                result.push_back(ch);
-            }
-            return std::nullopt;
-        }
-
-        std::optional<std::string> extractJsonObjectAfterKey(std::string_view text, std::string_view key) {
-            const auto keyToken = std::string("\"") + std::string(key) + "\"";
-            const auto keyPos = text.find(keyToken);
-            if (keyPos == std::string_view::npos) return std::nullopt;
-            auto pos = keyPos + keyToken.size();
-            while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-            if (pos >= text.size() || text[pos] != ':') return std::nullopt;
-            ++pos;
-            while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' || text[pos] == '\n')) ++pos;
-            if (pos >= text.size() || text[pos] != '{') return std::nullopt;
-
-            int depth = 0;
-            bool inString = false;
-            bool escaping = false;
-            const auto start = pos;
-            for (; pos < text.size(); ++pos) {
-                const auto ch = text[pos];
-                if (inString) {
-                    if (escaping) {
-                        escaping = false;
-                    } else if (ch == '\\') {
-                        escaping = true;
-                    } else if (ch == '"') {
-                        inString = false;
-                    }
-                    continue;
-                }
-                if (ch == '"') {
-                    inString = true;
-                    continue;
-                }
-                if (ch == '{') ++depth;
-                if (ch == '}') {
-                    --depth;
-                    if (depth == 0) return std::string(text.substr(start, pos - start + 1));
-                }
-            }
-            return std::nullopt;
-        }
-
 #if ARRANGE_JUCE_WITH_JUCE
         std::string base64Encode(const std::vector<std::uint8_t>& bytes) {
             static constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -180,9 +80,13 @@ namespace arrange {
                 frame.push_back(static_cast<std::uint8_t>((length >> 8u) & 0xffu));
                 frame.push_back(static_cast<std::uint8_t>(length & 0xffu));
             } else {
-                return false;
+                if (length > 1024u * 1024u) return false;
+                frame.push_back(0x80u | 127u);
+                for (int shift = 56; shift >= 0; shift -= 8) frame.push_back(static_cast<std::uint8_t>((static_cast<std::uint64_t>(length) >> shift) & 0xffu));
             }
-            const std::uint8_t mask[4] = {0x12u, 0x34u, 0x56u, 0x78u};
+            std::random_device random;
+            std::uint8_t mask[4];
+            for (auto& byte : mask) byte = static_cast<std::uint8_t>(random());
             frame.insert(frame.end(), std::begin(mask), std::end(mask));
             for (std::size_t i = 0; i < payload.size(); ++i) frame.push_back(static_cast<std::uint8_t>(payload[i]) ^ mask[i % 4u]);
             return writeAll(socket, frame.data(), static_cast<int>(frame.size()));
@@ -247,64 +151,53 @@ namespace arrange {
         return endpoint;
     }
 
-    std::optional<DevReloadEvent> parseViteHmrReloadMessage(std::string_view message) {
-        if (!containsJsonString(message, "type", "custom")) return std::nullopt;
-        if (!containsJsonString(message, "event", "arrange:reload")) return std::nullopt;
-
-        DevReloadEvent event;
-        event.rawMessage = std::string(message);
-        if (auto payload = extractJsonObjectAfterKey(message, "data")) event.payloadJson = *payload;
-        if (auto path = extractJsonString(message, "path")) event.path = *path;
-        return event;
-    }
-
-    std::string devBundleHttpUrl(std::string_view devServerUrl) {
-        const auto endpoint = parseDevServerUrl(devServerUrl);
-        if (!endpoint.ok) return {};
-        std::string url = endpoint.secure ? "https://" : "http://";
-        url += endpoint.host;
-        if ((!endpoint.secure && endpoint.port != 80) || (endpoint.secure && endpoint.port != 443)) {
-            url += ":";
-            url += std::to_string(endpoint.port);
-        }
-        url += "/@arrange/app.js";
-        return url;
-    }
-
 #if ARRANGE_JUCE_WITH_JUCE
 
-    DevServerReloadClient::DevServerReloadClient() : ::juce::Thread("Arrange DevServerReloadClient") {}
+    DevServerClient::DevServerClient() : ::juce::Thread("Arrange DevServerClient") {}
 
-    DevServerReloadClient::~DevServerReloadClient() {
+    DevServerClient::~DevServerClient() {
         stop();
     }
 
-    void DevServerReloadClient::start(std::string devServerUrl, ReloadCallback callback) {
+    void DevServerClient::stop() {
+        running_ = false;
+        signalThreadShouldExit();
+        std::shared_ptr<::juce::StreamingSocket> socket;
+        {
+            const ::juce::ScopedLock guard(lock_);
+            socket = socket_;
+        }
+        if (socket) socket->close();
+        stopThread(-1);
+        const ::juce::ScopedLock guard(lock_);
+        socket_.reset();
+        outgoing_.clear();
+        messageCallback_ = {};
+    }
+
+    void DevServerClient::start(std::string devServerUrl, std::function<void(std::string)> callback) {
         stop();
         {
             const ::juce::ScopedLock guard(lock_);
             devServerUrl_ = std::move(devServerUrl);
-            callback_ = std::move(callback);
+            messageCallback_ = std::move(callback);
             lastError_.clear();
         }
         running_ = true;
         startThread();
     }
 
-    void DevServerReloadClient::stop() {
-        running_ = false;
-        signalThreadShouldExit();
-        if (socket_) socket_->close();
-        stopThread(1500);
-        socket_.reset();
+    void DevServerClient::send(std::string message) {
+        const ::juce::ScopedLock guard(lock_);
+        outgoing_.push_back(std::move(message));
     }
 
-    std::string DevServerReloadClient::lastError() const {
+    std::string DevServerClient::lastError() const {
         const ::juce::ScopedLock guard(lock_);
         return lastError_;
     }
 
-    void DevServerReloadClient::run() {
+    void DevServerClient::run() {
         while (!threadShouldExit()) {
             std::string url;
             {
@@ -327,14 +220,18 @@ namespace arrange {
         running_ = false;
     }
 
-    bool DevServerReloadClient::connectAndPump(const DevServerEndpoint& endpoint) {
+    bool DevServerClient::connectAndPump(const DevServerEndpoint& endpoint) {
         if (endpoint.secure) {
             const ::juce::ScopedLock guard(lock_);
-            lastError_ = "Arrange dev server WebSocket currently supports local http/ws only; use http://127.0.0.1:9178 during M1.";
+            lastError_ = "Arrange live WebSocket 目前支持本地 http/ws 地址";
             return false;
         }
 
-        socket_ = std::make_unique<::juce::StreamingSocket>();
+        {
+            const ::juce::ScopedLock guard(lock_);
+            if (threadShouldExit()) return false;
+            socket_ = std::make_shared<::juce::StreamingSocket>();
+        }
         if (!socket_->connect(endpoint.host, endpoint.port, 1500)) {
             const ::juce::ScopedLock guard(lock_);
             lastError_ = "Cannot connect Arrange dev server: " + endpoint.host + ":" + std::to_string(endpoint.port);
@@ -359,7 +256,8 @@ namespace arrange {
         while (!threadShouldExit() && response.find("\r\n\r\n") == std::string::npos) {
             const auto ready = socket_->waitUntilReady(true, 1500);
             if (ready <= 0) return false;
-            char buffer[256];
+            // 不读过 HTTP header，避免把紧跟的 connected 帧丢掉
+            char buffer[1];
             const auto count = socket_->read(buffer, static_cast<int>(sizeof(buffer)), false);
             if (count <= 0) return false;
             response.append(buffer, static_cast<std::size_t>(count));
@@ -377,7 +275,19 @@ namespace arrange {
             lastError_.clear();
         }
 
+        std::string fragments;
+        bool fragmented = false;
         while (!threadShouldExit()) {
+            std::deque<std::string> outgoing;
+            {
+                const ::juce::ScopedLock guard(lock_);
+                outgoing.swap(outgoing_);
+            }
+            for (const auto& message : outgoing)
+                if (!sendClientFrame(*socket_, 0x1u, message)) return false;
+            const auto ready = socket_->waitUntilReady(true, 50);
+            if (ready < 0) return false;
+            if (!ready) continue;
             std::uint8_t header[2] = {};
             if (!readExact(*socket_, header, 2, *this)) return false;
             const auto opcode = static_cast<std::uint8_t>(header[0] & 0x0fu);
@@ -393,10 +303,7 @@ namespace arrange {
                 for (auto byte : ext) length = (length << 8u) | byte;
             }
 
-            if ((header[1] & 0x80u) != 0) {
-                std::uint8_t mask[4] = {};
-                if (!readExact(*socket_, mask, 4, *this)) return false;
-            }
+            if ((header[1] & 0x80u) != 0 || (header[0] & 0x70u) != 0) return false;
 
             if (length > 1024u * 1024u) return false;
             std::string payload(static_cast<std::size_t>(length), '\0');
@@ -404,19 +311,27 @@ namespace arrange {
 
             if (opcode == 0x8u) return false;
             if (opcode == 0x9u) {
+                if (length > 125 || (header[0] & 0x80u) == 0) return false;
                 (void)sendClientFrame(*socket_, 0xau, payload);
                 continue;
             }
-            if (opcode != 0x1u) continue;
-
-            if (auto event = parseViteHmrReloadMessage(payload)) {
-                ReloadCallback callback;
-                {
-                    const ::juce::ScopedLock guard(lock_);
-                    callback = callback_;
-                }
-                if (callback) callback(std::move(*event));
+            if (opcode == 0xau) continue;
+            if (opcode != 0x1u && opcode != 0x0u) return false;
+            if (opcode == 0x0u && !fragmented || opcode == 0x1u && fragmented) return false;
+            if (opcode == 0x0u || (header[0] & 0x80u) == 0) {
+                fragments += payload;
+                if (fragments.size() > 1024u * 1024u) return false;
+                fragmented = (header[0] & 0x80u) == 0;
+                if (fragmented) continue;
+                payload = std::exchange(fragments, {});
             }
+
+            std::function<void(std::string)> messageCallback;
+            {
+                const ::juce::ScopedLock guard(lock_);
+                messageCallback = messageCallback_;
+            }
+            if (messageCallback) messageCallback(payload);
         }
         return true;
     }

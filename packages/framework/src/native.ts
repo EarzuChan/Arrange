@@ -70,7 +70,6 @@ export type NativeTransactionTarget = {
     insertChild: (parent: NodeId, child: NodeId, index: number) => void
     removeChild: (parent: NodeId, child: NodeId) => void
     unmount: () => void
-    reload?: (payload: NativeReloadPayload) => void
     diagnosticsLog?: (level: string, payload: NativeDiagnosticPayload) => void
     diagnosticsToast?: (payload: NativeDiagnosticPayload) => void
     diagnosticsRequestReload?: (payload?: NativeReloadPayload) => void

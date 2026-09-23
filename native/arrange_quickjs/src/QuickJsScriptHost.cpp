@@ -1,4 +1,5 @@
 #include <arrange/quickjs/QuickJsScriptHost.h>
+#include "QuickJsHotTransport.h"
 
 #if ARRANGE_WITH_QUICKJS_NG
 
@@ -172,6 +173,7 @@ namespace arrange::quickjs {
             runtime.moduleLoader.clear();
             runtime.diagnosticEvents.clear();
             runtime.diagnosticActions.clear();
+            runtime.hotMessages.clear();
         }
 
         void initialise(QuickJsScriptHost* owner, const std::filesystem::path& entryPath) {
@@ -425,6 +427,45 @@ namespace arrange::quickjs {
         const auto& pending = pendingTransactions_.pending();
         if ((!pending || !pending->hasTreeMutations()) && JS_IsUndefined(impl_->runtime.prepareFrame)) return {false, "应用未挂载：需要 createApp(App).mount() 安装帧驱动"};
         return {true, {}};
+    }
+
+    ScriptExecutionResult QuickJsScriptHost::executeLiveModules(const LiveModuleSnapshot& snapshot) {
+        pendingTransactions_.clear();
+        impl_->initialise(this, snapshot.entry);
+        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
+        auto& state = impl_->runtime;
+        state.moduleLoader.install(snapshot);
+        installHotTransport(state.context);
+        auto* module = QuickJsModuleLoader::load(state.context, snapshot.entry.c_str(), &state.moduleLoader);
+        if (!module) return {false, quickJsExceptionText(state.context)};
+        ScopedValue result(state.context, JS_EvalFunction(state.context, JS_DupValue(state.context, JS_MKPTR(JS_TAG_MODULE, module))));
+        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        const auto drained = impl_->drainJobs();
+        return {drained.ok, drained.error};
+    }
+
+    CallbackInvokeResult QuickJsScriptHost::applyHotUpdate(const LiveModuleSnapshot& snapshot, const HotMessage& message) {
+        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
+        auto& state = impl_->runtime;
+        if (!state.context) return {false, "HMR runtime 尚未初始化"};
+        if (message.event == "arrange:import-ready") {
+            const auto* data = std::get_if<HotValue::Object>(&message.data.value);
+            if (!data || !data->contains("session") || !std::holds_alternative<std::string>(data->at("session").value) || std::get<std::string>(data->at("session").value) != state.hotSession) return {true, {}};
+        }
+        state.moduleLoader.install(snapshot);
+        ScopedValue global(state.context, JS_GetGlobalObject(state.context));
+        ScopedValue receive(state.context, JS_GetPropertyStr(state.context, global.get(), "__ARRANGE_HOT_RECEIVE__"));
+        if (!JS_IsFunction(state.context, receive.get())) return {false, "HMR runtime 未安装"};
+        ScopedValue argument(state.context, hotMessageValue(state.context, message));
+        JSValueConst argv[] = {argument.get()};
+        ScopedValue result(state.context, JS_Call(state.context, receive.get(), JS_UNDEFINED, 1, argv));
+        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        const auto drained = impl_->drainJobs();
+        return {drained.ok, drained.error};
+    }
+
+    std::vector<HotMessage> QuickJsScriptHost::takeHotMessages() {
+        return std::exchange(impl_->runtime.hotMessages, {});
     }
 
     CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options) {

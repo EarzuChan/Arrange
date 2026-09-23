@@ -5,7 +5,7 @@ import { animatedNumberAsRef, tween } from '@arrange/framework/animation'
 import { ref as internalRef } from '@arrange/framework/internal'
 
 if (core.ref !== internalRef || !(M instanceof Modifier) || !Text) throw new Error('发布包分层入口的运行时身份不一致')
-for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'RearrangeSession', 'installArrangeHmrClient']) {
+for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'RearrangeSession']) {
     if (Object.hasOwn(core, name)) throw new Error(`发布包根入口泄漏了 ${name}`)
 }
 

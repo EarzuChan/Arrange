@@ -84,13 +84,13 @@ export function getCurrentInstance(): ArrangableInstance | null {
     return currentInstance
 }
 
-export function setCurrentInstance(instance: ArrangableInstance): () => void {
+export function setCurrentInstance(instance: ArrangableInstance, scope: EffectScope = instance.scope): () => void {
     const previous = currentInstance
     currentInstance = instance
-    instance.scope.on()
+    scope.on()
 
     return () => {
-        instance.scope.off()
+        scope.off()
         currentInstance = previous
     }
 }

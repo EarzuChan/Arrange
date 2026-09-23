@@ -8,6 +8,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <deque>
 #include <juce_core/juce_core.h>
 #endif
 
@@ -23,28 +24,17 @@ namespace arrange {
         std::string error;
     };
 
-    struct DevReloadEvent {
-        std::string payloadJson = "{}";
-        std::string path;
-        std::string rawMessage;
-    };
-
-    inline constexpr const char* ArrangeDevBundlePath = "/@arrange/app.js";
-
     DevServerEndpoint parseDevServerUrl(std::string_view url);
-    std::string devBundleHttpUrl(std::string_view devServerUrl);
-    std::optional<DevReloadEvent> parseViteHmrReloadMessage(std::string_view message);
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-    class DevServerReloadClient final : private ::juce::Thread {
+    class DevServerClient final : private ::juce::Thread {
        public:
-        using ReloadCallback = std::function<void(DevReloadEvent)>;
+        DevServerClient();
+        ~DevServerClient() override;
 
-        DevServerReloadClient();
-        ~DevServerReloadClient() override;
-
-        void start(std::string devServerUrl, ReloadCallback callback);
+        void start(std::string devServerUrl, std::function<void(std::string)> callback);
+        void send(std::string message);
         void stop();
 
         bool isClientRunning() const noexcept {
@@ -59,10 +49,11 @@ namespace arrange {
 
         mutable ::juce::CriticalSection lock_;
         std::string devServerUrl_;
-        ReloadCallback callback_;
+        std::function<void(std::string)> messageCallback_;
+        std::deque<std::string> outgoing_;
         std::string lastError_;
         std::atomic<bool> running_{false};
-        std::unique_ptr<::juce::StreamingSocket> socket_;
+        std::shared_ptr<::juce::StreamingSocket> socket_;
     };
 
 #endif

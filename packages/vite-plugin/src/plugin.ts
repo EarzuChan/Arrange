@@ -1,17 +1,19 @@
-import { ARRANGE_DEFINES, DEV_BUNDLE_PATH, PUBLIC_PLUGIN_NAME } from "./constraints.ts"
-import { buildDevBundle } from "./dev-bundle.ts"
+import { ARRANGE_DEFINES, PUBLIC_PLUGIN_NAME } from "./constraints.ts"
+import { createModuleSnapshot, MODULE_SNAPSHOT_PATH } from './module-snapshot.ts'
+import type { ViteDevServer } from 'vite'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createArrangeTransformPlugin } from "./transform.ts"
-import { invalidateSfaTypeDependency, isHotSourceFile, normalizePath } from "./sfa.ts"
+import { invalidateSfaTypeDependency } from "./sfa.ts"
 import type { ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule } from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
+    const runtimeRoots = ['@arrange/framework/internal', '@arrange/reactivity', '@arrange/shared'].map(name => dirname(fileURLToPath(import.meta.resolve(name))).replaceAll('\\', '/') + '/')
     const entry = options.entry ?? "src/main.ts"
-    const devBundlePath = options.devBundlePath ?? DEV_BUNDLE_PATH
     let command: string | undefined = "serve"
     const transformPlugin = createArrangeTransformPlugin({
         name: PUBLIC_PLUGIN_NAME,
-        entry,
-        injectEntryHmrClient: () => command === "serve",
+        hot: () => command === "serve",
     })
     return {
         ...transformPlugin,
@@ -31,6 +33,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
                         output: {
                             format: "es",
                             entryFileNames: "app.js",
+                            codeSplitting: false,
                             chunkFileNames: "chunks/[name]-[hash].js",
                             assetFileNames: "assets/[name]-[hash][extname]",
                         },
@@ -39,33 +42,28 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
             }
         },
         configureServer(server: ArrangeDevServer): void {
-            server.middlewares?.use(devBundlePath, async (_req, res) => {
+            server.middlewares?.use(MODULE_SNAPSHOT_PATH, async (req, res) => {
                 try {
-                    const code = await buildDevBundle(server, entry)
+                    const query = new URL((req as { url?: string }).url ?? '/', 'http://arrange').searchParams
+                    const snapshot = await createModuleSnapshot(server as ViteDevServer, entry, query.getAll('url'))
                     res.statusCode = 200
-                    res.setHeader("Content-Type", "application/javascript; charset=utf-8")
-                    res.setHeader("Cache-Control", "no-store")
-                    res.setHeader("X-Arrange-Dev-Bundle", "1")
-                    res.end(code)
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.setHeader('Cache-Control', 'no-store')
+                    res.end(JSON.stringify(snapshot))
                 } catch (error) {
                     res.statusCode = 500
-                    res.setHeader("Content-Type", "text/plain; charset=utf-8")
                     res.end(error instanceof Error ? error.stack ?? error.message : String(error))
                 }
             })
         },
         handleHotUpdate(ctx: HotUpdateContext): HotUpdateModule[] {
             invalidateSfaTypeDependency(ctx.file)
-            if (!isHotSourceFile(ctx.file)) return ctx.modules
-            ctx.server?.ws?.send?.({
-                type: "custom",
-                event: "arrange:reload",
-                data: {
-                    path: normalizePath(ctx.file),
-                    timestamp: Date.now(),
-                },
-            })
-            return []
+            // runtime 自身维护实例、响应式和原生绑定身份；更新其实现必须重建整个 JS 世界
+            if (runtimeRoots.some(root => ctx.file.replaceAll('\\', '/').startsWith(root))) {
+                ctx.server?.ws?.send?.({ type: 'full-reload', path: '*' })
+                return []
+            }
+            return ctx.modules
         },
     }
 }

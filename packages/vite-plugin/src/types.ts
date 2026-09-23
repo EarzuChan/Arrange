@@ -1,6 +1,5 @@
 export type ArrangeVitePluginOptions = {
     entry?: string
-    devBundlePath?: string
     host?: string
     port?: number
     strictPort?: boolean
@@ -29,16 +28,10 @@ export type HotUpdateModule = {
     file?: string
 }
 
-export type ArrangeReloadEvent = {
-    type: "custom"
-    event: "arrange:reload"
-    data: { path: string; timestamp: number }
-}
-
 export type HotUpdateContext = {
     file: string
     modules: HotUpdateModule[]
-    server?: { ws?: { send?: (event: ArrangeReloadEvent) => void } }
+    server?: { ws?: { send?: (event: { type: 'full-reload'; path: string }) => void } }
 }
 
 export type TransformWarning = { id: string; message: string }
@@ -57,6 +50,7 @@ export type ArrangeViteConfig = {
             output: {
                 format: string
                 entryFileNames: string
+                codeSplitting: boolean
                 chunkFileNames: string
                 assetFileNames: string
             }
@@ -66,8 +60,7 @@ export type ArrangeViteConfig = {
 
 export type ArrangeTransformPluginOptions = {
     name: string
-    entry: string
-    injectEntryHmrClient: () => boolean
+    hot: () => boolean
 }
 
 export type ArrangeTransformPlugin = {

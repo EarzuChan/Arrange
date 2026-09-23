@@ -538,9 +538,7 @@ namespace {
     int verifyDevServerAndFramePlanner() {
         const auto endpoint = arrange::parseDevServerUrl("http://127.0.0.1:9178");
         if (!endpoint.ok || endpoint.host != "127.0.0.1" || endpoint.port != 9178) return 81;
-        if (arrange::devBundleHttpUrl("http://127.0.0.1:9178") != "http://127.0.0.1:9178/@arrange/app.js") return 82;
-        const auto reload = arrange::parseViteHmrReloadMessage(R"({"type":"custom","event":"arrange:reload","data":{"path":"src/App.sfa","timestamp":1}})");
-        if (!reload || reload->path != "src/App.sfa" || reload->payloadJson.find("timestamp") == std::string::npos) return 83;
+        if (arrange::parseDevServerUrl("http://127.0.0.1:invalid").ok) return 82;
 
         arrange::juce::FramePlanner planner;
         if (planner.planTick({}).hasTickWork) return 84;

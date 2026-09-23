@@ -80,6 +80,16 @@ namespace arrange::juce {
     }
 
 #if ARRANGE_WITH_QUICKJS_NG
+    quickjs::CallbackInvokeResult ArrangeRuntime::applyHotUpdate(const quickjs::LiveModuleSnapshot& snapshot, const quickjs::HotMessage& message) {
+        const auto result = rearrangeHost_.applyHotUpdate(snapshot, message);
+        triggerAsyncUpdate();
+        return result;
+    }
+
+    std::vector<quickjs::HotMessage> ArrangeRuntime::takeHotMessages() {
+        return rearrangeHost_.takeHotMessages();
+    }
+
     void ArrangeRuntime::setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept {
         rearrangeHost_.setScriptHost(std::move(host));
         const auto weak = std::weak_ptr<OwnerWake>(wake_);

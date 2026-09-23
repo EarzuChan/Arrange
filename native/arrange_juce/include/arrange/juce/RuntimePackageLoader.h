@@ -42,7 +42,7 @@ namespace arrange::juce {
 
     class RuntimePackageLoader final {
        public:
-        RuntimePackageLoadResult loadLive(const EditorConfig& config, arrange::AppResolver& resolver) const;
+        RuntimePackageLoadResult loadLiveSnapshot(const EditorConfig& config, arrange::AppResolver& resolver, const quickjs::LiveModuleSnapshot& snapshot, const std::string& error) const;
         RuntimePackageLoadResult loadDist(const EditorConfig& config, arrange::AppResolver& resolver) const;
     };
 

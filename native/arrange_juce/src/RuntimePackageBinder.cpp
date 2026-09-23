@@ -39,6 +39,7 @@ namespace arrange::juce {
     }  // namespace
 
     void RuntimePackageBinder::apply(PackageLoadOutcome outcome, RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint) const {
+        if (outcome.pending) return;
         resetRuntimeState(session, runtime, diagnostics, interaction, paint);
 
         if (outcome.error) {

@@ -10,6 +10,7 @@ import { arrangeExecutionStats } from './executionStats.ts'
 import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 import { ValueBinding } from './valueBinding.ts'
 import { bindFrameScheduler } from './animationOwner.ts'
+import { resolveHotArrangable, inheritHotState, setupHotArrangable } from './arrangableHmr.ts'
 
 interface CallEntry {
     readonly kind: 'call'
@@ -539,6 +540,7 @@ export class RearrangeSession {
 
 /** @arrangeCall */
 export function callArrangable<D extends ArrangableDefinition>(position: CallPosition, definition: D, inputs: PropInputs<ArrangableProps<D>>, contents: Contents = {}, metadata: CallMetadata = {}): void {
+    definition = resolveHotArrangable(definition) as D
     const scope = requireScope()
     pauseTracking()
     try {
@@ -555,6 +557,7 @@ export function callArrangable<D extends ArrangableDefinition>(position: CallPos
             if (updateContents(entry.instance, contents)) scope.rearrangeSession.enqueue(entry.instance.structure, true)
         } else {
             const instance = new ArrangableInstance(definition, scope.owner, scope.rearrangeSession.context, metadata.source)
+            inheritHotState(instance, previous?.kind === 'call' ? previous.instance : undefined)
             arrangeExecutionStats.instancesCreated++
             entry = { kind: 'call', position, key: metadata.key, instance }
             initializeInstance(instance, scope, normalized, contents, metadata)
@@ -607,7 +610,7 @@ function initializeInstance(instance: ArrangableInstance, parent: RearrangeScope
             },
             source: name => instance.propStore.source(name),
         }
-        const program = instance.type.setup(instance.props, instance.setupContext)
+        const program = setupHotArrangable(instance, () => instance.type.setup(instance.props, instance.setupContext))
         if (typeof program !== 'function') throw new TypeError('Arrangable setup 必须返回结构执行函数，不支持异步 setup')
         instance.structure = new RearrangeScope(parent.rearrangeSession, instance, parent, () => {
             runHooks(instance, instance.isMounted ? LifecycleHooks.BEFORE_UPDATE : LifecycleHooks.BEFORE_MOUNT)

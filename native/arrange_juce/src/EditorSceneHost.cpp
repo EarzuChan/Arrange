@@ -76,15 +76,37 @@ namespace arrange::juce {
             repaint_.repaintDirty(owner, runtime_.publishedFrame());
         }
 
-        bool consumeDevReloadRequested() {
-            return packageSource_.consumeDevReloadRequested();
-        }
-
         bool wantsVBlank() const {
             return pendingReload_ != ReloadKind::None || wantsReloadPolling() || diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork();
         }
 
         bool pumpFrame(double nowMillis) {
+#if ARRANGE_WITH_QUICKJS_NG
+            for (auto& packet : packageSource_.takeLivePackets()) {
+                if (packet.reload)
+                    applyPackageLoadOutcome(packageSource_.completeLiveLoad(std::move(packet)));
+                else {
+                    if (packet.message.type == "update" && packageSource_.activeSource() != PackageSource::Live) {
+                        applyPackageLoadOutcome(packageSource_.reloadFromDevServer());
+                        continue;
+                    }
+                    if (packet.error.empty() && packageSource_.activeSource() == PackageSource::Live) {
+                        const auto result = runtime_.applyHotUpdate(packet.snapshot, packet.message);
+                        if (!result.ok) packet.error = result.error;
+                    }
+                    if (!packet.error.empty()) {
+                        DiagnosticEventInput event;
+                        event.level = LogLevel::Error;
+                        event.category = DiagnosticCategory::HostHmr;
+                        event.code = "hmr.update.failed";
+                        event.message = packet.error;
+                        event.toast = true;
+                        (void)diagnostics_.emit(std::move(event));
+                    }
+                }
+            }
+            packageSource_.sendHotMessages(runtime_.takeHotMessages());
+#endif
             const auto scriptReload = runtime_.consumeReloadRequest();
             if (scriptReload && pendingReload_ == ReloadKind::None) pendingReload_ = ReloadKind::Configured;
             const auto reloadKind = std::exchange(pendingReload_, ReloadKind::None);
@@ -264,10 +286,6 @@ namespace arrange::juce {
 
     void EditorSceneHost::repaintDirty(::juce::Component& owner) {
         impl_->repaintDirty(owner);
-    }
-
-    bool EditorSceneHost::consumeDevReloadRequested() {
-        return impl_->consumeDevReloadRequested();
     }
 
     bool EditorSceneHost::wantsVBlank() const {

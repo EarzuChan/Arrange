@@ -11,12 +11,17 @@ target_link_libraries(arrange_m24_contract PRIVATE Arrange::framework)
 add_test(NAME arrange_m24_contract COMMAND arrange_m24_contract)
 
 if(TARGET qjs)
+  add_executable(arrange_live_modules arrange_live_modules.cpp)
+  target_link_libraries(arrange_live_modules PRIVATE Arrange::quickjs)
+  add_test(NAME arrange_live_modules COMMAND arrange_live_modules)
   add_executable(arrange_quickjs_app_smoke arrange_quickjs_app_smoke.cpp)
   target_link_libraries(arrange_quickjs_app_smoke PRIVATE Arrange::framework)
   add_test(NAME arrange_quickjs_app_smoke COMMAND arrange_quickjs_app_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js")
 endif()
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
+  add_executable(arrange_live_server arrange_live_server.cpp)
+  target_link_libraries(arrange_live_server PRIVATE Arrange::framework)
   add_executable(arrange_juce_runtime_smoke arrange_juce_runtime_smoke.cpp)
   target_link_libraries(arrange_juce_runtime_smoke PRIVATE Arrange::framework)
   add_test(

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url"
 const repoRoot = resolve(import.meta.dirname, "..")
 const uiRoot = resolve(repoRoot, "demo/ui-src")
 const port = 9178
-const devBundlePath = "/@arrange/app.js"
+const devBundlePath = "/@arrange/modules"
 const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const endpoint = `http://127.0.0.1:${port}${devBundlePath}`
 const require = createRequire(import.meta.url)
@@ -41,12 +41,11 @@ async function probeEndpoint(): Promise<{ status: number; body: string; headers:
 
 function assertBundle(result: { status: number; body: string; headers: Record<string, string | string[] | undefined> }): void {
     if (result.status !== 200) throw new Error(`unexpected dev endpoint status ${result.status}\n${result.body}`)
-    if (!/createApp/.test(result.body)) throw new Error("dev endpoint bundle missing createApp")
-    if (macroPattern.test(result.body)) {
-        throw new Error("dev endpoint bundle contains unresolved Arrange macro")
-    }
-    if (/process\.env/.test(result.body)) throw new Error("dev endpoint bundle contains process.env")
-    console.log(`dev endpoint ok: ${result.status}, bytes=${result.body.length}`)
+    const snapshot = JSON.parse(result.body) as { entry: string; modules: { url: string; source: string }[] }
+    if (snapshot.entry !== '/@arrange/entry' || !snapshot.modules.some(module => module.url === '/src/main.ts')) throw new Error('live ESM snapshot missing entry')
+    const client = snapshot.modules.find(module => module.url === '/@vite/client')
+    if (!client || /document\.|window\.|WebSocket|updateStyle/.test(client.source)) throw new Error('live snapshot contains browser client')
+    console.log(`live ESM endpoint ok: ${snapshot.modules.length} modules, bytes=${result.body.length}`)
 }
 
 const existing = await probeEndpoint()

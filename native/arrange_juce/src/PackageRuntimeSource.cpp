@@ -56,9 +56,9 @@ namespace arrange::juce {
         lastLiveUnavailable_ = false;
         activeSource_ = PackageSource::None;
 
+        startDevServerClientIfNeeded();
         auto outcome = loadConfiguredPackage();
         outcome.intentKind = PackageLoadOutcome::IntentKind::PackageLoad;
-        startDevServerClientIfNeeded();
         return outcome;
     }
 
@@ -93,33 +93,17 @@ namespace arrange::juce {
         return outcome;
     }
 
-    bool PackageRuntimeSource::consumeDevReloadRequested() {
-        return devReloadRequested_.exchange(false);
-    }
-
     bool PackageRuntimeSource::wantsReloadPolling() const {
         return config_.app.hasLive();
     }
 
     PackageLoadOutcome PackageRuntimeSource::loadConfiguredPackage() {
-        activeSource_ = PackageSource::None;
         if (!config_.app.hasAnySource()) {
             return noSourceOutcome();
         }
 
         if (config_.app.hasLive() && liveRuntimeEnabled_) {
-            auto live = loadLivePackage();
-            if (live.loaded) {
-                return live;
-            }
-            if (!live.serverUnavailable || !config_.app.hasDist()) {
-                return live;
-            }
-
-            lastLiveUnavailable_ = true;
-            auto dist = loadDistPackage();
-            prependDiagnostics(dist, {makeDiagnostic(LogLevel::Warn, "Using dist fallback", "Live dev server is unavailable; loading configured dist package.", true)});
-            return dist;
+            return loadLivePackage();
         }
 
         if (config_.app.hasDist()) {
@@ -130,11 +114,35 @@ namespace arrange::juce {
     }
 
     PackageLoadOutcome PackageRuntimeSource::loadLivePackage() {
-        auto outcome = packageOutcomeFromRuntimeLoad(runtimeLoader_.loadLive(config_, resolver_), PackageSource::Live);
+        PackageLoadOutcome outcome;
+        outcome.pending = true;
+        if (devServerClient_) devServerClient_->requestReload();
+        return outcome;
+    }
+
+    std::vector<LiveModulePacket> PackageRuntimeSource::takeLivePackets() {
+        return devServerClient_ ? devServerClient_->takePackets() : std::vector<LiveModulePacket>{};
+    }
+
+    void PackageRuntimeSource::sendHotMessages(std::vector<quickjs::HotMessage> messages) {
+        if (devServerClient_)
+            for (const auto& message : messages) devServerClient_->send(message);
+    }
+
+    PackageLoadOutcome PackageRuntimeSource::completeLiveLoad(LiveModulePacket packet) {
+        if (packet.unavailable && config_.app.hasDist()) {
+            lastLiveUnavailable_ = true;
+            auto outcome = loadDistPackage();
+            prependDiagnostics(outcome, {makeDiagnostic(LogLevel::Warn, "Using dist fallback", packet.error, true)});
+            return outcome;
+        }
+        auto outcome = packageOutcomeFromRuntimeLoad(runtimeLoader_.loadLiveSnapshot(config_, resolver_, packet.snapshot, packet.error), PackageSource::Live);
+        outcome.intentKind = PackageLoadOutcome::IntentKind::HmrReload;
         if (outcome.loaded) {
             activeSource_ = PackageSource::Live;
             lastLiveUnavailable_ = false;
-        }
+        } else
+            activeSource_ = PackageSource::None;
         return outcome;
     }
 
@@ -177,16 +185,14 @@ namespace arrange::juce {
             return;
         }
 
-        devServerClient_ = std::make_unique<arrange::DevServerReloadClient>();
-        devServerClient_->start(resolved.devServerUrl, [this](arrange::DevReloadEvent) { devReloadRequested_ = true; });
+        devServerClient_ = std::make_unique<LiveModuleClient>();
+        devServerClient_->start(resolved.devServerUrl);
     }
 
     void PackageRuntimeSource::stopDevServerClient() {
         if (devServerClient_) {
-            devServerClient_->stop();
             devServerClient_.reset();
         }
-        devReloadRequested_ = false;
     }
 
     void PackageRuntimeSource::prependDiagnostics(PackageLoadOutcome& outcome, std::vector<RuntimeLoadDiagnostic> diagnostics) const {

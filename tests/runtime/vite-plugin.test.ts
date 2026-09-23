@@ -3,8 +3,9 @@ import { compileScript, parse } from '../../packages/compiler/src/sfa/index.ts'
 import assert from "node:assert/strict"
 import { resolve } from "node:path"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
-import { DEV_BUNDLE_PATH } from "../../packages/vite-plugin/src/constraints.ts"
-import { buildDevBundle } from "../../packages/vite-plugin/src/dev-bundle.ts"
+import { MODULE_SNAPSHOT_PATH, createModuleSnapshot } from '../../packages/vite-plugin/src/module-snapshot.ts'
+import { createServer } from 'vite'
+import ts from 'typescript'
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -15,7 +16,7 @@ test("vite plugin config freezes Arrange dev server and app.js output defaults",
     assert.equal(config.build.rollupOptions.output.chunkFileNames, "chunks/[name]-[hash].js")
 })
 
-test("vite plugin registers an app.js dev bundle endpoint for native ArrangeEditor", () => {
+test("vite plugin registers the live ESM snapshot endpoint", () => {
     const plugin = arrange()
     const registrations: Array<{ path: string; handler: unknown }> = []
     plugin.configureServer({
@@ -26,37 +27,52 @@ test("vite plugin registers an app.js dev bundle endpoint for native ArrangeEdit
         },
     })
     assert.equal(registrations.length, 1)
-    assert.equal(registrations[0].path, DEV_BUNDLE_PATH)
+    assert.equal(registrations[0].path, MODULE_SNAPSHOT_PATH)
     assert.equal(typeof registrations[0].handler, "function")
 })
 
-test("vite plugin can build the native dev app.js bundle on demand", { timeout: 15000 }, async () => {
+test("vite plugin returns transformed ESM boundaries and native HMR without browser client", { timeout: 30000 }, async () => {
     const root = resolve("demo/ui-src")
-    const code = await buildDevBundle({
-        config: {
-            root,
-            mode: "development",
-        },
-    }, "src/main.ts")
-    assert.match(code, /__ARRANGE_NATIVE__/)
-    assert.match(code, /beginRearrange/)
-    assert.match(code, /submitRearrange/)
-    assert.doesNotMatch(code, /createVNode|arrangeValue|defineFoundationArrangable/)
+    const server = await createServer({ root, configFile: false, plugins: [arrange()], server: { middlewareMode: true, hmr: false } })
+    try {
+        const snapshot = await createModuleSnapshot(server, 'src/main.ts')
+        assert.equal(snapshot.entry, '/@arrange/entry')
+        assert.ok(snapshot.modules.length > 20)
+        assert.match(snapshot.modules.find(module => module.url === '/src/main.ts')!.source, /import /)
+        const client = snapshot.modules.find(module => module.url === '/@vite/client')!.source
+        assert.match(client, /createHotContext/)
+        assert.doesNotMatch(client, /document\.|window\.|WebSocket|updateStyle/)
+        assert.ok(snapshot.modules.some(module => module.url.split('?')[0] === '/src/App.sfa'))
+    } finally { await server.close() }
 })
 
-test("vite plugin injects Arrange HMR client into the configured entry", async () => {
+test("vite plugin leaves ordinary ESM entry to Vite import analysis", async () => {
     const plugin = arrange()
     const transformed = await plugin.transform.call({
         warn() {
         }
     }, 'import { createApp } from "@arrange/framework";\n', "C:/demo/ui-src/src/main.ts")
-    assert.equal(typeof transformed, 'string')
-    if (typeof transformed !== 'string') throw new Error('入口转换未返回源码')
-    assert.match(transformed, /installArrangeHmrClient/)
-    assert.match(transformed, /import\.meta\.hot/)
+    assert.equal(transformed, null)
 })
 
-test("vite plugin emits Arrange reload events over Vite HMR channel", () => {
+test('live 动态 import 辅助名称不覆盖用户绑定', async () => {
+    const source = `const __arrangeImport = 7\nconst __arrangeImport_ = 8\nexport const result = import('./dep').then(module => module.value + __arrangeImport + __arrangeImport_)`
+    const server = { async transformRequest() { return { code: source } } } as unknown as Parameters<typeof createModuleSnapshot>[0]
+    const snapshot = await createModuleSnapshot(server, 'entry.ts', ['/entry.ts'])
+    const entry = snapshot.modules.find(module => module.url === '/entry.ts')!
+    const output = ts.transpileModule(entry.source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+    const exports: { result?: Promise<number> } = {}
+    new Function('require', 'exports', output)(() => ({
+        importLiveModule: async (specifier: string, importer: string) => {
+            assert.equal(specifier, './dep')
+            assert.equal(importer, '/entry.ts')
+            return { value: 15 }
+        }
+    }), exports)
+    assert.equal(await exports.result, 30)
+})
+
+test("vite plugin lets Vite propagate updates to accept boundaries", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
     const modules = [{ id: "App.sfa" }]
@@ -71,15 +87,11 @@ test("vite plugin emits Arrange reload events over Vite HMR channel", () => {
             }
         },
     })
-    assert.deepEqual(result, [])
-    assert.equal(sent.length, 1)
-    assert.equal(sent[0].type, "custom")
-    assert.equal(sent[0].event, "arrange:reload")
-    assert.equal(sent[0]?.data?.path, "C:/demo/ui-src/src/App.sfa")
-    assert.equal(typeof sent[0]?.data?.timestamp, "number")
+    assert.equal(result, modules)
+    assert.equal(sent.length, 0)
 })
 
-test("vite plugin suppresses arrangable-level HMR so native reload owns state cleanup", () => {
+test("vite plugin preserves SFA modules as Arrangable accept boundaries", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
     const result = plugin.handleHotUpdate({
@@ -94,12 +106,11 @@ test("vite plugin suppresses arrangable-level HMR so native reload owns state cl
         },
     })
 
-    assert.deepEqual(result, [])
-    assert.equal(sent.length, 1)
-    assert.equal(sent[0].event, "arrange:reload")
+    assert.equal(result.length, 2)
+    assert.equal(sent.length, 0)
 })
 
-test("vite plugin does not emit Arrange reload for dependency updates", () => {
+test("vite plugin does not emit full reload for ordinary dependency updates", () => {
     const plugin = arrange()
     const sent: Array<{ type?: string; event?: string; data?: { path?: string; timestamp?: number } }> = []
     plugin.handleHotUpdate({

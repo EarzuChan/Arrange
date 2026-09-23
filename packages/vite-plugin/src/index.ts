@@ -1,6 +1,5 @@
-export { ARRANGE_DEFINES, ARRANGE_DEFINE_KEYS, ARRANGE_MACRO_PATTERN, ARRANGE_VERSION, DEV_BUNDLE_PATH, DEV_BUNDLE_PLUGIN_NAME, PUBLIC_PLUGIN_NAME } from "./constraints.ts"
-
-export { buildDevBundle } from "./dev-bundle.ts"
+export { ARRANGE_DEFINES, ARRANGE_DEFINE_KEYS, ARRANGE_MACRO_PATTERN, ARRANGE_VERSION, PUBLIC_PLUGIN_NAME } from "./constraints.ts"
+export { createModuleSnapshot, MODULE_SNAPSHOT_PATH } from './module-snapshot.ts'
 
 export { arrange, default } from "./plugin.ts"
 

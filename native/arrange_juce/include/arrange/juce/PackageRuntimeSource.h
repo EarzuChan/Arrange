@@ -3,6 +3,7 @@
 #include <arrange/juce/AppResolver.h>
 #include <arrange/juce/DevServerClient.h>
 #include <arrange/juce/RuntimePackageLoader.h>
+#include <arrange/juce/LiveModuleClient.h>
 
 #include <atomic>
 #include <filesystem>
@@ -30,6 +31,7 @@ namespace arrange::juce {
         };
 
         bool loaded = false;
+        bool pending = false;
         bool serverUnavailable = false;
         IntentKind intentKind = IntentKind::PackageLoad;
         PackageSource activeSource = PackageSource::None;
@@ -51,8 +53,10 @@ namespace arrange::juce {
         PackageLoadOutcome reloadFromDevServer();
         PackageLoadOutcome manualReload(bool toggleLive);
 
-        bool consumeDevReloadRequested();
         bool wantsReloadPolling() const;
+        std::vector<LiveModulePacket> takeLivePackets();
+        PackageLoadOutcome completeLiveLoad(LiveModulePacket packet);
+        void sendHotMessages(std::vector<quickjs::HotMessage> messages);
 
         const EditorConfig& config() const noexcept {
             return config_;
@@ -84,8 +88,7 @@ namespace arrange::juce {
         EditorConfig config_;
         AppResolver resolver_;
         RuntimePackageLoader runtimeLoader_;
-        std::unique_ptr<arrange::DevServerReloadClient> devServerClient_;
-        std::atomic<bool> devReloadRequested_{false};
+        std::unique_ptr<LiveModuleClient> devServerClient_;
         PackageSource activeSource_ = PackageSource::None;
         bool liveRuntimeEnabled_ = false;
         bool lastLiveUnavailable_ = false;

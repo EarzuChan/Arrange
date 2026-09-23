@@ -41,7 +41,6 @@ namespace arrange::juce {
 
     void EditorShellDriver::vblankTick(ArrangeEditor& editor, double nowMillis) const {
         // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线
-        if (editor.sceneHost_->consumeDevReloadRequested()) editor.sceneHost_->reloadFromDevServer();
         const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
         editor.updateWindowTitle();
         editor.updateFrameClockState();

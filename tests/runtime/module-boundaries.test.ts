@@ -9,7 +9,7 @@ import { frameScope } from './frameScope.ts'
 import { requireSfaModule } from './sfaModules.ts'
 
 test('根入口只保留核心能力，分层入口与编译协议共享响应式身份', () => {
-    for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'callArrangable', 'RearrangeSession', 'getArrangeExecutionStats', 'installArrangeHmrClient']) assert.equal(Object.hasOwn(core, name), false, `根入口泄漏了 ${name}`)
+    for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'callArrangable', 'RearrangeSession', 'getArrangeExecutionStats']) assert.equal(Object.hasOwn(core, name), false, `根入口泄漏了 ${name}`)
 
     assert.equal(requireSfaModule('@arrange/framework/foundation'), foundation)
     assert.equal(requireSfaModule('@arrange/framework/ui'), ui)

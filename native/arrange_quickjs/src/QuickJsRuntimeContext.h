@@ -61,6 +61,8 @@ namespace arrange::quickjs {
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeId> parentByNode;
         std::vector<QuickJsDiagnosticEventInput> diagnosticEvents;
         std::vector<QuickJsDiagnosticAction> diagnosticActions;
+        std::vector<HotMessage> hotMessages;
+        std::string hotSession;
 
         struct RearrangeCheckpoint {
             arrange::core::NodeId root;

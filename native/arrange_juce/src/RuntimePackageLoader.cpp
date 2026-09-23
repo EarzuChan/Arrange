@@ -20,10 +20,10 @@ namespace arrange::juce {
         }
     }  // namespace
 
-    RuntimePackageLoadResult RuntimePackageLoader::loadLive(const EditorConfig& config, AppResolver& resolver) const {
+    RuntimePackageLoadResult RuntimePackageLoader::loadLiveSnapshot(const EditorConfig& config, AppResolver& resolver, const quickjs::LiveModuleSnapshot& snapshot, const std::string& error) const {
         RuntimePackageLoadResult result;
         const auto resolved = resolver.resolveDebug(config.app, config.devServerUrl);
-        const auto bundleUrl = arrange::devBundleHttpUrl(resolved.devServerUrl);
+        const auto bundleUrl = resolved.devServerUrl;
         result.packageDir = resolved.packageDir;
 
         if (!resolved.ok || bundleUrl.empty()) {
@@ -33,27 +33,15 @@ namespace arrange::juce {
         }
 
 #if ARRANGE_WITH_QUICKJS_NG
-        int statusCode = 0;
-        const auto options = ::juce::URL::InputStreamOptions(::juce::URL::ParameterHandling::inAddress).withConnectionTimeoutMs(5000).withNumRedirectsToFollow(0).withStatusCode(&statusCode).withHttpRequestCmd("GET");
-        auto stream = ::juce::URL(bundleUrl).createInputStream(options);
-        if (!stream) {
-            result.serverUnavailable = true;
-            result.error = makeErrorScreenModel(ErrorSource::AppPackage, "Arrange dev server is not reachable: " + bundleUrl, "Debug fallback may load the last built ui/app.js, but true hot reload needs pnpm dev.", bundleUrl);
-            setDiagnostic(result, LogLevel::Warn, "Live unavailable", bundleUrl, true);
-            return result;
-        }
-
-        const auto source = stream->readEntireStreamAsString().toStdString();
-        if (statusCode != 200) {
-            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "Arrange dev bundle request failed with HTTP " + std::to_string(statusCode) + ".\n" + source, "修复 SFA 构建错误并保存；ArrangeEditor 将通过同一重载路径重试", bundleUrl);
-            setDiagnostic(result, LogLevel::Error, "Live bundle failed", "HTTP " + std::to_string(statusCode) + " from " + bundleUrl, true);
+        if (!error.empty()) {
+            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, error, {}, bundleUrl);
+            setDiagnostic(result, LogLevel::Error, "Live ESM failed", error, true);
             return result;
         }
 
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
-        const auto modulePath = result.packageDir / "__arrange_dev_app.js";
-        const auto executed = scriptHost->executeModule(modulePath, source);
+        const auto executed = scriptHost->executeLiveModules(snapshot);
         if (!executed.ok) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, executed.error, {}, bundleUrl);
             setDiagnostic(result, LogLevel::Error, "Live runtime failed", executed.error, true);

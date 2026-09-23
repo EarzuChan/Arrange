@@ -1,5 +1,5 @@
 import { transformWithOxc } from "vite"
-import { compileArrangeSfa, injectHmrClient, isEntryModule, isSfaModule, isSfaQueryModule } from "./sfa.ts"
+import { compileArrangeSfa, isSfaModule, isSfaQueryModule } from "./sfa.ts"
 import type { ArrangeTransformPlugin, ArrangeTransformPluginOptions, TransformThis } from "./types.ts"
 
 export function createArrangeTransformPlugin(options: ArrangeTransformPluginOptions): ArrangeTransformPlugin {
@@ -11,13 +11,10 @@ export function createArrangeTransformPlugin(options: ArrangeTransformPluginOpti
             return ""
         },
         transform(this: TransformThis, code: string, id: string) {
-            if (isEntryModule(id, options.entry)) {
-                return options.injectEntryHmrClient() ? injectHmrClient(code) : code
-            }
             if (!isSfaModule(id)) return null
             if (String(id).includes("?")) return ""
 
-            const { code: transformed, warnings, map, dependencies } = compileArrangeSfa(code, id)
+            const { code: transformed, warnings, map, dependencies } = compileArrangeSfa(code, id, options.hot())
             for (const message of warnings) this.warn({ id, message })
             for (const dependency of dependencies) this.addWatchFile?.(dependency)
 

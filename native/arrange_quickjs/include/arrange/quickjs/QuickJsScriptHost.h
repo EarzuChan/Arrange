@@ -12,6 +12,7 @@
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Painter.h>
 #include "ScriptHost.h"
+#include "LiveModule.h"
 
 namespace arrange::quickjs {
 #if ARRANGE_WITH_QUICKJS_NG
@@ -95,6 +96,9 @@ namespace arrange::quickjs {
         void setPainterLoader(arrange::core::PainterLoader loader);
 
         ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override;
+        ScriptExecutionResult executeLiveModules(const LiveModuleSnapshot& snapshot);
+        CallbackInvokeResult applyHotUpdate(const LiveModuleSnapshot& snapshot, const HotMessage& message);
+        std::vector<HotMessage> takeHotMessages();
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll);
 

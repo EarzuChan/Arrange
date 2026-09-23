@@ -2,7 +2,7 @@
 export * from './runtime/index.ts'
 export * from './runtime/internal.ts'
 export * from './native.ts'
-export * from './hmr.ts'
+export { registerArrangableHmr, applyArrangableHmr, arrangableHotState, bindArrangableHotTemplate } from './runtime/arrangableHmr.ts'
 export * from './diagnostics.ts'
 export { getArrangeExecutionStats } from './runtime/executionStats.ts'
 export { arrangeModifier } from './modifier.ts'

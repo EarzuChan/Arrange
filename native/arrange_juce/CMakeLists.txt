@@ -1,6 +1,7 @@
 add_library(arrange_juce STATIC
   src/AppResolver.cpp
   src/DevServerClient.cpp
+  src/LiveModuleClient.cpp
   src/ErrorScreenModel.cpp
   src/FramePlanner.cpp
   src/VBlankSource.cpp

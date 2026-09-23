@@ -31,6 +31,8 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
         void setScriptHost(std::unique_ptr<arrange::quickjs::QuickJsScriptHost> host) noexcept;
+        quickjs::CallbackInvokeResult applyHotUpdate(const quickjs::LiveModuleSnapshot& snapshot, const quickjs::HotMessage& message);
+        std::vector<quickjs::HotMessage> takeHotMessages();
 #endif
 
         [[nodiscard]] bool hasScriptHost() const noexcept;

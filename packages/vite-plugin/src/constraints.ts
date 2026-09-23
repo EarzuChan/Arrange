@@ -1,10 +1,6 @@
 export const ARRANGE_VERSION = "3.5.34-arrange"
 
-export const DEV_BUNDLE_PATH = "/@arrange/app.js"
-
 export const PUBLIC_PLUGIN_NAME = "arrange-framework"
-
-export const DEV_BUNDLE_PLUGIN_NAME = "arrange-framework:dev-bundle"
 
 export const ARRANGE_DEFINE_KEYS = ["__DEV__", "__TEST__", "__VERSION__",] as const
 
