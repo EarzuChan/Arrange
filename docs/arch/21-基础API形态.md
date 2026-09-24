@@ -53,19 +53,20 @@ config.app.useLive("http://host:port");
 
 # 基础类型 API
 
-```ts
-dp(value: number): Dp
-sp(value: number): Sp
-px(value: number): Px
+```sfa
+// SFA 写法，编译期拆箱
+114.dp
+16.sp
+8.px
 
 Color(value: number): ArrangeColor
 Color(args: { red: number; green: number; blue: number; alpha?: number }): ArrangeColor
 
 solidColor(color: ArrangeColor): Brush
-rounded(radius: Dp): Shape
+rounded(radiusDp: number, radiusPx: number): Shape
 ```
 
-`Dp`、`Sp`、`Px` 使用 number 别名。渐变与分角圆角属于后续设计，不提供空壳工厂。
+`Dp`、`Sp`、`Px` 是值壳类型，不是 number 别名。普通 TS 直接写真语义数字；SFA 的长度消费由编译器生成双通道数字。
 
 # Modifier API
 
@@ -74,29 +75,29 @@ interface Modifier {
     then(other: Modifier | null | undefined): Modifier
     keyed(key: string): Modifier
     if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier): Modifier
-    width(value: number): Modifier
-    height(value: number): Modifier
-    size(width: number, height?: number): Modifier
-    requiredWidth(width: number): Modifier
-    requiredHeight(height: number): Modifier
-    requiredSize(width: number, height?: number): Modifier
-    widthIn(args: { min?: number; max?: number }): Modifier
-    heightIn(args: { min?: number; max?: number }): Modifier
+    width(dp: number, px: number): Modifier
+    height(dp: number, px: number): Modifier
+    size(widthDp: number, widthPx: number, heightDp?: number, heightPx?: number): Modifier
+    requiredWidth(dp: number, px: number): Modifier
+    requiredHeight(dp: number, px: number): Modifier
+    requiredSize(widthDp: number, widthPx: number, heightDp?: number, heightPx?: number): Modifier
+    widthIn(args: { minDp?: number; minPx?: number; maxDp?: number; maxPx?: number }): Modifier
+    heightIn(args: { minDp?: number; minPx?: number; maxDp?: number; maxPx?: number }): Modifier
     sizeIn(args: SizeRange): Modifier
-    defaultMinSize(args: Pick<SizeRange, "minWidth" | "minHeight">): Modifier
+    defaultMinSize(args: Pick<SizeRange, "minWidthDp" | "minWidthPx" | "minHeightDp" | "minHeightPx">): Modifier
     fillMaxWidth(fraction?: number): Modifier
     fillMaxHeight(fraction?: number): Modifier
     fillMaxSize(fraction?: number): Modifier
     padding(value: PaddingValue): Modifier
-    offset(args: { x?: number; y?: number }): Modifier
-    absoluteOffset(args: { x?: number; y?: number }): Modifier
+    offset(args: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }): Modifier
+    absoluteOffset(args: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }): Modifier
     align(alignment: string): Modifier
     weight(weight: number, args?: { fill?: boolean }): Modifier
     zIndex(value: number): Modifier
     background(brush: Brush | number, shape?: Shape): Modifier
     paint(painter: Painter, options?: PaintOptions): Modifier
     border(args: BorderOptions): Modifier
-    border(width: number, brush: Brush | number, shape?: Shape): Modifier
+    border(widthDp: number, widthPx: number, brush: Brush | number, shape?: Shape): Modifier
     clip(shape: Shape): Modifier
     alpha(value: number): Modifier
     graphicsLayer(args?: GraphicsLayerOptions): Modifier

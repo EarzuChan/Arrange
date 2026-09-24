@@ -22,7 +22,7 @@ function diagnosticNative(): NativeTransactionTarget & { calls: (readonly [strin
 
 test('App 经 Layout 结构调用提交原生父子关系、Policy 与 Modifier', () => {
     const native = recordingNative()
-    const Root = defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.padding(8) }, { default: () => call(0, Text, { text: () => '正文' }) }) })
+    const Root = defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.padding(8, 0) }, { default: () => call(0, Text, { text: () => '正文' }) }) })
     const app = createApp(Root)
     mountFrame(app, native.target)
     assert.deepEqual(native.nodes.get(1)!.children, [2])

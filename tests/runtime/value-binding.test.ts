@@ -97,15 +97,15 @@ test('style 和 class 只是用户显式声明的普通参数，跨层 computed 
 test('Modifier 未被内部使用时没有隐式受体，显式交付多个 Layout 时各自拥有实例', () => {
     const Wrapper = internal.defineArrangable({ props: { modifier: ui.Modifier }, setup: () => () => { } })
     const native = recordingNative()
-    const empty = runtime.createApp(Wrapper, { modifier: ui.M.width(20) })
+    const empty = runtime.createApp(Wrapper, { modifier: ui.M.width(20, 0) })
     mountFrame(empty, native.target)
     assert.equal(native.nodes.size, 1)
     empty.unmount()
 
     const Shared = internal.defineArrangable({
         setup: (_props, { call }) => () => {
-            call(0, foundation.Box, { modifier: () => ui.M.width(20) })
-            call(1, foundation.Box, { modifier: () => ui.M.width(20) })
+            call(0, foundation.Box, { modifier: () => ui.M.width(20, 0) })
+            call(1, foundation.Box, { modifier: () => ui.M.width(20, 0) })
         }
     })
     const app = runtime.createApp(Shared)

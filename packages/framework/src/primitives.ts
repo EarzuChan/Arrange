@@ -1,14 +1,14 @@
-export { Dp, Sp, Px, ColorValue, dp, sp, px, Color } from './unit.ts'
+export { Dp, Sp, Px, ColorValue, Color } from './unit.ts'
 export type { ColorChannels } from './unit.ts'
 
 /** @arrangeFields shape */
-export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radius: number }>
+export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radiusDp: number; radiusPx: number }>
 /** @arrangeFields brush */
 export type Brush = Readonly<{ type: "solidColor"; color: number }>
 /** @arrangeFields padding */
-export type PaddingValue = number | { start?: number; top?: number; end?: number; bottom?: number; horizontal?: number; vertical?: number }
+export type PaddingValue = Readonly<{ startDp?: number; startPx?: number; topDp?: number; topPx?: number; endDp?: number; endPx?: number; bottomDp?: number; bottomPx?: number; horizontalDp?: number; horizontalPx?: number; verticalDp?: number; verticalPx?: number }>
 /** @arrangeFields padding */
-export type Padding = Readonly<{ start: number; top: number; end: number; bottom: number }>
+export type Padding = Readonly<{ startDp: number; startPx: number; topDp: number; topPx: number; endDp: number; endPx: number; bottomDp: number; bottomPx: number }>
 
 /** @arrangeArguments color */
 export function colorToHex(color: number): string {
@@ -18,10 +18,10 @@ export function colorToHex(color: number): string {
 export const RectangleShape = Object.freeze({ type: "rectangle" })
 export const CircleShape = Object.freeze({ type: "circle" })
 
-/** @arrangeArguments dp */
-export function rounded(radius: number): Shape {
-    if (!Number.isFinite(radius) || radius < 0) throw new RangeError("圆角半径必须是非负有限数值")
-    return Object.freeze({ type: "rounded", radius })
+/** @arrangeArguments length */
+export function rounded(radiusDp: number, radiusPx: number): Shape {
+    if (!Number.isFinite(radiusDp) || !Number.isFinite(radiusPx) || radiusDp < 0 || radiusPx < 0) throw new RangeError("圆角半径必须是非负有限数值")
+    return Object.freeze({ type: "rounded", radiusDp, radiusPx })
 }
 
 /** @arrangeArguments color */
@@ -48,11 +48,11 @@ export type ArrangementName = 'Start' | 'Top' | 'Center' | 'End' | 'Bottom' | 'S
 export type TextAlignment = 'left' | 'start' | 'Start' | 'center' | 'Center' | 'right' | 'end' | 'End'
 
 /** @arrangeFields arrangement */
-type SpacedArrangement<A extends AxisAlignment> = Readonly<{ kind: 'spacedBy'; space: number; alignment?: A }>
+type SpacedArrangement<A extends AxisAlignment> = Readonly<{ kind: 'spacedBy'; spaceDp: number; spacePx: number; alignment?: A }>
 
-/** @arrangeArguments dp */
-function spacedBy<A extends AxisAlignment = never>(space: number, alignment?: A): SpacedArrangement<A> {
-    return Object.freeze({ kind: "spacedBy", space, alignment })
+/** @arrangeArguments length */
+function spacedBy<A extends AxisAlignment = never>(spaceDp: number, spacePx: number, alignment?: A): SpacedArrangement<A> {
+    return Object.freeze({ kind: "spacedBy", spaceDp, spacePx, alignment })
 }
 
 export const Arrangement = Object.freeze({
@@ -62,10 +62,20 @@ export const Arrangement = Object.freeze({
 
 /** @arrangeArguments padding */
 export function PaddingValues(value: PaddingValue): Padding {
-    if (typeof value === "number") return Object.freeze({ start: value, top: value, end: value, bottom: value })
-    const horizontal = value.horizontal ?? 0
-    const vertical = value.vertical ?? 0
-    return Object.freeze({ start: value.start ?? horizontal, top: value.top ?? vertical, end: value.end ?? horizontal, bottom: value.bottom ?? vertical })
+    const horizontalDp = value.horizontalDp ?? 0
+    const horizontalPx = value.horizontalPx ?? 0
+    const verticalDp = value.verticalDp ?? 0
+    const verticalPx = value.verticalPx ?? 0
+    return Object.freeze({
+        startDp: value.startDp ?? horizontalDp,
+        startPx: value.startPx ?? horizontalPx,
+        topDp: value.topDp ?? verticalDp,
+        topPx: value.topPx ?? verticalPx,
+        endDp: value.endDp ?? horizontalDp,
+        endPx: value.endPx ?? horizontalPx,
+        bottomDp: value.bottomDp ?? verticalDp,
+        bottomPx: value.bottomPx ?? verticalPx,
+    })
 }
 
 export const IntrinsicSize = Object.freeze({ Min: "IntrinsicSize.Min", Max: "IntrinsicSize.Max" })

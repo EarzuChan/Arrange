@@ -1,19 +1,19 @@
 <template>
     <ValueSurface :tone="color" :offset="offset">
-        <Text :text="label(caption)" :style="{fontSize: sp(12), color: Color(0xffe6eef5)}" :modifier="M.width(dp(280)).height(dp(30)).padding(dp(6)).clickable(() => onSelect(item.id)).keyed('条目交互')" />
+        <Text :text="label(caption)" :style="{fontSize: 12.sp, color: Color(0xffe6eef5)}" :modifier="M.width(280.dp).height(30.dp).padding(6.dp).clickable(() => onSelect(item.id)).keyed('条目交互')" />
     </ValueSurface>
 </template>
 
 <script>
-import type { Dp, ColorValue } from '@arrange/framework/ui'
+import type { ColorValue } from '@arrange/framework/ui'
 import { computed } from '@arrange/framework'
-import { M, dp, sp, Color } from '@arrange/framework/ui'
+import { M, Color } from '@arrange/framework/ui'
 import { tween, animatedColorAsRef, animatedDpAsRef } from '@arrange/framework/animation'
 import ValueSurface from './ValueSurface.sfa'
 
 const props = defineProps<{ item: { id: number; name: string }; selected: boolean; tone: ColorValue; onSelect: (id: number) => void }>()
 const color = animatedColorAsRef(() => props.selected ? props.tone : Color(0xff263443), { animationSpec: tween({ durationMillis: 180 }) })
-const offset = animatedDpAsRef(() => props.selected ? dp(8) : dp(0), { animationSpec: tween({ durationMillis: 180 }) })
+const offset = animatedDpAsRef(() => props.selected ? 8.dp : 0.dp, { animationSpec: tween({ durationMillis: 180 }) })
 const caption = computed(() => `${props.item.id.toString().padStart(3, '0')}  ${props.item.name}`)
 function label(value: string) { return value }
 </script>

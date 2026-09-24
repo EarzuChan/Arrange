@@ -2,6 +2,7 @@ import { NO, extend } from '@arrange/shared'
 import { type ParserOptions as BabelOptions, parse, parseExpression } from '@babel/parser'
 import { decodeHTML } from 'entities/decode'
 import { type AttributeNode, ConstantTypes, type DirectiveNode, type ElementNode, ElementTypes, type ForParseResult, Namespaces, NodeTypes, type RootNode, type SimpleExpressionNode, type SourceLocation, type TemplateChildNode, createRoot, createSimpleExpression } from './ast.ts'
+import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from './unitSyntax.ts'
 import { ErrorCodes, createCompilerError, defaultOnError, defaultOnWarn } from './errors.ts'
 import type { ParserOptions } from './options.ts'
 import Tokenizer, { CharCodes, ParseMode, QuoteType, Sequences, State, isWhitespace, toCharCodes } from './tokenizer.ts'
@@ -627,15 +628,17 @@ function createExp(content: SimpleExpressionNode['content'], isStatic: SimpleExp
             const options: BabelOptions = {
                 plugins: plugins ? [...plugins, 'typescript'] : ['typescript'],
             }
+            const normalized = normalizeSfaUnitSyntax(content)
             if (parseMode === ExpParseMode.Statements) {
                 // a-on with multi-inline-statements, pad 1 char
-                exp.ast = parse(` ${content} `, options).program
+                exp.ast = parse(` ${normalized.content} `, options).program
             } else if (parseMode === ExpParseMode.Params) {
-                exp.ast = parseExpression(`(${content})=>{}`, options)
+                exp.ast = parseExpression(`(${normalized.content})=>{}`, options)
             } else {
                 // normal exp, wrap with parens
-                exp.ast = parseExpression(`(${content})`, options)
+                exp.ast = parseExpression(`(${normalized.content})`, options)
             }
+            restoreBabelNodePositions(exp.ast, normalized.restore)
         } catch (e: any) {
             exp.ast = false // indicate an error
             emitError(ErrorCodes.X_INVALID_EXPRESSION, loc.start.offset, e.message)

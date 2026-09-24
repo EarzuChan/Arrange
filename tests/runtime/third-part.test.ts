@@ -39,7 +39,7 @@ test('首次挂载与后续视觉失效都只由宿主帧授权，挂载通知�
 test('共享声明按各 Layout 的 Density 转换，DP、SP 独立且 PX 不订阅倍率', () => {
     const a = createDensity(2, 3)
     const b = createDensity(4, 5)
-    const declaration = M.width(8).clip(rounded(2)).text('单位', { style: { fontSize: 10, lineHeight: 12 } }).graphicsLayer({ translationX: 7 })
+    const declaration = M.width(8, 0).width(114, 514).clip(rounded(2, 0)).text('单位', { style: { fontSize: 10, lineHeight: 12 } }).graphicsLayer({ translationX: 7 })
     const Page = defineArrangable({
         setup(_props, { call }) {
             provide(DensityKey, b)
@@ -57,12 +57,15 @@ test('共享声明按各 Layout 的 Density 转换，DP、SP 独立且 PX 不订
     native.frame()
     const chains = () => [...native.nodes.values()].filter(node => node.inputs.has('modifier')).map(node => (node.inputs.get('modifier') as typeof declaration).elements)
     assert.deepEqual(chains().map(chain => chain[0].value.value), [16, 32])
-    assert.deepEqual(chains().map(chain => (chain[2].value.style as { fontSize: number }).fontSize), [30, 50])
-    assert.deepEqual(chains().map(chain => chain[3].value.translationX), [7, 7])
-    assert.equal(declaration.elements[0].value.value, 8)
+    assert.deepEqual(chains().map(chain => chain[1].value.value), [742, 970])
+    assert.deepEqual(chains().map(chain => (chain[3].value.style as { fontSize: number }).fontSize), [30, 50])
+    assert.deepEqual(chains().map(chain => chain[4].value.translationX), [7, 7])
+    assert.deepEqual(declaration.elements[0].value, { valueDp: 8, valuePx: 0 })
+    assert.deepEqual(declaration.elements[1].value, { valueDp: 114, valuePx: 514 })
     a.dpScale = 3
     native.frame()
     assert.deepEqual(chains().map(chain => chain[0].value.value), [24, 32])
+    assert.deepEqual(chains().map(chain => chain[1].value.value), [856, 970])
     const writes = native.writes
     a.dpScale = 3
     native.frame()
@@ -70,15 +73,41 @@ test('共享声明按各 Layout 的 Density 转换，DP、SP 独立且 PX 不订
     app.unmount()
 })
 
-test('SFA 值壳按导入身份拆除，保留表达式和局部遮蔽', () => {
-    const source = `<template><Text :modifier="M.width(unit(read()) * 2 + unit(4))" /></template><script>
-import { dp as unit, M } from '@arrange/framework/ui'
+test('SFA 混合长度合并为双通道，保留表达式和局部遮蔽', () => {
+    const source = `<template><Text :modifier="M.width(read().dp * 2 + 4.dp + 5.px)" /></template><script>
+import { M } from '@arrange/framework/ui'
 import { read } from './state'
 function local(unit: (value: number) => number) { return unit(9) }
 </script>`
     const result = compileArrangeSfa(source, '单位表达式.sfa')
-    assert.match(result.code, /\(.*read.*\(\)\) \* 2 \+ \(4\)/)
+    assert.match(result.code, /read.*2.*4.*5/s)
     assert.match(result.code, /return unit\(9\)/)
+
+    const exact = (expression: string) => compileArrangeSfa(`<template><Text :modifier="M.width(${expression})" /></template><script>import { M } from '@arrange/framework/ui'</script>`, '单位双通道.sfa').code
+    assert.match(exact('114.dp + 514.px'), /\[114, 514\]/)
+    assert.match(exact('1919.px + 114.dp * 2 + 810.px'), /\[228, 2729\]/)
+    const template = compileArrangeSfa('<script>const label = `尺寸 ${8.dp}`\nconst nested = `${{ value: 2.dp }.value}`</script>', '单位插值.sfa')
+    assert.match(template.code, /尺寸 \$\{8\}/)
+    assert.match(template.code, /\$\{\{ value: 2 \}\.value\}/)
+    const objects = compileArrangeSfa(`<template><Text :modifier="M.offset(offset).padding(padding)" /></template><script>import { M } from '@arrange/framework/ui'
+const offset = { x: 114.dp, y: 514.px }
+const padding = { horizontal: 8.dp, vertical: 2.px }
+</script>`, '单位对象.sfa')
+    assert.match(objects.code, /xDp: 114, xPx: 0, yDp: 0, yPx: 514/)
+    assert.match(objects.code, /horizontalDp: 8, horizontalPx: 0, verticalDp: 0, verticalPx: 2/)
+    const reactiveObjects = compileArrangeSfa(`<template><Text :modifier="M.offset(offset.value).padding(unref(padding))" /></template><script>import { M } from '@arrange/framework/ui'
+import { ref, unref } from '@arrange/framework'
+const offset = ref({ x: 8.dp, y: 2.px })
+const padding = ref({ horizontal: 4.dp, vertical: 3.px })
+</script>`, '单位响应式对象.sfa')
+    assert.match(reactiveObjects.code, /xDp: 8, xPx: 0, yDp: 0, yPx: 2/)
+    assert.match(reactiveObjects.code, /horizontalDp: 4, horizontalPx: 0, verticalDp: 0, verticalPx: 3/)
+    const scalarRef = compileArrangeSfa(`<template><Text :modifier="M.width(width)" /></template><script>import { M } from '@arrange/framework/ui'
+import { ref } from '@arrange/framework'
+const width = ref(8.dp)
+</script>`, '单位响应式长度.sfa')
+    assert.match(scalarRef.code, /\[8, 0\]/)
+
     let reads = 0
     const exports: { default?: Parameters<typeof createApp>[0] } = {}
     const js = ts.transpileModule(result.code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
@@ -95,39 +124,38 @@ function local(unit: (value: number) => number) { return unit(9) }
     native.frame()
     assert.equal(reads, 1)
     const chain = [...native.nodes.values()].find(node => node.inputs.has('modifier'))!.inputs.get('modifier') as typeof M
-    assert.equal(chain.elements[0].value.value, 40)
+    assert.equal(chain.elements[0].value.value, 45)
     app.unmount()
 })
 
 test('SFA 已知裸数和错单位在编译入口拒绝，普通 TS 参数仍直接用数字', () => {
-    const source = (value: string) => `<template><Text :modifier="M.width(${value})" /></template><script>import { M, sp } from '@arrange/framework/ui'</script>`
-    assert.throws(() => compileArrangeSfa(source('8'), '单位错误.sfa'), /要求 DP/)
-    assert.throws(() => compileArrangeSfa(source('sp(8)'), '单位错误.sfa'), /实际为 SP/)
-    assert.equal(M.width(8).elements[0].value.value, 8)
-    const script = (body: string) => `<script>import { createScrollState, ref } from '@arrange/framework'\nimport { M, dp, sp, px, Color, solidColor, createDensity, type Dp } from '@arrange/framework/ui'\n${body}</script>`
-    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState({ initial: px(4) }); scroll.scrollTo(scroll.value); const density = createDensity(); M.width(density.pxToDp(scroll.value)).background(solidColor(Color(0xff123456)))'), '单位边界.sfa'))
-    assert.throws(() => compileArrangeSfa(script('const scroll = createScrollState(); M.width(scroll.value)'), '单位边界.sfa'), /实际为 PX/)
+    const source = (value: string) => `<template><Text :modifier="M.width(${value})" /></template><script>import { M } from '@arrange/framework/ui'</script>`
+    assert.throws(() => compileArrangeSfa(source('8'), '单位错误.sfa'), /要求 LENGTH/)
+    assert.throws(() => compileArrangeSfa(source('8.sp'), '单位错误.sfa'), /实际为 SP/)
+    assert.equal(M.width(8, 0).elements[0].value.valueDp, 8)
+    const script = (body: string) => `<script>import { createScrollState, ref } from '@arrange/framework'\nimport { M, Color, solidColor, createDensity, type Dp } from '@arrange/framework/ui'\n${body}</script>`
+    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState({ initial: 4.px }); scroll.scrollTo(scroll.value); const density = createDensity(); M.width(density.pxToDp(scroll.value).dp, 0).background(solidColor(Color(0xff123456)))'), '单位边界.sfa'))
+    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState(); M.width(scroll.value)'), '单位边界.sfa'))
     assert.throws(() => compileArrangeSfa(script('createScrollState({ initial: 4 })'), '单位边界.sfa'), /要求 PX/)
-    assert.throws(() => compileArrangeSfa(script('function wrong(): Dp { return sp(4) }'), '单位边界.sfa'), /实际为 SP/)
-    assert.throws(() => compileArrangeSfa(script('const value = ref(dp(1)); value.value = sp(4)'), '单位边界.sfa'), /实际为 SP/)
+    assert.throws(() => compileArrangeSfa(script('function wrong(): Dp { return 4.sp }'), '单位边界.sfa'), /实际为 SP/)
+    assert.throws(() => compileArrangeSfa(script('const value = ref(1.dp); value.value = 4.sp'), '单位边界.sfa'), /实际为 SP/)
 })
 
 test('跨 SFA、TS 转导出及脚本表达式保留正式单位契约', () => {
     const directory = mkdtempSync(resolve('tmp-refs/sfa-units-'))
     try {
-        writeFileSync(join(directory, 'units.ts'), "export { dp as length } from '@arrange/framework/ui'")
         writeFileSync(join(directory, 'Child.sfa'), '<template><Text :modifier="M.width(width)" /></template><script>import { M, type Dp } from "@arrange/framework/ui"\ndefineProps<{ width: Dp }>()</script>')
-        const constructorProps = compileArrangeSfa('<script>import { Dp, dp } from "@arrange/framework/ui"\nconst length = dp\nconst value = length(4)\ndefineProps({ width: { type: Dp, required: true } })</script>', join(directory, 'Constructor.sfa'))
+        const constructorProps = compileArrangeSfa('<script>import { Dp } from "@arrange/framework/ui"\nconst value = 4.dp\ndefineProps({ width: { type: Dp, required: true } })</script>', join(directory, 'Constructor.sfa'))
         assert.match(constructorProps.code, /type: Number/)
-        assert.doesNotMatch(constructorProps.code, /length\(4\)/)
-        const source = (value: string) => `<template><Child :width="${value}" /></template><script>import Child from './Child.sfa'\nimport { length } from './units'\nimport { sp } from '@arrange/framework/ui'\nconst width = length(8) * 2 + 1\n</script>`
+        assert.doesNotMatch(constructorProps.code, /4\.dp/)
+        const source = (value: string) => `<template><Child :width="${value}" /></template><script>import Child from './Child.sfa'\nconst width = 8.dp * 2 + 1.dp\n</script>`
         const file = join(directory, 'Parent.sfa')
         writeFileSync(file, source('width'))
         assert.doesNotThrow(() => compileArrangeSfa(source('width'), file))
         assert.deepEqual(checkSfaProject(resolve('tsconfig.json'), [file]), [])
-        assert.throws(() => compileArrangeSfa(source('sp(8)'), file), /实际为 SP/)
+        assert.throws(() => compileArrangeSfa(source('8.sp'), file), /实际为 SP/)
         assert.throws(() => compileArrangeSfa(source('8'), file), /要求 DP/)
-        assert.throws(() => compileArrangeSfa(source('sp(8)').replace('<Child :width="sp(8)" />', '<DynamicArrangable :is="Child" :props="{ width: sp(8) }" />'), file), /实际为 SP/)
+        assert.throws(() => compileArrangeSfa(source('8.sp').replace('<Child :width="8.sp" />', '<DynamicArrangable :is="Child" :props="{ width: 8.sp }" />'), file), /实际为 SP/)
         assert.throws(() => compileArrangeSfa('<template><Text :style="{fontSize: 12}" /></template><script></script>', file), /要求 SP/)
         writeFileSync(file, '<template><Text :style="{fontSize: 12}" /></template><script></script>')
         assert.ok(checkSfaProject(resolve('tsconfig.json'), [file]).some(item => /要求 SP/.test(item.message)))
@@ -140,7 +168,7 @@ test('Input 未绑定的编辑值与 Density 最新配置跨停用保留', () =>
     const key = ref(0)
     const density = createDensity(2, 3)
     const native = recordingNative()
-    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, KeepAlive, { cacheKey: () => key.value }, { default: () => call(0, Input, { modifier: () => M.width(20) }) }) })).provide(DensityKey, density)
+    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, KeepAlive, { cacheKey: () => key.value }, { default: () => call(0, Input, { modifier: () => M.width(20, 0) }) }) })).provide(DensityKey, density)
     app.mount(native.target)
     native.frame()
     const input = () => [...native.nodes.values()].map(node => node.inputs.get('modifier') as typeof M | undefined).find(chain => chain?.elements.some(element => element.type === 'textField'))!
@@ -167,7 +195,7 @@ test('Density 解析失败保留旧帧，恢复有效倍率后只更新真实消
         setup(_props, { call }) {
             watch(scale, value => post.push(value), { flush: 'post' })
             return () => {
-                call(0, Layout, { measurePolicy: () => MinSizeMeasurePolicy, modifier: () => M.width(10) })
+                call(0, Layout, { measurePolicy: () => MinSizeMeasurePolicy, modifier: () => M.width(10, 0) })
                 call(1, Layout, { measurePolicy: () => MinSizeMeasurePolicy, modifier: () => M.graphicsLayer({ translationX: 5 }) })
             }
         }

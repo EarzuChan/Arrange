@@ -22,7 +22,8 @@
 
 
 <script>
-import { painter, Color, dp } from '@arrange/framework/ui'
+import { painter, Color } from '@arrange/framework/ui'
+import type { Dp } from '@arrange/framework/ui'
 import { ref, shallowRef, onScopeDispose, watch, getCurrentScope, effectScope } from '@arrange/framework'
 import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
 import { getArrangeExecutionStats } from '@arrange/framework/internal'
@@ -32,7 +33,7 @@ import CounterPanel from '../../../demo/ui-src/src/view/CounterPanel.sfa'
 import ShowcaseGallery from '../../../demo/ui-src/src/view/ShowcaseGallery.sfa'
 
 const color = ref(Color(0xff336699))
-const offset = ref(dp(0))
+const offset = ref<Dp>(0.dp)
 const clicks = ref(0)
 const shown = ref(true)
 const rows = ref([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }])

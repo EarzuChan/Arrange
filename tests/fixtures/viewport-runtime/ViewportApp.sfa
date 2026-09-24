@@ -1,24 +1,24 @@
 <template>
     <Box :modifier="M.fillMaxSize().verticalScroll(scroll)">
-        <Column :modifier="M.requiredHeight(dp(contentHeight)).fillMaxWidth().background(Color(0xff336699))">
+        <Column :modifier="M.requiredHeight(contentHeight.dp).fillMaxWidth().background(Color(0xff336699))">
             <Text :text="`${scroll.value}/${scroll.maxValue}/${scroll.viewportSize}/${scroll.contentSize}`" />
-            <Input value="单位输入" :onSubmit="command" :textStyle="{ fontSize: sp(10) }" :modifier="M.width(dp(80)).height(dp(30))" />
+            <Input value="单位输入" :onSubmit="command" :textStyle="{ fontSize: 10.sp }" :modifier="M.width(80.dp).height(30.dp)" />
         </Column>
     </Box>
 </template>
 
 <script>
 import { createScrollState, ref, provide } from '@arrange/framework'
-import { M, Color, dp, sp, px, createDensity, DensityKey } from '@arrange/framework/ui'
+import { M, Color, createDensity, DensityKey } from '@arrange/framework/ui'
 
-const scroll = createScrollState({ initial: px(450) })
+const scroll = createScrollState({ initial: 450.px })
 const contentHeight = ref(600)
 const density = createDensity()
 provide(DensityKey, density)
 
 function command(value: string) {
     if (value === '缩短') contentHeight.value = 80
-    else if (value === '越界') scroll.scrollTo(px(900))
+    else if (value === '越界') scroll.scrollTo(900.px)
     else if (value === '密度') {
         density.dpScale = 2
         density.spScale = 3

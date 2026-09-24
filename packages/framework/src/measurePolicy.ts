@@ -33,7 +33,7 @@ export function ColumnMeasurePolicy(options: ColumnPolicyOptions = {}): MeasureP
 }
 
 function freezeArrangement<T extends HorizontalArrangementProp | VerticalArrangementProp | undefined>(value: T): T {
-    return (value && typeof value === 'object' ? Object.freeze(value.alignment === undefined ? { kind: value.kind, space: value.space } : { ...value }) : value) as T
+    return (value && typeof value === 'object' ? Object.freeze(value.alignment === undefined ? { kind: value.kind, spaceDp: value.spaceDp, spacePx: value.spacePx } : { ...value }) : value) as T
 }
 
 export const MinSizeMeasurePolicy: MeasurePolicy = policy({ kind: 'MinSize' })

@@ -14,9 +14,9 @@ export type ModifierElement = Readonly<{ type: string, key?: string, value: Modi
 
 export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
 /** @arrangeFields sizeRange */
-export type SizeRange = { minWidth?: number; maxWidth?: number; minHeight?: number; maxHeight?: number }
+export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
 /** @arrangeFields border */
-export type BorderOptions = { width: number; brush: Brush | number; shape?: Shape }
+export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
 export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
 /** @arrangeFields paint */
@@ -70,35 +70,35 @@ export class Modifier {
         return this.#add("animateContentSize", { animationSpec: nativeAnimationSpec(animationSpec), clip: args.clip ?? true })
     }
 
-    width(value: number): Modifier {
-        return this.#add("width", { value })
+    width(dp: number, px: number): Modifier {
+        return this.#add("width", { valueDp: dp, valuePx: px })
     }
 
-    height(value: number): Modifier {
-        return this.#add("height", { value })
+    height(dp: number, px: number): Modifier {
+        return this.#add("height", { valueDp: dp, valuePx: px })
     }
 
-    size(width: number, height = width): Modifier {
-        return this.#add("size", { width, height })
+    size(widthDp: number, widthPx: number, heightDp = widthDp, heightPx = widthPx): Modifier {
+        return this.#add("size", { widthDp, widthPx, heightDp, heightPx })
     }
 
-    requiredWidth(width: number): Modifier {
-        return this.#add("requiredWidth", { width })
+    requiredWidth(dp: number, px: number): Modifier {
+        return this.#add("requiredWidth", { widthDp: dp, widthPx: px })
     }
 
-    requiredHeight(height: number): Modifier {
-        return this.#add("requiredHeight", { height })
+    requiredHeight(dp: number, px: number): Modifier {
+        return this.#add("requiredHeight", { heightDp: dp, heightPx: px })
     }
 
-    requiredSize(width: number, height = width): Modifier {
-        return this.#add("requiredSize", { width, height })
+    requiredSize(widthDp: number, widthPx: number, heightDp = widthDp, heightPx = widthPx): Modifier {
+        return this.#add("requiredSize", { widthDp, widthPx, heightDp, heightPx })
     }
 
-    widthIn(args: { min?: number; max?: number }): Modifier {
+    widthIn(args: { minDp?: number; minPx?: number; maxDp?: number; maxPx?: number }): Modifier {
         return this.#add("widthIn", { ...args })
     }
 
-    heightIn(args: { min?: number; max?: number }): Modifier {
+    heightIn(args: { minDp?: number; minPx?: number; maxDp?: number; maxPx?: number }): Modifier {
         return this.#add("heightIn", { ...args })
     }
 
@@ -106,7 +106,7 @@ export class Modifier {
         return this.#add("sizeIn", { ...args })
     }
 
-    defaultMinSize(args: Pick<SizeRange, "minWidth" | "minHeight">): Modifier {
+    defaultMinSize(args: Pick<SizeRange, "minWidthDp" | "minWidthPx" | "minHeightDp" | "minHeightPx">): Modifier {
         return this.#add("defaultMinSize", { ...args })
     }
 
@@ -122,16 +122,19 @@ export class Modifier {
         return this.#add("fillMaxSize", checkedFraction(fraction))
     }
 
-    padding(value: PaddingValue): Modifier {
+    padding(dp: number, px: number): Modifier
+    padding(value: PaddingValue): Modifier
+    padding(dpOrValue: number | PaddingValue, px?: number): Modifier {
+        const value = typeof dpOrValue === "number" ? { startDp: dpOrValue, startPx: px ?? 0, topDp: dpOrValue, topPx: px ?? 0, endDp: dpOrValue, endPx: px ?? 0, bottomDp: dpOrValue, bottomPx: px ?? 0 } : dpOrValue
         return this.#add("padding", PaddingValues(value))
     }
 
-    offset(args: { x?: number; y?: number }): Modifier {
-        return this.#add("offset", { x: args.x ?? 0, y: args.y ?? 0 })
+    offset(args: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }): Modifier {
+        return this.#add("offset", { xDp: args.xDp ?? 0, xPx: args.xPx ?? 0, yDp: args.yDp ?? 0, yPx: args.yPx ?? 0 })
     }
 
-    absoluteOffset(args: { x?: number; y?: number }): Modifier {
-        return this.#add("absoluteOffset", { x: args.x ?? 0, y: args.y ?? 0 })
+    absoluteOffset(args: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }): Modifier {
+        return this.#add("absoluteOffset", { xDp: args.xDp ?? 0, xPx: args.xPx ?? 0, yDp: args.yDp ?? 0, yPx: args.yPx ?? 0 })
     }
 
     align(alignment: AlignmentValue): Modifier {
@@ -164,9 +167,9 @@ export class Modifier {
     }
 
     border(args: BorderOptions): Modifier
-    border(width: number, brush: Brush | number, shape?: Shape): Modifier
-    border(widthOrArgs: number | BorderOptions, brush?: Brush | number, shape?: Shape): Modifier {
-        return typeof widthOrArgs === "object" ? this.#add("border", { ...widthOrArgs }) : this.#add("border", { width: widthOrArgs, brush, shape })
+    border(widthDp: number, widthPx: number, brush: Brush | number, shape?: Shape): Modifier
+    border(widthOrArgs: number | BorderOptions, widthPxOrBrush?: number | Brush, brushOrShape?: Brush | number | Shape, shape?: Shape): Modifier {
+        return typeof widthOrArgs === "object" ? this.#add("border", { ...widthOrArgs }) : this.#add("border", { widthDp: widthOrArgs, widthPx: widthPxOrBrush as number, brush: brushOrShape as Brush | number, shape })
     }
 
     clip(shape: Shape): Modifier {

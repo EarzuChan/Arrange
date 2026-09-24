@@ -8,8 +8,8 @@ const inputProps = { value: '初始内容', onSubmit: (value: string) => { text.
 const textProps = { text: '标题', style: { fontSize: 16, color: 0xff336699 } } satisfies TextProps
 const imageProps = { painter: painter({ path: 'logo.png' }) } satisfies ImageProps
 
-const rowProps = { horizontalArrangement: Arrangement.spacedBy(8, Alignment.End), verticalAlignment: Alignment.Baseline } satisfies RowProps
-const columnProps = { verticalArrangement: Arrangement.spacedBy(8, Alignment.Bottom), horizontalAlignment: Alignment.CenterHorizontally } satisfies ColumnProps
+const rowProps = { horizontalArrangement: Arrangement.spacedBy(8, 0, Alignment.End), verticalAlignment: Alignment.Baseline } satisfies RowProps
+const columnProps = { verticalArrangement: Arrangement.spacedBy(8, 0, Alignment.Bottom), horizontalAlignment: Alignment.CenterHorizontally } satisfies ColumnProps
 const scaledImage = { painter: painter('logo.png'), contentScale: ContentScale.FillWidth, alignment: Alignment.BottomEnd } satisfies ImageProps
 
 // @ts-expect-error 图片缩放仅接受已实现的枚举
@@ -23,7 +23,7 @@ const invalidRowAlignment: RowProps = { verticalAlignment: Alignment.End }
 // @ts-expect-error Column 的交叉轴不能使用垂直对齐
 const invalidColumnAlignment: ColumnProps = { horizontalAlignment: Alignment.Bottom }
 // @ts-expect-error 水平排列不能使用垂直方向
-const invalidArrangement: RowProps = { horizontalArrangement: Arrangement.spacedBy(8, Alignment.Bottom) }
+const invalidArrangement: RowProps = { horizontalArrangement: Arrangement.spacedBy(8, 0, Alignment.Bottom) }
 // @ts-expect-error 垂直排列不能使用水平方向
 const invalidArrangementName: ColumnProps = { verticalArrangement: Arrangement.End }
 // @ts-expect-error 文本对齐不接受拼写错误
@@ -35,7 +35,7 @@ const invalidInputAlignment: InputProps = { textAlign: 'center' }
 // @ts-expect-error Modifier 对齐不接受任意字符串
 M.align('Centre')
 // @ts-expect-error spacedBy 对齐不接受二维值
-Arrangement.spacedBy(8, Alignment.TopEnd)
+Arrangement.spacedBy(8, 0, Alignment.TopEnd)
 
 // @ts-expect-error Arrangable状态由 setup 声明
 defineArrangable({ data: () => ({ count: 1 }) })
@@ -88,7 +88,7 @@ export const ManualPage = defineArrangable({
     setup(_props, { call }) {
         const scroll = createScrollState()
 
-        return () => call(0, Column, { modifier: () => M.height(300).verticalScroll(scroll) }, {
+        return () => call(0, Column, { modifier: () => M.height(300, 0).verticalScroll(scroll) }, {
             default: () => {
                 call(0, Input, { value: () => inputProps.value, onSubmit: () => inputProps.onSubmit })
                 call(1, Text, { style: () => textProps.style, text: () => text.value })

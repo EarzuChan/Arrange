@@ -1,23 +1,23 @@
 <template>
-    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).verticalScroll(pageScroll).padding(dp(18))" :vertical-arrangement="Arrangement.spacedBy(dp(12))">
-        <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))">
-            <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(dp(20), dp(20))"/>
+    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).verticalScroll(pageScroll).padding(18.dp)" :vertical-arrangement="Arrangement.spacedBy(12.dp)">
+        <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
+            <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(20.dp, 20.dp)"/>
 
-            <Text :text="preset" :style="{ fontSize: sp(28), color: Color.hsl(hue, 1, 0.5) }" :modifier="M"/>
+            <Text :text="preset" :style="{ fontSize: 28.sp, color: Color.hsl(hue, 1, 0.5) }" :modifier="M"/>
 
-            <Image :painter="logoPainter" :modifier="M.size(dp(96), dp(40))"/>
+            <Image :painter="logoPainter" :modifier="M.size(96.dp, 40.dp)"/>
         </Row>
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(dp(8))" :modifier="M.fillMaxWidth().height(dp(44))">
-            <Box :modifier="M.size(dp(180), dp(38)).background(Color(0xFF3A7AFE))"/>
+        <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :modifier="M.fillMaxWidth().height(44.dp)">
+            <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFF3A7AFE))"/>
 
-            <Spacer :modifier="M.width(dp(8))"/>
+            <Spacer :modifier="M.width(8.dp)"/>
 
-            <Box :modifier="M.size(dp(180), dp(38)).background(Color(0xFFFFB020))"/>
+            <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFFFFB020))"/>
         </Row>
 
         // 模版内支持单行双斜杠注释，带派不带派！
-        <Spacer :modifier="M.height(dp(4))"/>
+        <Spacer :modifier="M.height(4.dp)"/>
 
         <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
 
@@ -25,21 +25,21 @@
 
         <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
 
-        <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: sp(13), color: Color(0xFFE8EAED) }" :modifier="M.size(dp(240), dp(28)).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))"/>
+        <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: 13.sp, color: Color(0xFFE8EAED) }" :modifier="M.size(240.dp, 28.dp).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))"/>
 
-        <Text :text="inputStatus" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(16))"/>
+        <Text :text="inputStatus" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(16.dp)"/>
 
-        <Column :modifier="M.size(dp(260), dp(58)).verticalScroll(scrollState).background(Color(0xFF151922)).border(dp(1), Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(dp(4))">
-            <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: sp(12), color: Color(0xFFE8EAED) }" :modifier="M.height(dp(14))"/>
+        <Column :modifier="M.size(260.dp, 58.dp).verticalScroll(scrollState).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
+            <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: 12.sp, color: Color(0xFFE8EAED) }" :modifier="M.height(14.dp)"/>
 
-            <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
 
-            <Text text="滚轮也可以触发啊一个" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="滚轮也可以触发啊一个" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
 
-            <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: sp(12), color: Color(0xFFB8BDC7) }" :modifier="M.height(dp(14))"/>
+            <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
         </Column>
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(dp(16))">
+        <Row :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
             <ShowcaseGallery/>
 
             <Text text="润" :style="{ color: Color(0xFFAAAA00) }"/>
@@ -47,12 +47,12 @@
             <AnimationGallery/>
         </Row>
 
-        <Text text="Arrangeの本格界面" :style="{fontSize: sp(12), color: Color(0xff91a6b8)}"/> // 以后颜色、尺寸单位不得裸写
+        <Text text="Arrangeの本格界面" :style="{fontSize: 12.sp, color: Color(0xff91a6b8)}"/>
     </Column>
 </template>
 
 <script>
-import { painter, Arrangement, Color, dp, M, sp } from "@arrange/framework/ui"
+import { painter, Arrangement, Color, M } from "@arrange/framework/ui"
 import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef, createInfiniteTransition } from "@arrange/framework/animation"
 import { Icon } from "@arrange/framework/foundation"
 import { Log } from "@arrange/framework"
@@ -70,7 +70,7 @@ const firstRef = ref(11)
 const secondRef = ref(29)
 const selectedRefName = ref('firstRef')
 const selectedKey = ref(false)
-const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? dp(6) : dp(0), { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
+const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? 6.dp : 0.dp, { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
 const playPainter = painter('icons/play.svg')
 const logoPainter = painter('logo.png')
 

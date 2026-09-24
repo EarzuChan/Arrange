@@ -6,6 +6,7 @@ import MagicString from 'magic-string'
 import type { ImportBinding, SFAScriptCompileOptions } from '../compileScript.ts'
 import type { SFADescriptor } from '../parse.ts'
 import { warn } from '../warn.ts'
+import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from '../../core/unitSyntax.ts'
 import type { PropsDestructureBindings } from './defineProps.ts'
 import type { TypeScope } from './resolveType.ts'
 
@@ -20,7 +21,7 @@ export class ScriptCompileContext {
     startOffset: number | undefined
     endOffset: number | undefined
 
-    // import / type analysis
+    // import / type 分析
     scope?: TypeScope
     globalScopes?: TypeScope[]
     userImports: Record<string, ImportBinding> = Object.create(null)
@@ -28,7 +29,7 @@ export class ScriptCompileContext {
     // macros presence check
     hasDefinePropsCall = false
 
-    // defineProps
+    // 定义Props
     propsCall: CallExpression | undefined
     propsDecl: Node | undefined
     propsRuntimeDecl: Node | undefined
@@ -38,7 +39,7 @@ export class ScriptCompileContext {
     propsDestructureRestId: string | undefined
     propsRuntimeDefaults: Node | undefined
 
-    // codegen
+    // 代码生成
     bindingMetadata: BindingMetadata = {}
     helperImports: Set<string> = new Set()
     helper(key: string): string {
@@ -46,14 +47,10 @@ export class ScriptCompileContext {
         return `_${key}`
     }
 
-    /**
-     * to be exposed on compiled script block for HMR cache busting
-     */
+    // 要暴露在编译的脚本块儿以便HMR这那的
     deps?: Set<string>
 
-    /**
-     * cache for resolved fs
-     */
+    // 已解析fs的缓存
     fs?: NonNullable<SFAScriptCompileOptions['fs']>
 
     constructor(public descriptor: SFADescriptor, public options: Partial<SFAScriptCompileOptions>) {
@@ -67,10 +64,13 @@ export class ScriptCompileContext {
 
         function parse(input: string, offset: number): Program {
             try {
-                return babelParse(input, {
+                const normalized = normalizeSfaUnitSyntax(input)
+                const program = babelParse(normalized.content, {
                     plugins,
                     sourceType: 'module',
                 }).program
+                restoreBabelNodePositions(program, normalized.restore)
+                return program
             } catch (e: any) {
                 e.message = `[Arrange/SFA] ${e.message}\n\n${descriptor.filename}\n${generateCodeFrame(descriptor.source, e.pos + offset, e.pos + offset + 1)}`
                 throw e

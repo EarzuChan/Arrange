@@ -153,8 +153,8 @@ Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、
 
 JS 侧 Modifier 是不可变链：
 
-```ts
-M.padding(dp(8)).background(Color(0xFF000000))
+```sfa
+M.padding(8.dp).background(Color(0xFF000000))
 ```
 
 生产链路必须是：

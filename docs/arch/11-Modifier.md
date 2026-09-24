@@ -3,11 +3,13 @@
 Modifier 是顺序敏感的洋葱模型。链条左侧先包裹右侧：
 
 ```ts
-M.background(red).padding(dp(8))
-M.padding(dp(8)).background(red)
+M.background(red).padding(8, 0)
+M.padding(8, 0).background(red)
 ```
 
 两者效果不同。
+
+本文代码块展示普通 TypeScript 真 API，长度参数使用平铺的 `(dp, px)` 双通道；SFA 模板中对应写法为 `8.dp`、`8.px`，由编译器转换为这两个数字。只接受 PX 的参数直接传数字，文本样式中的字号和行高在普通 TypeScript 中直接传 SP 数字。
 
 # 最终受体与实例归属
 
@@ -70,19 +72,19 @@ Modifier 可作用于：
 # 尺寸与约束
 
 ```ts
-M.width(dp(100))
-M.height(dp(40))
-M.size(dp(100))
-M.size(dp(100), dp(40))
+M.width(100, 0)
+M.height(40, 0)
+M.size(100, 0)
+M.size(100, 0, 40, 0)
 
-M.requiredWidth(dp(100))
-M.requiredHeight(dp(40))
-M.requiredSize(dp(100))
+M.requiredWidth(100, 0)
+M.requiredHeight(40, 0)
+M.requiredSize(100, 0)
 
-M.widthIn({ min: dp(40), max: dp(200) })
-M.heightIn({ min: dp(20), max: dp(80) })
+M.widthIn({ minDp: 40, minPx: 0, maxDp: 200, maxPx: 0 })
+M.heightIn({ minDp: 20, minPx: 0, maxDp: 80, maxPx: 0 })
 M.sizeIn({ minWidth, maxWidth, minHeight, maxHeight })
-M.defaultMinSize({ minWidth: dp(0), minHeight: dp(0) })
+M.defaultMinSize({ minWidthDp: 0, minWidthPx: 0, minHeightDp: 0, minHeightPx: 0 })
 
 M.fillMaxWidth()
 M.fillMaxWidth(0.5)
@@ -104,10 +106,9 @@ M.height(IntrinsicSize.Max)
 # 间距
 
 ```ts
-M.padding(dp(8))
-M.padding({ horizontal: dp(8), vertical: dp(4) })
-M.padding({ start, top, end, bottom })
-M.padding({ left, top, right, bottom })
+M.padding(8, 0)
+M.padding({ horizontalDp: 8, horizontalPx: 0, verticalDp: 4, verticalPx: 0 })
+M.padding({ startDp, startPx, topDp, topPx, endDp, endPx, bottomDp, bottomPx })
 ```
 
 `padding` 改变子节点约束，并把子节点尺寸加回自身尺寸。不提供 `margin`，因为不需要。
@@ -115,8 +116,8 @@ M.padding({ left, top, right, bottom })
 # 位置与父布局数据
 
 ```ts
-M.offset({ x: dp(4), y: dp(0) })
-M.absoluteOffset({ x: dp(4), y: dp(0) })
+M.offset({ xDp: 4, xPx: 0, yDp: 0, yPx: 0 })
+M.absoluteOffset({ xDp: 4, xPx: 0, yDp: 0, yPx: 0 })
 
 M.align(Alignment.Center)
 M.weight(1)
@@ -133,12 +134,12 @@ M.zIndex(10)
 
 ```ts
 M.background(Color(0xFF2C2C2C))
-M.background(Color(0xFF2C2C2C), rounded(dp(8)))
+M.background(Color(0xFF2C2C2C), rounded(8, 0))
 
-M.border(dp(1), Color(0xFF606060))
-M.border(dp(1), Color(0xFF606060), rounded(dp(8)))
+M.border(1, 0, Color(0xFF606060))
+M.border(1, 0, Color(0xFF606060), rounded(8, 0))
 
-M.clip(rounded(dp(8)))
+M.clip(rounded(8, 0))
 ```
 
 `background` 与 `border` 绘制在对应 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中测试默认仍按布局 bounds，精确形状命中后续另行设计。
@@ -150,8 +151,8 @@ M.clip(rounded(dp(8)))
 `clip` 必须保留 Modifier 顺序语义：
 
 ```ts
-M.background(red).clip(rounded(dp(8))).background(blue)
-M.clip(rounded(dp(8))).background(red)
+M.background(red).clip(rounded(8, 0)).background(blue)
+M.clip(rounded(8, 0)).background(red)
 ```
 
 以上链条的绘制顺序和裁剪作用范围不同，不能被折叠成同一种效果。
@@ -162,18 +163,22 @@ M.clip(rounded(dp(8))).background(red)
 
 ```ts
 M.dropShadow({
-  shape: rounded(dp(8)),
-  radius: dp(12),
-  spread: dp(2),
-  offset: DpOffset(dp(0), dp(4)),
+  shape: rounded(8, 0),
+  radiusDp: 12,
+  radiusPx: 0,
+  spreadDp: 2,
+  spreadPx: 0,
+  offset: { xDp: 0, xPx: 0, yDp: 4, yPx: 0 },
   color: Color(0x66000000),
 })
 
 M.innerShadow({
-  shape: rounded(dp(8)),
-  radius: dp(8),
-  spread: dp(1),
-  offset: DpOffset(dp(0), dp(2)),
+  shape: rounded(8, 0),
+  radiusDp: 8,
+  radiusPx: 0,
+  spreadDp: 1,
+  spreadPx: 0,
+  offset: { xDp: 0, xPx: 0, yDp: 2, yPx: 0 },
   color: Color(0x33000000),
 })
 ```
@@ -202,8 +207,8 @@ M.graphicsLayer({
   scaleX: 1,
   scaleY: 1,
   rotationZ: 0,
-  translationX: dp(0),
-  translationY: dp(0),
+  translationX: 0,
+  translationY: 0,
   transformOrigin: TransformOrigin.Center,
   clip: false,
 })
@@ -220,7 +225,7 @@ const interaction = createInteractionState()
 
 const modifier = computed(() =>
   M.background(interaction.hovered ? hoverBg : normalBg)
-   .border(interaction.focused ? dp(2) : dp(1), interaction.focused ? focusColor : outline)
+   .border(interaction.focused ? 2 : 1, 0, interaction.focused ? focusColor : outline)
    .clickable({ interactionState: interaction, onClick })
 )
 ```

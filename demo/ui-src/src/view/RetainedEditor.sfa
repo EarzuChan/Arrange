@@ -1,16 +1,16 @@
 <template>
-    <Column :vertical-arrangement="Arrangement.spacedBy(dp(8))">
-        <Text text="保留页面 · 输入与状态" :style="{fontSize: sp(15), color: Color(0xff61d6bb)}" />
+    <Column :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+        <Text text="保留页面 · 输入与状态" :style="{fontSize: 15.sp, color: Color(0xff61d6bb)}" />
 
-        <Input :value="note" :onValueChange="value => note = value" :text-style="{color: Color(0xffedf4fa)}" :modifier="M.width(dp(300)).height(dp(32)).background(Color(0xff263443)).padding(dp(6))" />
+        <Input :value="note" :onValueChange="value => note = value" :text-style="{color: Color(0xffedf4fa)}" :modifier="M.width(300.dp).height(32.dp).background(Color(0xff263443)).padding(6.dp)" />
 
-        <Text :text="`笔记：${note}`" :style="{fontSize: sp(12), color: Color(0xffc7d5e1)}" />
+        <Text :text="`笔记：${note}`" :style="{fontSize: 12.sp, color: Color(0xffc7d5e1)}" />
     </Column>
 </template>
 
 <script>
 import { ref } from '@arrange/framework'
-import { M, Arrangement, dp, sp, Color } from '@arrange/framework/ui'
+import { M, Arrangement, Color } from '@arrange/framework/ui'
 
 const note = ref('切页后仍保留这段笔记')
 </script>

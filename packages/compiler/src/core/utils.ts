@@ -1,5 +1,6 @@
 import { isObject, isString } from '@arrange/shared'
 import { parseExpression } from '@babel/parser'
+import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from './unitSyntax.ts'
 import type { Expression, Node } from '@babel/types'
 import { type DirectiveNode, type ElementNode, ElementTypes, type ExpressionNode, type InterpolationNode, NodeTypes, type Position, type RootNode, type SimpleExpressionNode, type TemplateChildNode, type TemplateNode, type TextNode } from './ast.ts'
 import { unwrapTSNode } from './babelUtils.ts'
@@ -98,11 +99,13 @@ export const isMemberExpressionBrowser = (exp: ExpressionNode): boolean => {
 
 export const isMemberExpressionNode: (exp: ExpressionNode, context: TransformContext) => boolean = ((exp, context) => {
     try {
-        let ret: Node = exp.ast || parseExpression(getExpSource(exp), {
+        const normalized = normalizeSfaUnitSyntax(getExpSource(exp))
+        let ret: Node = exp.ast || parseExpression(normalized.content, {
             plugins: context.expressionPlugins
                 ? [...context.expressionPlugins, 'typescript']
                 : ['typescript'],
         })
+        if (!exp.ast) restoreBabelNodePositions(ret, normalized.restore)
 
         ret = unwrapTSNode(ret) as Expression
 
@@ -120,11 +123,13 @@ export const isFnExpressionBrowser: (exp: ExpressionNode) => boolean = exp => fn
 
 export const isFnExpressionNode: (exp: ExpressionNode, context: TransformContext) => boolean = ((exp, context) => {
     try {
-        let ret: Node = exp.ast || parseExpression(getExpSource(exp), {
+        const normalized = normalizeSfaUnitSyntax(getExpSource(exp))
+        let ret: Node = exp.ast || parseExpression(normalized.content, {
             plugins: context.expressionPlugins
                 ? [...context.expressionPlugins, 'typescript']
                 : ['typescript'],
         })
+        if (!exp.ast) restoreBabelNodePositions(ret, normalized.restore)
 
         // parser may parse the exp as statements when it contains semicolons
         if (ret.type === 'Program') {

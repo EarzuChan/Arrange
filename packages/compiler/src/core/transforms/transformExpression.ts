@@ -16,6 +16,7 @@ import { BindingTypes } from '../options.ts'
 import { IS_REF, UNREF } from '../runtimeHelpers.ts'
 import type { NodeTransform, TransformContext } from '../transform.ts'
 import { advancePositionWithClone, findDir, isSimpleIdentifier } from '../utils.ts'
+import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from '../unitSyntax.ts'
 
 const isLiteralWhitelisted = /*@__PURE__*/ makeMap('true,false,null,this')
 
@@ -185,10 +186,12 @@ export function processExpression(
         // 3. Function arguments (a-for, a-slot): place in a function argument position
         const source = asRawStatements ? ` ${rawExp} ` : `(${rawExp})${asParams ? `=>{}` : ``}`
         try {
-            ast = parseExpression(source, {
+            const normalized = normalizeSfaUnitSyntax(source)
+            ast = parseExpression(normalized.content, {
                 sourceType: 'module',
                 plugins: context.expressionPlugins,
             })
+            restoreBabelNodePositions(ast, normalized.restore)
         } catch (e: any) {
             context.onError(createCompilerError(ErrorCodes.X_INVALID_EXPRESSION, node.loc, undefined, e.message))
             return node

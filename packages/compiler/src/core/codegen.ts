@@ -7,6 +7,7 @@ import { BindingTypes, type CompilerOptions } from './options.ts'
 import { processExpression, stringifyExpression } from './transforms/transformExpression.ts'
 import type { TransformContext } from './transform.ts'
 import { helperNameMap } from './runtimeHelpers.ts'
+import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from './unitSyntax.ts'
 
 export interface RawSourceMap {
     file?: string
@@ -59,7 +60,11 @@ export function generate(ast: RootNode, options: CompilerOptions = {}): CodegenR
     const modifierGetter = (node: ExpressionNode | undefined, identity: number): string | undefined => {
         if (options.arrangeTypecheck || node?.type !== NodeTypes.SIMPLE_EXPRESSION) return
         let current: Expression
-        try { current = parseExpression(node.content, { plugins: ['typescript'] }) } catch { return }
+        try {
+            const normalized = normalizeSfaUnitSyntax(node.content)
+            current = parseExpression(normalized.content, { plugins: ['typescript'] })
+            restoreBabelNodePositions(current, normalized.restore)
+        } catch { return }
         const segments: { method: string; args: string[] }[] = []
         const methods = new Set(['padding', 'width', 'height', 'size', 'requiredWidth', 'requiredHeight', 'requiredSize', 'fillMaxWidth', 'fillMaxHeight', 'fillMaxSize', 'widthIn', 'heightIn', 'sizeIn', 'defaultMinSize', 'offset', 'absoluteOffset', 'align', 'weight', 'zIndex', 'background', 'border', 'clip', 'alpha', 'graphicsLayer', 'clickable', 'hoverable', 'focusable', 'verticalScroll', 'horizontalScroll', 'animateContentSize', 'paint', 'text', 'textField'])
         while (current.type === 'CallExpression' && current.callee.type === 'MemberExpression' && !current.callee.computed && current.callee.property.type === 'Identifier' && methods.has(current.callee.property.name)) {

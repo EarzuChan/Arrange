@@ -46,12 +46,22 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         const declaration = symbol(node)?.valueDeclaration
         return declaration?.getSourceFile() === source && (ts.isVariableDeclaration(declaration) || ts.isPropertyAssignment(declaration)) ? declaration.initializer : undefined
     }
+    const objectInitializer = (node: ts.Expression): ts.Expression | undefined => {
+        const value = unwrap(node)
+        if (ts.isPropertyAccessExpression(value) && value.name.text === 'value') {
+            const owner = initializer(value.expression)
+            if (owner && ts.isCallExpression(owner) && owner.arguments.length === 1) return owner.arguments[0]
+        }
+        if (ts.isCallExpression(value) && tagged(value.expression, 'arrangeUnref') && value.arguments.length === 1) return objectInitializer(value.arguments[0]) ?? value.arguments[0]
+        return initializer(value)
+    }
     const fail = (node: ts.Expression, expected: string, actual?: string): never => {
         const generated = source.getLineAndCharacterOfPosition(node.getStart(source))
         const original = mapping?.originalPositionFor({ line: generated.line + 1, column: generated.character })
         const line = original?.line ?? generated.line + 1
         const column = (original?.column ?? generated.character) + 1
-        const error = new Error(`单位参数 ${node.getText(source)} 要求 ${expected.toUpperCase()}，${actual ? `实际为 ${actual.toUpperCase()}` : 'SFA 中需要显式值壳或已声明单位的值'}\n来源：${filename}:${line}:${column}`)
+        const expressionText = node.getText(source).replaceAll('/*@arrange-unit*/', '')
+        const error = new Error(`单位参数 ${expressionText} 要求 ${expected.toUpperCase()}，${actual ? `实际为 ${actual.toUpperCase()}` : 'SFA 中需要显式值壳或已声明单位的值'}\n来源：${filename}:${line}:${column}`)
         Object.assign(error, { loc: { start: { line, column } } })
         throw error
     }
@@ -60,18 +70,64 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         const fields = fieldsOf(checker.getTypeAtLocation(node.expression))
         return typeof fields === 'object' ? fields[node.name.text] : undefined
     }
-    const arithmeticUnits = (expression: ts.Expression, seen = new Set<ts.Node>()): string[] => {
+    type Dimension = 'number' | 'dp' | 'px' | 'length' | 'sp' | 'color' | 'unknown' | 'invalid'
+    const dimension = (expression: ts.Expression, seen = new Set<ts.Node>()): Dimension => {
         const node = unwrap(expression)
-        if (seen.has(node)) return []
+        if (seen.has(node)) return 'unknown'
         seen.add(node)
+
+        if (ts.isNumericLiteral(node)) return 'number'
+        if (ts.isPropertyAccessExpression(node) && (node.name.text === 'dp' || node.name.text === 'px')) return node.name.text
+        if (ts.isPropertyAccessExpression(node) && node.name.text === 'sp') return 'sp'
+
         const constructed = (ts.isCallExpression(node) || ts.isNewExpression(node)) && expressionKind(node.expression)
-        const known = fieldsOf(checker.getTypeAtLocation(expression)) ?? declaredField(node)
-        if (constructed || typeof known === 'string') return [constructed || known as string]
-        if (ts.isBinaryExpression(node)) return [...arithmeticUnits(node.left, seen), ...arithmeticUnits(node.right, seen)]
-        if (ts.isPrefixUnaryExpression(node)) return arithmeticUnits(node.operand, seen)
+        const known = constructed || fieldsOf(checker.getTypeAtLocation(expression)) as string | undefined || declaredField(node) as string | undefined
+        if (known === 'dp' || known === 'px' || known === 'length') return known
+        if (known === 'sp' || known === 'color') return known
+
+        if (ts.isConditionalExpression(node)) {
+            const whenTrue = dimension(node.whenTrue, seen)
+            const whenFalse = dimension(node.whenFalse, seen)
+            return whenTrue === whenFalse ? whenTrue : whenTrue === 'unknown' ? whenFalse : whenFalse === 'unknown' ? whenTrue : whenTrue === 'dp' && whenFalse === 'px' || whenTrue === 'px' && whenFalse === 'dp' ? 'length' : 'invalid'
+        }
+
+        if (ts.isPrefixUnaryExpression(node)) return dimension(node.operand, seen)
+
+        if (ts.isBinaryExpression(node)) {
+            const left = dimension(node.left, seen)
+            const right = dimension(node.right, seen)
+            const operator = node.operatorToken.kind
+            if (operator === ts.SyntaxKind.PlusToken || operator === ts.SyntaxKind.MinusToken) {
+                if (left === right) return left
+                if (left === 'length' && (right === 'dp' || right === 'px') || right === 'length' && (left === 'dp' || left === 'px')) return 'length'
+                if (left === 'dp' && right === 'px' || left === 'px' && right === 'dp') return 'length'
+                return left === 'unknown' ? right : right === 'unknown' ? left : 'invalid'
+            }
+            if (operator === ts.SyntaxKind.AsteriskToken) {
+                if (left === 'number') return right
+                if (right === 'number') return left
+                return left === 'unknown' ? right === 'unknown' ? 'unknown' : 'invalid' : 'invalid'
+            }
+            if (operator === ts.SyntaxKind.SlashToken) {
+                if (left === 'number' && right === 'number') return 'number'
+                if (right === 'number') return left
+                return 'invalid'
+            }
+        }
+
+        if (ts.isPropertyAccessExpression(node) && node.name.text === 'value') {
+            const init = initializer(node.expression)
+            if (init && ts.isCallExpression(init) && init.arguments.length) return dimension(init.arguments[0], seen)
+        }
+
         const init = initializer(node)
-        return init ? arithmeticUnits(init, seen) : []
+        if (init) return dimension(init, seen)
+
+        const type = checker.getTypeAtLocation(expression)
+        if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.NumberLiteral)) return 'number'
+        return 'unknown'
     }
+    const matches = (expected: string, actual: string): boolean => expected === 'length' ? actual === 'dp' || actual === 'px' || actual === 'length' : expected === actual
     const check = (expression: ts.Expression, rule: Rule): void => {
         const node = unwrap(expression)
         let rules = checked.get(node)
@@ -87,24 +143,27 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         }
         const known = fieldsOf(checker.getTypeAtLocation(expression)) ?? declaredField(node)
         if (typeof rule === 'string') {
+            if (ts.isPropertyAccessExpression(node) && (node.name.text === 'dp' || node.name.text === 'px' || node.name.text === 'sp')) {
+                if (rule === node.name.text || rule === 'length' && (node.name.text === 'dp' || node.name.text === 'px')) return
+                fail(node, rule, node.name.text)
+            }
             const constructed = (ts.isCallExpression(node) || ts.isNewExpression(node)) && expressionKind(node.expression)
             const actual = constructed || (typeof known === 'string' ? known : undefined)
             if (actual) {
-                if (actual !== rule) fail(node, rule, actual)
+                if (rule === 'length' ? actual !== 'dp' && actual !== 'px' && actual !== 'length' : actual !== rule) fail(node, rule, actual)
                 return
             }
-            if (ts.isBinaryExpression(node) || ts.isPrefixUnaryExpression(node)) {
-                // 消融后的算术是普通 JS 算术，只要求声明来源明确，不实现量纲代数
-                const units = arithmeticUnits(node)
-                if (units.length) {
-                    for (const unit of units) if (unit !== rule) fail(node, rule, unit)
-                    return
-                }
+            const actualDimension = dimension(node)
+            if (actualDimension !== 'unknown' && (actualDimension !== 'number' || rule === 'length')) {
+                const valid = rule === 'length' ? actualDimension === 'dp' || actualDimension === 'px' || actualDimension === 'length' : actualDimension === rule
+                if (!valid) fail(node, rule, actualDimension)
+                return
             }
+            if (rule === 'length' && ts.isPropertyAccessExpression(node) && (node.name.text === 'dp' || node.name.text === 'px')) return
             const valueProperty = checker.getTypeAtLocation(node).getProperty('value')
             const refUnit = valueProperty && fieldsOf(checker.getTypeOfSymbolAtLocation(valueProperty, node))
             if (typeof refUnit === 'string') {
-                if (refUnit !== rule) fail(node, rule, refUnit)
+                if (!matches(rule, refUnit)) fail(node, rule, refUnit)
                 return
             }
             if (ts.isPropertyAccessExpression(node) && node.name.text === 'value') {
@@ -113,7 +172,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             }
             if (ts.isCallExpression(node)) {
                 const resultUnit = tagged(node.expression, 'arrangeResult')?.comment
-                if (typeof resultUnit === 'string' && resultUnit.trim() === rule) return
+                if (typeof resultUnit === 'string' && matches(rule, resultUnit.trim())) return
             }
             const init = initializer(node)
             if (init) return check(init, rule)
@@ -121,7 +180,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             return fail(node, rule)
         }
         if (known === rule) return
-        const init = initializer(node)
+        const init = objectInitializer(node)
         if (init) return check(init, rule)
         if (ts.isObjectLiteralExpression(node)) {
             for (const property of node.properties) {
@@ -131,7 +190,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
                     if (name && rule[name]) check(ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer, rule[name])
                 }
             }
-        } else if (rule === unitFieldContracts.padding) check(node, 'dp')
+        } else if (rule === unitFieldContracts.padding) check(node, 'length')
         else if (rule === unitFieldContracts.brush) check(node, 'color')
         else if (ts.isCallExpression(node) && tagged(node.expression, 'arrangeCheckProps')) check(node.arguments[1], rule)
         else if (ts.isCallExpression(node) && tagged(node.expression, 'arrangeParameterInputs') && ts.isArrayLiteralExpression(node.arguments[0])) {
@@ -150,7 +209,11 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
                 if (!property) continue
                 const declaration = property.valueDeclaration
                 if (declaration && ts.isPropertyAssignment(declaration) && declaration.getSourceFile() === source) check(declaration.initializer, field)
-                else if (fieldsOf(checker.getTypeOfSymbolAtLocation(property, node)) !== field) fail(node, typeof field === 'string' ? field : '已声明字段单位的对象')
+                else {
+                    const actual = fieldsOf(checker.getTypeOfSymbolAtLocation(property, node))
+                    const compatible = typeof field === 'string' && typeof actual === 'string' ? matches(field, actual) : actual === field
+                    if (!compatible) fail(node, typeof field === 'string' ? field : '已声明字段单位的对象')
+                }
             }
         }
     }
@@ -227,14 +290,17 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             const declaration = checker.getResolvedSignature(node)?.declaration
             if (declaration && ts.isMethodDeclaration(declaration) && tag(declaration.parent, 'arrangeModifier')) {
                 const name = declaration.name.getText().replaceAll('"', '').replaceAll("'", '')
-                const rules = modifierArgumentUnits[name]
+                const rules = Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
                 if (rules) {
                     if (name === 'border' && node.arguments.length === 1) check(node.arguments[0], unitFieldContracts.border)
                     else if (name === 'padding') check(node.arguments[0], unitFieldContracts.padding)
                     else argumentsOf(node, rules)
                 }
             }
-            const argumentTag = tagged(node.expression, 'arrangeArguments')?.comment
+            const argumentTag = tagged(node.expression, 'arrangeArguments')?.comment ?? (() => {
+                const declaration = checker.getResolvedSignature(node)?.declaration
+                return declaration ? tag(declaration, 'arrangeArguments')?.comment : undefined
+            })()
             if (typeof argumentTag === 'string') for (const [index, name] of argumentTag.trim().split(/\s+/).entries()) {
                 if (name !== 'none' && node.arguments[index]) check(node.arguments[index], unitFieldContracts[name] ?? name as ValueUnit)
             }
@@ -244,13 +310,14 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
                     const name = segment.elements[0].text
                     const body = segment.elements[1].body
                     if (!ts.isArrayLiteralExpression(body)) continue
-                    const rules = name === 'border' && body.elements.length === 1 ? [unitFieldContracts.border] : modifierArgumentUnits[name]
+                    const rules = name === 'border' && body.elements.length === 1 ? [unitFieldContracts.border] : Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
                     for (const [index, rule] of (rules ?? []).entries()) if (rule && body.elements[index]) check(body.elements[index], name === 'padding' ? unitFieldContracts.padding : rule)
                 }
             }
             if (!expressionKind(node.expression)) {
                 const signature = checker.getResolvedSignature(node)
-                signature?.parameters.forEach((parameter, index) => {
+                const declaration = signature?.declaration
+                if (!(declaration && ts.isMethodDeclaration(declaration) && tag(declaration.parent, 'arrangeModifier'))) signature?.parameters.forEach((parameter, index) => {
                     if (!node.arguments[index]) return
                     const rule = parameterRule(checker.getTypeOfSymbolAtLocation(parameter, node))
                     if (rule) check(node.arguments[index], rule)
@@ -264,6 +331,10 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
             const rule = fieldsOf(checker.getTypeAtLocation(node.left))
             if (rule) check(node.right, rule)
+            else {
+                const left = dimension(node.left)
+                if (left === 'length' || left === 'dp' || left === 'px' || left === 'sp' || left === 'color') check(node.right, left === 'length' ? 'length' : left)
+            }
         }
         if (ts.isFunctionLike(node) && 'body' in node && node.body && node.type) {
             const rule = fieldsOf(checker.getTypeFromTypeNode(node.type))

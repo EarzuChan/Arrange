@@ -26,15 +26,6 @@ export class Px {
     }
 }
 
-/** @arrangeValue dp */
-export function dp(value: number): Dp { return new Dp(value) }
-
-/** @arrangeValue sp */
-export function sp(value: number): Sp { return new Sp(value) }
-
-/** @arrangeValue px */
-export function px(value: number): Px { return new Px(value) }
-
 export type ColorChannels = Readonly<{ red: number; green: number; blue: number; alpha?: number }>
 
 /** @arrangeValue color */

@@ -37,7 +37,8 @@ export type TextStyleProp = Readonly<{
 /** @arrangeFields arrangement */
 export type ArrangementProp<A extends AxisAlignment = AxisAlignment, N extends ArrangementName = ArrangementName> = N | Readonly<{
     kind: "spacedBy"
-    space: number
+    spaceDp: number
+    spacePx: number
     alignment?: A
 }>
 

@@ -36,8 +36,8 @@ test('真实 SFA 纯值变化只更新文本 Modifier，不执行结构且保留
 })
 
 test('用户 SFA 直接组合 Layout、Policy 与文本 Modifier，结果等同代码 FA', () => {
-    const Page = evaluateSfa("<template><Layout :measurePolicy=\"BoxMeasurePolicy()\" :modifier=\"M.padding(dp(8))\"><Layout :measurePolicy=\"MinSizeMeasurePolicy\" :modifier=\"M.text('正文')\" /></Layout></template><script>import { Layout } from '@arrange/framework/foundation'\n\nimport { BoxMeasurePolicy, MinSizeMeasurePolicy, M, dp } from '@arrange/framework/ui'\n</script>")
-    const Code = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, foundation.Box, { modifier: () => ui.M.padding(8) }, { default: () => call(0, foundation.Text, { text: () => '正文' }) }) })
+    const Page = evaluateSfa("<template><Layout :measurePolicy=\"BoxMeasurePolicy()\" :modifier=\"M.padding(8.dp)\"><Layout :measurePolicy=\"MinSizeMeasurePolicy\" :modifier=\"M.text('正文')\" /></Layout></template><script>import { Layout } from '@arrange/framework/foundation'\n\nimport { BoxMeasurePolicy, MinSizeMeasurePolicy, M } from '@arrange/framework/ui'\n</script>")
+    const Code = internal.defineArrangable({ setup: (_props, { call }) => () => call(0, foundation.Box, { modifier: () => ui.M.padding(8, 0) }, { default: () => call(0, foundation.Text, { text: () => '正文' }) }) })
     const collect = (definition: runtime.ArrangableDefinition) => {
         const native = recordingNative()
         const app = runtime.createApp(definition)
@@ -185,7 +185,7 @@ test('固定 Modifier 链只重新求值失效分段并精确写入既有实例'
         colors++
         return color.value
     }
-    const Root = evaluateSfa("<template><Box :modifier=\"M.width(dp(readWidth())).background(Color(readColor()))\" /></template><script>import { M, dp, Color } from '@arrange/framework/ui'\n\nimport { readWidth, readColor } from \"./state\"\n</script>", { readWidth, readColor })
+    const Root = evaluateSfa("<template><Box :modifier=\"M.width(readWidth().dp).background(Color(readColor()))\" /></template><script>import { M, Color } from '@arrange/framework/ui'\n\nimport { readWidth, readColor } from \"./state\"\n</script>", { readWidth, readColor })
     const native = recordingNative()
     const app = runtime.createApp(Root)
     mountFrame(app, native.target)
@@ -211,8 +211,8 @@ test('固定 Modifier 链相较完整表达式减少求值及分配，保持相�
             widths++
             return 20
         }
-        const makeModifier = () => ui.M.width(readWidth()).height(30).padding(4).background(color.value)
-        const Page = evaluateSfa(`<template><Spacer :modifier="${expression}"/></template><script>import { M, dp, Color } from '@arrange/framework/ui'
+        const makeModifier = () => ui.M.width(readWidth(), 0).height(30, 0).padding(4, 0).background(color.value)
+        const Page = evaluateSfa(`<template><Spacer :modifier="${expression}"/></template><script>import { M, Color } from '@arrange/framework/ui'
  import { color, readWidth, makeModifier } from "./state"
 </script>`, { color, readWidth, makeModifier })
         const native = recordingNative()
@@ -235,7 +235,7 @@ test('固定 Modifier 链相较完整表达式减少求值及分配，保持相�
         app.unmount()
         return { result, modifier }
     }
-    const fixed = await run('M.width(dp(readWidth())).height(dp(30)).padding(dp(4)).background(Color(color))')
+    const fixed = await run('M.width(readWidth().dp).height(30.dp).padding(4.dp).background(Color(color))')
     const dynamic = await run('makeModifier()')
     assert.deepEqual(fixed.modifier, dynamic.modifier)
     assert.equal(fixed.result.structures, 0)
@@ -255,7 +255,7 @@ test('列表词法环境中的固定 Modifier 链保持分段缓存，重排后�
         widths++
         return value
     }
-    const Page = evaluateSfa("<template><Spacer a-for=\"row in rows\" :key=\"row.id\" :modifier=\"M.width(dp(readWidth(row.width))).background(Color(color))\" /></template><script>import { M, dp, Color } from '@arrange/framework/ui'\n import { rows, color, readWidth } from \"./state\"\n</script>", { rows, color, readWidth })
+    const Page = evaluateSfa("<template><Spacer a-for=\"row in rows\" :key=\"row.id\" :modifier=\"M.width(readWidth(row.width).dp).background(Color(color))\" /></template><script>import { M, Color } from '@arrange/framework/ui'\n import { rows, color, readWidth } from \"./state\"\n</script>", { rows, color, readWidth })
     const native = recordingNative()
     const app = runtime.createApp(Page)
     mountFrame(app, native.target)
