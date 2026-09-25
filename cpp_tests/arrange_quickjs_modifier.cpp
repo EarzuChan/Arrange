@@ -277,6 +277,9 @@ int main() {
                 rejects({ type: 'graphicsLayer', value: { transformOrigin: 'Typo' } }, 'transformOrigin')
                 rejects({ type: 'clickable', value: { onClick: 42 } }, 'onClick')
                 rejects({ type: 'align', value: { alignment: 'Centre' } }, 'Centre')
+                rejects({ type: 'background', value: { color: -1 } }, '颜色')
+                rejects({ type: 'background', value: { color: 1.5 } }, '颜色')
+                rejects({ type: 'background', value: { color: NaN } }, '颜色')
                 n.setModifier(1, { elements: [{ type: 'background', value: { brush: { type: 'solidColor', color: 0xff123456 } } }] })
             )JS");
             if (!schema.ok) throw std::runtime_error(schema.error);

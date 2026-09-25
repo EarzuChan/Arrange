@@ -179,16 +179,14 @@ namespace arrange::quickjs {
         ScopedValue brush(context_, JS_GetPropertyStr(context_, object, brushKey));
         if (!JS_IsUndefined(color.get())) {
             if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "颜色输入不能同时提供 color 和 brush");
-            if (!JS_IsNumber(color.get())) JS_ThrowTypeError(context_, "color 需要数值颜色");
-            return reader_.toU32(color.get());
+            return reader_.colorValue(color.get());
         }
-        if (JS_IsNumber(brush.get())) return reader_.toU32(brush.get());
+        if (JS_IsNumber(brush.get())) return reader_.colorValue(brush.get());
         if (JS_IsObject(brush.get()) && !JS_IsArray(brush.get())) {
             if (!fieldsMatch(context_, brush.get(), {"type", "color"}, "brush")) return 0;
             if (reader_.stringField(brush.get(), "type") != "solidColor") JS_ThrowTypeError(context_, "brush.type 需要 solidColor");
             ScopedValue brushColor(context_, JS_GetPropertyStr(context_, brush.get(), "color"));
-            if (!JS_IsNumber(brushColor.get())) JS_ThrowTypeError(context_, "brush.color 需要数值颜色");
-            return reader_.toU32(brushColor.get());
+            return reader_.colorValue(brushColor.get());
         }
         if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "brush 需要数值颜色或 solidColor 对象");
         return 0;
@@ -386,12 +384,11 @@ namespace arrange::quickjs {
                     text.style.lineHeight = numberField(style.get(), "lineHeight", 0);
                     ScopedValue color(context_, JS_GetPropertyStr(context_, style.get(), "color"));
                     if (!JS_IsUndefined(color.get())) {
-                        const auto number = reader_.toDouble(color.get());
-                        if (!JS_IsNumber(color.get()) || !std::isfinite(number) || number < 0 || number > 4294967295.0 || std::floor(number) != number) {
-                            (void)throwTypeError("文字颜色必须是 uint32 颜色值");
+                        text.color = reader_.colorValue(color.get());
+                        if (JS_HasException(context_)) {
+                            failed_ = true;
                             return {};
                         }
-                        text.color = static_cast<std::uint32_t>(number);
                     }
                 }
                 if (editable) {
@@ -430,13 +427,11 @@ namespace arrange::quickjs {
                         return {};
                     }
                     ScopedValue tint(context_, JS_GetPropertyStr(context_, filter.get(), "tint"));
-                    const auto number = reader_.toDouble(tint.get());
-                    if (!JS_IsNumber(tint.get()) || !std::isfinite(number) || number < 0 || number > 4294967295.0 || std::floor(number) != number) {
+                    item.tint = reader_.colorValue(tint.get());
+                    if (JS_HasException(context_)) {
                         failed_ = true;
-                        JS_ThrowTypeError(context_, "colorFilter.tint 必须是 uint32 颜色值");
                         return {};
                     }
-                    item.tint = static_cast<std::uint32_t>(number);
                 }
                 result.push_back({item, key});
             } else if (type == "weight" || type == "align") {

@@ -5,13 +5,11 @@
 </template>
 
 <script>
-import type { Dp, ColorValue } from '@arrange/framework/ui'
 import { computed } from '@arrange/framework'
-import { M, Color } from '@arrange/framework/ui'
+import { M, Color, type Dp } from '@arrange/framework/ui'
 import ValueSurface from './ValueSurface.sfa'
 
-const props = defineProps<{ clicks: number; color: ColorValue; offset: Dp; onTap: () => void }>()
+const props = defineProps<{ clicks: number; color: Color; offset: Dp; onTap: () => void }>()
 const label = computed(() => `撅了啊 ${props.clicks} 次`)
 const tone = computed(() => props.color)
-
 </script>

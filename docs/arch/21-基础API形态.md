@@ -59,10 +59,11 @@ config.app.useLive("http://host:port");
 16.sp
 8.px
 
-Color(value: number): ArrangeColor
-Color(args: { red: number; green: number; blue: number; alpha?: number }): ArrangeColor
+Color(value: number): number // 仅 SFA 编译期语法，生成后为 ARGB number
+Color(args: { red: number; green: number; blue: number; alpha?: number }): number // 仅 SFA 编译期语法
+Color.hsl(hue: number, saturation: number, lightness: number, alpha?: number): number // 仅 SFA 编译期语法
 
-solidColor(color: ArrangeColor): Brush
+solidColor(color: number): Brush
 rounded(radiusDp: number, radiusPx: number): Shape
 ```
 
@@ -210,7 +211,7 @@ interface ImageProps {
 interface IconProps {
     painter: Painter
     modifier?: Modifier
-    tint?: ArrangeColor
+    tint?: number
     contentDescription?: string
 }
 ```

@@ -46,6 +46,7 @@ namespace arrange::quickjs {
 
         [[nodiscard]] std::string toString(JSValueConst value) const;
         [[nodiscard]] std::uint32_t toU32(JSValueConst value) const;
+        [[nodiscard]] std::uint32_t colorValue(JSValueConst value) const;
         [[nodiscard]] double toDouble(JSValueConst value, double fallback = 0.0) const;
         [[nodiscard]] bool toBool(JSValueConst value, bool fallback = false) const;
         [[nodiscard]] std::uint32_t arrayLength(JSValueConst value) const;

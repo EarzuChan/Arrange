@@ -46,6 +46,21 @@ namespace arrange::quickjs {
         return result;
     }
 
+    std::uint32_t QuickJsValueReader::colorValue(JSValueConst value) const {
+        if (!JS_IsNumber(value)) {
+            JS_ThrowTypeError(context_, "颜色必须是 uint32 数值");
+            return 0;
+        }
+
+        const auto number = toDouble(value);
+        if (!std::isfinite(number) || number < 0 || number > 4294967295.0 || std::floor(number) != number) {
+            JS_ThrowTypeError(context_, "颜色必须是 uint32 数值");
+            return 0;
+        }
+
+        return static_cast<std::uint32_t>(number);
+    }
+
     double QuickJsValueReader::toDouble(JSValueConst value, double fallback) const {
         double result = fallback;
         JS_ToFloat64(context_, &result, value);
@@ -151,7 +166,7 @@ namespace arrange::quickjs {
 
     std::uint32_t QuickJsValueReader::colorField(JSValueConst object, const char* key, std::uint32_t fallback) const {
         ScopedValue value(context_, JS_GetPropertyStr(context_, object, key));
-        return JS_IsUndefined(value.get()) || JS_IsNull(value.get()) ? fallback : toU32(value.get());
+        return JS_IsUndefined(value.get()) || JS_IsNull(value.get()) ? fallback : colorValue(value.get());
     }
 
     std::string quickJsExceptionText(JSContext* context) {

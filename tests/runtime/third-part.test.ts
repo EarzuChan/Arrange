@@ -86,6 +86,27 @@ function local(unit: (value: number) => number) { return unit(9) }
     const exact = (expression: string) => compileArrangeSfa(`<template><Text :modifier="M.width(${expression})" /></template><script>import { M } from '@arrange/framework/ui'</script>`, '单位双通道.sfa').code
     assert.match(exact('114.dp + 514.px'), /\[114, 514\]/)
     assert.match(exact('1919.px + 114.dp * 2 + 810.px'), /\[228, 2729\]/)
+    const once = compileArrangeSfa(`<template><Text :modifier="M.width(flag() ? 1.dp : 2.px)" /></template><script>import { M } from '@arrange/framework/ui'
+import { flag } from './state'</script>`, '单位单次求值.sfa').code
+    assert.equal((once.match(/_unref\(flag\)/g) ?? []).length, 1)
+    const scaled = compileArrangeSfa(`<template><Text :modifier="M.width((1.dp + 2.px) * factor())" /></template><script>import { M } from '@arrange/framework/ui'
+function factor() { return 2 }</script>`, '单位系数单次求值.sfa').code
+    assert.equal((scaled.match(/const __arrangeUnitValue = \(factor\(\)\)/g) ?? []).length, 1)
+    const multipleCaptures = compileArrangeSfa(`<template><Text :modifier="M.width((flag() ? 1.dp : 2.px) * factor())" /></template><script>import { M } from '@arrange/framework/ui'
+function flag() { return true }
+function factor() { return 2 }</script>`, '单位多个临时值.sfa').code
+    assert.equal((multipleCaptures.match(/const __arrangeUnitValue(?:_*) =/g) ?? []).length, 2)
+    const objectCondition = compileArrangeSfa(`<template><Text :modifier="M.offset({ x: flag() ? 1.dp : 2.px, y: 3.dp })" /></template><script>import { M } from '@arrange/framework/ui'
+function flag() { return true }</script>`, '单位对象单次求值.sfa').code
+    assert.equal((objectCondition.match(/const __arrangeUnitValue = \(flag\(\)\)/g) ?? []).length, 1)
+    const repeated = compileArrangeSfa(`<template><Text :modifier="M.width(gap + gap)" /></template><script>import { M } from '@arrange/framework/ui'\nconst gap = 8.dp</script>`, '重复单位变量.sfa').code
+    assert.match(repeated, /_unref\(gap\).*_unref\(gap\).*?, 0/)
+    const reactiveLength = compileArrangeSfa(`<template><Text :modifier="M.width(width)" /></template><script>import { M } from '@arrange/framework/ui'\nimport { ref } from '@arrange/framework'\nconst width = ref(8.dp)</script>`, '响应式单位变量.sfa').code
+    assert.match(reactiveLength, /width\.value, 0/)
+    const property = compileArrangeSfa(`<script>const value = { dp: 8 }\nconst width = value.dp</script>`, '普通dp字段.sfa').code
+    assert.match(property, /value\.dp/)
+    const customMethod = compileArrangeSfa(`<script>const custom = { width(value: number) { return value } }\nconst result = custom.width(8.dp)</script>`, '自定义width方法.sfa').code
+    assert.match(customMethod, /custom\.width\(8\)/)
     const template = compileArrangeSfa('<script>const label = `尺寸 ${8.dp}`\nconst nested = `${{ value: 2.dp }.value}`</script>', '单位插值.sfa')
     assert.match(template.code, /尺寸 \$\{8\}/)
     assert.match(template.code, /\$\{\{ value: 2 \}\.value\}/)
@@ -106,7 +127,7 @@ const padding = ref({ horizontal: 4.dp, vertical: 3.px })
 import { ref } from '@arrange/framework'
 const width = ref(8.dp)
 </script>`, '单位响应式长度.sfa')
-    assert.match(scalarRef.code, /\[8, 0\]/)
+    assert.match(scalarRef.code, /width\.value, 0/)
 
     let reads = 0
     const exports: { default?: Parameters<typeof createApp>[0] } = {}

@@ -46,7 +46,7 @@ animatedRectAsRef(...)
 - `NumberArray`：按固定长度 number group 处理；长度变化属于结构或 schema 变化，不属于普通动画 tick。
 
 - `Dp`：在 DP 声明域采样，Layout 随后按 Density 转 PX；改变 Density 不重启动画。
-- `Color`：按 Arrange color typed value 处理。
+- `Color`：按裸 ARGB `number` 的四通道颜色处理。
 - `Offset` / `Size` / `Rect`：固定字段的 DP 数值组；原生几何动画使用 PX。弹簧 visibilityThreshold 使用被采样通道的数值单位，stiffness、dampingRatio 与时间参数不当作长度。
 
 # Transition

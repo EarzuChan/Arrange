@@ -16,6 +16,18 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
     }
     const tag = (node: ts.Node | undefined, name: string) => node && ts.getJSDocTags(node).find(item => item.tagName.text === name)
     const tagged = (node: ts.Node, name: string) => symbol(node)?.declarations?.map(declaration => tag(declaration, name)).find(Boolean)
+    const isUnrefCall = (node: ts.Expression): node is ts.CallExpression => {
+        if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false
+        if (tagged(node.expression, 'arrangeUnref')) return true
+        if (!ts.isIdentifier(node.expression)) return false
+        const declaration = symbol(node.expression)?.declarations?.find(ts.isImportSpecifier)
+        if (!declaration) return false
+        const imported = declaration.propertyName ?? declaration.name
+        return ts.isIdentifier(imported) && imported.text === 'unref'
+    }
+    const unitAccess = (node: ts.Expression): node is ts.PropertyAccessExpression => {
+        return ts.isPropertyAccessExpression(node) && ['dp', 'px', 'sp'].includes(node.name.text) && !checker.getTypeAtLocation(node.expression).getProperty(node.name.text)
+    }
     const fieldsOf = (type: ts.Type): Rule | undefined => {
         const kind = valueKind(type.aliasSymbol) ?? valueKind(type.symbol)
         if (kind) return kind as ValueUnit
@@ -52,7 +64,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             const owner = initializer(value.expression)
             if (owner && ts.isCallExpression(owner) && owner.arguments.length === 1) return owner.arguments[0]
         }
-        if (ts.isCallExpression(value) && tagged(value.expression, 'arrangeUnref') && value.arguments.length === 1) return objectInitializer(value.arguments[0]) ?? value.arguments[0]
+        if (isUnrefCall(value)) return objectInitializer(value.arguments[0]) ?? value.arguments[0]
         return initializer(value)
     }
     const fail = (node: ts.Expression, expected: string, actual?: string): never => {
@@ -77,8 +89,9 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         seen.add(node)
 
         if (ts.isNumericLiteral(node)) return 'number'
-        if (ts.isPropertyAccessExpression(node) && (node.name.text === 'dp' || node.name.text === 'px')) return node.name.text
-        if (ts.isPropertyAccessExpression(node) && node.name.text === 'sp') return 'sp'
+        if (unitAccess(node)) return node.name.text as 'dp' | 'px' | 'sp'
+
+        if (isUnrefCall(node)) return dimension(node.arguments[0], new Set(seen))
 
         const constructed = (ts.isCallExpression(node) || ts.isNewExpression(node)) && expressionKind(node.expression)
         const known = constructed || fieldsOf(checker.getTypeAtLocation(expression)) as string | undefined || declaredField(node) as string | undefined
@@ -86,16 +99,16 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         if (known === 'sp' || known === 'color') return known
 
         if (ts.isConditionalExpression(node)) {
-            const whenTrue = dimension(node.whenTrue, seen)
-            const whenFalse = dimension(node.whenFalse, seen)
+            const whenTrue = dimension(node.whenTrue, new Set(seen))
+            const whenFalse = dimension(node.whenFalse, new Set(seen))
             return whenTrue === whenFalse ? whenTrue : whenTrue === 'unknown' ? whenFalse : whenFalse === 'unknown' ? whenTrue : whenTrue === 'dp' && whenFalse === 'px' || whenTrue === 'px' && whenFalse === 'dp' ? 'length' : 'invalid'
         }
 
-        if (ts.isPrefixUnaryExpression(node)) return dimension(node.operand, seen)
+        if (ts.isPrefixUnaryExpression(node)) return dimension(node.operand, new Set(seen))
 
         if (ts.isBinaryExpression(node)) {
-            const left = dimension(node.left, seen)
-            const right = dimension(node.right, seen)
+            const left = dimension(node.left, new Set(seen))
+            const right = dimension(node.right, new Set(seen))
             const operator = node.operatorToken.kind
             if (operator === ts.SyntaxKind.PlusToken || operator === ts.SyntaxKind.MinusToken) {
                 if (left === right) return left
@@ -117,11 +130,11 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
 
         if (ts.isPropertyAccessExpression(node) && node.name.text === 'value') {
             const init = initializer(node.expression)
-            if (init && ts.isCallExpression(init) && init.arguments.length) return dimension(init.arguments[0], seen)
+            if (init && ts.isCallExpression(init) && init.arguments.length) return dimension(init.arguments[0], new Set(seen))
         }
 
         const init = initializer(node)
-        if (init) return dimension(init, seen)
+        if (init) return dimension(init, new Set(seen))
 
         const type = checker.getTypeAtLocation(expression)
         if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.NumberLiteral)) return 'number'
@@ -143,7 +156,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         }
         const known = fieldsOf(checker.getTypeAtLocation(expression)) ?? declaredField(node)
         if (typeof rule === 'string') {
-            if (ts.isPropertyAccessExpression(node) && (node.name.text === 'dp' || node.name.text === 'px' || node.name.text === 'sp')) {
+            if (unitAccess(node)) {
                 if (rule === node.name.text || rule === 'length' && (node.name.text === 'dp' || node.name.text === 'px')) return
                 fail(node, rule, node.name.text)
             }
@@ -176,7 +189,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             }
             const init = initializer(node)
             if (init) return check(init, rule)
-            if (ts.isCallExpression(node) && node.arguments.length && tagged(node.expression, 'arrangeUnref')) return check(node.arguments[0], rule)
+            if (isUnrefCall(node)) return check(node.arguments[0], rule)
             return fail(node, rule)
         }
         if (known === rule) return

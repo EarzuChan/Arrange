@@ -652,6 +652,24 @@ function qualifiedNameToPath(node: Identifier | TSQualifiedName): string[] {
     }
 }
 
+function isSfaColorReference(node: ReferenceTypes, scope: TypeScope): boolean {
+    if (node.type === 'TSImportType') {
+        return node.argument.value === '@arrange/framework/ui' && getReferenceName(node) === 'Color'
+    }
+
+    if (node.type !== 'TSTypeReference') return false
+
+    const reference = getReferenceName(node)
+    if (typeof reference === 'string') {
+        const binding = scope.imports[reference]
+        return binding?.source === '@arrange/framework/ui' && binding.imported === 'Color'
+    }
+
+    if (reference.length !== 2 || reference[1] !== 'Color') return false
+    const binding = scope.imports[reference[0]]
+    return binding?.source === '@arrange/framework/ui' && binding.imported === '*'
+}
+
 function resolveGlobalScope(ctx: TypeResolveContext): TypeScope[] | undefined {
     if (ctx.options.globalTypeFiles) {
         const fs = resolveFS(ctx)
@@ -1323,6 +1341,8 @@ export function inferRuntimeType(ctx: TypeResolveContext, node: Node & MaybeWith
                 }
 
             case 'TSTypeReference': {
+                if (isSfaColorReference(node, scope)) return ['Number']
+
                 // #14729 — if resolution fails (e.g. an unresolvable import), still
                 // fall through to the built-in name handling below so that well-known
                 // types like Ref/MaybeRef/Promise can be inferred from the name alone.
@@ -1534,6 +1554,8 @@ export function inferRuntimeType(ctx: TypeResolveContext, node: Node & MaybeWith
                 return ['Object']
 
             case 'TSImportType': {
+                if (isSfaColorReference(node, scope)) return ['Number']
+
                 const sourceScope = importSourceToScope(ctx, node.argument, scope, node.argument.value)
                 const resolved = resolveTypeReference(ctx, node, sourceScope)
                 if (resolved) {

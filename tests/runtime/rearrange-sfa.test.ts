@@ -407,7 +407,10 @@ import { Color } from '@arrange/framework/ui'
 import { hue } from "./state"
 </script>`
     const compiled = compileArrangeSfa(source, '颜色.sfa')
-    assert.match(compiled.code, /__arrangeColorNumber\(_unref\(Color\)\.hsl\(/)
+    assert.doesNotMatch(compiled.code, /__arrangeColorNumber|Color\.hsl\s*\(/)
+    assert.match(compiled.code, /Math\.round\([^)]*255\)/)
+    assert.match(compiled.code, />>> 0/)
+    assert.match(compiled.code, /Number\.isFinite\(__arrangeColorHue\)/)
     const Page = evaluateSfa(source, { hue })
     const native = recordingNative()
     const app = runtime.createApp(Page)
@@ -417,4 +420,100 @@ import { hue } from "./state"
     advanceFrames()
     assert.equal(native.textNodes()[0].text, '彩虹')
     app.unmount()
+})
+
+test('Color 的 ARGB 数值与通道对象在 SFA 中直接生成裸数字表达式', () => {
+    const staticSource = `<template><Text :style="{ color: Color({ red: 1, green: 0.5, blue: 0, alpha: 0.25 }) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+</script>`
+    const staticCode = compileArrangeSfa(staticSource, '颜色静态.sfa').code
+    assert.doesNotMatch(staticCode, /from ['"]@arrange\/framework\/ui['"]/)
+    assert.match(staticCode, /1090486272/)
+
+    const dynamicSource = `<template><Text :style="{ color: Color({ red, green: 0.5, blue, alpha }) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+import { red, blue, alpha } from './state'
+</script>`
+    const dynamicCode = compileArrangeSfa(dynamicSource, '颜色动态.sfa').code
+    assert.doesNotMatch(dynamicCode, /Color\s*\(|colorNumber|ColorValue/)
+    assert.match(dynamicCode, /const __arrangeColorRedValue = \(_unref\(red\)\)/)
+    assert.match(dynamicCode, /const __arrangeColorBlueValue = \(_unref\(blue\)\)/)
+    assert.match(dynamicCode, /Number\.isFinite\(__arrangeColorRedValue\)/)
+    assert.match(dynamicCode, /\(_unref\(alpha\)\) \?\? 1/)
+})
+
+test('Color 可在 SFA 中同时作为类型和值使用而无需别名', () => {
+    const source = `<template><Text :style="{ color: Color(0xff123456) }" /></template><script>
+import { M, Color, type Dp } from '@arrange/framework/ui'
+const props = defineProps<{ color: Color; offset: Dp }>()
+</script>`
+    const code = compileArrangeSfa(source, '颜色同名类型和值.sfa').code
+    assert.match(code, /color: \{ type: Number as _PropType<\(\{ color: number; offset: number \}\)\["color"\]>, required: true \}/)
+    assert.match(code, /offset: \{ type: Number as _PropType<\(\{ color: number; offset: number \}\)\["offset"\]>, required: true \}/)
+    assert.match(code, /color: 4279383126/)
+    assert.match(code, /import \{ M, type Dp \} from ['"]@arrange\/framework\/ui['"]/)
+    assert.doesNotMatch(code, /\bColor\b/)
+})
+
+test('Color 动态通道对象只求值一次并拆成 ARGB 数字', () => {
+    const source = `<template><Text :style="{ color: Color(channels) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+const channels: { red: number; green: number; blue: number; alpha?: number } = getChannels()
+</script>`
+    const code = compileArrangeSfa(source, '颜色动态对象.sfa').code
+    assert.match(code, /const __arrangeColorChannels = \(\(_unref\(channels\)\)\)/)
+    assert.match(code, /__arrangeColorChannels\.red/)
+    assert.doesNotMatch(code, /color: \(channels\)/)
+})
+
+test('Color 未知类型输入也不会把通道对象直送 native', () => {
+    const source = `<template><Text :style="{ color: Color(channels) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+import { channels } from './state'
+</script>`
+    const code = compileArrangeSfa(source, '颜色未知对象.sfa').code
+    assert.match(code, /typeof __arrangeColorValue === 'number'/)
+    assert.match(code, /__arrangeColorValue\.red/)
+    assert.doesNotMatch(code, /color: \(_unref\(channels\)\)/)
+})
+
+test('Color 静态十六进制值参与 ARGB 与通道范围校验', () => {
+    assert.throws(() => compileArrangeSfa(`<template><Text :style="{ color: Color({ red: 0xff, green: 0, blue: 0 }) }" /></template><script>import { Color } from '@arrange/framework/ui'</script>`, '颜色通道越界.sfa'), /red 通道必须在 0\.\.1/)
+    assert.throws(() => compileArrangeSfa(`<template><Text :style="{ color: Color(0x100000000) }" /></template><script>import { Color } from '@arrange/framework/ui'</script>`, '颜色数值越界.sfa'), /ARGB 数值必须是 uint32/)
+})
+
+test('Color 的 namespace 与别名导入在消融后退出生成 TS', () => {
+    const namespaceCode = compileArrangeSfa(`<template><Text :style="{ color: Ui.Color(0xff123456) }" /></template><script>import * as Ui from '@arrange/framework/ui'</script>`, '颜色命名空间.sfa').code
+    assert.doesNotMatch(namespaceCode, /from ['"]@arrange\/framework\/ui['"]/)
+
+    const elementCode = compileArrangeSfa(`<template><Text :style="{ color: Ui['Color'](0xff123456) }" /></template><script>import * as Ui from '@arrange/framework/ui'</script>`, '颜色元素访问.sfa').code
+    assert.doesNotMatch(elementCode, /Ui\[['"]Color['"]\]/)
+    assert.doesNotMatch(elementCode, /from ['"]@arrange\/framework\/ui['"]/)
+
+    const aliasCode = compileArrangeSfa(`<template><Text :style="{ color: C(0xff123456) }" /></template><script>import { Color as C } from '@arrange/framework/ui'</script>`, '颜色别名.sfa').code
+    assert.doesNotMatch(aliasCode, /from ['"]@arrange\/framework\/ui['"]/)
+
+    const destructuredCode = compileArrangeSfa(`<template><Text :style="{ color: C(0xff123456) }" /></template><script>import * as Ui from '@arrange/framework/ui'
+const { Color: C } = Ui</script>`, '颜色解构.sfa').code
+    assert.doesNotMatch(destructuredCode, /const \{ Color: C \} = Ui/)
+    assert.doesNotMatch(destructuredCode, /from ['"]@arrange\/framework\/ui['"]/)
+    assert.throws(() => compileArrangeSfa(`<template><Text text="x" /></template><script>import { Color } from '@arrange/framework/ui'
+const factory = Color</script>`, '颜色工厂引用.sfa'), /Color 只能作为 SFA 编译期构造调用使用/)
+})
+
+test('Color 的嵌套解构可消融并拒绝循环变量解构', () => {
+    const nested = compileArrangeSfa(`<template><Text text="x" /></template><script>import * as Ui from '@arrange/framework/ui'
+function make() { const { Color } = Ui; return Color(0xff123456) }</script>`, '颜色嵌套解构.sfa').code
+    assert.match(nested, /4279383126/)
+    assert.doesNotMatch(nested, /const \{ Color \} = Ui/)
+    assert.doesNotMatch(nested, /from ['"]@arrange\/framework\/ui['"]/)
+
+    assert.throws(() => compileArrangeSfa(`<template><Text text="x" /></template><script>import * as Ui from '@arrange/framework/ui'
+function make() { for (const { Color } of [Ui]) return Color(0xff123456) }</script>`, '颜色循环解构.sfa'), /Color 解构只能出现在变量声明语句中/)
+
+    const computed = compileArrangeSfa(`<template><Text text="x" /></template><script>import * as Ui from '@arrange/framework/ui'
+const { ['Color']: C } = Ui
+const color = C(0xff123456)</script>`, '颜色计算解构.sfa').code
+    assert.match(computed, /const color = 4279383126/)
+    assert.doesNotMatch(computed, /const \{ \['Color'\]: C \} = Ui/)
 })

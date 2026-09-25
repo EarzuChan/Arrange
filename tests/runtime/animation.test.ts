@@ -4,17 +4,6 @@ import assert from "node:assert/strict"
 import { tween, linearEasing, animatedColorAsRef, animatedDpAsRef, animatedNumberAsRef, createTransition } from '../../packages/framework/src/animation/index.ts'
 import { frameScope } from './frameScope.ts'
 import { ref } from '../../packages/framework/src/index.ts'
-import { Color } from '../../packages/framework/src/unit.ts'
-
-test("Color.hsl converts normalized hue values to validated ARGB colors", () => {
-    assert.equal(Color.hsl(0, 1, 0.5).value, 0xffff0000)
-    assert.equal(Color.hsl(120, 1, 0.5).value, 0xff00ff00)
-    assert.equal(Color.hsl(240, 1, 0.5).value, 0xff0000ff)
-    assert.equal(Color.hsl(360, 1, 0.5).value, Color.hsl(0, 1, 0.5).value)
-    assert.equal(Color.hsl(-120, 1, 0.5).value, Color.hsl(240, 1, 0.5).value)
-    assert.throws(() => Color.hsl(0, 1.1, 0.5), /必须在 0\.\.1/)
-    assert.throws(() => Color.hsl(Number.NaN, 1, 0.5), /有限数值/)
-})
 
 test("animatedNumberAsRef follows target changes with a deterministic clock", () => {
     const clock = frameScope()

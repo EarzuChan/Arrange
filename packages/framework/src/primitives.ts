@@ -1,5 +1,4 @@
-export { Dp, Sp, Px, ColorValue, Color } from './unit.ts'
-export type { ColorChannels } from './unit.ts'
+export { Dp, Sp, Px } from './unit.ts'
 
 /** @arrangeFields shape */
 export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radiusDp: number; radiusPx: number }>
