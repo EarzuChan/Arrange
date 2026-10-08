@@ -1,31 +1,26 @@
+import { requireArgb } from './color.ts'
+
 export { Dp, Sp, Px } from './unit.ts'
 
-/** @arrangeFields shape */
 export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radiusDp: number; radiusPx: number }>
-/** @arrangeFields brush */
 export type Brush = Readonly<{ type: "solidColor"; color: number }>
-/** @arrangeFields padding */
 export type PaddingValue = Readonly<{ startDp?: number; startPx?: number; topDp?: number; topPx?: number; endDp?: number; endPx?: number; bottomDp?: number; bottomPx?: number; horizontalDp?: number; horizontalPx?: number; verticalDp?: number; verticalPx?: number }>
-/** @arrangeFields padding */
 export type Padding = Readonly<{ startDp: number; startPx: number; topDp: number; topPx: number; endDp: number; endPx: number; bottomDp: number; bottomPx: number }>
 
-/** @arrangeArguments color */
 export function colorToHex(color: number): string {
-    return `0x${(color >>> 0).toString(16).toUpperCase().padStart(8, "0")}`
+    return `0x${requireArgb(color).toString(16).toUpperCase().padStart(8, "0")}`
 }
 
 export const RectangleShape = Object.freeze({ type: "rectangle" })
 export const CircleShape = Object.freeze({ type: "circle" })
 
-/** @arrangeArguments length */
 export function rounded(radiusDp: number, radiusPx: number): Shape {
     if (!Number.isFinite(radiusDp) || !Number.isFinite(radiusPx) || radiusDp < 0 || radiusPx < 0) throw new RangeError("圆角半径必须是非负有限数值")
     return Object.freeze({ type: "rounded", radiusDp, radiusPx })
 }
 
-/** @arrangeArguments color */
 export function solidColor(color: number): Brush {
-    return Object.freeze({ type: "solidColor", color })
+    return Object.freeze({ type: "solidColor", color: requireArgb(color) })
 }
 
 export const Alignment = Object.freeze({
@@ -46,10 +41,8 @@ export type AxisAlignment = HorizontalAlignment | VerticalAlignment
 export type ArrangementName = 'Start' | 'Top' | 'Center' | 'End' | 'Bottom' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly'
 export type TextAlignment = 'left' | 'start' | 'Start' | 'center' | 'Center' | 'right' | 'end' | 'End'
 
-/** @arrangeFields arrangement */
 type SpacedArrangement<A extends AxisAlignment> = Readonly<{ kind: 'spacedBy'; spaceDp: number; spacePx: number; alignment?: A }>
 
-/** @arrangeArguments length */
 function spacedBy<A extends AxisAlignment = never>(spaceDp: number, spacePx: number, alignment?: A): SpacedArrangement<A> {
     return Object.freeze({ kind: "spacedBy", spaceDp, spacePx, alignment })
 }
@@ -59,7 +52,6 @@ export const Arrangement = Object.freeze({
     SpaceBetween: "SpaceBetween", SpaceAround: "SpaceAround", SpaceEvenly: "SpaceEvenly", spacedBy,
 })
 
-/** @arrangeArguments padding */
 export function PaddingValues(value: PaddingValue): Padding {
     const horizontalDp = value.horizontalDp ?? 0
     const horizontalPx = value.horizontalPx ?? 0

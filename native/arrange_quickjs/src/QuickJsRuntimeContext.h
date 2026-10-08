@@ -99,6 +99,6 @@ namespace arrange::quickjs {
         void recordToast(QuickJsToastRequest toast);
         void recordDiagnosticAction(QuickJsDiagnosticAction action);
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

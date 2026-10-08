@@ -36,7 +36,7 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
 
     const config: AppConfig = {}
     const definitions = { ...foundationArrangables } as Record<string, ArrangableDefinition>
-    
+
     const provides = Object.create(null)
     provides[DensityKey] = createDensity()
 

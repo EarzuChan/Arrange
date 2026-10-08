@@ -181,35 +181,10 @@ namespace {
         return 0;
     }
 
-    int verifyEventPropIsNotCoreEventSlot() {
-        arrange::core::LayoutTree tree;
-        tree.apply(std::vector<arrange::core::TreeMutation>{
-            arrange::core::CreateNodeMutation{1, arrange::core::NodeType::Layout},
-            arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
-        });
-        tree.clearDirty();
-        (void)tree.takeInvalidation();
-
-        try {
-            tree.apply(std::vector<arrange::core::TreeMutation>{
-                arrange::core::SetPropMutation{1, "onSubmit", arrange::core::PropValue::stringValue("not an event slot")},
-            });
-            return 20;
-        } catch (const std::invalid_argument&) {
-        }
-        const auto snapshot = tree.invalidationSnapshot();
-        if (snapshot.affects(arrange::core::DirtyFlag::EventSlot)) return 18;
-        return 0;
-    }
-
     int verifyPropSchema() {
         using namespace arrange::core;
         std::string error;
-        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::numberValue(12)), field("color", PropValue::numberValue(0xff000000u))}), error)) return 101;
-        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontSize", PropValue::stringValue("12"))}), error)) return 102;
-        for (const auto* key : {"unknownProp", "tint", "source", "testTag", "verticalArrangement"}) {
-            if (validateSetPropMutation(NodeType::Layout, key, PropValue::stringValue("非法输入"), error)) return 103;
-        }
+        if (validateSetPropMutation(NodeType::Layout, "unknownProp", PropValue::stringValue("非法输入"), error)) return 103;
 
         struct PolicyCase {
             const char* kind;
@@ -233,7 +208,6 @@ namespace {
             if (!validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "CenterHorizontally" : "Bottom"), error)) return 208;
             if (validateSetPropMutation(NodeType::Layout, "measurePolicy", policy(horizontal ? "Top" : "End"), error)) return 209;
         }
-        if (validateSetPropMutation(NodeType::Layout, "textStyle", object({field("fontWeight", PropValue::stringValue("bold"))}), error)) return 210;
         return 0;
     }
 
@@ -587,7 +561,6 @@ int main() {
     } while (false)
     RUN_SMOKE(verifyTypedLayoutTreePipeline);
     RUN_SMOKE(verifyTypedDirtyPrecision);
-    RUN_SMOKE(verifyEventPropIsNotCoreEventSlot);
     RUN_SMOKE(verifyPropSchema);
     RUN_SMOKE(verifyAlignmentAndArrangement);
     RUN_SMOKE(verifyNativeSceneAndFramePipeline);

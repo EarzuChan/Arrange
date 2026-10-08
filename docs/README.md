@@ -83,6 +83,7 @@
 | :--- | :--- |
 | App 入口、`useLive`、`useDist` | `docs/arch/02-App入口.md` |
 | 热更新与 Reload 链路 | `docs/arch/06-热更新.md` |
+| SFA 文件、模板与脚本转换、独立 TypeScript 的编译边界 | `docs/arch/33-SFA与模板写法.md` |
 
 若发现多个文档同时详细解释同一概念，维护者必须立即确立母文档，并将其他位置的解释内容删减，视情况添加引用链接。
 

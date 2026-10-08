@@ -83,7 +83,6 @@ export async function createModuleSnapshot(server: ViteDevServer, entry: string,
             result = await transformWithOxc(await readFile(hotRuntimeFilePath(), 'utf8'), hotRuntimePath(), { lang: 'ts', target: 'es2022' })
         }
         else {
-            if (/\.(css|less|sass|scss|styl)(?:\?|$)/.test(url)) throw new Error(`Arrange live 不支持 CSS 模块：${url}`)
             result = await server.transformRequest(url)
         }
         if (!result) throw new Error(`Vite 未返回模块：${url}`)

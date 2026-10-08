@@ -26,7 +26,7 @@ namespace arrange::juce {
 #endif
             return outcome;
         }
-    }  // namespace
+    }
 
     const char* packageSourceLabel(PackageSource source) noexcept {
         switch (source) {
@@ -154,8 +154,10 @@ namespace arrange::juce {
         activeSource_ = PackageSource::Dist;
         const auto message = !outcome.logs.empty() && !outcome.logs.front().message.empty() ? outcome.logs.front().message : outcome.packageDir.string();
         outcome.logs.clear();
-        if (lastLiveUnavailable_) outcome.toasts.push_back(makeToast(LogLevel::Info, "已加载 Dist 回退包", message));
-        else outcome.logs.push_back({LogLevel::Info, "已加载 Dist 应用 " + message});
+        if (lastLiveUnavailable_)
+            outcome.toasts.push_back(makeToast(LogLevel::Info, "已加载 Dist 回退包", message));
+        else
+            outcome.logs.push_back({LogLevel::Info, "已加载 Dist 应用 " + message});
         return outcome;
     }
 
@@ -202,6 +204,6 @@ namespace arrange::juce {
         toasts.insert(toasts.end(), std::make_move_iterator(outcome.toasts.begin()), std::make_move_iterator(outcome.toasts.end()));
         outcome.toasts = std::move(toasts);
     }
-}  // namespace arrange::juce
+}
 
 #endif

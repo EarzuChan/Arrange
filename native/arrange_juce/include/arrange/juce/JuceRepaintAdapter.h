@@ -18,4 +18,4 @@ namespace arrange::juce {
     };
 
 #endif
-}  // namespace arrange::juce
+}

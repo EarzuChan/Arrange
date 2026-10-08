@@ -1,6 +1,6 @@
 export { ref, shallowRef, isRef, unref, toRef, toRefs, toValue, customRef, triggerRef, reactive, shallowReactive, readonly, shallowReadonly, isReactive, isReadonly, isProxy, toRaw, markRaw, effectScope, getCurrentScope, onScopeDispose, batchUpdates } from '@arrange/reactivity'
 export type { Ref, ShallowRef, ComputedRef, WritableComputedRef, DeepReadonly, UnwrapRef, MaybeRef, MaybeRefOrGetter, EffectScope } from '@arrange/reactivity'
-export { computed } from './runtime/apiComputed.ts'
+export { computed } from '@arrange/reactivity'
 export { watch, watchEffect, watchPostEffect, watchSyncEffect } from './runtime/apiWatch.ts'
 export type { WatchOptions, WatchHandle, WatchSource } from './runtime/apiWatch.ts'
 export { provide, inject, hasInjectionContext } from './runtime/apiInject.ts'

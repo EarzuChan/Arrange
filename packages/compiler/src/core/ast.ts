@@ -33,16 +33,15 @@ export interface Node {
     loc: SourceLocation
 }
 
-// The node's range. The `start` is inclusive and `end` is exclusive.
-// [start, end)
 export interface SourceLocation {
+    // 起点包含在范围内，终点不包含在范围内
     start: Position
     end: Position
     source: string
 }
 
 export interface Position {
-    offset: number // from start of file
+    offset: number
     line: number
     column: number
 }
@@ -74,7 +73,7 @@ export interface BaseElementNode extends Node {
     props: Array<AttributeNode | DirectiveNode>
     children: TemplateChildNode[]
     isSelfClosing?: boolean
-    innerLoc?: SourceLocation // only for SFA root level elements
+    innerLoc?: SourceLocation
 }
 
 export interface PlainElementNode extends BaseElementNode { tagType: ElementTypes.ELEMENT }
@@ -101,29 +100,14 @@ export interface AttributeNode extends Node {
 
 export interface DirectiveNode extends Node {
     type: NodeTypes.DIRECTIVE
-    /**
-     * the normalized name without prefix or shorthands, e.g. "bind", "on"
-     */
     name: string
-    /**
-     * the raw attribute name, preserving shorthand, and including arg & modifiers
-     * this is only used during parse.
-     */
     rawName?: string
     exp: ExpressionNode | undefined
     arg: ExpressionNode | undefined
     modifiers: SimpleExpressionNode[]
-    /**
-     * optional property to cache the expression parse result for a-for
-     */
     forParseResult?: ForParseResult
 }
 
-/**
- * Static types have several levels.
- * Higher levels implies lower levels. e.g. a node that can be stringified
- * can be reused by expression consumers.
- */
 export enum ConstantTypes {
     NOT_CONSTANT = 0,
     CAN_REUSE_VALUE,
@@ -136,16 +120,7 @@ export interface SimpleExpressionNode extends Node {
     content: string
     isStatic: boolean
     constType: ConstantTypes
-    /**
-     * - `null` means the expression is a simple identifier that doesn't need
-     *    parsing
-     * - `false` means there was a parsing error
-     */
     ast?: BabelNode | null | false
-    /**
-     * an expression parsed as the params of a function will track
-     * the identifiers declared inside the function body.
-     */
     identifiers?: string[]
     preserveRef?: boolean
     rawRefRanges?: readonly [number, number][]
@@ -158,11 +133,6 @@ export interface InterpolationNode extends Node {
 
 export interface CompoundExpressionNode extends Node {
     type: NodeTypes.COMPOUND_EXPRESSION
-    /**
-     * - `null` means the expression is a simple identifier that doesn't need
-     *    parsing
-     * - `false` means there was a parsing error
-     */
     ast?: BabelNode | null | false
     children: (
         | SimpleExpressionNode
@@ -173,10 +143,6 @@ export interface CompoundExpressionNode extends Node {
         | symbol
     )[]
 
-    /**
-     * an expression parsed as the params of a function will track
-     * the identifiers declared inside the function body.
-     */
     identifiers?: string[]
 }
 

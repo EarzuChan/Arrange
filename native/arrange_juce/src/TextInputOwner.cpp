@@ -331,6 +331,6 @@ namespace arrange::juce {
         }
         return true;
     }
-}  // namespace arrange::juce
+}
 
 #endif

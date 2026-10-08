@@ -9,7 +9,7 @@ M.padding(8, 0).background(red)
 
 两者效果不同。
 
-本文代码块展示普通 TypeScript 真 API，长度参数使用平铺的 `(dp, px)` 双通道；SFA 模板中对应写法为 `8.dp`、`8.px`，由编译器转换为这两个数字。只接受 PX 的参数直接传数字，文本样式中的字号和行高在普通 TypeScript 中直接传 SP 数字。
+本文 `ts` 代码块采用纯 `.ts` 的真实数值参数，长度使用平铺的 `(dp, px)` 双通道，颜色使用 ARGB 数字。单位含义见 [基础类型](10-基础类型.md)，SFA 模板与脚本的对应写法见 [SFA 与模板写法](33-SFA与模板写法.md#sfa-与纯-typescript-的编译边界)；后续能力的示例为设计草案。
 
 # 最终受体与实例归属
 
@@ -133,11 +133,11 @@ M.zIndex(10)
 # 背景、边框、裁剪
 
 ```ts
-M.background(Color(0xFF2C2C2C))
-M.background(Color(0xFF2C2C2C), rounded(8, 0))
+M.background(0xFF2C2C2C)
+M.background(0xFF2C2C2C, rounded(8, 0))
 
-M.border(1, 0, Color(0xFF606060))
-M.border(1, 0, Color(0xFF606060), rounded(8, 0))
+M.border(1, 0, 0xFF606060)
+M.border(1, 0, 0xFF606060, rounded(8, 0))
 
 M.clip(rounded(8, 0))
 ```
@@ -163,23 +163,23 @@ M.clip(rounded(8, 0)).background(red)
 
 ```ts
 M.dropShadow({
-  shape: rounded(8, 0),
-  radiusDp: 12,
-  radiusPx: 0,
-  spreadDp: 2,
-  spreadPx: 0,
-  offset: { xDp: 0, xPx: 0, yDp: 4, yPx: 0 },
-  color: Color(0x66000000),
+    shape: rounded(8, 0),
+    radiusDp: 12,
+    radiusPx: 0,
+    spreadDp: 2,
+    spreadPx: 0,
+    offset: { xDp: 0, xPx: 0, yDp: 4, yPx: 0 },
+    color: 0x66000000,
 })
 
 M.innerShadow({
-  shape: rounded(8, 0),
-  radiusDp: 8,
-  radiusPx: 0,
-  spreadDp: 1,
-  spreadPx: 0,
-  offset: { xDp: 0, xPx: 0, yDp: 2, yPx: 0 },
-  color: Color(0x33000000),
+    shape: rounded(8, 0),
+    radiusDp: 8,
+    radiusPx: 0,
+    spreadDp: 1,
+    spreadPx: 0,
+    offset: { xDp: 0, xPx: 0, yDp: 2, yPx: 0 },
+    color: 0x33000000,
 })
 ```
 

@@ -1,5 +1,5 @@
 import { NO, extend } from '@arrange/shared'
-import { type ParserOptions as BabelOptions, parse, parseExpression } from '@babel/parser'
+import { type ParserOptions as BabelOptions, parseExpression } from '@babel/parser'
 import { decodeHTML } from 'entities/decode'
 import { type AttributeNode, ConstantTypes, type DirectiveNode, type ElementNode, ElementTypes, type ForParseResult, Namespaces, NodeTypes, type RootNode, type SimpleExpressionNode, type SourceLocation, type TemplateChildNode, createRoot, createSimpleExpression } from './ast.ts'
 import { normalizeSfaUnitSyntax, restoreBabelNodePositions } from './unitSyntax.ts'
@@ -8,7 +8,7 @@ import type { ParserOptions } from './options.ts'
 import Tokenizer, { CharCodes, ParseMode, QuoteType, Sequences, State, isWhitespace, toCharCodes } from './tokenizer.ts'
 import { forAliasRE, isAllWhitespace, isSimpleIdentifier } from './utils.ts'
 
-type OptionalOptions = 'decodeEntities' | 'whitespace' | 'isNativeTag' | 'isBuiltInArrangable' | 'expressionPlugins'
+type OptionalOptions = 'whitespace' | 'expressionPlugins'
 
 export type MergedParserOptions = Omit<Required<ParserOptions>, OptionalOptions> & Pick<ParserOptions, OptionalOptions>
 
@@ -29,7 +29,6 @@ export const defaultParserOptions: MergedParserOptions = {
 let currentOptions: MergedParserOptions = defaultParserOptions
 let currentRoot: RootNode | null = null
 
-// parser state
 let currentInput = ''
 let currentOpenTag: ElementNode | null = null
 let currentProp: AttributeNode | DirectiveNode | null = null
@@ -57,12 +56,8 @@ const tokenizer = new Tokenizer(stack, {
             innerEnd--
         }
         let exp = getSlice(innerStart, innerEnd)
-        // decode entities for backwards compat
-        if (exp.includes('&')) {
-            {
-                exp = decodeHTML(exp)
-            }
-        }
+        // 区块扫描仍需正确识别实体，模板入口会拒绝正文插值
+        if (exp.includes('&')) exp = decodeHTML(exp)
         addNode({
             type: NodeTypes.INTERPOLATION,
             content: createExp(exp, false, getLoc(innerStart, innerEnd)),
@@ -75,7 +70,7 @@ const tokenizer = new Tokenizer(stack, {
             type: NodeTypes.ELEMENT,
             tag: name,
             ns: currentOptions.getNamespace(name, stack[0], currentOptions.ns),
-            tagType: ElementTypes.ELEMENT, // will be refined on tag close
+            tagType: ElementTypes.ELEMENT,
             props: [],
             children: [],
             loc: getLoc(start - 1, end),
@@ -116,7 +111,6 @@ const tokenizer = new Tokenizer(stack, {
         }
     },
     onattribname(start, end) {
-        // plain attribute
         currentProp = {
             type: NodeTypes.ATTRIBUTE,
             name: getSlice(start, end),
@@ -127,7 +121,7 @@ const tokenizer = new Tokenizer(stack, {
     },
     ondirname(start, end) {
         const raw = getSlice(start, end)
-        const name = raw === '.' || raw === ':' ? 'bind' : raw === '@' ? 'on' : raw === '#' ? 'slot' : raw.slice(2)
+        const name = raw === ':' ? 'bind' : raw === '#' ? 'slot' : raw.slice(2)
 
         if (name === '') {
             emitError(ErrorCodes.X_MISSING_DIRECTIVE_NAME, start)
@@ -148,7 +142,7 @@ const tokenizer = new Tokenizer(stack, {
                 rawName: raw,
                 exp: undefined,
                 arg: undefined,
-                modifiers: raw === '.' ? [createSimpleExpression('prop')] : [],
+                modifiers: [],
                 loc: getLoc(start),
             }
 
@@ -181,7 +175,6 @@ const tokenizer = new Tokenizer(stack, {
         if (currentProp!.type === NodeTypes.DIRECTIVE) {
             currentProp!.rawName = name
         }
-        // check duplicate attrs
         if (
             currentOpenTag!.props.some(p => (p.type === NodeTypes.DIRECTIVE ? p.rawName : p.name) === name)
         ) {
@@ -190,13 +183,11 @@ const tokenizer = new Tokenizer(stack, {
     },
     onattribend(quote, end) {
         if (currentOpenTag && currentProp) {
-            // finalize end pos
             setLocEnd(currentProp.loc, end)
 
             if (quote !== QuoteType.NoValue) {
 
                 if (currentProp.type === NodeTypes.ATTRIBUTE) {
-                    // assign value
 
                     if (quote === QuoteType.Unquoted && !currentAttrValue) {
                         emitError(ErrorCodes.MISSING_ATTRIBUTE_VALUE, end)
@@ -208,27 +199,8 @@ const tokenizer = new Tokenizer(stack, {
                         loc:
                             quote === QuoteType.Unquoted ? getLoc(currentAttrStartIndex, currentAttrEndIndex) : getLoc(currentAttrStartIndex - 1, currentAttrEndIndex + 1),
                     }
-                    if (
-                        tokenizer.inSFARoot && currentOpenTag.tag === 'template' && currentProp.name === 'lang' && currentAttrValue && currentAttrValue !== 'html'
-                    ) {
-                        // SFA root template with preprocessor lang, force tokenizer to
-                        // RCDATA mode
-                        tokenizer.enterRCDATA(toCharCodes(`</template`), 0)
-                    }
                 } else {
-                    // directive
-                    let expParseMode = ExpParseMode.Normal
-                    {
-                        if (currentProp.name === 'for') {
-                            expParseMode = ExpParseMode.Skip
-                        } else if (currentProp.name === 'slot') {
-                            expParseMode = ExpParseMode.Params
-                        } else if (
-                            currentProp.name === 'on' && currentAttrValue.includes(';')
-                        ) {
-                            expParseMode = ExpParseMode.Statements
-                        }
-                    }
+                    const expParseMode = currentProp.name === 'for' ? ExpParseMode.Skip : ExpParseMode.Normal
                     const trimmed = currentAttrValue.trim()
                     const preserveRef = currentProp.name === 'bind' && isRawRefExpression(trimmed)
                     const expressionStart = preserveRef ? currentAttrStartIndex + currentAttrValue.indexOf('<') + 1 : currentAttrStartIndex
@@ -259,7 +231,6 @@ const tokenizer = new Tokenizer(stack, {
     },
     onend() {
         const end = currentInput.length
-        // EOF ERRORS
         if ((__DEV__ || !false) && tokenizer.state !== State.Text) {
             switch (tokenizer.state) {
                 case State.BeforeTagName:
@@ -294,7 +265,6 @@ const tokenizer = new Tokenizer(stack, {
                     emitError(ErrorCodes.EOF_IN_TAG, end)
                     break
                 default:
-                    // console.log(tokenizer.state)
                     break
             }
         }
@@ -311,15 +281,12 @@ const tokenizer = new Tokenizer(stack, {
         }
     },
     onprocessinginstruction(start) {
-        // ignore as we do not have runtime handling for this, only check error
         if ((stack[0] ? stack[0].ns : currentOptions.ns) === Namespaces.HTML) {
             emitError(ErrorCodes.UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME, start - 1)
         }
     },
 })
 
-// This regex doesn't cover the case if key or index aliases have destructuring,
-// but those do not make sense in the first place, so this works in practice.
 const forIteratorRE = /,([^,\}\]]*)(?:,([^,\}\]]*))?$/
 const stripParensRE = /^\(|\)$/g
 
@@ -381,7 +348,6 @@ function getSlice(start: number, end: number) {
 
 function endOpenTag(end: number) {
     if (tokenizer.inSFARoot) {
-        // in SFA mode, generate locations for root-level tags' inner content.
         currentOpenTag!.innerLoc = getLoc(end + 1, end + 1)
     }
     addNode(currentOpenTag!)
@@ -405,7 +371,6 @@ function onText(content: string, start: number, end: number) {
     const parent = stack[0] || currentRoot
     const lastNode = parent.children[parent.children.length - 1]
     if (lastNode && lastNode.type === NodeTypes.TEXT) {
-        // merge
         lastNode.content += content
         setLocEnd(lastNode.loc, end)
     } else {
@@ -418,16 +383,13 @@ function onText(content: string, start: number, end: number) {
 }
 
 function onCloseTag(el: ElementNode, end: number, isImplied = false) {
-    // attach end position
     if (isImplied) {
-        // implied close, end should be backtracked to close
         setLocEnd(el.loc, backTrack(end, CharCodes.Lt))
     } else {
         setLocEnd(el.loc, lookAhead(end, CharCodes.Gt) + 1)
     }
 
     if (tokenizer.inSFARoot) {
-        // SFA root tag, resolve inner end
         if (el.children.length) {
             el.innerLoc!.end = extend({}, el.children[el.children.length - 1].loc.end)
         } else {
@@ -436,20 +398,16 @@ function onCloseTag(el: ElementNode, end: number, isImplied = false) {
         el.innerLoc!.source = getSlice(el.innerLoc!.start.offset, el.innerLoc!.end.offset)
     }
 
-    // refine element type
     const { tag, ns, children } = el
     if (tag === 'Slot') el.tagType = ElementTypes.SLOT
     else if (tag === 'Template') el.tagType = ElementTypes.TEMPLATE
     else if (isArrangable(el)) el.tagType = ElementTypes.ARRANGABLE
 
-    // whitespace management
     if (!tokenizer.inRCDATA) {
         el.children = condenseWhitespace(children)
     }
 
     if (ns === Namespaces.HTML && currentOptions.isIgnoreNewlineTag(tag)) {
-        // remove leading newline for <textarea> and <pre> per html spec
-        // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
         const first = children[0]
         if (first && first.type === NodeTypes.TEXT) {
             first.content = first.content.replace(/^\r?\n/, '')
@@ -464,8 +422,6 @@ function onCloseTag(el: ElementNode, end: number, isImplied = false) {
     ) {
         tokenizer.inXML = false
     }
-
-    // 2.x compat / deprecation checks
 
 }
 
@@ -501,27 +457,18 @@ function condenseWhitespace(nodes: TemplateChildNode[]): TemplateChildNode[] {
                 if (isAllWhitespace(node.content)) {
                     const prev = nodes[i - 1] && nodes[i - 1].type
                     const next = nodes[i + 1] && nodes[i + 1].type
-                    // Remove if:
-                    // - the whitespace is the first or last node, or:
-                    // - (condense mode) the whitespace is between two comments, or:
-                    // - (condense mode) the whitespace is between comment and element, or:
-                    // - (condense mode) the whitespace is between two elements AND contains newline
                     if (
                         !prev || !next || (shouldCondense && ((prev === NodeTypes.COMMENT && (next === NodeTypes.COMMENT || next === NodeTypes.ELEMENT)) || (prev === NodeTypes.ELEMENT && (next === NodeTypes.COMMENT || (next === NodeTypes.ELEMENT && hasNewlineChar(node.content))))))
                     ) {
                         removedWhitespace = true
                         nodes[i] = null as any
                     } else {
-                        // Otherwise, the whitespace is condensed into a single space
                         node.content = ' '
                     }
                 } else if (shouldCondense) {
-                    // in condense mode, consecutive whitespaces in text are condensed
-                    // down to a single space.
                     node.content = condense(node.content)
                 }
             } else {
-                // #6410 normalize windows newlines in <pre>:
 
                 node.content = node.content.replace(windowsNewlineRE, '\n')
             }
@@ -562,13 +509,11 @@ function addNode(node: TemplateChildNode) {
     (stack[0] || currentRoot).children.push(node)
 }
 
-function getLoc(start: number, end?: number): SourceLocation {
+function getLoc(start: number, end = start): SourceLocation {
     return {
         start: tokenizer.getPos(start),
-        // @ts-expect-error allow late attachment
-        end: end == null ? end : tokenizer.getPos(end),
-        // @ts-expect-error allow late attachment
-        source: end == null ? end : getSlice(start, end),
+        end: tokenizer.getPos(end),
+        source: getSlice(start, end),
     }
 }
 
@@ -590,7 +535,6 @@ function dirToAttr(dir: DirectiveNode): AttributeNode {
         loc: dir.loc,
     }
     if (dir.exp) {
-        // account for quotes
         const loc = dir.exp.loc
         if (loc.end.offset < dir.loc.end.offset) {
             loc.start.offset--
@@ -610,7 +554,6 @@ function dirToAttr(dir: DirectiveNode): AttributeNode {
 enum ExpParseMode {
     Normal,
     Params,
-    Statements,
     Skip,
 }
 
@@ -620,7 +563,7 @@ function createExp(content: SimpleExpressionNode['content'], isStatic: SimpleExp
         (!isStatic) && currentOptions.prefixIdentifiers && parseMode !== ExpParseMode.Skip && content.trim()
     ) {
         if (isSimpleIdentifier(content)) {
-            exp.ast = null // fast path
+            exp.ast = null
             return exp
         }
         try {
@@ -629,18 +572,14 @@ function createExp(content: SimpleExpressionNode['content'], isStatic: SimpleExp
                 plugins: plugins ? [...plugins, 'typescript'] : ['typescript'],
             }
             const normalized = normalizeSfaUnitSyntax(content)
-            if (parseMode === ExpParseMode.Statements) {
-                // a-on with multi-inline-statements, pad 1 char
-                exp.ast = parse(` ${normalized.content} `, options).program
-            } else if (parseMode === ExpParseMode.Params) {
+            if (parseMode === ExpParseMode.Params) {
                 exp.ast = parseExpression(`(${normalized.content})=>{}`, options)
             } else {
-                // normal exp, wrap with parens
                 exp.ast = parseExpression(`(${normalized.content})`, options)
             }
             restoreBabelNodePositions(exp.ast, normalized.restore)
         } catch (e: any) {
-            exp.ast = false // indicate an error
+            exp.ast = false
             emitError(ErrorCodes.X_INVALID_EXPRESSION, loc.start.offset, e.message)
         }
     }
@@ -670,15 +609,8 @@ export function baseParse(input: string, options?: ParserOptions): RootNode {
         let key: keyof ParserOptions
         for (key in options) {
             if (options[key] != null) {
-                // @ts-expect-error
-                currentOptions[key] = options[key]
+                Object.assign(currentOptions, { [key]: options[key] })
             }
-        }
-    }
-
-    if (__DEV__) {
-        if ((currentOptions.decodeEntities)) {
-            console.warn('[ArrangeCompiler]', 'decodeEntities option is passed but will be ignored in non-browser builds')
         }
     }
 

@@ -111,7 +111,7 @@ namespace {
         }
         return true;
     }
-}  // namespace
+}
 
 int main(int argc, char** argv) {
 #if !ARRANGE_WITH_QUICKJS_NG
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
     }
     if (argc >= 3 && std::string(argv[2]) == "--expect-script-diagnostics-rejection") {
         if (!expectScriptDiagnosticsRejection(host)) return 44;
-    std::cout << "QuickJS 诊断测试拒绝非法日志级别\n";
+        std::cout << "QuickJS 诊断测试拒绝非法日志级别\n";
         return 0;
     }
     if (argc >= 4 && std::string(argv[2]) == "--expect-strict-modifier-ok") {

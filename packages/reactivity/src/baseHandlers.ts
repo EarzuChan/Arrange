@@ -6,21 +6,11 @@ import { type Target, isReadonly, isShallow, reactive, reactiveMap, readonly, re
 import { isRef } from './ref.ts'
 import { warn } from './warning.ts'
 
-const isNonTrackableKeys = /*@__PURE__*/ makeMap(`__proto__,${ReactiveFlags.IS_REF}`)
+const isNonTrackableKeys = makeMap(`__proto__,${ReactiveFlags.IS_REF}`)
 
-const builtInSymbols = new Set(
-    /*@__PURE__*/
-    Object.getOwnPropertyNames(Symbol)
-        // ios10.x Object.getOwnPropertyNames(Symbol) can enumerate 'arguments' and 'caller'
-        // but accessing them on Symbol leads to TypeError because Symbol is a strict mode
-        // function
-        .filter(key => key !== 'arguments' && key !== 'caller')
-        .map(key => Symbol[key as keyof SymbolConstructor])
-        .filter(isSymbol),
-)
+const builtInSymbols = new Set(Object.getOwnPropertyNames(Symbol).filter(key => key !== 'arguments' && key !== 'caller').map(key => Symbol[key as keyof SymbolConstructor]).filter(isSymbol))
 
 function hasOwnProperty(this: object, key: unknown) {
-    // #10455 hasOwnProperty may be called with non-string values
     if (!isSymbol(key)) key = String(key)
     const obj = toRaw(this)
     track(obj, TrackOpTypes.HAS, key)
@@ -42,14 +32,10 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
             return isShallow
         } else if (key === ReactiveFlags.RAW) {
             if (
-                receiver === (isReadonly ? isShallow ? shallowReadonlyMap : readonlyMap : isShallow ? shallowReactiveMap : reactiveMap).get(target) ||
-                // receiver is not the reactive proxy, but has the same prototype
-                // this means the receiver is a user proxy of the reactive proxy
-                Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
+                receiver === (isReadonly ? isShallow ? shallowReadonlyMap : readonlyMap : isShallow ? shallowReactiveMap : reactiveMap).get(target) || Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
             ) {
                 return target
             }
-            // early return undefined
             return
         }
 
@@ -65,14 +51,7 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
             }
         }
 
-        const res = Reflect.get(
-            target,
-            key,
-            // if this is a proxy wrapping a ref, return methods using the raw ref
-            // as receiver so that we don't have to call `toRaw` on the ref in all
-            // its class methods
-            isRef(target) ? target : receiver,
-        )
+        const res = Reflect.get(target, key, isRef(target) ? target : receiver)
 
         if (isSymbol(key) ? builtInSymbols.has(key) : isNonTrackableKeys(key)) {
             return res
@@ -87,15 +66,11 @@ class BaseReactiveHandler implements ProxyHandler<Target> {
         }
 
         if (isRef(res)) {
-            // ref unwrapping - skip unwrap for Array + integer key.
             const value = targetIsArray && isIntegerKey(key) ? res : res.value
             return isReadonly && isObject(value) ? readonly(value) : value
         }
 
         if (isObject(res)) {
-            // Convert returned value into a proxy as well. we do the isObject check
-            // here to avoid invalid value warning. Also need to lazy access readonly
-            // and reactive here to avoid circular dependency.
             return isReadonly ? readonly(res) : reactive(res)
         }
 
@@ -129,12 +104,10 @@ class MutableReactiveHandler extends BaseReactiveHandler {
                 }
             }
         } else {
-            // in shallow mode, objects are set as-is regardless of reactive or not
         }
 
         const hadKey = isArrayWithIntegerKey ? Number(key) < target.length : hasOwn(target, key)
         const result = Reflect.set(target, key, value, isRef(target) ? target : receiver)
-        // don't trigger if target is something up in the prototype chain of original
         if (target === toRaw(receiver)) {
             if (!hadKey) {
                 trigger(target, TriggerOpTypes.ADD, key, value)
@@ -189,17 +162,10 @@ class ReadonlyReactiveHandler extends BaseReactiveHandler {
     }
 }
 
-export const mutableHandlers: ProxyHandler<object> =
-  /*@__PURE__*/ new MutableReactiveHandler()
+export const mutableHandlers: ProxyHandler<object> = new MutableReactiveHandler()
 
-export const readonlyHandlers: ProxyHandler<object> =
-  /*@__PURE__*/ new ReadonlyReactiveHandler()
+export const readonlyHandlers: ProxyHandler<object> = new ReadonlyReactiveHandler()
 
-export const shallowReactiveHandlers: MutableReactiveHandler =
-  /*@__PURE__*/ new MutableReactiveHandler(true)
+export const shallowReactiveHandlers: MutableReactiveHandler = new MutableReactiveHandler(true)
 
-// Props handlers are special in the sense that it should not unwrap top-level
-// refs (in order to allow refs to be explicitly passed down), but should
-// retain the reactivity of the normal readonly object.
-export const shallowReadonlyHandlers: ReadonlyReactiveHandler =
-  /*@__PURE__*/ new ReadonlyReactiveHandler(true)
+export const shallowReadonlyHandlers: ReadonlyReactiveHandler = new ReadonlyReactiveHandler(true)

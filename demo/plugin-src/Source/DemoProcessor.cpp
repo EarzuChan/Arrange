@@ -9,9 +9,9 @@
 
 namespace {
     void configureDebugConsole() {
-        FreeConsole(); // 放走老控制台
+        FreeConsole();  // 放走老控制台
 
-        AllocConsole(); // 拉来一个船新控制台
+        AllocConsole();  // 拉来一个船新控制台
         SetConsoleTitleW(L"Arrange Demo - native log");
 
         FILE* stream = nullptr;

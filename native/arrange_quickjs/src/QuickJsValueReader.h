@@ -66,6 +66,6 @@ namespace arrange::quickjs {
     };
 
     [[nodiscard]] std::string quickJsExceptionText(JSContext* context);
-}  // namespace arrange::quickjs
+}
 
 #endif

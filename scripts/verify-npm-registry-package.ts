@@ -2,12 +2,12 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from "node:path"
 import { npmSubprocessEnv, repoRoot, run } from "./common.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
+import { ARRANGE_MACRO_PATTERN } from '../packages/vite-plugin/src/constraints.ts'
 
 const contract = readArrangeVersionContract()
 const consumerDir = resolve(repoRoot, "build/npm-registry-consumer")
 const cliManifest = JSON.parse(readFileSync(resolve(repoRoot, "cli/package.json"), "utf8")) as { version: string }
 const cliTarball = resolve(repoRoot, `artifacts/npm/arrange-cli-${cliManifest.version}.tgz`)
-const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 
 async function runNpm(args: readonly string[]): Promise<void> {
     const env = npmSubprocessEnv()
@@ -73,7 +73,7 @@ await runNpm(["run", "build"])
 const appBundle = resolve(consumerDir, "dist/app.js")
 if (!existsSync(appBundle)) throw new Error(`npm registry consumer did not produce ${appBundle}`)
 const source = readFileSync(appBundle, "utf8")
-const macro = source.match(macroPattern)
+const macro = source.match(ARRANGE_MACRO_PATTERN)
 if (macro) throw new Error(`npm registry consumer bundle contains unresolved Arrange macro ${macro[0]}`)
 
 console.log('[ArrangePackageVerify]', `verified @arrange/framework registry consumer for Arrange ${contract.frameworkVersion} with @arrange/cli ${cliManifest.version}`)

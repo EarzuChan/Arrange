@@ -20,4 +20,4 @@ namespace arrange::quickjs {
        private:
         ScriptHost& host_;
     };
-}  // namespace arrange::quickjs
+}

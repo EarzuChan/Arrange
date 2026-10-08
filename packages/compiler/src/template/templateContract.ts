@@ -31,7 +31,6 @@ export function validateTemplateContract(root: RootNode, options: CompilerOption
                 const original = prop.type === NodeTypes.ATTRIBUTE ? prop.name : prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.isStatic ? prop.arg.content : undefined
                 if (original === undefined) continue
                 const name = camelize(original)
-                if (name === 'ref' || name === 'refFor' || name === 'refKey') fail('模板不提供实例 ref，请通过已声明的参数传递状态', prop.loc)
                 if (names.has(name)) fail(`重复参数：${name}`, prop.loc)
                 names.add(name)
             }

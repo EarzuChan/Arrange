@@ -28,7 +28,7 @@ namespace arrange::core {
         const T* getIf(const TreeMutation& mutation) noexcept {
             return std::get_if<T>(&mutation);
         }
-    }  // namespace
+    }
 
     void LayoutTree::apply(const std::vector<TreeMutation>& mutations) {
         for (const auto& mutation : mutations) applyMutation(mutation);
@@ -313,8 +313,7 @@ namespace arrange::core {
             case DirtyFlag::EventSlot:
                 break;
         }
-        // A viewport resize changes root constraints; descendants validate their
-        // actual incoming constraints instead of receiving an indiscriminate dirty.
+        // 视口尺寸变化只改变根约束，后代自行检查实际传入的约束
         if (source != InvalidationSource::Resize)
             for (auto& [_, node] : nodes_) node.dirty |= dirty;
         invalidation_.record(source, std::nullopt, dirty, std::move(field), std::move(reason));
@@ -385,4 +384,4 @@ namespace arrange::core {
         }
         return false;
     }
-}  // namespace arrange::core
+}

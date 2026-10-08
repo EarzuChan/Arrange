@@ -42,4 +42,4 @@ namespace arrange {
         ResolvedApp resolved_;
         ErrorScreenModel error_;
     };
-}  // namespace arrange
+}

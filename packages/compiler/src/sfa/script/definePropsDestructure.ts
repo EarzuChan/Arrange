@@ -28,26 +28,19 @@ export function processPropsDestructure(ctx: ScriptCompileContext, declId: Objec
             if (!propKey) ctx.error(`${DEFINE_PROPS}() destructure cannot use computed key.`, prop.key)
 
             if (prop.value.type === 'AssignmentPattern') {
-                // default value { foo = 123 }
                 const { left, right } = prop.value
                 if (left.type !== 'Identifier') ctx.error(`${DEFINE_PROPS}() destructure does not support nested patterns.`, left)
 
                 registerBinding(propKey, left.name, right)
-            } else if (prop.value.type === 'Identifier') registerBinding(propKey, prop.value.name)// simple destructure
+            } else if (prop.value.type === 'Identifier') registerBinding(propKey, prop.value.name)
             else ctx.error(`${DEFINE_PROPS}() destructure does not support nested patterns.`, prop.value)
         } else {
-            // rest spread
             ctx.propsDestructureRestId = (prop.argument as Identifier).name
-            // register binding
             ctx.bindingMetadata[ctx.propsDestructureRestId] = BindingTypes.SETUP_REACTIVE_CONST
         }
     }
 }
 
-/**
- * true -> prop binding
- * false -> local binding
- */
 type Scope = Record<string, boolean>
 
 export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImportAliases: Record<string, string>): void {
@@ -99,8 +92,6 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
         for (const decl of stmt.declarations) {
             const isDefineProps = isRoot && decl.init && isCallOf(unwrapTSNode(decl.init), 'defineProps')
             for (const id of extractIdentifiers(decl.id)) {
-                // for defineProps destructure, only exclude them since they
-                // are already passed in as knownProps
                 if (isDefineProps) excludedIds.add(id)
                 else registerLocalBinding(id)
             }
@@ -115,16 +106,12 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
         }
 
         if (isStaticProperty(parent) && parent.shorthand) {
-            // let binding used in a property shorthand
-            // skip for destructure patterns
             if (
                 !(parent as any).inPattern || isInDestructureAssignment(parent, parentStack)
             ) {
-                // { prop } -> { prop: __props.prop }
                 ctx.s.appendLeft(id.end! + ctx.startOffset!, `: ${genPropsAccessExp(propsLocalToPublicMap[id.name])}`)
             }
         } else {
-            // x --> __props.x
             ctx.s.overwrite(id.start! + ctx.startOffset!, id.end! + ctx.startOffset!, genPropsAccessExp(propsLocalToPublicMap[id.name]))
         }
     }
@@ -138,14 +125,12 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
         }
     }
 
-    // check root scope first
     const ast = ctx.scriptAst!
     walkScope(ast, true)
     walk(ast, {
         enter(node: Node, parent: Node | null) {
             parent && parentStack.push(parent)
 
-            // skip type nodes
             if (
                 parent && parent.type.startsWith('TS') && !TS_NODE_TYPES.includes(parent.type)
             ) {
@@ -155,7 +140,6 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
             checkUsage(node, 'watch', arrangeImportAliases.watch)
             checkUsage(node, 'toRef', arrangeImportAliases.toRef)
 
-            // function scopes
             if (isFunctionType(node)) {
                 pushScope()
                 walkFunctionParams(node, registerLocalBinding)
@@ -165,7 +149,6 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
                 return
             }
 
-            // catch param
             if (node.type === 'CatchClause') {
                 pushScope()
                 if (node.param && node.param.type === 'Identifier') {
@@ -175,7 +158,6 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
                 return
             }
 
-            // for loops: loop variable should be scoped to the loop
             if (
                 node.type === 'ForOfStatement' || node.type === 'ForInStatement' || node.type === 'ForStatement'
             ) {
@@ -190,7 +172,6 @@ export function transformDestructuredProps(ctx: ScriptCompileContext, arrangeImp
                 return
             }
 
-            // non-function block scopes
             if (node.type === 'BlockStatement' && !isFunctionType(parent!)) {
                 pushScope()
                 walkScope(node)

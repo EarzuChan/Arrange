@@ -163,7 +163,7 @@ function ensureRuntime(): HotRuntime {
     if (runtime) return runtime
     const transport = globalThis.__ARRANGE_HOT_TRANSPORT__
     if (!transport) throw new Error('Arrange live HMR transport 尚未安装')
-    runtime = new HotRuntime(transport, url => import(/* @vite-ignore */ url))
+    runtime = new HotRuntime(transport, url => import(url))
     globalThis.__ARRANGE_HOT_RECEIVE__ = async message => {
         if (message.type === 'custom' && message.event === 'arrange:import-ready') {
             const data = message.data as { id: number; error?: string }
@@ -173,7 +173,7 @@ function ensureRuntime(): HotRuntime {
             if (data.error) pending.reject(new Error(data.error))
             else {
                 Log.i(HOT_RUNTIME_TAG, '已收到动态模块快照', pending.url)
-                import(/* @vite-ignore */ pending.url).then(pending.resolve, pending.reject)
+                import(pending.url).then(pending.resolve, pending.reject)
             }
             return
         }

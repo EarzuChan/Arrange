@@ -10,7 +10,8 @@ export interface RearrangeNode {
     retire(): void
 }
 
-export interface RearrangeHost { // TODO：RearrangeSession？？？真该改你名了
+// 应用原生候选并交付回执；RearrangeSession 负责前端实例和结构账本
+export interface RearrangeHost {
     currentTime(): number
     requestFrame(pending: boolean): void
     begin(): void

@@ -47,4 +47,4 @@ namespace arrange::core {
     void MutationTransactionQueue::clear() noexcept {
         pending_.reset();
     }
-}  // namespace arrange::core
+}

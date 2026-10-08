@@ -39,6 +39,7 @@ export class FrameScheduler {
     constructor(private readonly request: (pending: boolean) => void, private readonly semanticTime?: () => number) { }
 
     now(): number { return this.phase === 'animation' || this.phase === 'values' ? this.timestamp : Math.max(this.timestamp, this.semanticTime?.() ?? this.timestamp) }
+    private get disposed(): boolean { return this.phase === 'disposed' }
     get hasPreWork(): boolean { return this.queues.pre.size > 0 }
 
     drainPre(): void {
@@ -101,6 +102,7 @@ export class FrameScheduler {
             for (const participant of [...this.participants]) if (this.participants.has(participant) && participant.active()) {
                 this.counters.animationSamples++
                 participant.sample(time)
+                if (this.disposed) return
             }
 
             this.phase = 'values'
@@ -109,10 +111,11 @@ export class FrameScheduler {
                 const job = this.queues[phase].values().next().value!
                 this.queues[phase].delete(job)
                 execute(job)
+                if (this.disposed) return
             }
         } finally {
             this.executeCurrent = undefined
-            this.phase = 'idle'
+            if (!this.disposed) this.phase = 'idle'
         }
         this.phase = 'awaiting'
         if ([...this.participants].some(participant => participant.active())) this.request(true)
@@ -128,12 +131,17 @@ export class FrameScheduler {
         const jobs = [...this.queues.post]
         this.queues.post.clear()
         try {
-            if (success) for (const job of jobs) if (!(job.flags! & SchedulerJobFlags.DISPOSED) && !job.i?.isUnmounted && !job.i?.isDeactivated) callWithErrorHandling(job, job.i, ErrorCodes.SCHEDULER)
+            if (success) for (const job of jobs) {
+                if (this.disposed) break
+                if (!(job.flags! & SchedulerJobFlags.DISPOSED) && !job.i?.isUnmounted && !job.i?.isDeactivated) callWithErrorHandling(job, job.i, ErrorCodes.SCHEDULER)
+            }
         } finally {
-            this.phase = 'idle'
-            for (const job of this.deferred) this.enqueue(job, job.phase ?? 'collect')
-            this.deferred.clear()
-            this.synchronizeRequest()
+            if (!this.disposed) {
+                this.phase = 'idle'
+                for (const job of this.deferred) this.enqueue(job, job.phase ?? 'collect')
+                this.deferred.clear()
+                this.synchronizeRequest()
+            }
         }
     }
 

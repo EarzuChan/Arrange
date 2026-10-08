@@ -1,0 +1,2 @@
+M23_PERF {"frames":240,"mean_ms":2.59605,"p95_ms":15.3157,"max_ms":21.3138,"cpp_new_count":1078877,"cpp_new_bytes":563891467,"js_allocations":1452483,"js_allocated_bytes":94611290,"js_live_bytes":28190945,"measure":20,"place":87,"paint":117,"hit":87,"copied_nodes":22558}
+SFA/Vite/QuickJS/原生集成：值阶段、参数、计算值、内容、身份复用与退休验证通过

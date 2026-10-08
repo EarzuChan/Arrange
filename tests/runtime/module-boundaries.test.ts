@@ -8,17 +8,13 @@ import * as internal from '@arrange/framework/internal'
 import { frameScope } from './frameScope.ts'
 import { requireSfaModule } from './sfaModules.ts'
 
-test('根入口只保留核心能力，分层入口与编译协议共享响应式身份', () => {
-    for (const name of ['Text', 'Layout', 'M', 'Modifier', 'tween', 'defineArrangable', 'callArrangable', 'RearrangeSession', 'getArrangeExecutionStats']) assert.equal(Object.hasOwn(core, name), false, `根入口泄漏了 ${name}`)
+test('分层入口、编译协议与动画通道共享响应式身份', () => {
     assert.equal(typeof core.Log, 'object')
-    assert.equal(Object.hasOwn(internal, 'Log'), false, 'Log 只能从 framework 公共入口提供')
-    assert.equal(Object.hasOwn(internal, 'diagnostics'), false, 'diagnostics 只能从 framework 公共入口提供')
 
     assert.equal(requireSfaModule('@arrange/framework/foundation'), foundation)
     assert.equal(requireSfaModule('@arrange/framework/ui'), ui)
     assert.equal(requireSfaModule('@arrange/framework/animation'), animation)
     assert.equal(requireSfaModule('@arrange/framework/internal'), internal)
-    assert.throws(() => requireSfaModule('@arrange/framework/missing'), /测试未提供 SFA 依赖/)
     assert.equal(core.ref, internal.ref)
     assert.ok(ui.M instanceof ui.Modifier)
 

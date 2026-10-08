@@ -55,16 +55,10 @@ function toFileNameLowerCase(x: string) {
     return fileNameLowerCaseRegExp.test(x) ? x.replace(fileNameLowerCaseRegExp, toLowerCase) : x
 }
 
-/**
- * We need `getCanonicalFileName` when creating ts module resolution cache,
- * but TS does not expose it directly. This implementation is replicated from
- * the TS source code.
- */
 export function createGetCanonicalFileName(useCaseSensitiveFileNames: boolean): (str: string) => string {
     return useCaseSensitiveFileNames ? identity : toFileNameLowerCase
 }
 
-// posix behavior.
 const normalize = (path.posix || path).normalize
 const windowsSlashRE = /\\/g
 export function normalizePath(p: string): string {
@@ -73,10 +67,8 @@ export function normalizePath(p: string): string {
 
 export const joinPaths: (...paths: string[]) => string = (path.posix || path).join
 
-/**
- * key may contain symbols
- * 含非标识符字符的名称转换为字符串键
- */
+// 键名可能包含符号
+// 含非标识符字符的名称转换为字符串键
 export const propNameEscapeSymbolsRE: RegExp = /[ !"#$%&'()*+,./:;<=>?@[\\\]^`{|}~\-]/
 
 export function getEscapedPropName(key: string): string {

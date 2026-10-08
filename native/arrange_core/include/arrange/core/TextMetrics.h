@@ -53,4 +53,4 @@ namespace arrange::core {
         return fontSize * (isWideCodepoint(codepoint) ? 1.0f : 0.6f);
     }
 
-}  // namespace arrange::core
+}

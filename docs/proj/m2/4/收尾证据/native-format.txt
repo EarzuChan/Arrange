@@ -1,0 +1,5 @@
+
+> arrange@0.0.0-m.2.2 format:native:check E:\a_dev\proj\Arrange
+> node scripts/format-native.ts
+
+[ArrangeNativeFormat] 已检查 175 个 C++ 文件

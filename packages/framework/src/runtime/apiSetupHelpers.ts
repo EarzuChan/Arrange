@@ -1,11 +1,9 @@
-import {type Prettify, isArray, isFunction} from '@arrange/shared'
-import {type SetupContext, getCurrentInstance} from './arrangable.ts'
-import type {ArrangableObjectPropsOptions, ArrangablePropsOptions, ExtractPropTypes} from './arrangableProps.ts'
-import {warn} from './warning.ts'
+import { type Prettify, isArray, isFunction } from '@arrange/shared'
+import { type SetupContext, getCurrentInstance } from './arrangable.ts'
+import type { ArrangableObjectPropsOptions, ArrangablePropsOptions, ExtractPropTypes } from './arrangableProps.ts'
+import { warn } from './warning.ts'
 
-// overload 1: runtime props w/ array
 export function defineProps<PropNames extends string = string>(props: PropNames[]): Prettify<Readonly<{ [key in PropNames]?: any }>>
-// overload 2: runtime props w/ object
 export function defineProps<PP extends ArrangableObjectPropsOptions = ArrangableObjectPropsOptions>(props: PP): Prettify<Readonly<ExtractPropTypes<PP>>>
 export function defineProps<TypeProps>(): Readonly<TypeProps>
 export function defineProps(): never {
@@ -54,9 +52,9 @@ export function mergeDefaults(raw: ArrangablePropsOptions, defaults: Record<stri
 
         let opt = props[key]
         if (opt) {
-            if (isArray(opt) || isFunction(opt)) opt = props[key] = {type: opt, default: defaults[key]}
+            if (isArray(opt) || isFunction(opt)) opt = props[key] = { type: opt, default: defaults[key] }
             else opt.default = defaults[key]
-        } else if (opt === null) opt = props[key] = {default: defaults[key]}
+        } else if (opt === null) opt = props[key] = { default: defaults[key] }
         else if (__DEV__) warn(`props default key "${key}" has no corresponding declaration.`)
 
         if (opt && defaults[`__skip_${key}`]) opt.skipFactory = true
@@ -69,7 +67,7 @@ export function mergeDefaults(raw: ArrangablePropsOptions, defaults: Record<stri
 export function createPropsRestProxy(props: any, excludedKeys: string[]): Record<string, any> {
     const ret: Record<string, any> = {}
 
-    for (const key in props) if (!excludedKeys.includes(key)) Object.defineProperty(ret, key, {enumerable: true, get: () => props[key]})
+    for (const key in props) if (!excludedKeys.includes(key)) Object.defineProperty(ret, key, { enumerable: true, get: () => props[key] })
 
     return ret
 }

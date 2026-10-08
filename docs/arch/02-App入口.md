@@ -68,7 +68,7 @@ import App from "./App.sfa"
 createApp(App).mount()
 ```
 
-正式编写路径为 SFA 模板，经 Arrange 编译器与运行时进入 Rearrange mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口。
+正式编写路径为 SFA 模板与脚本，经 Arrange 编译器与运行时进入 Rearrange mutations 与 Reactive slot updates。`@arrange/framework` 是 authoring API 主入口；源码编译边界见 [SFA 与模板写法](33-SFA与模板写法.md#sfa-与纯-typescript-的编译边界)。
 
 # 路径约定
 

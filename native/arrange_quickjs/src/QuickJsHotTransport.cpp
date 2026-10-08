@@ -74,7 +74,7 @@ namespace arrange::quickjs {
                 return false;
             return true;
         }
-    }  // namespace
+    }
 
     void installHotTransport(JSContext* context) {
         static std::atomic<std::uint64_t> nextSession{1};
@@ -134,4 +134,4 @@ namespace arrange::quickjs {
         for (const auto& path : message.paths) paths.push_back({path});
         return toJs(context, {HotValue::Object{{"type", {message.type}}, {"updates", {std::move(updates)}}, {"paths", {std::move(paths)}}, {"event", {message.event}}, {"data", message.data}}});
     }
-}  // namespace arrange::quickjs
+}

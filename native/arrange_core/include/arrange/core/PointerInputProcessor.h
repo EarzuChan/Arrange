@@ -28,4 +28,4 @@ namespace arrange::core {
         ModifierHandle pressedModifier_;
         HitTester hitTester_;
     };
-}  // namespace arrange::core
+}

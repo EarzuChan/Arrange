@@ -21,7 +21,7 @@ namespace arrange::juce {
             }
             return 0xff3b82f6u;
         }
-    }  // namespace
+    }
 
     std::vector<arrange::core::DrawOp> DiagnosticsScene::buildErrorScreen(::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const {
         std::vector<arrange::core::DrawOp> ops;
@@ -129,6 +129,6 @@ namespace arrange::juce {
         op.overflow = "clip";
         return op;
     }
-}  // namespace arrange::juce
+}
 
 #endif

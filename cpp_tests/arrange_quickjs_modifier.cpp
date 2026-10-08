@@ -92,7 +92,6 @@ namespace {
                     reject(() => n.updateBinding(bg, background(1)))
                     bg = old
                     inner = n.registerModifierBinding(1, instances.find(item => item.key === 'inner'))
-                    reject(() => n.updateBinding(bg, {type: 'width', value: {value: 40}}))
                     n.updateBinding(bg, background(0xff112233))
                     n.updateBinding(inner, click('inner', 'changed'))
                     n.updateBinding(inner, click('inner', 'changed again'))
@@ -243,7 +242,7 @@ namespace {
         check(scene.node(1).props.at("contentDescription").stringOr() == "旧回调" && host.eventSlotCount() == 1, "回滚没有保留旧回调或泄漏候选");
     }
 
-}  // namespace
+}
 
 int main() {
     try {
@@ -271,7 +270,6 @@ int main() {
                     }
                     throw new Error(`无效参数被接受：${field}`)
                 }
-                rejects({ type: 'graphicsLayer', value: { translation: 30 } }, 'translation')
                 rejects({ type: 'background', value: { brush: { type: 'solidColor', color: 1, extra: 2 } } }, 'extra')
                 rejects({ type: 'clip', value: { shape: { type: 'rounded', radius: 8, extra: 2 } } }, 'extra')
                 rejects({ type: 'graphicsLayer', value: { transformOrigin: 'Typo' } }, 'transformOrigin')

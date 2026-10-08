@@ -77,4 +77,4 @@ namespace arrange::core {
         LayoutTree tree_;
         std::unordered_set<EventSlotId, EventSlotIdHash> activeEventSlots_;
     };
-}  // namespace arrange::core
+}

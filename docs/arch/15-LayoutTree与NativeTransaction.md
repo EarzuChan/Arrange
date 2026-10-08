@@ -151,7 +151,7 @@ Prop 不是任意 JS value 的序列化结果。每类节点支持哪些 prop、
 
 # Modifier 表达
 
-JS 侧 Modifier 是不可变链：
+JS 侧 Modifier 是不可变链。以下为 SFA 源码表达式，写法边界见 [SFA 与模板写法](33-SFA与模板写法.md#sfa-与纯-typescript-的编译边界)：
 
 ```sfa
 M.padding(8.dp).background(Color(0xFF000000))

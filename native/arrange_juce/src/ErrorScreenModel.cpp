@@ -46,4 +46,4 @@ namespace arrange {
         model.retryAvailable = retryAvailable;
         return model;
     }
-}  // namespace arrange
+}

@@ -180,6 +180,6 @@ namespace arrange::quickjs {
         }
         return result.empty() ? "QuickJS exception" : result;
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

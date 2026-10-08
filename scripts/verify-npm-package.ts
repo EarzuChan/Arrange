@@ -2,13 +2,13 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from "node:path"
 import { cmakeExe, configureSmokeBuild, npmSubprocessEnv, repoRoot, run, runInVsDev } from "./common.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
+import { ARRANGE_MACRO_PATTERN } from '../packages/vite-plugin/src/constraints.ts'
 
 const contract = readArrangeVersionContract()
 const consumerDir = resolve(repoRoot, "build/npm-package-consumer")
 const frameworkTarball = resolve(repoRoot, `artifacts/npm/arrange-framework-${contract.frameworkVersion}.tgz`)
 const cliManifest = JSON.parse(readFileSync(resolve(repoRoot, "cli/package.json"), "utf8")) as { version: string }
 const cliTarball = resolve(repoRoot, `artifacts/npm/arrange-cli-${cliManifest.version}.tgz`)
-const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 
 async function runNpm(args: readonly string[]): Promise<void> {
     const env = npmSubprocessEnv()
@@ -59,7 +59,7 @@ await runNpm(["run", "build"])
 const appBundle = resolve(consumerDir, "dist/app.js")
 if (!existsSync(appBundle)) throw new Error(`发布包消费者未生成产物： ${appBundle}`)
 const source = readFileSync(appBundle, "utf8")
-const macro = source.match(macroPattern)
+const macro = source.match(ARRANGE_MACRO_PATTERN)
 if (macro) throw new Error(`发布包产物残留未替换的编译宏： ${macro[0]}`)
 
 // 原生宿主必须加载本次安装包生成的产物，源码侧 Demo 不能代替发布包验收

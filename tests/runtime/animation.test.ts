@@ -238,3 +238,112 @@ test("Transition child mappings follow their actual reactive reads and stop unsu
     clock.advanceBy(100)
     assert.equal(width.value, 150)
 })
+
+test('不规则帧与跳帧按实际时间采样 tween 及三种阻尼弹簧', async () => {
+    const { spring } = await import('../../packages/framework/src/animation/index.ts')
+    const specs = [tween({ durationMillis: 500, delayMillis: 30, easing: linearEasing }), ...[0.4, 1, 2].map(dampingRatio => spring({ stiffness: 90, dampingRatio }))]
+    for (const animationSpec of specs) {
+        const skipped = frameScope(), dense = frameScope()
+        const aTarget = ref(0), bTarget = ref(0)
+        const a = skipped.run(() => animatedNumberAsRef(aTarget, { animationSpec }))
+        const b = dense.run(() => animatedNumberAsRef(bTarget, { animationSpec }))
+        aTarget.value = bTarget.value = 100
+        skipped.advanceBy(247)
+        for (const elapsed of [11, 29, 77, 130]) dense.advanceBy(elapsed)
+        assert.ok(Math.abs(a.value - b.value) < 1e-9, `跳帧改变了 ${animationSpec.kind} 的采样结果`)
+        assert.equal(skipped.scheduler.counters.frames, 1)
+        assert.equal(dense.scheduler.counters.frames, 4)
+        skipped.advanceBy(10000)
+        assert.equal(a.value, 100)
+        assert.equal(a.isRunning.value, false)
+        skipped.stop()
+        dense.stop()
+    }
+})
+
+test('无限动画跨周期跳帧时 delay 保持当前周期端点且不依赖旧采样', async () => {
+    const { createInfiniteTransition } = await import('../../packages/framework/src/animation/index.ts')
+    for (const repeatMode of ['restart', 'reverse'] as const) {
+        const skipped = frameScope(), dense = frameScope()
+        const create = () => createInfiniteTransition().animatedNumber('延迟周期', 0, 10, { animationSpec: tween({ durationMillis: 100, delayMillis: 20, easing: linearEasing }), repeatMode })
+        const a = skipped.run(create), b = dense.run(create)
+        skipped.advanceBy(60)
+        dense.advanceBy(60)
+        assert.equal(a.value, 4)
+        skipped.advanceBy(70)
+        dense.advanceBy(59)
+        dense.advanceBy(11)
+        assert.equal(a.value, repeatMode === 'restart' ? 0 : 10)
+        assert.equal(a.value, b.value)
+        skipped.advanceBy(120)
+        dense.advanceBy(120)
+        assert.equal(a.value, 0)
+        assert.equal(a.value, b.value)
+        skipped.stop()
+        dense.stop()
+    }
+})
+
+test('颜色入口拒绝非 uint32 值，非法目标不破坏之后的有效动画', async () => {
+    const { colorToHex, solidColor } = await import('../../packages/framework/src/ui.ts')
+    const clock = frameScope(), target = ref(0xff000000)
+    const animated = clock.run(() => animatedColorAsRef(target, { animationSpec: tween({ durationMillis: 100, easing: linearEasing }) }))
+    for (const invalid of [-1, 0x100000000, 1.5, NaN, Infinity]) {
+        assert.throws(() => clock.run(() => animatedColorAsRef(invalid)), /ARGB/)
+        assert.throws(() => colorToHex(invalid), /ARGB/)
+        assert.throws(() => solidColor(invalid), /ARGB/)
+        assert.throws(() => { target.value = invalid }, /ARGB/)
+    }
+    target.value = 0xffffffff
+    clock.advanceBy(50)
+    assert.equal(animated.value, 0xff808080)
+    clock.advanceBy(50)
+    assert.equal(animated.value, 0xffffffff)
+    assert.equal(colorToHex(0x00ffffff), '0x00FFFFFF')
+    assert.equal(solidColor(0).color, 0)
+    clock.stop()
+})
+
+test('数值组输出仍是独立冻结快照，颜色弹簧把过冲夹到字节范围', async () => {
+    const { animatedRectAsRef, spring } = await import('../../packages/framework/src/animation/index.ts')
+    const clock = frameScope(), rectTarget = ref({ x: 0, y: 0, width: 10, height: 20 }), colorTarget = ref(0xff000000)
+    const rect = clock.run(() => animatedRectAsRef(rectTarget, { animationSpec: tween({ durationMillis: 100, easing: linearEasing }) }))
+    const color = clock.run(() => animatedColorAsRef(colorTarget, { animationSpec: spring({ stiffness: 100, dampingRatio: 0.1 }) }))
+    rectTarget.value = { x: 20, y: 30, width: 30, height: 40 }
+    colorTarget.value = 0xffffffff
+    clock.advanceBy(50)
+    const snapshot = rect.value
+    assert.ok(Object.isFrozen(snapshot))
+    clock.advanceBy(300)
+    assert.deepEqual(snapshot, { x: 10, y: 15, width: 20, height: 30 })
+    assert.notEqual(rect.value, snapshot)
+    assert.equal(color.value, 0xffffffff)
+    clock.stop()
+})
+
+test('重定向到当前静止值取消帧需求，同批完成后再重定向使旧完成回调失效', () => {
+    const clock = frameScope(), target = ref(0)
+    const spec = tween({ durationMillis: 100, easing: linearEasing })
+    const animated = clock.run(() => animatedNumberAsRef(target, { animationSpec: spec }))
+    target.value = 100
+    clock.advanceBy(40)
+    target.value = 40
+    assert.equal(animated.isRunning.value, false)
+    assert.equal(animated.value, 40)
+    animated.stop()
+
+    const xTarget = ref(0), yTarget = ref(0)
+    let retiredCompletions = 0
+    clock.run(() => animatedNumberAsRef(xTarget, {
+        animationSpec: spec, finished() {
+            yTarget.value = 10
+            yTarget.value = 20
+        }
+    }))
+    clock.run(() => animatedNumberAsRef(yTarget, { animationSpec: spec, finished() { retiredCompletions++ } }))
+    xTarget.value = 10
+    yTarget.value = 20
+    clock.advanceBy(100)
+    assert.equal(retiredCompletions, 0)
+    clock.stop()
+})

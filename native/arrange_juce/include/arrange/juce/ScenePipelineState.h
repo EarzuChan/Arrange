@@ -56,4 +56,4 @@ namespace arrange::juce {
         arrange::core::MutationTransactionQueue pendingTransactions_;
         arrange::core::PublishedFrame publishedFrame_;
     };
-}  // namespace arrange::juce
+}

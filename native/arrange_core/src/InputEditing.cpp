@@ -55,7 +55,7 @@ namespace arrange::core {
             while (pos < text.size() && isUtf8Continuation(static_cast<unsigned char>(text[pos]))) ++pos;
             return pos;
         }
-    }  // namespace
+    }
 
     void TextInputState::begin(std::string value, bool selectAll) {
         text_ = std::move(value);
@@ -305,4 +305,4 @@ namespace arrange::core {
         clearSelection();
         return true;
     }
-}  // namespace arrange::core
+}

@@ -6,8 +6,6 @@
 #include <vector>
 
 namespace arrange::core {
-    struct LayoutNode;
-
     enum class PropValueKind {
         Null,
         Number,
@@ -88,14 +86,4 @@ namespace arrange::core {
     };
 
     std::string kebabCase(std::string_view key);
-    const PropValue* propValue(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
-    bool hasProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
-    PropObject objectProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase = {});
-
-    std::string stringProp(const LayoutNode& node, std::string_view key, std::string_view fallback = {});
-    std::string stringProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebabCase, std::string_view fallback);
-    float numberProp(const LayoutNode& node, std::string_view key, float fallback = 0.0f);
-    int intProp(const LayoutNode& node, std::string_view key, int fallback = 0);
-    bool boolProp(const LayoutNode& node, std::string_view key, bool fallback = false);
-    std::uint32_t colorProp(const LayoutNode& node, std::string_view key, std::uint32_t fallback = 0);
-}  // namespace arrange::core
+}

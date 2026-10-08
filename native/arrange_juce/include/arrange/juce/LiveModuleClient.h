@@ -41,5 +41,5 @@ namespace arrange::juce {
         bool hasSnapshot_ = false;
         std::shared_ptr<::juce::WebInputStream> request_;
     };
-}  // namespace arrange::juce
+}
 #endif

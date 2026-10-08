@@ -11,6 +11,6 @@ namespace arrange::juce {
         arrange::Log::write(level, tag, message);
         return visible;
     }
-}  // namespace arrange::juce
+}
 
 #endif

@@ -41,4 +41,4 @@ namespace arrange::core {
     inline void markDirty(LayoutNode& node, DirtyFlag flag) noexcept {
         node.dirty |= dirtyMask(flag);
     }
-}  // namespace arrange::core
+}

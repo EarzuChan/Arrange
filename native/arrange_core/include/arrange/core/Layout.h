@@ -49,4 +49,4 @@ namespace arrange::core {
         std::vector<ScrollResult> scrollUpdates_;
         const TextLayoutService* textLayoutService_ = nullptr;
     };
-}  // namespace arrange::core
+}

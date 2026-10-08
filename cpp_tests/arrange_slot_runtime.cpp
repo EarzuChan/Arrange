@@ -182,7 +182,7 @@ namespace {
         check(test_support::textOf(scene.node(1)) == "反应式文本" && scene.bindingCount() == 1, "退休文本绑定接受了迟到更新");
     }
 
-}  // namespace
+}
 
 int main() {
     try {

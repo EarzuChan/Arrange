@@ -1,11 +1,10 @@
 import { Box } from './LayoutingArrangables.ts'
 import { arrangeScope, defineArrangable, onMounted, shallowRef, watch } from "../runtime/index.ts"
 import type { Arrangable, ArrangableProps, PropType } from "../runtime/index.ts"
-import { animatedNumberAsRef, tween } from "../animation.ts"
-import type { AnimationSpec } from "../animation.ts"
+import { animatedNumberAsRef, tween } from "../animation/value.ts"
+import type { AnimationSpec } from "../animation/value.ts"
 import { M } from "../modifier.ts"
 
-/** @arrangeFields graphics */
 export type VisibilityTransform = Readonly<{ alpha?: number; translationX?: number; translationY?: number; scaleX?: number; scaleY?: number }>
 const clampAlpha = (value: number) => Math.max(0, Math.min(1, value))
 

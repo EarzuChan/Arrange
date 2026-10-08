@@ -12,6 +12,7 @@
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/PointerInputState.h>
 #include <arrange/juce/JuceTextServices.h>
+#include <arrange/juce/JucePointerInputAdapter.h>
 #include <arrange/core/ModifierGeometry.h>
 #include <algorithm>
 #include <cmath>
@@ -57,10 +58,10 @@ const n = globalThis.__ARRANGE_NATIVE__
 let count = 0
 n.createNode(1, 'LayoutNode')
 n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
-    console.log(`操作 ${++count}`)
+    n.diagnosticsToast('i', '语义验收', '输入', [String(++count)], false)
     if (count === 3) {
         const handle = n.acquirePainter('资源', () => {
-            console.log('资源完成')
+            n.diagnosticsToast('i', '语义验收', '资源完成', [], false)
             n.releasePainter(handle)
         })
     }
@@ -75,7 +76,10 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto revision = runtime.publishedFrame().revision;
         const auto slot = *runtime.scene().activeEventSlots().begin();
         for (int i = 0; i < 3; ++i) runtime.enqueueEvent(slot);
-        check(runtime.semanticCheckpoint(16).ok, "输入语义检查点失败");
+        const auto semantic = runtime.semanticCheckpoint(16);
+        if (!semantic.ok) throw std::runtime_error("输入语义检查点失败：" + semantic.error);
+        const auto inputs = runtime.takeDiagnosticToasts();
+        check(inputs.size() == 3 && inputs[0].content == "1" && inputs[1].content == "2" && inputs[2].content == "3", "同帧前输入没有依次完成语义操作");
         check(runtime.publishedFrame().revision == revision, "语义任务自行发布了视觉帧");
 
         request->set_value({std::make_shared<PainterContent>(), {}});
@@ -83,7 +87,20 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         wake();
         ::juce::MessageManager::callAsync([] { ::juce::MessageManager::getInstance()->stopDispatchLoop(); });
         ::juce::MessageManager::getInstance()->runDispatchLoop();
+        const auto completions = runtime.takeDiagnosticToasts();
+        check(completions.size() == 1 && completions[0].title == "资源完成", "无 peer 时资源完成没有经过 Owner 语义唤醒");
         check(runtime.publishedFrame().revision == revision, "资源语义完成绕过了视觉授权");
+
+        // 发布版本改变不等于输入身份退休，已排队的有效回调仍须交付
+        runtime.enqueueEvent(slot);
+        check(runtime.hasPendingEvents(), "有效事件没有进入 Owner 邮箱");
+        check(runtime.publishRetained([](const auto&, auto& frame) { frame.content.overlayDrawOps.push_back(DrawOp{}); }), "保留场景的发布版本未推进");
+        check(runtime.publishedFrame().revision == revision + 1 && runtime.scene().hasEventSlot(slot), "版本变化验收误换了事件身份");
+        const auto afterPublication = runtime.semanticCheckpoint(24);
+        if (!afterPublication.ok) throw std::runtime_error("跨发布版本事件失败：" + afterPublication.error);
+        const auto retainedEvents = runtime.takeDiagnosticToasts();
+        check(retainedEvents.size() == 1 && retainedEvents[0].content == "4", "单纯发布版本变化误删了有效离散事件");
+        check(!runtime.hasPendingEvents() && runtime.publishedFrame().revision == revision + 1, "跨版本事件没有完成语义交付或自行发布视觉帧");
 
         for (int i = 0; i < 4097; ++i) runtime.enqueueEvent(slot);
         const auto overload = runtime.semanticCheckpoint(32);
@@ -191,6 +208,51 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         check(pointer.wheel(tree, 1, {20, 20}, 0, -1, 2).scroll.value == 48, "Reset retained wheel prediction");
     }
 
+    void verifyPointerMoveBarriers() {
+        // 当前生产输入队列不合并 move，离散边界前后的每项均保序
+        InputIntentQueue queue;
+        const std::vector<std::string> sequence{"move-before", "down", "move-1", "move-2", "up", "move-after", "down", "move-3", "up"};
+        for (const auto& reason : sequence) queue.push(InputIntent::pointer(reason));
+        const auto intents = queue.take();
+        check(intents.size() == sequence.size() && queue.empty(), "指针输入队列在离散边界上合并或丢弃了操作");
+        for (std::size_t index = 0; index < sequence.size(); ++index) check(intents[index].reason == sequence[index], "指针移动越过 down/up 改变了输入顺序");
+
+        ApproximateTextMeasurer measurer;
+        TextLayoutService text(measurer);
+        arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{text}}};
+        MutationTransaction initial;
+        initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{fixedSize(200, 40)}, {test_support::textField("abcdef")}}}};
+        runtime.enqueue(std::move(initial));
+        check(runtime.pumpFrame(1, {0, 400, 0, 100}, 0).ok, "指针离散边界初始帧失败");
+        const auto revision = runtime.publishedFrame().revision;
+        arrange::juce::RuntimeSessionState session;
+        session.markLoaded();
+        arrange::juce::DiagnosticsState diagnostics;
+        arrange::juce::InteractionStateOwner interaction(text);
+        arrange::juce::JucePointerInputAdapter adapter;
+        ::juce::Component component;
+        const auto event = [&](::juce::Point<float> point) {
+            return ::juce::MouseEvent(::juce::Desktop::getInstance().getMainMouseSource(), point, ::juce::ModifierKeys::leftButtonModifier, 1, 0, 0, 0, 0, &component, &component, {}, {}, {}, 1, true);
+        };
+        const auto caret = [&](int index) {
+            const auto bounds = interaction.caretRectangleForCharIndex(runtime.scene().tree(), true, index);
+            return event({static_cast<float>(bounds.getX()), static_cast<float>(bounds.getCentreY())});
+        };
+        const arrange::juce::TextInputCallbacks callbacks;
+        check(!adapter.pointerDrag(runtime, session, diagnostics, interaction, event({20, 10}), callbacks), "down 之前的 move 建立了拖选");
+        adapter.pointerDown(runtime, session, diagnostics, interaction, 1, event({1, 1}), callbacks);
+        check(interaction.isTextInputActive(runtime.scene().tree(), true), "down 未建立正式编辑受体");
+        check(adapter.pointerDrag(runtime, session, diagnostics, interaction, caret(2), callbacks) && interaction.highlightedRegion(runtime.scene().tree(), true) == ::juce::Range<int>(0, 2), "第一次 move 没有在输入边界交付");
+        check(adapter.pointerDrag(runtime, session, diagnostics, interaction, caret(4), callbacks) && interaction.highlightedRegion(runtime.scene().tree(), true) == ::juce::Range<int>(0, 4), "同帧第二次 move 被吞掉");
+        (void)adapter.pointerUp(runtime, session, diagnostics, interaction, 1, caret(4));
+        check(!adapter.pointerDrag(runtime, session, diagnostics, interaction, caret(6), callbacks) && interaction.highlightedRegion(runtime.scene().tree(), true) == ::juce::Range<int>(0, 4), "up 后的 move 穿过离散边界改变了旧拖选");
+        adapter.pointerDown(runtime, session, diagnostics, interaction, 1, caret(3), callbacks);
+        check(adapter.pointerDrag(runtime, session, diagnostics, interaction, caret(5), callbacks) && interaction.highlightedRegion(runtime.scene().tree(), true) == ::juce::Range<int>(3, 5), "新 down 复用了旧移动的拖选 anchor");
+        (void)adapter.pointerUp(runtime, session, diagnostics, interaction, 1, caret(5));
+        check(!adapter.pointerDrag(runtime, session, diagnostics, interaction, caret(1), callbacks), "第二次 up 未结束拖选");
+        check(runtime.publishedFrame().revision == revision && runtime.hasPendingIntents(), "指针语义绕过了统一视觉帧或丢失了失效");
+    }
+
     void verifyManualVBlankExecution() {
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         const auto loaded = host->executeModule("vblank-execution.js", R"JS(
@@ -285,8 +347,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
     }
 
     void verifyReloadAtFrameBoundary() {
-        // Use the real package loader and passive renderer, including script requests
-        // issued in an animation callback after initial module evaluation has finished.
+        // 使用真实包加载器与被动绘制器，覆盖模块初始化后的动画回调提出的脚本请求
         ::juce::TemporaryFile temporary(".arrange-reload");
         const auto directory = temporary.getFile();
         check(directory.createDirectory().wasOk(), "reload package directory failed");
@@ -420,13 +481,14 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         state.enqueue(std::move(fresh));
         check(!state.run(1, constraints, true).error && !state.scene().contains(2) && state.scene().bindingCount() == 0, "reset replayed the failed previous context");
     }
-}  // namespace
+}
 
 int main() {
     try {
         ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
         verifyInputGeometryAndRetirement();
         verifyWheelAccumulation();
+        verifyPointerMoveBarriers();
         verifyManualVBlankExecution();
         verifyFailedSubmissionRollback();
         verifyFinalPublication();

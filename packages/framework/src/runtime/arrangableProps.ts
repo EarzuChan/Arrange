@@ -1,11 +1,11 @@
-import {batchUpdates, isRef, isReadonly, shallowReadonly, shallowRef, pauseTracking, resetTracking, type ShallowRef} from '@arrange/reactivity'
-import {type IfAny, hasOwn, isArray} from '@arrange/shared'
-import type {ArrangableInstance, CallMetadata, Data} from './arrangable.ts'
-import {checkParameterPlan, normalizeDeclaredProps, prepareParameters} from './propDeclarations.ts'
-import {arrangeExecutionStats} from './executionStats.ts'
-import {ValueBinding} from './valueBinding.ts'
-import {queueJob, SchedulerJobFlags, type SchedulerJob} from './scheduler.ts'
-import {callWithErrorHandling, ErrorCodes} from './errorHandling.ts'
+import { batchUpdates, isRef, isReadonly, shallowReadonly, shallowRef, pauseTracking, resetTracking, type ShallowRef } from '@arrange/reactivity'
+import { type IfAny, hasOwn, isArray } from '@arrange/shared'
+import type { ArrangableInstance, CallMetadata, Data } from './arrangable.ts'
+import { checkParameterPlan, normalizeDeclaredProps, prepareParameters } from './propDeclarations.ts'
+import { arrangeExecutionStats } from './executionStats.ts'
+import { ValueBinding } from './valueBinding.ts'
+import { queueJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
+import { callWithErrorHandling, ErrorCodes } from './errorHandling.ts'
 
 export type ArrangablePropsOptions<P = Data> = | ArrangableObjectPropsOptions<P> | string[]
 
@@ -35,18 +35,18 @@ type PropConstructor<T = any> =
     | PropMethod<T>
 
 type PropMethod<T, TConstructor = any> = [T] extends [
-            ((...args: any) => any) | undefined,
-    ] // if is function with args, allowing non-required functions
-    ? { new(): TConstructor; (): T; readonly prototype: TConstructor } // Create Function like constructor
+    ((...args: any) => any) | undefined,
+]
+    ? { new(): TConstructor; (): T; readonly prototype: TConstructor }
     : never
 
 type RequiredKeys<T> = {
     [K in keyof T]: T[K] extends | { required: true }
-        | { default: any }
-        ? T[K] extends { default: undefined | (() => undefined) }
-            ? never
-            : K
-        : never
+    | { default: any }
+    ? T[K] extends { default: undefined | (() => undefined) }
+    ? never
+    : K
+    : never
 }[keyof T]
 
 type OptionalKeys<T> = Exclude<keyof T, RequiredKeys<T>>
@@ -55,46 +55,33 @@ type DefaultKeys<T> = { [K in keyof T]: T[K] extends { default: any } ? K : neve
 
 type InferPropType<T, NullAsAny = true> = [T] extends [null]
     ? NullAsAny extends true
-        ? any
-        : null
+    ? any
+    : null
     : [T] extends [{ type: null | true }]
-        ? any // As TS issue https://github.com/Microsoft/TypeScript/issues/14829 // somehow `ObjectConstructor` when inferred from { (): T } becomes `any` // `BooleanConstructor` when inferred from PropConstructor(with PropMethod) becomes `Boolean`
-        : [T] extends [ObjectConstructor | { type: ObjectConstructor }]
-            ? Record<string, any>
-            : [T] extends [BooleanConstructor | { type: BooleanConstructor }]
-                ? boolean
-                : [T] extends [DateConstructor | { type: DateConstructor }]
-                    ? Date
-                    : [T] extends [(infer U)[] | { type: (infer U)[] }]
-                        ? U extends DateConstructor
-                            ? Date | InferPropType<U, false>
-                            : InferPropType<U, false>
-                        : [T] extends [Prop<infer V, infer D>]
-                            ? unknown extends V
-                                ? keyof V extends never
-                                    ? IfAny<V, V, D>
-                                    : V
-                                : V
-                            : T
+    ? any
+    : [T] extends [ObjectConstructor | { type: ObjectConstructor }]
+    ? Record<string, any>
+    : [T] extends [BooleanConstructor | { type: BooleanConstructor }]
+    ? boolean
+    : [T] extends [DateConstructor | { type: DateConstructor }]
+    ? Date
+    : [T] extends [(infer U)[] | { type: (infer U)[] }]
+    ? U extends DateConstructor
+    ? Date | InferPropType<U, false>
+    : InferPropType<U, false>
+    : [T] extends [Prop<infer V, infer D>]
+    ? unknown extends V
+    ? keyof V extends never
+    ? IfAny<V, V, D>
+    : V
+    : V
+    : T
 
-/**
- * Extract prop types from a runtime props options object.
- * The extracted types are **internal** - i.e. the resolved props received by
- * the arrangable.
- * - Boolean props are always present
- * - Props with default values are always present
- *
- * To extract accepted props from the parent, use {@link ExtractPublicPropTypes}.
- */
 export type ExtractPropTypes<O> = {
-    // use `keyof Pick<O, RequiredKeys<O>>` instead of `RequiredKeys<O>` to
-    // support IDE features
     [K in keyof Pick<O, RequiredKeys<O>>]: O[K] extends { default: any }
-        ? Exclude<InferPropType<O[K]>, undefined>
-        : InferPropType<O[K]>
+    ? Exclude<InferPropType<O[K]>, undefined>
+    : InferPropType<O[K]>
 } & {
-    // use `keyof Pick<O, OptionalKeys<O>>` instead of `OptionalKeys<O>` to
-    // support IDE features
     [K in keyof Pick<O, OptionalKeys<O>>]?: InferPropType<O[K]>
 }
 
@@ -104,11 +91,6 @@ type PublicRequiredKeys<T> = {
 
 type PublicOptionalKeys<T> = Exclude<keyof T, PublicRequiredKeys<T>>
 
-/**
- * Extract prop types from a runtime props options object.
- * The extracted types are **public** - i.e. the expected props that can be
- * passed to arrangable.
- */
 export type ExtractPublicPropTypes<O> = { [K in keyof Pick<O, PublicRequiredKeys<O>>]: InferPropType<O[K]> } & { [K in keyof Pick<O, PublicOptionalKeys<O>>]?: InferPropType<O[K]> }
 
 // 默认值只来自声明，布尔参数不自动补值或转换
@@ -132,7 +114,7 @@ export class PropStore {
         for (const binding of this.bindings.values()) binding.refreshDirty()
         this.publishValues()
     }
-    private readonly updateTask = {scope: () => this.owner.structure, dirty: () => !this.owner.isUnmounted && !this.owner.isDeactivated && [...this.bindings.values()].some(binding => binding.dirty), run: this.refreshDirty}
+    private readonly updateTask = { scope: () => this.owner.structure, dirty: () => !this.owner.isUnmounted && !this.owner.isDeactivated && [...this.bindings.values()].some(binding => binding.dirty), run: this.refreshDirty }
     private readonly declarations: NormalizedProps
     private constants = new Set<string>()
     private inputs: PropInputs<Data> | undefined
@@ -147,7 +129,7 @@ export class PropStore {
         for (const name of Object.keys(this.declarations)) {
             const cell = shallowRef<unknown>()
             this.cells.set(name, cell)
-            Object.defineProperty(this.values, name, {enumerable: true, get: () => cell.value})
+            Object.defineProperty(this.values, name, { enumerable: true, get: () => cell.value })
         }
         Object.freeze(this.values)
     }
@@ -230,7 +212,7 @@ export class PropStore {
         const nextConstants = new Set(metadata.constants ?? [])
         pauseTracking()
         try {
-            for (const {name, position} of plan.fields) {
+            for (const { name, position } of plan.fields) {
                 const declaration = this.declarations[name]
                 if (this.constants.has(name) && nextConstants.has(name)) continue
                 const read = () => {
@@ -268,7 +250,7 @@ function validateProp(name: string, value: unknown, declaration: PropOptions, pr
     if (absent && declaration.required && !hasOwn(declaration, 'default')) throw new TypeError(`缺少必需参数：${name}`)
     if (value === undefined && !declaration.required) return
     if (declaration.refKind && (!isRef(value) || declaration.refKind === 'writable' && isReadonly(value))) throw new TypeError(`参数 ${name} 要求${declaration.refKind === 'writable' ? '可写' : '只读'} Ref 本体`)
-    const {type, validator} = declaration
+    const { type, validator } = declaration
     if (type != null && type !== true) {
         const types = isArray(type) ? type : [type]
         if (!types.some(candidate => matchesType(value, candidate))) throw new TypeError(`参数 ${name} 类型错误：要求 ${types.map(candidate => candidate?.name ?? 'null').join(' | ')}，实际为 ${value === null ? 'null' : isArray(value) ? 'Array' : typeof value}`)

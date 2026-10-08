@@ -62,7 +62,7 @@ export async function fetchFrameworkCandidates(recentLimit = 5, registry?: strin
                 version: manifest.version,
                 cliCompatibility: typeof compatibility === "number" && Number.isInteger(compatibility) ? compatibility : null,
                 latest: false, // 默认全部为 false
-                stable: !manifest.version.includes("-"), // HACK：这里是简单粗暴筛选是否有“-”而已
+                stable: !manifest.version.includes("-"), // 这里是简单粗暴筛选是否有“-”而已
                 publishedAt: times[manifest.version] ?? null,
             }
         })

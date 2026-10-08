@@ -5,8 +5,9 @@ import { parse } from './parse.ts'
 import { generateSfaScript } from './compileScript.ts'
 import { dirname, resolve } from 'node:path'
 import { SourceMapConsumer, SourceMapGenerator, type RawSourceMap } from 'source-map-js'
-import { normalizeSfaUnitSyntax, SFA_UNIT_SEPARATOR } from '../core/unitSyntax.ts'
+import { normalizeSfaUnitSyntax } from '../core/unitSyntax.ts'
 import { modifierArgumentUnits, unitFieldContracts, type UnitFields, type ValueUnit } from '@arrange/shared'
+import { createSfaValueContracts } from './valueContracts.ts'
 
 const compilerOptions: ts.CompilerOptions = { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, allowImportingTsExtensions: true, noLib: true, skipLibCheck: true }
 
@@ -25,18 +26,14 @@ export function lowerSfaValues(content: string, filename: string, previousMap?: 
     let colorModulePath: string | undefined
     const colorDeclarations = `
 export type SfaColorChannels = Readonly<{ red: number; green: number; blue: number; alpha?: number }>
-/** @arrangeValue color */
 export type Color = number & {}
 interface SfaColorFactory {
-    /** @arrangeValue color */
     (value: number | SfaColorChannels): Color
-    /** @arrangeValue color */
     hsl(hue: number, saturation: number, lightness: number, alpha?: number): Color
 }
-/** @arrangeValue color */
 export declare const Color: SfaColorFactory
 `
-    const analysisPrelude = "\nimport * as __ArrangeUnitsFoundation from '@arrange/framework/foundation'\nimport * as __Foundation from '@arrange/framework/foundation'\n/** @arrangeCheckProps */\ndeclare function __arrangeCheck(...args: any[]): any\n"
+    const analysisPrelude = "\nimport * as __ArrangeUnitsFoundation from '@arrange/framework/foundation'\nimport * as __Foundation from '@arrange/framework/foundation'\nimport * as __ArrangeUnitsRoot from '@arrange/framework'\nimport * as __ArrangeUnitsUi from '@arrange/framework/ui'\nimport * as __ArrangeUnitsAnimation from '@arrange/framework/animation'\nimport * as __ArrangeUnitsInternal from '@arrange/framework/internal'\ndeclare function __arrangeCheck(...args: any[]): any\n"
     host.readFile = file => {
         if (resolve(file) === entry) return normalizedEntry.content + analysisPrelude
         if (colorModulePath && resolve(file) === colorModulePath) return `${read(file) ?? ''}${colorDeclarations}`
@@ -68,6 +65,9 @@ export declare const Color: SfaColorFactory
     const program = ts.createProgram([entry], options, host)
     const checker = program.getTypeChecker()
     const source = program.getSourceFile(entry)!
+    const originalSource = normalizedEntry.content === content ? source : ts.createSourceFile(entry, content, ts.ScriptTarget.ESNext)
+    const restorePosition = (offset: number) => originalSource.getLineAndCharacterOfPosition(normalizedEntry.restore(offset))
+    const contracts = createSfaValueContracts(checker, source)
     const deps = program.getSourceFiles().filter(file => file !== source && !program.isSourceFileDefaultLibrary(file) && !file.fileName.replaceAll('\\', '/').includes('/node_modules/')).map(file => file.fileName.endsWith('.sfa.ts') ? file.fileName.slice(0, -3) : file.fileName)
     const output = new MagicString(normalizedEntry.content)
     type LengthCapture = { name: string; text: string }
@@ -75,7 +75,7 @@ export declare const Color: SfaColorFactory
     const unitCaptureNames = new Set<string>()
     type Rule = ValueUnit | UnitFields
 
-    const textOf = (node: ts.Node): string => source.text.slice(node.getStart(source), node.end).replaceAll(SFA_UNIT_SEPARATOR, '')
+    const textOf = (node: ts.Node): string => source.text.slice(node.getStart(source), node.end)
     const numeric = (value: string): number | undefined => {
         const text = value.trim()
         if (!/^[+-]?(?:(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d[\d_]*)?|0[xX][\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+)$/.test(text)) return
@@ -108,7 +108,7 @@ export declare const Color: SfaColorFactory
     }
 
     type Scalar = { text: string; value?: number }
-    type ColorChannels = { red: Scalar; green: Scalar; blue: Scalar; alpha: Scalar; base?: { name: string; text: string } }
+    type ColorChannels = { red: Scalar; green: Scalar; blue: Scalar; alpha: Scalar; base?: { name: string; text: string }; captures?: readonly { name: string; text: string }[] }
 
     const numericExpression = (node: ts.Expression, seen = new Set<ts.Node>()): number | undefined => {
         const value = unwrap(node)
@@ -150,7 +150,7 @@ export declare const Color: SfaColorFactory
 
     const isUndefined = (node: ts.Expression): boolean => {
         const value = unwrap(node)
-        return ts.isIdentifier(value) && value.text === 'undefined' || ts.isVoidExpression(value)
+        return ts.isIdentifier(value) && value.text === 'undefined' && !checker.getSymbolAtLocation(value)?.valueDeclaration || ts.isVoidExpression(value) && ts.isNumericLiteral(unwrap(value.expression))
     }
 
     const staticColorError = (message: string): never => {
@@ -173,13 +173,15 @@ export declare const Color: SfaColorFactory
             ['green', channels.green],
             ['blue', channels.blue],
         ] as const
+        const captures = (channels.captures ?? []).map(value => `const ${value.name} = (${value.text}); `).join('')
 
         if (values.every(([, value]) => value.value !== undefined)) {
             const alpha = colorByte(alphaValue, 'alpha')
             const red = colorByte(channels.red, 'red')
             const green = colorByte(channels.green, 'green')
             const blue = colorByte(channels.blue, 'blue')
-            return folded(((alpha.value! << 24) | (red.value! << 16) | (green.value! << 8) | blue.value!) >>> 0)
+            const packed = folded(((alpha.value! << 24) | (red.value! << 16) | (green.value! << 8) | blue.value!) >>> 0)
+            return captures ? `(() => { ${captures}return ${packed} })()` : packed
         }
 
         const names = {
@@ -188,14 +190,12 @@ export declare const Color: SfaColorFactory
             green: uniqueName(content, '__arrangeColorGreenValue'),
             blue: uniqueName(content, '__arrangeColorBlueValue'),
         }
-        const base = channels.base ? `const ${channels.base.name} = (${channels.base.text}); ` : ''
+        const base = (channels.base ? `const ${channels.base.name} = (${channels.base.text}); ` : '') + captures
         const declarations = values.map(([name, value]) => `const ${names[name]} = (${value.text});`).join(' ')
         const finiteChecks = values.map(([name]) => `if (!Number.isFinite(${names[name]})) throw new TypeError('Color 的 ${name} 通道必须是有限数值');`).join(' ')
         const rangeChecks = values.map(([name]) => `if (${names[name]} < 0 || ${names[name]} > 1) throw new RangeError('Color 的 ${name} 通道必须在 0..1 之间');`).join(' ')
         return `(() => { ${base}${declarations} ${finiteChecks} ${rangeChecks} return ((Math.round(${names.alpha} * 255) << 24) | (Math.round(${names.red} * 255) << 16) | (Math.round(${names.green} * 255) << 8) | Math.round(${names.blue} * 255)) >>> 0 })()`
     }
-
-    const isStaticColor = (channels: ColorChannels): boolean => [channels.red, channels.green, channels.blue, channels.alpha].every(channel => channel.value !== undefined)
 
     const colorObject = (input: ts.Expression, seen = new Set<ts.Node>()): ColorChannels | undefined => {
         const node = unwrap(input)
@@ -203,20 +203,9 @@ export declare const Color: SfaColorFactory
         seen.add(node)
 
         if (!ts.isObjectLiteralExpression(node)) {
-            if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.expression.getText(source) === 'Object' && node.expression.name.text === 'freeze' && node.arguments.length === 1) {
-                const argument = unwrap(node.arguments[0])
-                if (ts.isObjectLiteralExpression(argument)) return colorObject(argument, seen)
-            }
-
             if (isUnrefCall(node)) {
                 const argument = unwrap(node.arguments[0])
                 if (ts.isObjectLiteralExpression(argument)) return colorObject(argument, seen)
-            }
-
-            const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration
-            if (declaration && declaration.getSourceFile() === source && ts.isVariableDeclaration(declaration) && (declaration.parent.flags & ts.NodeFlags.Const) !== 0 && declaration.initializer && ts.isObjectLiteralExpression(unwrap(declaration.initializer))) {
-                const resolved = colorObject(unwrap(declaration.initializer), new Set(seen))
-                if (resolved && isStaticColor(resolved)) return resolved
             }
 
             const type = checker.getTypeAtLocation(node)
@@ -233,13 +222,21 @@ export declare const Color: SfaColorFactory
             }
         }
 
-        const values = new Map<string, ts.Expression>()
+        const values = new Map<string, Scalar>()
+        const captures: { name: string; text: string }[] = []
         for (const property of node.properties) {
             if (ts.isSpreadAssignment(property)) return
             if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) return
             const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ? property.name.text : undefined
             if (!name) return
-            values.set(name, ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer)
+            const expression = ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer
+            const value = name === 'alpha' && isUndefined(expression) ? { text: '1', value: 1 } : scalar(expression)
+            // 按源码顺序求值，重复字段及未消费字段的副作用也不能在拆箱时消失
+            if (value.value === undefined) {
+                const captureName = uniqueName(content, `__arrangeColorInput${captures.length}`)
+                captures.push({ name: captureName, text: value.text })
+                values.set(name, { text: captureName })
+            } else values.set(name, value)
         }
 
         const red = values.get('red')
@@ -247,7 +244,7 @@ export declare const Color: SfaColorFactory
         const blue = values.get('blue')
         if (!red || !green || !blue) return
         const alpha = values.get('alpha')
-        return { red: scalar(red), green: scalar(green), blue: scalar(blue), alpha: !alpha || isUndefined(alpha) ? { text: '1', value: 1 } : scalar(alpha) }
+        return { red, green, blue, alpha: alpha ?? { text: '1', value: 1 }, captures }
     }
 
     const hslArgb = (hue: Scalar, saturation: Scalar, lightness: Scalar, alpha: Scalar): string => {
@@ -309,18 +306,19 @@ export declare const Color: SfaColorFactory
 
         if (ts.isCallExpression(argument) && expressionKind(argument.expression) === 'color') return colorExpression(argument)
 
-        const type = checker.getTypeAtLocation(argument)
-        if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.NumberLiteral)) return `(${textOf(argument)})`
-
         const name = uniqueName(content, '__arrangeColorValue')
         const base = `(${textOf(argument)})`
+        const numericResult = `if (!Number.isFinite(${name})) throw new TypeError('Color 的 ARGB 数值必须是有限数值'); if (!Number.isInteger(${name}) || ${name} < 0 || ${name} > 0xffffffff) throw new RangeError('Color 的 ARGB 数值必须是 uint32 整数'); return ${name}`
+        const type = checker.getTypeAtLocation(argument)
+        if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.NumberLiteral)) return `(() => { const ${name} = ${base}; ${numericResult} })()`
+
         const packed = packArgb({
             red: { text: `${name}.red` },
             green: { text: `${name}.green` },
             blue: { text: `${name}.blue` },
             alpha: { text: `${name}.alpha ?? 1` },
         })
-        return `(() => { const ${name} = ${base}; return typeof ${name} === 'number' ? ${name} : ${packed} })()`
+        return `(() => { const ${name} = ${base}; if (typeof ${name} === 'number') { ${numericResult} } return ${packed} })()`
     }
 
     const lengthParts = (input: ts.Expression, seen = new Set<ts.Node>(), captures = new Map<ts.Node, LengthCapture>()): LengthPair | undefined => {
@@ -424,6 +422,16 @@ export declare const Color: SfaColorFactory
 
     const lowerObject = (node: ts.Expression, fields: UnitFields): void => {
         const object = unwrap(node)
+        if (ts.isArrowFunction(object) || ts.isFunctionExpression(object)) {
+            if (ts.isBlock(object.body)) {
+                const returns = (body: ts.Node): void => {
+                    if (ts.isReturnStatement(body) && body.expression) lowerObject(body.expression, fields)
+                    else if (!ts.isFunctionLike(body)) ts.forEachChild(body, returns)
+                }
+                returns(object.body)
+            } else lowerObject(object.body, fields)
+            return
+        }
         if (!ts.isObjectLiteralExpression(object)) {
             const owner = ts.isPropertyAccessExpression(object) && object.name.text === 'value' ? object.expression : object
             const declaration = checker.getSymbolAtLocation(owner)?.valueDeclaration
@@ -496,48 +504,23 @@ export declare const Color: SfaColorFactory
     }
 
     const argumentRules = (call: ts.CallExpression): readonly (Rule | undefined)[] | undefined => {
-        const node = call.expression
-        let symbol = checker.getSymbolAtLocation(node)
-        if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-        const declarations = [...symbol?.declarations ?? []]
-        const signature = checker.getResolvedSignature(call)?.declaration
-        if (signature && !declarations.includes(signature)) declarations.push(signature)
-        const comment = declarations.map(declaration => ts.getJSDocTags(declaration).find(tag => tag.tagName.text === 'arrangeArguments')?.comment).find(value => typeof value === 'string')
-        if (typeof comment !== 'string') return
-        return comment.trim().split(/\s+/).map(name => name === 'none' ? undefined : name as ValueUnit)
-    }
-    const hasTag = (node: ts.Node, name: string): boolean => {
-        let symbol = checker.getSymbolAtLocation(node)
-        if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-        return !!symbol?.declarations?.some(declaration => ts.getJSDocTags(declaration).some(tag => tag.tagName.text === name))
+        return contracts.forCall(call)?.arguments
     }
 
     const isUnrefCall = (node: ts.Expression): node is ts.CallExpression => {
         if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false
-        if (hasTag(node.expression, 'arrangeUnref')) return true
-        if (!ts.isIdentifier(node.expression)) return false
-        const symbol = checker.getSymbolAtLocation(node.expression)
-        return !!symbol?.declarations?.some(declaration => {
-            if (!ts.isImportSpecifier(declaration)) return false
-            const imported = declaration.propertyName ?? declaration.name
-            return ts.isIdentifier(imported) && imported.text === 'unref'
-        })
+        return !!contracts.forCall(node)?.unref
     }
 
     const isModifierMethodCall = (node: ts.CallExpression): boolean => {
         const declarations = checker.getSymbolAtLocation(node.expression)?.declarations ?? []
-        if (declarations.some(declaration => ts.isMethodDeclaration(declaration) && ts.getJSDocTags(declaration.parent).some(tag => tag.tagName.text === 'arrangeModifier'))) return true
+        if (declarations.some(declaration => ts.isMethodDeclaration(declaration) && contracts.forDeclaration(declaration.parent)?.modifier)) return true
         const declaration = checker.getResolvedSignature(node)?.declaration
-        return !!declaration && ts.isMethodDeclaration(declaration) && ts.getJSDocTags(declaration.parent).some(tag => tag.tagName.text === 'arrangeModifier')
+        return !!declaration && ts.isMethodDeclaration(declaration) && !!contracts.forDeclaration(declaration.parent)?.modifier
     }
 
     const valueKind = (symbol: ts.Symbol | undefined): string | undefined => {
-        if (!symbol) return
-        if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-        for (const declaration of symbol.declarations ?? []) {
-            const tag = ts.getJSDocTags(declaration).find(tag => tag.tagName.text === 'arrangeValue')
-            if (typeof tag?.comment === 'string') return tag.comment.trim()
-        }
+        return contracts.forSymbol(symbol)?.value
     }
 
     const typeUnit = (type: ts.Type): ValueUnit | undefined => {
@@ -550,15 +533,8 @@ export declare const Color: SfaColorFactory
     }
 
     const fieldsUnit = (type: ts.Type, name: string): ValueUnit | undefined => {
-        for (const declaration of [...type.aliasSymbol?.declarations ?? [], ...type.symbol?.declarations ?? []]) {
-            const tag = ts.getJSDocTags(declaration).find(item => item.tagName.text === 'arrangeFields')
-            if (typeof tag?.comment === 'string') {
-                const fields = unitFieldContracts[tag.comment.trim()]
-                const unit = fields?.[name]
-                return typeof unit === 'string' ? unit : undefined
-            }
-        }
-        return type.isUnion() ? type.types.map(item => fieldsUnit(item, name)).find(Boolean) : undefined
+        const unit = contracts.fieldsOf(type)?.[name]
+        return typeof unit === 'string' ? unit : undefined
     }
 
     const propertyUnit = (node: ts.Expression): ValueUnit | undefined => ts.isPropertyAccessExpression(node) ? fieldsUnit(checker.getTypeAtLocation(node.expression), node.name.text) : undefined
@@ -580,6 +556,18 @@ export declare const Color: SfaColorFactory
             if (propertyKind) return propertyKind
         }
         if (isUnrefCall(node)) return expressionKind(node.arguments[0], new Set(seen))
+        if (ts.isCallExpression(node)) {
+            const result = contracts.forCall(node)?.result
+            if (result) return result
+        }
+        if (ts.isPropertyAccessExpression(node) && node.name.text === 'value') {
+            const owner = checker.getSymbolAtLocation(node.expression)?.valueDeclaration
+            const initializer = owner && (ts.isVariableDeclaration(owner) || ts.isPropertyAssignment(owner)) && owner.initializer
+            if (initializer && ts.isCallExpression(initializer)) {
+                const result = contracts.forCall(initializer)?.result
+                if (result) return result
+            }
+        }
         const symbol = checker.getSymbolAtLocation(node)
         const kind = valueKind(symbol)
         if (kind) return kind
@@ -623,7 +611,7 @@ export declare const Color: SfaColorFactory
                 }
             }
 
-            if (ts.isCallExpression(node) && expressionKind(node.expression) === undefined && hasTag(node.expression, 'arrangeModifierCall') && node.arguments[1] && ts.isArrayLiteralExpression(node.arguments[1])) {
+            if (ts.isCallExpression(node) && expressionKind(node.expression) === undefined && contracts.forCall(node)?.modifierCall && node.arguments[1] && ts.isArrayLiteralExpression(node.arguments[1])) {
                 for (const segment of node.arguments[1].elements) {
                     if (!ts.isArrayLiteralExpression(segment) || !ts.isStringLiteral(segment.elements[0]) || !ts.isArrowFunction(segment.elements[1])) continue
                     const body = segment.elements[1].body
@@ -724,7 +712,7 @@ export declare const Color: SfaColorFactory
         const isColorFactoryUse = (node: ts.Node): boolean => {
             const parent = node.parent
             if (ts.isCallExpression(parent) && parent.expression === node) return true
-            if (ts.isCallExpression(parent) && parent.arguments.length === 1 && parent.arguments[0] === node && hasTag(parent.expression, 'arrangeUnref')) {
+            if (ts.isCallExpression(parent) && parent.arguments.length === 1 && parent.arguments[0] === node && contracts.forCall(parent)?.unref) {
                 const owner = parent.parent
                 if (ts.isCallExpression(owner) && owner.expression === parent) return true
                 return ts.isPropertyAccessExpression(owner) && owner.expression === parent && owner.name.text === 'hsl' && ts.isCallExpression(owner.parent) && owner.parent.expression === owner
@@ -833,6 +821,7 @@ export declare const Color: SfaColorFactory
         }
 
         for (const statement of source.statements) {
+            if (statement.getStart(source) >= normalizedEntry.content.length) continue
             if (!ts.isImportDeclaration(statement)) continue
             const importClause = statement.importClause
             if (!importClause) continue
@@ -875,11 +864,21 @@ export declare const Color: SfaColorFactory
         }
     }
 
-    validateValueUnits(program, source, expressionKind, valueKind, filename, previousMap)
+    validateValueUnits(program, source, contracts, expressionKind, valueKind, filename, previousMap, restorePosition)
     visit(source)
     removeColorImports()
-    const generated = output.toString().replaceAll(SFA_UNIT_SEPARATOR, '')
-    const map = output.generateMap({ source: filename, includeContent: true, hires: true }) as unknown as RawSourceMap
+    const generated = output.toString()
+    let map = output.generateMap({ source: filename, includeContent: true, hires: true }) as unknown as RawSourceMap
+    if (originalSource !== source) {
+        const generator = new SourceMapGenerator()
+        new SourceMapConsumer(map).eachMapping(mapping => {
+            if (mapping.originalLine === null || mapping.originalColumn === null) return
+            const original = restorePosition(source.getPositionOfLineAndCharacter(mapping.originalLine - 1, mapping.originalColumn))
+            generator.addMapping({ generated: { line: mapping.generatedLine, column: mapping.generatedColumn }, original: { line: original.line + 1, column: original.character }, source: filename, name: mapping.name ?? undefined })
+        })
+        generator.setSourceContent(filename, content)
+        map = generator.toJSON()
+    }
     if (previousMap) {
         const generator = SourceMapGenerator.fromSourceMap(new SourceMapConsumer(map))
         generator.applySourceMap(new SourceMapConsumer(previousMap), filename)

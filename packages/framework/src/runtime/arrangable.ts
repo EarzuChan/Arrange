@@ -44,8 +44,6 @@ export interface SetupContext {
 export interface AppConfig {
     errorHandler?: (error: unknown, source: string | undefined, phase: string) => void
     warnHandler?: (message: string) => void
-    warnRecursiveComputed?: boolean
-    throwUnhandledErrorInProduction?: boolean
 }
 
 export interface AppContext {

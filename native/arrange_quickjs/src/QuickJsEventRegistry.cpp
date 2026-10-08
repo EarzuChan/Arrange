@@ -105,6 +105,6 @@ namespace arrange::quickjs {
             if (slot.node == node && !retiredEventSlots_.contains(slot) && std::find(retained.begin(), retained.end(), slot) == retained.end()) release(slot, transaction);
         }
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

@@ -42,4 +42,4 @@ namespace arrange::core {
         return {node, kind, std::move(path)};
     }
 
-}  // namespace arrange::core
+}

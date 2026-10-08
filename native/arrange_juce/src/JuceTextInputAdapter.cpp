@@ -12,7 +12,7 @@ namespace arrange::juce {
         [[nodiscard]] bool inputReady(const RuntimeSessionState& session, const DiagnosticsState& diagnostics) noexcept {
             return session.interactive(diagnostics);
         }
-    }  // namespace
+    }
 
     bool JuceTextInputAdapter::isActive(const arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, const InteractionStateOwner& interaction) const {
         return inputReady(session, diagnostics) && interaction.isTextInputActive(tree, session.loaded());
@@ -64,6 +64,6 @@ namespace arrange::juce {
         }
         return interaction.keyPressed(tree, session.loaded(), key, callbacks);
     }
-}  // namespace arrange::juce
+}
 
 #endif

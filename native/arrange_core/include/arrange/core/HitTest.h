@@ -61,4 +61,4 @@ namespace arrange::core {
         HitTestResult hitTest(const LayoutTree& tree, NodeId root, Point point) const;
         HitTestResult hitTestClickable(const LayoutTree& tree, NodeId root, Point point) const;
     };
-}  // namespace arrange::core
+}

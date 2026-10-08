@@ -66,6 +66,6 @@ namespace arrange::juce {
         context.error = diagnostics.error();
         return context;
     }
-}  // namespace arrange::juce
+}
 
 #endif

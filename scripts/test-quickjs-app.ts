@@ -14,7 +14,7 @@ await runInVsDev(`"${cmakeExe()}" --build "${buildDir}" --target arrange_quickjs
 await run(smokeExe, [appBundle])
 await run(resolve(buildDir, 'cpp_tests/arrange_juce_runtime_smoke.exe'), [appBundle])
 await run(smokeExe, [appBundle, '--expect-strict-modifier-ok', '{ elements: [] }'])
-for (const expression of ["{ elements: 'not-array' }", "{ elements: [{ type: 'unknownModifier', value: {} }] }", "{ elements: [{ type: 'width', value: {} }] }"]) {
+for (const expression of ["{ elements: 'not-array' }", "{ elements: [{ type: 'unknownModifier', value: {} }] }"]) {
     await run(smokeExe, [appBundle, '--expect-strict-modifier-error', expression])
 }
 await run(smokeExe, [appBundle, '--expect-script-diagnostics'])

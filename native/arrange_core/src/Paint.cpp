@@ -1,7 +1,6 @@
 #include <arrange/core/ModifierGeometry.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/Modifier.h>
-#include <arrange/core/PropValue.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -12,37 +11,6 @@
 
 namespace arrange::core {
     namespace {
-        std::string inputValue(const LayoutNode& node) {
-            if (const auto* value = propValue(node, "value")) return value->stringOr();
-            return {};
-        }
-
-        std::string inputPlaceholder(const LayoutNode& node) {
-            if (const auto* value = propValue(node, "placeholder")) return value->stringOr();
-            return {};
-        }
-
-        float numericProp(const LayoutNode& node, const char* key, float fallback) {
-            return numberProp(node, key, fallback);
-        }
-
-        std::string textProp(const LayoutNode& node, const char* key, const char* fallback = "") {
-            return stringProp(node, key, fallback);
-        }
-
-        std::string textProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
-            return stringProp(node, camelCase, kebabCase, fallback);
-        }
-
-        bool hasProp(const LayoutNode& node, const char* key) {
-            return node.props.find(key) != node.props.end();
-        }
-
-        bool hasColorUnspecified(const LayoutNode& node, const char* key) {
-            const auto* value = propValue(node, key);
-            return value != nullptr && value->isString() && value->string == "Color.Unspecified";
-        }
-
         float zIndexOf(const LayoutNode& node) {
             return node.modifier.zIndex();
         }
@@ -69,7 +37,7 @@ namespace arrange::core {
             const auto nextAlpha = static_cast<std::uint32_t>(std::clamp(sourceAlpha * clamped, 0.0f, 255.0f) + 0.5f);
             return (color & 0x00ffffffu) | (nextAlpha << 24u);
         }
-    }  // namespace
+    }
 
     void DrawOpsBuilder::prepareText(DrawOp& op, const TextLayoutService& service) {
         if (op.type != DrawOpType::DrawText) return;
@@ -151,7 +119,7 @@ namespace arrange::core {
             ++counters.fragmentsBuilt;
             return std::make_shared<const PaintFragment>(std::move(next));
         }
-    }  // namespace
+    }
 
     PaintBounds drawOpBounds(const DrawOp& op) {
         if (op.type == DrawOpType::PushClip || op.type == DrawOpType::PopClip || op.type == DrawOpType::PushTransform || op.type == DrawOpType::PopTransform) return {};
@@ -563,4 +531,4 @@ namespace arrange::core {
         ops.push_back(std::move(popClip));
         return ops;
     }
-}  // namespace arrange::core
+}

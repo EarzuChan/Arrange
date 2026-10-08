@@ -7,4 +7,4 @@ namespace arrange::quickjs {
         virtual ~RuntimeHost() = default;
         virtual void loadModule(std::string_view moduleName, std::string_view source) = 0;
     };
-}  // namespace arrange::quickjs
+}

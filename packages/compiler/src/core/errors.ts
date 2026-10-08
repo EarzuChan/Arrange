@@ -46,14 +46,6 @@ export enum ErrorCodes {
     X_MISSING_INTERPOLATION_END,
     X_MISSING_DIRECTIVE_NAME,
     X_MISSING_DYNAMIC_DIRECTIVE_ARGUMENT_END,
-    X_V_IF_NO_EXPRESSION,
-    X_V_IF_SAME_KEY,
-    X_V_ELSE_NO_ADJACENT_IF,
-    X_V_FOR_NO_EXPRESSION,
-    X_V_FOR_MALFORMED_EXPRESSION,
-    X_V_FOR_TEMPLATE_KEY_PLACEMENT,
-    X_V_SLOT_DUPLICATE_SLOT_NAMES,
-    X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN,
     X_INVALID_EXPRESSION,
 }
 
@@ -76,13 +68,5 @@ export const errorMessages: Record<ErrorCodes, string> = {
     [ErrorCodes.X_MISSING_INTERPOLATION_END]: '插值缺少结束标记',
     [ErrorCodes.X_MISSING_DIRECTIVE_NAME]: '缺少有效的指令名称',
     [ErrorCodes.X_MISSING_DYNAMIC_DIRECTIVE_ARGUMENT_END]: '动态参数名称缺少结束方括号，名称表达式不能包含空格',
-    [ErrorCodes.X_V_IF_NO_EXPRESSION]: 'a-if 或 a-else-if 缺少表达式',
-    [ErrorCodes.X_V_IF_SAME_KEY]: '条件分支必须使用不同的 key',
-    [ErrorCodes.X_V_ELSE_NO_ADJACENT_IF]: 'a-else 或 a-else-if 前没有相邻条件分支',
-    [ErrorCodes.X_V_FOR_NO_EXPRESSION]: 'a-for 缺少表达式',
-    [ErrorCodes.X_V_FOR_MALFORMED_EXPRESSION]: 'a-for 表达式无效',
-    [ErrorCodes.X_V_FOR_TEMPLATE_KEY_PLACEMENT]: '列表分组的 key 必须声明在 Template 上',
-    [ErrorCodes.X_V_SLOT_DUPLICATE_SLOT_NAMES]: '重复的内容入口名称',
-    [ErrorCodes.X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN]: '显式提供 default 内容后不能再提供隐式默认内容',
     [ErrorCodes.X_INVALID_EXPRESSION]: 'TS 表达式解析失败：',
 }

@@ -1,21 +1,15 @@
-import { requireSfaModule } from './sfaModules.ts'
+import { evaluateSfa as evaluateSfaModule } from './sfaModules.ts'
 import * as internal from '../../packages/framework/src/internal.ts'
 import * as foundation from '../../packages/framework/src/foundation.ts'
 import * as ui from '../../packages/framework/src/ui.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import ts from 'typescript'
 import * as runtime from '../../packages/framework/src/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
 function evaluateSfa(source: string, state: object = {}) {
-    const { code } = compileArrangeSfa(source, '重排验收.sfa')
-    assert.doesNotMatch(code, /createVNode|createBlock|arrangeValue|LayoutRearrangeNode/)
-    const output = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
-    const exports: { default?: runtime.ArrangableDefinition } = {}
-    new Function('require', 'exports', output)((name: string) => name === './state' ? state : requireSfaModule(name), exports)
-    return exports.default!
+    return evaluateSfaModule(source, { './state': state }, '重排验收.sfa')
 }
 
 test('真实 SFA 纯值变化只更新文本 Modifier，不执行结构且保留 Layout 身份', async () => {
@@ -169,6 +163,76 @@ test('对象绑定区分形状和值，字段变化不唤醒结构，移除字�
     advanceFrames()
     assert.equal(native.textNodes()[0].text, '')
     app.unmount()
+})
+
+test('真实 SFA 动态参数改名恢复旧字段默认值，拒绝重复、非法名称和错误类型后仍可恢复', () => {
+    const name = runtime.ref<unknown>('first-value')
+    const value = runtime.ref<unknown>('首值')
+    let setups = 0
+    const Receiver = internal.defineArrangable({
+        props: { firstValue: { type: String, default: '第一默认' }, secondValue: { type: String, default: '第二默认' }, fixedValue: String },
+        setup(props, { call }) {
+            setups++
+            return () => call(0, foundation.Text, { text: () => `${props.firstValue}/${props.secondValue}/${props.fixedValue}` })
+        }
+    })
+    const Page = evaluateSfa('<template><Receiver :[name].camel="value" fixed-value="固定" /></template><script>import { Receiver, name, value } from "./state"</script>', { Receiver, name, value })
+    const native = recordingNative(), errors: unknown[] = []
+    const app = runtime.createApp(Page)
+    app.config.errorHandler = error => errors.push(error)
+    mountFrame(app, native.target)
+    const id = native.textNodes()[0].id
+    assert.deepEqual(native.textNodes(), [{ id, text: '首值/第二默认/固定' }])
+
+    name.value = 'second-value'
+    value.value = '次值'
+    native.frame()
+    const published = [{ id, text: '第一默认/次值/固定' }]
+    assert.deepEqual(native.textNodes(), published)
+    const submissions = native.submissions
+    for (const [invalid, diagnostic] of [['unknown', /未声明参数/], ['fixed-value', /重复参数/], ['', /非空字符串/], [null, /非空字符串/], [123, /非空字符串/]] as const) {
+        const count = errors.length
+        name.value = invalid
+        native.frame()
+        assert.equal(errors.length, count + 1)
+        assert.ok(errors.at(-1) instanceof Error)
+        assert.match((errors.at(-1) as Error).message, diagnostic)
+        assert.deepEqual(native.textNodes(), published)
+        assert.equal(native.submissions, submissions)
+    }
+
+    name.value = 'first-value'
+    value.value = 123
+    native.frame()
+    assert.match((errors.at(-1) as Error).message, /firstValue 类型错误/)
+    assert.deepEqual(native.textNodes(), published)
+    assert.equal(native.submissions, submissions)
+    value.value = '最终值'
+    native.frame()
+    assert.deepEqual(native.textNodes(), [{ id, text: '最终值/第二默认/固定' }])
+    assert.equal(setups, 1)
+    app.unmount()
+})
+
+test('真实 SFA 的 a-slot:header 与 #header 交付相同具名多根内容及默认内容', () => {
+    const Receiver = evaluateSfa('<template><Slot name="header" /><Slot /></template>')
+    const results: string[][][] = []
+    for (const attribute of ['a-slot:header', '#header']) {
+        const title = runtime.ref('标题')
+        const Page = evaluateSfa(`<template><Receiver><Template ${attribute}><Text :text="title" /><Text text="副标题" /></Template><Text text="正文" /></Receiver></template><script>import { Receiver, title } from "./state"</script>`, { Receiver, title })
+        const native = recordingNative(), app = runtime.createApp(Page)
+        mountFrame(app, native.target)
+        const initial = native.textNodes()
+        assert.deepEqual(initial.map(node => node.text), ['标题', '副标题', '正文'])
+        title.value = '更新标题'
+        native.frame()
+        const updated = native.textNodes()
+        assert.deepEqual(updated.map(node => node.id), initial.map(node => node.id))
+        assert.deepEqual(updated.map(node => node.text), ['更新标题', '副标题', '正文'])
+        results.push([initial.map(node => node.text), updated.map(node => node.text)])
+        app.unmount()
+    }
+    assert.deepEqual(results[0], results[1])
 })
 
 
@@ -407,7 +471,7 @@ import { Color } from '@arrange/framework/ui'
 import { hue } from "./state"
 </script>`
     const compiled = compileArrangeSfa(source, '颜色.sfa')
-    assert.doesNotMatch(compiled.code, /__arrangeColorNumber|Color\.hsl\s*\(/)
+    assert.doesNotMatch(compiled.code, /Color\.hsl\s*\(/)
     assert.match(compiled.code, /Math\.round\([^)]*255\)/)
     assert.match(compiled.code, />>> 0/)
     assert.match(compiled.code, /Number\.isFinite\(__arrangeColorHue\)/)
@@ -435,11 +499,12 @@ import { Color } from '@arrange/framework/ui'
 import { red, blue, alpha } from './state'
 </script>`
     const dynamicCode = compileArrangeSfa(dynamicSource, '颜色动态.sfa').code
-    assert.doesNotMatch(dynamicCode, /Color\s*\(|colorNumber|ColorValue/)
-    assert.match(dynamicCode, /const __arrangeColorRedValue = \(_unref\(red\)\)/)
-    assert.match(dynamicCode, /const __arrangeColorBlueValue = \(_unref\(blue\)\)/)
+    assert.doesNotMatch(dynamicCode, /Color\s*\(/)
+    assert.match(dynamicCode, /const __arrangeColorInput0 = \(_unref\(red\)\)/)
+    assert.match(dynamicCode, /const __arrangeColorInput1 = \(_unref\(blue\)\)/)
     assert.match(dynamicCode, /Number\.isFinite\(__arrangeColorRedValue\)/)
-    assert.match(dynamicCode, /\(_unref\(alpha\)\) \?\? 1/)
+    assert.match(dynamicCode, /const __arrangeColorInput2 = \(_unref\(alpha\)\)/)
+    assert.match(dynamicCode, /\(__arrangeColorInput2\) \?\? 1/)
 })
 
 test('Color 可在 SFA 中同时作为类型和值使用而无需别名', () => {
@@ -480,6 +545,125 @@ import { channels } from './state'
 test('Color 静态十六进制值参与 ARGB 与通道范围校验', () => {
     assert.throws(() => compileArrangeSfa(`<template><Text :style="{ color: Color({ red: 0xff, green: 0, blue: 0 }) }" /></template><script>import { Color } from '@arrange/framework/ui'</script>`, '颜色通道越界.sfa'), /red 通道必须在 0\.\.1/)
     assert.throws(() => compileArrangeSfa(`<template><Text :style="{ color: Color(0x100000000) }" /></template><script>import { Color } from '@arrange/framework/ui'</script>`, '颜色数值越界.sfa'), /ARGB 数值必须是 uint32/)
+})
+
+test('Color 动态 ARGB 保留 uint32 校验并在失败后保留已发布颜色', () => {
+    const color = runtime.ref(0xff123456)
+    const source = `<template><Text text="颜色" :style="{ color: Color(color) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+import { color } from './state'
+</script>`
+    const Page = evaluateSfa(source, { color })
+    const native = recordingNative(), errors: unknown[] = []
+    const app = runtime.createApp(Page)
+    app.config.errorHandler = error => errors.push(error)
+    mountFrame(app, native.target)
+    const input = native.nodes.get(native.textNodes()[0].id)!
+    const published = input.inputs.get('modifier')
+    const writes = native.writes
+    for (const invalid of [-1, 0x100000000, 1.5, NaN, Infinity]) {
+        color.value = invalid
+        native.frame()
+        assert.equal(native.nodes.get(input.id)!.inputs.get('modifier'), published)
+        assert.equal(native.writes, writes)
+    }
+    assert.equal(errors.length, 5)
+    assert.ok(errors.every(error => error instanceof Error && /ARGB/.test(error.message)))
+    color.value = 0
+    native.frame()
+    const modifier = native.nodes.get(input.id)!.inputs.get('modifier') as ui.Modifier
+    const text = modifier.elements.find(element => element.type === 'text')!
+    assert.equal((text.value.style as { color: number }).color, 0)
+    app.unmount()
+})
+
+test('const 通道对象仍可变，Color 不把初始化字段永久折叠成旧颜色', () => {
+    const source = `<template><Text text="可变颜色" :style="{ color: Color(channels) }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+const channels = { red: 1, green: 0, blue: 0 }
+channels.red = 0
+channels.green = 1
+</script>`
+    const native = recordingNative(), app = runtime.createApp(evaluateSfa(source))
+    mountFrame(app, native.target)
+    const node = native.nodes.get(native.textNodes()[0].id)!
+    const modifier = node.inputs.get('modifier') as ui.Modifier
+    const text = modifier.elements.find(element => element.type === 'text')!
+    assert.equal((text.value.style as { color: number }).color, 0xff00ff00)
+    app.unmount()
+})
+
+test('Color 拆箱按对象字面量顺序求值，显式 void alpha 的副作用保留', () => {
+    const trace: string[] = []
+    const readChannel = (name: string, value: number) => {
+        trace.push(name)
+        return value
+    }
+    const source = `<template><Text text="求值顺序" :style="{ color }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+import { readChannel } from './state'
+const color = Color({ red: readChannel('red', 1), green: readChannel('green', 0), blue: readChannel('blue', 0), alpha: void readChannel('alpha', 1) })
+</script>`
+    const native = recordingNative(), app = runtime.createApp(evaluateSfa(source, { readChannel }))
+    mountFrame(app, native.target)
+    assert.deepEqual(trace, ['red', 'green', 'blue', 'alpha'])
+    const modifier = native.nodes.get(native.textNodes()[0].id)!.inputs.get('modifier') as ui.Modifier
+    const text = modifier.elements.find(element => element.type === 'text')!
+    assert.equal((text.value.style as { color: number }).color, 0xffff0000)
+    app.unmount()
+})
+
+test('Color 不把被遮蔽的 Object.freeze 当作纯静态对象构造', () => {
+    const source = `<template><Text text="对象调用" :style="{ color }" /></template><script>
+import { Color } from '@arrange/framework/ui'
+const Object = { freeze(value: { red: number; green: number; blue: number }) { if ('red' in value) { value.red = 0; value.green = 1 } return value } }
+const color = Color(Object.freeze({ red: 1, green: 0, blue: 0 }))
+</script>`
+    const native = recordingNative(), app = runtime.createApp(evaluateSfa(source))
+    mountFrame(app, native.target)
+    const modifier = native.nodes.get(native.textNodes()[0].id)!.inputs.get('modifier') as ui.Modifier
+    const text = modifier.elements.find(element => element.type === 'text')!
+    assert.equal((text.value.style as { color: number }).color, 0xff00ff00)
+    app.unmount()
+})
+
+test('真实 SFA 的 AnimatedVisibility 保留退出和反向期间 Input 编辑值，完全退出后重新初始化', () => {
+    const visible = runtime.ref(true)
+    const source = `<template><AnimatedVisibility :visible="visible" :animationSpec="spec"><Input value="初始编辑值" /></AnimatedVisibility></template><script>
+import { AnimatedVisibility, tween, linearEasing } from '@arrange/framework/animation'
+import { visible } from './state'
+const spec = tween({ durationMillis: 100, easing: linearEasing })
+</script>`
+    const native = recordingNative(), app = runtime.createApp(evaluateSfa(source, { visible }))
+    mountFrame(app, native.target)
+    const inputId = native.textNodes()[0].id
+    const node = native.nodes.get(inputId)!
+    const modifier = node.inputs.get('modifier') as ui.Modifier
+    const textField = modifier.elements.find(element => element.type === 'textField')!
+    const handles = node.modifiers
+    const edited = textField.value.onValueChange as (value: string) => void
+    edited('已经编辑')
+    native.frame()
+    assert.deepEqual(native.textNodes(), [{ id: inputId, text: '已经编辑' }])
+    visible.value = false
+    native.frame()
+    assert.deepEqual(native.textNodes(), [{ id: inputId, text: '已经编辑' }])
+    native.frame(native.time + 40)
+    visible.value = true
+    native.frame()
+    native.frame(native.time + 100)
+    assert.deepEqual(native.textNodes(), [{ id: inputId, text: '已经编辑' }])
+    assert.deepEqual(native.nodes.get(inputId)!.modifiers, handles)
+    visible.value = false
+    native.frame()
+    native.frame(native.time + 100)
+    native.frame()
+    assert.equal(native.textNodes().length, 0)
+    visible.value = true
+    native.frame()
+    assert.equal(native.textNodes()[0].text, '初始编辑值')
+    assert.notEqual(native.textNodes()[0].id, inputId)
+    app.unmount()
 })
 
 test('Color 的 namespace 与别名导入在消融后退出生成 TS', () => {

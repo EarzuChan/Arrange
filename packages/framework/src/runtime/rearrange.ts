@@ -35,6 +35,7 @@ export interface ValueTask {
 }
 let activeScope: RearrangeScope | null = null
 let nextScopeId = 1
+class RearrangeCancelled extends Error { }
 
 // 账本只保存已建立调用和范围，不创建等待 patch 的描述树
 export class RearrangeScope {
@@ -146,7 +147,9 @@ export class RearrangeScope {
         this.next = []
         arrangeExecutionStats.structureRuns++
         try {
-            if (this.program() !== undefined) throw new TypeError('结构程序只执行调用，不能返回节点描述、数组或文本')
+            const result = this.program()
+            if (this.retired || this.rearrangeSession.isDisposed) return
+            if (result !== undefined) throw new TypeError('结构程序只执行调用，不能返回节点描述、数组或文本')
             this.rearrangeSession.stage(this, this.next)
             this.rearrangeSession.preserve(this.parameterObjects, () => {
                 this.rearrangeSession.onCommit(() => {
@@ -248,6 +251,7 @@ export class RearrangeSession {
     }
 
     get preparing(): boolean { return this.running && !this.applying }
+    get isDisposed(): boolean { return this.disposed }
 
     mount(): void {
         this.schedule(this.root, true)
@@ -345,6 +349,8 @@ export class RearrangeSession {
             return
         }
         this.values.add(update)
+        // 失败后父范围仍可能失效，先重读最新调用形状再消费回滚后的旧值绑定
+        for (let scope: RearrangeScope | null = update.scope(); scope; scope = scope.parent) if (!scope.retired && !scope.paused && !this.hasCandidate(scope) && scope.effect.dirty) this.enqueue(scope)
         if (!this.running) queueRearrangeJob(this.job)
     }
 
@@ -381,6 +387,7 @@ export class RearrangeSession {
             }
             while (this.values.size || this.work.size || this.scheduler.hasPreWork) {
                 this.scheduler.drainPre()
+                if (this.disposed) return
                 let scope: RearrangeScope | undefined
                 for (const candidate of this.work.keys()) if (!scope || candidate.identity < scope.identity) scope = candidate
                 let update: ValueTask | undefined
@@ -399,6 +406,7 @@ export class RearrangeSession {
                         scope.prepare(force)
                     }
                 }
+                if (this.disposed) return
             }
             if (this.failed) throw this.failed.error
             this.discardUnusedCandidates()
@@ -410,6 +418,7 @@ export class RearrangeSession {
             this.applying = true
             this.context.host.apply(error => { if (this.transaction === transaction) this.complete(error) })
         } catch (error) {
+            if (this.disposed && error instanceof RearrangeCancelled) return
             if (this.transaction === transaction) {
                 try { this.abort() } catch (cleanup) { throw new AggregateError([error, cleanup], '重排失败且撤销清理发生错误') }
             }
@@ -538,7 +547,6 @@ export class RearrangeSession {
     }
 }
 
-/** @arrangeCall */
 export function callArrangable<D extends ArrangableDefinition>(position: CallPosition, definition: D, inputs: PropInputs<ArrangableProps<D>>, contents: Contents = {}, metadata: CallMetadata = {}): void {
     definition = resolveHotArrangable(definition) as D
     const scope = requireScope()
@@ -566,7 +574,7 @@ export function callArrangable<D extends ArrangableDefinition>(position: CallPos
         scope.record(entry)
     } catch (error) {
         if (error instanceof Error && metadata.source && !error.message.includes('来源：')) error.message += `\n来源：${metadata.source}`
-        scope.rearrangeSession.invalidate(error)
+        if (!(error instanceof RearrangeCancelled)) scope.rearrangeSession.invalidate(error)
         throw error
     } finally {
         resetTracking()
@@ -611,18 +619,23 @@ function initializeInstance(instance: ArrangableInstance, parent: RearrangeScope
             source: name => instance.propStore.source(name),
         }
         const program = setupHotArrangable(instance, () => instance.type.setup(instance.props, instance.setupContext))
+        if (instance.rearrangeSession.isDisposed) throw new RearrangeCancelled('重排所有者已销毁')
         if (typeof program !== 'function') throw new TypeError('Arrangable setup 必须返回结构执行函数，不支持异步 setup')
         instance.structure = new RearrangeScope(parent.rearrangeSession, instance, parent, () => {
             runHooks(instance, instance.isMounted ? LifecycleHooks.BEFORE_UPDATE : LifecycleHooks.BEFORE_MOUNT)
+            if (instance.isUnmounted) return
             if (program() !== undefined) throw new TypeError('结构程序只执行调用，不能返回节点描述、数组或文本')
+            if (instance.isUnmounted) return
             parent.rearrangeSession.notify(instance, instance.isMounted ? LifecycleHooks.UPDATED : LifecycleHooks.MOUNTED)
         }, metadata.source)
         parent.rearrangeSession.enqueue(instance.structure, true)
     } catch (error) {
         instance.isUnmounted = true
         arrangeExecutionStats.instancesRetired++
-        instance.node?.retire()
-        instance.scope.stop()
+        const cleanupErrors: unknown[] = []
+        try { instance.node?.retire() } catch (cleanup) { cleanupErrors.push(cleanup) }
+        try { instance.scope.stop() } catch (cleanup) { cleanupErrors.push(cleanup) }
+        if (cleanupErrors.length) throw new AggregateError([error, ...cleanupErrors], 'Arrangable 初始化失败且清理发生错误')
         throw error
     } finally {
         restore()
@@ -726,6 +739,7 @@ export function invokeContent(position: CallPosition, content: Content): void {
 }
 
 function requireScope(): RearrangeScope {
+    if (activeScope?.rearrangeSession.isDisposed) throw new RearrangeCancelled('重排所有者已销毁')
     if (!activeScope || activeScope.retired) throw new Error('结构调用只能在活动重排作用域中执行')
     return activeScope
 }
@@ -797,6 +811,7 @@ export function runHooks(instance: ArrangableInstance, hook: LifecycleHooks): vo
     const errors: unknown[] = []
     try {
         for (const callback of instance.hooks.get(hook) ?? []) {
+            if (instance.isUnmounted && hook !== LifecycleHooks.BEFORE_UNMOUNT && hook !== LifecycleHooks.UNMOUNTED) break
             try { callback() } catch (error) { errors.push(error) }
         }
     } finally {
@@ -837,7 +852,6 @@ export function arrangeList<T>(position: CallPosition, collection: Iterable<T> |
     for (const [value, key, index] of values) arrangeScope(position, () => program(value, key, index), identity(value, key, index) ?? index)
 }
 
-/** @arrangeParameterInputs */
 export function parameterInputs(entries: readonly (readonly [string, () => unknown])[], source?: string): PropInputs<Data> {
     const inputs: Record<string, () => unknown> = Object.create(null)
     for (const [original, getter] of entries) {
@@ -868,7 +882,6 @@ class ObjectParameterBinding {
     }
 }
 
-/** @arrangeParameterObject */
 export function parameterObject(position: CallPosition, read: () => Record<string, unknown>): [string, () => unknown][] {
     const scope = requireScope()
     if (!scope.owner) throw new Error('对象参数绑定必须归属 Arrangable 调用')

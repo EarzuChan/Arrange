@@ -64,6 +64,6 @@ namespace arrange::core {
         std::uint64_t rejected = 0;
     };
 
-    // 跨 scene/context 不复用身份，防止 reload 后同 node id 命中旧生产者。
+    // 跨 scene/context 不复用身份，防止 reload 后同 node id 命中旧生产者
     std::uint64_t allocateRuntimeIdentity();
-}  // namespace arrange::core
+}

@@ -1,11 +1,12 @@
 import ts from 'typescript'
 import { modifierArgumentUnits, unitFieldContracts, type UnitFields, type ValueUnit } from '@arrange/shared'
 import { SourceMapConsumer, type RawSourceMap } from 'source-map-js'
+import type { SfaValueContracts } from './valueContracts.ts'
 
 type Rule = ValueUnit | UnitFields
 
 // 只消费正式声明的单位契约，不按局部变量名或函数拼写推测单位
-export function validateValueUnits(program: ts.Program, source: ts.SourceFile, expressionKind: (node: ts.Expression) => string | undefined, valueKind: (symbol: ts.Symbol | undefined) => string | undefined, filename: string, map?: RawSourceMap): void {
+export function validateValueUnits(program: ts.Program, source: ts.SourceFile, contracts: SfaValueContracts, expressionKind: (node: ts.Expression) => string | undefined, valueKind: (symbol: ts.Symbol | undefined) => string | undefined, filename: string, map?: RawSourceMap, restorePosition = (offset: number) => source.getLineAndCharacterOfPosition(offset)): void {
     const checker = program.getTypeChecker()
     const mapping = map ? new SourceMapConsumer(map) : undefined
     const checked = new Map<ts.Node, Set<Rule>>()
@@ -14,16 +15,9 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         if (result && result.flags & ts.SymbolFlags.Alias) result = checker.getAliasedSymbol(result)
         return result
     }
-    const tag = (node: ts.Node | undefined, name: string) => node && ts.getJSDocTags(node).find(item => item.tagName.text === name)
-    const tagged = (node: ts.Node, name: string) => symbol(node)?.declarations?.map(declaration => tag(declaration, name)).find(Boolean)
     const isUnrefCall = (node: ts.Expression): node is ts.CallExpression => {
         if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false
-        if (tagged(node.expression, 'arrangeUnref')) return true
-        if (!ts.isIdentifier(node.expression)) return false
-        const declaration = symbol(node.expression)?.declarations?.find(ts.isImportSpecifier)
-        if (!declaration) return false
-        const imported = declaration.propertyName ?? declaration.name
-        return ts.isIdentifier(imported) && imported.text === 'unref'
+        return !!contracts.forCall(node)?.unref
     }
     const unitAccess = (node: ts.Expression): node is ts.PropertyAccessExpression => {
         return ts.isPropertyAccessExpression(node) && ['dp', 'px', 'sp'].includes(node.name.text) && !checker.getTypeAtLocation(node.expression).getProperty(node.name.text)
@@ -32,22 +26,12 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         const kind = valueKind(type.aliasSymbol) ?? valueKind(type.symbol)
         if (kind) return kind as ValueUnit
         const unit = type.getProperty('unit')
-        if (unit?.declarations?.some(declaration => tag(declaration.parent, 'arrangeValue'))) {
+        if (unit?.declarations?.some(declaration => contracts.forDeclaration(declaration.parent)?.value)) {
             const literal = checker.getTypeOfSymbolAtLocation(unit, source)
             if (literal.isStringLiteral()) return literal.value as ValueUnit
         }
-        for (const declaration of [...type.aliasSymbol?.declarations ?? [], ...type.symbol?.declarations ?? []]) {
-            const fields = tag(declaration, 'arrangeFields')?.comment
-            if (typeof fields === 'string') return unitFieldContracts[fields.trim()]
-        }
-        for (const property of type.getProperties()) for (const declaration of property.declarations ?? []) {
-            let parent: ts.Node | undefined = declaration.parent
-            while (parent && !ts.isSourceFile(parent)) {
-                const fields = tag(parent, 'arrangeFields')?.comment
-                if (typeof fields === 'string') return unitFieldContracts[fields.trim()]
-                parent = parent.parent
-            }
-        }
+        const fields = contracts.fieldsOf(type)
+        if (fields) return fields
         if (type.isUnion()) return type.types.map(fieldsOf).find(Boolean)
     }
     const unwrap = (node: ts.Expression): ts.Expression => {
@@ -68,11 +52,11 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         return initializer(value)
     }
     const fail = (node: ts.Expression, expected: string, actual?: string): never => {
-        const generated = source.getLineAndCharacterOfPosition(node.getStart(source))
+        const generated = restorePosition(node.getStart(source))
         const original = mapping?.originalPositionFor({ line: generated.line + 1, column: generated.character })
         const line = original?.line ?? generated.line + 1
         const column = (original?.column ?? generated.character) + 1
-        const expressionText = node.getText(source).replaceAll('/*@arrange-unit*/', '')
+        const expressionText = node.getText(source)
         const error = new Error(`单位参数 ${expressionText} 要求 ${expected.toUpperCase()}，${actual ? `实际为 ${actual.toUpperCase()}` : 'SFA 中需要显式值壳或已声明单位的值'}\n来源：${filename}:${line}:${column}`)
         Object.assign(error, { loc: { start: { line, column } } })
         throw error
@@ -148,7 +132,16 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         if (!rules) checked.set(node, rules = new Set())
         rules.add(rule)
         if (node.kind === ts.SyntaxKind.UndefinedKeyword || ts.isIdentifier(node) && node.text === 'undefined') return
-        if (ts.isArrowFunction(node) && !ts.isBlock(node.body)) return check(node.body, rule)
+        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+            if (ts.isBlock(node.body)) {
+                const returns = (body: ts.Node): void => {
+                    if (ts.isReturnStatement(body) && body.expression) check(body.expression, rule)
+                    else if (!ts.isFunctionLike(body)) ts.forEachChild(body, returns)
+                }
+                returns(node.body)
+            } else check(node.body, rule)
+            return
+        }
         if (ts.isConditionalExpression(node)) {
             check(node.whenTrue, rule)
             check(node.whenFalse, rule)
@@ -181,10 +174,10 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             }
             if (ts.isPropertyAccessExpression(node) && node.name.text === 'value') {
                 const input = initializer(node.expression)
-                if (input && ts.isCallExpression(input) && tagged(input.expression, 'arrangeResult')?.comment === rule) return
+                if (input && ts.isCallExpression(input) && contracts.forCall(input)?.result === rule) return
             }
             if (ts.isCallExpression(node)) {
-                const resultUnit = tagged(node.expression, 'arrangeResult')?.comment
+                const resultUnit = contracts.forCall(node)?.result
                 if (typeof resultUnit === 'string' && matches(rule, resultUnit.trim())) return
             }
             const init = initializer(node)
@@ -205,10 +198,10 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             }
         } else if (rule === unitFieldContracts.padding) check(node, 'length')
         else if (rule === unitFieldContracts.brush) check(node, 'color')
-        else if (ts.isCallExpression(node) && tagged(node.expression, 'arrangeCheckProps')) check(node.arguments[1], rule)
-        else if (ts.isCallExpression(node) && tagged(node.expression, 'arrangeParameterInputs') && ts.isArrayLiteralExpression(node.arguments[0])) {
+        else if (ts.isCallExpression(node) && contracts.forCall(node)?.checkProps) check(node.arguments[1], rule)
+        else if (ts.isCallExpression(node) && contracts.forCall(node)?.parameterInputs && ts.isArrayLiteralExpression(node.arguments[0])) {
             for (const entry of node.arguments[0].elements) {
-                if (ts.isSpreadElement(entry) && ts.isCallExpression(entry.expression) && tagged(entry.expression.expression, 'arrangeParameterObject')) check(entry.expression.arguments[1], rule)
+                if (ts.isSpreadElement(entry) && ts.isCallExpression(entry.expression) && contracts.forCall(entry.expression)?.parameterObject) check(entry.expression.arguments[1], rule)
                 else if (ts.isArrayLiteralExpression(entry) && ts.isStringLiteral(entry.elements[0]) && rule[entry.elements[0].text]) check(entry.elements[1], rule[entry.elements[0].text])
             }
         } else {
@@ -246,7 +239,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
         return node
     }
     const definitionType = (node: ts.Expression): ts.Type => {
-        if (ts.isCallExpression(node) && tagged(node.expression, 'arrangeResolve') && ts.isStringLiteral(node.arguments[0])) {
+        if (ts.isCallExpression(node) && contracts.forCall(node)?.resolve && ts.isStringLiteral(node.arguments[0])) {
             const imported = source.statements.find(statement => ts.isImportDeclaration(statement) && statement.importClause?.namedBindings && ts.isNamespaceImport(statement.importClause.namedBindings) && statement.importClause.namedBindings.name.text === '__ArrangeUnitsFoundation') as ts.ImportDeclaration | undefined
             const namespace = imported?.importClause?.namedBindings
             if (namespace && ts.isNamespaceImport(namespace)) {
@@ -298,10 +291,10 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
 
     const visit = (node: ts.Node): void => {
         if (ts.isCallExpression(node)) {
-            if (tagged(node.expression, 'arrangeCall') && node.arguments.length >= 3) checkProps(node.arguments[1], node.arguments[2])
-            if (tagged(node.expression, 'arrangeCheckProps') && node.arguments.length >= 2) checkProps(node.arguments[0], node.arguments[1])
+            if (contracts.forCall(node)?.call && node.arguments.length >= 3) checkProps(node.arguments[1], node.arguments[2])
+            if (contracts.forCall(node)?.checkProps && node.arguments.length >= 2) checkProps(node.arguments[0], node.arguments[1])
             const declaration = checker.getResolvedSignature(node)?.declaration
-            if (declaration && ts.isMethodDeclaration(declaration) && tag(declaration.parent, 'arrangeModifier')) {
+            if (declaration && ts.isMethodDeclaration(declaration) && contracts.forDeclaration(declaration.parent)?.modifier) {
                 const name = declaration.name.getText().replaceAll('"', '').replaceAll("'", '')
                 const rules = Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
                 if (rules) {
@@ -310,14 +303,9 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
                     else argumentsOf(node, rules)
                 }
             }
-            const argumentTag = tagged(node.expression, 'arrangeArguments')?.comment ?? (() => {
-                const declaration = checker.getResolvedSignature(node)?.declaration
-                return declaration ? tag(declaration, 'arrangeArguments')?.comment : undefined
-            })()
-            if (typeof argumentTag === 'string') for (const [index, name] of argumentTag.trim().split(/\s+/).entries()) {
-                if (name !== 'none' && node.arguments[index]) check(node.arguments[index], unitFieldContracts[name] ?? name as ValueUnit)
-            }
-            if (tagged(node.expression, 'arrangeModifierCall') && ts.isArrayLiteralExpression(node.arguments[1])) {
+            const argumentRules = contracts.forCall(node)?.arguments
+            if (argumentRules) argumentsOf(node, argumentRules)
+            if (contracts.forCall(node)?.modifierCall && ts.isArrayLiteralExpression(node.arguments[1])) {
                 for (const segment of node.arguments[1].elements) {
                     if (!ts.isArrayLiteralExpression(segment) || !ts.isStringLiteral(segment.elements[0]) || !ts.isArrowFunction(segment.elements[1])) continue
                     const name = segment.elements[0].text
@@ -330,7 +318,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, e
             if (!expressionKind(node.expression)) {
                 const signature = checker.getResolvedSignature(node)
                 const declaration = signature?.declaration
-                if (!(declaration && ts.isMethodDeclaration(declaration) && tag(declaration.parent, 'arrangeModifier'))) signature?.parameters.forEach((parameter, index) => {
+                if (!(declaration && ts.isMethodDeclaration(declaration) && contracts.forDeclaration(declaration.parent)?.modifier)) signature?.parameters.forEach((parameter, index) => {
                     if (!node.arguments[index]) return
                     const rule = parameterRule(checker.getTypeOfSymbolAtLocation(parameter, node))
                     if (rule) check(node.arguments[index], rule)

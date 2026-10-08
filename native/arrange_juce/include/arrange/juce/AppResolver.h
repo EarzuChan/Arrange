@@ -39,4 +39,4 @@ namespace arrange {
         ResolvedApp resolveDebug(const App& app, std::string_view explicitDevServerUrl = {}) const;
         std::string devServerUrlFromEnvironment(std::string_view explicitDevServerUrl = {}) const;
     };
-}  // namespace arrange
+}

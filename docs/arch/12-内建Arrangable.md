@@ -36,7 +36,7 @@ Box 叠放内容，默认对齐 TopStart；子项显式 M.align 优先于容器�
 
 Foundation Arrangable 不自带背景、边框、圆角、阴影、装饰性 padding、主题色、设计系统字体或输入框皮肤，不通过 provide/inject 取得视觉样式。行为服务可以注入，但不得暗改样式。
 
-未指定文字颜色时 Text/Input 使用基础黑色；字体和字号仅有基础排版 Foundation Arrangablellback。Input 的光标、选区、焦点与 IME 属于编辑行为。Icon 未指定 tint 时保留 Painter 原色，不补主题色或固定图标尺寸。
+未指定文字颜色时 Text/Input 使用基础黑色；字体和字号仅有基础排版后备设置。Input 的光标、选区、焦点与 IME 属于编辑行为。Icon 未指定 tint 时保留 Painter 原色，不补主题色或固定图标尺寸。
 
 Input 使用 value 与显式 onValueChange 函数参数表达受控文本；Text 仅消费 text 参数。文字几何、输入事件与缓存规则归属 [文本输入与绘制](18-文本输入与绘制.md)。
 
@@ -45,6 +45,8 @@ Input 使用 value 与显式 onValueChange 函数参数表达受控文本；Text
 Painter 由资源获取层创建，提供固有尺寸、内容版本、状态、错误与释放能力。Image/Icon 只消费 Painter，不接收 source、path 或 URL 来加载资源。资源路径规则归属 [工具链与 App 发布包](14-工具链与App发布包.md)。
 
 资源请求具有身份与代际，加载和解码在工作线程执行，Owner 接收不可变结果后更新 Painter 状态。paint Modifier 消费资源快照及版本，固有尺寸变化进入必要测量，内容变化进入绘制失效。绘制阶段不回调任意 JS。
+
+JUCE 的 SVG Drawable 也是 Component；工作线程解析它时须取得消息线程锁。Owner 通过完成通知消费结果，不能在消息线程同步等待该加载 future，否则会阻塞解析所需的消息派发。无 peer 的资源完成仍通过同一语义任务运行，不借此获得视觉帧授权。
 
 Image 使用 contentScale、alignment 和 alpha；Icon 的显式 tint 转为 colorFilter。Fit、Crop、FillBounds、FillWidth、FillHeight、Inside、None 使用统一缩放与对齐语义，绘制限制在目标区域内。SVG 固有尺寸来自视口，保留 viewBox 中的透明留白，不使用可见图形边界冒充视口；未给绝对宽高时使用 viewBox 尺寸，无 viewBox 时使用 300 × 150 基础视口。显式 Modifier 尺寸与父约束共同决定布局，paint 可以使用 Painter 固有尺寸参与约束。
 

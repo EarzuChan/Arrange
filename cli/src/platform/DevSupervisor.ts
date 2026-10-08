@@ -11,7 +11,7 @@ export class DevSupervisor {
 
     async run(processes: LongRunningProcessSpec[]): Promise<number> {
         void processes
-        // TODO：启动并监管 Vite dev server / native editor：信号转发、子进程退出策略、错误归一化
+        // 启动并监管 Vite dev server / native editor：信号转发、子进程退出策略、错误归一化
         return 0
     }
 

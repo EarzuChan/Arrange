@@ -474,7 +474,7 @@ namespace {
         }
         check(draw.counters().opsSkipped == 1 && image.getPixelAt(155, 155) == ::juce::Colour(0xff00ff00), "操作剔除破坏了相邻片段的状态");
     }
-}  // namespace
+}
 
 int main() {
     try {

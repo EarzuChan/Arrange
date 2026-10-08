@@ -42,7 +42,7 @@ namespace arrange::juce {
                 },
                 input.value);
         }
-    }  // namespace
+    }
 
     LiveModuleClient::LiveModuleClient() : ::juce::Thread("Arrange live modules") {}
 
@@ -233,9 +233,11 @@ namespace arrange::juce {
             }
             packet.snapshot.modules.push_back({module["url"].toString().toStdString(), module["source"].toString().toStdString(), ::juce::JSON::toString(module["map"]).toStdString()});
         }
-        if (!packet.error.empty()) arrange::Log::e(TAG, "Live 模块快照解析失败", packet.error);
-        else if (packet.reload) arrange::Log::i(TAG, "已收到 Live 模块快照", packet.snapshot.modules.size(), "个模块");
+        if (!packet.error.empty())
+            arrange::Log::e(TAG, "Live 模块快照解析失败", packet.error);
+        else if (packet.reload)
+            arrange::Log::i(TAG, "已收到 Live 模块快照", packet.snapshot.modules.size(), "个模块");
         return packet;
     }
-}  // namespace arrange::juce
+}
 #endif

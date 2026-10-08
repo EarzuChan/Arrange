@@ -51,4 +51,4 @@ namespace arrange::core {
     };
 
     using TreeMutation = std::variant<CreateNodeMutation, DeleteNodeMutation, InsertChildMutation, RemoveChildMutation, SetPropMutation, SetModifierMutation, NativeInvalidationMutation>;
-}  // namespace arrange::core
+}

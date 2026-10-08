@@ -115,4 +115,4 @@ namespace arrange::core {
     bool NativeScene::hasEventSlot(const EventSlotId& slot) const {
         return slot.valid() && activeEventSlots_.contains(slot);
     }
-}  // namespace arrange::core
+}

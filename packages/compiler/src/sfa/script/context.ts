@@ -26,7 +26,6 @@ export class ScriptCompileContext {
     globalScopes?: TypeScope[]
     userImports: Record<string, ImportBinding> = Object.create(null)
 
-    // macros presence check
     hasDefinePropsCall = false
 
     // 定义Props
@@ -108,8 +107,6 @@ export function resolveParserPlugins(lang: string, userPlugins?: ParserPlugin[],
     if (lang === 'jsx' || lang === 'tsx' || lang === 'mtsx') {
         plugins.push('jsx')
     } else if (userPlugins) {
-        // If don't match the case of adding jsx
-        // should remove the jsx from user options
         userPlugins = userPlugins.filter(p => p !== 'jsx')
     }
     if (

@@ -6,10 +6,10 @@ import { DecodingMode, EntityDecoder, fromCodePoint, htmlDecodeTree } from 'enti
 export enum ParseMode { BASE, HTML, SFA, }
 
 export enum CharCodes {
-    Tab = 0x9, // "\t"
-    NewLine = 0xa, // "\n"
-    FormFeed = 0xc, // "\f"
-    CarriageReturn = 0xd, // "\r"
+    Tab = 0x9,
+    NewLine = 0xa,
+    FormFeed = 0xc,
+    CarriageReturn = 0xd,
     Space = 0x20, // " "
     ExclamationMark = 0x21, // "!"
     Number = 0x23, // "#"
@@ -26,16 +26,15 @@ export enum CharCodes {
     Eq = 0x3d, // "="
     Gt = 0x3e, // ">"
     Questionmark = 0x3f, // "?"
-    UpperA = 0x41, // "A"
-    LowerA = 0x61, // "a"
-    UpperF = 0x46, // "F"
-    LowerF = 0x66, // "f"
-    UpperZ = 0x5a, // "Z"
-    LowerZ = 0x7a, // "z"
-    LowerX = 0x78, // "x"
+    UpperA = 0x41,
+    LowerA = 0x61,
+    UpperF = 0x46,
+    LowerF = 0x66,
+    UpperZ = 0x5a,
+    LowerZ = 0x7a,
+    LowerX = 0x78,
     Dot = 0x2e, // "."
     Colon = 0x3a, // ":"
-    At = 0x40, // "@"
     LeftSquare = 91, // "["
     RightSquare = 93, // "]"
 }
@@ -43,21 +42,17 @@ export enum CharCodes {
 const defaultDelimitersOpen = new Uint8Array([123, 123]) // "{{"
 const defaultDelimitersClose = new Uint8Array([125, 125]) // "}}"
 
-/** All the states the tokenizer can be in. */
 export enum State {
     Text = 1,
-    // interpolation
     InterpolationOpen,
     Interpolation,
     InterpolationClose,
-    // Tags
-    BeforeTagName, // After <
+    BeforeTagName,
     InTagName,
     InSelfClosingTag,
     BeforeClosingTagName,
     InClosingTagName,
     AfterClosingTagName,
-    // Attrs
     BeforeAttrName,
     InAttrName,
     InDirName,
@@ -69,20 +64,16 @@ export enum State {
     InAttrValueDq, // "
     InAttrValueSq, // '
     InAttrValueNq,
-    // Declarations
     BeforeDeclaration, // !
     InDeclaration,
-    // Processing instructions
     InProcessingInstruction, // ?
 
-    // Comments & CDATA
     BeforeComment,
     CDATASequence,
     InSpecialComment,
     InCommentLike,
-    // Special tags
-    BeforeSpecialS, // Decide if we deal with `<script` or `<style`
-    BeforeSpecialT, // Decide if we deal with `<title` or `<textarea`
+    BeforeSpecialS,
+    BeforeSpecialT,
     SpecialStartSequence,
     InRCDATA,
     InEntity,
@@ -140,42 +131,32 @@ export interface Callbacks {
     oncdata(start: number, endIndex: number): void
 
     onprocessinginstruction(start: number, endIndex: number): void
-    // ondeclaration(start: number, endIndex: number): void
     onend(): void
     onerr(code: ErrorCodes, index: number): void
 }
 
 // 真该砍你了：说明Cdata什么的我们全然没有
 export const Sequences: { Cdata: Uint8Array, CdataEnd: Uint8Array, CommentEnd: Uint8Array, ScriptEnd: Uint8Array, StyleEnd: Uint8Array, TitleEnd: Uint8Array, TextareaEnd: Uint8Array } = {
-    Cdata: new Uint8Array([0x43, 0x44, 0x41, 0x54, 0x41, 0x5b]), // CDATA[
+    Cdata: new Uint8Array([0x43, 0x44, 0x41, 0x54, 0x41, 0x5b]),
     CdataEnd: new Uint8Array([0x5d, 0x5d, 0x3e]), // ]]>
     CommentEnd: new Uint8Array([0x2d, 0x2d, 0x3e]), // `-->`
-    ScriptEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74]), // `</script`
+    ScriptEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74]),
     StyleEnd: new Uint8Array([0x3c, 0x2f, 0x73, 0x74, 0x79, 0x6c, 0x65]), // `</style`更是恶劣的
-    TitleEnd: new Uint8Array([0x3c, 0x2f, 0x74, 0x69, 0x74, 0x6c, 0x65]), // `</title`
+    TitleEnd: new Uint8Array([0x3c, 0x2f, 0x74, 0x69, 0x74, 0x6c, 0x65]),
     TextareaEnd: new Uint8Array([
         0x3c, 0x2f, 116, 101, 120, 116, 97, 114, 101, 97,
     ]), // `</textarea到了死几百回的时候了
 }
 
 export default class Tokenizer {
-    /** The current state the tokenizer is in. */
     public state: State = State.Text
-    /** The read buffer. */
     private buffer = ''
-    /** The beginning of the section that is currently being read. */
     public sectionStart = 0
-    /** The index within the buffer that we are currently looking at. */
     private index = 0
-    /** The start of the last entity. */
     private entityStart = 0
-    /** Some behavior, eg. when decoding entities, is done while we are in another state. This keeps track of the other state type. */
     private baseState = State.Text
-    /** For special parsing behavior inside of script and style tags. */
     public inRCDATA = false
-    /** For disabling RCDATA tags handling */
     public inXML = false
-    /** Record newline positions for fast line / column calculation */
     private newlines: number[] = []
 
     private readonly entityDecoder?: EntityDecoder
@@ -205,12 +186,6 @@ export default class Tokenizer {
         this.delimiterClose = defaultDelimitersClose
     }
 
-    /**
-     * Generate Position object with line / column information using recorded
-     * newline positions. We know the index is always going to be an already
-     * processed index, so all the newlines up to this index should have been
-     * recorded.
-     */
     public getPos(index: number): Position {
         let line = 1
         let column = index + 1
@@ -319,11 +294,7 @@ export default class Tokenizer {
     private sequenceIndex = 0
     private stateSpecialStartSequence(c: number): void {
         const isEnd = this.sequenceIndex === this.currentSequence.length
-        const isMatch = isEnd
-            ? // If we are at the end of the sequence, make sure the tag name has ended
-            isEndOfTagSection(c)
-            : // Otherwise, do a case-insensitive comparison
-            (c | 0x20) === this.currentSequence[this.sequenceIndex]
+        const isMatch = isEnd ? isEndOfTagSection(c) : (c | 0x20) === this.currentSequence[this.sequenceIndex]
 
         if (!isMatch) this.inRCDATA = false
         else if (!isEnd) {
@@ -336,24 +307,22 @@ export default class Tokenizer {
         this.stateInTagName(c)
     }
 
-    /** Look for an end tag. For <title> and <textarea>, also decode entities. */
     private stateInRCDATA(c: number): void {
         if (this.sequenceIndex === this.currentSequence.length) {
             if (c === CharCodes.Gt || isWhitespace(c)) {
                 const endOfText = this.index - this.currentSequence.length
 
                 if (this.sectionStart < endOfText) {
-                    // Spoof the index so that reported locations match up.
                     const actualIndex = this.index
                     this.index = endOfText
                     this.cbs.ontext(this.sectionStart, endOfText)
                     this.index = actualIndex
                 }
 
-                this.sectionStart = endOfText + 2 // Skip over the `</`
+                this.sectionStart = endOfText + 2
                 this.stateInClosingTagName(c)
                 this.inRCDATA = false
-                return // We are done; skip the rest of the function.
+                return
             }
 
             this.sequenceIndex = 0
@@ -365,21 +334,17 @@ export default class Tokenizer {
             if (
                 this.currentSequence === Sequences.TitleEnd || (this.currentSequence === Sequences.TextareaEnd && !this.inSFARoot)
             ) {
-                // We have to parse entities in <title> and <textarea> tags.
                 if ((c === CharCodes.Amp)) {
                     this.startEntity()
                 } else if (c === this.delimiterOpen[0]) {
-                    // We also need to handle interpolation
                     this.state = State.InterpolationOpen
                     this.delimiterIndex = 0
                     this.stateInterpolationOpen(c)
                 }
             } else if (this.fastForwardTo(CharCodes.Lt)) {
-                // Outside of <title> and <textarea> tags, we can fast-forward.
                 this.sequenceIndex = 1
             }
         } else {
-            // If we see a `<`, set the sequence index to 1; useful for eg. `<</script>`.
             this.sequenceIndex = Number(c === CharCodes.Lt)
         }
     }
@@ -395,16 +360,10 @@ export default class Tokenizer {
         } else {
             this.sequenceIndex = 0
             this.state = State.InDeclaration
-            this.stateInDeclaration(c) // Reconsume the character
+            this.stateInDeclaration(c)
         }
     }
 
-    /**
-     * When we wait for one specific character, we can speed things up
-     * by skipping through the buffer until we find it.
-     *
-     * @returns Whether the character was found.
-     */
     private fastForwardTo(c: number): boolean {
         while (++this.index < this.buffer.length) {
             const cc = this.buffer.charCodeAt(this.index)
@@ -416,25 +375,11 @@ export default class Tokenizer {
             }
         }
 
-        /*
-         * We increment the index at the end of the `parse` loop,
-         * so set it to `buffer.length - 1` here.
-         *
-         * TODO: Refactor `parse` to increment index before calling states.
-         */
         this.index = this.buffer.length - 1
 
         return false
     }
 
-    /**
-     * Comments and CDATA end with `-->` and `]]>`.
-     *
-     * Their common qualities are:
-     * - Their end sequences have a distinct character they start with.
-     * - That character is then repeated, so we have to check multiple repeats.
-     * - All characters but the start character of the sequence can be skipped.
-     */
     private stateInCommentLike(c: number): void {
         if (c === this.currentSequence[this.sequenceIndex]) {
             if (++this.sequenceIndex === this.currentSequence.length) {
@@ -449,12 +394,10 @@ export default class Tokenizer {
                 this.state = State.Text
             }
         } else if (this.sequenceIndex === 0) {
-            // Fast-forward to the first character of the sequence
             if (this.fastForwardTo(this.currentSequence[0])) {
                 this.sequenceIndex = 1
             }
         } else if (c !== this.currentSequence[this.sequenceIndex - 1]) {
-            // Allow long sequences, eg. --->, ]]]>
             this.sequenceIndex = 0
         }
     }
@@ -480,22 +423,14 @@ export default class Tokenizer {
         } else if (isTagStartChar(c)) {
             this.sectionStart = this.index
             if (this.mode === ParseMode.BASE) {
-                // no special tags in base mode
                 this.state = State.InTagName
             } else if (this.inSFARoot) {
-                // SFA mode + root level
-                // - everything except <template> is RAWTEXT
-                // - <template> with lang other than html is also RAWTEXT
                 this.state = State.InSFARootTagName
             } else if (!this.inXML) {
-                // HTML mode
-                // - <script>, <style> RAWTEXT
-                // - <title>, <textarea> RCDATA
-                if (c === 116 /* t */) {
+                if (c === 116) {
                     this.state = State.BeforeSpecialT
                 } else {
-                    this.state =
-                        c === 115 /* s */ ? State.BeforeSpecialS : State.InTagName
+                    this.state = c === 115 ? State.BeforeSpecialS : State.InTagName
                 }
             } else {
                 this.state = State.InTagName
@@ -529,13 +464,11 @@ export default class Tokenizer {
     }
     private stateBeforeClosingTagName(c: number): void {
         if (isWhitespace(c)) {
-            // Ignore
         } else if (c === CharCodes.Gt) {
             if (__DEV__ || !false) {
                 this.cbs.onerr(ErrorCodes.MISSING_END_TAG_NAME, this.index)
             }
             this.state = State.Text
-            // Ignore
             this.sectionStart = this.index + 1
         } else {
             this.state = isTagStartChar(c) ? State.InClosingTagName : State.InSpecialComment
@@ -551,7 +484,6 @@ export default class Tokenizer {
         }
     }
     private stateAfterClosingTagName(c: number): void {
-        // Skip everything until ">"
         if (c === CharCodes.Gt) {
             this.state = State.Text
             this.sectionStart = this.index + 1
@@ -572,9 +504,6 @@ export default class Tokenizer {
                 this.cbs.onerr(ErrorCodes.UNEXPECTED_SOLIDUS_IN_TAG, this.index)
             }
         } else if (c === CharCodes.Lt && this.peek() === CharCodes.Slash) {
-            // special handling for </ appearing in open tag state
-            // this is different from standard HTML parsing but makes practical sense
-            // especially for parsing intermediate input state in IDEs.
             this.cbs.onopentagend(this.index)
             this.state = State.BeforeTagName
             this.sectionStart = this.index
@@ -590,7 +519,7 @@ export default class Tokenizer {
             this.state = State.InDirName
             this.sectionStart = this.index
         } else if (
-            c === CharCodes.Dot || c === CharCodes.Colon || c === CharCodes.At || c === CharCodes.Number
+            c === CharCodes.Colon || c === CharCodes.Number
         ) {
             this.cbs.ondirname(this.index, this.index + 1)
             this.state = State.InDirArg
@@ -605,7 +534,7 @@ export default class Tokenizer {
             this.cbs.onselfclosingtag(this.index)
             this.state = State.Text
             this.sectionStart = this.index + 1
-            this.inRCDATA = false // Reset special state, in case of self-closing special tags
+            this.inRCDATA = false
         } else if (!isWhitespace(c)) {
             this.state = State.BeforeAttrName
             this.stateBeforeAttrName(c)
@@ -696,7 +625,7 @@ export default class Tokenizer {
         } else if (!isWhitespace(c)) {
             this.sectionStart = this.index
             this.state = State.InAttrValueNq
-            this.stateInAttrValueNoQuotes(c) // Reconsume token
+            this.stateInAttrValueNoQuotes(c)
         }
     }
     private handleInAttrValue(c: number, quote: number) {
@@ -740,7 +669,6 @@ export default class Tokenizer {
     }
     private stateInDeclaration(c: number): void {
         if (c === CharCodes.Gt || this.fastForwardTo(CharCodes.Gt)) {
-            // this.cbs.ondeclaration(this.sectionStart, this.index)
             this.state = State.Text
             this.sectionStart = this.index + 1
         }
@@ -756,7 +684,6 @@ export default class Tokenizer {
         if (c === CharCodes.Dash) {
             this.state = State.InCommentLike
             this.currentSequence = Sequences.CommentEnd
-            // Allow short comments (eg. <!-->)
             this.sequenceIndex = 2
             this.sectionStart = this.index + 1
         } else {
@@ -777,7 +704,7 @@ export default class Tokenizer {
             this.startSpecial(Sequences.StyleEnd, 4)
         } else {
             this.state = State.InTagName
-            this.stateInTagName(c) // Consume the token again
+            this.stateInTagName(c)
         }
     }
     private stateBeforeSpecialT(c: number): void {
@@ -785,7 +712,7 @@ export default class Tokenizer {
         else if (c === Sequences.TextareaEnd[3]) this.startSpecial(Sequences.TextareaEnd, 4)
         else {
             this.state = State.InTagName
-            this.stateInTagName(c) // Consume the token again
+            this.stateInTagName(c)
         }
     }
 
@@ -812,11 +739,6 @@ export default class Tokenizer {
         }
     }
 
-    /**
-     * Iterates through the buffer, calling the function corresponding to the current state.
-     *
-     * States that are more likely to be hit are higher up, as a performance improvement.
-     */
     public parse(input: string): void {
         this.buffer = input
         while (this.index < this.buffer.length) {
@@ -966,11 +888,7 @@ export default class Tokenizer {
         this.finish()
     }
 
-    /**
-     * Remove data that has already been consumed from the buffer.
-     */
     private cleanup() {
-        // If we are inside of text or attributes, emit what we already have.
         if (this.sectionStart !== this.index) {
             if (
                 this.state === State.Text || (this.state === State.InRCDATA && this.sequenceIndex === 0)
@@ -997,11 +915,9 @@ export default class Tokenizer {
         this.cbs.onend()
     }
 
-    /** Handle any trailing data. */
     private handleTrailingData() {
         const endIndex = this.buffer.length
 
-        // If there is no remaining data, we are done.
         if (this.sectionStart >= endIndex) return
 
         if (this.state === State.InCommentLike) {

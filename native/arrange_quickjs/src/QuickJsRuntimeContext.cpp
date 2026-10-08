@@ -179,6 +179,6 @@ namespace arrange::quickjs {
         diagnosticActions.push_back(std::move(action));
         while (diagnosticActions.size() > 64) diagnosticActions.erase(diagnosticActions.begin());
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

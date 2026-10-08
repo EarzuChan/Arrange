@@ -36,7 +36,7 @@ namespace arrange::juce {
             }
             return arrange::core::InputIntent::diagnostics("package load failed");
         }
-    }  // namespace
+    }
 
     void RuntimePackageBinder::apply(PackageLoadOutcome outcome, RuntimeSessionState& session, ArrangeRuntime& runtime, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint) const {
         if (outcome.pending) return;
@@ -69,9 +69,8 @@ namespace arrange::juce {
     }
 
     void RuntimePackageBinder::deliverToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadToast toast) {
-        if (DiagnosticsToast::show(diagnostics, toast.level, TAG, std::move(toast.title), std::move(toast.message), toast.coalesce))
-            runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package toast"));
+        if (DiagnosticsToast::show(diagnostics, toast.level, TAG, std::move(toast.title), std::move(toast.message), toast.coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package toast"));
     }
-}  // namespace arrange::juce
+}
 
 #endif

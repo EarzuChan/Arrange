@@ -1,5 +1,4 @@
 #include <arrange/core/PropValue.h>
-#include <arrange/core/LayoutNode.h>
 
 #include <utility>
 
@@ -8,7 +7,7 @@ namespace arrange::core {
         std::string toString(std::string_view value) {
             return {value.data(), value.size()};
         }
-    }  // namespace
+    }
 
     PropValue PropValue::nullValue() {
         return {};
@@ -119,55 +118,4 @@ namespace arrange::core {
         return result;
     }
 
-    const PropValue* propValue(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) {
-        if (const auto it = node.props.find(toString(camelCase)); it != node.props.end()) return &it->second;
-        if (!kebab.empty()) {
-            if (const auto it = node.props.find(toString(kebab)); it != node.props.end()) return &it->second;
-        }
-        if (!camelCase.empty()) {
-            const auto generatedKebab = kebabCase(camelCase);
-            if (generatedKebab != camelCase) {
-                if (const auto it = node.props.find(generatedKebab); it != node.props.end()) return &it->second;
-            }
-        }
-        return nullptr;
-    }
-
-    bool hasProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) {
-        return propValue(node, camelCase, kebab) != nullptr;
-    }
-
-    PropObject objectProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab) {
-        return PropObject(propValue(node, camelCase, kebab));
-    }
-
-    std::string stringProp(const LayoutNode& node, std::string_view key, std::string_view fallback) {
-        const auto* value = propValue(node, key);
-        return value == nullptr ? toString(fallback) : value->stringOr(fallback);
-    }
-
-    std::string stringProp(const LayoutNode& node, std::string_view camelCase, std::string_view kebab, std::string_view fallback) {
-        const auto* value = propValue(node, camelCase, kebab);
-        return value == nullptr ? toString(fallback) : value->stringOr(fallback);
-    }
-
-    float numberProp(const LayoutNode& node, std::string_view key, float fallback) {
-        const auto* value = propValue(node, key);
-        return value == nullptr ? fallback : value->numberOr(fallback);
-    }
-
-    int intProp(const LayoutNode& node, std::string_view key, int fallback) {
-        const auto* value = propValue(node, key);
-        return value == nullptr ? fallback : value->intOr(fallback);
-    }
-
-    bool boolProp(const LayoutNode& node, std::string_view key, bool fallback) {
-        const auto* value = propValue(node, key);
-        return value == nullptr ? fallback : value->boolOr(fallback);
-    }
-
-    std::uint32_t colorProp(const LayoutNode& node, std::string_view key, std::uint32_t fallback) {
-        const auto* value = propValue(node, key);
-        return value == nullptr ? fallback : value->uint32Or(fallback);
-    }
-}  // namespace arrange::core
+}

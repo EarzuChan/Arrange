@@ -27,7 +27,7 @@
 namespace arrange::juce {
     namespace {
         constexpr arrange::core::NodeId rootNodeId = 1;
-    }  // namespace
+    }
 
     class EditorSceneHost::Impl final {
        public:
@@ -365,6 +365,6 @@ namespace arrange::juce {
     bool EditorSceneHost::keyPressed(const ::juce::KeyPress& key) {
         return impl_->keyPressed(key);
     }
-}  // namespace arrange::juce
+}
 
 #endif

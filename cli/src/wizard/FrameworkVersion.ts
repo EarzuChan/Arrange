@@ -15,7 +15,7 @@ const enterAnotherVersionValue = "enter-another-version"
 const skipVerificationValue = "skip-verification"
 const cancelValue = "cancel"
 
-// TIPS：本方法执行版本选择
+// 本方法执行版本选择
 export async function selectFrameworkVersion(registryClient: FrameworkRegistryClient, input: FrameworkVersionWizardInput = {}): Promise<string> {
     const registryUrl = normalizeRegistryUrl(input.registryUrl)
 
@@ -134,7 +134,7 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 log.warn(`Using unverified ${frameworkPackageName}@${version}. Later sync/install may fail if this version does not exist or is incompatible.`)
                 return {
                     version,
-                    cliCompatibility: cliCompatibility, // TIPS：强行认为它以兼容
+                    cliCompatibility: cliCompatibility, // 强行认为它以兼容
                     markedLatest: false,
                     publishedAt: null,
                     incompatibility: null,

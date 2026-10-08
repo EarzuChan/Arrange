@@ -36,6 +36,6 @@ namespace arrange::juce {
         return {true, true, {}};
     }
 #endif
-}  // namespace arrange::juce
+}
 
 #endif

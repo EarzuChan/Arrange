@@ -3,11 +3,11 @@ import type { InjectionKey } from './runtime/apiInject.ts'
 
 export interface Density {
     dpToPx(value: number): number
-    
+
     spToPx(value: number): number
-    
+
     pxToDp(value: number): number
-    
+
     pxToSp(value: number): number
 }
 

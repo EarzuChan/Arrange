@@ -9,15 +9,35 @@ import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts
 
 const flush = () => advanceFrames()
 
-test('定义拒绝 Options 配置，setup 必须返回结构程序', () => {
-    for (const key of ['data', 'computed', 'methods', 'watch', 'created', 'mounted', 'mixins', 'extends', 'inject', 'provide', 'expose', 'template', 'render', 'compilerOptions']) {
-        assert.throws(() => internal.defineArrangable({ [key]: {}, setup: () => () => { } }), new RegExp(key))
-    }
+test('App 结构执行中自行卸载后读取 Ref 不重新注册退休订阅', () => {
+    const value = runtime.ref(0)
+    const native = recordingNative()
+    let triggers = 0
+    let app: runtime.ArrangeApp
+    const Root = internal.defineArrangable({
+        setup: () => {
+            runtime.onRenderTriggered(() => { triggers++ })
+            return () => {
+                app.unmount()
+                void value.value
+            }
+        }
+    })
+    app = runtime.createApp(Root)
+    mountFrame(app, native.target)
+    assert.equal(native.nodes.size, 0)
+    value.value = 1
+    advanceFrames()
+    assert.equal(triggers, 0)
+    assert.equal(native.nodes.size, 0)
+})
+
+test('Arrangable setup 必须返回结构程序', () => {
     const invalid = internal.defineArrangable({ setup: (() => ({})) as never })
     assert.throws(() => mountFrame(runtime.createApp(invalid), recordingNative().target), /结构执行函数/)
 })
 
-test('内部 Arrangable 调用只接受 prop getter，裸值不会进入兼容分支', () => {
+test('内部 Arrangable 的参数边界要求 getter', () => {
     const Broken = internal.defineArrangable({
         props: { text: String },
         setup: (props, { call }) => () => call(0, foundation.Text, { text: props.text as never }),

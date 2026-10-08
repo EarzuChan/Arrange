@@ -21,7 +21,7 @@ export interface CreateProjectRequest {
     readonly managedItems: Record<string, boolean>
 }
 
-// Wizard返回的Request包装为State，Vamos！
+// 将向导返回的请求包装为项目状态
 export function createInitialProjectState(request: CreateProjectRequest): ProjectState {
     return {
         rootDir: request.rootDir,

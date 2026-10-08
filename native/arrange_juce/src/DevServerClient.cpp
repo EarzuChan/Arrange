@@ -92,7 +92,7 @@ namespace arrange {
             return writeAll(socket, frame.data(), static_cast<int>(frame.size()));
         }
 #endif
-    }  // namespace
+    }
 
     DevServerEndpoint parseDevServerUrl(std::string_view url) {
         DevServerEndpoint endpoint;
@@ -337,4 +337,4 @@ namespace arrange {
     }
 
 #endif
-}  // namespace arrange
+}

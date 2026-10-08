@@ -6,9 +6,9 @@ export interface NormalizedUnitSyntax {
 }
 
 const units = new Set(['dp', 'px', 'sp'])
-export const SFA_UNIT_SEPARATOR = '/*@arrange-unit*/'
+const SFA_UNIT_SEPARATOR = ' '
 
-// 让 Babel 能解析 114.dp 这种 SFA 后缀写法，插入的注释不会进入最终代码
+// 用空格分隔数值与单位属性，让 Babel 能解析 114.dp 这种 SFA 后缀写法
 export function normalizeSfaUnitSyntax(source: string): NormalizedUnitSyntax {
     const insertions: { offset: number; length: number }[] = []
     const output: string[] = []

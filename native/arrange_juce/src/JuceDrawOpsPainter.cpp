@@ -100,7 +100,7 @@ namespace arrange::juce {
             content.vector->draw(graphics, alpha, ::juce::RectanglePlacement(placement).getTransformToFit(bounds, target));
         }
 
-    }  // namespace
+    }
 
     void JuceDrawOpsPainter::drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float horizontalViewportOffset, float alpha) const {
         if (!op.textLayout) throw std::logic_error("发布的文字缺少排版资源");
@@ -265,6 +265,6 @@ namespace arrange::juce {
             }
         }
     }
-}  // namespace arrange::juce
+}
 
 #endif

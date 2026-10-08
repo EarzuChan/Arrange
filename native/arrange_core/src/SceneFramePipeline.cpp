@@ -144,8 +144,7 @@ namespace arrange::core {
         const auto& after = candidate.content;
         candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps || before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
         candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
-        // Transformed overlays require the same full viewport repaint as transformed scene ops.
-        // Local untransformed rectangles cannot safely bound them.
+        // 变换后的覆盖层与场景绘制都需重绘整个视口，未变换的局部矩形无法安全界定其范围
         if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
             candidate.plan.publishFrame = true;
             candidate.plan.passivePaint = true;
@@ -173,4 +172,4 @@ namespace arrange::core {
     void SceneFramePipeline::recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason) {
         phases.push_back({phase, ran, std::move(reason)});
     }
-}  // namespace arrange::core
+}

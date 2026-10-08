@@ -47,4 +47,4 @@ namespace arrange {
         bool distEnabled_ = false;
         bool liveEnabled_ = false;
     };
-}  // namespace arrange
+}

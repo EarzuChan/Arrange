@@ -29,4 +29,4 @@ namespace arrange::juce {
         if (result.scroll.consumed) pendingScrollValues_[result.scroll.modifier.identity] = result.scroll.value;
         return result;
     }
-}  // namespace arrange::juce
+}

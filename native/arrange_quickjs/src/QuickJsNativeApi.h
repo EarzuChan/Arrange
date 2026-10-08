@@ -13,6 +13,6 @@ namespace arrange::quickjs {
        public:
         static void install(JSContext* context, QuickJsRuntimeContext& runtime);
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

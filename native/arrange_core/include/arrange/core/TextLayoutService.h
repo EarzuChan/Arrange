@@ -145,4 +145,4 @@ namespace arrange::core {
     };
 
     const TextLayoutService& defaultTextLayoutService();
-}  // namespace arrange::core
+}

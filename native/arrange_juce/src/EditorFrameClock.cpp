@@ -22,7 +22,7 @@ namespace arrange::juce {
             ::juce::Component& owner_;
             std::unique_ptr<::juce::VBlankAttachment> attachment_;
         };
-    }  // namespace
+    }
 
     EditorFrameClock::~EditorFrameClock() = default;
 
@@ -55,5 +55,5 @@ namespace arrange::juce {
         insideVBlankCallback_ = false;
         return std::exchange(resyncAfterVBlank_, false);
     }
-}  // namespace arrange::juce
+}
 #endif

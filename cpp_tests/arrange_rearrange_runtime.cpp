@@ -10,6 +10,7 @@
 #include <arrange/juce/FramePumpDriver.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/PainterResources.h>
+#include <arrange/juce/TextInputMutationSink.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
@@ -50,7 +51,7 @@ namespace {
         for (const auto& instance : node.modifier.elements()) result.push_back(instance.handle);
         return result;
     }
-}  // namespace
+}
 
 int main(int argc, char** argv) {
     try {
@@ -181,7 +182,18 @@ int main(int argc, char** argv) {
         const auto inputBounds = inputTree.node(focusedInput).contentBounds;
         interaction.pointerDown(inputTree, *runtime.publishedFrame().content.hitTest, inputBounds.x + 10, inputBounds.y + 10, {});
         check(interaction.focusedNode() == focusedInput, "gallery input could not acquire focus");
+        const auto inputHandles = handles(runtime.scene().node(focusedInput));
+        check(interaction.insertTextAtCaret(inputTree, true, ::juce::String::fromUTF8("收尾编辑"), arrange::juce::TextInputMutationSink{}.callbacks(runtime)), "真实 Gallery 输入编辑未被消费");
+        const auto editedFrame = runtime.pumpFrame(1, constraints, timestamp += 16);
+        check(editedFrame.ok, "真实 Gallery 输入编辑发布失败");
+        if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
+            const auto editedApply = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(editedApply.ok, "真实 Gallery 输入回执产生的候选发布失败");
+        }
+        const auto editedText = test_support::textOf(runtime.scene().node(focusedInput));
+        check(editedText.find("收尾编辑") != std::string::npos, "真实 Gallery 输入回执未保留编辑内容");
         command("gallery:all");
+        check(runtime.scene().contains(focusedInput) && handles(runtime.scene().node(focusedInput)) == inputHandles && test_support::textOf(runtime.scene().node(focusedInput)) == editedText, "退出动画首帧替换了输入实例或重置编辑内容");
         interaction.synchronizePublishedInput(runtime.scene().tree(), true);
         check(!interaction.focusedNode(), "exiting AnimatedVisibility retained native input focus");
         for (const auto& region : exportHitRegions(*runtime.publishedFrame().content.hitTest)) check(region.target.node != focusedInput, "exiting AnimatedVisibility retained hit regions");
@@ -191,13 +203,24 @@ int main(int argc, char** argv) {
         }
         check(runtime.scene().tree().activeAnimationCount() > 0, "gallery content-size animation did not join native frame clock");
         command("reorder");
-        command("gallery:visibility");  // reverse an exit before retirement
+        command("gallery:visibility");  // 在退休前反向退出动画
+        check(runtime.scene().contains(focusedInput) && handles(runtime.scene().node(focusedInput)) == inputHandles && test_support::textOf(runtime.scene().node(focusedInput)) == editedText, "退出动画中途反向未复用输入实例及编辑内容");
         for (int i = 0; i < 180 && runtime.hasPendingFrameWork(); ++i) {
             const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
             if (!sample.ok) throw std::runtime_error(sample.error);
         }
         command("gallery:validate-settled");
         check(!runtime.hasPendingVisualWork() && runtime.scene().tree().activeAnimationCount() == 0, "gallery did not release animation frame demand");
+        command("gallery:visibility");
+        for (int i = 0; i < 40 && runtime.hasPendingFrameWork(); ++i) {
+            const auto sample = runtime.pumpFrame(1, constraints, timestamp += 16);
+            check(sample.ok, "退出动画完整退休失败");
+        }
+        check(!runtime.scene().contains(focusedInput), "退出动画完成后输入实例未退休");
+        command("gallery:validate-settled");
+        command("gallery:visibility");
+        const auto freshInput = findText(runtime.scene(), "编辑我，如果我彻底离场会被重置");
+        check(freshInput != focusedInput, "完全离场后重新进入复用了已退休输入实例");
         command("gallery:all");
         command("gallery-remove");
         // 上一候选 apply 后才能提交整页退出，不能在等待回执时提前 dispose
@@ -331,7 +354,7 @@ int main(int argc, char** argv) {
         session.resize(520, 380, runtime);
         auto oldSubmit = submit;
         for (int iteration = 0; iteration < 4; ++iteration) {
-            // Replace a live context while JS and native animations own resources.
+            // 在 JS 与原生动画仍持有资源时替换运行中的上下文
             runtime.enqueueStringEvent(oldSubmit, "gallery");
             auto running = runtime.pumpFrame(1, constraints, timestamp += 16);
             if (!running.ok) throw std::runtime_error(running.error);

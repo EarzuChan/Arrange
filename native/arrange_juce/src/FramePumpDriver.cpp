@@ -24,7 +24,7 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
 #endif
-    }  // namespace
+    }
 
     bool FramePumpDriver::pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const {
         (void)tickDiagnostics(diagnostics, runtime, nowMillis);
@@ -59,8 +59,8 @@ namespace arrange::juce {
             }
         }
         if (!frame.ok) {
-            // JS effects cannot be rolled back. Preserve the last scene, stop this context,
-            // and recover only by loading a fresh context. Core retry remains available to native callers.
+            // JS 副作用无法回滚，保留上一场景并停止当前上下文，加载新上下文后恢复
+            // 原生调用方仍可使用核心层重试
             runtime.suspend();
             (void)session.applyFrameError(frame, diagnostics, runtime, frameErrorPath);
             (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
@@ -108,6 +108,6 @@ namespace arrange::juce {
         return true;
     }
 
-}  // namespace arrange::juce
+}
 
 #endif

@@ -1,12 +1,12 @@
-import {type DebuggerOptions, type ReactiveMarker, watch as baseWatch, type WatchCallback, type WatchEffect, type WatchHandle, type WatchOptions as BaseWatchOptions, type WatchSource} from '@arrange/reactivity'
-import {EMPTY_OBJ, extend, isFunction} from '@arrange/shared'
-import {currentInstance} from './arrangable.ts'
-import {callWithAsyncErrorHandling} from './errorHandling.ts'
-import {queueJob, queuePostFlushCb, type SchedulerJob} from './scheduler.ts'
-import {findFrameScheduler} from './animationOwner.ts'
-import {warn} from './warning.ts'
+import { type DebuggerOptions, type ReactiveMarker, watch as baseWatch, type WatchCallback, type WatchEffect, type WatchHandle, type WatchOptions as BaseWatchOptions, type WatchSource } from '@arrange/reactivity'
+import { EMPTY_OBJ, extend, isFunction } from '@arrange/shared'
+import { currentInstance } from './arrangable.ts'
+import { callWithAsyncErrorHandling } from './errorHandling.ts'
+import { queueJob, queuePostFlushCb, type SchedulerJob } from './scheduler.ts'
+import { findFrameScheduler } from './animationOwner.ts'
+import { warn } from './warning.ts'
 
-export type {OnCleanup, WatchCallback, WatchEffect, WatchHandle, WatchSource, WatchStopHandle} from '@arrange/reactivity'
+export type { OnCleanup, WatchCallback, WatchEffect, WatchHandle, WatchSource, WatchStopHandle } from '@arrange/reactivity'
 
 type MaybeUndefined<T, I> = I extends true ? T | undefined : T
 
@@ -28,11 +28,11 @@ export function watchEffect(effect: WatchEffect, options?: WatchEffectOptions): 
 }
 
 export function watchPostEffect(effect: WatchEffect, options?: DebuggerOptions): WatchHandle {
-    return doWatch(effect, null, __DEV__ ? extend({}, options as WatchEffectOptions, {flush: 'post'}) : {flush: 'post'})
+    return doWatch(effect, null, __DEV__ ? extend({}, options as WatchEffectOptions, { flush: 'post' }) : { flush: 'post' })
 }
 
 export function watchSyncEffect(effect: WatchEffect, options?: DebuggerOptions): WatchHandle {
-    return doWatch(effect, null, __DEV__ ? extend({}, options as WatchEffectOptions, {flush: 'sync'}) : {flush: 'sync'})
+    return doWatch(effect, null, __DEV__ ? extend({}, options as WatchEffectOptions, { flush: 'sync' }) : { flush: 'sync' })
 }
 
 export type MultiWatchSources = (WatchSource<unknown> | object)[]
@@ -57,7 +57,7 @@ export function watch<T = any, Immediate extends Readonly<boolean> = false>(sour
 }
 
 function doWatch(source: WatchSource | WatchSource[] | WatchEffect | object, cb: WatchCallback | null, options: WatchOptions = EMPTY_OBJ): WatchHandle {
-    const {immediate, deep, flush, once} = options
+    const { immediate, deep, flush, once } = options
 
     if (__DEV__ && !cb) {
         if (immediate !== undefined) warn('immediate 选项仅用于 watch(source, callback, options)')

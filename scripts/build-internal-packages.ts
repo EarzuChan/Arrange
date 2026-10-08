@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs
 import { resolve } from "node:path"
 import { repoRoot } from "./common.ts"
 import { assertArrangeVersionContract, readArrangeVersionContract } from "./version-contract.ts"
+import { ARRANGE_MACRO_PATTERN } from '../packages/vite-plugin/src/constraints.ts'
 
 type PackageManifest = {
     name?: unknown
@@ -31,7 +32,6 @@ const cliPackagePath = resolve(repoRoot, "cli", "package.json")
 const forbiddenPublicFields = ["main", "module", "types", "unpkg", "jsdelivr"] as const
 const forbiddenExportKeys = new Set(["types", "require", "default"])
 const allowedExportKeys = new Set(["arrange-ts", "import"])
-const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const internalPackagePattern = /^@arrange\//
 const publicPackageNames = new Set(["@arrange/framework"])
 const publicBundleDeps = new Map<string, readonly string[]>([['@arrange/framework', ['@arrange/vite-plugin', '@arrange/reactivity', '@arrange/compiler', '@arrange/shared']]])
@@ -182,7 +182,7 @@ function walkFiles(dir: string, visit: (path: string) => void): void {
 
 function assertNoMacrosInBundle(path: string): void {
     const source = readFileSync(path, "utf8")
-    const match = source.match(macroPattern)
+    const match = source.match(ARRANGE_MACRO_PATTERN)
     if (match) fail(`unresolved Arrange macro in app bundle ${path}: ${match[0]}`)
 }
 

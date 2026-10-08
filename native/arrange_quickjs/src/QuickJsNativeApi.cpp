@@ -468,7 +468,7 @@ namespace arrange::quickjs {
         const JSCFunctionListEntry nativeApiFunctions[] = {
             JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("log", 3, nativeLog), JS_CFUNC_DEF("diagnosticsToast", 5, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
         };
-    }  // namespace
+    }
 
     void QuickJsNativeApi::install(JSContext* context, QuickJsRuntimeContext& runtime) {
         ScopedValue global(context, JS_GetGlobalObject(context));
@@ -483,6 +483,6 @@ namespace arrange::quickjs {
         JS_SetPropertyStr(context, performance.get(), "measureNow", JS_NewCFunction(context, performanceMeasureNow, "measureNow", 0));
         JS_SetPropertyStr(context, global.get(), "performance", performance.release());
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

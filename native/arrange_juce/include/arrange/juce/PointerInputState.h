@@ -33,4 +33,4 @@ namespace arrange::juce {
         arrange::core::PendingScrollValues pendingScrollValues_;
         std::uint64_t scrollRevision_ = 0;
     };
-}  // namespace arrange::juce
+}

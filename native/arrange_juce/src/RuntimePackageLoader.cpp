@@ -22,7 +22,7 @@ namespace arrange::juce {
         void setToast(RuntimePackageLoadResult& result, LogLevel level, std::string title, std::string message, bool coalesce = true) {
             result.toast = RuntimeLoadToast{level, std::move(title), std::move(message), coalesce};
         }
-    }  // namespace
+    }
 
     RuntimePackageLoadResult RuntimePackageLoader::loadLiveSnapshot(const EditorConfig& config, AppResolver& resolver, const quickjs::LiveModuleSnapshot& snapshot, const std::string& error) const {
         RuntimePackageLoadResult result;
@@ -96,6 +96,6 @@ namespace arrange::juce {
         return result;
 #endif
     }
-}  // namespace arrange::juce
+}
 
 #endif

@@ -22,5 +22,5 @@ namespace arrange::juce {
         bool insideVBlankCallback_ = false;
         bool resyncAfterVBlank_ = false;
     };
-}  // namespace arrange::juce
+}
 #endif

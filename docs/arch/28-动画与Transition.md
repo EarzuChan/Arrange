@@ -23,6 +23,8 @@ VBlankTick
 
 Promise、microtask、JS timer、production timer fallback 或 synthetic production frame source 都不能表达动画帧。rAF、cancelRAF、公开 AnimationClock 和手动时钟均已删除；测试控制宿主帧源并使用生产调度器。每个 Owner 的动画通道在同一时间戳下批量采样，完成回调在整批值更新之后执行。
 
+tween 与 snap 按 Owner 时间戳减去起始时间求进度；spring 按实际经过的秒数求解析振子结果，不按调用次数积累固定步长。跳帧直接采样最新时刻，不补跑或发布中间画面。重定向保留最近显示值及弹簧速度；目标与当前值相同且没有速度时立即释放帧需求。完成回调归属该次目标，整批采样之后已被停止或再次重定向的旧回调不再执行。
+
 # animatedXAsRef
 
 基础 animated API：
@@ -49,6 +51,8 @@ animatedRectAsRef(...)
 - `Color`：按裸 ARGB `number` 的四通道颜色处理。
 - `Offset` / `Size` / `Rect`：固定字段的 DP 数值组；原生几何动画使用 PX。弹簧 visibilityThreshold 使用被采样通道的数值单位，stiffness、dampingRatio 与时间参数不当作长度。
 
+颜色输入遵守 [基础类型](10-基础类型.md) 的 uint32 契约，四个字节通道分别插值，输出夹到 0..255 后四舍五入并打包。通道的内部工作向量复用，公开数组及几何对象仍是独立冻结快照，后续采样不能改动已交付值。
+
 # Transition
 
 `transition` 表达多值状态机。一个 target state 可以派生多个 animated child value；这些 child value 共享 target state、时间轴、生命周期与取消规则。
@@ -64,6 +68,8 @@ Transition 需要支持：
 - arrangable unmount、branch remove、reload、HMR 与 QuickJS context reset 时取消并退休 binding。
 
 `createInfiniteTransition` 为持续重复的 UI 值创建 Owner 作用域动画。数值、DP 和颜色 child 接收初始值、目标值及正时长 tween；`repeatMode` 支持 `restart` 与 `reverse`。所有 child 共用 Owner 的 VBlankSource 和动画时间轴，child 或 transition 停止、作用域销毁时释放帧需求。
+
+无限 tween 的 delay 属于每个周期；延迟期间保持该周期的起点，reverse 的奇数周期起点为目标端。跨周期跳帧也按当前周期直接取值，不保留已经过时的前次采样。
 
 # Animation Spec
 
@@ -133,6 +139,8 @@ KeepAlive 停用时保留最近采样值并冻结动画进度，不申请持续�
 - Transition 多 child value 同一 VBlankTick 批量推进。
 - unmount / reload / HMR 后 binding 退休。
 - `ManualVBlankSource.advanceFrame(timestamp)` 注入同一条生产调度路径。
+- 不规则帧、跨周期跳帧及欠阻尼、临界阻尼、过阻尼 spring 的相同时间戳结果一致。
+- AnimatedVisibility 内 Input 的未绑定编辑值和受体身份在退出首帧及中途反向时保留，彻底退出后重入才重新初始化。
 
 # 不做
 

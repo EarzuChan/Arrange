@@ -8,7 +8,7 @@ export interface ArtifactLocation {
 export class ArtifactLocator {
     async locate(context: ProjectState): Promise<ArtifactLocation[]> {
         void context
-        // TODO：定位 UI/native 构建产物
+        // 定位 UI/native 构建产物
         return []
     }
 }

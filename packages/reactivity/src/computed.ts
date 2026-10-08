@@ -10,10 +10,6 @@ declare const WritableComputedRefSymbol: unique symbol
 
 interface BaseComputedRef<T, S = T> extends Ref<T, S> {
     [ComputedRefSymbol]: true
-    /**
-     * @deprecated computed no longer uses effect
-     */
-    effect: ComputedRefImpl
 }
 
 export interface ComputedRef<T = any> extends BaseComputedRef<T> {
@@ -32,79 +28,30 @@ export interface WritableComputedOptions<T, S = T> {
     set: ComputedSetter<S>
 }
 
-/**
- * @private 响应式核心实现，不从 Framework 用户入口导出
- */
+// 响应式核心实现，不从 Framework 用户入口导出
 export class ComputedRefImpl<T = any> implements Subscriber {
-    /**
-     * @internal
-     */
     _value: any = undefined
-    /**
-     * @internal
-     */
     readonly dep: Dep = new Dep(this)
-    /**
-     * @internal
-     */
     readonly [ReactiveFlags.IS_REF] = true
-    /**
-     * @internal
-     */
     readonly [ReactiveFlags.IS_READONLY]: boolean
-    // A computed is also a subscriber that tracks other deps
-    /**
-     * @internal
-     */
     deps?: Link = undefined
-    /**
-     * @internal
-     */
     depsTail?: Link = undefined
-    /**
-     * @internal
-     */
     flags: EffectFlags = EffectFlags.DIRTY
-    /**
-     * @internal
-     */
     globalVersion: number = globalVersion - 1
-    /**
-     * @internal
-     */
-
-    /**
-     * @internal
-     */
     next?: Subscriber = undefined
 
-    // for backwards compat
-    effect: this = this
-    // dev only
     onTrack?: (event: DebuggerEvent) => void
-    // dev only
     onTrigger?: (event: DebuggerEvent) => void
-
-    /**
-     * Dev only
-     * @internal
-     */
-    _warnRecursive?: boolean
 
     constructor(public fn: ComputedGetter<T>, private readonly setter: ComputedSetter<T> | undefined) {
         this[ReactiveFlags.IS_READONLY] = !setter
 
     }
 
-    /**
-     * @internal
-     */
     notify(): true | void {
         this.flags |= EffectFlags.DIRTY
         if (
-            !(this.flags & EffectFlags.NOTIFIED) &&
-            // avoid infinite self recursion
-            activeSub !== this
+            !(this.flags & EffectFlags.NOTIFIED) && activeSub !== this
         ) {
             batch(this, true)
             return true
@@ -120,7 +67,6 @@ export class ComputedRefImpl<T = any> implements Subscriber {
             })
             : this.dep.track()
         refreshComputed(this)
-        // sync version after evaluation
         if (link) {
             link.version = this.dep.version
         }
@@ -138,7 +84,6 @@ export class ComputedRefImpl<T = any> implements Subscriber {
 
 export function computed<T>(getter: ComputedGetter<T>, debugOptions?: DebuggerOptions): ComputedRef<T>
 export function computed<T, S = T>(options: WritableComputedOptions<T, S>, debugOptions?: DebuggerOptions): WritableComputedRef<T, S>
-/*@__NO_SIDE_EFFECTS__*/
 export function computed<T>(getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>, debugOptions?: DebuggerOptions) {
     let getter: ComputedGetter<T>
     let setter: ComputedSetter<T> | undefined

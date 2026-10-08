@@ -22,7 +22,7 @@ namespace arrange::core {
             }
             return line.width;
         }
-    }  // namespace
+    }
 
     float ApproximateTextMeasurer::advance(std::string_view, char32_t codepoint, const TextStyle& style) const {
         return textCodepointAdvance(codepoint, style.fontSize > 0.0f ? style.fontSize : 14.0f);
@@ -259,4 +259,4 @@ namespace arrange::core {
         static const TextLayoutService service(measurer, 0, 0);
         return service;
     }
-}  // namespace arrange::core
+}

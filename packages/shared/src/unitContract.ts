@@ -44,4 +44,7 @@ export const unitFieldContracts: Readonly<Record<string, UnitFields>> = {
     scroll: { value: 'px', maxValue: 'px', viewportSize: 'px', contentSize: 'px' },
     scrollOptions: { initial: 'px' },
     pxSize: { width: 'px', height: 'px' },
+    dpOffset: { x: 'dp', y: 'dp' },
+    dpSize: { width: 'dp', height: 'dp' },
+    dpRect: { x: 'dp', y: 'dp', width: 'dp', height: 'dp' },
 }

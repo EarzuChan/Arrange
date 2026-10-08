@@ -24,7 +24,7 @@ namespace arrange::juce {
         }
 
         void pulse(double timestampMillis) {
-            // 回调允许停钟；调用期间保留当前闭包。
+            // 回调允许停钟；调用期间保留当前闭包
             const auto callback = callback_;
             if (callback) callback(timestampMillis);
         }
@@ -59,4 +59,4 @@ namespace arrange::juce {
         bool active_ = false;
         bool ticking_ = false;
     };
-}  // namespace arrange::juce
+}

@@ -1,7 +1,6 @@
 import { getCurrentScope, onScopeDispose, shallowRef } from '@arrange/reactivity'
 import type { NativeBindingHandle, NativeTransactionTarget, ResourceRef } from './native.ts'
 
-/** @arrangeFields pxSize */
 export type PainterSize = Readonly<{ width: number; height: number }>
 export type PainterStatus = 'loading' | 'ready' | 'failed' | 'disposed'
 export interface Painter {

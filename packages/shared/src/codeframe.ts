@@ -1,19 +1,13 @@
 const range: number = 2
 
 export function generateCodeFrame(source: string, start = 0, end: number = source.length): string {
-    // Ensure start and end are within the source length
     start = Math.max(0, Math.min(start, source.length))
     end = Math.max(0, Math.min(end, source.length))
 
     if (start > end) return ''
 
-    // Split the content into individual lines but capture the newline sequence
-    // that separated each line. This is important because the actual sequence is
-    // needed to properly take into account the full line length for offset
-    // comparison
     let lines = source.split(/(\r?\n)/)
 
-    // Separate the lines and newline sequences into separate arrays for easier referencing
     const newlineSequences = lines.filter((_, idx) => idx % 2 === 1)
     lines = lines.filter((_, idx) => idx % 2 === 0)
 
@@ -35,7 +29,6 @@ export function generateCodeFrame(source: string, start = 0, end: number = sourc
                 const newLineSeqLength = (newlineSequences[j] && newlineSequences[j].length) || 0
 
                 if (j === i) {
-                    // push underline
                     const pad = start - (count - (lineLength + newLineSeqLength))
                     const length = Math.max(1, end > count ? lineLength - pad : end - start)
                     res.push(`   |  ` + ' '.repeat(pad) + '^'.repeat(length))

@@ -1,0 +1,8 @@
+00:47:52 [vite] (client) hmr update /state.ts
+00:47:53 [vite] (client) hmr update /state.ts
+00:47:53 [vite] (client) hmr update /state.ts
+00:47:53 [vite] (client) hmr update /state.ts
+00:47:53 [vite] (client) hmr invalidate /state.ts 向入口传播
+00:47:53 [vite] (client) page reload state.ts
+00:47:53 [vite] (client) page reload main.ts
+[ArrangeLiveHmrVerify] 真实 Vite → 后台快照 → QuickJS：动态 import/TLA、dispose/data、同 context accept、编译失败恢复、invalidate/full reload 全部通过

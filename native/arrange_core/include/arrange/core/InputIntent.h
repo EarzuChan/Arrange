@@ -174,4 +174,4 @@ namespace arrange::core {
        private:
         std::vector<InputIntent> intents_;
     };
-}  // namespace arrange::core
+}

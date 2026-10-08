@@ -221,6 +221,6 @@ namespace arrange::juce {
         }
     }
 
-}  // namespace arrange::juce
+}
 
 #endif

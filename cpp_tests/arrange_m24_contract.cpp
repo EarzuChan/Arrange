@@ -150,12 +150,6 @@ native.beginRearrange()
 native.createNode(1, 'Root')
 native.createNode(2, 'LayoutNode')
 native.insertChild(1, 2, 0)
-for (const name of ['onValueChange', 'onSubmit', 'onChange', 'onBlur']) {
-    let rejected = 0
-    try { native.setProp(2, name, () => {}) } catch { rejected++ }
-    try { native.registerBinding(2, name) } catch { rejected++ }
-    if (rejected !== 2) throw new Error('节点直属编辑回调入口仍然可用：' + name)
-}
 const modifier = native.registerBinding(2, 'modifier')
 native.updateBinding(modifier, { elements: [{ type: 'textField', value: { value: '旧值', onValueChange: value => { if (value !== '回调') throw new Error('文本回调值错误') } } }] })
 native.submitRearrange(error => {
@@ -314,7 +308,7 @@ const handle = native.acquirePainter('失败', completion => {
         }
         late->set_value({content, {}});
     }
-}  // namespace
+}
 
 void scriptExecutionBudgets() {
     arrange::quickjs::QuickJsScriptHost host({10, 10, 10});

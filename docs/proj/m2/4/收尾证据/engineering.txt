@@ -1,0 +1,29 @@
+M2.4 最终工程验收，2026-10-08–09，Windows x64，Node 24.16.0，VS 2026 Build Tools + Ninja
+pnpm test：173/173，通过，无跳过；完整结果见 tests.txt
+pnpm --dir cli test：49/49，通过
+ℹ tests 49
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+pnpm typecheck / typecheck:sfa / CLI typecheck：通过
+pnpm build:packages / build:demo-ui / verify:version：通过
+pnpm format:check：239 个 TS/JS/SFA 文件，0 待调整
+pnpm format:native:check：175 个 C++ 文件，通过；详见 native-format.txt
+Framework 0.0.0-m.2.2，内部协议5；CLI 1.0.1，兼容契约1
+[ArrangePackageConsumer] 发布包 SFA 参数、内容与脚本类型检查通过
+[ArrangePackageVerify] Framework 0.0.0-m.2.2 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI 1.0.1 已验证安装
+安装包 native build：build/m24-final-package-native，Debug，新目录官方脚本；QuickJS-NG显式v0.14.0，JUCE自动FetchContent 8.0.12
+compiler/shared/reactivity 上游 LICENSE 和 UPSTREAM.md 已进入本轮 .tgz
+[ArrangeFinalConsumer] 当前源码 FetchContent + Arrange::framework 独立消费者通过，JUCE 8.0.12 / QuickJS-NG v0.14.0，Debug
+独立 FetchContent 消费者：build/m24-final-fetchcontent-consumer，当前源码，Arrange::framework，Debug；显式干净JUCE/QuickJS checkout
+Demo：新目录首次完整构建 Debug/Release 各138步骤；最终源码增量构建与 Standalone/VST3 链接通过
+[ArrangeDemoUiSync] Debug/Release Standalone/VST3 四份工件的 3 个 UI 文件逐字节一致
+Debug Standalone：build/m24-final-demo-debug/ArrangeDemoPlugin_artefacts/Debug/Standalone/Arrange Demo.exe
+Release Standalone：build/m24-final-demo-release/ArrangeDemoPlugin_artefacts/Release/Standalone/Arrange Demo.exe
+Debug/Release VST3：对应 artefacts/<配置>/VST3/Arrange Demo.vst3
+文档变更的本地链接与项目总纲SFA示例已检查；git diff --check通过
+自有源码英文说明和块注释已清理；SFA编译契约使用真实声明身份与类型化数据，编译期开关声明随正式初始化源进入安装包
+2026-10-09 主人已检查并确认本机 Debug live Demo 试玩；记录见 demo-play.txt
+未执行：macOS/Linux、DAW装载和真实系统输入法候选窗口专项验收

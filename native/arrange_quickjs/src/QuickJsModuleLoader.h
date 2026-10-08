@@ -36,6 +36,6 @@ namespace arrange::quickjs {
         bool live_ = false;
         std::unordered_map<std::string, LiveModuleSource> sources_;
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

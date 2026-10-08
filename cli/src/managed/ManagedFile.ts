@@ -17,7 +17,7 @@ async function readText(path: string) {
     }
 }
 
-// THINKING：以前是自己的check只对自己负责。现在是还会级联探索子级。这不能说不干净，但也是某种设计😂
+// 以前是自己的check只对自己负责。现在是还会级联探索子级。这不能说不干净，但也是某种设计😂
 
 export abstract class TextFile {
     readonly kind = "text-file"

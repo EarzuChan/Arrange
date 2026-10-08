@@ -4,21 +4,21 @@ import { ARRAY_ITERATE_KEY, track } from './dep.ts'
 import { endBatch, pauseTracking, resetTracking, startBatch } from './effect.ts'
 import { isProxy, isReactive, isReadonly, isShallow, toRaw, toReactive, toReadonly } from './reactive.ts'
 
-/**
- * Track array iteration and return:
- * - if input is reactive: a cloned raw array with reactive values
- * - if input is non-reactive or shallowReactive: the original raw array
- */
+// 数组适配器调用宿主已实现的方法，不改变工程的最低编译目标
+type NonMutatingArray = unknown[] & {
+    toReversed(): unknown[]
+    toSorted(comparer?: (a: unknown, b: unknown) => number): unknown[]
+    toSpliced(...args: unknown[]): unknown[]
+}
+
 export function reactiveReadArray<T>(array: T[]): T[] {
+    // 遍历只跟踪整组元素，深响应式数组才为读出的元素建立代理
     const raw = toRaw(array)
     if (raw === array) return raw
     track(raw, TrackOpTypes.ITERATE, ARRAY_ITERATE_KEY)
     return isShallow(array) ? raw : raw.map(toReactive)
 }
 
-/**
- * Track array iteration and return raw array
- */
 export function shallowReadArray<T>(arr: T[]): T[] {
     track((arr = toRaw(arr)), TrackOpTypes.ITERATE, ARRAY_ITERATE_KEY)
     return arr
@@ -63,7 +63,6 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
     findLastIndex(fn: (item: unknown, index: number, array: unknown[]) => boolean, thisArg?: unknown) {
         return apply(this, 'findLastIndex', fn, thisArg, undefined, arguments)
     },
-    // flat, flatMap could benefit from ARRAY_ITERATE but are not straight-forward to implement
 
     forEach(fn: (item: unknown, index: number, array: unknown[]) => unknown, thisArg?: unknown) {
         return apply(this, 'forEach', fn, thisArg, undefined, arguments)
@@ -77,7 +76,6 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
     join(separator?: string) {
         return reactiveReadArray(this).join(separator)
     },
-    // keys() iterator only reads `length`, no optimization required
 
     lastIndexOf(...args: unknown[]) {
         return searchProxy(this, 'lastIndexOf', args)
@@ -100,7 +98,6 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
     shift() {
         return noTracking(this, 'shift')
     },
-    // slice could use ARRAY_ITERATE but also seems to beg for range tracking
 
     some(fn: (item: unknown, index: number, array: unknown[]) => unknown, thisArg?: unknown) {
         return apply(this, 'some', fn, thisArg, undefined, arguments)
@@ -109,16 +106,13 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
         return noTracking(this, 'splice', args)
     },
     toReversed() {
-        // @ts-expect-error user code may run in es2016+
-        return reactiveReadArray(this).toReversed()
+        return (reactiveReadArray(this) as NonMutatingArray).toReversed()
     },
     toSorted(comparer?: (a: unknown, b: unknown) => number) {
-        // @ts-expect-error user code may run in es2016+
-        return reactiveReadArray(this).toSorted(comparer)
+        return (reactiveReadArray(this) as NonMutatingArray).toSorted(comparer)
     },
     toSpliced(...args: unknown[]) {
-        // @ts-expect-error user code may run in es2016+
-        return (reactiveReadArray(this).toSpliced as any)(...args)
+        return (reactiveReadArray(this) as NonMutatingArray).toSpliced(...args)
     },
     unshift(...args: unknown[]) {
         return noTracking(this, 'unshift', args)
@@ -128,16 +122,7 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
     },
 }
 
-// instrument iterators to take ARRAY_ITERATE dependency
 function iterator(self: unknown[], method: keyof Array<unknown>, wrapValue: (value: any) => unknown) {
-    // note that taking ARRAY_ITERATE dependency here is not strictly equivalent
-    // to calling iterate on the proxied array.
-    // creating the iterator does not access any array property:
-    // it is only when .next() is called that length and indexes are accessed.
-    // pushed to the extreme, an iterator could be created in one effect scope,
-    // partially iterated in another, then iterated more in yet another.
-    // given that JS iterator can only be read once, this doesn't seem like
-    // a plausible use-case, so this tracking simplification seems ok.
     const arr = shallowReadArray(self)
     const iter = (arr[method] as any)() as IterableIterator<unknown> & {
         _next: IterableIterator<unknown>['next']
@@ -155,24 +140,16 @@ function iterator(self: unknown[], method: keyof Array<unknown>, wrapValue: (val
     return iter
 }
 
-// in the codebase we enforce es2016, but user code may run in environments
-// higher than that
-type ArrayMethods = keyof Array<any> | 'findLast' | 'findLastIndex'
+type ArrayMethods = 'every' | 'filter' | 'find' | 'findIndex' | 'findLast' | 'findLastIndex' | 'forEach' | 'map' | 'some'
 
-const arrayProto = Array.prototype
-// instrument functions that read (potentially) all items
-// to take ARRAY_ITERATE dependency
+const arrayProto = Array.prototype as unknown as Record<ArrayMethods, Function>
 function apply(self: unknown[], method: ArrayMethods, fn: (item: unknown, index: number, array: unknown[]) => unknown, thisArg?: unknown, wrappedRetFn?: (result: any) => unknown, args?: IArguments) {
-    const arr = shallowReadArray(self)
+    const arr = shallowReadArray(self) as unknown[] & Record<ArrayMethods, Function>
     const needsWrap = arr !== self && !isShallow(self)
-    // @ts-expect-error our code is limited to es2016 but user code is not
     const methodFn = arr[method]
 
-    // #11759
-    // If the method being called is from a user-extended Array, the arguments will be unknown
-    // (unknown order and unknown parameter types). In this case, we skip the shallowReadArray
-    // handling and directly call apply with self.
-    if (methodFn !== arrayProto[method as any]) {
+    // 用户覆盖的方法仍以代理为接收者，并保持返回值的响应式转换
+    if (methodFn !== arrayProto[method]) {
         const result = methodFn.apply(self, args)
         return needsWrap ? toReactive(result) : result
     }
@@ -193,7 +170,6 @@ function apply(self: unknown[], method: ArrayMethods, fn: (item: unknown, index:
     return needsWrap && wrappedRetFn ? wrappedRetFn(result) : result
 }
 
-// instrument reduce and reduceRight to take ARRAY_ITERATE dependency
 function reduce(self: unknown[], method: keyof Array<any>, fn: (acc: unknown, item: unknown, index: number, array: unknown[]) => unknown, args: unknown[]) {
     const arr = shallowReadArray(self)
     const needsWrap = arr !== self && !isShallow(self)
@@ -219,14 +195,11 @@ function reduce(self: unknown[], method: keyof Array<any>, fn: (acc: unknown, it
     return wrapInitialAccumulator ? toWrapped(self, result) : result
 }
 
-// instrument identity-sensitive methods to account for reactive proxies
 function searchProxy(self: unknown[], method: keyof Array<any>, args: unknown[]) {
     const arr = toRaw(self) as any
     track(arr, TrackOpTypes.ITERATE, ARRAY_ITERATE_KEY)
-    // we run the method using the original args first (which may be reactive)
     const res = arr[method](...args)
 
-    // if that didn't work, run it again using raw values.
     if ((res === -1 || res === false) && isProxy(args[0])) {
         args[0] = toRaw(args[0])
         return arr[method](...args)
@@ -235,13 +208,12 @@ function searchProxy(self: unknown[], method: keyof Array<any>, args: unknown[])
     return res
 }
 
-// instrument length-altering mutation methods to avoid length being tracked
-// which leads to infinite loops in some cases (#2137)
 function noTracking(
     self: unknown[],
     method: keyof Array<any>,
     args: unknown[] = [],
 ) {
+    // 变更方法在批次内暂停收集，避免数组长度读写形成递归依赖
     pauseTracking()
     startBatch()
     const res = (toRaw(self) as any)[method].apply(self, args)

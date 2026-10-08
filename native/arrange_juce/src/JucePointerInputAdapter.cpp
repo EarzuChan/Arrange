@@ -59,6 +59,6 @@ namespace arrange::juce {
         runtime.enqueueScrollSnapshotEvent(result.eventSlot, result);
         return true;
     }
-}  // namespace arrange::juce
+}
 
 #endif

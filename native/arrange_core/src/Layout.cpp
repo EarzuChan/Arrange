@@ -1,5 +1,4 @@
 #include <arrange/core/Layout.h>
-#include <arrange/core/PropValue.h>
 #include <arrange/core/TextLayoutService.h>
 
 #include <algorithm>
@@ -85,14 +84,10 @@ namespace arrange::core {
             return result;
         }
 
-        std::string nodeAlignmentProp(const LayoutNode& node, const char* camelCase, const char* kebabCase, const char* fallback) {
-            return stringProp(node, camelCase, kebabCase, fallback);
-        }
-
         std::string alignModifier(const LayoutNode& node) {
             return node.modifier.parentData().align;
         }
-    }  // namespace
+    }
 
     LayoutEngine::LayoutEngine() : textLayoutService_(&defaultTextLayoutService()) {}
 
@@ -452,4 +447,4 @@ namespace arrange::core {
         for (auto childId : node.children) place(tree, childId, x, y);
     }
 
-}  // namespace arrange::core
+}

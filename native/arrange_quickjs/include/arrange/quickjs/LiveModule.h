@@ -40,4 +40,4 @@ namespace arrange::quickjs {
         std::string event;
         HotValue data;
     };
-}  // namespace arrange::quickjs
+}

@@ -106,7 +106,7 @@ namespace arrange::quickjs {
             resizeScriptMemory,
             [](const void* pointer) -> std::size_t { return pointer ? (static_cast<const AllocationHeader*>(pointer) - 1)->size : 0; },
         };
-    }  // namespace
+    }
 
     struct QuickJsScriptHost::Impl {
         explicit Impl(ScriptExecutionLimits value) : limits(value) {
@@ -513,6 +513,6 @@ namespace arrange::quickjs {
         if (!drained.ok) return {false, drained.error};
         return {true, {}};
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

@@ -2,9 +2,7 @@ import type { HorizontalArrangementProp, VerticalArrangementProp } from './nativ
 import type { BoxAlignment, HorizontalAlignment, VerticalAlignment } from './primitives.ts'
 
 export type BoxPolicyOptions = Readonly<{ contentAlignment?: BoxAlignment; propagateMinConstraints?: boolean }>
-/** @arrangeFields row */
 export type RowPolicyOptions = Readonly<{ horizontalArrangement?: HorizontalArrangementProp; verticalAlignment?: VerticalAlignment | 'Baseline' }>
-/** @arrangeFields column */
 export type ColumnPolicyOptions = Readonly<{ verticalArrangement?: VerticalArrangementProp; horizontalAlignment?: HorizontalAlignment }>
 export type MeasurePolicy = Readonly<({ kind: 'Box' } & BoxPolicyOptions) | ({ kind: 'Row' } & RowPolicyOptions) | ({ kind: 'Column' } & ColumnPolicyOptions) | { kind: 'MinSize' }>
 

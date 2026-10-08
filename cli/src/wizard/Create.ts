@@ -14,7 +14,7 @@ export interface CreateWizardInput {
 
 const projectNamePattern = /^[A-Za-z][A-Za-z0-9_]*$/
 
-// THINK：以后能不能让每一项的Ctrl+C变为“上一步”
+// 以后能不能让每一项的Ctrl+C变为“上一步”
 export async function runCreateWizard(registryClient: FrameworkRegistryClient, input: CreateWizardInput = {}): Promise<false | CreateProjectRequest> {
     try {
         intro("Create Arrange project")
@@ -55,7 +55,7 @@ export async function runCreateWizard(registryClient: FrameworkRegistryClient, i
                 ],
             }),
             products: () => multiselect({
-                message: "Products", // TODO：未来支持更多类型
+                message: "Products", // 未来支持更多类型
                 required: true,
                 options: [
                     { label: "Standalone", value: "standalone", hint: "recommended" },

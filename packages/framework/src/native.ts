@@ -27,14 +27,12 @@ export type NativeToastPayload = {
     coalesce: boolean
 }
 
-/** @arrangeFields style */
 export type TextStyleProp = Readonly<{
     fontSize?: number
     lineHeight?: number
     color?: number
 }>
 
-/** @arrangeFields arrangement */
 export type ArrangementProp<A extends AxisAlignment = AxisAlignment, N extends ArrangementName = ArrangementName> = N | Readonly<{
     kind: "spacedBy"
     spaceDp: number

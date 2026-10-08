@@ -33,4 +33,4 @@ namespace arrange::juce {
     [[nodiscard]] bool diagnosticVisibilityEnabled(DiagnosticVisibility visibility) noexcept;
 
 #endif
-}  // namespace arrange::juce
+}

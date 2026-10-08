@@ -21,7 +21,7 @@ namespace arrange::juce {
             }
             return out.str();
         }
-    }  // namespace
+    }
 
     void DiagnosticsState::configure(DiagnosticsConfig config) {
         model_.configure(std::move(config));
@@ -125,6 +125,6 @@ namespace arrange::juce {
     std::string DiagnosticsState::currentLocalTimeLabel() {
         return DiagnosticsModel::currentLocalTimeLabel();
     }
-}  // namespace arrange::juce
+}
 
 #endif

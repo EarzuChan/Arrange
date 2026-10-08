@@ -280,4 +280,4 @@ namespace arrange::core {
     void validateModifierDescriptors(const ModifierDescriptors& descriptors);
     void validateModifierValue(const ModifierValue& value);
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after);
-}  // namespace arrange::core
+}

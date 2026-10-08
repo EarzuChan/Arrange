@@ -116,7 +116,7 @@ namespace arrange::core {
 
         [[nodiscard]] SceneFramePipelineResult run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize = {}, double timeMillis = 0);
 
-        // Diagnostics/interaction can publish against retained geometry without replaying JS.
+        // 诊断与交互可复用已保留的几何发布，无需重新执行 JS
         bool publishRetained(const NativeScene& scene, PublishedFrame& publishedFrame, const FrameFinalizer& finalize);
 
         const FrameExecutionCounters& counters() const noexcept {
@@ -131,4 +131,4 @@ namespace arrange::core {
         LayoutEngine layout_;
         DrawOpsBuilder drawOpsBuilder_;
     };
-}  // namespace arrange::core
+}

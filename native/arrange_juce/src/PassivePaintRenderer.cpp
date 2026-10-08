@@ -34,6 +34,6 @@ namespace arrange::juce {
         (void)drawOpsPainter_.paint(g, content.diagnosticsToastDrawOps);
         paintMillis_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     }
-}  // namespace arrange::juce
+}
 
 #endif

@@ -28,7 +28,7 @@
             <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
                 <Text text="可视啊一个内容" :style="{ color: Color(0xffeeeeee) }"/>
 
-                <Input value="编辑我，如果我彻底离场会被重置" :modifier="M.size(130.dp, 24.dp).background(Color(0xff151922))"/> // FIXME：刚开始离场就重置文本了。或涉及两个问题：刚开始离场为什么会换掉实例，未彻底离场能否复用实例。且得对齐 Compose 实现
+                <Input value="编辑我，如果我彻底离场会被重置" :modifier="M.size(130.dp, 24.dp).background(Color(0xff151922))"/>
             </Row>
         </AnimatedVisibility>
 

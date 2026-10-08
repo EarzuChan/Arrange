@@ -32,6 +32,6 @@ namespace arrange::quickjs {
         arrange::core::PainterLoader loader_;
         std::unordered_map<std::uint64_t, Resource> resources_;
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

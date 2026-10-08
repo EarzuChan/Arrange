@@ -30,4 +30,4 @@ namespace arrange::core {
         static NodeId findVerticalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback);
         static NodeId findHorizontalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback);
     };
-}  // namespace arrange::core
+}

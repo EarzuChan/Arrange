@@ -20,7 +20,7 @@ createApp(App).mount()
 正式 authoring 路径：
 
 ```txt
-SFA 模板与 TS setup
+SFA 模板与脚本
 -> Arrange compiler / runtime
 -> Rearrange mutations + Reactive slot updates
 -> QuickJS native boundary
@@ -30,6 +30,10 @@ SFA 模板与 TS setup
 `@arrange/framework` 根入口提供核心状态、生命周期、上下文与 App 能力；Foundation、UI 和动画从对应子入口导入。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
 
 用户通过 SFA 的 defineProps/withDefaults 声明参数，通过模板中的 Slot 声明内容。内建 FA 直接用代码编写，与 SFA 编译结果遵守同一种 Arrangable 定义和调用契约，见 [运行时](04-运行时.md)。参数、内容与错误行为见 [SFA 与模板写法](33-SFA与模板写法.md)。
+
+## 异步顺序与成功通知
+
+根入口公开 `nextTick(): Promise<void>` 及 `nextTick<T, R>(this: T, callback: (this: T) => R | Promise<R>): Promise<R>`，并导出 mounted、activated、updated 对应生命周期注册函数。等待边界、Ref 失效及未开放的提交等待设计见 [调度线程与帧阶段](26-调度线程与帧阶段.md#authoring-更新完成的边界)。
 
 # C++ App source
 
@@ -53,21 +57,15 @@ config.app.useLive("http://host:port");
 
 # 基础类型 API
 
-```sfa
-// SFA 写法，编译期拆箱
-114.dp
-16.sp
-8.px
+`Dp`、`Sp`、`Px`、Color、Shape、Brush 等值的写法与含义见 [基础类型](10-基础类型.md)。SFA 模板与脚本的特色构造和独立 `.ts` 的区别见 [SFA 与模板写法](33-SFA与模板写法.md#sfa-与纯-typescript-的编译边界)。
 
-Color(value: number): number // 仅 SFA 编译期语法，生成后为 ARGB number
-Color(args: { red: number; green: number; blue: number; alpha?: number }): number // 仅 SFA 编译期语法
-Color.hsl(hue: number, saturation: number, lightness: number, alpha?: number): number // 仅 SFA 编译期语法
+以下为纯 `.ts` 可调用的真实函数签名：
 
-solidColor(color: number): Brush
-rounded(radiusDp: number, radiusPx: number): Shape
+```ts
+declare function solidColor(color: number): Brush
+declare function colorToHex(color: number): string
+declare function rounded(radiusDp: number, radiusPx: number): Shape
 ```
-
-`Dp`、`Sp`、`Px` 是值壳类型，不是 number 别名。普通 TS 直接写真语义数字；SFA 的长度消费由编译器生成双通道数字。
 
 # Modifier API
 

@@ -61,4 +61,4 @@ namespace arrange::core {
        private:
         std::optional<MutationTransaction> pending_;
     };
-}  // namespace arrange::core
+}

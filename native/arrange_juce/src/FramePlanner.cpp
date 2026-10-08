@@ -42,4 +42,4 @@ namespace arrange::juce {
     void FramePlanner::reset() noexcept {
         framePipelineRunRequested_ = false;
     }
-}  // namespace arrange::juce
+}

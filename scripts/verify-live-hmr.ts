@@ -36,7 +36,7 @@ import.meta.hot.accept(next => { ${invalidate ? "hot.invalidate('向入口传播
 `
 
 try {
-    await writeFile(resolve(directory, 'main.ts'), `import {value} from './state.ts'\nconst path = './lazy.ts'\nconst lazy = await import(/* @vite-ignore */ path)\nimport.meta.hot.send('test:probe', {value: value + lazy.value})\n`)
+    await writeFile(resolve(directory, 'main.ts'), `import {value} from './state.ts'\nconst lazy = await import('./lazy.ts')\nimport.meta.hot.send('test:probe', {value: value + lazy.value})\n`)
     await writeFile(resolve(directory, 'state.ts'), module(1))
     await writeFile(resolve(directory, 'lazy.ts'), 'export const value = await Promise.resolve(10)')
     await server.listen()

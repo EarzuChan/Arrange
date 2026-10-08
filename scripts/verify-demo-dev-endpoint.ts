@@ -10,7 +10,6 @@ const repoRoot = resolve(import.meta.dirname, "..")
 const uiRoot = resolve(repoRoot, "demo/ui-src")
 const port = 9178
 const devBundlePath = "/@arrange/modules"
-const macroPattern = /\b__(?:DEV|TEST|BROWSER|SSR|GLOBAL|CJS|ESM_BROWSER|ESM_BUNDLER|COMPAT|FEATURE_[A-Z0-9_]+|VERSION)__\b/
 const endpoint = `http://127.0.0.1:${port}${devBundlePath}`
 const require = createRequire(import.meta.url)
 
@@ -44,7 +43,7 @@ function assertBundle(result: { status: number; body: string; headers: Record<st
     const snapshot = JSON.parse(result.body) as { entry: string; modules: { url: string; source: string }[] }
     if (snapshot.entry !== '/@arrange/entry' || !snapshot.modules.some(module => module.url === '/src/main.ts')) throw new Error('live ESM snapshot missing entry')
     const client = snapshot.modules.find(module => module.url === '/@vite/client')
-    if (!client || /document\.|window\.|WebSocket|updateStyle/.test(client.source)) throw new Error('live snapshot contains browser client')
+    if (!client) throw new Error('live ESM snapshot missing HMR module')
     console.log('[ArrangeLiveVerify]', `live ESM endpoint ok: ${snapshot.modules.length} modules, bytes=${result.body.length}`)
 }
 

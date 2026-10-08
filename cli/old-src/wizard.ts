@@ -50,7 +50,7 @@ export async function createProject(options: WizardOptions = {}): Promise<void> 
     printCreateNextSteps(projectRoot)
 }
 
-// HACK：狗屎
+// 狗屎
 export async function adoptProject(options: WizardOptions = {}): Promise<void> {
     const registry = options.registry ? normalizeRegistryUrl(options.registry) : undefined
     const nativePath = await promptRequiredText("Native project path", { hint: "relative or absolute path; use native for the standard layout" })

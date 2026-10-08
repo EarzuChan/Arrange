@@ -1,5 +1,5 @@
 import { computed } from "@arrange/reactivity"
-import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation.ts"
+import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation/value.ts"
 import { PaddingValues } from "./primitives.ts"
 import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts"
 import type { ScrollState } from "./state.ts"
@@ -13,19 +13,13 @@ export type ModifierValue = Readonly<Record<string, unknown>>
 export type ModifierElement = Readonly<{ type: string, key?: string, value: ModifierValue }>
 
 export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
-/** @arrangeFields sizeRange */
 export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
-/** @arrangeFields border */
 export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
 export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
-/** @arrangeFields paint */
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
-/** @arrangeFields text */
 export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
-/** @arrangeFields textField */
 export type TextFieldOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; placeholder?: string; enabled?: boolean; selectAllOnFocus?: boolean; onValueChange?: (value: string) => void; onSubmit?: (value: string) => void; onChange?: (value: string) => void; onBlur?: (value: string) => void }>
-/** @arrangeFields graphics */
 export type GraphicsLayerOptions = {
     translationX?: number
     translationY?: number
@@ -39,7 +33,6 @@ export type GraphicsLayerOptions = {
 
 export const modifierAllocationStats = { chains: 0, elementReferences: 0 }
 
-/** @arrangeModifier */
 export class Modifier {
     readonly elements: readonly ModifierElement[]
 
@@ -235,7 +228,6 @@ export const modifierStats = { parameterEvaluations: 0, chainsAssembled: 0, inst
 const builtinMethods = new Map(Object.getOwnPropertyNames(Modifier.prototype).map(name => [name, (Modifier.prototype as unknown as Record<string, unknown>)[name]]))
 
 // 编译器仅拆分已经确认的固定原厂 Modifier 链
-/** @arrangeModifierCall */
 export function arrangeModifier(root: Modifier, segments: readonly (readonly [string, () => unknown[]])[], source?: string) {
     const invoke = (receiver: Modifier, method: string, args: unknown[]) => {
         const factory = (receiver as unknown as Record<string, (...args: unknown[]) => Modifier>)[method]

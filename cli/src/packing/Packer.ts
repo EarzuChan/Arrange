@@ -7,6 +7,6 @@ export class Packer {
     async pack(context: ProjectState): Promise<void> {
         const artifacts = await this.artifactLocator.locate(context)
         void artifacts
-        // TODO：根据 ArtifactLocator 结果生成最终 artifacts/ 工件
+        // 根据 ArtifactLocator 结果生成最终 artifacts/ 工件
     }
 }

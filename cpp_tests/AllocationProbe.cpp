@@ -12,7 +12,7 @@ namespace {
         ++allocations.count;
         allocations.bytes += size;
     }
-}  // namespace
+}
 
 namespace arrange::test {
     void beginAllocationProbe() noexcept {
@@ -24,7 +24,7 @@ namespace arrange::test {
         recording = false;
         return allocations;
     }
-}  // namespace arrange::test
+}
 
 // 仅链接验收程序，统计当前 UI 线程实际经过 C++ new 的分配
 void* operator new(std::size_t size) {

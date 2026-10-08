@@ -1,0 +1,7 @@
+2026-10-09，Windows x64
+Debug Standalone：build/m24-final-demo-debug/ArrangeDemoPlugin_artefacts/Debug/Standalone/Arrange Demo.exe
+启动检查窗口标题：Arrange 原生画廊 [Debug live]
+Live：http://127.0.0.1:9178/@arrange/modules，入口 /@arrange/entry，84 个模块，含 /src/main.ts 与 /@vite/client
+启动时 Debug exe 与 9178 已建立连接
+主人确认：我看ok了，demo我也玩到了
+一般试玩确认，不代表跨平台、DAW或系统输入法候选窗口专项验收

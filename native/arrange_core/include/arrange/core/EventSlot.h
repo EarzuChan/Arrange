@@ -53,4 +53,4 @@ namespace arrange::core {
     [[nodiscard]] std::string eventSlotKindName(EventSlotKind kind);
     [[nodiscard]] EventSlotKind eventSlotKindFromName(std::string_view name) noexcept;
     [[nodiscard]] EventSlotId makeEventSlotId(NodeId node, EventSlotKind kind, std::string path = {});
-}  // namespace arrange::core
+}

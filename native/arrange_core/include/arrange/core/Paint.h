@@ -168,4 +168,4 @@ namespace arrange::core {
         static Layout layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
         static std::vector<Rect> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService);
     };
-}  // namespace arrange::core
+}

@@ -57,6 +57,6 @@ namespace arrange::quickjs {
 
         std::optional<CandidateCheckpoint> checkpoint_;
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

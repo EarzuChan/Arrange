@@ -1,4 +1,4 @@
-import { requireSfaModule } from './sfaModules.ts'
+import { evaluateSfa as evaluateSfaModule } from './sfaModules.ts'
 import * as internal from '../../packages/framework/src/internal.ts'
 import * as foundation from '../../packages/framework/src/foundation.ts'
 import * as ui from '../../packages/framework/src/ui.ts'
@@ -8,32 +8,40 @@ import ts from 'typescript'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { checkSfaProject } from '../../packages/vite-plugin/src/typecheck.ts'
-import { compile } from '../../packages/compiler/src/template/index.ts'
+import { compile, baseParse, NodeTypes, processExpression } from '../../packages/compiler/src/template/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import * as runtime from '../../packages/framework/src/index.ts'
 import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
 
-function evaluateSfa(source: string, imports: Record<string, unknown> = {}) {
-    const { code } = compileArrangeSfa(source, '契约.sfa')
-    const output = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
-    const exports: { default?: runtime.ArrangableDefinition } = {}
-    new Function('require', 'exports', output)((name: string) => Object.hasOwn(imports, name) ? imports[name] : requireSfaModule(name), exports)
-    return exports.default!
-}
+const evaluateSfa = (source: string, imports: Record<string, unknown> = {}) => evaluateSfaModule(source, imports, '契约.sfa')
+
+test('多行模板表达式改写按完整原始表达式计算标识符位置', () => {
+    const source = '<Text\n :text="first +\n   second" />'
+    const root = baseParse(source, { prefixIdentifiers: true, expressionPlugins: ['typescript'] })
+    const element = root.children[0]
+    assert.equal(element.type, NodeTypes.ELEMENT)
+    if (element.type !== NodeTypes.ELEMENT) return
+    const parameter = element.props[0]
+    assert.equal(parameter.type, NodeTypes.DIRECTIVE)
+    if (parameter.type !== NodeTypes.DIRECTIVE || parameter.exp?.type !== NodeTypes.SIMPLE_EXPRESSION) return
+    const expression = processExpression(parameter.exp, { prefixIdentifiers: true, inline: false, isTS: true, bindingMetadata: {}, identifiers: {}, expressionPlugins: ['typescript'], onError: error => { throw error }, helperString: () => '' })
+    assert.equal(expression.type, NodeTypes.COMPOUND_EXPRESSION)
+    if (expression.type !== NodeTypes.COMPOUND_EXPRESSION) return
+    const identifier = expression.children.find(child => typeof child === 'object' && child.type === NodeTypes.SIMPLE_EXPRESSION && child.content === '_ctx.second')
+    assert.ok(identifier && typeof identifier === 'object')
+    assert.deepEqual(identifier.loc.start, { line: 3, column: 4, offset: source.indexOf('second') })
+    assert.deepEqual(identifier.loc.end, { line: 3, column: 10, offset: source.indexOf('second') + 6 })
+})
 
 test('模板内容和指令只接受正式语法，空白不改变结构', () => {
-    for (const source of ['<Row>正文</Row>', '<Text>{{ title }}</Text>', '<Xxx :value />', '<Xxx @submit="go" />', '<Input a-model="value" />', '<Box ref="box" />', '<Box a-pre />', '<Box a-once />', '<Box a-memo="[]" />', '<keep-alive />', '<Xxx :someValue="a" :some-value="b" />']) assert.throws(() => compile(source), SyntaxError)
+    for (const source of ['<Row>正文</Row>', '<Text>{{ title }}</Text>', '<Xxx :value />', '<Xxx :someValue="a" :some-value="b" />']) assert.throws(() => compile(source), SyntaxError)
     const options = { mode: 'module' as const, prefixIdentifiers: true }
     assert.equal(compile('<Row><Spacer/> <Spacer/></Row>', options).code.replace(/模板.sfa:\d+:\d+/g, '位置'), compile('<Row>\n    <Spacer/>\n    <Spacer/>\n</Row>', options).code.replace(/模板.sfa:\d+:\d+/g, '位置'))
     assert.match(compile('<Xxx enabled />', options).code, /"enabled": \(\) => true/)
     assert.match(compile('<Xxx enabled="" />', options).code, /"enabled": \(\) => ""/)
-
-    const legacyDirective = evaluateSfa('<template><Box v-if="false" /></template>')
-    assert.throws(() => mountFrame(runtime.createApp(legacyDirective), recordingNative().target), /未声明参数：vIf/)
 })
 
-test('SFA 只接受无属性的 TS setup，原样 Ref 与普通绑定明确分开', () => {
-    for (const attributes of ['setup', 'lang="ts"', 'lang="js"']) assert.throws(() => compileArrangeSfa(`<script ${attributes}>const x = 1</script>`, '失败.sfa'), /不接受属性/)
+test('SFA 的 TS setup 生成声明参数并区分原样 Ref 与普通绑定', () => {
     assert.throws(() => compileArrangeSfa('<script>const a = 1</script><script>const b = 2</script>', '失败.sfa'))
     const result = compileArrangeSfa("<template><Editor :raw=\"<state>\" :plain=\"state\" /></template><script>import { ref } from '@arrange/framework'\n const state = ref(1)</script>", '状态.sfa')
     assert.match(result.code, /\(state\)/)
@@ -60,7 +68,17 @@ test('参数提取类型通过正式入口解析别名和导入类型，默认�
         }
     }
 
-    assert.throws(() => evaluateSfa('<script>interface Props extends /* @vue-ignore */ Missing {}\ndefineProps<Props>()</script>'), /无法解析继承的参数类型/)
+    const reference = runtime.ref('业务引用')
+    const Receiver = evaluateSfa('<template><Text :text="props.ref" /></template><script>const props = defineProps<{ ref: string }>()</script>')
+    const Page = evaluateSfa('<template><Receiver :ref="reference" /></template><script>import { Receiver, reference } from "harness"</script>', { harness: { Receiver, reference } })
+    const native = recordingNative(), app = runtime.createApp(Page)
+    mountFrame(app, native.target)
+    const id = native.textNodes()[0].id
+    assert.deepEqual(native.textNodes(), [{ id, text: '业务引用' }])
+    reference.value = '更新引用'
+    native.frame()
+    assert.deepEqual(native.textNodes(), [{ id, text: '更新引用' }])
+    app.unmount()
 })
 
 test('参数对象按同一 camelize 规则拒绝重复，不合并回调', () => {

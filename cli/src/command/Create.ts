@@ -21,12 +21,12 @@ export function registerCreateCommand(program: Command, store: ProjectStateStore
             if (!request) return
 
             const state = createInitialProjectState(request)
-            // TODO：调用生成器生成文件
+            // 调用生成器生成文件
             await store.save(state)
 
             console.log('[ArrangeCLI]', `Project created:\n  root: ${state.rootDir}\n`)
 
-            // TODO：询问用户是否立即运行 sync；sync 模块后续专项落地后接入
+            // 询问用户是否立即运行 sync；sync 模块后续专项落地后接入
 
             if (state.rootDir !== process.cwd()) {
                 console.log('[ArrangeCLI]', "")

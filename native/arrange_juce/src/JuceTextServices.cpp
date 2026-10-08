@@ -10,7 +10,7 @@ namespace arrange::juce {
         bool isUtf8Continuation(unsigned char ch) {
             return (ch & 0xc0u) == 0x80u;
         }
-    }  // namespace
+    }
 
     std::size_t nextUtf8Boundary(const std::string& text, std::size_t cursor) {
         if (cursor >= text.size()) return text.size();
@@ -167,6 +167,6 @@ namespace arrange::juce {
         result.truncated = result.lines.back().end < source.size();
         return result;
     }
-}  // namespace arrange::juce
+}
 
 #endif

@@ -1,4 +1,4 @@
-import { getCurrentScope, onScopeDispose } from '@arrange/reactivity'
+import { getCurrentScope } from '@arrange/reactivity'
 import { animationScheduler } from './animationOwner.ts'
 import type { FrameParticipant } from './scheduler.ts'
 
@@ -9,9 +9,16 @@ export function scheduleFrameDeadline(delay: number, callback: () => void): () =
     const scope = getCurrentScope()
     const deadline = owner.now() + delay
     let pending = true
+    const wake = () => { if (pending) owner.wake() }
+    const pause = () => owner.refresh()
     const cancel = () => {
+        if (!pending) return
         pending = false
         owner.remove(participant)
+        scope?.resumeCallbacks.delete(wake)
+        scope?.pauseCallbacks.delete(pause)
+        const index = scope?.cleanups.indexOf(cancel) ?? -1
+        if (index >= 0) scope!.cleanups.splice(index, 1)
     }
     const participant: FrameParticipant = {
         active: () => pending && (!scope || scope.active && !scope.paused),
@@ -22,14 +29,8 @@ export function scheduleFrameDeadline(delay: number, callback: () => void): () =
         },
     }
     owner.add(participant)
-    const wake = () => { if (pending) owner.wake() }
-    const pause = () => owner.refresh()
     scope?.pauseCallbacks.add(pause)
     scope?.resumeCallbacks.add(wake)
-    if (scope) onScopeDispose(() => {
-        scope.resumeCallbacks.delete(wake)
-        scope.pauseCallbacks.delete(pause)
-        cancel()
-    })
+    scope?.cleanups.push(cancel)
     return cancel
 }

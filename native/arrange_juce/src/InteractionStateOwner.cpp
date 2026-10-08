@@ -94,6 +94,6 @@ namespace arrange::juce {
     std::vector<arrange::core::DrawOp> InteractionStateOwner::buildFocusedInputOps(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
         return input_.buildFocusedInputOps(tree, runtimeReady);
     }
-}  // namespace arrange::juce
+}
 
 #endif

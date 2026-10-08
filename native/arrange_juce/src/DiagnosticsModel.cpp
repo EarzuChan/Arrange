@@ -13,8 +13,10 @@
 namespace arrange::juce {
     bool diagnosticVisibilityEnabled(DiagnosticVisibility visibility) noexcept {
         switch (visibility) {
-            case DiagnosticVisibility::Hidden: return false;
-            case DiagnosticVisibility::Always: return true;
+            case DiagnosticVisibility::Hidden:
+                return false;
+            case DiagnosticVisibility::Always:
+                return true;
             case DiagnosticVisibility::DebugOnly:
 #if defined(NDEBUG)
                 return false;
@@ -40,7 +42,7 @@ namespace arrange::juce {
             return out.str();
         }
 
-    }  // namespace
+    }
 
     void DiagnosticsModel::configure(DiagnosticsConfig config) {
         config_ = std::move(config);
@@ -111,6 +113,6 @@ namespace arrange::juce {
         while (toasts_.size() > 3) toasts_.erase(toasts_.begin());
         return true;
     }
-}  // namespace arrange::juce
+}
 
 #endif

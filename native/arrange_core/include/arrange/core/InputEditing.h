@@ -92,4 +92,4 @@ namespace arrange::core {
         std::vector<Snapshot> undoStack_;
         std::vector<Snapshot> redoStack_;
     };
-}  // namespace arrange::core
+}

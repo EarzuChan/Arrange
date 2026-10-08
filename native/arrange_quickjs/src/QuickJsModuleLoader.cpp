@@ -79,6 +79,6 @@ namespace arrange::quickjs {
         if (JS_IsException(compiled.get())) return nullptr;
         return static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(compiled.get()));
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

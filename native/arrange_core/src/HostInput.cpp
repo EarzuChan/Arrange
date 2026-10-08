@@ -62,4 +62,4 @@ namespace arrange::core {
                 return measure;
         }
     }
-}  // namespace arrange::core
+}

@@ -28,4 +28,4 @@ namespace arrange::core {
         float maxHeight = 0.0f;
         bool operator==(const Constraints&) const = default;
     };
-}  // namespace arrange::core
+}

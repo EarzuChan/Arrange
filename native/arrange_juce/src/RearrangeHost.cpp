@@ -7,7 +7,7 @@ namespace arrange::juce {
         RearrangeInvokeResult fromScriptEventResult(ScriptEventInvokeResult result) {
             return {result.invoked, result.ok, std::move(result.error)};
         }
-    }  // namespace
+    }
 
     void RearrangeHost::reset() noexcept {
 #if ARRANGE_WITH_QUICKJS_NG
@@ -150,6 +150,6 @@ namespace arrange::juce {
         return scriptHost_ ? scriptHost_->takeDiagnosticActions() : std::vector<arrange::quickjs::QuickJsDiagnosticAction>{};
     }
 #endif
-}  // namespace arrange::juce
+}
 
 #endif

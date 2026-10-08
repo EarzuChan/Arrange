@@ -1,7 +1,6 @@
 import type { ParserPlugin } from '@babel/parser'
 import type { BindingMetadata } from './options.ts'
 import type { CompilerError } from './errors.ts'
-import type { TemplateChildNode } from './ast.ts'
 
 export interface TransformContext {
     readonly prefixIdentifiers: boolean
@@ -13,5 +12,3 @@ export interface TransformContext {
     onError(error: CompilerError): void
     helperString(helper: symbol): string
 }
-
-export type NodeTransform = (node: TemplateChildNode, context: TransformContext) => void

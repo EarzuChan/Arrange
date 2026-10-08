@@ -39,7 +39,7 @@ namespace arrange::core {
             if (!distributed && !(horizontal ? isHorizontalAlignment(result.alignment) : isVerticalAlignment(result.alignment))) throw std::invalid_argument("排列对齐方向不匹配：" + result.alignment);
             return result;
         }
-    }  // namespace
+    }
 
     MeasurePolicy readMeasurePolicy(const PropValue& value) {
         const auto kind = text(value, "kind", "");
@@ -82,4 +82,4 @@ namespace arrange::core {
         }
         return dirtyMask(DirtyFlag::Layout) | placement;
     }
-}  // namespace arrange::core
+}

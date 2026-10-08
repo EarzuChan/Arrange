@@ -43,7 +43,6 @@ function getTargetType(value: Target) {
     return value[ReactiveFlags.SKIP] || !Object.isExtensible(value) ? TargetType.INVALID : targetTypeMap(toRawType(value))
 }
 
-// only unwrap nested ref
 export type UnwrapNestedRefs<T> = T extends Ref ? T : UnwrapRefSimple<T>
 
 declare const ReactiveMarkerSymbol: unique symbol
@@ -56,18 +55,13 @@ export type Reactive<T> = UnwrapNestedRefs<T> &
     (T extends readonly any[] ? ReactiveMarker : {})
 
 export function reactive<T extends object>(target: T): Reactive<T>
-/*@__NO_SIDE_EFFECTS__*/
 export function reactive(target: object) {
-    // if trying to observe a readonly proxy, return the readonly version.
     if (isReadonly(target)) {
         return target
     }
     return createReactiveObject(target, false, mutableHandlers, mutableCollectionHandlers, reactiveMap)
 }
 
-// Use a private class brand instead of a marker property so shallow-reactive
-// types remain distinguishable in `UnwrapRef` without leaking the brand into
-// `keyof`/indexed access types or requiring the property for plain assignment.
 declare class ShallowReactiveBrandClass {
     private __shallowReactiveBrand?: never
 }
@@ -76,7 +70,6 @@ export type ShallowReactiveBrand = ShallowReactiveBrandClass
 
 export type ShallowReactive<T> = T & ShallowReactiveBrand
 
-/*@__NO_SIDE_EFFECTS__*/
 export function shallowReactive<T extends object>(target: T): ShallowReactive<T> {
     return createReactiveObject(target, false, shallowReactiveHandlers, shallowCollectionHandlers, shallowReactiveMap)
 }
@@ -105,12 +98,10 @@ export type DeepReadonly<T> = T extends Builtin
     ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
     : Readonly<T>
 
-/*@__NO_SIDE_EFFECTS__*/
 export function readonly<T extends object>(target: T): DeepReadonly<UnwrapNestedRefs<T>> {
     return createReactiveObject(target, true, readonlyHandlers, readonlyCollectionHandlers, readonlyMap)
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function shallowReadonly<T extends object>(target: T): Readonly<T> {
     return createReactiveObject(target, true, shallowReadonlyHandlers, shallowReadonlyCollectionHandlers, shallowReadonlyMap)
 }
@@ -122,19 +113,15 @@ function createReactiveObject(target: Target, isReadonly: boolean, baseHandlers:
         }
         return target
     }
-    // target is already a Proxy, return it.
-    // exception: calling readonly() on a reactive object
     if (
         target[ReactiveFlags.RAW] && !(isReadonly && target[ReactiveFlags.IS_REACTIVE])
     ) {
         return target
     }
-    // only specific value types can be observed.
     const targetType = getTargetType(target)
     if (targetType === TargetType.INVALID) {
         return target
     }
-    // target already has corresponding Proxy
     const existingProxy = proxyMap.get(target)
     if (existingProxy) {
         return existingProxy
@@ -144,7 +131,6 @@ function createReactiveObject(target: Target, isReadonly: boolean, baseHandlers:
     return proxy
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function isReactive(value: unknown): boolean {
     if (isReadonly(value)) {
         return isReactive((value as Target)[ReactiveFlags.RAW])
@@ -152,22 +138,18 @@ export function isReactive(value: unknown): boolean {
     return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function isReadonly(value: unknown): boolean {
     return !!(value && (value as Target)[ReactiveFlags.IS_READONLY])
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function isShallow(value: unknown): boolean {
     return !!(value && (value as Target)[ReactiveFlags.IS_SHALLOW])
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function isProxy(value: any): boolean {
     return value ? !!value[ReactiveFlags.RAW] : false
 }
 
-/*@__NO_SIDE_EFFECTS__*/
 export function toRaw<T>(observed: T): T {
     const raw = observed && (observed as Target)[ReactiveFlags.RAW]
     return raw ? toRaw(raw) : observed
@@ -182,20 +164,6 @@ export function markRaw<T extends object>(value: T): Raw<T> {
     return value
 }
 
-/**
- * Returns a reactive proxy of the given value (if possible).
- *
- * If the given value is not an object, the original value itself is returned.
- *
- * @param value - The value for which a reactive proxy shall be created.
- */
 export const toReactive = <T extends unknown>(value: T): T => isObject(value) ? reactive(value) : value
 
-/**
- * Returns a readonly proxy of the given value (if possible).
- *
- * If the given value is not an object, the original value itself is returned.
- *
- * @param value - The value for which a readonly proxy shall be created.
- */
 export const toReadonly = <T extends unknown>(value: T): DeepReadonly<T> => isObject(value) ? readonly(value) : (value as DeepReadonly<T>)

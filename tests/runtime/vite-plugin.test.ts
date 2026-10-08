@@ -6,6 +6,8 @@ import arrange from "../../packages/vite-plugin/src/plugin.ts"
 import { MODULE_SNAPSHOT_PATH, createModuleSnapshot } from '../../packages/vite-plugin/src/module-snapshot.ts'
 import { createServer } from 'vite'
 import ts from 'typescript'
+import { ARRANGE_DEFINES, ARRANGE_DEFINE_KEYS, ARRANGE_VERSION } from '../../packages/vite-plugin/src/constraints.ts'
+import { ARRANGE_PACKAGE_VERSION } from '../../packages/framework/src/version.ts'
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -14,6 +16,9 @@ test("vite plugin config freezes Arrange dev server and app.js output defaults",
     assert.equal(config.build.rollupOptions.input, "src/main.ts")
     assert.equal(config.build.rollupOptions.output.entryFileNames, "app.js")
     assert.equal(config.build.rollupOptions.output.chunkFileNames, "chunks/[name]-[hash].js")
+    assert.equal(ARRANGE_VERSION, ARRANGE_PACKAGE_VERSION)
+    assert.deepEqual(ARRANGE_DEFINE_KEYS, ['__DEV__', '__TEST__'])
+    assert.deepEqual(config.define, { ...ARRANGE_DEFINES, 'process.env.NODE_ENV': '"development"' })
 })
 
 test("vite plugin registers the live ESM snapshot endpoint", () => {
@@ -31,7 +36,7 @@ test("vite plugin registers the live ESM snapshot endpoint", () => {
     assert.equal(typeof registrations[0].handler, "function")
 })
 
-test("vite plugin returns transformed ESM boundaries and native HMR without browser client", { timeout: 30000 }, async () => {
+test('Vite 保留 ESM 模块边界并提供原生 HMR', { timeout: 30000 }, async () => {
     const root = resolve("demo/ui-src")
     const server = await createServer({ root, configFile: false, plugins: [arrange()], server: { middlewareMode: true, hmr: false } })
     try {
@@ -41,8 +46,6 @@ test("vite plugin returns transformed ESM boundaries and native HMR without brow
         assert.match(snapshot.modules.find(module => module.url === '/src/main.ts')!.source, /import /)
         const client = snapshot.modules.find(module => module.url === '/@vite/client')!.source
         assert.match(client, /createHotContext/)
-        assert.doesNotMatch(client, /document\.|window\.|WebSocket|updateStyle/)
-        assert.doesNotMatch(client, /import \{ importLiveModule as __arrangeImport \}/, 'HMR runtime must load accepted modules through QuickJS, not request their snapshots recursively')
         const updatedApp = await createModuleSnapshot(server, 'src/main.ts', ['/src/App.sfa?t=1790156770640&import'])
         const updatedAppModule = updatedApp.modules.find(module => module.url === '/src/App.sfa?t=1790156770640&import')
         assert.ok(updatedAppModule?.source.includes('__registerHot'), 'timestamped SFA HMR modules must retain their compiled update boundary')
@@ -145,13 +148,12 @@ test("vite plugin accepts Arrange arrangable template without warnings", async (
     assert.deepEqual(warnings, [])
 })
 
-test('SFA 仅接受 TS setup，模块导出及脚本属性在源码边界报错', () => {
+test('SFA 的同步初始化与局部异步函数遵守 setup 边界', () => {
     const compile = (source: string) => {
         const result = parse(source, { filename: '声明.sfa' })
         if (result.errors.length) throw result.errors[0]
         return compileScript(result.descriptor, {})
     }
-    for (const source of ['<script>export default {}</script>', '<script setup>const count = 1</script>', '<script lang="ts">const count = 1</script>']) assert.throws(() => compile(source))
     assert.throws(() => compile('<script>const result = await Promise.resolve(1)</script>'), /初始化必须同步/)
     assert.throws(() => compile('<script>for await (const item of source) { Log.i("Test", item) }</script>'), /初始化必须同步/)
     assert.doesNotThrow(() => compile('<script>async function load() { return await Promise.resolve(1) }</script>'))

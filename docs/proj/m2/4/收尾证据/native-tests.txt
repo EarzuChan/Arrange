@@ -1,0 +1,63 @@
+[ArrangeFinalVerify] 构建并验证原生 debug
+[1/2] 编译 Arrange SFA 原生运行夹具
+Test project E:/a_dev/proj/Arrange/build/m23-final-debug
+      Start  1: arrange_core_smoke
+ 1/13 Test  #1: arrange_core_smoke ...............   Passed    0.03 sec
+      Start  2: arrange_local_work
+ 2/13 Test  #2: arrange_local_work ...............   Passed    9.04 sec
+      Start  3: arrange_m24_contract
+ 3/13 Test  #3: arrange_m24_contract .............   Passed    0.07 sec
+      Start  4: arrange_live_modules
+ 4/13 Test  #4: arrange_live_modules .............   Passed    0.02 sec
+      Start  5: arrange_quickjs_app_smoke
+ 5/13 Test  #5: arrange_quickjs_app_smoke ........   Passed    6.88 sec
+      Start  6: arrange_juce_runtime_smoke
+ 6/13 Test  #6: arrange_juce_runtime_smoke .......   Passed    1.46 sec
+      Start  7: arrange_modifier_runtime
+ 7/13 Test  #7: arrange_modifier_runtime .........   Passed    0.10 sec
+      Start  8: arrange_quickjs_modifier
+ 8/13 Test  #8: arrange_quickjs_modifier .........   Passed    0.09 sec
+      Start  9: arrange_slot_runtime
+ 9/13 Test  #9: arrange_slot_runtime .............   Passed    0.02 sec
+      Start 10: arrange_frame_submission
+10/13 Test #10: arrange_frame_submission .........   Passed    1.13 sec
+      Start 11: arrange_rearrange_runtime
+11/13 Test #11: arrange_rearrange_runtime ........   Passed   12.15 sec
+      Start 12: arrange_viewport_runtime
+12/13 Test #12: arrange_viewport_runtime .........   Passed    0.12 sec
+      Start 13: arrange_retained_paint
+13/13 Test #13: arrange_retained_paint ...........   Passed   13.17 sec
+100% tests passed, 0 tests failed out of 13
+Total Test time (real) =  44.30 sec
+[ArrangeFinalVerify] 构建并验证原生 release
+[1/2] 编译 Arrange SFA 原生运行夹具
+Test project E:/a_dev/proj/Arrange/build/m23-final-release
+      Start  1: arrange_core_smoke
+ 1/13 Test  #1: arrange_core_smoke ...............   Passed    0.02 sec
+      Start  2: arrange_local_work
+ 2/13 Test  #2: arrange_local_work ...............   Passed    0.31 sec
+      Start  3: arrange_m24_contract
+ 3/13 Test  #3: arrange_m24_contract .............   Passed    0.05 sec
+      Start  4: arrange_live_modules
+ 4/13 Test  #4: arrange_live_modules .............   Passed    0.01 sec
+      Start  5: arrange_quickjs_app_smoke
+ 5/13 Test  #5: arrange_quickjs_app_smoke ........   Passed    5.96 sec
+      Start  6: arrange_juce_runtime_smoke
+ 6/13 Test  #6: arrange_juce_runtime_smoke .......   Passed    0.55 sec
+      Start  7: arrange_modifier_runtime
+ 7/13 Test  #7: arrange_modifier_runtime .........   Passed    0.02 sec
+      Start  8: arrange_quickjs_modifier
+ 8/13 Test  #8: arrange_quickjs_modifier .........   Passed    0.04 sec
+      Start  9: arrange_slot_runtime
+ 9/13 Test  #9: arrange_slot_runtime .............   Passed    0.01 sec
+      Start 10: arrange_frame_submission
+10/13 Test #10: arrange_frame_submission .........   Passed    1.19 sec
+      Start 11: arrange_rearrange_runtime
+11/13 Test #11: arrange_rearrange_runtime ........   Passed    3.59 sec
+      Start 12: arrange_viewport_runtime
+12/13 Test #12: arrange_viewport_runtime .........   Passed    0.07 sec
+      Start 13: arrange_retained_paint
+13/13 Test #13: arrange_retained_paint ...........   Passed    4.58 sec
+100% tests passed, 0 tests failed out of 13
+Total Test time (real) =  16.44 sec
+[ArrangeFinalVerify] 原生整期复验完成：E:\a_dev\proj\Arrange

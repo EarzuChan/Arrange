@@ -136,9 +136,9 @@ namespace arrange::juce {
     };
 
 #endif
-}  // namespace arrange::juce
+}
 
 namespace arrange {
     using ArrangeEditorConfig = juce::EditorConfig;
     using ArrangeEditor = juce::ArrangeEditor;
-}  // namespace arrange
+}

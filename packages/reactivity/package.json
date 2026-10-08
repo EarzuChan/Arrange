@@ -17,7 +17,9 @@
   "license": "MIT",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "UPSTREAM.md"
   ],
   "engines": {
     "node": ">=24"

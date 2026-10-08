@@ -61,12 +61,10 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
     function hoistNode(node: Statement) {
         const start = node.start! + startOffset
         let end = node.end! + startOffset
-        // locate comment
         if (node.trailingComments && node.trailingComments.length > 0) {
             const lastCommentNode = node.trailingComments[node.trailingComments.length - 1]
             end = lastCommentNode.end! + startOffset
         }
-        // locate the end of whitespace between this statement and the next
         while (end <= source.length) {
             if (!/\s/.test(source.charAt(end))) {
                 break
@@ -92,13 +90,10 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
 
     const scriptAst = ctx.scriptAst!
 
-    // 1.2 walk import declarations of <script setup>
     for (const node of scriptAst.body) {
         if (node.type === 'ImportDeclaration') {
-            // import declarations are moved to top
             hoistNode(node)
 
-            // dedupe imports
             let removed = 0
             const removeSpecifier = (i: number) => {
                 const removeLeft = i > removed
@@ -123,7 +118,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
                     removeSpecifier(i)
                 } else if (existing) {
                     if (existing.source === source && existing.imported === imported) {
-                        // already imported in <script setup>, dedupe
                         removeSpecifier(i)
                     } else {
                         ctx.error(`different imports aliased to same local name.`, specifier)
@@ -138,14 +132,12 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
         }
     }
 
-    // 1.3 resolve possible user import alias of `ref` and `reactive`
     const arrangeImportAliases: Record<string, string> = {}
     for (const key in ctx.userImports) {
         const { source, imported, local } = ctx.userImports[key]
         if ((source === '@arrange/framework')) arrangeImportAliases[imported] = local
     }
 
-    // 2.2 process <script setup> body
     for (const node of scriptAst.body) {
         if (node.type === 'ExpressionStatement' && processDefineProps(ctx, unwrapTSNode(node.expression))) {
             ctx.s.remove(node.start! + startOffset, node.end! + startOffset)
@@ -160,7 +152,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
                 const decl = node.declarations[i]
                 const init = decl.init && unwrapTSNode(decl.init)
                 if (init) {
-                    // defineProps
                     const isDefineProps = processDefineProps(ctx, init, decl.id as LVal)
                     if (ctx.propsDestructureRestId) {
                         setupBindings[ctx.propsDestructureRestId] = BindingTypes.SETUP_REACTIVE_CONST
@@ -175,12 +166,8 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
                             let start = decl.start! + startOffset
                             let end = decl.end! + startOffset
                             if (i === total - 1) {
-                                // last one, locate the end of the last one that is not removed
-                                // if we arrive at this branch, there must have been a
-                                // non-removed decl before us, so lastNonRemoved is non-null.
                                 start = node.declarations[lastNonRemoved!].end! + startOffset
                             } else {
-                                // not the last one, locate the start of the next
                                 end = node.declarations[i + 1].start! + startOffset
                             }
                             ctx.s.remove(start, end)
@@ -194,20 +181,16 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
         }
 
         let isAllLiteral = false
-        // walk declarations to record declared bindings
         if (
             (node.type === 'VariableDeclaration' || node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration' || node.type === 'TSEnumDeclaration') && !node.declare
         ) {
             isAllLiteral = walkDeclaration(node, setupBindings, arrangeImportAliases, hoistStatic, !!ctx.propsDestructureDecl)
         }
 
-        // hoist literal constants
         if (hoistStatic && isAllLiteral) {
             hoistNode(node)
         }
 
-        // walk statements & named exports / variable declarations for top level
-        // await
         if (
             (node.type === 'VariableDeclaration' && !node.declare) || node.type.endsWith('Statement')
         ) {
@@ -230,7 +213,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
         }
 
         if (ctx.isTS) {
-            // move all Type declarations to outer scope
             if (
                 node.type.startsWith('TS') || (node.type === 'ExportNamedDeclaration' && node.exportKind === 'type') || (node.type === 'VariableDeclaration' && node.declare)
             ) {
@@ -241,13 +223,10 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
         }
     }
 
-    // 3 props destructure transform
     if (ctx.propsDestructureDecl) {
         transformDestructuredProps(ctx, arrangeImportAliases)
     }
 
-    // 4. check macro args to make sure it doesn't reference setup scope
-    // variables
     checkInvalidScopeReference(ctx.propsRuntimeDecl, DEFINE_PROPS)
     checkInvalidScopeReference(ctx.propsRuntimeDefaults, DEFINE_PROPS)
     checkInvalidScopeReference(ctx.propsDestructureDecl, DEFINE_PROPS)
@@ -267,9 +246,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
 
     // 整理 setup 参数
     let args = ctx.propsTypeDecl ? `__props: ${ctx.getString(ctx.propsTypeDecl)}` : '__props'
-    // inject user assignment of props
-    // we use a default __props so that template expressions referencing props
-    // can use it directly
     if (ctx.propsDecl) {
         if (ctx.propsDestructureRestId) {
             ctx.s.overwrite(startOffset + ctx.propsCall!.start!, startOffset + ctx.propsCall!.end!, `${ctx.helper(`createPropsRestProxy`)}(__props, ${JSON.stringify(Object.keys(ctx.propsDestructuredBindings))})`)
@@ -281,15 +257,10 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
 
     let templateMap
     let slotNames: readonly string[] = []
-    // 9. generate return statement
     let returned
-    // ensure props bindings register before compile template in inline mode
     const propsDecl = genRuntimeProps(ctx)
-    // inline mode
     if (sfa.template) {
 
-        // inline render function mode - we are going to compile the template and
-        // inline it right here
         const { code, ast, preamble, tips, errors, map } = compileTemplate({
             filename,
             ast: sfa.template.ast,
@@ -321,8 +292,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
         if (preamble) {
             ctx.s.prepend(preamble)
         }
-        // avoid duplicated unref import
-        // as this may get injected by the render function preamble OR the
 
         if (ast && ast.helpers.has(UNREF)) {
             ctx.helperImports.delete('unref')
@@ -334,7 +303,6 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
 
     ctx.s.appendRight(endOffset, `\nreturn ${returned}\n}\n\n`)
 
-    // 10. finalize default export
     const genDefaultAs = options.genDefaultAs ? `const ${options.genDefaultAs} =` : `export default`
 
     let runtimeOptions = `\n    __file: ${JSON.stringify(filename)},\n    slotNames: ${JSON.stringify(slotNames)},`
@@ -347,7 +315,7 @@ export function generateSfaScript(sfa: SFADescriptor, options: SFAScriptCompileO
 
     if (propsDecl) runtimeOptions += `\n  props: ${propsDecl},`
 
-    ctx.s.prependLeft(startOffset, `\n${genDefaultAs} /*@__PURE__*/${ctx.helper('defineArrangable')}({${runtimeOptions}\n    setup(${args}) {\n`)
+    ctx.s.prependLeft(startOffset, `\n${genDefaultAs} ${ctx.helper('defineArrangable')}({${runtimeOptions}\n    setup(${args}) {\n`)
     ctx.s.appendRight(endOffset, `})`)
 
     // 汇总 Arrange 编译辅助函数导入
@@ -371,7 +339,6 @@ import { ${[...ctx.helperImports]
                 includeContent: true,
             }) as unknown as RawSourceMap)
             : undefined
-    // merge source maps of the script setup and template in inline mode
     if (templateMap && map) {
         const offset = content.indexOf(returned)
         const templateLineOffset = content.slice(0, offset).split(/\r?\n/).length - 1
@@ -399,7 +366,6 @@ function walkDeclaration(node: Declaration, bindings: Record<string, BindingType
         const isConst = node.kind === 'const'
         isAllLiteral = isConst && node.declarations.every(decl => decl.id.type === 'Identifier' && isStaticNode(decl.init!))
 
-        // export const foo = ...
         for (const { id, init: _init } of node.declarations) {
             const init = _init && unwrapTSNode(_init)
             const isConstMacroCall = isConst && isCallOf(init, c => c === DEFINE_PROPS || c === WITH_DEFAULTS)
@@ -411,11 +377,8 @@ function walkDeclaration(node: Declaration, bindings: Record<string, BindingType
                 ) {
                     bindingType = BindingTypes.LITERAL_CONST
                 } else if (isCallOf(init, userReactiveBinding)) {
-                    // treat reactive() calls as let since it's meant to be mutable
                     bindingType = isConst ? BindingTypes.SETUP_REACTIVE_CONST : BindingTypes.SETUP_LET
                 } else if (
-                    // if a declaration is a const literal, we can mark it so that
-                    // the generated render fn code doesn't need to unref() it
                     isConstMacroCall || (isConst && canNeverBeRef(init!, userReactiveBinding))
                 ) {
                     bindingType = isCallOf(init, DEFINE_PROPS) ? BindingTypes.SETUP_REACTIVE_CONST : BindingTypes.SETUP_CONST
@@ -448,8 +411,6 @@ function walkDeclaration(node: Declaration, bindings: Record<string, BindingType
     } else if (
         node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration'
     ) {
-        // export function foo() {} / export class Foo {}
-        // export declarations must be named.
         bindings[node.id!.name] = BindingTypes.SETUP_CONST
     }
 
@@ -460,15 +421,12 @@ function walkObjectPattern(node: ObjectPattern, bindings: Record<string, Binding
     for (const p of node.properties) {
         if (p.type === 'ObjectProperty') {
             if (p.key.type === 'Identifier' && p.key === p.value) {
-                // shorthand: const { x } = ...
                 const type = isDefineCall ? BindingTypes.SETUP_CONST : isConst ? BindingTypes.SETUP_MAYBE_REF : BindingTypes.SETUP_LET
                 registerBinding(bindings, p.key, type)
             } else {
                 walkPattern(p.value, bindings, isConst, isDefineCall)
             }
         } else {
-            // ...rest
-            // argument can only be identifier when destructuring
             const type = isConst ? BindingTypes.SETUP_CONST : BindingTypes.SETUP_LET
             registerBinding(bindings, p.argument as Identifier, type)
         }
@@ -486,7 +444,6 @@ function walkPattern(node: Node, bindings: Record<string, BindingTypes>, isConst
         const type = isDefineCall ? BindingTypes.SETUP_CONST : isConst ? BindingTypes.SETUP_MAYBE_REF : BindingTypes.SETUP_LET
         registerBinding(bindings, node, type)
     } else if (node.type === 'RestElement') {
-        // argument can only be identifier when destructuring
         const type = isConst ? BindingTypes.SETUP_CONST : BindingTypes.SETUP_LET
         registerBinding(bindings, node.argument as Identifier, type)
     } else if (node.type === 'ObjectPattern') {
@@ -532,7 +489,7 @@ function isStaticNode(node: Node): boolean {
     node = unwrapTSNode(node)
 
     switch (node.type) {
-        case 'UnaryExpression': // void 0, !true
+        case 'UnaryExpression':
             return isStaticNode(node.argument)
 
         case 'LogicalExpression': // 1 > 2
@@ -545,7 +502,7 @@ function isStaticNode(node: Node): boolean {
         }
 
         case 'SequenceExpression': // (1, 2)
-        case 'TemplateLiteral': // `foo${1}`
+        case 'TemplateLiteral':
             return node.expressions.every(expr => isStaticNode(expr))
 
         case 'ParenthesizedExpression': // (1)

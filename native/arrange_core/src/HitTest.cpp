@@ -55,7 +55,7 @@ namespace arrange::core {
             }
             return {};
         }
-    }  // namespace
+    }
 
     HitTestSnapshot buildCachedHitTestSnapshot(LayoutTree& tree, NodeId root, HitWorkCounters& counters) {
         HitTestSnapshot result;
@@ -155,4 +155,4 @@ namespace arrange::core {
     HitTestResult HitTester::hitTestClickable(const LayoutTree& tree, NodeId root, Point point) const {
         return hitTestClickable(buildHitTestSnapshot(tree, root), point);
     }
-}  // namespace arrange::core
+}

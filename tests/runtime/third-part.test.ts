@@ -12,7 +12,7 @@ import { animatedNumberAsRef, linearEasing, tween } from '@arrange/framework/ani
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import { recordingNative } from './recordingNative.ts'
 import { frameScope } from './frameScope.ts'
-import { requireSfaModule } from './sfaModules.ts'
+import { evaluateSfa, requireSfaModule } from './sfaModules.ts'
 
 test('首次挂载与后续视觉失效都只由宿主帧授权，挂载通知写状态进入下一帧', async () => {
     const count = ref(0)
@@ -351,4 +351,109 @@ test('动态定义的 props 与具名内容在真实 SFA 类型检查中按所�
     } finally {
         rmSync(directory, { recursive: true })
     }
+})
+
+
+test('正式函数重导出与局部别名、readonly映射和联合字段契约保留运行语义', () => {
+    const directory = mkdtempSync(resolve('tmp-refs/sfa-contract-fields-'))
+    try {
+        writeFileSync(join(directory, 'contracts.ts'), "export { rounded as curve } from '@arrange/framework/ui'")
+        const source = `<template><Text :modifier="chain" /></template><script>
+import { curve as corner } from './contracts'
+import { M, Color, Arrangement, type TextStyleProp, type GraphicsLayerOptions, type ArrangementProp } from '@arrange/framework/ui'
+import { observe } from './observe'
+type StyleCopy = { readonly [K in keyof TextStyleProp]: TextStyleProp[K] }
+const style: Readonly<StyleCopy> | undefined = { fontSize: 12.sp, lineHeight: 16.sp, color: Color(0xff123456) }
+const graphics: Readonly<GraphicsLayerOptions> = { translationX: 7.px }
+const alias = corner
+const shape = alias(8.dp + 3.px)
+const spacing: ArrangementProp = Arrangement.spacedBy(4.dp + 2.px)
+function shadow(corner: (value: number) => number) { return corner(9) }
+const chain = M.graphicsLayer(graphics).text('正式契约', { style }).clip(shape)
+observe({ shape, spacing, style, graphics, shadow: shadow(value => value + 1) })
+</script>`
+        let observed: { shape: unknown; spacing: unknown; style: unknown; graphics: unknown; shadow: number } | undefined
+        const app = createApp(evaluateSfa(source, { './contracts': { curve: rounded }, './observe': { observe: (value: NonNullable<typeof observed>) => { observed = value } } }, join(directory, 'App.sfa')))
+        const native = recordingNative()
+        app.mount(native.target)
+        native.frame()
+        assert.deepEqual(observed, { shape: { type: 'rounded', radiusDp: 8, radiusPx: 3 }, spacing: { kind: 'spacedBy', spaceDp: 4, spacePx: 2, alignment: undefined }, style: { fontSize: 12, lineHeight: 16, color: 0xff123456 }, graphics: { translationX: 7 }, shadow: 10 })
+        const chain = [...native.nodes.values()].map(node => node.inputs.get('modifier') as typeof M | undefined).find(chain => chain?.elements.some(element => element.type === 'text'))!
+        assert.equal(chain.elements.find(element => element.type === 'text')!.value.text, '正式契约')
+        app.unmount()
+    } finally {
+        rmSync(directory, { recursive: true })
+    }
+})
+
+test('真实SFA有限和无限过渡的别名方法按值与对象回调契约运行', () => {
+    const source = `<template><Text :text="String(width)" :modifier="M.width(distance)" /></template><script>
+import { createTransition, createInfiniteTransition, animatedNumberAsRef, animatedDpAsRef, tween, linearEasing } from '@arrange/framework/animation'
+import { M, Color } from '@arrange/framework/ui'
+import { ref } from '@arrange/framework'
+import { observe } from './observe'
+const state = ref(false)
+const options = { animationSpec: tween({ durationMillis: 32, easing: linearEasing }) }
+const finite = createTransition(state)
+const addWidth = finite.animatedDp
+const width = addWidth('width', value => { return value ? 8.dp : 4.dp }, options)
+const color = finite.animatedColor('color', function(value) { return Color(value ? 0xffff0000 : 0xff0000ff) }, options)
+const offset = finite.animatedOffset('offset', value => { return { x: value ? 3.dp : 1.dp, y: 2.dp } }, options)
+const size = finite.animatedSize('size', value => ({ width: value ? 5.dp : 1.dp, height: 6.dp }), options)
+const rect = finite.animatedRect('rect', value => ({ x: 1.dp, y: 2.dp, width: value ? 5.dp : 1.dp, height: 6.dp }), options)
+const infinite = createInfiniteTransition()
+const addRepeat = infinite.animatedDp
+const repeat = addRepeat('repeat', 1.dp, 2.dp, options)
+const repeatColor = infinite.animatedColor('repeatColor', Color(0xff0000ff), Color(0xffff0000), options)
+const raw = animatedNumberAsRef(9)
+const addDistance = animatedDpAsRef
+const distance = addDistance(7.dp)
+observe({ state, finite, infinite, width, color, offset, size, rect, repeat, repeatColor, raw, distance })
+</script>`
+    type Scalar = { readonly value: number }
+    type Dimensions = { readonly value: Readonly<Record<string, number>> }
+    let observed: { state: { value: boolean }; finite: { isRunning: { readonly value: boolean } }; infinite: { stop(): void }; width: Scalar; color: Scalar; offset: Dimensions; size: Dimensions; rect: Dimensions; repeat: Scalar; repeatColor: Scalar; raw: Scalar; distance: Scalar } | undefined
+    const app = createApp(evaluateSfa(source, { './observe': { observe: (value: NonNullable<typeof observed>) => { observed = value } } }))
+    const native = recordingNative()
+    app.mount(native.target)
+    native.frame(16)
+    assert.ok(observed)
+    assert.equal(observed.width.value, 4)
+    assert.equal(observed.color.value, 0xff0000ff)
+    assert.deepEqual(observed.offset.value, { x: 1, y: 2 })
+    assert.equal(observed.repeat.value, 1)
+    assert.equal(observed.repeatColor.value, 0xff0000ff)
+    assert.equal(observed.raw.value, 9)
+    assert.equal(observed.distance.value, 7)
+    assert.equal(native.textNodes()[0].text, '4')
+    observed.state.value = true
+    for (let time = 32; time <= 112; time += 16) native.frame(time)
+    assert.equal(observed.width.value, 8)
+    assert.equal(observed.color.value, 0xffff0000)
+    assert.deepEqual(observed.offset.value, { x: 3, y: 2 })
+    assert.deepEqual(observed.size.value, { width: 5, height: 6 })
+    assert.deepEqual(observed.rect.value, { x: 1, y: 2, width: 5, height: 6 })
+    assert.equal(observed.finite.isRunning.value, false)
+    assert.equal(native.textNodes()[0].text, '8')
+    assert.ok(Number.isFinite(observed.repeat.value))
+    observed.infinite.stop()
+    app.unmount()
+})
+
+test('单位后缀归一化后的源码映射与诊断保留原始列', async () => {
+    const { SourceMapConsumer } = await import('source-map-js')
+    const filename = '单位源码映射.sfa'
+    const source = '<script>\nconst width = 8.dp; const mappingMarker = width + 2.px\n</script>'
+    const result = compileArrangeSfa(source, filename)
+    const lines = result.code.slice(0, result.code.indexOf('mappingMarker')).split('\n')
+    const position = new SourceMapConsumer(result.map!).originalPositionFor({ line: lines.length, column: lines.at(-1)!.length })
+    assert.equal(position.source, filename)
+    assert.equal(position.line, 2)
+    assert.equal(position.column, source.split('\n')[1].indexOf('mappingMarker'))
+    const invalid = '<script>\nimport { M } from "@arrange/framework/ui"\nconst width = 8.dp; const invalidWidth = M.width(3.sp)\n</script>'
+    assert.throws(() => compileArrangeSfa(invalid, filename), error => {
+        assert.match(String(error), /实际为 SP/)
+        assert.deepEqual((error as Error & { loc: { start: { line: number; column: number } } }).loc.start, { line: 3, column: invalid.split('\n')[2].indexOf('3.sp') + 1 })
+        return true
+    })
 })

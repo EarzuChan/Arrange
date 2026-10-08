@@ -29,7 +29,7 @@ namespace arrange::quickjs {
             }
             return std::pair{a, b};
         }
-    }  // namespace
+    }
 
     QuickJsPainterResources::QuickJsPainterResources(JSContext* context, arrange::core::PainterLoader loader) : context_(context), loader_(std::move(loader)) {}
 
@@ -142,6 +142,6 @@ namespace arrange::quickjs {
         }
         return found->second.snapshot;
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

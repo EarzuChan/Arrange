@@ -96,4 +96,4 @@ namespace arrange::core {
             return current;
         }
     };
-}  // namespace arrange::core
+}

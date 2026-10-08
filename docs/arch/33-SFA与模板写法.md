@@ -4,11 +4,51 @@
 
 ## 文件与初始化
 
-SFA（Single-File Arrangable）使用 `.sfa` 扩展名。推荐先写 `<template>`，再写 `<script>`。`<script>` 不需要额外的 `setup` 或语言属性；它默认且只能是 TypeScript setup。没有初始化逻辑时可以省略 script。
+SFA（Single-File Arrangable）使用 `.sfa` 扩展名。推荐先写 `<template>`，再写 `<script>`。`<script>` 不需要额外的 `setup` 或语言属性；它以 TypeScript 为基础，作为 SFA 的 setup 脚本参与编译与转换。没有初始化逻辑时可以省略 script。
 
-一个 SFA 不能写第二个 script。不支持：Options API、JSX/TSX 或 style 块（Arrange 不具备 css style 相关能力，视觉表现通过 Arrangable 参数和 Modifier 表达）。
+SFA 的顶层区块只有 template 与 script，每类至多一个。视觉表现通过 Arrangable 参数和 Modifier 表达。
 
 setup 按实例执行一次，该 Arrangable 不退场的重排**不会重新执行其初始化**。SFA 顶层初始化系同步（有没有必要做异步支持）；共享逻辑可放进独立 `.ts` 模块。`defineProps`、`withDefaults`、响应式状态、生命周期及 provide/inject 按正式 API 使用。
+
+## SFA 与纯 TypeScript 的编译边界
+
+`.sfa` 的模板和脚本都经过 Arrange 编译与转换。单位后缀、Color 构造和正式消费位置的单位处理在两者中都可用；`<script>` 不是原样执行的独立 `.ts` 文件。转换后再由 TypeScript 工具链处理生成代码。
+
+| 源码位置 | 单位与颜色特色写法 | Ref 读取 |
+| --- | --- | --- |
+| `.sfa` 的模板绑定表达式 | 支持 `8.dp`、`16.sp`、`8.px`、`Color(...)` 和 `Color.hsl(...)` | setup 绑定按模板规则自动解包，尖括号作用域可取消解包 |
+| `.sfa` 的 `<script>` | 支持相同的单位与颜色转换，以及脚本宏 | 保留脚本读取规则，显式使用 `.value` |
+| 独立 `.ts` 模块 | 使用原始 TypeScript 和真实 API 签名，没有 SFA 转换 | 显式使用 `.value` |
+
+模板中的自动解包不扩展到脚本或被导入的 `.ts` 函数内部；独立 `.ts` 也不会因为被 SFA 导入而获得特色语法。以下 SFA 在脚本中声明单位与颜色，并在模板中消费：
+
+```sfa
+<template>
+    <Box :modifier="M.width(width).background(tone)">
+        <Text :text="label" :modifier="M.clickable(rename)"/>
+    </Box>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { Color, M } from '@arrange/framework/ui'
+
+const width = 8.dp
+const tone = Color(0xff336699)
+const label = ref('标题')
+function rename() {
+    label.value = '已更新'
+}
+</script>
+```
+
+在独立 `.ts` 中构造同样的 Modifier，使用真实参数契约：
+
+```ts
+import { M } from '@arrange/framework/ui'
+
+const modifier = M.width(8, 0).background(0xff336699)
+```
 
 ## 模板节点
 
@@ -16,7 +56,7 @@ setup 按实例执行一次，该 Arrangable 不退场的重排**不会重新执
 
 参数名使用确定的 camelize 规则归一化；标签名必须准确 PascalCase，不做大小写、短横线或模糊猜测。每个 Arrangable 只接收自己声明的参数：无 attrs 收集，无 prop 透传，无隐式转交给子 Arrangable。子节点“把模板节点内容灌入其Arrangable的槽位”，绝非未声明参数的旁路。
 
-模板只提供 Arrange 自己的能力，没有 HTML、DOM、CSS 或浏览器元素语义。`v-model`、`v-pre`、`v-once`、`v-memo`、`:ref`（Vue中的 Dom 对象引用取得）、`v-on`（`@`）、emits/emit 等均没有解释或执行入口。回调通过声明的普通函数 prop 传递。
+模板只提供 Arrange 自己的能力，没有 HTML、DOM、CSS 或浏览器元素语义。参数词汇不自带特殊能力，包括 ref 在内的普通参数按目标声明处理；回调通过声明的普通函数 prop 传递。
 
 模板内容位置不接受裸文本或插值。显示文字必须使用 `Text` 的 `text` 参数；标签之间的排版空白统一忽略。
 
@@ -59,8 +99,12 @@ Arrange 模板支持标签外的 `//` 单行注释，独占一行和节点行末
 
 ## 单位值编译
 
-模板与 script 的单位位置要求明确值壳或已声明单位的值，普通 TS 参数仍使用数字。单位及 Density 含义以 [基础类型](10-基础类型.md) 为准。
+SFA 模板与脚本的单位位置要求明确值壳或已声明单位的值；纯 `.ts` 按真实参数契约传数字。单位及 Density 含义以 [基础类型](10-基础类型.md) 为准。
 
 编译器根据导入、转导出及声明身份识别构造与消费，处理局部遮蔽，不按 dp/sp 等拼写替换。分析跨 SFA 定义时保留单位声明；最终输出才拆壳，源码映射及依赖列表仍指向真实文件。条件、变量、函数参数与 prop 的已知不匹配在最早边界拒绝；无法确定的动态输入须明确声明契约。
 
-消融生成数字表达式，不提前执行用户函数或建立单位运算代数。Color 的 `Color(number)`、通道对象和 `Color.hsl(...)` 在编译期展开为 ARGB 数字或数字计算表达式，不注入运行时 helper，也不保留颜色对象；生成的 TS 与手写 TS 一样只传裸 ARGB number。SFA 转译、完整 TS 类型检查和 bundle 是不同环节，能打包不表示脚本类型检查已通过。
+消融将长度表达式生成平铺的 `(dp, px)` 双通道数字，SP、PX-only 与颜色消费位置生成单个数字，不提前执行用户函数或读取 Density。表达式求值时机、依赖和副作用仍按源码保留。
+
+`Color(number)`、通道对象和 `Color.hsl(...)` 展开为 ARGB 数字或数字计算表达式，不注入运行时颜色 helper，也不保留颜色值对象。静态构造在编译期校验，动态构造保留等价校验。直接字面量的静态通道可以常量折叠；对象引用在调用时读取字段，`const` 不代表对象字段不可变。通道表达式按源码顺序各求值一次，不能删掉 `void` 表达式的求值或把被遮蔽函数当作编译期构造。
+
+生成代码和手写 `.ts` 均按真实 API 传数值。SFA 转译、完整 TS 类型检查和 bundle 是不同环节，能打包不表示脚本类型检查已通过。

@@ -39,7 +39,7 @@ namespace arrange::core {
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             return kPaint | kHit;
         }
-    }  // namespace
+    }
 
     std::string_view modifierKindName(const ModifierValue& value) {
         return std::visit(
@@ -304,4 +304,4 @@ namespace arrange::core {
             if (const auto* input = std::get_if<ZIndexModifier>(&instance.descriptor.value)) result += input->value;
         return result;
     }
-}  // namespace arrange::core
+}

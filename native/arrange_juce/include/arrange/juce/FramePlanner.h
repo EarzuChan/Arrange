@@ -32,4 +32,4 @@ namespace arrange::juce {
        private:
         bool framePipelineRunRequested_ = false;
     };
-}  // namespace arrange::juce
+}

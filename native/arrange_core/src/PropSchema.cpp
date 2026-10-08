@@ -51,7 +51,7 @@ namespace arrange::core {
 
             return false;
         }
-    }  // namespace
+    }
 
     bool validateSetPropMutation(NodeType nodeType, const std::string& rawKey, const PropValue& value, std::string& error) {
         error.clear();
@@ -73,4 +73,4 @@ namespace arrange::core {
 
         return validateByKey(key, value, error);
     }
-}  // namespace arrange::core
+}

@@ -1,8 +1,9 @@
-import { animationScheduler } from './runtime/animationOwner.ts'
-import type { FrameScheduler, FrameParticipant } from './runtime/scheduler.ts'
+import { animationScheduler } from '../runtime/animationOwner.ts'
+import { requireArgb } from '../color.ts'
+import type { FrameScheduler, FrameParticipant } from '../runtime/scheduler.ts'
 import { computed, getCurrentScope, isRef, onScopeDispose, readonly, shallowReadonly, shallowRef } from "@arrange/reactivity"
 import { batchUpdates } from "@arrange/reactivity"
-import { watch } from "./runtime/index.ts"
+import { watch } from "../runtime/index.ts"
 import type { Ref } from "@arrange/reactivity"
 
 export type AnimationTarget<T> = T | Ref<T> | (() => T)
@@ -18,13 +19,10 @@ export type InfiniteAnimationArgs = { animationSpec?: AnimationSpec; repeatMode?
 
 export type AnimatedRef<T> = Readonly<Ref<T>> & { readonly isRunning: Readonly<Ref<boolean>>; readonly label: string; stop: () => void }
 
-/** @arrangeFields offset */
 export type Offset = Readonly<{ x: number; y: number }>
 
-/** @arrangeFields size */
 export type Size = Readonly<{ width: number; height: number }>
 
-/** @arrangeFields rect */
 export type Rect = Offset & Size
 
 function finite(value: number, name: string): number {
@@ -102,17 +100,20 @@ class AnimationTimeline implements FrameParticipant {
 
     constructor(readonly owner: FrameScheduler) { }
 
-    active = () => [...this.participants.values()].some(active => active())
+    active = () => {
+        for (const active of this.participants.values()) if (active()) return true
+        return false
+    }
 
     sample(time: number): void {
         animationStats.sampledFrames++
         batchUpdates(() => {
-            for (const [sample, active] of [...this.participants]) if (this.participants.has(sample) && active()) {
+            for (const sample of [...this.participants.keys()]) if (this.participants.get(sample)?.()) {
                 animationStats.sampledAnimations++
                 sample(time)
             }
         })
-        for (const complete of this.completions.splice(0)) complete()
+        if (this.completions.length) for (const complete of this.completions.splice(0)) complete()
     }
 
     add(sample: FrameParticipantCallback, active: () => boolean): void {
@@ -151,21 +152,28 @@ const arrayConverter: Converter<readonly number[]> = { to: value => value.map(it
 
 const colorConverter: Converter<number> = {
     to(value) {
-        finite(value, "color")
+        requireArgb(value)
         return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]
     },
     from(vector) {
-        const [a, r, g, b] = vector.map(value => Math.round(Math.max(0, Math.min(255, value))))
+        const a = colorChannel(vector[0]), r = colorChannel(vector[1]), g = colorChannel(vector[2]), b = colorChannel(vector[3])
         return ((a << 24) | (r << 16) | (g << 8) | b) >>> 0
     },
 }
 
+function colorChannel(value: number): number { return Math.round(Math.max(0, Math.min(255, value))) }
+
 function objectConverter<T>(keys: readonly (keyof T)[]): Converter<T> {
     return {
         to: value => keys.map(key => key === 'width' || key === 'height' ? nonnegative(value[key] as number, String(key)) : finite(value[key] as number, String(key))),
-        from: vector => Object.freeze(Object.fromEntries(keys.map((key, index) => [key,
-            key === 'width' || key === 'height' ? Math.max(0, vector[index]) : vector[index],
-        ]))) as T,
+        from(vector) {
+            const value = {} as Record<keyof T, number>
+            for (let index = 0; index < keys.length; index++) {
+                const key = keys[index]
+                value[key] = key === 'width' || key === 'height' ? Math.max(0, vector[index]) : vector[index]
+            }
+            return Object.freeze(value) as T
+        },
     }
 }
 
@@ -199,9 +207,10 @@ function springChannel(displacement: number, velocity: number, seconds: number, 
 function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs, infinite?: { target: T; repeatMode: RepeatMode }) {
     const clock = animationScheduler(), scheduler = timeline(clock)
     const scope = getCurrentScope()
-    let current = converter.to(initial), from = current, target = infinite ? converter.to(infinite.target) : current, velocity = current.map(() => 0), initialVelocity = velocity
+    const current = converter.to(initial), velocity = current.map(() => 0)
+    let from = [...current], target = infinite ? converter.to(infinite.target) : current, initialVelocity = velocity
     const state = shallowRef(converter.from(current)) as Ref<T>, running = shallowRef(false)
-    let startTime = 0, stopped = false
+    let startTime = 0, stopped = false, generation = 0
     let pausedAt = 0
     let resumed = false
     const spec = args.animationSpec ?? spring()
@@ -217,53 +226,59 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs, in
             const cycleDuration = spec.delayMillis + spec.durationMillis
             const cycle = Math.floor(elapsed / cycleDuration)
             const cycleTime = elapsed - cycle * cycleDuration
-            if (cycleTime < spec.delayMillis) return
-            let progress = Math.min(1, (cycleTime - spec.delayMillis) / spec.durationMillis)
+            let progress = Math.max(0, Math.min(1, (cycleTime - spec.delayMillis) / spec.durationMillis))
             if (infinite.repeatMode === 'reverse' && cycle % 2 === 1) progress = 1 - progress
             progress = finite(spec.easing(progress), "缓动结果")
-            current = from.map((value, index) => value + (target[index] - value) * progress)
+            for (let index = 0; index < current.length; index++) current[index] = from[index] + (target[index] - from[index]) * progress
             state.value = converter.from(current)
             return
         }
         let done = true
         if (spec.kind === "spring") {
-            current = from.map((value, index) => {
-                const [delta, speed] = springChannel(value - target[index], initialVelocity[index], elapsed / 1000, spec)
+            for (let index = 0; index < current.length; index++) {
+                const [delta, speed] = springChannel(from[index] - target[index], initialVelocity[index], elapsed / 1000, spec)
                 velocity[index] = speed
                 if (Math.abs(delta) > spec.visibilityThreshold || Math.abs(speed) > spec.visibilityThreshold * 10) done = false
-                return target[index] + delta
-            })
+                current[index] = target[index] + delta
+            }
         } else {
             if (elapsed < spec.delayMillis) return
             const duration = spec.kind === "tween" ? spec.durationMillis : 0
             const fraction = duration ? Math.min(1, (elapsed - spec.delayMillis) / duration) : 1
             const progress = spec.kind === "tween" ? finite(spec.easing(fraction), "缓动结果") : 1
             done = fraction >= 1
-            current = from.map((value, index) => value + (target[index] - value) * progress)
-            velocity = current.map(() => 0)
+            for (let index = 0; index < current.length; index++) current[index] = from[index] + (target[index] - from[index]) * progress
+            velocity.fill(0)
         }
         if (done) {
-            current = [...target]
-            velocity = target.map(() => 0)
+            for (let index = 0; index < current.length; index++) current[index] = target[index]
+            velocity.fill(0)
             scheduler.remove(sample)
             running.value = false
         }
         state.value = converter.from(current)
-        if (done) scheduler.finish(() => { if (!stopped && !running.value) args.finished?.() })
+        if (done) {
+            const completedGeneration = generation
+            scheduler.finish(() => { if (!stopped && !running.value && generation === completedGeneration) args.finished?.() })
+        }
     }
 
-    const retarget = (value: T, time = clock.now()) => {
+    const retarget = (next: number[], time = clock.now()) => {
         if (stopped) return
-        const next = converter.to(value)
         if (next.length !== target.length) throw new RangeError("动画数值数组的长度不能改变")
         if (next.every((item, index) => item === target[index])) return
         // 从最近采样值重定向，保留弹簧动量
         from = converter.to(state.value)
         target = next
+        generation++
         initialVelocity = [...velocity]
         startTime = time
         resumed = false
-        if (from.every((item, index) => item === target[index]) && velocity.every(value => value === 0)) return
+        if (from.every((item, index) => item === target[index]) && velocity.every(value => value === 0)) {
+            scheduler.remove(sample)
+            running.value = false
+            return
+        }
         running.value = true
         scheduler.add(sample, () => !scope || scope.active && !scope.paused)
     }
@@ -314,7 +329,7 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs, in
 
 function animated<T>(target: AnimationTarget<T>, converter: Converter<T>, args: AnimationArgs): AnimatedRef<T> {
     const controller = channel(read(target), converter, args)
-    const stopWatch = isRef(target) || typeof target === "function" ? watch(() => converter.to(read(target)), vector => controller.retarget(converter.from(vector)), { flush: "sync" }) : () => { }
+    const stopWatch = isRef(target) || typeof target === "function" ? watch(() => converter.to(read(target)), vector => controller.retarget(vector), { flush: "sync" }) : () => { }
     const stop = () => {
         stopWatch()
         controller.output.stop()
@@ -326,23 +341,16 @@ function animated<T>(target: AnimationTarget<T>, converter: Converter<T>, args: 
 
 export const animatedNumberAsRef = (target: AnimationTarget<number>, args: AnimationArgs = {}) => animated(target, numberConverter, args)
 
-/** @arrangeArguments dp
- * @arrangeResult dp */
 export const animatedDpAsRef = animatedNumberAsRef
 
-/** @arrangeArguments color
- * @arrangeResult color */
 export const animatedColorAsRef = (target: AnimationTarget<number>, args: AnimationArgs = {}) => animated(target, colorConverter, args)
 
 export const animatedNumberArrayAsRef = (target: AnimationTarget<readonly number[]>, args: AnimationArgs = {}) => animated(target, arrayConverter, args)
 
-/** @arrangeArguments offset */
 export const animatedOffsetAsRef = (target: AnimationTarget<Offset>, args: AnimationArgs = {}) => animated(target, offsetConverter, args)
 
-/** @arrangeArguments size */
 export const animatedSizeAsRef = (target: AnimationTarget<Size>, args: AnimationArgs = {}) => animated(target, sizeConverter, args)
 
-/** @arrangeArguments rect */
 export const animatedRectAsRef = (target: AnimationTarget<Rect>, args: AnimationArgs = {}) => animated(target, rectConverter, args)
 
 export function createTransition<S>(target: AnimationTarget<S>, args: AnimationArgs = {}) {
@@ -365,10 +373,10 @@ export function createTransition<S>(target: AnimationTarget<S>, args: AnimationA
             }
         })
         const mapped = computed(() => converter.to(mapping(targetState.value)))
-        const child = { value: control.output as AnimatedRef<unknown>, retarget: (_state: S, time: number) => control.retarget(converter.from(mapped.value), time) }
+        const child = { value: control.output as AnimatedRef<unknown>, retarget: (_state: S, time: number) => control.retarget(mapped.value, time) }
         children.set(label, child)
         const stopMapping = watch(mapped, vector => {
-            control.retarget(converter.from(vector), clock.now())
+            control.retarget(vector, clock.now())
             settle()
         }, { flush: "sync" })
         children.get(label)!.stopMapping = stopMapping
@@ -406,18 +414,11 @@ export function createTransition<S>(target: AnimationTarget<S>, args: AnimationA
     return {
         currentState: readonly(currentState), targetState: readonly(targetState), isRunning: readonly(running), stop,
         animatedNumber: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, numberConverter, childArgs),
-        /** @arrangeArguments none dp
-         * @arrangeResult dp */
         animatedDp: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, numberConverter, childArgs),
-        /** @arrangeArguments none color
-         * @arrangeResult color */
         animatedColor: (label: string, map: (state: S) => number, childArgs: AnimationArgs = {}) => register(label, map, colorConverter, childArgs),
         animatedNumberArray: (label: string, map: (state: S) => readonly number[], childArgs: AnimationArgs = {}) => register(label, map, arrayConverter, childArgs),
-        /** @arrangeArguments none offset */
         animatedOffset: (label: string, map: (state: S) => Offset, childArgs: AnimationArgs = {}) => register(label, map, offsetConverter, childArgs),
-        /** @arrangeArguments none size */
         animatedSize: (label: string, map: (state: S) => Size, childArgs: AnimationArgs = {}) => register(label, map, sizeConverter, childArgs),
-        /** @arrangeArguments none rect */
         animatedRect: (label: string, map: (state: S) => Rect, childArgs: AnimationArgs = {}) => register(label, map, rectConverter, childArgs),
     }
 }
@@ -461,11 +462,7 @@ export function createInfiniteTransition(args: { label?: string } = {}) {
         isRunning: readonly(running),
         stop,
         animatedNumber: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, numberConverter, childArgs),
-        /** @arrangeArguments none dp
-         * @arrangeResult dp */
         animatedDp: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, numberConverter, childArgs),
-        /** @arrangeArguments none color
-         * @arrangeResult color */
         animatedColor: (label: string, initial: number, target: number, childArgs?: InfiniteAnimationArgs) => register(label, initial, target, colorConverter, childArgs),
     }
 }

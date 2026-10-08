@@ -79,4 +79,4 @@ namespace arrange::core {
        private:
         InvalidationSnapshot snapshot_;
     };
-}  // namespace arrange::core
+}

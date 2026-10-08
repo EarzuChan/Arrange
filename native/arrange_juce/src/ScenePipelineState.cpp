@@ -63,4 +63,4 @@ namespace arrange::juce {
         return result;
     }
 
-}  // namespace arrange::juce
+}

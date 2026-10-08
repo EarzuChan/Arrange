@@ -2,7 +2,7 @@ add_executable(arrange_core_smoke arrange_core_smoke.cpp)
 target_link_libraries(arrange_core_smoke PRIVATE Arrange::framework)
 add_test(NAME arrange_core_smoke COMMAND arrange_core_smoke)
 
-add_executable(arrange_local_work arrange_local_work.cpp)
+add_executable(arrange_local_work arrange_local_work.cpp AllocationProbe.cpp)
 target_link_libraries(arrange_local_work PRIVATE Arrange::core)
 add_test(NAME arrange_local_work COMMAND arrange_local_work)
 
@@ -28,6 +28,7 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
     NAME arrange_juce_runtime_smoke
     COMMAND arrange_juce_runtime_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js"
   )
+  set_tests_properties(arrange_juce_runtime_smoke PROPERTIES TIMEOUT 30)
 endif()
 
 add_executable(arrange_modifier_runtime arrange_modifier_runtime.cpp)

@@ -7,9 +7,6 @@ import { isReactive, isShallow } from './reactive.ts'
 import { type Ref, isRef } from './ref.ts'
 import { warn } from './warning.ts'
 
-// These errors were transferred from `packages/runtime-core/src/errorHandling.ts`
-// to @arrange/reactivity to allow co-location with the moved base watch logic, hence
-// it is essential to keep these values unchanged.
 export enum WatchErrorCodes {
     WATCH_GETTER = 2,
     WATCH_CALLBACK,
@@ -30,13 +27,7 @@ export interface WatchOptions<Immediate = boolean> extends DebuggerOptions {
     once?: boolean
     scheduler?: WatchScheduler
     onWarn?: (msg: string, ...args: any[]) => void
-    /**
-     * @internal
-     */
     augmentJob?: (job: (...args: any[]) => void) => void
-    /**
-     * @internal
-     */
     call?: (fn: Function | Function[], type: WatchErrorCodes, args?: unknown[]) => void
 }
 
@@ -48,7 +39,6 @@ export interface WatchHandle extends WatchStopHandle {
     stop: () => void
 }
 
-// initial value for watchers to trigger on undefined initial values
 const INITIAL_WATCHER_VALUE = {}
 
 export type WatchScheduler = (job: () => void, isFirstRun: boolean) => void
@@ -56,24 +46,10 @@ export type WatchScheduler = (job: () => void, isFirstRun: boolean) => void
 const cleanupMap: WeakMap<ReactiveEffect, (() => void)[]> = new WeakMap()
 let activeWatcher: ReactiveEffect | undefined = undefined
 
-/**
- * Returns the current active effect if there is one.
- */
 export function getCurrentWatcher(): ReactiveEffect<any> | undefined {
     return activeWatcher
 }
 
-/**
- * Registers a cleanup callback on the current active effect. This
- * registered cleanup callback will be invoked right before the
- * associated effect re-runs.
- *
- * @param cleanupFn - The callback function to attach to the effect's cleanup.
- * @param failSilently - if `true`, will not throw warning when called without
- * an active effect.
- * @param owner - The effect that this cleanup function should be attached to.
- * By default, the current active effect.
- */
 export function onWatcherCleanup(cleanupFn: () => void, failSilently = false, owner: ReactiveEffect | undefined = activeWatcher): void {
     if (owner) {
         let cleanups = cleanupMap.get(owner)
@@ -93,12 +69,9 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
     }
 
     const reactiveGetter = (source: object) => {
-        // traverse will happen in wrapped getter below
         if (deep) return source
-        // for `deep: false | 0` or shallow reactive, only traverse root-level properties
         if (isShallow(source) || deep === false || deep === 0)
             return traverse(source, 1)
-        // for `deep: undefined` on a reactive object, deeply traverse all properties
         return traverse(source)
     }
 
@@ -132,10 +105,8 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
             })
     } else if (isFunction(source)) {
         if (cb) {
-            // getter with cb
             getter = call ? () => call(source, WatchErrorCodes.WATCH_GETTER) : (source as () => any)
         } else {
-            // no cb -> simple effect
             getter = () => {
                 if (cleanup) {
                     pauseTracking()
@@ -192,21 +163,18 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
             return
         }
         if (cb) {
-            // watch(source, cb)
             const newValue = effect.run()
             if (
                 deep || forceTrigger || (isMultiSource ? (newValue as any[]).some((v, i) => hasChanged(v, oldValue[i])) : hasChanged(newValue, oldValue))
             ) {
-                // cleanup before running cb again
                 if (cleanup) {
                     cleanup()
                 }
                 const currentWatcher = activeWatcher
                 activeWatcher = effect
                 try {
-                    const args = [
+                    const args: Parameters<WatchCallback> = [
                         newValue,
-                        // pass undefined as the old value when it's changed for the first time
                         oldValue === INITIAL_WATCHER_VALUE
                             ? undefined
                             : isMultiSource && oldValue[0] === INITIAL_WATCHER_VALUE
@@ -215,16 +183,12 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
                         boundCleanup,
                     ]
                     oldValue = newValue
-                    call
-                        ? call(cb!, WatchErrorCodes.WATCH_CALLBACK, args)
-                        : // @ts-expect-error
-                        cb!(...args)
+                    call ? call(cb!, WatchErrorCodes.WATCH_CALLBACK, args) : cb!(...args)
                 } finally {
                     activeWatcher = currentWatcher
                 }
             }
         } else {
-            // watchEffect
             effect.run()
         }
     }
@@ -256,7 +220,6 @@ export function watch(source: WatchSource | WatchSource[] | WatchEffect | object
         effect.onTrigger = options.onTrigger
     }
 
-    // initial run
     if (cb) {
         if (immediate) {
             job(true)

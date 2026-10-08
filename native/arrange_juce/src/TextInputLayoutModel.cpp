@@ -60,6 +60,6 @@ namespace arrange::juce {
         return std::clamp(viewportX, 0.0f, std::max(0.0f, textWidth - metrics.textWidth + margin));
     }
 
-}  // namespace arrange::juce
+}
 
 #endif

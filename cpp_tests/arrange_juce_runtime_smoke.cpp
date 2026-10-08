@@ -73,7 +73,7 @@ namespace {
         const auto slot = test_support::event(inputNode, arrange::core::EventSlotKind::InputSubmit);
         return slot.valid() && slot.node == 42 && !test_support::event(inputNode, arrange::core::EventSlotKind::InputUpdate).valid();
     }
-}  // namespace
+}
 
 int main(int argc, char** argv) {
     {
@@ -283,7 +283,10 @@ int main(int argc, char** argv) {
         std::ofstream svg(validSvg);
         svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
     }
-    const auto iconPrepared = acquire("play.svg", {}).get();
+    // SVG 解析需要消息线程锁，Owner 等待期间继续派发语义消息而不授予视觉帧
+    auto iconRequest = acquire("play.svg", [] { ::juce::MessageManager::callAsync([] { ::juce::MessageManager::getInstance()->stopDispatchLoop(); }); });
+    ::juce::MessageManager::getInstance()->runDispatchLoop();
+    const auto iconPrepared = iconRequest.get();
     if (!iconPrepared.error.empty() || !iconPrepared.content || iconPrepared.content->intrinsicSize != arrange::core::Size{24, 24}) return 31;
     const std::vector iconOps{painterOp(iconPrepared.content, true)};
     ::juce::Graphics graphics(canvas);

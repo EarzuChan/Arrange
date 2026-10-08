@@ -12,7 +12,7 @@ test('AST 格式修复保留注释、字符串与必要分号，拆分语句且�
         '    A,',
         '    B,',
         '} from "types"; import { call } from "api";',
-        '/** 中文说明 */',
+        '// 中文说明',
         'export const value = call(',
         '    1,',
         '    2,',
@@ -33,7 +33,7 @@ test('AST 格式修复保留注释、字符串与必要分号，拆分语句且�
         const result = readFileSync(file, 'utf8')
         assert.match(result, /import type \{ A, B \} from "types"\nimport \{ call \} from "api"/)
         assert.match(result, /export const value = call\(1, 2\)/)
-        assert.equal(result.match(/\/\*\* 中文说明 \*\//g)?.length, 1)
+        assert.equal(result.match(/\/\/ 中文说明/g)?.length, 1)
         assert.match(result, /function run\(\) \{\n    call\(\)\n    call\(\)\n\}/)
         assert.ok(result.includes('const boundary = call();\n(call)()'))
         assert.ok(result.includes('"import { A } from \'x\'; import { B } from \'y\'"'))

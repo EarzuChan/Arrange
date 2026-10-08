@@ -4,16 +4,8 @@ import type { ArrangableInstance } from './arrangable.ts'
 import { LifecycleHooks } from './enums.ts'
 
 export enum ErrorCodes {
-    SETUP_FUNCTION,
-    STRUCTURE_FUNCTION,
-    NATIVE_EVENT_HANDLER = 5,
-    TRANSITION_HOOK,
-    APP_ERROR_HANDLER,
-    APP_WARN_HANDLER,
-    ASYNC_ARRANGABLE_LOADER,
-    SCHEDULER,
+    SCHEDULER = 10,
     ARRANGABLE_UPDATE,
-    APP_UNMOUNT_CLEANUP,
 }
 
 export type ErrorTypes = ErrorCodes | LifecycleHooks | number

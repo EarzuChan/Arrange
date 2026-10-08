@@ -12,6 +12,6 @@ namespace arrange::core {
     bool containsRect(Rect bounds, Point point) noexcept;
     bool containsShape(Rect bounds, const PaintStyleSemantics& shape, Point point) noexcept;
     Point inverseLayerPoint(Point point, Rect bounds, const TransformModifierSemantics& transform) noexcept;
-    // 绘制和命中使用同一层 bounds；坐标逆变换只在 graphicsLayer 所在层进行。
+    // 绘制和命中使用同一层 bounds；坐标逆变换只在 graphicsLayer 所在层进行
     bool enterModifier(const ModifierInstance& instance, Point& point) noexcept;
-}  // namespace arrange::core
+}

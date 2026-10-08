@@ -1,5 +1,4 @@
 export * from '@arrange/reactivity'
-export { computed } from './apiComputed.ts'
 export { defineArrangable } from './apiDefineArrangable.ts'
 export type { DefineArrangable } from './apiDefineArrangable.ts'
 export type { Arrangable, ArrangableDefinition, ArrangableProps, SetupContext, StructureProgram, Content, Contents, AppConfig } from './arrangable.ts'

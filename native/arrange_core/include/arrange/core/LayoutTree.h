@@ -90,4 +90,4 @@ namespace arrange::core {
         double frameTimeMillis_ = 0;
         mutable std::uint64_t nodeAccesses_ = 0;
     };
-}  // namespace arrange::core
+}

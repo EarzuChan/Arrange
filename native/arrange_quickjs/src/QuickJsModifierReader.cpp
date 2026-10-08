@@ -63,7 +63,7 @@ namespace arrange::quickjs {
             JS_ThrowTypeError(context, "Arrange Modifier 类型 '%.*s' 未定义", static_cast<int>(type.size()), type.data());
             return false;
         }
-    }  // namespace
+    }
 
     JSValue QuickJsModifierReader::throwTypeError(const char* message) {
         failed_ = true;
@@ -532,6 +532,6 @@ namespace arrange::quickjs {
         if (!instanceInput) events_.releaseModifierCallbacksExcept(id, retained, transaction_);
         return result;
     }
-}  // namespace arrange::quickjs
+}
 
 #endif

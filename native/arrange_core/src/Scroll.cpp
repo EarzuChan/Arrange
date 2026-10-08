@@ -56,7 +56,7 @@ namespace arrange::core {
             }
             return blocked;
         }
-    }  // namespace
+    }
 
     ScrollSnapshot ScrollDispatcher::snapshot(const ModifierInstance& instance) {
         const auto& input = std::get<LayoutModifierSemantics>(instance.descriptor.value);
@@ -119,4 +119,4 @@ namespace arrange::core {
         collectTargets(tree, id, point, false, targets);
         return targets.empty() ? fallback : targets.back().node;
     }
-}  // namespace arrange::core
+}

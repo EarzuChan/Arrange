@@ -397,7 +397,7 @@ namespace {
         resized.operations = {SetModifierMutation{1, chain}};
         check(pipeline.run(scene, 1, {0, 500, 0, 500}, &resized, true, frame).plan.measure, "size update skipped measure");
     }
-}  // namespace
+}
 
 int main() {
     try {

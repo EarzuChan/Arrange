@@ -39,9 +39,6 @@ export interface ReactiveEffectRunner<T = any> {
 export let activeSub: Subscriber | undefined
 
 export enum EffectFlags {
-    /**
-     * ReactiveEffect only
-     */
     ACTIVE = 1 << 0,
     RUNNING = 1 << 1,
     TRACKING = 1 << 2,
@@ -52,33 +49,11 @@ export enum EffectFlags {
     EVALUATED = 1 << 7,
 }
 
-/**
- * Subscriber is a type that tracks (or subscribes to) a list of deps.
- */
 export interface Subscriber extends DebuggerOptions {
-    /**
-     * Head of the doubly linked list representing the deps
-     * @internal
-     */
     deps?: Link
-    /**
-     * Tail of the same list
-     * @internal
-     */
     depsTail?: Link
-    /**
-     * @internal
-     */
     flags: EffectFlags
-    /**
-     * @internal
-     */
     next?: Subscriber
-    /**
-     * returning `true` indicates it's a computed that needs to call notify
-     * on its dep too
-     * @internal
-     */
     notify(): true | void
 }
 
@@ -86,25 +61,10 @@ const pausedQueueEffects = new WeakSet<ReactiveEffect>()
 
 export class ReactiveEffect<T = any>
     implements Subscriber, ReactiveEffectOptions {
-    /**
-     * @internal
-     */
     deps?: Link = undefined
-    /**
-     * @internal
-     */
     depsTail?: Link = undefined
-    /**
-     * @internal
-     */
     flags: EffectFlags = EffectFlags.ACTIVE | EffectFlags.TRACKING
-    /**
-     * @internal
-     */
     next?: Subscriber = undefined
-    /**
-     * @internal
-     */
     cleanup?: () => void = undefined
 
     scheduler?: EffectScheduler = undefined
@@ -117,14 +77,7 @@ export class ReactiveEffect<T = any>
             if (activeEffectScope.active) {
                 activeEffectScope.effects.push(this)
             } else {
-                // The active scope has already been stopped. This happens when a
-                // arrangable's setup is resumed after a top-level `await` (via the
-                // compiler-emitted `__restore()` from `withAsyncContext`) but the
                 // 作用域在延迟任务完成前已经卸载，退休任务不能重新收集依赖
-                // Without
-                // this guard the effect would become an orphan: not held by any
-                // scope (so it cannot be stopped via the scope chain) yet still
-                // able to subscribe to reactive deps and fire forever.
                 this.flags &= ~EffectFlags.ACTIVE
             }
         }
@@ -145,9 +98,6 @@ export class ReactiveEffect<T = any>
         }
     }
 
-    /**
-     * @internal
-     */
     notify(): void {
         if (
             this.flags & EffectFlags.RUNNING && !(this.flags & EffectFlags.ALLOW_RECURSE)
@@ -160,10 +110,7 @@ export class ReactiveEffect<T = any>
     }
 
     run(): T {
-        // TODO cleanupEffect
-
         if (!(this.flags & EffectFlags.ACTIVE)) {
-            // stopped during cleanup
             return this.fn()
         }
 
@@ -181,7 +128,15 @@ export class ReactiveEffect<T = any>
             if (__DEV__ && activeSub !== this) {
                 warn('活动响应式副作用未正确恢复，请检查 Arrange 内部作用域切换')
             }
-            cleanupDeps(this)
+            if (this.flags & EffectFlags.ACTIVE) cleanupDeps(this)
+            else {
+                // 运行中的停止已退订，这里只恢复追踪上下文，不能再次减少订阅计数
+                for (let link = this.deps; link; link = link.nextDep) {
+                    link.dep.activeLink = link.prevActiveLink
+                    link.prevActiveLink = undefined
+                }
+                this.deps = this.depsTail = undefined
+            }
             activeSub = prevEffect
             shouldTrack = prevShouldTrack
             this.flags &= ~EffectFlags.RUNNING
@@ -190,13 +145,24 @@ export class ReactiveEffect<T = any>
 
     stop(): void {
         if (this.flags & EffectFlags.ACTIVE) {
+            // 先退休，再清理；清理抛错或重入也不能重新启动已停止的副作用
+            this.flags &= ~EffectFlags.ACTIVE
+            pausedQueueEffects.delete(this)
             for (let link = this.deps; link; link = link.nextDep) {
                 removeSub(link)
             }
-            this.deps = this.depsTail = undefined
-            cleanupEffect(this)
-            this.onStop && this.onStop()
-            this.flags &= ~EffectFlags.ACTIVE
+            if (!(this.flags & EffectFlags.RUNNING)) this.deps = this.depsTail = undefined
+            let cleanupFailed = false
+            let cleanupError: unknown
+            try { cleanupEffect(this) } catch (error) {
+                cleanupFailed = true
+                cleanupError = error
+            }
+            try { this.onStop?.() } catch (error) {
+                if (cleanupFailed) throw new AggregateError([cleanupError, error], '响应式副作用停止时发生清理错误')
+                throw error
+            }
+            if (cleanupFailed) throw cleanupError
         }
     }
 
@@ -210,9 +176,6 @@ export class ReactiveEffect<T = any>
         }
     }
 
-    /**
-     * @internal
-     */
     runIfDirty(): void {
         if (this.flags & EffectFlags.PAUSED) {
             pausedQueueEffects.add(this)
@@ -227,23 +190,6 @@ export class ReactiveEffect<T = any>
         return isDirty(this)
     }
 }
-
-/**
- * For debugging
- */
-// function printDeps(sub: Subscriber) {
-//   let d = sub.deps
-//   let ds = []
-//   while (d) {
-//     ds.push(d)
-//     d = d.nextDep
-//   }
-//   return ds.map(d => ({
-//     id: d.id,
-//     prev: d.prevDep?.id,
-//     next: d.nextDep?.id,
-//   }))
-// }
 
 let batchDepth = 0
 let batchedSub: Subscriber | undefined
@@ -260,18 +206,12 @@ export function batch(sub: Subscriber, isComputed = false): void {
     batchedSub = sub
 }
 
-/**
- * @internal
- */
 export function startBatch(): void {
     batchDepth++
 }
 
-/**
- * Run batched effects when all batches have ended
- * @internal
- */
 export function endBatch(): void {
+    // 只有最外层批次结束才派发，批次内多次写入不会重复执行订阅者
     if (--batchDepth > 0) {
         return
     }
@@ -297,7 +237,6 @@ export function endBatch(): void {
             e.flags &= ~EffectFlags.NOTIFIED
             if (e.flags & EffectFlags.ACTIVE) {
                 try {
-                    // ACTIVE flag is effect-only
 
                     (e as ReactiveEffect).trigger()
                 } catch (err) {
@@ -312,19 +251,16 @@ export function endBatch(): void {
 }
 
 function prepareDeps(sub: Subscriber) {
-    // Prepare deps for tracking, starting from the head
+    // 先标记旧依赖未访问，并保存嵌套执行前的活动连接
     for (let link = sub.deps; link; link = link.nextDep) {
-        // set all previous deps' (if any) version to -1 so that we can track
-        // which ones are unused after the run
         link.version = -1
-        // store previous active sub if link was being used in another context
         link.prevActiveLink = link.dep.activeLink
         link.dep.activeLink = link
     }
 }
 
 function cleanupDeps(sub: Subscriber) {
-    // Cleanup unused deps
+    // 本轮未重新读取的依赖退休，其余恢复嵌套执行前的连接
     let head
     let tail = sub.depsTail
     let link = tail
@@ -332,22 +268,16 @@ function cleanupDeps(sub: Subscriber) {
         const prev = link.prevDep
         if (link.version === -1) {
             if (link === tail) tail = prev
-            // unused - remove it from the dep's subscribing effect list
             removeSub(link)
-            // also remove it from this effect's dep list
             removeDep(link)
         } else {
-            // The new head is the last node seen which wasn't removed
-            // from the doubly-linked list
             head = link
         }
 
-        // restore previous active link if any
         link.dep.activeLink = link.prevActiveLink
         link.prevActiveLink = undefined
         link = prev
     }
-    // set the new head & tail
     sub.deps = head
     sub.depsTail = tail
 }
@@ -360,18 +290,9 @@ function isDirty(sub: Subscriber): boolean {
             return true
         }
     }
-    // @ts-expect-error only for backwards compatibility where libs manually set
-    // this flag - e.g. Pinia's testing module
-    if (sub._dirty) {
-        return true
-    }
     return false
 }
 
-/**
- * Returning false indicates the refresh failed
- * @internal
- */
 export function refreshComputed(computed: ComputedRefImpl): undefined {
     if (
         computed.flags & EffectFlags.TRACKING && !(computed.flags & EffectFlags.DIRTY)
@@ -380,22 +301,13 @@ export function refreshComputed(computed: ComputedRefImpl): undefined {
     }
     computed.flags &= ~EffectFlags.DIRTY
 
-    // Global version fast path when no reactive changes has happened since
-    // last refresh.
     if (computed.globalVersion === globalVersion) {
         return
     }
     computed.globalVersion = globalVersion
 
-    // and therefore tracks no deps, thus we cannot rely on the dirty check.
-    // Instead, computed always re-evaluate and relies on the globalVersion
-    // fast path above for caching.
-    // #12337 if computed has no deps (does not rely on any reactive data) and evaluated,
-    // there is no need to re-evaluate.
-    if (
-
-        computed.flags & EffectFlags.EVALUATED && ((!computed.deps && !(computed as any)._dirty) || !isDirty(computed))
-    ) {
+    // 已求值的常量与未失效依赖均复用缓存，外部不能通过隐藏标记强制失效
+    if (computed.flags & EffectFlags.EVALUATED && (!computed.deps || !isDirty(computed))) {
         return
     }
     computed.flags |= EffectFlags.RUNNING
@@ -436,31 +348,22 @@ function removeSub(link: Link, soft = false) {
         link.nextSub = undefined
     }
     if (__DEV__ && dep.subsHead === link) {
-        // was previous head, point new head to next
         dep.subsHead = nextSub
     }
 
     if (dep.subs === link) {
-        // was previous tail, point new tail to prev
         dep.subs = prevSub
 
         if (!prevSub && dep.computed) {
-            // if computed, unsubscribe it from all its deps so this computed and its
-            // value can be GCed
             dep.computed.flags &= ~EffectFlags.TRACKING
             for (let l = dep.computed.deps; l; l = l.nextDep) {
-                // here we are only "soft" unsubscribing because the computed still keeps
-                // referencing the deps and the dep should not decrease its sub count
                 removeSub(l, true)
             }
         }
     }
 
     if (!soft && !--dep.sc && dep.map) {
-        // #11979
-        // property dep no longer has effect subscribers, delete it
-        // this mostly is for the case where an object is kept in memory but only a
-        // subset of its properties is tracked at one time
+        // 最后一个订阅退出后移除键对应的依赖，避免长期保存无人使用的键
         dep.map.delete(dep.key)
     }
 }
@@ -497,57 +400,28 @@ export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): R
     return runner
 }
 
-/**
- * Stops the effect associated with the given runner.
- *
- * @param runner - Association with the effect to stop tracking.
- */
 export function stop(runner: ReactiveEffectRunner): void {
     runner.effect.stop()
 }
 
-/**
- * @internal
- */
 export let shouldTrack = true
 const trackStack: boolean[] = []
 
-/**
- * Temporarily pauses tracking.
- */
 export function pauseTracking(): void {
     trackStack.push(shouldTrack)
     shouldTrack = false
 }
 
-/**
- * Re-enables effect tracking (if it was paused).
- */
 export function enableTracking(): void {
     trackStack.push(shouldTrack)
     shouldTrack = true
 }
 
-/**
- * Resets the previous global effect tracking state.
- */
 export function resetTracking(): void {
     const last = trackStack.pop()
     shouldTrack = last === undefined ? true : last
 }
 
-/**
- * Registers a cleanup function for the current active effect.
- * The cleanup function is called right before the next effect run, or when the
- * effect is stopped.
- *
- * Throws a warning if there is no current active effect. The warning can be
- * suppressed by passing `true` to the second argument.
- *
- * @param fn - the cleanup function to be registered
- * @param failSilently - if `true`, will not throw warning when called without
- * an active effect.
- */
 export function onEffectCleanup(fn: () => void, failSilently = false): void {
     if (activeSub instanceof ReactiveEffect) {
         activeSub.cleanup = fn
@@ -560,7 +434,6 @@ function cleanupEffect(e: ReactiveEffect) {
     const { cleanup } = e
     e.cleanup = undefined
     if (cleanup) {
-        // run cleanup without active effect
         const prevSub = activeSub
         activeSub = undefined
         try {
@@ -571,7 +444,6 @@ function cleanupEffect(e: ReactiveEffect) {
     }
 }
 
-// Native frame sampling publishes all animated channels before notifying observers.
 export function batchUpdates<T>(work: () => T): T {
     startBatch()
     try { return work() } finally { endBatch() }

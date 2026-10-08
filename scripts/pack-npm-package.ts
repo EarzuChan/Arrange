@@ -36,7 +36,7 @@ function copyIfExists(source: string, target: string): void {
 
 function copyPackageSource(sourceDir: string, targetDir: string, options: { includeBin?: boolean } = {}): void {
     mkdirSync(targetDir, { recursive: true })
-    const items = ["src", ...(options.includeBin ? ["bin"] : []), "README.md"]
+    const items = ["src", ...(options.includeBin ? ["bin"] : []), "README.md", "LICENSE", "UPSTREAM.md"]
     for (const item of items) copyIfExists(resolve(sourceDir, item), resolve(targetDir, item))
     writeJson(resolve(targetDir, "package.json"), readJson(resolve(sourceDir, "package.json")))
 }

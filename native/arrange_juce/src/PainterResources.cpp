@@ -25,7 +25,7 @@ namespace arrange::juce {
             if (!std::isfinite(result) || result <= 0.0f) throw std::runtime_error("Painter SVG 视口尺寸必须是正有限数");
             return result;
         }
-    }  // namespace
+    }
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir) {
         return [packageDir = std::move(packageDir)](const std::string& resource, std::function<void()> wake) {
@@ -72,6 +72,6 @@ namespace arrange::juce {
             return future;
         };
     }
-}  // namespace arrange::juce
+}
 
 #endif

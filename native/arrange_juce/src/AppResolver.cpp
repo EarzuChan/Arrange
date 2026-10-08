@@ -72,7 +72,7 @@ namespace arrange {
             if (root.empty()) return {};
             return (root / configuredPath).lexically_normal();
         }
-    }  // namespace
+    }
 
     ResolvedApp AppResolver::resolvePackage(const App& app) const {
         ResolvedApp result;
@@ -166,4 +166,4 @@ namespace arrange {
         result.ok = true;
         return result;
     }
-}  // namespace arrange
+}

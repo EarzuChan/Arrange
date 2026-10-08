@@ -1,5 +1,4 @@
 // SFA 的值壳在编译期消融；普通 TS 的数值由消费参数确定单位
-/** @arrangeValue dp */
 export class Dp {
     readonly unit = 'dp'
     constructor(readonly value: number) {
@@ -8,7 +7,6 @@ export class Dp {
     }
 }
 
-/** @arrangeValue sp */
 export class Sp {
     readonly unit = 'sp'
     constructor(readonly value: number) {
@@ -17,7 +15,6 @@ export class Sp {
     }
 }
 
-/** @arrangeValue px */
 export class Px {
     readonly unit = 'px'
     constructor(readonly value: number) {

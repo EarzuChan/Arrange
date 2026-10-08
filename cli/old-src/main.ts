@@ -137,7 +137,7 @@ function productsOf(parsed: Parsed, defaults: Product[]): Product[] {
     return result
 }
 
-// CMD IMPLs
+
 
 async function sync(parsed: Parsed): Promise<void> {
     const { root, config } = await loadAndCheckProject()

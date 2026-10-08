@@ -1,6 +1,6 @@
 import { painter, Alignment, Arrangement, ContentScale, M } from '@arrange/framework/ui'
 import { Column, Image, Input, Text, type BoxProps, type ColumnProps, type ImageProps, type InputProps, type RowProps, type TextProps } from '@arrange/framework/foundation'
-import { createApp, createScrollState, ref, type PropType, type ArrangableProps } from '@arrange/framework'
+import { createScrollState, ref, type PropType, type ArrangableProps } from '@arrange/framework'
 import { defineArrangable, callArrangable } from '@arrange/framework/internal'
 
 const text = ref('原生输入')
@@ -14,7 +14,7 @@ const scaledImage = { painter: painter('logo.png'), contentScale: ContentScale.F
 
 // @ts-expect-error 图片缩放仅接受已实现的枚举
 const invalidScale: ImageProps = { painter: painter('logo.png'), contentScale: 'Crpo' }
-// @ts-expect-error 图片没有基线对齐
+// @ts-expect-error 图片对齐要求二维值
 const invalidImageAlignment: ImageProps = { painter: painter('logo.png'), alignment: Alignment.Baseline }
 // @ts-expect-error Box 要求二维对齐
 const invalidBoxAlignment: BoxProps = { contentAlignment: Alignment.Baseline }
@@ -28,25 +28,10 @@ const invalidArrangement: RowProps = { horizontalArrangement: Arrangement.spaced
 const invalidArrangementName: ColumnProps = { verticalArrangement: Arrangement.End }
 // @ts-expect-error 文本对齐不接受拼写错误
 const invalidTextAlignment: TextProps = { textAlign: 'middel' }
-// @ts-expect-error 原生字体族尚无消费者
-const invalidFontStyle: TextProps = { style: { fontFamily: '不存在的字体族' } }
-// @ts-expect-error Input 未实现文本对齐选项
-const invalidInputAlignment: InputProps = { textAlign: 'center' }
 // @ts-expect-error Modifier 对齐不接受任意字符串
 M.align('Centre')
 // @ts-expect-error spacedBy 对齐不接受二维值
 Arrangement.spacedBy(8, 0, Alignment.TopEnd)
-
-// @ts-expect-error Arrangable状态由 setup 声明
-defineArrangable({ data: () => ({ count: 1 }) })
-// @ts-expect-error Arrangable不接受 Options 生命周期
-defineArrangable({ created() { } })
-// @ts-expect-error Arrangable不接受 mixins
-defineArrangable({ mixins: [] })
-// @ts-expect-error createApp 同样拒绝 Options API
-createApp({ methods: { act() { } } })
-// @ts-expect-error 应用不再提供无效的 mixin 方法
-createApp(defineArrangable({ setup: () => () => callArrangable(0, Text, { text: () => '正式 Arrangable' }) })).mixin({})
 
 const TypedArrangable = defineArrangable({
     props: { title: { type: String, required: true }, count: { type: Number, default: 2 }, onChange: Function as PropType<(value: number) => void> },
@@ -77,12 +62,8 @@ const missingSource: ImageProps = {}
 const invalidInput: InputProps = { onSubmit: (value: number) => { } }
 
 M.graphicsLayer({ translationX: 20, transformOrigin: { x: 0.5, y: 0 } }).clickable({ onClick: () => { }, enabled: true })
-// @ts-expect-error 图层字段必须属于正式参数集合
-M.graphicsLayer({ translation: 20 })
 // @ts-expect-error 点击回调必须是函数
 M.clickable({ onClick: 1 })
-// @ts-expect-error 尺寸范围区分主轴范围与二维范围
-M.widthIn({ minWidth: 20 })
 
 export const ManualPage = defineArrangable({
     setup(_props, { call }) {

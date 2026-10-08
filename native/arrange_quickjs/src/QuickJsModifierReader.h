@@ -41,6 +41,6 @@ namespace arrange::quickjs {
         arrange::core::MutationTransaction* transaction_ = nullptr;
         bool failed_ = false;
     };
-}  // namespace arrange::quickjs
+}
 
 #endif

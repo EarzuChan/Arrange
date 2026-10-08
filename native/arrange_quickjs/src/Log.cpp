@@ -30,22 +30,32 @@ namespace arrange {
 
         const char* levelCode(LogLevel level) noexcept {
             switch (level) {
-                case LogLevel::Verbose: return "V";
-                case LogLevel::Debug: return "D";
-                case LogLevel::Info: return "I";
-                case LogLevel::Warn: return "W";
-                case LogLevel::Error: return "E";
+                case LogLevel::Verbose:
+                    return "V";
+                case LogLevel::Debug:
+                    return "D";
+                case LogLevel::Info:
+                    return "I";
+                case LogLevel::Warn:
+                    return "W";
+                case LogLevel::Error:
+                    return "E";
             }
             return "I";
         }
 
         const char* levelColor(LogLevel level) noexcept {
             switch (level) {
-                case LogLevel::Verbose: return "\x1b[90m";
-                case LogLevel::Debug: return "\x1b[36m";
-                case LogLevel::Info: return "\x1b[32m";
-                case LogLevel::Warn: return "\x1b[33m";
-                case LogLevel::Error: return "\x1b[31m";
+                case LogLevel::Verbose:
+                    return "\x1b[90m";
+                case LogLevel::Debug:
+                    return "\x1b[36m";
+                case LogLevel::Info:
+                    return "\x1b[32m";
+                case LogLevel::Warn:
+                    return "\x1b[33m";
+                case LogLevel::Error:
+                    return "\x1b[31m";
             }
             return "\x1b[32m";
         }
