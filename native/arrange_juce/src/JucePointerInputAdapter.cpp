@@ -9,15 +9,23 @@
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include "ScrollProbe.h"
+#include "PlatformWheelInput.h"
 
 namespace arrange::juce {
     namespace {
-        float wheelDistanceScale([[maybe_unused]] const ::juce::MouseWheelDetails& wheel) noexcept {
-            // JUCE 的 macOS 精细 delta 是 AppKit point 值的 1/512；恢复逻辑距离而不是套用滚轮步长。
-#if JUCE_MAC
-            if (wheel.isSmooth) return 512.0f;
-#endif
-            return 48.0f;
+        void recordWheelInput(ScrollProbe::Sample sample, const WheelInput& input, ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, arrange::core::NodeId root) {
+            if (!ScrollProbe::active()) return;
+            sample.kind = ScrollProbe::Kind::Input;
+            sample.phase = static_cast<std::uint8_t>(input.phase);
+            sample.momentumPhase = static_cast<std::uint8_t>(input.momentumPhase);
+            sample.unitX = static_cast<std::uint8_t>(input.unitX);
+            sample.unitY = static_cast<std::uint8_t>(input.unitY);
+            sample.nativePhases = input.nativePhases;
+            sample.interactive = session.interactive(diagnostics);
+            sample.valid = runtime.scene().contains(root);
+            sample.pending = runtime.hasPendingFrameWork();
+            sample.revision = runtime.publishedFrame().revision;
+            ScrollProbe::record(sample);
         }
     }
 
@@ -56,35 +64,53 @@ namespace arrange::juce {
     }
 
     bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) const {
-        if (ScrollProbe::active()) {
-            ScrollProbe::Sample sample;
-            sample.kind = ScrollProbe::Kind::Input;
-            sample.sourceMillis = static_cast<double>(event.eventTime.toMilliseconds());
-            sample.x = event.position.x;
-            sample.y = event.position.y;
-            sample.deltaX = wheel.deltaX;
-            sample.deltaY = wheel.deltaY;
-            sample.inertial = wheel.isInertial;
-            sample.smooth = wheel.isSmooth;
-            sample.reversed = wheel.isReversed;
-            sample.interactive = session.interactive(diagnostics);
-            sample.valid = runtime.scene().contains(root);
-            sample.pending = runtime.hasPendingFrameWork();
-            sample.revision = runtime.publishedFrame().revision;
-            ScrollProbe::record(sample);
-        }
+        const auto input = readPlatformWheelInput(event, wheel);
+        ScrollProbe::Sample sample;
+        sample.sourceMillis = static_cast<double>(event.eventTime.toMilliseconds());
+        sample.x = event.position.x;
+        sample.y = event.position.y;
+        sample.deltaX = wheel.deltaX;
+        sample.deltaY = wheel.deltaY;
+        sample.inertial = wheel.isInertial;
+        sample.smooth = wheel.isSmooth;
+        sample.reversed = wheel.isReversed;
+        recordWheelInput(sample, input, runtime, session, diagnostics, root);
+        return dispatchWheel(runtime, session, diagnostics, interaction, root, {event.position.x, event.position.y}, input);
+    }
+
+    bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input) const {
+        ScrollProbe::Sample sample;
+        sample.sourceMillis = input.timeMillis;
+        sample.x = point.x;
+        sample.y = point.y;
+        sample.deltaX = input.deltaX;
+        sample.deltaY = input.deltaY;
+        sample.inertial = input.inertial;
+        sample.smooth = input.precise;
+        recordWheelInput(sample, input, runtime, session, diagnostics, root);
+        return dispatchWheel(runtime, session, diagnostics, interaction, root, point, input);
+    }
+
+    bool JucePointerInputAdapter::dispatchWheel(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input) const {
         if (!session.interactive(diagnostics) || !runtime.scene().contains(root)) {
+            interaction.cancelWheel();
             return false;
         }
-
-        const auto distanceScale = wheelDistanceScale(wheel);
-        const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, event.position.x, event.position.y, wheel.deltaX * distanceScale, wheel.deltaY * distanceScale, runtime.publishedFrame().revision, 1.0f);
+        const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision);
         const auto& result = wheelResult.scroll;
         if (ScrollProbe::active()) {
+            const auto logicalDistance = [&](float delta, WheelUnit unit) { return delta * (unit == WheelUnit::Lines ? scrollLineDistance : unit == WheelUnit::Pages ? result.viewportSize : 1.0f); };
             ScrollProbe::Sample sample;
             sample.kind = ScrollProbe::Kind::Route;
-            sample.deltaX = wheel.deltaX * distanceScale;
-            sample.deltaY = wheel.deltaY * distanceScale;
+            sample.deltaX = logicalDistance(input.deltaX, input.unitX);
+            sample.deltaY = logicalDistance(input.deltaY, input.unitY);
+            sample.phase = static_cast<std::uint8_t>(input.phase);
+            sample.momentumPhase = static_cast<std::uint8_t>(input.momentumPhase);
+            sample.nativePhases = input.nativePhases;
+            sample.sessionId = wheelResult.sessionId;
+            sample.locked = wheelResult.locked;
+            sample.sessionStarted = wheelResult.sessionStarted;
+            sample.sessionCancelled = wheelResult.sessionCancelled;
             sample.revision = runtime.publishedFrame().revision;
             sample.target = result.target;
             sample.modifierIdentity = result.modifier.identity;
@@ -95,11 +121,8 @@ namespace arrange::juce {
             sample.maxValue = result.maxValue;
             ScrollProbe::record(sample);
         }
-        if (!result.consumed) {
-            return false;
-        }
-
-        runtime.enqueueIntent(arrange::core::InputIntent::wheel(wheelResult.horizontal ? "native horizontal wheel input" : "native vertical wheel input", result.target, result.eventSlot));
+        if (!result.consumed) return false;
+        runtime.enqueueIntent(arrange::core::InputIntent::wheel(wheelResult.horizontal ? "原生横向滚动" : "原生纵向滚动", result.target, result.eventSlot));
         runtime.enqueueScrollSnapshotEvent(result.eventSlot, result);
         return true;
     }

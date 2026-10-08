@@ -53,6 +53,9 @@ namespace arrange::juce {
 
     class ArrangeEditor;
     class EditorSceneHost;
+#if JUCE_WINDOWS
+    class WindowsPrecisionWheelSource;
+#endif
 
     class EditorShellDriver final {
        public:
@@ -81,6 +84,9 @@ namespace arrange::juce {
         void paint(::juce::Graphics& g) override;
         void resized() override;
         void parentHierarchyChanged() override;
+        void focusLost(FocusChangeType cause) override;
+        void focusGained(FocusChangeType cause) override;
+        void visibilityChanged() override;
         void mouseDown(const ::juce::MouseEvent& event) override;
         void mouseDrag(const ::juce::MouseEvent& event) override;
         void mouseUp(const ::juce::MouseEvent& event) override;
@@ -107,6 +113,10 @@ namespace arrange::juce {
 
         EditorConfig config_;
         std::unique_ptr<EditorSceneHost> sceneHost_;
+#if JUCE_WINDOWS
+        // 未测试！
+        std::unique_ptr<WindowsPrecisionWheelSource> precisionWheelSource_;
+#endif
         EditorFrameClock frameClock_;
         EditorShellDriver shell_;
     };

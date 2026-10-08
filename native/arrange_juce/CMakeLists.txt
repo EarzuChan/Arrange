@@ -57,3 +57,14 @@ target_link_libraries(arrange_juce PUBLIC
   juce::juce_audio_processors
   juce::juce_gui_basics
 )
+
+if(APPLE)
+  target_sources(arrange_juce PRIVATE src/PlatformWheelInput_mac.mm)
+elseif(WIN32)
+  # 未测试！
+  target_compile_definitions(arrange_juce PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+  target_sources(arrange_juce PRIVATE src/PlatformWheelInput_windows.cpp src/WindowsPrecisionWheelSource.cpp)
+  target_link_libraries(arrange_juce PRIVATE comctl32 ole32 uuid)
+else()
+  target_sources(arrange_juce PRIVATE src/PlatformWheelInput_fallback.cpp)
+endif()

@@ -21,10 +21,7 @@ namespace arrange::juce {
         arrange::core::EventSlotId eventSlot;
     };
 
-    struct InteractionWheelResult {
-        arrange::core::ScrollResult scroll;
-        bool horizontal = false;
-    };
+    using InteractionWheelResult = WheelDispatchResult;
 
     class InteractionStateOwner final {
        public:
@@ -49,6 +46,9 @@ namespace arrange::juce {
         [[nodiscard]] InteractionPointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y);
         [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
+        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision = 0);
+        void cancelWheel() { pointer_.cancelWheel(); }
+
         [[nodiscard]] bool isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
         [[nodiscard]] ::juce::Range<int> highlightedRegion(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
         [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range, const TextInputCallbacks& callbacks);
@@ -63,6 +63,7 @@ namespace arrange::juce {
         [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks);
 
         void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
+            pointer_.synchronizePublishedWheel(tree, runtimeReady);
             input_.synchronizePublishedInput(tree, runtimeReady);
         }
 

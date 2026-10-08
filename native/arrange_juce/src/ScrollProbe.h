@@ -27,6 +27,15 @@ namespace arrange::juce {
             std::uint64_t inputSequence = 0;
             std::uint64_t previousRevision = 0;
             std::uint64_t modifierIdentity = 0;
+            std::uint64_t sessionId = 0;
+            std::uint8_t phase = 0;
+            std::uint8_t momentumPhase = 0;
+            std::uint8_t unitX = 0;
+            std::uint8_t unitY = 0;
+            bool nativePhases = false;
+            bool locked = false;
+            bool sessionStarted = false;
+            bool sessionCancelled = false;
             bool inertial = false;
             bool smooth = false;
             bool horizontal = false;

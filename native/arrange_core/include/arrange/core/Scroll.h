@@ -4,9 +4,18 @@
 #include "Geometry.h"
 #include "LayoutTree.h"
 #include <unordered_map>
+#include <vector>
 
 namespace arrange::core {
     using PendingScrollValues = std::unordered_map<std::uint64_t, float>;
+
+    struct ScrollTarget {
+        NodeId node = 0;
+        ModifierHandle modifier;
+        bool horizontal = false;
+    };
+
+    using ScrollHitPath = std::vector<ScrollTarget>;
 
     struct ScrollResult : ScrollSnapshot {
         bool consumed = false;
@@ -18,6 +27,8 @@ namespace arrange::core {
     class ScrollDispatcher {
        public:
         static ScrollSnapshot snapshot(const ModifierInstance& instance);
+        static ScrollHitPath hitPath(const LayoutTree& tree, NodeId root, Point point);
+        static ScrollResult targetWheel(const LayoutTree& tree, const ScrollTarget& target, float delta, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr);
         ScrollResult verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
         ScrollResult horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
         static bool hasVerticalScroll(const LayoutNode& node);

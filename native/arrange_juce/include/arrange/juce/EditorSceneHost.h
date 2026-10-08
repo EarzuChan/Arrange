@@ -5,6 +5,8 @@
 #endif
 
 #include <memory>
+#include <arrange/juce/WheelInput.h>
+#include <arrange/core/Geometry.h>
 #include <string>
 #include <string_view>
 
@@ -43,6 +45,8 @@ namespace arrange::juce {
         [[nodiscard]] bool pointerDrag(const ::juce::MouseEvent& event);
         void pointerUp(const ::juce::MouseEvent& event);
         [[nodiscard]] bool wheelMove(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel);
+        [[nodiscard]] bool wheelMove(arrange::core::Point point, const WheelInput& input);
+        void cancelWheel();
 
         [[nodiscard]] bool isTextInputActive() const;
         [[nodiscard]] ::juce::Range<int> highlightedRegion() const;

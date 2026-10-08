@@ -166,6 +166,12 @@ namespace arrange::juce {
             return pointerEvents_.wheelMove(runtime_, session_, diagnostics_, interaction_, rootNodeId, event, wheel);
         }
 
+        bool wheelMove(arrange::core::Point point, const WheelInput& input) {
+            return pointerEvents_.wheelMove(runtime_, session_, diagnostics_, interaction_, rootNodeId, point, input);
+        }
+
+        void cancelWheel() { interaction_.cancelWheel(); }
+
         bool isTextInputActive() const {
             return textInput_.isActive(runtime_.scene().tree(), session_, diagnostics_, interaction_);
         }
@@ -324,6 +330,12 @@ namespace arrange::juce {
     bool EditorSceneHost::wheelMove(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
         return impl_->wheelMove(event, wheel);
     }
+
+    bool EditorSceneHost::wheelMove(arrange::core::Point point, const WheelInput& input) {
+        return impl_->wheelMove(point, input);
+    }
+
+    void EditorSceneHost::cancelWheel() { impl_->cancelWheel(); }
 
     bool EditorSceneHost::isTextInputActive() const {
         return impl_->isTextInputActive();

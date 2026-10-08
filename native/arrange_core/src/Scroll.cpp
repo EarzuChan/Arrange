@@ -2,6 +2,7 @@
 #include <arrange/core/ModifierGeometry.h>
 
 #include <algorithm>
+#include <optional>
 #include <vector>
 
 namespace arrange::core {
@@ -18,18 +19,16 @@ namespace arrange::core {
             return nullptr;
         }
 
-        struct ScrollTarget {
-            NodeId node;
-            const ModifierInstance* instance;
-        };
-
-        bool collectTargets(const LayoutTree& tree, NodeId id, Point point, bool vertical, std::vector<ScrollTarget>& targets) {
+        bool collectTargets(const LayoutTree& tree, NodeId id, Point point, std::optional<bool> vertical, ScrollHitPath& targets) {
             if (!nodeInteractionEnabled(tree, id)) return false;
             const auto& node = tree.node(id);
             const auto initialSize = targets.size();
             for (const auto& instance : node.modifier.elements()) {
                 if (!enterModifier(instance, point)) return targets.size() != initialSize;
-                if (isScroll(instance, vertical) && containsRect(instance.bounds, point)) targets.push_back({id, &instance});
+                const auto* layout = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value);
+                if (layout && layout->enabled && (layout->kind == LayoutModifierKind::VerticalScroll || layout->kind == LayoutModifierKind::HorizontalScroll) && (!vertical || isScroll(instance, *vertical)) && containsRect(instance.bounds, point)) {
+                    targets.push_back({id, instance.handle, layout->kind == LayoutModifierKind::HorizontalScroll});
+                }
             }
             auto children = node.children;
             std::stable_sort(children.begin(), children.end(), [&](NodeId a, NodeId b) { return tree.node(a).modifier.zIndex() < tree.node(b).modifier.zIndex(); });
@@ -40,17 +39,11 @@ namespace arrange::core {
 
         ScrollResult wheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, bool vertical, const PendingScrollValues* pending) {
             if (delta == 0) return {};
-            std::vector<ScrollTarget> targets;
+            ScrollHitPath targets;
             collectTargets(tree, root, point, vertical, targets);
             ScrollResult blocked;
             for (auto it = targets.rbegin(); it != targets.rend(); ++it) {
-                const auto& instance = *it->instance;
-                const auto& input = std::get<LayoutModifierSemantics>(instance.descriptor.value);
-                auto metrics = ScrollDispatcher::snapshot(instance);
-                const auto current = pending && pending->contains(instance.handle.identity) ? pending->at(instance.handle.identity) : metrics.value;
-                const auto next = std::clamp(current - delta * pixels, 0.0f, metrics.maxValue);
-                metrics.value = next;
-                ScrollResult result{metrics, next != current, it->node, input.eventSlot, instance.handle};
+                const auto result = ScrollDispatcher::targetWheel(tree, *it, delta, pixels, pending);
                 if (result.consumed) return result;
                 if (!blocked.target) blocked = result;
             }
@@ -65,6 +58,24 @@ namespace arrange::core {
         const auto content = vertical ? instance.childMeasured.height : instance.childMeasured.width;
         const auto maximum = std::max(0.0f, content - viewport);
         return {std::clamp(input.scrollValue, 0.0f, maximum), maximum, viewport, content};
+    }
+
+    ScrollHitPath ScrollDispatcher::hitPath(const LayoutTree& tree, NodeId root, Point point) {
+        ScrollHitPath targets;
+        if (tree.contains(root)) collectTargets(tree, root, point, std::nullopt, targets);
+        return targets;
+    }
+
+    ScrollResult ScrollDispatcher::targetWheel(const LayoutTree& tree, const ScrollTarget& target, float delta, float pixels, const PendingScrollValues* pending) {
+        if (!target.modifier.valid() || !nodeInteractionEnabled(tree, target.node)) return {};
+        const auto* instance = tree.node(target.node).modifier.find(target.modifier);
+        if (!instance || !isScroll(*instance, !target.horizontal)) return {};
+        const auto& input = std::get<LayoutModifierSemantics>(instance->descriptor.value);
+        auto metrics = snapshot(*instance);
+        const auto current = pending && pending->contains(instance->handle.identity) ? pending->at(instance->handle.identity) : metrics.value;
+        const auto next = std::clamp(current - delta * pixels, 0.0f, metrics.maxValue);
+        metrics.value = next;
+        return {metrics, next != current, target.node, input.eventSlot, instance->handle};
     }
 
     ScrollResult ScrollDispatcher::verticalWheel(const LayoutTree& tree, NodeId root, Point point, float delta, float pixels, const PendingScrollValues* pending) const {
@@ -109,13 +120,13 @@ namespace arrange::core {
     }
 
     NodeId ScrollDispatcher::findVerticalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
-        std::vector<ScrollTarget> targets;
+        ScrollHitPath targets;
         collectTargets(tree, id, point, true, targets);
         return targets.empty() ? fallback : targets.back().node;
     }
 
     NodeId ScrollDispatcher::findHorizontalScrollTarget(const LayoutTree& tree, NodeId id, Point point, NodeId fallback) {
-        std::vector<ScrollTarget> targets;
+        ScrollHitPath targets;
         collectTargets(tree, id, point, false, targets);
         return targets.empty() ? fallback : targets.back().node;
     }

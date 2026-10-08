@@ -7,7 +7,7 @@ namespace arrange::juce {
 
     void InteractionStateOwner::reset() {
         input_.reset();
-        pointer_.reset();
+        pointer_.resetForSceneChange();
     }
 
     const std::optional<arrange::core::NodeId>& InteractionStateOwner::focusedNode() const noexcept {
@@ -36,7 +36,11 @@ namespace arrange::juce {
 
     InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision, float pixelsPerWheelUnit) {
         const auto result = pointer_.wheel(tree, root, {x, y}, deltaX, deltaY, publishedRevision, pixelsPerWheelUnit);
-        return {result.scroll, result.horizontal};
+        return result;
+    }
+
+    InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision) {
+        return pointer_.wheel(tree, root, {x, y}, input, publishedRevision);
     }
 
     bool InteractionStateOwner::isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const {

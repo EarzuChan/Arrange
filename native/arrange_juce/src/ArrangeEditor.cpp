@@ -4,6 +4,9 @@
 
 #include <arrange/juce/EditorSceneHost.h>
 #include "ScrollProbe.h"
+#if JUCE_WINDOWS
+#include "WindowsPrecisionWheelSource.h"
+#endif
 
 #include <utility>
 
@@ -48,6 +51,10 @@ namespace arrange::juce {
             sample.pending = editor.sceneHost_->wantsVBlank();
             ScrollProbe::record(sample);
         }
+#if JUCE_WINDOWS
+        // 未测试！
+        if (editor.precisionWheelSource_) editor.precisionWheelSource_->tick();
+#endif
         // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线
         const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
         editor.updateWindowTitle();
@@ -59,10 +66,20 @@ namespace arrange::juce {
 
     ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor, EditorConfig config) : ::juce::AudioProcessorEditor(processor), sceneHost_(std::make_unique<EditorSceneHost>()) {
         sceneHost_->setWorkAvailable([this] { updateFrameClockState(); });
+#if JUCE_WINDOWS
+        // 未测试！
+        precisionWheelSource_ = std::make_unique<WindowsPrecisionWheelSource>([this](arrange::core::Point point, const WheelInput& input) {
+            (void)sceneHost_->wheelMove(point, input);
+        }, [this] { requestFrameClockResyncAsync(); });
+#endif
         configure(std::move(config));
     }
 
     ArrangeEditor::~ArrangeEditor() {
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->cancel();
+#endif
         frameClock_.stop();
     }
 
@@ -85,6 +102,10 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::resized() {
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->sync(*this);
+#endif
         sceneHost_->resized(getWidth(), getHeight());
         shell_.afterResize(*this);
     }
@@ -94,8 +115,35 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::parentHierarchyChanged() {
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->sync(*this);
+#endif
         updateWindowTitle();
         updateFrameClockState();
+    }
+
+    void ArrangeEditor::focusLost(FocusChangeType) {
+        sceneHost_->cancelWheel();
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->cancel();
+#endif
+    }
+
+    void ArrangeEditor::focusGained(FocusChangeType) {
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->sync(*this);
+#endif
+    }
+
+    void ArrangeEditor::visibilityChanged() {
+        if (!isShowing()) sceneHost_->cancelWheel();
+#if JUCE_WINDOWS
+        // 未测试！
+        if (precisionWheelSource_) precisionWheelSource_->sync(*this);
+#endif
     }
 
     void ArrangeEditor::mouseDown(const ::juce::MouseEvent& event) {
@@ -208,7 +256,12 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::updateFrameClockState() {
-        frameClock_.sync(*this, sceneHost_->wantsVBlank(), [this](double timestampMillis) {
+        auto wantsVBlank = sceneHost_->wantsVBlank();
+#if JUCE_WINDOWS
+        // 未测试！
+        wantsVBlank = wantsVBlank || (precisionWheelSource_ && precisionWheelSource_->needsTicks());
+#endif
+        frameClock_.sync(*this, wantsVBlank, [this](double timestampMillis) {
             frameClock_.beginVBlankCallback();
             shell_.vblankTick(*this, timestampMillis);
             if (frameClock_.endVBlankCallback()) {
