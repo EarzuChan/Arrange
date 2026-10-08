@@ -1,14 +1,17 @@
 import { join, resolve } from "node:path"
 import { parseDocument, stringify } from "yaml"
-import { localDefinitionSchema, projectDefinitionSchema, projectStateSchema, type ProjectState } from "./ProjectState.ts"
+import { localDefinitionSchema, projectDefinitionSchema, projectStateSchema, type LocalDefinition, type ProjectState } from "./ProjectState.ts"
 import { writeTextFile } from "../util/Utils.ts"
 import { errorMessage } from "../util/Utils.ts"
 import { readSnapshot, type FileSnapshot } from "../util/FileUtils.ts"
+import type { FileTransaction } from "../util/FileTransaction.ts"
 
 export const projectFileNames = { project: "arrange.project.yaml", local: "arrange.local.yaml" } as const
 export interface StateDiagnostic { readonly path: string, readonly message: string }
 
 export class ProjectStateStore {
+    constructor(private readonly writer: FileTransaction) { }
+
     async deepLoad(rootDir: string) {
         const root = resolve(rootDir)
 
@@ -60,5 +63,12 @@ export class ProjectStateStore {
         const validated = projectStateSchema.parse(state)
         await writeTextFile(join(state.rootDir, projectFileNames.project), stringify(validated.project))
         if (validated.local !== null) await writeTextFile(join(state.rootDir, projectFileNames.local), stringify(validated.local))
+    }
+
+    async saveLocal(rootDir: string, local: LocalDefinition, guards: readonly FileSnapshot[]): Promise<void> {
+        const path = join(resolve(rootDir), projectFileNames.local)
+        const before = guards.find(snapshot => snapshot.path === path)
+        if (!before) throw new Error("缺少本机配置扫描快照")
+        await this.writer.write(resolve(rootDir), [{ before, after: stringify(localDefinitionSchema.parse(local)) }], guards)
     }
 }

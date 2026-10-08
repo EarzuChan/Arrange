@@ -1,4 +1,5 @@
 #include "TextFixtures.h"
+#include "JuceTestApplication.h"
 #include <arrange/core/PointerInputProcessor.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/LayoutTree.h>
@@ -75,7 +76,7 @@ namespace {
     }
 }
 
-int main(int argc, char** argv) {
+int runSmoke() {
     {
         std::ostringstream captured;
         auto* previous = std::clog.rdbuf(captured.rdbuf());
@@ -87,8 +88,6 @@ int main(int argc, char** argv) {
         if (output.find(" - A - RuntimeSmoke \x1b[33m[W]\x1b[0m > \x1b[33m换行 已清理 后续内容\x1b[0m\n") == std::string::npos) return 40;
     }
 #if !ARRANGE_WITH_QUICKJS_NG || !ARRANGE_JUCE_WITH_JUCE
-    (void)argc;
-    (void)argv;
     std::cerr << "Arrange JUCE 运行时烟雾测试需要 QuickJS 和 JUCE\n";
     return 2;
 #else
@@ -99,7 +98,9 @@ int main(int argc, char** argv) {
         return 18;
     }
 
-    const auto entry = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::absolute("build/demo-ui-dist/app.js");
+    const auto parameters = ::juce::JUCEApplication::getCommandLineParameterArray();
+    const auto packagePath = parameters.isEmpty() ? std::string("build/demo-ui-dist/app.js") : parameters[0].toStdString();
+    const auto entry = std::filesystem::absolute(std::filesystem::path(std::u8string(packagePath.begin(), packagePath.end())));
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
     host->setPainterLoader(arrange::juce::packagePainterLoader(entry.parent_path()));
@@ -334,3 +335,6 @@ int main(int argc, char** argv) {
     return 0;
 #endif
 }
+
+using RuntimeSmokeApplication = arrange::test::JuceTestApplication<runSmoke>;
+START_JUCE_APPLICATION(RuntimeSmokeApplication)

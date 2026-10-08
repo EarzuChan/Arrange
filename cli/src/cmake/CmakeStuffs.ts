@@ -1,4 +1,4 @@
-import { defaultFetchUrl } from "../CliMetadata.ts"
+import { defaultFetchUrl, defaultBundleIdPrefix } from "../CliMetadata.ts"
 import { resolve } from "node:path"
 import { TextFile } from "../managed/ManagedFile.ts"
 import { TextCluster } from "../managed/TextCluster.ts"
@@ -31,7 +31,7 @@ export const pluginVersionRegion: TextRegion = new class extends TextRegion {
     readonly managedItemId = "cmake.plugin-version"
 
     protected override makeInner(state: ProjectState): string {
-        return `    VERSION ${quote(state.project.project.version)}\n`
+        return `    VERSION ${quote(state.project.project.version.split(/[+-]/)[0])}\n`
     }
 }()
 
@@ -44,6 +44,7 @@ export const pluginIdentityRegion: TextRegion = new class extends TextRegion {
         return `    COMPANY_NAME ${quote(project.vendorName)}
     PLUGIN_MANUFACTURER_CODE ${project.vendorCode}
     PLUGIN_CODE ${project.pluginCode}
+    BUNDLE_ID ${quote(`${defaultBundleIdPrefix}.${project.vendorCode.toLowerCase()}.${state.project.native.target.replace(/[^A-Za-z0-9.-]/g, "-")}`)}
 `
     }
 }()
@@ -88,7 +89,7 @@ export const jucePluginCluster: TextCluster = new class extends TextCluster {
         const regions = this.regions.map(region => region.make(state)).join("")
         const isSynth = state.project.native.pluginType === "instrument" ? "TRUE" : "FALSE"
 
-        return `juce_add_plugin(${state.project.project.name}
+        return `juce_add_plugin(${state.project.native.target}
 ${regions}    IS_SYNTH ${isSynth}
     NEEDS_MIDI_INPUT ${isSynth}
     NEEDS_MIDI_OUTPUT FALSE
@@ -110,22 +111,22 @@ export const cmakeListsFile: TextFile = new class extends TextFile {
     }
 
     override make(state: ProjectState): string {
-        const name = state.project.project.name
+        const target = state.project.native.target
         const fetchContent = fetchContentCluster.make(state)
         const plugin = jucePluginCluster.make(state)
         return `cmake_minimum_required(VERSION 3.24)
-project(${name} LANGUAGES C CXX)
+project(${target} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ${fetchContent}
 ${plugin}
-juce_generate_juce_header(${name})
-target_sources(${name} PRIVATE Source/${name}Processor.cpp)
-target_compile_definitions(${name} PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
-target_compile_definitions(${name} PUBLIC JUCE_VST3_CAN_REPLACE_VST2=0)
-target_link_libraries(${name} PRIVATE
+juce_generate_juce_header(${target})
+target_sources(${target} PRIVATE "Source/${target}Processor.cpp")
+target_compile_definitions(${target} PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_compile_definitions(${target} PUBLIC JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(${target} PRIVATE
     Arrange::framework
     juce::juce_audio_utils
     juce::juce_dsp

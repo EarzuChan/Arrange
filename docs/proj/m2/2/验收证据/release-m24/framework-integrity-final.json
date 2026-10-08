@@ -1,0 +1,13 @@
+{
+  "package": "@arrange/framework",
+  "version": "0.0.0-m.2.4",
+  "files": 125,
+  "tarMatchesSource": true,
+  "installedMatchesTar": true,
+  "physicalBundledPackages": 4,
+  "lockIntegrityMatchesTar": true,
+  "sha256": "fed388c25df9e4fb8fc16d0faf2c8f4d29adff2f814beafc3b9f8749be741511",
+  "integrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+  "consumerVite": "8.0.16",
+  "appSha256": "ab9af52a4043c3bb30414567c06fa7163f05480dbb2a22b325441914b8a40d2d"
+}

@@ -1,0 +1,10 @@
+{
+  "portsClosed": {
+    "9178": true,
+    "54225": true
+  },
+  "demoNativeProcesses": 0,
+  "debugDevExit": 0,
+  "releaseDevExit": 0,
+  "registryStopped": true
+}

@@ -44,7 +44,13 @@ namespace arrange::juce {
         }
 
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-        scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
+        try {
+            scriptHost->setPainterLoader(livePainterLoader(resolved.devServerUrl));
+        } catch (const std::exception& failure) {
+            result.error = makeErrorScreenModel(ErrorSource::AppPackage, failure.what(), {}, bundleUrl);
+            setToast(result, LogLevel::Error, "Live 资源来源无效", failure.what());
+            return result;
+        }
         const auto executed = scriptHost->executeLiveModules(snapshot);
         if (!executed.ok) {
             result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, executed.error, {}, bundleUrl);

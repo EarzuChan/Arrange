@@ -1,0 +1,24 @@
+[
+  {
+    "name": "@arrange/framework",
+    "version": "0.0.0-m.2.4",
+    "tag": "m",
+    "tarball": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-framework-0.0.0-m.2.4.tgz",
+    "sha256": "fed388c25df9e4fb8fc16d0faf2c8f4d29adff2f814beafc3b9f8749be741511",
+    "integrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+    "publishDryRunExit": 0,
+    "dryRunMatchesTar": true,
+    "files": 125
+  },
+  {
+    "name": "@arrange/cli",
+    "version": "1.0.0",
+    "tag": "latest",
+    "tarball": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-cli-1.0.0.tgz",
+    "sha256": "eaecc13c5fedd90f0dfc7d181bb2efad934bb53f6fc0d3e21931fbbf5f22be01",
+    "integrity": "sha512-M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+    "publishDryRunExit": 0,
+    "dryRunMatchesTar": true,
+    "files": 75
+  }
+]

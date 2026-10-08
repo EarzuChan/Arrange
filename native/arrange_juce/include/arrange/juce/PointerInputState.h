@@ -24,7 +24,7 @@ namespace arrange::juce {
 
         [[nodiscard]] arrange::core::PointerDispatchResult pointerUp(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId = 0);
 
-        [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision = 0);
+        [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
        private:
         arrange::core::HitTester hitTester_;

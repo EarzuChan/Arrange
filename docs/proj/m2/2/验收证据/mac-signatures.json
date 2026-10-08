@@ -1,0 +1,34 @@
+[
+    {
+        "flavor": "debug",
+        "product": "standalone",
+        "bundle": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/debug/1.2.3/macos-arm64/standalone/AcceptancePlugin.app",
+        "command": "/usr/bin/codesign --verify --deep --strict",
+        "exitCode": 0,
+        "architecture": "arm64"
+    },
+    {
+        "flavor": "debug",
+        "product": "vst3",
+        "bundle": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/debug/1.2.3/macos-arm64/vst3/AcceptancePlugin.vst3",
+        "command": "/usr/bin/codesign --verify --deep --strict",
+        "exitCode": 0,
+        "architecture": "arm64"
+    },
+    {
+        "flavor": "release",
+        "product": "standalone",
+        "bundle": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/standalone/AcceptancePlugin.app",
+        "command": "/usr/bin/codesign --verify --deep --strict",
+        "exitCode": 0,
+        "architecture": "arm64"
+    },
+    {
+        "flavor": "release",
+        "product": "vst3",
+        "bundle": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/vst3/AcceptancePlugin.vst3",
+        "command": "/usr/bin/codesign --verify --deep --strict",
+        "exitCode": 0,
+        "architecture": "arm64"
+    }
+]

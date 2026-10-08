@@ -1,28 +1,29 @@
 #!/usr/bin/env node
-import { Command } from "commander"
-import { cliDescription, cliName, cliVersion } from "./CliMetadata.ts"
-import { ProjectStateStore } from "./project/ProjectStateStore.ts"
-import { FrameworkRegistryClient } from "./framework/FrameworkRegistryClient.ts"
-import { SyncService } from "./sync/SyncService.ts"
-import { registerAdoptCommand } from "./command/Adopt.ts"
-import { registerBuildCommand } from "./command/Build.ts"
-import { registerCreateCommand } from "./command/Create.ts"
-import { registerDevCommand } from "./command/Dev.ts"
-import { registerPackageCommand } from "./command/Package.ts"
-import { registerSyncCommand } from "./command/Sync.ts"
+import { CommanderError } from "commander"
+import { assertCliEnvironment } from "./CliEnvironment.ts"
+import { isAbortError } from "./platform/ProcessSpec.ts"
 
-const store = new ProjectStateStore()
-const registry = new FrameworkRegistryClient()
-const cli = new Command()
-const syncService = new SyncService(store, registry)
+const controller = new AbortController()
+const interrupt = (): void => controller.abort()
 
-cli.name(cliName).description(cliDescription).version(cliVersion)
-
-registerCreateCommand(cli, store, registry)
-registerAdoptCommand(cli)
-registerSyncCommand(cli, syncService)
-registerDevCommand(cli)
-registerBuildCommand(cli)
-registerPackageCommand(cli)
-
-await cli.parseAsync(process.argv)
+try {
+    assertCliEnvironment({ platform: process.platform, stdinIsTTY: process.stdin.isTTY === true, stdoutIsTTY: process.stdout.isTTY === true })
+    const { createCliApplication } = await import("./CliApplication.ts")
+    const cli = createCliApplication({ signal: controller.signal, interactions: "terminal" })
+    process.on("SIGINT", interrupt)
+    process.on("SIGTERM", interrupt)
+    cli.exitOverride()
+    await cli.parseAsync(process.argv)
+} catch (error) {
+    if (error instanceof CommanderError) process.exitCode = error.exitCode
+    else if (controller.signal.aborted && (error === controller.signal.reason || isAbortError(error))) {
+        console.log("[ArrangeCLI]", error === controller.signal.reason ? "操作已取消" : `操作已取消：${error instanceof Error ? error.message : String(error)}`)
+        process.exitCode = 130
+    } else {
+        console.error("[ArrangeCLI]", error instanceof Error ? error.message : String(error))
+        process.exitCode = 1
+    }
+} finally {
+    process.removeListener("SIGINT", interrupt)
+    process.removeListener("SIGTERM", interrupt)
+}

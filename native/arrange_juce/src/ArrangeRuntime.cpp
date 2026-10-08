@@ -3,6 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/juce/ScriptEventDispatcher.h>
+#include "ScrollProbe.h"
 
 #include <utility>
 #include <chrono>
@@ -59,7 +60,21 @@ namespace arrange::juce {
         event.ownerGeneration = ownerGeneration_;
         event.publishedRevision = pipelineState_.publishedFrame().revision;
         event.timestampMillis = ::juce::Time::getMillisecondCounterHiRes();
+        if (ScrollProbe::active() && event.kind == QueuedEventKind::InvokeScrollSnapshot) event.probeInputSequence = ScrollProbe::currentInputSequence();
         events_.push_back(std::move(event));
+        if (ScrollProbe::active() && events_.back().kind == QueuedEventKind::InvokeScrollSnapshot) {
+            const auto& queued = events_.back();
+            ScrollProbe::Sample sample;
+            sample.kind = ScrollProbe::Kind::Queue;
+            sample.inputSequence = queued.probeInputSequence;
+            sample.sequence = queued.sequence;
+            sample.revision = queued.publishedRevision;
+            sample.target = queued.scroll.target;
+            sample.modifierIdentity = queued.scroll.modifier.identity;
+            sample.value = queued.scroll.value;
+            sample.queueDepth = events_.size();
+            ScrollProbe::record(sample);
+        }
         triggerAsyncUpdate();
     }
 
@@ -201,13 +216,30 @@ namespace arrange::juce {
         const auto cutoff = nextSequence_ - 1;
         const auto started = std::chrono::steady_clock::now();
         std::size_t processed = 0;
+        bool budgetBreak = false;
         while (!events_.empty() && events_.front().sequence <= cutoff) {
             if (processed++ >= 256 || std::chrono::steady_clock::now() - started > std::chrono::milliseconds(8)) {
+                budgetBreak = true;
                 triggerAsyncUpdate();
                 break;
             }
             auto event = std::move(events_.front());
             events_.pop_front();
+            ScrollProbe::Sample sample;
+            if (ScrollProbe::active() && event.kind == QueuedEventKind::InvokeScrollSnapshot) {
+                sample.kind = ScrollProbe::Kind::Dispatch;
+                sample.inputSequence = event.probeInputSequence;
+                sample.sequence = event.sequence;
+                sample.previousRevision = event.publishedRevision;
+                sample.revision = pipelineState_.publishedFrame().revision;
+                sample.target = event.scroll.target;
+                sample.modifierIdentity = event.scroll.modifier.identity;
+                sample.value = event.scroll.value;
+                sample.queueDepth = events_.size();
+                sample.durationMillis = ::juce::Time::getMillisecondCounterHiRes() - event.timestampMillis;
+                sample.valid = event.ownerGeneration == ownerGeneration_ && pipelineState_.scene().hasEventSlot(event.slot);
+                ScrollProbe::record(sample);
+            }
             if (event.ownerGeneration != ownerGeneration_ || !pipelineState_.scene().hasEventSlot(event.slot)) continue;
 
             RearrangeInvokeResult invoked;
@@ -223,6 +255,13 @@ namespace arrange::juce {
                     break;
             }
 
+            if (ScrollProbe::active() && event.kind == QueuedEventKind::InvokeScrollSnapshot) {
+                sample.kind = ScrollProbe::Kind::DispatchDone;
+                sample.valid = invoked.ok;
+                sample.changed = invoked.invoked;
+                sample.durationMillis = ::juce::Time::getMillisecondCounterHiRes() - event.timestampMillis;
+                ScrollProbe::record(sample);
+            }
             if (!invoked.ok) return {true, false, invoked.error};
             if (invoked.invoked) {
                 result.changed = true;
@@ -230,6 +269,17 @@ namespace arrange::juce {
             }
         }
 
+        if (ScrollProbe::active()) {
+            ScrollProbe::Sample sample;
+            sample.kind = ScrollProbe::Kind::Batch;
+            sample.sequence = cutoff;
+            sample.revision = pipelineState_.publishedFrame().revision;
+            sample.queueDepth = events_.size();
+            sample.processed = processed - static_cast<std::size_t>(budgetBreak);
+            sample.budgetBreak = budgetBreak;
+            sample.durationMillis = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            ScrollProbe::record(sample);
+        }
         return result;
     }
 

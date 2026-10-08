@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { posix } from 'node:path'
 import { parse } from '@babel/parser'
 import { walk } from 'estree-walker'
 import MagicString from 'magic-string'
@@ -32,8 +33,9 @@ function hotRuntimePath(): string {
 
 function moduleUrl(specifier: string, importer: string): string {
     if (!specifier.startsWith('/') && !specifier.startsWith('.')) throw new Error(`live ESM 存在未解析的模块：${specifier}（${importer}）`)
-    const url = new URL(specifier, `http://arrange${importer}`)
-    return url.pathname + url.search
+    // Vite 程序接口与 QuickJS 共用原始模块名，不能按 HTTP URL 编解码字面百分号
+    if (specifier.startsWith('/')) return specifier
+    return posix.join(posix.dirname(importer.split('?')[0]!), specifier)
 }
 
 function imports(source: string, importer: string, map?: RawSourceMap | null, rewriteRelativeImports = false, rewriteDynamicImports = true): { urls: string[]; code: string; map?: RawSourceMap | null } {

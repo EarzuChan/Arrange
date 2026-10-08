@@ -20,10 +20,10 @@ export function addIncompatibilityIfPresenceFor(candidates: readonly FrameworkVe
     return candidates.map((candidate) => {
         const compatibility = candidate.cliCompatibility
 
-        return { ...candidate, incompatibility: compatibility === null ? "incompatible: no compatibility code" : (compatibility !== cliCompatibility ? `incompatible: ${compatibility}` : null) }
+        return { ...candidate, incompatibility: compatibility === null ? "不兼容：未声明 arrange.cliCompatibility" : (compatibility !== cliCompatibility ? `不兼容：cliCompatibility 为 ${compatibility}，需要 ${cliCompatibility}` : null) }
     })
 }
 
 export function assertFrameworkCompatible(candidate: FrameworkVersionCandidate): void {
-    if (candidate.cliCompatibility !== cliCompatibility) throw new Error(`CLI compatibility mismatch: this CLI is ${cliCompatibility}, but your ${candidate.version} is ${candidate.cliCompatibility}.`)
+    if (candidate.cliCompatibility !== cliCompatibility) throw new Error(`CLI 兼容契约不一致：本 CLI 需要 ${cliCompatibility}，Framework ${candidate.version} 声明的是 ${candidate.cliCompatibility ?? "未声明"}`)
 }

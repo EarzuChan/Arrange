@@ -1,0 +1,10 @@
+{
+  "releaseDevExit": 0,
+  "actualReleaseWindowSeen": true,
+  "distStartupLogged": true,
+  "packedUiMatchesBuild": true,
+  "appJsSha256": "6fbe91453293b0d677d983eb0602f09a62ebd16837294ccc1d8cabab7fabc9f8",
+  "devServerAbsent": true,
+  "devPortClosed": true,
+  "debugObservationHelperRestartClosed": true
+}

@@ -1,4 +1,5 @@
 #include "TextFixtures.h"
+#include "JuceTestApplication.h"
 #include <arrange/juce/ScenePipelineState.h>
 #include <arrange/juce/EditorSceneHost.h>
 #include <arrange/juce/ArrangeEditor.h>
@@ -483,7 +484,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
     }
 }
 
-int main() {
+int runSmoke() {
     try {
         ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
         verifyInputGeometryAndRetirement();
@@ -502,3 +503,6 @@ int main() {
         return 1;
     }
 }
+
+using FrameSubmissionApplication = arrange::test::JuceTestApplication<runSmoke>;
+START_JUCE_APPLICATION(FrameSubmissionApplication)

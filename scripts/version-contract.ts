@@ -92,6 +92,7 @@ export function syncArrangeVersionContract(): void {
     const nativeHeaderPath = resolve(repoRoot, "native/arrange_core/include/arrange/core/Version.h")
     writeFileSync(nativeHeaderPath, [
         "#pragma once",
+        "",
         "namespace arrange::core {",
         `    inline constexpr unsigned RuntimeVersion = ${contract.frameworkInternalProtocolCode}u;`,
         "    inline constexpr unsigned ProtocolVersion = RuntimeVersion;",
@@ -106,7 +107,9 @@ export function syncArrangeVersionContract(): void {
         "#include <arrange/core/Version.h>",
         "",
         "namespace arrange::core {",
-        "    const char* version() noexcept { return PackageVersion; }",
+        "    const char* version() noexcept {",
+        "        return PackageVersion;",
+        "    }",
         "}",
         "",
     ].join("\n"))

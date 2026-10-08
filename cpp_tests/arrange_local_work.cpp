@@ -38,12 +38,12 @@ namespace {
             const auto parent = 2 + group * 17;
             add(CreateNodeMutation{parent, NodeType::Layout});
             add(SetPropMutation{parent, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("Row")}})});
-            add(InsertChildMutation{1, parent, static_cast<std::size_t>(group)});
+            add(InsertChildMutation{1, parent, static_cast<std::uint32_t>(group)});
             for (NodeId item = 1; item <= 16; ++item) {
                 const auto id = parent + item;
                 add(CreateNodeMutation{id, NodeType::Layout});
                 add(SetModifierMutation{id, description()});
-                add(InsertChildMutation{parent, id, static_cast<std::size_t>(item - 1)});
+                add(InsertChildMutation{parent, id, static_cast<std::uint32_t>(item - 1)});
             }
         }
         return transaction;

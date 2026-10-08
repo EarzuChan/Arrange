@@ -9,16 +9,18 @@ import { join } from "node:path"
 import { readFile, readdir, rm } from "node:fs/promises"
 import { fixture, write } from "./fixture.ts"
 import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { managedFiles } from "../src/sync/ConfigScanner.ts"
+import { FileTransaction } from "../src/util/FileTransaction.ts"
+import { configRegistry } from "../src/config/ConfigRegistry.ts"
 import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
 
 const exec = promisify(execFile)
-const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
+const sourceEntry = fileURLToPath(new URL("./cli-runner.ts", import.meta.url))
+const tsxLoader = import.meta.resolve("tsx")
 
 async function cli(root: string, args: string[]) {
     try {
-        const result = await exec(process.execPath, ["--experimental-transform-types", sourceEntry, ...args], { cwd: root, env: { ...process.env, NODE_NO_WARNINGS: "1" }, timeout: 15000 })
+        const result = await exec(process.execPath, ["--import", tsxLoader, sourceEntry, ...args], { cwd: root, env: { ...process.env, NODE_NO_WARNINGS: "1" }, timeout: 15000 })
         return { ...result, code: 0 }
     } catch (error) {
         const failure = error as Error & { code: number, stdout: string, stderr: string }
@@ -26,7 +28,7 @@ async function cli(root: string, args: string[]) {
     }
 }
 
-test("真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async t => {
+test("程序化 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async t => {
     const state = await fixture(t, false)
     const requests: string[] = []
     const server = createServer((request, response) => {
@@ -40,9 +42,9 @@ test("真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async
     const address = server.address()
     assert.ok(address && typeof address !== "string")
     state.project.framework.nodeRegistryUrl = `http://127.0.0.1:${address.port}`
-    const store = new ProjectStateStore()
+    const store = new ProjectStateStore(new FileTransaction())
     await store.save(state)
-    for (const file of managedFiles) await write(file.path(state), file.make(state))
+    for (const file of configRegistry.files) await write(file.path(state), file.make(state))
 
     state.project.project.version = "2.0.0"
     await store.save(state)
@@ -65,9 +67,9 @@ test("真实 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", async
         const invalid = await cli(state.rootDir, ["sync", ...args])
         assert.notEqual(invalid.code, 0)
     }
-    const setup = await cli(state.rootDir, ["sync", "--setup"])
+    const setup = await cli(state.rootDir, ["sync", "--setup", "--scan", "--ui"])
     assert.notEqual(setup.code, 0)
-    assert.match(setup.stdout, /SETUP 尚未实现/)
+    assert.match(setup.stdout, /SETUP UI/)
 
     await rm(cmakeListsFile.path(state))
     const missing = await cli(state.rootDir, ["sync", "--config", "--scan", "--native"])

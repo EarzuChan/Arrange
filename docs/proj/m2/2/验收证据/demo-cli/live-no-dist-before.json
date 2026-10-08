@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-08T20:41:49.572Z",
+  "projects": [
+    {
+      "kind": "manual",
+      "root": "/tmp/arrange-demo-cli-icPpq0/manual project",
+      "uiDistExists": false,
+      "rawBundle": "/tmp/arrange-demo-cli-icPpq0/manual project/.arrange/build/mac-arm64/debug/ArrangeDemoPlugin_artefacts/Debug/Standalone/ArrangeDemoManual.app",
+      "rawBundleUiExists": false,
+      "rawBundleExists": true
+    },
+    {
+      "kind": "adopt",
+      "root": "/tmp/arrange-demo-cli-icPpq0/adopt project",
+      "uiDistExists": false,
+      "rawBundle": "/tmp/arrange-demo-cli-icPpq0/adopt project/.arrange/build/mac-arm64/debug/ArrangeDemoPlugin_artefacts/Debug/Standalone/ArrangeDemoAdopt.app",
+      "rawBundleUiExists": false,
+      "rawBundleExists": true
+    }
+  ]
+}

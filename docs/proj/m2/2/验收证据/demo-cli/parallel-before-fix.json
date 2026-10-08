@@ -1,0 +1,52 @@
+[
+    {
+        "name": "env2 no parallel option",
+        "parallel": [],
+        "limit": "2",
+        "nativeInvocations": [
+            [
+                "-j",
+                "2",
+                "probe"
+            ]
+        ]
+    },
+    {
+        "name": "env2 bare --parallel (CLI)",
+        "parallel": [
+            "--parallel"
+        ],
+        "limit": "2",
+        "nativeInvocations": [
+            [
+                "probe"
+            ]
+        ]
+    },
+    {
+        "name": "env2 explicit --parallel 4",
+        "parallel": [
+            "--parallel",
+            "4"
+        ],
+        "limit": "2",
+        "nativeInvocations": [
+            [
+                "-j",
+                "4",
+                "probe"
+            ]
+        ]
+    },
+    {
+        "name": "env unset bare --parallel",
+        "parallel": [
+            "--parallel"
+        ],
+        "nativeInvocations": [
+            [
+                "probe"
+            ]
+        ]
+    }
+]

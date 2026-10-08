@@ -45,6 +45,7 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             native: {
                 directory: request.nativeDirectory,
+                target: request.projectName,
                 pluginType: request.pluginType,
             },
             artifacts: {

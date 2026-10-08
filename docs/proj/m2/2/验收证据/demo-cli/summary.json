@@ -1,0 +1,63 @@
+{
+  "testedAt": "2026-10-08T21:01:13.107Z",
+  "tempRoot": "/tmp/arrange-demo-cli-icPpq0",
+  "projects": [
+    {
+      "mode": "hand-written-yaml",
+      "name": "ArrangeDemoManual",
+      "root": "/tmp/arrange-demo-cli-icPpq0/manual project"
+    },
+    {
+      "mode": "real-pty-adopt",
+      "name": "ArrangeDemoAdopt",
+      "root": "/tmp/arrange-demo-cli-icPpq0/adopt project"
+    }
+  ],
+  "target": "ArrangeDemoPlugin",
+  "platform": "macOS arm64",
+  "frameworkVersion": "0.0.0-m.2.2",
+  "cliVersion": "1.0.1",
+  "frameworkSource": "fresh installed local npm archive; native source override points to current workspace",
+  "regressions": {
+    "cli": 188,
+    "root": 178,
+    "nativeRelatedCTest": 6,
+    "failures": 0
+  },
+  "live": {
+    "requiresUiDist": false,
+    "requiresBundleUi": false,
+    "publicPngSvg": "actual native HTTP GET and visible render",
+    "publicUpdates": "Vite full-reload and visible changed image/icon",
+    "esmPngUnicodeAndSvgInline": "Vite URLs/data URI and module HMR visibly applied",
+    "actualSourceProvider": "selected by Live or Dist result"
+  },
+  "dist": {
+    "unicodeNonInlinePng": "URL single-decode and packed bytes match; visible render",
+    "inlineSvg": "visible render",
+    "nativeOnlyFallback": "original Demo selects Live to Dist fallback; visible render"
+  },
+  "delivery": {
+    "projects": 2,
+    "flavors": [
+      "debug",
+      "release"
+    ],
+    "products": [
+      "standalone",
+      "vst3"
+    ],
+    "bundles": 8,
+    "strictMacSignatures": true,
+    "uiFileTreesAndBytesMatch": true,
+    "finalReceipts": "completed and cover both enabled products"
+  },
+  "cleanup": "no remaining test apps/services; 9178 and 49372 ECONNREFUSED",
+  "originalDemoAndLegacyScripts": "unchanged",
+  "limits": [
+    "Windows real execution awaits other machine",
+    "VST3 host loading not tested",
+    "not public registry or remote native tag release verification",
+    "adopt needs explicit existing native target and CONFIG boundary markers"
+  ]
+}

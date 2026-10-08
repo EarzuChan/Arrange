@@ -34,8 +34,8 @@ namespace arrange::juce {
         return {result.clickTriggered, result.eventSlot};
     }
 
-    InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision) {
-        const auto result = pointer_.wheel(tree, root, {x, y}, deltaX, deltaY, publishedRevision);
+    InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision, float pixelsPerWheelUnit) {
+        const auto result = pointer_.wheel(tree, root, {x, y}, deltaX, deltaY, publishedRevision, pixelsPerWheelUnit);
         return {result.scroll, result.horizontal};
     }
 

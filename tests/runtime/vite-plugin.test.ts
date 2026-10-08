@@ -1,7 +1,9 @@
 import test from "node:test"
 import { compileScript, parse } from '../../packages/compiler/src/sfa/index.ts'
 import assert from "node:assert/strict"
-import { resolve } from "node:path"
+import { join, resolve } from "node:path"
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import arrange from "../../packages/vite-plugin/src/plugin.ts"
 import { MODULE_SNAPSHOT_PATH, createModuleSnapshot } from '../../packages/vite-plugin/src/module-snapshot.ts'
 import { createServer } from 'vite'
@@ -53,6 +55,37 @@ test('Vite 保留 ESM 模块边界并提供原生 HMR', { timeout: 30000 }, asyn
         assert.equal(frameworkLog.length, 1, 'App 与 HMR 必须共用同一个 framework Log 模块')
         assert.match(client, new RegExp(`from ["']${frameworkLog[0]!.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`))
         assert.ok(snapshot.modules.some(module => module.url.split('?')[0] === '/src/App.sfa'))
+    } finally { await server.close() }
+})
+
+test('真实 Vite 快照保留空格、Unicode 与字面百分号模块身份', { timeout: 30000 }, async t => {
+    const temporary = await realpath(await mkdtemp(join(tmpdir(), 'arrange-vite-module-paths-')))
+    t.after(() => rm(temporary, { recursive: true, force: true }))
+    const root = join(temporary, '工程 with spaces %')
+    const external = join(temporary, '外部 module with spaces %20.ts')
+    await mkdir(join(root, 'src'), { recursive: true })
+    await mkdir(join(root, 'node_modules/@arrange'), { recursive: true })
+    await symlink(resolve('packages/framework'), join(root, 'node_modules/@arrange/framework'), process.platform === 'win32' ? 'junction' : 'dir')
+    await writeFile(join(root, 'src/百分比 100%.ts'), 'export const percentage = 100\n')
+    await writeFile(join(root, 'src/literal%20.ts'), 'export const literal = 20\n')
+    await writeFile(external, 'export const external = 3\n')
+    await writeFile(join(root, 'src/main.ts'), `import { createApp } from '@arrange/framework'\nimport { percentage } from './百分比 100%.ts'\nimport { literal } from './literal%20.ts'\nimport { external } from ${JSON.stringify(external.replaceAll('\\', '/'))}\nexport { createApp }\nexport const result = percentage + literal + external\n`)
+    const server = await createServer({ root, configFile: false, plugins: [arrange()], optimizeDeps: { entries: [join(root, 'src/main.ts')] }, server: { middlewareMode: true, hmr: false, fs: { allow: [temporary, resolve('.')] } } })
+    try {
+        const snapshot = await createModuleSnapshot(server, 'src/main.ts')
+        const entry = snapshot.modules.find(module => module.url === '/src/main.ts')!
+        assert.ok(entry)
+        assert.ok(snapshot.modules.some(module => module.url === '/src/百分比 100%.ts'))
+        assert.ok(snapshot.modules.some(module => module.url === '/src/literal%20.ts'))
+        const externalModule = snapshot.modules.find(module => module.url.endsWith('/外部 module with spaces %20.ts'))
+        assert.ok(externalModule)
+        assert.ok(externalModule.url.startsWith('/@fs/'))
+        assert.ok(entry.source.includes(JSON.stringify(externalModule.url)))
+        assert.ok(entry.source.includes('"/src/百分比 100%.ts"'))
+        assert.ok(entry.source.includes('"/src/literal%20.ts"'))
+        assert.equal(snapshot.modules.some(module => module.url.includes('%E7') || module.url.includes('with%20spaces')), false)
+        const updated = await createModuleSnapshot(server, 'src/main.ts', ['/src/百分比 100%.ts?t=1790156770640&import'])
+        assert.ok(updated.modules.some(module => module.url === '/src/百分比 100%.ts?t=1790156770640&import'))
     } finally { await server.close() }
 })
 

@@ -1,0 +1,11 @@
+{
+  "root": "/tmp/arrange-demo-cli-icPpq0",
+  "manual": "/tmp/arrange-demo-cli-icPpq0/manual project",
+  "adopt": "/tmp/arrange-demo-cli-icPpq0/adopt project",
+  "prepared": "/tmp/arrange-demo-cli-icPpq0/adopt sources",
+  "registry": "http://127.0.0.1:49372",
+  "sourceEdits": [
+    "仅临时副本：CMake 相对 add_subdirectory 改 FetchContent；删除旧 UI POST_BUILD 复制；UI build 输出 dist；加入 SFA 类型检查入口"
+  ],
+  "nativeSourceSha256": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec"
+}

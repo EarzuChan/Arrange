@@ -1,0 +1,55 @@
+{
+  "status": "completed",
+  "fixtureRoot": "/tmp/arrange-demo-cli-icPpq0/resource-fixture",
+  "fixtureCtrlCExitCode": 0,
+  "port9178Released": true,
+  "frameworkInstalledPackageVersion": "0.0.0-m.2.2",
+  "viteVersion": "8.0.11",
+  "observation": "public literal paths provide fresh HTTP bytes but the original plugin emitted no update event; imported assets already follow Vite module HMR",
+  "implementation": {
+    "files": [
+      "packages/vite-plugin/src/public-resource-hmr.ts",
+      "packages/vite-plugin/src/plugin.ts"
+    ],
+    "publicDirectorySource": "Vite resolved config.publicDir",
+    "events": [
+      "change",
+      "add",
+      "unlink"
+    ],
+    "message": {
+      "type": "full-reload",
+      "path": "*"
+    },
+    "maintainsAssetGraph": false,
+    "cleanup": "captured watcher/HTTP server lifetime; Vite closes watcher for middleware mode"
+  },
+  "validation": {
+    "command": "node --import tsx --test tests/runtime/vite-public-resources.test.ts tests/runtime/vite-plugin.test.ts",
+    "tests": 16,
+    "passed": 16,
+    "exitCode": 0,
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    }
+  },
+  "evidence": [
+    "resource-probe.mjs",
+    "resource-probe.log",
+    "resource-probe-results.json",
+    "resource-snapshot-probe-initial.json",
+    "resource-snapshot-public-png.json",
+    "resource-snapshot-public-svg.json",
+    "resource-snapshot-import-png.json",
+    "resource-snapshot-import-svg.json",
+    "resource-http-bodies/",
+    "resource-fixture-terminal-final.log"
+  ],
+  "boundaries": {
+    "formalProjectBusinessSourcesChanged": false,
+    "originalDemoChanged": false,
+    "nativeDecodeAndWindowVerification": "parent and target_design ongoing",
+    "windowsRealMachineVerification": false
+  }
+}

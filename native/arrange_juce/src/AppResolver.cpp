@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <charconv>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -137,11 +138,36 @@ namespace arrange {
             return result;
         }
 
-        const auto resourcePath = std::filesystem::path(result.resource);
-        if (resourcePath.is_absolute()) {
+        auto packagePath = result.resource;
+        if (packagePath.starts_with('/')) {
+            packagePath = packagePath.substr(1, packagePath.find_first_of("?#") == std::string::npos ? std::string::npos : packagePath.find_first_of("?#") - 1);
+            std::string decoded;
+            for (std::size_t index = 0; index < packagePath.size(); ++index) {
+                if (packagePath[index] != '%')
+                    decoded += packagePath[index];
+                else {
+                    unsigned int value = 0;
+                    const auto end = index + 3;
+                    if (end > packagePath.size()) {
+                        result.error = "Painter 包根 URL 百分号编码无效：" + result.resource;
+                        return result;
+                    }
+                    const auto parsed = std::from_chars(packagePath.data() + index + 1, packagePath.data() + end, value, 16);
+                    if (parsed.ec != std::errc{} || parsed.ptr != packagePath.data() + end) {
+                        result.error = "Painter 包根 URL 百分号编码无效：" + result.resource;
+                        return result;
+                    }
+                    decoded += static_cast<char>(value);
+                    index += 2;
+                }
+            }
+            packagePath = std::move(decoded);
+        }
+        if (result.resource.starts_with("//") || packagePath.starts_with('/') || packagePath.find('\\') != std::string::npos || packagePath.find(':') != std::string::npos || packagePath.find('\0') != std::string::npos) {
             result.error = "Painter 资源路径必须相对 UI package：" + result.resource;
             return result;
         }
+        const auto resourcePath = std::filesystem::path(std::u8string(packagePath.begin(), packagePath.end()));
 
         if (!std::filesystem::exists(result.packageDir) || !std::filesystem::is_directory(result.packageDir)) {
             result.error = "解析 Painter 资源时 UI package 目录不可用：" + result.packageDir.string();

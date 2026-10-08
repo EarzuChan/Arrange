@@ -1,0 +1,73 @@
+[
+  {
+    "name": "production_quickjs",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/production_quickjs-final.log"
+  },
+  {
+    "name": "production_juce",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_juce_runtime_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/production_juce-final.log"
+  },
+  {
+    "name": "modifier_valid",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js",
+      "--expect-strict-modifier-ok",
+      "{ elements: [] }"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/modifier_valid-final.log"
+  },
+  {
+    "name": "modifier_array_rejected",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js",
+      "--expect-strict-modifier-error",
+      "{ elements: 'not-array' }"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/modifier_array_rejected-final.log"
+  },
+  {
+    "name": "modifier_kind_rejected",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js",
+      "--expect-strict-modifier-error",
+      "{ elements: [{ type: 'unknownModifier', value: {} }] }"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/modifier_kind_rejected-final.log"
+  },
+  {
+    "name": "script_diagnostics",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js",
+      "--expect-script-diagnostics"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/script_diagnostics-final.log"
+  },
+  {
+    "name": "script_diagnostics_rejection",
+    "exitCode": 0,
+    "command": [
+      "/tmp/arrange-release-m24-WKbIAu/native-candidate/sdk-test-build/cpp_tests/arrange_quickjs_app_smoke",
+      "/tmp/arrange-release-m24-WKbIAu/framework consumer/dist/app.js",
+      "--expect-script-diagnostics-rejection"
+    ],
+    "log": "/tmp/arrange-release-m24-WKbIAu/native-candidate/script_diagnostics_rejection-final.log"
+  }
+]

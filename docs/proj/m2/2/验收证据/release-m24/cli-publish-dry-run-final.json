@@ -1,0 +1,391 @@
+{
+  "@arrange/cli": {
+    "id": "@arrange/cli@1.0.0",
+    "name": "@arrange/cli",
+    "version": "1.0.0",
+    "size": 53947,
+    "unpackedSize": 211386,
+    "shasum": "12676ea81f6bf499b1a9aafcaa3edc8517ec08fc",
+    "integrity": "sha512-M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+    "filename": "arrange-cli-1.0.0.tgz",
+    "files": [
+      {
+        "path": "dist/building/BuildReceipt.js",
+        "size": 994,
+        "mode": 420
+      },
+      {
+        "path": "dist/building/BuildService.js",
+        "size": 1533,
+        "mode": 420
+      },
+      {
+        "path": "dist/building/DevService.js",
+        "size": 3396,
+        "mode": 420
+      },
+      {
+        "path": "dist/building/NativeBuildService.js",
+        "size": 492,
+        "mode": 420
+      },
+      {
+        "path": "dist/building/UiBuildService.js",
+        "size": 277,
+        "mode": 420
+      },
+      {
+        "path": "dist/CliApplication.js",
+        "size": 4552,
+        "mode": 420
+      },
+      {
+        "path": "dist/CliEnvironment.js",
+        "size": 572,
+        "mode": 420
+      },
+      {
+        "path": "dist/CliMetadata.js",
+        "size": 1638,
+        "mode": 420
+      },
+      {
+        "path": "dist/cmake/CmakeService.js",
+        "size": 14601,
+        "mode": 420
+      },
+      {
+        "path": "dist/cmake/CmakeStuffs.js",
+        "size": 4588,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Adopt.js",
+        "size": 2351,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Build.js",
+        "size": 1052,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Create.js",
+        "size": 2088,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Dev.js",
+        "size": 1073,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Package.js",
+        "size": 948,
+        "mode": 420
+      },
+      {
+        "path": "dist/command/Sync.js",
+        "size": 873,
+        "mode": 420
+      },
+      {
+        "path": "dist/config/ConfigRegistry.js",
+        "size": 2161,
+        "mode": 420
+      },
+      {
+        "path": "dist/Entry.js",
+        "size": 1399,
+        "mode": 493
+      },
+      {
+        "path": "dist/framework/FrameworkMamba.js",
+        "size": 777,
+        "mode": 420
+      },
+      {
+        "path": "dist/framework/FrameworkRegistryClient.js",
+        "size": 3785,
+        "mode": 420
+      },
+      {
+        "path": "dist/framework/FrameworkService.js",
+        "size": 2218,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/CheckResult.js",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/JsonRegion.js",
+        "size": 2940,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/ManagedFile.js",
+        "size": 975,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/ManageItems.js",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/TextCluster.js",
+        "size": 597,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/TextRegion.js",
+        "size": 1337,
+        "mode": 420
+      },
+      {
+        "path": "dist/managed/Wrapper.js",
+        "size": 3039,
+        "mode": 420
+      },
+      {
+        "path": "dist/node-js/NodeJsService.js",
+        "size": 6530,
+        "mode": 420
+      },
+      {
+        "path": "dist/node-js/NodeJsStuffs.js",
+        "size": 2417,
+        "mode": 420
+      },
+      {
+        "path": "dist/packing/ArtifactLocator.js",
+        "size": 5904,
+        "mode": 420
+      },
+      {
+        "path": "dist/packing/MacBundleSigner.js",
+        "size": 3433,
+        "mode": 420
+      },
+      {
+        "path": "dist/packing/Packer.js",
+        "size": 15531,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/CreatePlatformService.js",
+        "size": 423,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/DevSupervisor.js",
+        "size": 6892,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/Executor.js",
+        "size": 9472,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/MacPlatformService.js",
+        "size": 3597,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/PlatformService.js",
+        "size": 115,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/ProcessSpec.js",
+        "size": 249,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/ToolchainService.js",
+        "size": 4555,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/ToolLocator.js",
+        "size": 1283,
+        "mode": 420
+      },
+      {
+        "path": "dist/platform/WindowsPlatformService.js",
+        "size": 5489,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/CreateProject.js",
+        "size": 1551,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectInitializer.js",
+        "size": 10207,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectInteraction.js",
+        "size": 59,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectPaths.js",
+        "size": 1852,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectService.js",
+        "size": 536,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectState.js",
+        "size": 3226,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/ProjectStateStore.js",
+        "size": 3376,
+        "mode": 420
+      },
+      {
+        "path": "dist/project/StarterFiles.js",
+        "size": 6126,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigApplier.js",
+        "size": 2574,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigInteraction.js",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigResolver.js",
+        "size": 6659,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigScanner.js",
+        "size": 5598,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigScanReport.js",
+        "size": 158,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigurationReadiness.js",
+        "size": 534,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/ConfigWriter.js",
+        "size": 116,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/SetupInteraction.js",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/SetupScanReport.js",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/SetupService.js",
+        "size": 5323,
+        "mode": 420
+      },
+      {
+        "path": "dist/sync/SyncService.js",
+        "size": 4494,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/FileTransaction.js",
+        "size": 4379,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/FileUtils.js",
+        "size": 580,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/JsonFile.js",
+        "size": 822,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/PlainDirectoryPath.js",
+        "size": 1081,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/PromptUtils.js",
+        "size": 1202,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/Utils.js",
+        "size": 823,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/Adopt.js",
+        "size": 4494,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/Create.js",
+        "size": 1994,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/FrameworkVersion.js",
+        "size": 7600,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/Project.js",
+        "size": 4837,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/ProjectInteraction.js",
+        "size": 765,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/Setup.js",
+        "size": 1641,
+        "mode": 420
+      },
+      {
+        "path": "dist/wizard/Sync.js",
+        "size": 1780,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 798,
+        "mode": 420
+      }
+    ],
+    "entryCount": 75,
+    "bundled": []
+  }
+}

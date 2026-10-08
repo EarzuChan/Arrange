@@ -9,7 +9,7 @@ export type BuildFlavor = z.infer<typeof buildFlavorSchema>
 export const nativeProductSchema = z.enum(["standalone", "vst3"])
 export type NativeProduct = z.infer<typeof nativeProductSchema>
 
-export const packageManagerNameSchema = z.enum(["pnpm", "npm", "yarn"])
+export const packageManagerNameSchema = z.enum(["pnpm", "npm"])
 export type PackageManagerName = z.infer<typeof packageManagerNameSchema>
 
 export const frameworkDefinitionSchema = z.object({
@@ -22,11 +22,13 @@ export type FrameworkDefinition = z.infer<typeof frameworkDefinitionSchema>
 export const uiProjectDefinitionSchema = z.object({
     directory: z.string().min(1),
     packageManager: packageManagerNameSchema,
+    outputDirectory: z.string().min(1).optional(),
 })
 export type UiProjectDefinition = z.infer<typeof uiProjectDefinitionSchema>
 
 export const nativeProjectDefinitionSchema = z.object({
     directory: z.string().min(1),
+    target: z.string().regex(/^[A-Za-z_][A-Za-z0-9_.+-]*$/, "需要明确且合法的 CMake 插件根目标名称"),
     pluginType: z.enum(["effect", "instrument"]).default("effect"),
 })
 export type NativeProjectDefinition = z.infer<typeof nativeProjectDefinitionSchema>
@@ -58,7 +60,7 @@ export const projectDefinitionSchema = z.object({
 export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>
 
 export const toolPathDefinitionSchema = z.object({
-    path: z.string(),
+    path: z.string().min(1),
     version: z.string().optional(),
 })
 export type ToolPathDefinition = z.infer<typeof toolPathDefinitionSchema>
@@ -68,6 +70,14 @@ export const localDefinitionSchema = z.object({
     packageManager: toolPathDefinitionSchema.optional(),
     cmake: toolPathDefinitionSchema.optional(),
     nativeCompiler: toolPathDefinitionSchema.optional(),
+    ninja: toolPathDefinitionSchema.optional(),
+    native: z.object({
+        generator: z.string().min(1),
+        architecture: z.enum(["x64", "arm64"]),
+        developerCommand: z.string().optional(),
+        developerDirectory: z.string().optional(),
+        cmakeDefinitions: z.record(z.string(), z.string()).optional(),
+    }).optional(),
 })
 export type LocalDefinition = z.infer<typeof localDefinitionSchema>
 

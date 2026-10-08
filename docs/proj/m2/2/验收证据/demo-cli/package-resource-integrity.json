@@ -1,0 +1,95 @@
+{
+  "checkedAt": "2026-10-08T20:41:48.986Z",
+  "archive": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-framework-0.0.0-m.2.2.tgz",
+  "archiveBytes": 164743,
+  "archiveIntegrity": "sha512-t4mLpwpUIH8SrkFcNmaXmiozAtlWaDPHLDNF6VA9SkKpzjSqh4zoH6ZAhjJT8SapmpK7iXK0uvwIhBf0jQXjNQ==",
+  "archiveSha1": "28984c1f648da65153a11ba69c45c6cedabbf98b",
+  "tarFiles": [
+    {
+      "file": "public-resource-hmr.ts",
+      "tarEntry": "package/node_modules/@arrange/vite-plugin/src/public-resource-hmr.ts",
+      "tarEntryPresent": true,
+      "tarEqualsRepository": true,
+      "sha256": "edf40ad7f22dc83b5f1f7e4249ae72e88b3c8d282664cbe59666acef97dcee91"
+    },
+    {
+      "file": "plugin.ts",
+      "tarEntry": "package/node_modules/@arrange/vite-plugin/src/plugin.ts",
+      "tarEntryPresent": true,
+      "tarEqualsRepository": true,
+      "sha256": "16e491d1682d6df14bd95ffedd4cfd291c5f64be31ce538642a9f5505d5f942b"
+    },
+    {
+      "file": "module-snapshot.ts",
+      "tarEntry": "package/node_modules/@arrange/vite-plugin/src/module-snapshot.ts",
+      "tarEntryPresent": true,
+      "tarEqualsRepository": true,
+      "sha256": "5abd36e6f2620958a16ed2844c2649b49fb2af72a1bfd68177db8e4e6e544dac"
+    }
+  ],
+  "projects": [
+    {
+      "project": "manual project",
+      "frameworkVersion": "0.0.0-m.2.2",
+      "lockVersion": "0.0.0-m.2.2",
+      "resolved": "http://127.0.0.1:49372/framework.tgz",
+      "lockIntegrity": "sha512-t4mLpwpUIH8SrkFcNmaXmiozAtlWaDPHLDNF6VA9SkKpzjSqh4zoH6ZAhjJT8SapmpK7iXK0uvwIhBf0jQXjNQ==",
+      "integrityEqualsCurrentTarball": true,
+      "files": [
+        {
+          "file": "public-resource-hmr.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/manual project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/public-resource-hmr.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "edf40ad7f22dc83b5f1f7e4249ae72e88b3c8d282664cbe59666acef97dcee91"
+        },
+        {
+          "file": "plugin.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/manual project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/plugin.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "16e491d1682d6df14bd95ffedd4cfd291c5f64be31ce538642a9f5505d5f942b"
+        },
+        {
+          "file": "module-snapshot.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/manual project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/module-snapshot.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "5abd36e6f2620958a16ed2844c2649b49fb2af72a1bfd68177db8e4e6e544dac"
+        }
+      ]
+    },
+    {
+      "project": "adopt project",
+      "frameworkVersion": "0.0.0-m.2.2",
+      "lockVersion": "0.0.0-m.2.2",
+      "resolved": "http://127.0.0.1:49372/framework.tgz",
+      "lockIntegrity": "sha512-t4mLpwpUIH8SrkFcNmaXmiozAtlWaDPHLDNF6VA9SkKpzjSqh4zoH6ZAhjJT8SapmpK7iXK0uvwIhBf0jQXjNQ==",
+      "integrityEqualsCurrentTarball": true,
+      "files": [
+        {
+          "file": "public-resource-hmr.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/public-resource-hmr.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "edf40ad7f22dc83b5f1f7e4249ae72e88b3c8d282664cbe59666acef97dcee91"
+        },
+        {
+          "file": "plugin.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/plugin.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "16e491d1682d6df14bd95ffedd4cfd291c5f64be31ce538642a9f5505d5f942b"
+        },
+        {
+          "file": "module-snapshot.ts",
+          "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/node_modules/@arrange/framework/node_modules/@arrange/vite-plugin/src/module-snapshot.ts",
+          "isSymlink": false,
+          "equalsRepository": true,
+          "sha256": "5abd36e6f2620958a16ed2844c2649b49fb2af72a1bfd68177db8e4e6e544dac"
+        }
+      ]
+    }
+  ],
+  "allChecksPassed": true
+}

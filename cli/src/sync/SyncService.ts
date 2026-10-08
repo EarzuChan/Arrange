@@ -1,13 +1,14 @@
 import type { ProjectStateStore } from "../project/ProjectStateStore.ts"
-import { SyncWizard } from "../wizard/Sync.ts"
-import type { FrameworkRegistryClient } from "../framework/FrameworkRegistryClient.ts"
-import { assertFrameworkCompatible } from "../framework/FrameworkMamba.ts"
-import type { ProjectState } from "../project/ProjectState.ts"
+import type { FrameworkService } from "../framework/FrameworkService.ts"
 import { errorMessage } from "../util/Utils.ts"
 import { ConfigScanner } from "./ConfigScanner.ts"
 import { ConfigApplier } from "./ConfigApplier.ts"
 import { ConfigResolver } from "./ConfigResolver.ts"
 import type { ConfigScanReport } from "./ConfigScanReport.ts"
+import type { SetupService } from "./SetupService.ts"
+import type { SetupScanReport } from "./SetupScanReport.ts"
+import type { ConfigInteraction } from "./ConfigInteraction.ts"
+import { isAbortError } from "../platform/ProcessSpec.ts"
 
 export interface SyncRunOptions {
     readonly scanOnly?: boolean
@@ -18,25 +19,16 @@ export interface SyncRunOptions {
 }
 
 export interface SyncResult {
-    readonly status: "completed" | "blocked" | "aborted" | "failed" | "setup-unavailable",
+    readonly status: "completed" | "blocked" | "aborted" | "failed",
     readonly report?: ConfigScanReport
+    readonly setupReport?: SetupScanReport
 }
 
 export class SyncService {
-    private readonly configScanner = new ConfigScanner()
-    private readonly configApplier = new ConfigApplier()
-    private readonly syncWizard: SyncWizard = new SyncWizard()
-    private readonly configResolver: ConfigResolver = new ConfigResolver(this.syncWizard)
-
-    constructor(private readonly projectStateStore: ProjectStateStore, private readonly registryClient: FrameworkRegistryClient) { }
-
-    private async checkCompatibility(state: ProjectState): Promise<void> {
-        const candidate = await this.registryClient.fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
-        if (candidate.version !== state.project.framework.version) throw new Error("registry 返回的 Framework 版本与配置不符")
-        assertFrameworkCompatible(candidate)
-    }
+    constructor(private readonly projectStateStore: ProjectStateStore, private readonly framework: FrameworkService, private readonly configScanner: ConfigScanner, private readonly configResolver: ConfigResolver, private readonly configApplier: ConfigApplier, private readonly setupService: Pick<SetupService, "run">, private readonly interaction: ConfigInteraction, private readonly signal: AbortSignal) { }
 
     async run(options: SyncRunOptions, rootDir: string): Promise<SyncResult> {
+        this.signal.throwIfAborted()
         if (options.configOnly && options.setupOnly) throw new Error("--config 与 --setup 互斥")
         if (options.uiOnly && options.nativeOnly) throw new Error("--ui 与 --native 互斥")
 
@@ -44,6 +36,10 @@ export class SyncService {
         if (options.setupOnly) return this.runSetup(options, rootDir, scope)
 
         const configResult = await this.runConfig(options, rootDir, scope)
+        if (options.scanOnly && !options.configOnly) {
+            const setupResult = await this.runSetup(options, rootDir, scope, configResult.report)
+            return { ...setupResult, status: configResult.status === "completed" ? setupResult.status : configResult.status }
+        }
         if (options.configOnly || configResult.status !== "completed") return configResult
 
         return this.runSetup(options, rootDir, scope, configResult.report)
@@ -52,6 +48,7 @@ export class SyncService {
     private async runConfig(options: SyncRunOptions, rootDir: string, scope: "Global" | "UI" | "Native"): Promise<SyncResult> {
         try {
             while (true) {
+                this.signal.throwIfAborted()
                 // 深度加载状态和校验阶段
 
                 const loadedStuff = await this.projectStateStore.deepLoad(rootDir)
@@ -60,7 +57,7 @@ export class SyncService {
                 if (!state) {
                     const report: ConfigScanReport = { scope, fatal: loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })), resolvable: [], idle: [], applicable: [] }
 
-                    this.syncWizard.report(report)
+                    this.interaction.report(report)
                     return { status: "blocked", report }
                 }
 
@@ -71,12 +68,14 @@ export class SyncService {
                 report.fatal.push(...loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })))
 
                 try {
-                    await this.checkCompatibility(state)
+                    await this.framework.assertCompatible(state, "remote")
                 } catch (error) {
+                    if (isAbortError(error)) throw error
                     report.fatal.push({ path: "arrange.project.yaml", cause: "framework-incompatible", message: errorMessage(error) })
                 }
 
-                this.syncWizard.report(report)
+                this.interaction.report(report)
+                this.signal.throwIfAborted()
 
                 if (report.fatal.length) return { status: "blocked", report }
 
@@ -85,6 +84,7 @@ export class SyncService {
                 // RESOLVE 阶段
 
                 const resolved = await this.configResolver.resolve(state, report, loadedStuff.snapshots)
+                this.signal.throwIfAborted()
 
                 if (resolved === "abort") return { status: "aborted", report }
                 if (resolved === "rescan") continue
@@ -95,17 +95,19 @@ export class SyncService {
 
                 // 完成
 
-                this.syncWizard.message("CONFIG 完成")
+                this.interaction.message("CONFIG 完成")
                 return { status: "completed", report }
             }
         } catch (error) {
-            this.syncWizard.message(errorMessage(error))
+            if (isAbortError(error)) throw error
+            this.interaction.failure(`CONFIG 失败：${errorMessage(error)}`)
             return { status: "failed" }
         }
     }
 
-    private runSetup(_options: SyncRunOptions, _rootDir: string, _scope: "Global" | "UI" | "Native", report?: ConfigScanReport): SyncResult {
-        this.syncWizard.message("SETUP 尚未实现；可使用 sync --config 单独同步工程文件")
-        return { status: "setup-unavailable", report }
+    private async runSetup(options: SyncRunOptions, rootDir: string, scope: "Global" | "UI" | "Native", report?: ConfigScanReport): Promise<SyncResult> {
+        this.signal.throwIfAborted()
+        const result = await this.setupService.run(rootDir, scope, options.scanOnly)
+        return { status: result.status, report, setupReport: result.report }
     }
 }

@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-10-08T21:42:50.920Z",
+  "allChecksPassed": true,
+  "cliVersion": "1.0.0",
+  "frameworkVersion": "0.0.0-m.2.4",
+  "node": "v24.19.0",
+  "toolVersions": {
+    "vite": "8.0.16",
+    "sourceMapJs": "1.2.2"
+  },
+  "frameworkFilesCompared": 125,
+  "frameworkIntegrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+  "productionAudit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "expectedFailureCases": [
+    "SFA脚本类型损坏",
+    "构建脚本未生成约定app.js"
+  ],
+  "restoredOutput": {
+    "bytes": 81047,
+    "sha256": "9fa6e0fd06b68efefc0097614a9e430e209a2541eba39d06d041bf0bf95bb493",
+    "sameAsInitial": true
+  },
+  "evidence": [
+    "cli-final-deps-tests.log",
+    "cli-final-deps-typecheck.log",
+    "cli-final-ui-workflow.log",
+    "cli-final-ui-workflow.json",
+    "cli-final-ui-failurecheck.log",
+    "cli-final-ui-failurecheck.json",
+    "cli-final-ui-production-audit.json",
+    "cli-final-ui-production-audit-summary.json"
+  ],
+  "boundaries": {
+    "productionPublish": false,
+    "repositoryChanged": false,
+    "nativeBuildRepeated": false
+  }
+}

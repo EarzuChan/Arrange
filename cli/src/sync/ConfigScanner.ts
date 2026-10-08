@@ -1,40 +1,22 @@
-import { cmakeListsFile } from "../cmake/CmakeStuffs.ts"
-import { npmrcFile, packageJsonFile } from "../node-js/NodeJsStuffs.ts"
+import { readFile, stat } from "node:fs/promises"
+import type { ConfigRegistry } from "../config/ConfigRegistry.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
-import type { ManagedFile, ConfigScope } from "../managed/ManagedFile.ts"
-import type { ManagedItem } from "../managed/ManageItems.ts"
-import type { CheckResult, Located } from "../managed/CheckResult.ts"
+import type { ConfigScope } from "../managed/ManagedFile.ts"
+import type { CheckResult, FileCheckResult, Located } from "../managed/CheckResult.ts"
 import type { JsonExpected, JsonPath } from "../managed/JsonRegion.ts"
-import { managedItems } from "../managed/ManageItems.ts"
+import type { FileSnapshot } from "../util/FileUtils.ts"
 import { errorMessage } from "../util/Utils.ts"
 import type { ConfigScanReport, ConfigTarget } from "./ConfigScanReport.ts"
 
-export const managedFiles: readonly ManagedFile[] = [packageJsonFile, npmrcFile, cmakeListsFile]
+type FileReadResult = { readonly kind: "Loaded", readonly snapshot: FileSnapshot } | { readonly kind: "Fatal", readonly message: string }
 
 export class ConfigScanner {
-    readonly files: readonly ManagedFile[] = managedFiles
-    readonly items: readonly ManagedItem[] = managedItems
+    constructor(private readonly registry: ConfigRegistry) { }
 
-    private validateDefinitions(): void {
-        const owners = new Map<object, string>()
-        for (const item of this.items) for (const region of item.regions) {
-            if (owners.has(region) || region.managedItemId !== item.id) throw new Error(`Region 关联冲突：${region.id}`)
-
-            owners.set(region, item.id)
-        }
-
-        const physical = new Set<object>()
-        for (const file of this.files) for (const region of file.kind === "text-file" ? file.clusters.flatMap(cluster => cluster.regions) : file.regions) {
-            if (physical.has(region) || !owners.has(region)) throw new Error(`Region 物理归属冲突或缺少 ManagedItem：${region.id}`)
-
-            physical.add(region)
-        }
-
-        if (physical.size !== owners.size) throw new Error("有 Region 缺少物理归属")
-    }
+    get files() { return this.registry.files }
+    get items() { return this.registry.items }
 
     async scan(state: ProjectState, scope: ConfigScope): Promise<ConfigScanReport> {
-        this.validateDefinitions()
         const report: ConfigScanReport = { scope, fatal: [], resolvable: [], idle: [], applicable: [] }
         for (const id of state.project["managed-items"]) if (!this.items.some(item => item.id === id)) report.fatal.push({ path: "arrange.project.yaml", cause: "config-invalid", message: `未知 ManagedItem：${id}` })
 
@@ -54,35 +36,33 @@ export class ConfigScanner {
             paths.add(path)
 
             try {
+                const read = await this.readFile(path)
+                if (read.kind === "Fatal") {
+                    report.fatal.push({ path, cause: "read-error", message: read.message })
+                    continue
+                }
+                const target: ConfigTarget = { path, file, snapshot: read.snapshot }
                 if (file.kind === "text-file") {
-                    const result = await file.check(state, path)
+                    const result = file.check(state, read.snapshot.content)
+                    if (!this.collectFileResult(report, target, result)) continue
 
-                    const target = this.collectFileResult(report, file, path, result)
-                    if (!target) continue
-
-                    if (result.kind !== "Idle") continue // 级联跳过
-
-                    for (const entry of result.clusters) {
-                        const child: ConfigTarget = { ...target, cluster: entry.cluster }
-
-                        if (entry.result.kind === "Resolvable") {
-                            report.resolvable.push({ target: child, cause: entry.result.cause, message: entry.result.message })
-                            continue // 级联跳过
+                    for (const cluster of file.clusters) {
+                        if (!cluster.regions.some(region => region.enabled(state))) continue
+                        const child: ConfigTarget = { ...target, cluster }
+                        const checked = cluster.check(state, result.value)
+                        if (checked.kind === "Resolvable") {
+                            report.resolvable.push({ target: child, cause: checked.cause, message: checked.message })
+                            continue
                         }
-
                         report.idle.push({ target: child })
-
-                        for (const region of entry.result.regions) this.collectText(report, { ...child, region: region.region }, region.result, entry.result.location.inner.start)
+                        const inner = result.value.slice(checked.location.inner.start, checked.location.inner.end)
+                        for (const region of cluster.regions) if (region.enabled(state)) this.collectText(report, { ...child, region }, region.check(state, inner), checked.location.inner.start)
                     }
                 } else {
-                    const result = await file.check(state, path)
+                    const result = file.check(state, read.snapshot.content)
+                    if (!this.collectFileResult(report, target, result)) continue
 
-                    const target = this.collectFileResult(report, file, path, result)
-                    if (!target) continue
-
-                    if (result.kind !== "Idle") continue // 级联跳过
-
-                    for (const region of result.regions) this.collectJson(report, { ...target, region: region.region }, region.result)
+                    for (const region of file.regions) if (region.enabled(state)) this.collectJson(report, { ...target, region }, region.check(state, result.value))
                 }
             } catch (error) {
                 report.fatal.push({ path, cause: "check-error", message: errorMessage(error) })
@@ -92,20 +72,26 @@ export class ConfigScanner {
         return report
     }
 
-    private collectFileResult(report: ConfigScanReport, file: ManagedFile, path: string, result: any): ConfigTarget | undefined {
-        if (result.kind === "Fatal") {
-            report.fatal.push({ path, cause: result.cause, message: result.message })
-            return
+    private async readFile(path: string): Promise<FileReadResult> {
+        try {
+            if (!(await stat(path)).isFile()) return { kind: "Fatal", message: "目标不是文件" }
+            return { kind: "Loaded", snapshot: { path, content: await readFile(path, "utf8") } }
+        } catch (error) {
+            return (error as NodeJS.ErrnoException).code === "ENOENT" ? { kind: "Loaded", snapshot: { path, content: null } } : { kind: "Fatal", message: errorMessage(error) }
         }
+    }
 
-        const target: ConfigTarget = { path, file, snapshot: { path, content: result.kind === "Idle" ? result.text : null } }
+    private collectFileResult<T>(report: ConfigScanReport, target: ConfigTarget, result: FileCheckResult<T>): result is Extract<FileCheckResult<T>, { kind: "Idle" }> {
+        if (result.kind === "Fatal") {
+            report.fatal.push({ path: target.path, cause: result.cause, message: result.message })
+            return false
+        }
         if (result.kind === "Resolvable") {
             report.resolvable.push({ target, cause: result.cause, message: result.message })
-            return
+            return false
         }
-
         report.idle.push({ target })
-        return target
+        return true
     }
 
     private collectText(report: ConfigScanReport, target: ConfigTarget, result: CheckResult<string, Located>, offset: number): void {

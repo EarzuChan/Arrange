@@ -1,0 +1,44 @@
+{
+    "date": "2026-10-09",
+    "cli": {
+        "tests": 175,
+        "passed": 175,
+        "typecheck": true,
+        "npmPackageVerification": true
+    },
+    "repository": {
+        "tests": 174,
+        "passed": 174,
+        "typecheck": true
+    },
+    "format": {
+        "checkedFiles": 92,
+        "remainingChanges": 0,
+        "astPreserved": true
+    },
+    "architecture": {
+        "modules": 74,
+        "typeCycles": 0,
+        "runtimeCycles": 0
+    },
+    "mac": {
+        "platform": "darwin",
+        "architecture": "arm64",
+        "terminalHelp": true,
+        "node24TerminalHelp": true,
+        "releaseBuild": true,
+        "standaloneAndVst3Package": true,
+        "cleanPackage": true,
+        "devLiveModules": 37,
+        "devExitCode": 0
+    },
+    "cleanup": {
+        "devExitCode": 0,
+        "remainingProcesses": [],
+        "closedPorts": [
+            9178,
+            64225
+        ]
+    },
+    "windows": "实现与模拟测试通过，真实开发机验收待执行"
+}

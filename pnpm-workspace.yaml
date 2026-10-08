@@ -11,7 +11,11 @@ catalog:
   "entities": "7.0.1"
   "estree-walker": "2.0.2"
   "magic-string": "0.30.21"
-  "source-map-js": "1.2.1"
+  "source-map-js": "1.2.2"
+
+# 固定 Sass 可选工具链中的 Immutable 安全补丁。
+overrides:
+  "sass>immutable": "5.1.8"
 
 allowBuilds:
   '@parcel/watcher': true

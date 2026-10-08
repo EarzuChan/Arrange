@@ -1,0 +1,28 @@
+project:
+  name: ArrangeDemoManual
+  version: 1.2.3
+  vendorName: Arrange
+  vendorCode: Arng
+  pluginCode: ArD1
+  products: [standalone, vst3]
+framework:
+  version: 0.0.0-m.2.2
+  nodeRegistryUrl: http://127.0.0.1:49372
+ui:
+  directory: ui
+  packageManager: npm
+native:
+  directory: native
+  target: ArrangeDemoPlugin
+  pluginType: effect
+artifacts:
+  directory: artifacts
+  includeVersionDirectory: true
+managed-items:
+  - project.name
+  - framework.version
+  - cmake.fetch-content-repository
+  - cmake.plugin-version
+  - cmake.plugin-identity
+  - cmake.plugin-formats
+  - node.npmrc.arrange-registry

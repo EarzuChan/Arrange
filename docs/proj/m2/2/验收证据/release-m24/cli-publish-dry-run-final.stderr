@@ -1,0 +1,2 @@
+npm warn publish This command requires you to be logged in to https://registry.npmjs.org/ (dry-run)
+npm notice Publishing to https://registry.npmjs.org/ with tag latest and public access (dry-run)

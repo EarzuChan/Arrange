@@ -1,0 +1,27 @@
+{
+  "framework": "0.0.0-m.2.4",
+  "vite": "8.0.16",
+  "uiDistAbsent": true,
+  "rawBundleUiAbsent": true,
+  "liveImageAndIconSeenInActualWindow": true,
+  "resources": [
+    {
+      "url": "http://127.0.0.1:9178/logo.png",
+      "status": 200,
+      "bytes": 2408,
+      "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288",
+      "matchesPublicSource": true
+    },
+    {
+      "url": "http://127.0.0.1:9178/icons/play.svg",
+      "status": 200,
+      "bytes": 134,
+      "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+      "matchesPublicSource": true
+    }
+  ],
+  "templateHmrAppliedInActualWindow": true,
+  "observedHmrText": "m2.4 最终 HMR 验收",
+  "temporarySourceRestored": true,
+  "sourceSha256": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c"
+}

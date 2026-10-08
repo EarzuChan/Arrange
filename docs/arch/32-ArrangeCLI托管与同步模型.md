@@ -1,12 +1,12 @@
 # Arrange CLI 托管与同步模型
 
-本文是定义、拓扑、ManagedItem、CONFIG 扫描矩阵和 LSRA 的唯一长期事实源。用户可见命令见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，当期执行流程见 [命令定义](../proj/m2/2/命令定义.md)。
+本文是定义、拓扑、ManagedItem、CONFIG/SETUP 扫描矩阵和 LSRA 的唯一长期事实源。用户可见命令见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，当期执行流程见 [命令定义](../proj/m2/2/命令定义.md)。
 
 ## 定义、State 与拓扑
 
 `ProjectState` 包含 `rootDir`、共享 `project` 配置和本机 `local` 配置。操作必须发生在明确的工程根下；本机配置尚未建立时，`local` 可以为空。
 
-File、Cluster、Region、ManagedItem 都是无状态定义：各级负责自身规则，并委派子级；具体路径、生成内容和检查结果由传入的 State 与本次输入产生。定义不保存某个工程的内容、span 或上次扫描结果，也不另建生成器复制这些规则。Region 直接从 State 读取对应配置值和 ManagedItem 开关，无需拓扑先提取后传入。
+File、Cluster、Region、ManagedItem 都是无状态定义：各级 `check` 只检查自身，不调用子级检查；生成内容时可以组合子级的 `make`。具体路径、生成内容和检查结果由传入的 State 与本次输入产生。定义不保存某个工程的内容、span 或上次扫描结果，也不另建生成器复制这些规则。Region 直接从 State 读取对应配置值和 ManagedItem 开关，无需拓扑先提取后传入。
 
 拓扑是本次操作的参与关系描述：哪些定义参与、对应哪些文件、如何关联。CONFIG 根据 State、启用的 ManagedItem 和命令范围推导拓扑，状态改变后重新推导。创建则根据 State 推导需要生成的文件及其子项，包括未托管的初始内容。两者使用同一套定义；拓扑不作为第二份配置保存，也不承载定位、生成或修复实现。
 
@@ -23,13 +23,14 @@ type Region = TextRegion | JsonRegion
 
 interface ManagedItem {
     readonly id: string
+    readonly label: string
     readonly regions: readonly Region[]
 }
 ```
 
 物理父级与 ManagedItem 直接关联同一份 Region 定义；Region 不保存所属 File 或 Cluster。定义或描述符可以按固定参数特化，绑定关系仍是确定的；本次参与拓扑由 State 和操作范围推导。
 
-具体 ManagedItem 在 `ManageItems.ts` 中分别以命名 `export const` 对象声明，自持 id、label 与跨文本/JSON 的 regions 数组；同文件定义 ManagedItem 类型及 managedItems 列表。物理定义分别位于 `CmakeStuffs.ts` 与 `NodeJsStuffs.ts`，不反向导入逻辑定义；Region 保留稳定的 managedItemId，扫描时校验逻辑归属一致性。物理文件入口列表由 ConfigScanner 维护。
+具体支持项由 `config/ConfigRegistry.ts` 注册，维护唯一的物理文件根集合和托管项 id、label；逻辑 regions 列表从物理定义的 managedItemId 派生，不再次手写关联。注册时验证物理归属、托管 ID 和关联完整性。Scanner、初始化与向导使用同一份注册结果。`managed/` 只提供通用机制和类型，不导入 CMake/npm 的具体定义；物理父子关系仍由定义的 clusters、regions 数组表达。
 
 ## ManagedItem 与 expect
 
@@ -37,7 +38,7 @@ interface ManagedItem {
 
 ManagedItem 的开关决定是否托管，其对应配置值经各 Region 自己的生成规则形成 expect。同一 ManagedItem 的多个 Region 可以生成不同格式的内容，不要求文本与 JSON 表达相同。
 
-`project.name` 共同管理 CMake `PRODUCT_NAME` 和 package.json `name`，后者生成小写；`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [ManageItems.ts](../../cli/src/managed/ManageItems.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
+`project.name` 共同管理 CMake `PRODUCT_NAME` 和 package.json `name`，后者生成小写；`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [配置注册](../../cli/src/config/ConfigRegistry.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
 
 | ManagedItem | 对应配置 | CONFIG 中的期望 |
 |---|---|---|
@@ -54,16 +55,16 @@ ManagedItem 关闭时，创建仍按需生成一次性普通内容，文本 Regi
 
 ## 物理定义接口
 
-所有 `check` 都结合期待与实情判断，只读和计算；各级的期待、实际输入和结果不同，具体判定见下文扫描矩阵。File 从 State 确定文件路径，读取后委派子级；Cluster 和 Region 在父级提供的内容中检查自身。
+所有 `check` 都结合期待与实情判断，只计算自身状态；各级的期待、实际输入和结果不同，具体判定见下文扫描矩阵。Scanner 从 File 和 State 确定文件路径，每文件读取一次并保存快照，再将输入交给各级检查。File 检查文件存在性与自身格式，Cluster 和 Region 在父级提供的内容中检查自身。检查结果不包含子级结果树；Scanner 沿现有父子数组遍历并汇总，不维护另一套结构。
 
 具体定义继承抽象基类，公共检查、定位和包装规则由基类实现。TextRegion/TextCluster 通过受保护的 `makeInner` 生成正文；JsonRegion 通过 `makeValue` 生成值，由公共 `make` 将 null 统一为字段不存在。File 子类实现 `path`，TextFile 实现 `make`，JsonFile 实现 `makeContent` 提供初始对象，再由基类委派 Region 填入字段。具体 File、Cluster、Region 均以 `export const xxx = new class extends ... {}()` 声明唯一实例，固定身份由字段声明。物理父级通过数组引用子定义，不在内部创建子实例；ManagedItem 关联同一份 Region；业务生成逻辑写在方法中，定义实例不保存工程状态。
 
 | 定义 | check | locate | make(state) |
 |---|---|---|---|
-| TextFile | `check(state, path)`：读取并检查文件 | 无 | 整个文件文本，Cluster 内容委派其 make |
-| TextCluster | `check(state, fileText)`：检查自身并委派参与的 Region | `locate(state, fileText)`：相对 File 正文的 outer/inner 区间 | 自身 outer，Region 内容委派其 make |
+| TextFile | 检查读取结果，返回自身状态与可用文本 | 无 | 整个文件文本，Cluster 内容委派其 make |
+| TextCluster | `check(state, fileText)`：只检查自身 Wrapper | `locate(state, fileText)`：相对 File 正文的 outer/inner 区间 | 自身 outer，Region 内容委派其 make |
 | TextRegion | `check(state, clusterInnerText)`：定位并比较正文 | `locate(state, clusterInnerText)`：相对 Cluster inner 的 outer/inner 区间 | 自身 outer |
-| JsonFile | `check(state, path)`：读取、解析 JSON 并委派参与的 Region | 无 | 整个 JSON 文件文本，字段委派 JsonRegion.make 汇合 |
+| JsonFile | 检查读取结果，解析 JSON 并返回自身状态与解析值 | 无 | 整个 JSON 文件文本，字段委派 JsonRegion.make 汇合 |
 | JsonRegion | `check(state, json)`：检查字段路径及字段值 | `locate(state)`：JSON path，固定路径直接返回 | 期望 JSON 值，或表达“字段应不存在” |
 
 TextCluster/TextRegion 的 `check` 复用 `locate`，检查与生成共用正文生成规则。JsonRegion 的 `locate` 只给出路径；路径是否缺失、中间容器类型是否错误，由 `check` 判定。`make` 只生成内容，不写文件。
@@ -119,7 +120,7 @@ SCAN 从 ManagedItem 与配置取得 expect，沿物理归属观察 actual，委
 | TextCluster | Wrapper 损坏，无法可靠定位 | `damaged`/Resolvable | 所属参与 Region 不进入扫描 |
 | TextCluster | Wrapper 完整、范围确定 | `located` | 扫描其中参与的 TextRegion |
 
-Cluster 扫描报告可以包含 Region 问题；子 Region 不符合 expect，不等于 Cluster 自身损坏。若损坏波及其他区域的定位，那些区域不进入扫描。
+Scanner 汇总的报告可以同时包含 Cluster 与 Region 结果，Cluster.check 的返回值只反映自身。子 Region 不符合 expect，不等于 Cluster 自身损坏。若损坏波及其他区域的定位，那些区域不进入扫描。
 
 ### TextRegion
 
@@ -206,7 +207,27 @@ CONFIG 每轮执行：
 4. Fatal 和 Resolvable 都为空时，RESOLVE 完成，进入 APPLY。
 5. APPLY 完成后结束本部分；正常流程不再追加扫描或内容复检。开发测试可以验证结果，但不成为生产状态机的一环。
 
-`sync --scan` 只输出所选部分的扫描报告，不 RESOLVE、不 APPLY；有 Fatal 或 Resolvable 时返回非零状态。扫描模式的 SETUP 只能观察当前状态，不能假定 CONFIG 已完成更新。SETUP 的具体检查项、分类和交互流程另行设计，本矩阵不直接套用到 SETUP。
+`sync --scan` 只输出所选部分的扫描报告，不 RESOLVE、不 APPLY。CONFIG 有 Fatal 或 Resolvable 时返回非零状态；SETUP 另将未完成的 Applicable 准备任务视为非零。完整扫描即使某部分有阻塞，也报告另一部分当前能观察到的事实；不能假定 CONFIG 已完成更新。
+
+## SETUP 扫描与准备
+
+SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原生 configure 结果。它不修改 CMakeLists、package.json 或 npmrc，安装使用已经确定的工程文件。本机工具写入 local YAML，依赖及 CMake 查询结果写入本机工作目录或包管理器正常使用的目录。
+
+| 检查项 | 当前事实 | 分类与处理 |
+|---|---|---|
+| 共享/local YAML、Framework 兼容契约 | 无法解析、版本或 CLI 契约不兼容 | Fatal，停止本次准备 |
+| UI manifest、dev/build 脚本、Framework 精确依赖、产物路径 | 缺失、损坏或与工程配置不符 | Fatal，用户先整理 UI 工程或运行 CONFIG |
+| Node、包管理器、CMake、Ninja、Xcode/MSVC 环境 | 工具缺失、不能执行、版本/架构不满足需求 | Resolvable，用户安装工具或修正 local YAML，继续后重载并重扫 |
+| 本机工具 | 探测验证通过，但本机路径或版本尚未保存 | Resolvable，展示并确认后写 local YAML，随后重载并重扫 |
+| UI 安装 | Framework/直接依赖缺失，或安装输入记录失效 | Applicable，调用所选 npm/pnpm install 并验证 Framework 契约 |
+| native debug/release | prepare 记录、缓存或 File API 模型缺失/失效 | Applicable，调用 CMake configure 并验证产品目标 |
+| 各项 | 符合上述准备契约 | Idle |
+
+SETUP SCAN 可以执行只读的工具查询，例如 `--version`、Xcode 查找和 Visual Studio 环境查询；不安装、不 configure、不保存 local YAML。工具缺失时阻断依赖它的 native 检查，UI 结构检查仍可独立报告。范围仅为 UI 时不要求原生工具，范围仅为 native 时不要求 Node 或包管理器。
+
+RESOLVE 先拒绝全报告中的 Fatal；无 Fatal 时一次处理一个 Resolvable，任何确认写入或用户修改后重新加载整个所选范围。APPLY 前核对 YAML 快照，依次安装 UI、configure debug/release；失败即停止并保留已完成的本机准备。正常完成不追加扫描循环。正式入口的终端限制见 [CLI 入口](31-ArrangeCLI与工程模式.md#正式入口与自动化)；业务服务通过注入的交互接口处理确认与修正，不自行判断 TTY。
+
+UI 准备记录关联 package.json、npmrc 和所选包管理器的 lockfile，安装前使旧记录失效，成功验证后记录新输入。它只描述依赖准备，不证明源码已构建。原生准备记录关联 native 配置、原生工具、CMake 输入和查询模型；UI 工具的变化不使 native 准备失效。工程移动、生成器/编译器变更或 CMake 输入变更后需重新准备；互不兼容的缓存仅在 CLI 拥有的对应构建目录内重建。
 
 ## CONFIG 的恢复与应用
 
@@ -228,10 +249,12 @@ APPLY 仅使用最后一轮无阻塞报告中的 Applicable 及其定位结果�
 
 `.arrange/` 是本机工作目录，与 `arrange.local.yaml` 一样不提交 Git，不作为共享配置或第二份 State。它可承载事务 journal 和恢复信息，未来缓存的具体机制不在当前设计内。
 
-首版 Apply 事务记录包括事务 ID、涉及文件、原内容 hash、预期新内容 hash、写入进度和完成状态。先组合全部待写内容，再用目标旁临时文件逐个替换并记录进度；不承诺多文件操作系统级绝对原子性。
+Apply 的失败恢复记录包含操作 ID、涉及文件、原文、目标内容和写入进度，不重复保存全文的 hash。先组合全部待写内容，再用目标旁临时文件逐个替换并记录进度。成功后尽力清理记录，清理失败不改变操作成功结果；失败或中断的记录保留供人工处理。初始化记录同样只在未完成时保留；接入复制排他创建目的目录后复制一次，不承诺整目录原子发布。
+
+这些操作是逐文件提交加失败记录，不承诺跨文件全有或全无、文件锁或断电持久性；写入前的快照核对不能完全消除检查与替换之间的并发修改窗口。打包的暂存和备份回退职责见 [交付物提交](31-ArrangeCLI与工程模式.md#交付物布局与提交)。
 
 写入前核对报告基于的文件内容，避免使用已失效的 span；发现外部修改或写入失败时终止本次 Apply，保留恢复信息。恢复时，原内容表示尚未写入，预期内容表示已写入，二者都不是则交给用户处理。这些写入保护不构成 Apply 后的常规复检循环。
 
 ## 共用边界
 
-create、adopt、sync 以及后续命令复用同一套定义和生成链。创建所需的未托管初始内容，不意味着后续 CONFIG 有权扫描或更新它。SETUP 的具体 LSRA 另行设计；本模型不规定工具探测、安装或 configure 对策。
+create、adopt、sync 以及后续命令复用同一套定义和生成链。创建所需的未托管初始内容，不意味着后续 CONFIG 有权扫描或更新它。CONFIG 与 SETUP 分别拥有自己的报告和状态机，通过明确的编排顺序连接，不互相承担对方的写入职责。

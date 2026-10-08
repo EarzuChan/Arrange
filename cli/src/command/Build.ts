@@ -1,4 +1,6 @@
-import type { Command } from "commander"
+import { Command, Option } from "commander"
+import { buildFlavorSchema, nativeProductSchema } from "../project/ProjectState.ts"
+import { BuildService } from "../building/BuildService.ts"
 
 export interface BuildCommandOptions {
     flavor?: "debug" | "release" | string
@@ -9,10 +11,9 @@ export interface BuildCommandOptions {
     clean?: boolean
 }
 
-export function registerBuildCommand(program: Command): void {
-    program.command("build").description("Build Arrange project artifacts").option("--flavor <flavor>", "Build flavor", "release").option("--ui-only", "Build only UI artifacts").option("--native-only", "Build only native artifacts").option("--no-package", "Skip packaging step").option("--product <product...>", "Native product(s) to build, for example standalone or vst3").option("--clean", "Clean before building")
+export function registerBuildCommand(program: Command, service: BuildService): void {
+    program.command("build").description("构建 Arrange 工程，完整构建默认整理交付物").addOption(new Option("--flavor <flavor>", "构建配置").choices(["debug", "release"]).default("release")).addOption(new Option("--ui-only", "只构建 UI").conflicts("native-only")).addOption(new Option("--native-only", "只构建 native").conflicts("ui-only")).option("--no-package", "跳过打包").addOption(new Option("--product <product...>", "选择产品").choices(["standalone", "vst3"])).option("--clean", "清理本次所选构建范围")
         .action(async (options: BuildCommandOptions) => {
-            void options
-            // BuildService 编排 UI/native build，并按需调用 Packer
+            await service.build(process.cwd(), { flavor: buildFlavorSchema.parse(options.flavor), ui: !options.nativeOnly, native: !options.uiOnly, products: options.product?.map(product => nativeProductSchema.parse(product)), package: options.package, clean: options.clean })
         })
 }

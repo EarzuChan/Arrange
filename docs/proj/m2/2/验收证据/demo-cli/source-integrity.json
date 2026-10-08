@@ -1,0 +1,183 @@
+{
+    "inspectedAt": "2026-10-08T20:18:02.982Z",
+    "repo": "/Users/earzuchan/Documents/Sources/ArrangeReal",
+    "origins": {
+        "uiSource": {
+            "App.sfa": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c",
+            "main.ts": "0c8bd23aea5609e17b2fd988bcf70bc29d780d7a7e504474004985aed9cd2585",
+            "view/AnimationGallery.sfa": "e31c086d97126120b3362ef6c476149d777e512f5f64229d7cb63d53ca867b6d",
+            "view/CounterPanel.sfa": "e0b1f077419f684a97fcf0c85c2dc8ba2109b5f0dbc77ccb51f11fdf452fca6b",
+            "view/GalleryButton.sfa": "63527a7f645f63ae7eb4dbca199bd808761439534b500d8eb1d9e67db490d71f",
+            "view/GalleryItem.sfa": "f49060cb924563529a94c87f4e7609b7d1a6713224b176aea77d3bb8c69a37b9",
+            "view/InnerBoundary.sfa": "e95f2ccb8d1e7aaba7efadb93da3576310479dfafe2dead72025ecfee4b5ac27",
+            "view/PropBoundary.sfa": "db87d92eab83cff339aad80da48b1ee2b9383c324d646f7fc6a3f96d416e44c5",
+            "view/RefRelay.sfa": "1bb996aba80c17f0497aa792a369402be7e6026fe53793f58d08d8650bc8e945",
+            "view/RetainedEditor.sfa": "2dfdca56d689ec4394a274bb825b36a287b7d8d67fbfc3f886e5eb1e31f0bfab",
+            "view/ShowcaseGallery.sfa": "0904aaa21cf1fb21ae4914594b50cfaea23c1b07ad509100ad941c1e53359d44",
+            "view/ValueSurface.sfa": "6f2dbacc012a0c3253e27b8971763f3961c9da481328300e96deba89e6e8eba8"
+        },
+        "uiResources": {
+            "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+            "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+        },
+        "nativeSource": {
+            "DemoProcessor.cpp": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec",
+            "DemoProcessor.h": "1b599f399cc2719a7979ee93aab0d3ff9cff35fe81cd3e319c754cff7c5e6369"
+        }
+    },
+    "projects": [
+        {
+            "root": "/tmp/arrange-demo-cli-icPpq0/manual project",
+            "comparisons": {
+                "uiSource": {
+                    "expectedCount": 12,
+                    "actualCount": 12,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "App.sfa": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c",
+                        "main.ts": "0c8bd23aea5609e17b2fd988bcf70bc29d780d7a7e504474004985aed9cd2585",
+                        "view/AnimationGallery.sfa": "e31c086d97126120b3362ef6c476149d777e512f5f64229d7cb63d53ca867b6d",
+                        "view/CounterPanel.sfa": "e0b1f077419f684a97fcf0c85c2dc8ba2109b5f0dbc77ccb51f11fdf452fca6b",
+                        "view/GalleryButton.sfa": "63527a7f645f63ae7eb4dbca199bd808761439534b500d8eb1d9e67db490d71f",
+                        "view/GalleryItem.sfa": "f49060cb924563529a94c87f4e7609b7d1a6713224b176aea77d3bb8c69a37b9",
+                        "view/InnerBoundary.sfa": "e95f2ccb8d1e7aaba7efadb93da3576310479dfafe2dead72025ecfee4b5ac27",
+                        "view/PropBoundary.sfa": "db87d92eab83cff339aad80da48b1ee2b9383c324d646f7fc6a3f96d416e44c5",
+                        "view/RefRelay.sfa": "1bb996aba80c17f0497aa792a369402be7e6026fe53793f58d08d8650bc8e945",
+                        "view/RetainedEditor.sfa": "2dfdca56d689ec4394a274bb825b36a287b7d8d67fbfc3f886e5eb1e31f0bfab",
+                        "view/ShowcaseGallery.sfa": "0904aaa21cf1fb21ae4914594b50cfaea23c1b07ad509100ad941c1e53359d44",
+                        "view/ValueSurface.sfa": "6f2dbacc012a0c3253e27b8971763f3961c9da481328300e96deba89e6e8eba8"
+                    }
+                },
+                "uiResources": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+                        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+                    }
+                },
+                "nativeSource": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "DemoProcessor.cpp": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec",
+                        "DemoProcessor.h": "1b599f399cc2719a7979ee93aab0d3ff9cff35fe81cd3e319c754cff7c5e6369"
+                    }
+                }
+            }
+        },
+        {
+            "root": "/tmp/arrange-demo-cli-icPpq0/adopt project",
+            "comparisons": {
+                "uiSource": {
+                    "expectedCount": 12,
+                    "actualCount": 12,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "App.sfa": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c",
+                        "main.ts": "0c8bd23aea5609e17b2fd988bcf70bc29d780d7a7e504474004985aed9cd2585",
+                        "view/AnimationGallery.sfa": "e31c086d97126120b3362ef6c476149d777e512f5f64229d7cb63d53ca867b6d",
+                        "view/CounterPanel.sfa": "e0b1f077419f684a97fcf0c85c2dc8ba2109b5f0dbc77ccb51f11fdf452fca6b",
+                        "view/GalleryButton.sfa": "63527a7f645f63ae7eb4dbca199bd808761439534b500d8eb1d9e67db490d71f",
+                        "view/GalleryItem.sfa": "f49060cb924563529a94c87f4e7609b7d1a6713224b176aea77d3bb8c69a37b9",
+                        "view/InnerBoundary.sfa": "e95f2ccb8d1e7aaba7efadb93da3576310479dfafe2dead72025ecfee4b5ac27",
+                        "view/PropBoundary.sfa": "db87d92eab83cff339aad80da48b1ee2b9383c324d646f7fc6a3f96d416e44c5",
+                        "view/RefRelay.sfa": "1bb996aba80c17f0497aa792a369402be7e6026fe53793f58d08d8650bc8e945",
+                        "view/RetainedEditor.sfa": "2dfdca56d689ec4394a274bb825b36a287b7d8d67fbfc3f886e5eb1e31f0bfab",
+                        "view/ShowcaseGallery.sfa": "0904aaa21cf1fb21ae4914594b50cfaea23c1b07ad509100ad941c1e53359d44",
+                        "view/ValueSurface.sfa": "6f2dbacc012a0c3253e27b8971763f3961c9da481328300e96deba89e6e8eba8"
+                    }
+                },
+                "uiResources": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+                        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+                    }
+                },
+                "nativeSource": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "DemoProcessor.cpp": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec",
+                        "DemoProcessor.h": "1b599f399cc2719a7979ee93aab0d3ff9cff35fe81cd3e319c754cff7c5e6369"
+                    }
+                }
+            }
+        },
+        {
+            "root": "/tmp/arrange-demo-cli-icPpq0/adopt sources",
+            "comparisons": {
+                "uiSource": {
+                    "expectedCount": 12,
+                    "actualCount": 12,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "App.sfa": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c",
+                        "main.ts": "0c8bd23aea5609e17b2fd988bcf70bc29d780d7a7e504474004985aed9cd2585",
+                        "view/AnimationGallery.sfa": "e31c086d97126120b3362ef6c476149d777e512f5f64229d7cb63d53ca867b6d",
+                        "view/CounterPanel.sfa": "e0b1f077419f684a97fcf0c85c2dc8ba2109b5f0dbc77ccb51f11fdf452fca6b",
+                        "view/GalleryButton.sfa": "63527a7f645f63ae7eb4dbca199bd808761439534b500d8eb1d9e67db490d71f",
+                        "view/GalleryItem.sfa": "f49060cb924563529a94c87f4e7609b7d1a6713224b176aea77d3bb8c69a37b9",
+                        "view/InnerBoundary.sfa": "e95f2ccb8d1e7aaba7efadb93da3576310479dfafe2dead72025ecfee4b5ac27",
+                        "view/PropBoundary.sfa": "db87d92eab83cff339aad80da48b1ee2b9383c324d646f7fc6a3f96d416e44c5",
+                        "view/RefRelay.sfa": "1bb996aba80c17f0497aa792a369402be7e6026fe53793f58d08d8650bc8e945",
+                        "view/RetainedEditor.sfa": "2dfdca56d689ec4394a274bb825b36a287b7d8d67fbfc3f886e5eb1e31f0bfab",
+                        "view/ShowcaseGallery.sfa": "0904aaa21cf1fb21ae4914594b50cfaea23c1b07ad509100ad941c1e53359d44",
+                        "view/ValueSurface.sfa": "6f2dbacc012a0c3253e27b8971763f3961c9da481328300e96deba89e6e8eba8"
+                    }
+                },
+                "uiResources": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+                        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+                    }
+                },
+                "nativeSource": {
+                    "expectedCount": 2,
+                    "actualCount": 2,
+                    "identical": true,
+                    "missing": [],
+                    "extra": [],
+                    "changed": [],
+                    "hashes": {
+                        "DemoProcessor.cpp": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec",
+                        "DemoProcessor.h": "1b599f399cc2719a7979ee93aab0d3ff9cff35fe81cd3e319c754cff7c5e6369"
+                    }
+                }
+            }
+        }
+    ]
+}

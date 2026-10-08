@@ -1,4 +1,7 @@
-import type { Command } from "commander"
+import { Command, Option } from "commander"
+import { buildFlavorSchema } from "../project/ProjectState.ts"
+import { DevService } from "../building/DevService.ts"
+import { isAbortError } from "../platform/ProcessSpec.ts"
 
 export interface DevCommandOptions {
     uiOnly?: boolean
@@ -6,10 +9,13 @@ export interface DevCommandOptions {
     flavor?: "debug" | "release" | string
 }
 
-export function registerDevCommand(program: Command): void {
-    program.command("dev").description("Run Arrange development environment").option("--ui-only", "Run only UI dev server").option("--native-only", "Run only native editor").option("--flavor <flavor>", "Build flavor", "debug")
+export function registerDevCommand(program: Command, service: DevService, signal: AbortSignal): void {
+    program.command("dev").description("启动并监管 UI 开发服务和 Standalone").addOption(new Option("--ui-only", "只启动 UI").conflicts("native-only")).addOption(new Option("--native-only", "只启动 native").conflicts("ui-only")).addOption(new Option("--flavor <flavor>", "native 构建配置").choices(["debug", "release"]).default("debug"))
         .action(async (options: DevCommandOptions) => {
-            void options
-            // DevService 编排：sync check -> 可开发性判断 -> 必要构建 -> DevSupervisor 托管长进程
+            try { process.exitCode = await service.run(process.cwd(), { flavor: buildFlavorSchema.parse(options.flavor), ui: !options.nativeOnly, native: !options.uiOnly, signal }) } catch (error) {
+                if (!signal.aborted || error !== signal.reason && !isAbortError(error)) throw error
+                console.log("[ArrangeCLI]", "开发会话已结束")
+                process.exitCode = 0
+            }
         })
 }

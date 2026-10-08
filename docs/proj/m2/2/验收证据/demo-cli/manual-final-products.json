@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-10-08T20:58:27.896Z",
+  "project": "/tmp/arrange-demo-cli-icPpq0/manual project",
+  "products": [
+    {
+      "flavor": "debug",
+      "product": "standalone",
+      "bundle": "/tmp/arrange-demo-cli-icPpq0/manual project/artifacts/debug/1.2.3/macos-arm64/standalone/ArrangeDemoManual.app",
+      "signatureExitCode": 0,
+      "uiFiles": {
+        "app.js": "d9f69a07f14549c90df32ef07aef25047e41700ac2106615a1a1f39a45891866",
+        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+      },
+      "binaryArchitectures": "arm64"
+    },
+    {
+      "flavor": "debug",
+      "product": "vst3",
+      "bundle": "/tmp/arrange-demo-cli-icPpq0/manual project/artifacts/debug/1.2.3/macos-arm64/vst3/ArrangeDemoManual.vst3",
+      "signatureExitCode": 0,
+      "uiFiles": {
+        "app.js": "d9f69a07f14549c90df32ef07aef25047e41700ac2106615a1a1f39a45891866",
+        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+      },
+      "binaryArchitectures": "arm64"
+    },
+    {
+      "flavor": "release",
+      "product": "standalone",
+      "bundle": "/tmp/arrange-demo-cli-icPpq0/manual project/artifacts/release/1.2.3/macos-arm64/standalone/ArrangeDemoManual.app",
+      "signatureExitCode": 0,
+      "uiFiles": {
+        "app.js": "d9f69a07f14549c90df32ef07aef25047e41700ac2106615a1a1f39a45891866",
+        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+      },
+      "binaryArchitectures": "arm64"
+    },
+    {
+      "flavor": "release",
+      "product": "vst3",
+      "bundle": "/tmp/arrange-demo-cli-icPpq0/manual project/artifacts/release/1.2.3/macos-arm64/vst3/ArrangeDemoManual.vst3",
+      "signatureExitCode": 0,
+      "uiFiles": {
+        "app.js": "d9f69a07f14549c90df32ef07aef25047e41700ac2106615a1a1f39a45891866",
+        "icons/play.svg": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd",
+        "logo.png": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+      },
+      "binaryArchitectures": "arm64"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-import { defaultNodeRegistryUrl, frameworkPackageName } from "../CliMetadata.ts"
-import type { FrameworkMetadata, FrameworkVersionCandidate } from "./FrameworkMamba.ts"
+import { defaultNodeRegistryUrl, frameworkPackageName, frameworkRegistryTimeoutMs } from "../CliMetadata.ts"
+import type { FrameworkVersionCandidate } from "./FrameworkMamba.ts"
 
 export function normalizeRegistryUrl(registryUrl?: string): string { // 是否带派
     const raw = registryUrl?.trim() || defaultNodeRegistryUrl
@@ -20,20 +20,27 @@ interface FrameworkManifest {
 }
 
 export class FrameworkRegistryClient {
+    constructor(private readonly signal?: AbortSignal) { }
+
+    private requestSignal(): AbortSignal {
+        const timeout = AbortSignal.timeout(frameworkRegistryTimeoutMs)
+        return this.signal ? AbortSignal.any([this.signal, timeout]) : timeout
+    }
+
     // 对于一个特定版本。缺陷：无法获得版本发布时间
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
         // 原 fetchManifest 逻辑
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) })
+        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
 
-        if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName}@${version} from ${registry}: HTTP ${response.status}`)
+        if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName}@${version}：HTTP ${response.status}`)
 
         const manifest = await response.json() as FrameworkManifest
 
         // 后续处理逻辑
         const actualVersion = typeof manifest.version === "string" ? manifest.version : version
         const cliCompatibility = readCliCompatibility(manifest)
-        if (cliCompatibility === null) throw new Error(`${frameworkPackageName}@${actualVersion} does not declare arrange.cliCompatibility.`)
+        if (cliCompatibility === null) throw new Error(`${frameworkPackageName}@${actualVersion} 未声明有效的 arrange.cliCompatibility`)
 
         return { version: actualVersion, cliCompatibility, markedLatest: false, publishedAt: null }
     }
@@ -41,9 +48,9 @@ export class FrameworkRegistryClient {
     // 对于所有版本
     async fetchCandidates(recentLimit = 5, registryUrl?: string): Promise<FrameworkVersionCandidate[]> {
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) })
+        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
 
-        if (!response.ok) throw new Error(`Cannot read ${frameworkPackageName} packument from ${registry}: HTTP ${response.status}`)
+        if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName} 版本列表：HTTP ${response.status}`)
 
         const packument = await response.json() as FrameworkPackument
 
@@ -64,7 +71,12 @@ export class FrameworkRegistryClient {
 
         if (latestCandidate) result.push({ ...latestCandidate, markedLatest: true })
 
-        result.push(...[...allCandidates].sort(comparePublishedTimeDesc).slice(0, recentLimit))
+        const included = new Set(result.map(candidate => candidate.version))
+        for (const candidate of [...allCandidates].sort(comparePublishedTimeDesc).slice(0, recentLimit)) {
+            if (included.has(candidate.version)) continue
+            result.push(candidate)
+            included.add(candidate.version)
+        }
         return result
     }
 }

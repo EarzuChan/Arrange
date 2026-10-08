@@ -1,0 +1,3409 @@
+{
+  "createdAt": "2026-10-08T21:28:09.079Z",
+  "original": "/Users/earzuchan/Documents/Sources/ArrangeReal",
+  "originalHead": "3c8b75966dbc268e1b9985c32c4591442c3940bc",
+  "originalTags": [
+    "v0.0.0-m.2.0",
+    "v0.0.0-m.2.1"
+  ],
+  "snapshot": "/private/tmp/arrange-release-m24-WKbIAu/native-candidate/source-git",
+  "commit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+  "tag": "v0.0.0-m.2.4",
+  "version": {
+    "frameworkVersion": "0.0.0-m.2.4",
+    "frameworkInternalProtocolCode": 5,
+    "cliVersion": "1.0.0",
+    "cliCompatibility": 1
+  },
+  "fileCount": 677,
+  "files": [
+    {
+      "path": ".clang-format",
+      "size": 638,
+      "sha256": "f5f4357c04cc68d259d259702aa1ffa08a494a6afc447958c91afaaf5c36682c"
+    },
+    {
+      "path": ".gitignore",
+      "size": 718,
+      "sha256": "6d5b60edd1945521fc4e8cae04183ee05fa0414054a0420331a1c718271733d1"
+    },
+    {
+      "path": ".nvmrc",
+      "size": 19,
+      "sha256": "ae81cbea6fc1e1140bf997d399f8112184ea0f450c4d003d9c4d0cdead9bbb75"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 351,
+      "sha256": "6d1633ce0e5c8fbdc657d38246c55f30e26707f91e4e71dc798be2df43b6c1f6"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "size": 1006,
+      "sha256": "45c694dcae53726de15815ca156ab72cb1c52150a32aa9d0a54235b7813ea2c3"
+    },
+    {
+      "path": "README.md",
+      "size": 446,
+      "sha256": "10edc7b2e233725bb9e71688e81e785da3e0fe8f82030d2651a3058cb4ba2748"
+    },
+    {
+      "path": "arrange.version.json",
+      "size": 128,
+      "sha256": "f2aac790d11d477358a99c53e9a69ff401bfcadb1a9991ce6826bc8e1784a62b"
+    },
+    {
+      "path": "artworks/logo.png",
+      "size": 90233,
+      "sha256": "44ea0f5d675cecf1672ee708e1b9f2d2d31e76ac06be335ca9f0d79c8963005c"
+    },
+    {
+      "path": "cli/old-src/artifacts.ts",
+      "size": 4003,
+      "sha256": "2d6b08117a717632f999051676dbf5a7c33f7fba84c330571760ddbabdd52b20"
+    },
+    {
+      "path": "cli/old-src/config.ts",
+      "size": 8479,
+      "sha256": "7947da86fc0d074e23d9c05a0c5c32f1496c6b43b6bea2f5718f57ac6a8435b4"
+    },
+    {
+      "path": "cli/old-src/constants.ts",
+      "size": 205,
+      "sha256": "4279f4ed3a3d3276a7ad5f3401e2b2e5765fbea75938e6c6c95b44459fdbe8c4"
+    },
+    {
+      "path": "cli/old-src/errors.ts",
+      "size": 942,
+      "sha256": "ffd1ba74d3cb96e945f3621adccd78533d81878c1d7e2d51884c8b21439d105f"
+    },
+    {
+      "path": "cli/old-src/framework.ts",
+      "size": 5622,
+      "sha256": "9b1f0a002dbb57e8ac5c5e9131042f878b6adbe2d1688fd8ab4563f2ae0f5999"
+    },
+    {
+      "path": "cli/old-src/index.ts",
+      "size": 254,
+      "sha256": "ed1053293d0f4b1f174a1633ed9057d3217c924ede2537497b37ac4f38ff8ba8"
+    },
+    {
+      "path": "cli/old-src/local.ts",
+      "size": 28125,
+      "sha256": "f10740ea195ccbf9246406da15bc78edd3b77cb107eff828997cfa7cd783a39c"
+    },
+    {
+      "path": "cli/old-src/main.ts",
+      "size": 13374,
+      "sha256": "38c551693aaa520bafa98e4fe27ba52e8e44bc39c6e555c4cf1314ed850d5139"
+    },
+    {
+      "path": "cli/old-src/package-resolve.ts",
+      "size": 2548,
+      "sha256": "0f011e1d92c75da6efc2a38220f870aac4e0e43abc857ab424b315e22eace4bf"
+    },
+    {
+      "path": "cli/old-src/process.ts",
+      "size": 7832,
+      "sha256": "cea93d2030cd5ba8e7423e0d29be8c592868375fa40124e48d5998b2bf865c40"
+    },
+    {
+      "path": "cli/old-src/project.ts",
+      "size": 15131,
+      "sha256": "46d6ee5bcfcc22d39b21995696d751cb050a6aed84d9129cf69ce391c9a33eae"
+    },
+    {
+      "path": "cli/old-src/prompt.ts",
+      "size": 1944,
+      "sha256": "588a6fe0f816ebf4667724f20402a5410289b56aba97e797622eec1dc532e5d2"
+    },
+    {
+      "path": "cli/old-src/vite.ts",
+      "size": 3718,
+      "sha256": "21aa3d81d010efd74aa01ef8a430613a405b24c13569e5340497740955ced46a"
+    },
+    {
+      "path": "cli/old-src/wizard.ts",
+      "size": 10958,
+      "sha256": "d20500fc7235ca72f68732d10143c8b5bdbd429cd6a133dc8346a66bd3af7a25"
+    },
+    {
+      "path": "cli/package.json",
+      "size": 798,
+      "sha256": "3369048991e682b423bb1161efeb4df5a44a633a6cf164172b1eaf6e11202002"
+    },
+    {
+      "path": "cli/scripts/build.ts",
+      "size": 676,
+      "sha256": "edd26d0b828360e94df473fa9639be3c875459a4d24ea2fdd8d2f41c838a009e"
+    },
+    {
+      "path": "cli/src/CliApplication.ts",
+      "size": 5013,
+      "sha256": "13a04058c1150b9ca28783fb7a7c8758161cfc94c1bdec4b9e5a2f79a46e27d6"
+    },
+    {
+      "path": "cli/src/CliEnvironment.ts",
+      "size": 808,
+      "sha256": "1966252f2e69bc268ffb7180a8235ede107c754f1312af2327f8fd05cdac0a67"
+    },
+    {
+      "path": "cli/src/CliMetadata.ts",
+      "size": 1646,
+      "sha256": "67699b979efc8e239c0bbbd51490cd322dad724d28b266bbd7961ab473d1e831"
+    },
+    {
+      "path": "cli/src/Entry.ts",
+      "size": 1376,
+      "sha256": "88c67112902b88773761298f51e159aeb446cd538b8ebad1a456a7b6e6b1426c"
+    },
+    {
+      "path": "cli/src/building/BuildReceipt.ts",
+      "size": 1161,
+      "sha256": "c0b7e6ffea14e1bfa1f6d84eb0770a673769bb0b73b71fb3d28c7a7f2379e230"
+    },
+    {
+      "path": "cli/src/building/BuildService.ts",
+      "size": 2059,
+      "sha256": "8e5ef6df78baef9ddc2bf2d4e163f619114b5803e04d6d0698a0c3f6e3f3b40f"
+    },
+    {
+      "path": "cli/src/building/DevService.ts",
+      "size": 4003,
+      "sha256": "2c3570583fee33f06a987959e7a7052e16b66628428ac47c2ce23918fb63514b"
+    },
+    {
+      "path": "cli/src/building/NativeBuildService.ts",
+      "size": 718,
+      "sha256": "5777e6e8f13654517b6fc2c3a1afafa1040240f2851d3d1357092c87dd0c9ebc"
+    },
+    {
+      "path": "cli/src/building/UiBuildService.ts",
+      "size": 422,
+      "sha256": "72498d0bf06145c8042045f33f2441efbcd674ce9c8a9be3acd3bec9d89d72e0"
+    },
+    {
+      "path": "cli/src/cmake/CmakeService.ts",
+      "size": 16625,
+      "sha256": "6676632ad77faa87b2bee3b4e3d2f2fb85f32c3fcd4c05d4049dca8012bc0667"
+    },
+    {
+      "path": "cli/src/cmake/CmakeStuffs.ts",
+      "size": 5332,
+      "sha256": "51a5e2267be6f421d223f5cd63172fc24d243660d17775ef6332b0236f5e7ccc"
+    },
+    {
+      "path": "cli/src/command/Adopt.ts",
+      "size": 2778,
+      "sha256": "840bd595c77dc77b8ead362d2868bb58c71f58628a3e23d246ba38404a4c6650"
+    },
+    {
+      "path": "cli/src/command/Build.ts",
+      "size": 1370,
+      "sha256": "2c414ec3b87f228cf2e6ebf6c5a6b3e94d5a3e347db9a5160741ebd6e09f9022"
+    },
+    {
+      "path": "cli/src/command/Create.ts",
+      "size": 2484,
+      "sha256": "77b15eaf58c681b023d63f470dae4adcb7ad76f915c8c106108ed0ee916a640f"
+    },
+    {
+      "path": "cli/src/command/Dev.ts",
+      "size": 1297,
+      "sha256": "ff576c6eee9c4e0d506765f6aa8718b88070612536a846a9629a0a74541cb619"
+    },
+    {
+      "path": "cli/src/command/Package.ts",
+      "size": 1267,
+      "sha256": "bf6bbb8109b2c91b577727fac4e31b27dde5c3f0401183cad99bea15eb059fbc"
+    },
+    {
+      "path": "cli/src/command/Sync.ts",
+      "size": 1108,
+      "sha256": "4f179ab4e048c1ffb73c41d8ab1192f96919651225e1ed4fd44752ad5d694062"
+    },
+    {
+      "path": "cli/src/config/ConfigRegistry.ts",
+      "size": 2494,
+      "sha256": "339712d2ec3254b0d7b09394c17b47297f861782cdfcbc95ec63a4484330e800"
+    },
+    {
+      "path": "cli/src/framework/FrameworkMamba.ts",
+      "size": 1315,
+      "sha256": "ea7c5fbdcd2c32ead2eb4a296cf7a683382d8f6401dac96330d0b4d24ee9bb57"
+    },
+    {
+      "path": "cli/src/framework/FrameworkRegistryClient.ts",
+      "size": 4506,
+      "sha256": "3e9bc6b63dcceaa60d4b66db0290479eb3058d23f4af16176d1832e30ba15c58"
+    },
+    {
+      "path": "cli/src/framework/FrameworkService.ts",
+      "size": 2380,
+      "sha256": "031249680241b5b8cad1481d3a63e6f4f354565b98a067a211be5198f469c60c"
+    },
+    {
+      "path": "cli/src/managed/CheckResult.ts",
+      "size": 1059,
+      "sha256": "31593fac549dfd063e8514ac2177d7dd1d84e777bf056f76d01c66f0efe55f79"
+    },
+    {
+      "path": "cli/src/managed/JsonRegion.ts",
+      "size": 3643,
+      "sha256": "32147b48e307b379c6c2dc288d46c8d6649ee5f0f20458ee8fcf988a37db0108"
+    },
+    {
+      "path": "cli/src/managed/ManageItems.ts",
+      "size": 340,
+      "sha256": "11b06bd280c402d341d2475d0f5b67c2f0da392b0361c592f71588315de47041"
+    },
+    {
+      "path": "cli/src/managed/ManagedFile.ts",
+      "size": 1889,
+      "sha256": "44ab3c03b4e506bf34723829d429f5a9049fb8b8b25290d51176cfea6b08973e"
+    },
+    {
+      "path": "cli/src/managed/TextCluster.ts",
+      "size": 1089,
+      "sha256": "12d9b5442dcb90fa36c37018a5117eaf7e829f46a63d7cd8f8d41a7266be2d0d"
+    },
+    {
+      "path": "cli/src/managed/TextRegion.ts",
+      "size": 1683,
+      "sha256": "6765af1762a13a6f015dd8a3f984b98eab0af90da4ff7aef76522a428c5b950c"
+    },
+    {
+      "path": "cli/src/managed/Wrapper.ts",
+      "size": 3428,
+      "sha256": "9a7e50226dcb5a9b66e8d170fa6a8d2abf05216e3600fc079403713e29b8179e"
+    },
+    {
+      "path": "cli/src/node-js/NodeJsService.ts",
+      "size": 6605,
+      "sha256": "3223e3654aba0486cd0aad7f9add5b0f5b2bc3252f99fdaeb21c298e0694c443"
+    },
+    {
+      "path": "cli/src/node-js/NodeJsStuffs.ts",
+      "size": 3034,
+      "sha256": "77101a3371c2ced0d3a23a022aaa7c1b36e8a4b066d48aa11c8e4ff600c5df22"
+    },
+    {
+      "path": "cli/src/packing/ArtifactLocator.ts",
+      "size": 6531,
+      "sha256": "846756dbbd711d2a867a3a3b0ec31e8dca2a53ad82b9a395ff8eb2d0a9ff4ae0"
+    },
+    {
+      "path": "cli/src/packing/MacBundleSigner.ts",
+      "size": 3515,
+      "sha256": "9638a4422932748cb12a105c1c7995dcada672f6862a846432d1bc1772265b5c"
+    },
+    {
+      "path": "cli/src/packing/Packer.ts",
+      "size": 16290,
+      "sha256": "946dfcac70a21f5d49cec361364b312739bac35851a644d698cd515d62ceb01e"
+    },
+    {
+      "path": "cli/src/platform/CreatePlatformService.ts",
+      "size": 569,
+      "sha256": "30462d2c32294717504d5488711d9e456ddfe0628122e2703beef2fd652b7933"
+    },
+    {
+      "path": "cli/src/platform/DevSupervisor.ts",
+      "size": 7418,
+      "sha256": "ce0a8dbf11fc2b05c31c3c1d5ea878e6cd9b5e2f106029ad000acbd1626b129e"
+    },
+    {
+      "path": "cli/src/platform/Executor.ts",
+      "size": 9359,
+      "sha256": "40da4c87c4d6765bd83554e264d56be05fc8ef3f23162098ed98bd64b92d46e9"
+    },
+    {
+      "path": "cli/src/platform/MacPlatformService.ts",
+      "size": 3686,
+      "sha256": "f435f591fe2e14c253ea36407a3bb5aa6ff2e7fc0f03b560ca8312ed26006c15"
+    },
+    {
+      "path": "cli/src/platform/PlatformService.ts",
+      "size": 685,
+      "sha256": "8638c41f909be42a51ec3b065c61c1df73bdc37b20150c0e22a19fcf49cd48ad"
+    },
+    {
+      "path": "cli/src/platform/ProcessSpec.ts",
+      "size": 1091,
+      "sha256": "d33a1e08012105cb1b951339b95c9f7cafed9d69420516e8875fb4a6399e9383"
+    },
+    {
+      "path": "cli/src/platform/ToolLocator.ts",
+      "size": 1359,
+      "sha256": "7a9b459501bcc77c6547c6289a9cf2d0f650dc8e36b5ced3c659ed3f5c2460ba"
+    },
+    {
+      "path": "cli/src/platform/ToolchainService.ts",
+      "size": 4915,
+      "sha256": "f314ec7197dafcca9343c88fc0d87445147460996b7b45aba567b0fff6bc357a"
+    },
+    {
+      "path": "cli/src/platform/WindowsPlatformService.ts",
+      "size": 5528,
+      "sha256": "2e00a9eccc58cc744049ee320b3fc33442acc303bfe9cf054c5da843e0d02e62"
+    },
+    {
+      "path": "cli/src/project/CreateProject.ts",
+      "size": 2384,
+      "sha256": "59b4415bba1684c3f78d09f69c7a1a514ba656fcbeac190d322eb0b88b62e266"
+    },
+    {
+      "path": "cli/src/project/ProjectInitializer.ts",
+      "size": 11440,
+      "sha256": "bb75a4bff84d26bf3df038ad1424d25581d46d473733501639b9607558eb72bb"
+    },
+    {
+      "path": "cli/src/project/ProjectInteraction.ts",
+      "size": 741,
+      "sha256": "3ba3cd777242380d87ab3b2fa29141f0fa61931e6c30cc8cf09fd2da70f98255"
+    },
+    {
+      "path": "cli/src/project/ProjectPaths.ts",
+      "size": 2022,
+      "sha256": "e7d033f3e86d0a9651322fb448204ae005508f063094bf892bdcd772c23421f2"
+    },
+    {
+      "path": "cli/src/project/ProjectService.ts",
+      "size": 880,
+      "sha256": "e75dedcb0f8469714cba98262d199b2a7ff1921b0cd143c3b4b6727a4031ddfc"
+    },
+    {
+      "path": "cli/src/project/ProjectState.ts",
+      "size": 4180,
+      "sha256": "37367d7cfb06d4f96f4d72a3a23388d4f62ba684066e04d343eaa7a7dc59850e"
+    },
+    {
+      "path": "cli/src/project/ProjectStateStore.ts",
+      "size": 3668,
+      "sha256": "fc97f2c33cd76992c8dd6ce65c1e4e84e7325d32da60b25fe11a91be9a67a7f8"
+    },
+    {
+      "path": "cli/src/project/StarterFiles.ts",
+      "size": 6272,
+      "sha256": "9f87df89d1faee8d78f19359a7ce96b74925093b58611c908b2ffa661b1fe4a7"
+    },
+    {
+      "path": "cli/src/sync/ConfigApplier.ts",
+      "size": 2745,
+      "sha256": "356f3540374a93897c84d0fb1c77951df98e3593a8635cc994e73e24f6d40931"
+    },
+    {
+      "path": "cli/src/sync/ConfigInteraction.ts",
+      "size": 451,
+      "sha256": "911bd3fd910e7b141b1b9fdeb46d7bb19a12c4c7f0e5739912023f4e9f85c7d4"
+    },
+    {
+      "path": "cli/src/sync/ConfigResolver.ts",
+      "size": 7817,
+      "sha256": "80ea50a755dfa0e240df3fb097101d76b38a3fc2015302abf41a0001eafbe111"
+    },
+    {
+      "path": "cli/src/sync/ConfigScanReport.ts",
+      "size": 1688,
+      "sha256": "b7a7030d8adfacaef67d67cf68db4401aef9fee6f84a3b89bdd054c92f20b7e7"
+    },
+    {
+      "path": "cli/src/sync/ConfigScanner.ts",
+      "size": 6355,
+      "sha256": "946f24778330ab96fc9baa5e0082cfab93f0ffd03a0c26830c9be67566489a2e"
+    },
+    {
+      "path": "cli/src/sync/ConfigWriter.ts",
+      "size": 192,
+      "sha256": "2deb834de7216c0edd3ed0b1d16195437b58cca15d6b8423673c67cc078797cf"
+    },
+    {
+      "path": "cli/src/sync/ConfigurationReadiness.ts",
+      "size": 763,
+      "sha256": "4f91cb8b126ffa12ac9f1bf7aebdfd7b9e30a3adbfe80da09aafb00f206efbaa"
+    },
+    {
+      "path": "cli/src/sync/SetupInteraction.ts",
+      "size": 384,
+      "sha256": "5b8138b30845479e53d3bd7e0b82fe9d8f910e417c88e2d3cb6ce91cf77a43a4"
+    },
+    {
+      "path": "cli/src/sync/SetupScanReport.ts",
+      "size": 954,
+      "sha256": "2bf4e702a8059477926d3fe1a1638d1660a6b895bf8713f3236d1d5a41724b0b"
+    },
+    {
+      "path": "cli/src/sync/SetupService.ts",
+      "size": 5454,
+      "sha256": "365e526e0f9f40fa060e0c7fd341c961cd14d6ac028ed2363c6dad8e136ad502"
+    },
+    {
+      "path": "cli/src/sync/SyncService.ts",
+      "size": 5252,
+      "sha256": "a7a63d8d5c7b0cc04db77e10e17c3a40b7e705f1e081096ac3760c400a84c35a"
+    },
+    {
+      "path": "cli/src/util/FileTransaction.ts",
+      "size": 4910,
+      "sha256": "45ac31da32921bad3a01d9ca47af6ffe79d931fe613de6a15bfd58aadfa56367"
+    },
+    {
+      "path": "cli/src/util/FileUtils.ts",
+      "size": 724,
+      "sha256": "ef88176cddf3e3dadb85d88dd029c25bb9c174ea79ff62f83af0ee8b166b7f25"
+    },
+    {
+      "path": "cli/src/util/JsonFile.ts",
+      "size": 874,
+      "sha256": "1a8bae0bb9e438d56b45c1836313cd946a1c2b1936019c93aac4d0167eb329c4"
+    },
+    {
+      "path": "cli/src/util/PlainDirectoryPath.ts",
+      "size": 1065,
+      "sha256": "c3c24c400cf565a8bdd98e38e723f607bab6489b7fffe28ddffe6255a2d560d4"
+    },
+    {
+      "path": "cli/src/util/PromptUtils.ts",
+      "size": 1396,
+      "sha256": "8c344a5fd2abc841ae8a8f288a94dfe20a6e9d78bd6fc165d81fd08d52882ecf"
+    },
+    {
+      "path": "cli/src/util/Utils.ts",
+      "size": 935,
+      "sha256": "c466781b6a1e26f06d0f6415177caa9fb5ded97809471b89871df9d6dbbe1350"
+    },
+    {
+      "path": "cli/src/wizard/Adopt.ts",
+      "size": 5053,
+      "sha256": "7384af5882106fde256a0b555251c6d2a4b20223f58b0127babaf388a3a818af"
+    },
+    {
+      "path": "cli/src/wizard/Create.ts",
+      "size": 2414,
+      "sha256": "03534b6aeb62a32f5df4251efaa362f3b5254a9ee6d955849a4fa85325fdd34a"
+    },
+    {
+      "path": "cli/src/wizard/FrameworkVersion.ts",
+      "size": 7874,
+      "sha256": "f416f5aaee3d2d2c6d8e5d3b163fd754414a50eb27912bf0fd1e98d2182bbd6b"
+    },
+    {
+      "path": "cli/src/wizard/Project.ts",
+      "size": 5915,
+      "sha256": "27f2f9f0afcf5d4b8c158675745c593b78a948273dee24164e16fa6c37b6ea5c"
+    },
+    {
+      "path": "cli/src/wizard/ProjectInteraction.ts",
+      "size": 1211,
+      "sha256": "0489f3c72a7b8e6d9e798bd7ef48d29bd801aa18ceae8b61ad260df9b237b0bc"
+    },
+    {
+      "path": "cli/src/wizard/Setup.ts",
+      "size": 1923,
+      "sha256": "973319ff43c173c3ae48752de3d7a7818f74568d15f8ca539174ab206b7afad2"
+    },
+    {
+      "path": "cli/src/wizard/Sync.ts",
+      "size": 2104,
+      "sha256": "df5ae5a149ebd5e7383fedee06c79b46e4be1ede8422099ff56c4acde0dbed1e"
+    },
+    {
+      "path": "cli/tests/cli-runner.ts",
+      "size": 1285,
+      "sha256": "927369281cd92cb3cbb8c460ea765d5ba02f772552a831ffe9ea85c722b2a8c2"
+    },
+    {
+      "path": "cli/tests/cmake-service.test.ts",
+      "size": 10254,
+      "sha256": "eea061c5ee7c0615ed38821f5dcf837443b929c189ef13a3029c3685985b20ba"
+    },
+    {
+      "path": "cli/tests/config-cli.test.ts",
+      "size": 4321,
+      "sha256": "51cbea28401d761735466f0ce133129ecf1c7f63683652081f12d7cb489246ab"
+    },
+    {
+      "path": "cli/tests/config-model.test.ts",
+      "size": 14193,
+      "sha256": "a93feedb7c3f57d49735fd4dfc3df85f264f17dc090fc7e43fa61f6884c61405"
+    },
+    {
+      "path": "cli/tests/config-sync.test.ts",
+      "size": 31868,
+      "sha256": "ef1efc0e4586683f4f91b06cf08417694f175a874a2c4fd97906f8b524c20c08"
+    },
+    {
+      "path": "cli/tests/dev-command.test.ts",
+      "size": 1598,
+      "sha256": "5b1d9a458ec4d1b527e27a61f6eca90a2990b5950e963b5882836c6275c77e4f"
+    },
+    {
+      "path": "cli/tests/entry-environment.test.ts",
+      "size": 6247,
+      "sha256": "a9b786be07cf2b926bc016df6f592df8034d94a81d3d6fc9a977adb323347397"
+    },
+    {
+      "path": "cli/tests/file-transaction.test.ts",
+      "size": 10273,
+      "sha256": "aed5372ba5e0ad6e3cd8b5f9c718c82f48143489bac8b40e4d901660c95569bb"
+    },
+    {
+      "path": "cli/tests/fixture.ts",
+      "size": 2732,
+      "sha256": "e5fe04d87fb97c5b0192aa94cf3e444364a7369388c5283dfa08e7ce1203435f"
+    },
+    {
+      "path": "cli/tests/framework-service.test.ts",
+      "size": 4581,
+      "sha256": "29a19cb78035928e8eea6fea9ea3d9b6c67b192f8c508c46e0d484a188e1ce02"
+    },
+    {
+      "path": "cli/tests/framework-versions.test.ts",
+      "size": 5555,
+      "sha256": "34d43ebd4e9789f02010aa1c97aee9f30047e0efffb7ea4a18af2b30d257f0ea"
+    },
+    {
+      "path": "cli/tests/node-service.test.ts",
+      "size": 9343,
+      "sha256": "e94c682880f27d1718f0e767b7c38d866d7b5c56b4d1414929a23467b236d91f"
+    },
+    {
+      "path": "cli/tests/packing.test.ts",
+      "size": 25641,
+      "sha256": "665d893b1792f14b0112bf729111d310ab19285c44d52cbf8682b98cbf45e308"
+    },
+    {
+      "path": "cli/tests/platform-process.test.ts",
+      "size": 15600,
+      "sha256": "7db7b15b086bf49a2ad417e1fade959ceae321d226ee561a241b267896f3dc70"
+    },
+    {
+      "path": "cli/tests/project-initializer.test.ts",
+      "size": 27417,
+      "sha256": "2dc7e78a586ecc103501ff7b2f32f9fdbaddcb2eef62fec3423304c9854610a2"
+    },
+    {
+      "path": "cli/tests/setup-build-dev.test.ts",
+      "size": 22945,
+      "sha256": "b4713e60e7edae99999c72361d6ba09f4602d0371bea0e4a2aa03534fca98dd9"
+    },
+    {
+      "path": "cli/tests/store-cancellation.test.ts",
+      "size": 3395,
+      "sha256": "64ff4ba18ffec7bcb1cf115b62b1790ec24a4b76ff70a2624af4c3d26b0602ee"
+    },
+    {
+      "path": "cli/tsconfig.build.json",
+      "size": 406,
+      "sha256": "75f13beb8bfbf9921896916e30b7bd3802ac1d1a47622ee60a55eb8be226d5b5"
+    },
+    {
+      "path": "cli/tsconfig.json",
+      "size": 292,
+      "sha256": "ad84e8e0b9909dc6b2f03999a9e3c2ef707e67794fcfccc4f8b128a5c0812bbc"
+    },
+    {
+      "path": "cmake/ArrangeVersion.cmake",
+      "size": 653,
+      "sha256": "deafb53a3a8b15bf0072964e61eb1e697d1d2863f895fb2237e8fa36c51f9d23"
+    },
+    {
+      "path": "cmake/Dependencies.cmake",
+      "size": 3362,
+      "sha256": "74895dae140050e351df0d54e0ebb3a0622a5ac3ee898663862d094d639b3cb4"
+    },
+    {
+      "path": "cmake/copy-demo-ui-dist.cmake",
+      "size": 842,
+      "sha256": "c7d9a05642a61cac1ceebfc553010812bf834d0f236933d9c7d9c899c2b06262"
+    },
+    {
+      "path": "cpp_tests/AllocationProbe.cpp",
+      "size": 1235,
+      "sha256": "69cbcea524b7518d6dbce897cf461feff556c923e36f85c9bcd98150ba3ff07f"
+    },
+    {
+      "path": "cpp_tests/AllocationProbe.h",
+      "size": 277,
+      "sha256": "c96e5297652286482ea8d0e053a10f8adcb83401502d924e14d606f45e04ed9f"
+    },
+    {
+      "path": "cpp_tests/CMakeLists.txt",
+      "size": 5603,
+      "sha256": "fc84f225c0daf8311bd8577ccd2d53fde37cb7858a6ff6e8bb484ca9d6e6a222"
+    },
+    {
+      "path": "cpp_tests/JuceTestApplication.h",
+      "size": 663,
+      "sha256": "af3ad3378491d1a60797e85525b59df9ae2131c62f4f1360dae3ef40a5f38ab9"
+    },
+    {
+      "path": "cpp_tests/TextFixtures.h",
+      "size": 2348,
+      "sha256": "3222aefab7816674cdd89d0857c8a9bf32acafd01f99d414d53859c1f8c65f58"
+    },
+    {
+      "path": "cpp_tests/arrange_core_smoke.cpp",
+      "size": 32379,
+      "sha256": "a675f0067d97db62af61b9370640cbd24f9880fd2a8a103fab5e9d3ee91d5d14"
+    },
+    {
+      "path": "cpp_tests/arrange_frame_submission.cpp",
+      "size": 35329,
+      "sha256": "d7dd2b9ff2645a81ae4a65c5306d4ab3817bca3e30e174d5689b6342f3a98bcd"
+    },
+    {
+      "path": "cpp_tests/arrange_juce_runtime_smoke.cpp",
+      "size": 17925,
+      "sha256": "61cef9d0f12b35c6baab0ef375777ef0a8f6c8d3444331b87c02fdfdb15d1d1b"
+    },
+    {
+      "path": "cpp_tests/arrange_live_modules.cpp",
+      "size": 2154,
+      "sha256": "036594051c460528ec97ff5489150e3ac51f5211a706a189cb93a0f476e3730f"
+    },
+    {
+      "path": "cpp_tests/arrange_live_server.cpp",
+      "size": 2219,
+      "sha256": "669475072a0e7fc2c2c42c2f87d55c8949d2bc05f3dfb66a71edf0305c86e7eb"
+    },
+    {
+      "path": "cpp_tests/arrange_local_work.cpp",
+      "size": 9508,
+      "sha256": "8f2ba0f6178936aeeaa520d4d4b1bf3b8e9476535835adb6895aee30b09a28c0"
+    },
+    {
+      "path": "cpp_tests/arrange_m24_contract.cpp",
+      "size": 19807,
+      "sha256": "171abf27ddda547dd74132960328b360ea8e7ac7f9fe1df3c4c0983a0d850c35"
+    },
+    {
+      "path": "cpp_tests/arrange_modifier_runtime.cpp",
+      "size": 30379,
+      "sha256": "c1c64f199fde325610a45a3248e5b545168fa7317ba706c292df696a2cf21aa0"
+    },
+    {
+      "path": "cpp_tests/arrange_painter_resources.cpp",
+      "size": 17417,
+      "sha256": "21b00e2feafc83e6b32bf624df64dcd6eb19ea31d2aa88dbebcb49fd79af4b60"
+    },
+    {
+      "path": "cpp_tests/arrange_quickjs_app_smoke.cpp",
+      "size": 10530,
+      "sha256": "72e374a18bb26354f2f717c0f72687155cacf869769ba72019344f0c3ec3805b"
+    },
+    {
+      "path": "cpp_tests/arrange_quickjs_modifier.cpp",
+      "size": 26218,
+      "sha256": "ca068c9e92009acb0ef3b56b103a7191ae10f6226a40213690fd3f6cfa7076c4"
+    },
+    {
+      "path": "cpp_tests/arrange_rearrange_runtime.cpp",
+      "size": 28095,
+      "sha256": "d430dec1a82bfbbed9b3a67a1009228d2b3c7780096e43820d5f7f515a44a441"
+    },
+    {
+      "path": "cpp_tests/arrange_retained_paint.cpp",
+      "size": 32090,
+      "sha256": "91681d137013c4f8a88a00a1697cfff242bca933284f1b26aea0e9b0e4d771a5"
+    },
+    {
+      "path": "cpp_tests/arrange_slot_runtime.cpp",
+      "size": 11864,
+      "sha256": "d1fd647a90efade6d6ce8dbcd41b8dedad7f9480562bf837af4da85c7f0d83bb"
+    },
+    {
+      "path": "cpp_tests/arrange_viewport_runtime.cpp",
+      "size": 7342,
+      "sha256": "a788031ea88c29a95045045f2dab9b122dc43036f742193b466ac06d8578ca2c"
+    },
+    {
+      "path": "demo/plugin-src/CMakeLists.txt",
+      "size": 2208,
+      "sha256": "f10a857bc11fcd357194a33eaab9f7238c750e116e8d463a90bc9474ba4d4475"
+    },
+    {
+      "path": "demo/plugin-src/README.md",
+      "size": 361,
+      "sha256": "ffddb8335ab5e05daf3bd6cc237f46c08ff9ca0d2714d41fdbf6b254eeb23f93"
+    },
+    {
+      "path": "demo/plugin-src/Source/DemoProcessor.cpp",
+      "size": 2220,
+      "sha256": "cae31e6970059b60f73895e1b485b89cf9e1c4e8ed6f3f1ae399a500e7fd7fec"
+    },
+    {
+      "path": "demo/plugin-src/Source/DemoProcessor.h",
+      "size": 1530,
+      "sha256": "1b599f399cc2719a7979ee93aab0d3ff9cff35fe81cd3e319c754cff7c5e6369"
+    },
+    {
+      "path": "demo/ui-src/package.json",
+      "size": 448,
+      "sha256": "4b438d7090b3afcd3e2a0a1798ce615ea3a14dcf9c513a6bd38caa99ff45d2eb"
+    },
+    {
+      "path": "demo/ui-src/public/icons/play.svg",
+      "size": 134,
+      "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd"
+    },
+    {
+      "path": "demo/ui-src/public/logo.png",
+      "size": 2408,
+      "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+    },
+    {
+      "path": "demo/ui-src/src/App.sfa",
+      "size": 5322,
+      "sha256": "cc864b430b4130eabaabb65e23ea46c168d4d578a9d0b1e5493bc17ed264735c"
+    },
+    {
+      "path": "demo/ui-src/src/main.ts",
+      "size": 98,
+      "sha256": "0c8bd23aea5609e17b2fd988bcf70bc29d780d7a7e504474004985aed9cd2585"
+    },
+    {
+      "path": "demo/ui-src/src/view/AnimationGallery.sfa",
+      "size": 5874,
+      "sha256": "e31c086d97126120b3362ef6c476149d777e512f5f64229d7cb63d53ca867b6d"
+    },
+    {
+      "path": "demo/ui-src/src/view/CounterPanel.sfa",
+      "size": 593,
+      "sha256": "e0b1f077419f684a97fcf0c85c2dc8ba2109b5f0dbc77ccb51f11fdf452fca6b"
+    },
+    {
+      "path": "demo/ui-src/src/view/GalleryButton.sfa",
+      "size": 408,
+      "sha256": "63527a7f645f63ae7eb4dbca199bd808761439534b500d8eb1d9e67db490d71f"
+    },
+    {
+      "path": "demo/ui-src/src/view/GalleryItem.sfa",
+      "size": 1086,
+      "sha256": "f49060cb924563529a94c87f4e7609b7d1a6713224b176aea77d3bb8c69a37b9"
+    },
+    {
+      "path": "demo/ui-src/src/view/InnerBoundary.sfa",
+      "size": 398,
+      "sha256": "e95f2ccb8d1e7aaba7efadb93da3576310479dfafe2dead72025ecfee4b5ac27"
+    },
+    {
+      "path": "demo/ui-src/src/view/PropBoundary.sfa",
+      "size": 255,
+      "sha256": "db87d92eab83cff339aad80da48b1ee2b9383c324d646f7fc6a3f96d416e44c5"
+    },
+    {
+      "path": "demo/ui-src/src/view/RefRelay.sfa",
+      "size": 874,
+      "sha256": "1bb996aba80c17f0497aa792a369402be7e6026fe53793f58d08d8650bc8e945"
+    },
+    {
+      "path": "demo/ui-src/src/view/RetainedEditor.sfa",
+      "size": 681,
+      "sha256": "2dfdca56d689ec4394a274bb825b36a287b7d8d67fbfc3f886e5eb1e31f0bfab"
+    },
+    {
+      "path": "demo/ui-src/src/view/ShowcaseGallery.sfa",
+      "size": 5719,
+      "sha256": "0904aaa21cf1fb21ae4914594b50cfaea23c1b07ad509100ad941c1e53359d44"
+    },
+    {
+      "path": "demo/ui-src/src/view/ValueSurface.sfa",
+      "size": 275,
+      "sha256": "6f2dbacc012a0c3253e27b8971763f3961c9da481328300e96deba89e6e8eba8"
+    },
+    {
+      "path": "demo/ui-src/vite.config.ts",
+      "size": 141,
+      "sha256": "7aa666a4e7bdd3e44be9f93fac911069fe86165151ce35b8515b92845be73865"
+    },
+    {
+      "path": "docs/README.md",
+      "size": 8177,
+      "sha256": "97a459037e107f3c99e6494487f9e869d7d317e48ddea2c82162b33c46a224bc"
+    },
+    {
+      "path": "docs/adr/001-初始架构决策.md",
+      "size": 4042,
+      "sha256": "dce646ceb3edb88c16aad0a919a31749b5b17d4894b501ada32a9ad1cb8198b5"
+    },
+    {
+      "path": "docs/adr/002-M1真实链路收口设定.md",
+      "size": 7070,
+      "sha256": "a5fd994f6400bcf3a1edb774d8da49f599b3b90804fde6275a621ad021881143"
+    },
+    {
+      "path": "docs/adr/003-NativeFrameClock与动画刷新链路.md",
+      "size": 4936,
+      "sha256": "6c9f78226b8d621b4e14242b0c7641013b3d6b7ab91ded4deee3166b60cb1b5f"
+    },
+    {
+      "path": "docs/adr/004-UIOwner线程与帧阶段调度.md",
+      "size": 5849,
+      "sha256": "0bdae801702bb0b4c79973d099aed064a272b248a1dae13a46649f05769cf722"
+    },
+    {
+      "path": "docs/adr/005-M1正规化链路与事件槽事务模型.md",
+      "size": 2924,
+      "sha256": "1bddab37bbedcdf98d828cec6dc31e68012265da75b67c0ae53819bcbf808c5a"
+    },
+    {
+      "path": "docs/adr/006-第二期正规化统一输入状态与帧计划.md",
+      "size": 5528,
+      "sha256": "d0c463a1dbebf6271b19b10151a069f9e693b68c9f362b420ea3b308d896e6f8"
+    },
+    {
+      "path": "docs/adr/007-M1三四五期正规化收束总结.md",
+      "size": 9095,
+      "sha256": "a9dd1de4cd1191b14af84015ffc5c0b6243697ca6e01232b70374ac3c7d6d03e"
+    },
+    {
+      "path": "docs/adr/008-M1收尾化诊断资源与Vue边界.md",
+      "size": 9495,
+      "sha256": "ba225a929a458fcab02a356a5941793f60d883aec8c6fe58137bfd223fc1d2e4"
+    },
+    {
+      "path": "docs/adr/009-ArrangeVue阶段化响应式与ReactiveSlotRuntime.md",
+      "size": 3909,
+      "sha256": "8144e5489231c6aa644b4240e313cc255096920daa68dfcbd9fc269a25c6193c"
+    },
+    {
+      "path": "docs/adr/010-生产视觉帧源收束为VBlankSource.md",
+      "size": 2583,
+      "sha256": "d810fa72089c3f8271b70ef7ad045ecd54c399a882cdfb643becaedc7e867400"
+    },
+    {
+      "path": "docs/adr/011-原生外部消费以FetchContent为首发契约.md",
+      "size": 1529,
+      "sha256": "d055cd7440d212fe88e5f234a4d9e36e56114b30acaede01aefb8da98cf3341a"
+    },
+    {
+      "path": "docs/adr/012-外部消费收束为ArrangeFramework.md",
+      "size": 1579,
+      "sha256": "a08c0e0137c03d62eaa75efa6bed970fbbfc6c78f048a1ca3974dc599eee7f9b"
+    },
+    {
+      "path": "docs/adr/013-ArrangeCLI成为唯一工程编排入口.md",
+      "size": 1849,
+      "sha256": "8f0f7583dfc0695707e82e8e210edbd8591694ecd3ae308828f5639c4ce33e2a"
+    },
+    {
+      "path": "docs/adr/014-M2.2 CLI配置托管与同步状态机.md",
+      "size": 2865,
+      "sha256": "f93f696281388c6caf23f84f00ebf2b5d9fb02ac01ce48459fb9ef566e365cef"
+    },
+    {
+      "path": "docs/adr/015-M2.4统一Arrangable与Layout重排模型.md",
+      "size": 2748,
+      "sha256": "67fecab9d2bb8791046adac196bba32fdcbf9ce9ef04d8054f146b21d535aabd"
+    },
+    {
+      "path": "docs/adr/016-M2.2 CLI工程准备与交付整理.md",
+      "size": 4418,
+      "sha256": "7a5e06c95248cd041a9c12267b06c6402c3e7ca3ebbca0b9977d243694b4efcd"
+    },
+    {
+      "path": "docs/arch/01-架构总览.md",
+      "size": 5298,
+      "sha256": "992a5d8159c53c83f771a0e3e124eb4bf16a17515b13316768b680ffd02ec594"
+    },
+    {
+      "path": "docs/arch/02-App入口.md",
+      "size": 4378,
+      "sha256": "18688c20198fd40e689ff13b876239d9128813f48c2e1066304378b9c2a0d503"
+    },
+    {
+      "path": "docs/arch/03-模块边界.md",
+      "size": 4794,
+      "sha256": "c7724573b2d51a052b6c2c7f143b76360a8a0279fb1c42d60923454a5305adea"
+    },
+    {
+      "path": "docs/arch/04-运行时.md",
+      "size": 17150,
+      "sha256": "e1453e899a4956e5326b5bed1ab6fb2ed97a9a4a73e1525e082df1654870906d"
+    },
+    {
+      "path": "docs/arch/05-渲染设计.md",
+      "size": 3962,
+      "sha256": "2b1c02bf218d8a0b6a9b89111726fcf67bc030e320ff11b5653e10d75b66fc20"
+    },
+    {
+      "path": "docs/arch/06-热更新.md",
+      "size": 2037,
+      "sha256": "38e68470fb625ae038982e56f7619f5943dca2d207378b46eaef394a5519da43"
+    },
+    {
+      "path": "docs/arch/07-错误屏与重试.md",
+      "size": 1899,
+      "sha256": "3967452e69c831c3543f2ff9af334c932c12888d056a2f0aa1be286ee97c60b3"
+    },
+    {
+      "path": "docs/arch/08-协作边界.md",
+      "size": 1722,
+      "sha256": "f1ab6c356ed14a7025735a68f7fcd8986557b857c8dedb7e462729088f1e361d"
+    },
+    {
+      "path": "docs/arch/09-布局.md",
+      "size": 3752,
+      "sha256": "62bc3257ed33dc641d1c59d04ffacbf91fb81dd173cb387660b5afebd743a00c"
+    },
+    {
+      "path": "docs/arch/10-基础类型.md",
+      "size": 6556,
+      "sha256": "9b127a0395a12024cd75b11132523bfe662b12e0b6678fe72b7a29864911c969"
+    },
+    {
+      "path": "docs/arch/11-Modifier.md",
+      "size": 12448,
+      "sha256": "cc285758adb471bbf191441ee96b0930ae86df0e07d59be60e32a2908b0cd194"
+    },
+    {
+      "path": "docs/arch/12-内建Arrangable.md",
+      "size": 6513,
+      "sha256": "1c1c77b0f7d0fb379454199818cd63e6cca3768fa6562ac5e95375ec2ea21f35"
+    },
+    {
+      "path": "docs/arch/13-用户使用与模块.md",
+      "size": 1515,
+      "sha256": "9a9aed6d43c3f39a78fdcb968ffd584ec7e87cc32596ccd3932b767c8524f6b0"
+    },
+    {
+      "path": "docs/arch/14-工具链与App发布包.md",
+      "size": 6664,
+      "sha256": "767ba852221212da3beac15ac23506e6d7cbf03e4e2d69e3d167bb2da689db17"
+    },
+    {
+      "path": "docs/arch/15-LayoutTree与NativeTransaction.md",
+      "size": 14106,
+      "sha256": "3c06bbeae8af5f8d6f2bcc39ac308412f0084299747b59136467772ca19dd929"
+    },
+    {
+      "path": "docs/arch/16-互操作.md",
+      "size": 1966,
+      "sha256": "218a1ff27e46d61408fe2462d7ea8041c70ca71d94ca7ac3f199c9947f6a9949"
+    },
+    {
+      "path": "docs/arch/17-事件与输入.md",
+      "size": 11154,
+      "sha256": "bba5788ae34a6ebd9319dd41bb6394d7263f4a1fb40ce1b7ce3012344a068320"
+    },
+    {
+      "path": "docs/arch/18-文本输入与绘制.md",
+      "size": 9638,
+      "sha256": "277fa12ca7bb113812a7d2982a2adee6f099614dd15751f0b5e009c53cc57094"
+    },
+    {
+      "path": "docs/arch/19-基础设定索引.md",
+      "size": 2825,
+      "sha256": "8e2150f1758a703967575fe1b66bd5a59a2ea40f31e4dfdad4d085f8dc4f9a46"
+    },
+    {
+      "path": "docs/arch/20-主题与扩展包.md",
+      "size": 1122,
+      "sha256": "7074d2754053279e0ba21a4abe17e3d0cdc0c1c0c4c8896d289ebbd30b9bd041"
+    },
+    {
+      "path": "docs/arch/21-基础API形态.md",
+      "size": 14662,
+      "sha256": "9dd534a49033d73129c66f04d902c8a5ad10dadf0978a4e4dd71e682dd3cf013"
+    },
+    {
+      "path": "docs/arch/22-测试策略.md",
+      "size": 14938,
+      "sha256": "d9bb665421aa4657024ec0e2cad046cea98877b9b1962d77792e3fa8b5c48bd5"
+    },
+    {
+      "path": "docs/arch/23-Demo.md",
+      "size": 2157,
+      "sha256": "752056977e7200abf2f215303484612b226e254faa77334c3038cf52d2c03718"
+    },
+    {
+      "path": "docs/arch/24-跨平台开发策略.md",
+      "size": 5609,
+      "sha256": "ee6392e9cff3d3dc54c0d73d71bf0f6a1f185ccebb254e47dcd514d1625b57ef"
+    },
+    {
+      "path": "docs/arch/25-开发期诊断表层.md",
+      "size": 12690,
+      "sha256": "03b6a9bd470462eeae1a735bcfcd243cf00adced6a3d0ee770c3d9c297b4e0b9"
+    },
+    {
+      "path": "docs/arch/26-调度线程与帧阶段.md",
+      "size": 19924,
+      "sha256": "dd60dfc36342e5f31cba1be724223cfb54c6d73cd703eb8b4d6238b050870a02"
+    },
+    {
+      "path": "docs/arch/27-Arrange宿主目标.md",
+      "size": 908,
+      "sha256": "5f9f1912eabcc1a85083780921c8b044deb85847d6d9dfe5b67d89d02fd2c0b2"
+    },
+    {
+      "path": "docs/arch/28-动画与Transition.md",
+      "size": 7321,
+      "sha256": "811ac87b874c8712e56be2b05f3d31d3d974981e9420f9b9197c269683ff5755"
+    },
+    {
+      "path": "docs/arch/29-内部包构建与分发契约.md",
+      "size": 7532,
+      "sha256": "7e3ed8e77f8ff8f94c6031ce771ca6c142a98708a9938885bb47276b16f8f412"
+    },
+    {
+      "path": "docs/arch/30-Native包消费与FetchContent契约.md",
+      "size": 2066,
+      "sha256": "4e9c6b9c1bad9186aade75f7a3c69105abdbd7180544f3afbedb6055a2e2ce6e"
+    },
+    {
+      "path": "docs/arch/31-ArrangeCLI与工程模式.md",
+      "size": 15800,
+      "sha256": "5da1b5c85075537d8098e8f3ade0c78c305103755d4a80816a1ae3da2e778fc4"
+    },
+    {
+      "path": "docs/arch/32-ArrangeCLI托管与同步模型.md",
+      "size": 23057,
+      "sha256": "e6c36dabac8934b1cb1cf7c01c2ef4a2dd0aed644e40aee736b925a571ce9df0"
+    },
+    {
+      "path": "docs/arch/33-SFA与模板写法.md",
+      "size": 7053,
+      "sha256": "c546b2cf3049fcb2e39582a0494b2c136e6cf20c6e7c5eb3f30a337938d0671e"
+    },
+    {
+      "path": "docs/proj/1：项目总纲.md",
+      "size": 3048,
+      "sha256": "ff4a7e1cdec9c537300920d902667f15a226da4afb37991f59acf28cb8cd2345"
+    },
+    {
+      "path": "docs/proj/2：里程碑.md",
+      "size": 13422,
+      "sha256": "36ae6980a7b9c4805a82e4a1c6151b41e563f1365a3896a43096b8734cea0f0e"
+    },
+    {
+      "path": "docs/proj/3：术语速查表.md",
+      "size": 10156,
+      "sha256": "f0eca06242e2151b6052ae2ebd53c5c644eb2536ea8fabb2ea4f26e4860ece43"
+    },
+    {
+      "path": "docs/proj/4：远期想法暂存器.md",
+      "size": 2585,
+      "sha256": "bfb6e708b990fdbd7e85b4e355bcfb72f8b717c2dd8d9ea9505ee4d4aed44785"
+    },
+    {
+      "path": "docs/proj/5：具体开发的额外约束.md",
+      "size": 5298,
+      "sha256": "697a674b5877209d6d1bcfd1526df171953b7713b99b91373ebfd61a508edcc8"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第一期收尾化.md",
+      "size": 2708,
+      "sha256": "95c04a57576f6200b05c9a50a8d27c10db3e5fb7082bb2134c2aeedede8d6abc"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第一期正规化.md",
+      "size": 2324,
+      "sha256": "eb3dbcd9abe0b55ae98648ec3fef3cc66af5b3bed76151cb61e86fe0e2e9d8df"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第三期正规化.md",
+      "size": 2932,
+      "sha256": "9f67b935be8f16f084d8961f1cac393ce01725b88eb3b54aa9f3420d62aa07a2"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第二期收尾化.md",
+      "size": 3383,
+      "sha256": "16a5afd0f2631fe60df21fea6fd4d18b0dadf1cfa36161f35e75b8557915642e"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第二期正规化.md",
+      "size": 3566,
+      "sha256": "22f28ea16d680be4036a02326133eff3e2215f74b3a3e866fd178289e3712c3d"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第五期正规化.md",
+      "size": 3078,
+      "sha256": "19884044acaea48ca74c0ab3269444f88df3a454a88e5861066781f1c72c6763"
+    },
+    {
+      "path": "docs/proj/m1：已完成/已完成，无需再看：第四期正规化.md",
+      "size": 3131,
+      "sha256": "dc2d3d4a5da1b928aa6030786905ab7be1f83cd352ab681102bcc573f376abda"
+    },
+    {
+      "path": "docs/proj/m1：已完成/无需看，系草稿：后M1.md",
+      "size": 13922,
+      "sha256": "f75ab7641d64a5a71c6d9985983767bdd667958accea2247c645fb123e475175"
+    },
+    {
+      "path": "docs/proj/m2/0：已完成/已完成，无需再看：历史工作内容.md",
+      "size": 1446,
+      "sha256": "2d0c0cddf11a92bf0fb31612bee5fcc3a2e1320679f4642e4ef224909695c25e"
+    },
+    {
+      "path": "docs/proj/m2/1：已完成/已完成，无需再看：M2.1的工作.md",
+      "size": 2690,
+      "sha256": "182c63d550f34e7a93a97ecc2589282f28b95674191ea828510147f063418842"
+    },
+    {
+      "path": "docs/proj/m2/2/CLI配置管理部件职能.md",
+      "size": 1294,
+      "sha256": "0f546b7bb2d4d3ca09c82ed673acfe1eecfaf82749d1cd49dfec1d84f284321e"
+    },
+    {
+      "path": "docs/proj/m2/2/Managed相关定义.md",
+      "size": 1069,
+      "sha256": "1a6f2df2dd2236f5e26b45017986dc458a73995bb1a57fec0bafd3095750ae2e"
+    },
+    {
+      "path": "docs/proj/m2/2/SCAN结果各项+对策.md",
+      "size": 3900,
+      "sha256": "9004d8bbab111903fef17641f4b86e89c98856ed27d61cb3ab9d3817ba0dcc8d"
+    },
+    {
+      "path": "docs/proj/m2/2/命令定义.md",
+      "size": 18214,
+      "sha256": "615761da0d92de4f7a9a19ed3a9092b4e135e5f26047885fd3e3ef979c48dfec"
+    },
+    {
+      "path": "docs/proj/m2/2/已完成，无需再看：第一期M2.2的工作.md",
+      "size": 3462,
+      "sha256": "e2709b6ed9d224602f062ba228043fe8d63ee46486c5dcff0932bb84c59672ce"
+    },
+    {
+      "path": "docs/proj/m2/2/已完成，无需再看：第二期M2.2的工作.md",
+      "size": 3724,
+      "sha256": "93144419f0dc0aba293e59566891fe58c84f6666abe5cc2678f2e25f4b91c3af"
+    },
+    {
+      "path": "docs/proj/m2/2/本轮验收.md",
+      "size": 17969,
+      "sha256": "6fb7bc5cb987c9dc9551f3ff07b725a140757938b8037121b7a4aee002106a2d"
+    },
+    {
+      "path": "docs/proj/m2/2/第三期M2.2的工作.md",
+      "size": 8442,
+      "sha256": "d2d56192fd495f81aee2d3d81ffe1d0512ce7c80c141ef921d50000417d3eda4"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/build-products.json",
+      "size": 5523,
+      "sha256": "45dc7f8ed850b63d3d044661cf4162d2669c659fd1775d36886d48f73d62020d"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/adopt-final-config-scan.json",
+      "size": 4459,
+      "sha256": "2150ad89e9636c4715f7ccff1ad4aaea6854dec73fb6b99f75d5e11765f7498f"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/adopt-final-products.json",
+      "size": 8955,
+      "sha256": "37b9ae5fe491eec1ff514f14bac371f256eb8465dccaecb957e1c1e1857ec65e"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/adopt-live-no-dist-during.json",
+      "size": 79,
+      "sha256": "001c0ca965d21058bad2def9365ac859e78823d6349b2b64d88c558b47147763"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/adopt-project.yaml",
+      "size": 609,
+      "sha256": "ea0bc56af59d86f7fae47ffdf0e9b0cc2e530cd8274176d279353ec65cf5e569"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/cleanup-final.json",
+      "size": 595,
+      "sha256": "5c6025c7cbfb760244e5b738e9b7b06665eeb3db0bd20498857eb2053d806cf6"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/live-no-dist-before.json",
+      "size": 765,
+      "sha256": "c690e823079a6782a1750c8434f236abd7d4b793646f7942dd1df62e937f11a9"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-dist-esm-noinline.json",
+      "size": 223,
+      "sha256": "732e23112af482c049b92b21328a6203ed54bd472f94e1bf6bca891ff64a2fed"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-dist-esm-noinline.png",
+      "size": 219826,
+      "sha256": "1f0e299522ec05a5a07943ab940ec716d80810362f2f0fbf35ae42996b3fb02a"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-final-config-scan.json",
+      "size": 151,
+      "sha256": "12ed740f5a81eb0f82615309fc25872b0235552cfab26da6b8eef09463cbfb74"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-final-products.json",
+      "size": 2356,
+      "sha256": "3f658f467768208f14610721627613cb970f5c99bc8d12adb21c603fe66634bb"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-live-esm-resources.json",
+      "size": 583,
+      "sha256": "3c41b52b24c87964650a25b93153089255f9adb3d703088e737c1d1ba1d4f133"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-live-public-changed.png",
+      "size": 221850,
+      "sha256": "aa6a30e8dea2cf59d6fe513203fe63c2e49dff89e9c9ed45db8c6ec632483e55"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-live-public-no-bundle-ui.png",
+      "size": 225274,
+      "sha256": "99112d31f7c0cd951ac708461b3f4d5ea1079c637c701d30481528b8d10d8382"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-package-clean.json",
+      "size": 52,
+      "sha256": "fee0366e03392b4609bf5fd1f352159ee469301bbcaadba567da951dc735fdee"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-package-nonclean.json",
+      "size": 74,
+      "sha256": "d0fb1214499c8b2866ae48aee760657aba9e48581294fe3e10e3002812e70d91"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/manual-project.yaml",
+      "size": 601,
+      "sha256": "b21be010611b4942d832ee1e4430e5212976ed33696a04ac66358224159e8b53"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/native-resource-summary.md",
+      "size": 2210,
+      "sha256": "2bd902b5cdc0d655f309798827f6220d6298726001c53db35b74368ac3dd4ad1"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/offline-final-start.json",
+      "size": 102,
+      "sha256": "8aa8205645638e485d0b191e5bf63dbf3acb4579095f724cc7a1dcfc66d6528f"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/package-resource-integrity.json",
+      "size": 4224,
+      "sha256": "f5d8793df5b27b034a8339535ec6b2c8f2bd1098ff5536a1359f00b3ea527584"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/parallel-before-fix.json",
+      "size": 974,
+      "sha256": "833858c098876ed9891096a5747c3ca7b0266cf38aeef7764f1ef5037c234475"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/preparation.json",
+      "size": 536,
+      "sha256": "6721e13cfb09ef6cb47f031a892fc30f7b101c033eaf82b04871c0b3688cea89"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/resource-plugin-verification.json",
+      "size": 1766,
+      "sha256": "9be8c242793d7334039744ac3d56191e48acf856cc8a3a93629312553c1ca070"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/source-integrity-final.json",
+      "size": 6897,
+      "sha256": "2f1e0e863a38b4d1a917255b5c20286960008187bb1b519e5faf7b429af223d4"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/source-integrity.json",
+      "size": 10663,
+      "sha256": "7bf8c36247f10b97d659c2dbbd22821ef755b4c47784234375b3b16bab3e57c4"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/demo-cli/summary.json",
+      "size": 2003,
+      "sha256": "d23c6b2b0a8ec926b679d21c89b37feda1f433fbb1c013669078a7c64c6a3c77"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/dev-checks.json",
+      "size": 1195,
+      "sha256": "9e24a14e3b9743f9aa6ecfa76b916974c2abb0a4a6709f3c6862f3564d2f36a0"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/interactive/acceptance-summary.json",
+      "size": 3022,
+      "sha256": "0cdb794a8a42954fc7ef2c5d33c48852e74cb8f3cc6338e37a8fc88b5e855b61"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/interactive/text-probe-node24-xterm.jsonl",
+      "size": 532,
+      "sha256": "ffec818907ff8e3fde8576241c569a4b4b832d082a603af029ef1bb169621b78"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/interactive/text-probe-node26-xterm.jsonl",
+      "size": 485,
+      "sha256": "3132cc04c5de2d28e5c11666385af31cad25fa0c9bd42639ab19545630f89ee8"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/live-snapshot.json",
+      "size": 454555,
+      "sha256": "2bd06643dbec7ef64ed4254ad1af9b90b2575edece7f32f939efb4af21e6b03d"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/mac-signatures.json",
+      "size": 1329,
+      "sha256": "f8c01202bbd86d217fb6f2801d7e1a97ee79267e521b78d7fdcd5a3b5fc5fda1"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/node-versions.json",
+      "size": 1553,
+      "sha256": "fc31bf17e116bb4ba2599021e9fff1d5799b413792eef58e7b802abbfd5036f5"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/refactor/cleanup.json",
+      "size": 110,
+      "sha256": "361c4c54915b8a202e51c2f89ac7e14c75ba3e83a525a476e0b33ed1fc6a5e9f"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/refactor/dev-live.json",
+      "size": 100,
+      "sha256": "6e664781aa8a7d3ec100dbe5d229cabca2427a1537878a7ef826ce2f5e76baa4"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/refactor/products.json",
+      "size": 793,
+      "sha256": "a65fe915bf30ddad13e74385c230f249c315888620ad005f7035633d98035033"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/refactor/public-gate.json",
+      "size": 989,
+      "sha256": "c27c6505c62173c3fd21e22188b405c1b63d2cc13129a19c7168eacc08bc1d20"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/refactor/summary.json",
+      "size": 1013,
+      "sha256": "d513c3f9a69b59115fc4e88ec51ee5b0083e49781cd96b3b9c35e2cbe210e443"
+    },
+    {
+      "path": "docs/proj/m2/2/验收证据/result.json",
+      "size": 99,
+      "sha256": "38a0a040271df0b15b48050a31728025bf57d0c5b67490bf7e45becda43e3d7f"
+    },
+    {
+      "path": "docs/proj/m2/3：已完成，其遗留项正在4中补完/00-M2.3任务总纲.md",
+      "size": 34010,
+      "sha256": "08e5a145952f6610e651bc2bf771a773a441d0f96aadf51cd248776fbc8c7a64"
+    },
+    {
+      "path": "docs/proj/m2/3：已完成，其遗留项正在4中补完/6、7趴的实现与验收记录.md",
+      "size": 15117,
+      "sha256": "b9ace8a0ebee8e7c410d12ccdd433eaf0401ed4626fc87a72de901e01545c165"
+    },
+    {
+      "path": "docs/proj/m2/3：已完成，其遗留项正在4中补完/8、9趴的实现与验收记录.md",
+      "size": 9495,
+      "sha256": "42c894bd291b0a5be36f4afe744f56df3c8c2b63de62bd1c720e8d4a1c0fddb1"
+    },
+    {
+      "path": "docs/proj/m2/3：已完成，其遗留项正在4中补完/M2.3的工作.md",
+      "size": 74130,
+      "sha256": "0aa6adf2e2f53a233effa17b74d3ff7731c07fc43c4e101475c0ea05268f5c5a"
+    },
+    {
+      "path": "docs/proj/m2/4/01-M2.4任务待办.md",
+      "size": 106971,
+      "sha256": "0c52fb6f4a9bc8c91f8d4c9d5a20631e3e403572016f7982746eac46124a1f10"
+    },
+    {
+      "path": "docs/proj/m2/4/02-M2.4整期验收.md",
+      "size": 17606,
+      "sha256": "7bfcec2b8a361a8a67c8c08e940f571ac6de7f5f52feae32b1ed7339d1fee379"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/audit.txt",
+      "size": 464,
+      "sha256": "59e31e2e34e5eda51cbb74bec10da3be3f02f7135d3e9a75bcb61564ed9615a4"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/demo-native.txt",
+      "size": 7300,
+      "sha256": "ad2f97f71af6ce2ab186aafacb38825091a39d8cd689f9c6d5da12a2b093be18"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/demo-ui.txt",
+      "size": 487,
+      "sha256": "d71862cfce02b29dcf40be3aaa213d4f9a4d0877656f5fdc2cd013053dd3f5e7"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/getter-contract.txt",
+      "size": 1413,
+      "sha256": "f9f6050132c908e9ed8b32832f9e734f72f3efba1e858b59a82e5308fd463e4b"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/native-callback-build.txt",
+      "size": 459,
+      "sha256": "92726f5ed25aa0321390f63a37e706c16edaccc6679ae1df9d9c801ae4ba9579"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/native-debug-build.txt",
+      "size": 7790,
+      "sha256": "572f223c62d81bb0033c3df946ee2a16295959f1e6dbeb2946026461ec96fc32"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/native-debug-tests.txt",
+      "size": 1251,
+      "sha256": "f454af2780548586f55f6001024219924e945b3816280f18d60a2a7709f63a83"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/native-release-build.txt",
+      "size": 9077,
+      "sha256": "0d2789a37fdb408cb0adf5bd162cd9a1b59f9fb0daeb1e3a70cf4fdf9b7012af"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/native-release-tests.txt",
+      "size": 1253,
+      "sha256": "e8d63791e940ce4a09695cc0e6c29cd0b58ec5181139130cc82dadb45d7a7041"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/package-consumer.txt",
+      "size": 4437,
+      "sha256": "6a3dd5b8bb9cea8637365ef6ae6dd97ede2ac94f5e6ad3db36a43576dc4b77b7"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/package-juce.txt",
+      "size": 56,
+      "sha256": "a8a0f877cfc6e256741769317643a345615e52625b4fd657b5641641fa625c16"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/package-quickjs.txt",
+      "size": 42,
+      "sha256": "ced2cd94bc7473ecfd753fa48c4685a2f4ddb1d24d840a8a82f47dd80c17a752"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/sfa-check.txt",
+      "size": 143,
+      "sha256": "d33fd8db48149641ff374401817383667967b360db1fa68917bc968f701a9903"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/tests.txt",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/typecheck.txt",
+      "size": 88,
+      "sha256": "90b72b7119929559b4445160847fd6d03133de83937129c7476ef0b836adee6a"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/verify-native.ts",
+      "size": 733,
+      "sha256": "0e36027297a0678784bdf468f43434f1f42a77cae66a3b3b92c531bcf2ad598f"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/version.txt",
+      "size": 212,
+      "sha256": "868cea10ab91089138fbf4922f3a0b96ecf354726b9c2bfaa81fe6cb58e3188a"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/新第一趴/复验说明.md",
+      "size": 1503,
+      "sha256": "d9d24a5f47f525ad073453c6ff35a673088a6ca98feb15e9ff5f160f5a0a3ebe"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/demo-native.txt",
+      "size": 8488,
+      "sha256": "3950e6392f43d7c3e7d4c041d3f334167da1ae1a7e88c26fedb76fd02e6e4434"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/demo-ui.txt",
+      "size": 391,
+      "sha256": "b9dae37aa83437d1af1e75531451ce6c5b839cb245c316555886ee7709860ddc"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/native-debug-release.txt",
+      "size": 7149,
+      "sha256": "96270f4956299fde7565f296523bc237e3c06ca94871aba9714bc1b6ce996968"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/package-boundaries.txt",
+      "size": 56,
+      "sha256": "209a7c0472af0959619b3385b4d4d28b7951c3797ecbf427b8e980666abee725"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/package-consumer.txt",
+      "size": 4316,
+      "sha256": "1a9e937c0896e7baa143cc4bc6be007ded585f99b64bb20554ea2769ec9ec2ee"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/package-native.txt",
+      "size": 98,
+      "sha256": "8869280ac984771f86e3c520c033ccc21f7108dd3e6337031a3beb1eadc4ab5e"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/sfa-check.txt",
+      "size": 38,
+      "sha256": "54e707f4fdd40320b62f706cd3f52054e89904fed73883fbddfa50ac58210426"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/tests.txt",
+      "size": 8503,
+      "sha256": "c73bb3499bef19646b6326d3d6dc364f068a5cdfa3dcf0454d5bc6f1f2b234ba"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/typecheck.txt",
+      "size": 88,
+      "sha256": "90b72b7119929559b4445160847fd6d03133de83937129c7476ef0b836adee6a"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第一趴/verify-native.ts",
+      "size": 733,
+      "sha256": "0e36027297a0678784bdf468f43434f1f42a77cae66a3b3b92c531bcf2ad598f"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/demo-native.txt",
+      "size": 304,
+      "sha256": "058d9ed7ee9b073e7e49203f77396e06ec17747488dec2d3b809f92f7d7a31e0"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/demo-ui.txt",
+      "size": 488,
+      "sha256": "74c1cd479a189cd245d9ff2995f2da8bf1c3458bdd9e721d14bc8c0a9c4b15f0"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/engineering-checks.txt",
+      "size": 891,
+      "sha256": "0d277fe0ad483d078ed6096799011b897da236617ec1babd5c91e064ecad4d8b"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/focused-tests.txt",
+      "size": 1263,
+      "sha256": "558706b314ee0f13f23d495c700a19f81bb49c66e2671d8a0d2756322da0b83a"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/native-debug-release.txt",
+      "size": 2512,
+      "sha256": "386088d13a7d05ea8c17488f83e4b2f28809ace18a99c77de7b110de17cdff52"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/package-consumer.txt",
+      "size": 8074,
+      "sha256": "7035a331ea6559a0c9e8f82b515ecaa669e6db2ffad33fa23f47a68545501962"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第三趴/tests.txt",
+      "size": 11722,
+      "sha256": "67dcc5356f9c7d8b62ec349a2be55a79de7d5d9dbeb4eaff7597904fe340a395"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/cli-tests.txt",
+      "size": 4800,
+      "sha256": "0ef481b70e81707c07274d4371fbab33a6c724ead6622de0eaf9db3d98eba074"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/engineering-checks.txt",
+      "size": 1370,
+      "sha256": "1a37521c586c6026c5c1c9b144db59817148aa8e8ae396979509a1f443e7e758"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/native-debug.txt",
+      "size": 2180,
+      "sha256": "3066a69aadf587b9cacfd55650f2186acfe9597122f8404390b5bb87dbbbbd51"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/native-local-work-debug.txt",
+      "size": 574,
+      "sha256": "d13d7367e4f4d57a53d6eb18207169f2ee183d1654a3d2976f25b9a14fd1b9b8"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/native-local-work.txt",
+      "size": 469,
+      "sha256": "69228bddf72a54a53ac85ea2090e80b3004f1d5a8074e1c280fd2c4bdee64684"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/package-consumer.txt",
+      "size": 7797,
+      "sha256": "ae345a329a0a5de698c1e2d214acbe6e5558f12cc1295c9d564377113282847f"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/quickjs.txt",
+      "size": 2732,
+      "sha256": "98c13ac8138580637d39de7e7004024a43af3b671fe84419acc2bd668408c321"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/tests.txt",
+      "size": 10521,
+      "sha256": "fb9e777553cec9d4e1791c1f709d1207dc46e922336410ed46f5229a9c107bf2"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/viewport-native.txt",
+      "size": 3323,
+      "sha256": "34b6093c0e8ba847addd81f8bf19c4761741b955a439ca08c3b7c211edbbc1a0"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看/第二趴/viewport-ts.txt",
+      "size": 10401,
+      "sha256": "4f95e46a70e3b132af657e2a298dbf9ba0dbd746372eecb19982d9a086edcbdf"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看：第一趴实现与验收.md",
+      "size": 14186,
+      "sha256": "dcccecbbc93008d6dbc58abd5d6cdddc10ea55ea43ff4151cdc96330d78589ab"
+    },
+    {
+      "path": "docs/proj/m2/4/不要看：视口与输入链路复盘.md",
+      "size": 4533,
+      "sha256": "c6988184bc07b41168b149f3b61eea818b37309983a0871c0dae125686829775"
+    },
+    {
+      "path": "docs/proj/m2/4/已完成：HMR特种作战结果.md",
+      "size": 4853,
+      "sha256": "c32f106c1a7748b053c0000b267a79b016a7a4f00425a24cf60fb3c086536c9d"
+    },
+    {
+      "path": "docs/proj/m2/4/已完成：旧M2.4的工作.md",
+      "size": 42653,
+      "sha256": "0eeda3bc07ee06ef56204ded7cde4da0e5010a170c4a430afecb9444466a0242"
+    },
+    {
+      "path": "docs/proj/m2/4/已完成：第三趴实现与验收.md",
+      "size": 3245,
+      "sha256": "37e49c5354153898de1ff5a25e1e141de06741fc8ae2d9e910da4f435b294ea7"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/cleanup-coverage.txt",
+      "size": 17732,
+      "sha256": "3bde7a38a1b78af160dd8ebb7ffd87c32389d375ffed91974ab76b8c4177a0b3"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/cleanup-format.txt",
+      "size": 65,
+      "sha256": "5acdb01f4c1c812bee208ae526d589112bd0a3fc72d6418e0694b787dc0ba39e"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/cleanup-retirement.txt",
+      "size": 2333,
+      "sha256": "6fcb8c4c9064f45b4098129f19c3efe985d41f3aa384e361d6f7b55746996166"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/cleanup-summary.md",
+      "size": 4013,
+      "sha256": "67480c646ad28a11136544fa7c308b0077daa40289f286d086428605c9d72724"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/demo-play.txt",
+      "size": 499,
+      "sha256": "9a00d99d3dd6af0caaad5ec00a29a75c9fb5732c4a580c66fe2aae43c76902ef"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/engineering.txt",
+      "size": 2303,
+      "sha256": "661be5fc6110bee623bdd0838f78a3771eaf75a928e113fb2bf12c00dad5d754"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/live-hmr.txt",
+      "size": 520,
+      "sha256": "d864a6ca5334c04b52f4aba08fc4286b624379f8afeabce2f8a120e1119929c6"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/local-work-release.txt",
+      "size": 2752,
+      "sha256": "e1fadfc189a531f70e4c3c4dfba7a71e28cdb35afe577003857e183b69d24939"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/native-format.txt",
+      "size": 149,
+      "sha256": "c5460a5793da283389b01aca0c74220d5c68ead1ddde35ffd37d75b4c8a2b1ec"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/native-tests.txt",
+      "size": 3428,
+      "sha256": "a64157fc8ffd4a8a373c669aedd60239a0a95d2ad9c01b6df6c7c2fca55e92db"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/rearrange-release.txt",
+      "size": 380,
+      "sha256": "71ce71b0f709e2166cdf2cb1ef721ac49d6dfdecd935d552aa42d003f2665b36"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/source-audit.md",
+      "size": 8305,
+      "sha256": "eadbac88a91ca61d0a741220abd60c2fb83f1d910a4c616481220de8e29b4ba5"
+    },
+    {
+      "path": "docs/proj/m2/4/收尾证据/tests.txt",
+      "size": 16809,
+      "sha256": "7a54712e8e4a46d9e3dcd5b4d1bf722687bb240aca025f2b1d2b1c138d6abc61"
+    },
+    {
+      "path": "native/arrange_core/CMakeLists.txt",
+      "size": 749,
+      "sha256": "16f4140391f8e727f660218d6707c996dc16d45984a7dc79ea23978dea342694"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Alignment.h",
+      "size": 921,
+      "sha256": "a534d38947a0506d62488dddc6c23f12719ef6264d5dd960ecce2964c757cef7"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Animation.h",
+      "size": 4794,
+      "sha256": "99721863dce91ed5ea661a91bba7ed1455a30265ddc41e64f62b130f035dd42b"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/EventSlot.h",
+      "size": 2052,
+      "sha256": "2bc755ba25ef0ce3aad6e9a292128d0131f26c61c4aceaf31414f147562da1f1"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Geometry.h",
+      "size": 713,
+      "sha256": "14414333ac29eeebfdbadeaf73bb47912c0db8108fbf23849550c4123fdf6816"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/HitTest.h",
+      "size": 1958,
+      "sha256": "5da76a1e3737ca754cc2f93bf70bbf191794fa57d5935e9bd7fc8651eee0cc00"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/HostInput.h",
+      "size": 706,
+      "sha256": "9e7da4825483eabf1d40c2b8f414a9f365a9322316edf81b3047034a1dc176d1"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/InputEditing.h",
+      "size": 3030,
+      "sha256": "e744608b2d02242174748c9373dc69d3b8854d1b6c14fac5761403023b421b08"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/InputIntent.h",
+      "size": 5866,
+      "sha256": "f5010f0e5b6c066175551189a460b577269e55c0a15ae8a0fb30af834356a015"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Invalidation.h",
+      "size": 2265,
+      "sha256": "a7be2d08c1545c2b2fa08c809f82e20b8757e5b8d0fd8516c0ea9e8fc8b8558f"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Layout.h",
+      "size": 1726,
+      "sha256": "399740821bc608a9413a2bf68b1acbf1f70b3d16f1f205d214168468cd7638bc"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/LayoutNode.h",
+      "size": 1264,
+      "sha256": "b6507208eeccf3a0f6afc900d25f7c85bb1c691606d9258de4f4bb8f21368d24"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/LayoutTree.h",
+      "size": 3367,
+      "sha256": "45359930b02c170471917c2048594b289dc35b4c3802da5310154b074aae329e"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/MeasurePolicy.h",
+      "size": 1358,
+      "sha256": "1e1234e9c16c2aefe6e0b53bfe038388a71b18d80e19ef8d9ab99f374e8147ad"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Modifier.h",
+      "size": 9391,
+      "sha256": "9c89226732a66a58d58d358c6ca813ec049550366b3450296a199efb9da8abcd"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/ModifierGeometry.h",
+      "size": 998,
+      "sha256": "e3df78727162a4a8338bbd7e004abf1a49e844957ab7c5451546b1eb7bb45e5c"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Mutation.h",
+      "size": 1246,
+      "sha256": "0b3a074ec379d666c44bd34e5a23200e93ecf631b6b64816ea31d3765c87ce1c"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/MutationTransaction.h",
+      "size": 1747,
+      "sha256": "b925111bd11aead92c96752ab20bb0734ae522eb1667a1ae40e5cc0eedaee06d"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/NativeScene.h",
+      "size": 2360,
+      "sha256": "bc4fdc3106cb375854be1973c1b799baaa8ab4560b5831e18b6dc1169f830a74"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Paint.h",
+      "size": 5824,
+      "sha256": "5521e22a8362f5eef73665a5408219430a6427df13ef38a999bfcfd12fd19624"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Painter.h",
+      "size": 913,
+      "sha256": "3328e02948c38a9c6813de9f8c978bb0682afa9264c517bee35fef3ee11dd99f"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/PointerInputProcessor.h",
+      "size": 1062,
+      "sha256": "6b601e4bd6a531970f31150006e8bed0caf28907fd1327c118bdf59fa6b8b4d7"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/PropSchema.h",
+      "size": 219,
+      "sha256": "ace4e67328ded0d7b40c7dbddab56636aea04169831ac8c4c64d7727680b46bf"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/PropValue.h",
+      "size": 2992,
+      "sha256": "0e4cfe3cb4c77fe22392d9948dc10440c55387f6dbc15323a933b7f82117826f"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/SceneFramePipeline.h",
+      "size": 4452,
+      "sha256": "aa65e8bd40d25b032f14af7093ae8ddfc29581c8512af775a66576880dd9b752"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Scroll.h",
+      "size": 1666,
+      "sha256": "9ddea07b57841c8e301e4eb6bee7674a1b2692843937f4c3627bd6f7266778e1"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/ScrollSnapshot.h",
+      "size": 270,
+      "sha256": "3b8010505ab6118ce9bd892a90bd657aa625f676a678478156aa6bd98e847e76"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/SlotUpdate.h",
+      "size": 1650,
+      "sha256": "368e4ed165b7519cab74d52dda2ac67c8b57ad7538f16eaf4a15baec8d67f285"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/TextLayoutService.h",
+      "size": 4948,
+      "sha256": "7ee53fbfb17a182565f37cd5f1421207357a493405b125309ec4ea233c20b757"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/TextMetrics.h",
+      "size": 2884,
+      "sha256": "3a322556d9919262943465a7ceaa632350aa024c866a80ce9b2f1532e4f8eeab"
+    },
+    {
+      "path": "native/arrange_core/include/arrange/core/Version.h",
+      "size": 258,
+      "sha256": "f01e12e2809c0c2eeea3e54d702400a235f2b89112b7fea7fdcc730042398566"
+    },
+    {
+      "path": "native/arrange_core/src/EventSlot.cpp",
+      "size": 1794,
+      "sha256": "a2846d407856b77744a8e1692745b31fe68e3b8a3259cc5442e2277771c97b4d"
+    },
+    {
+      "path": "native/arrange_core/src/HitTest.cpp",
+      "size": 9674,
+      "sha256": "239c4d5ca846fccbe178f421e1b452a420ab6ea499321ea611525e18b1f0b9eb"
+    },
+    {
+      "path": "native/arrange_core/src/HostInput.cpp",
+      "size": 2627,
+      "sha256": "ace3556c4d7599f3967d186bfb336f1890b44ff59c074bf827adac3a76e72403"
+    },
+    {
+      "path": "native/arrange_core/src/InputEditing.cpp",
+      "size": 10839,
+      "sha256": "d8a138af8bd42b47c365e6d0b09f8539fd5fcd5b213650e538878552ae9cea2f"
+    },
+    {
+      "path": "native/arrange_core/src/InputIntent.cpp",
+      "size": 38,
+      "sha256": "cce2c83e26370c28fab53ec74738e28390b2ee0d8310edb812d7ef869b61ac33"
+    },
+    {
+      "path": "native/arrange_core/src/Invalidation.cpp",
+      "size": 39,
+      "sha256": "c817ccffbace2712c822501b2f4337585ef459d7f1c4a543a9d418008e4504d1"
+    },
+    {
+      "path": "native/arrange_core/src/Layout.cpp",
+      "size": 25222,
+      "sha256": "a546794b7b60e5b19d26c716e70e599f3110baec58790d52a00f0c603495ef38"
+    },
+    {
+      "path": "native/arrange_core/src/LayoutTree.cpp",
+      "size": 16559,
+      "sha256": "f76304a0bdea6527328cb9213a60df0963ff2355c0ae54e5c25d15703980631e"
+    },
+    {
+      "path": "native/arrange_core/src/MeasurePolicy.cpp",
+      "size": 5061,
+      "sha256": "09ac7476a83bfcbf2756015e3ba6573087177ffd2ab5a283da0366a452f3ea69"
+    },
+    {
+      "path": "native/arrange_core/src/Modifier.cpp",
+      "size": 19248,
+      "sha256": "65f3e61ca67079c3848dc820c01c533a4bd4eed5d3909be5bf817e5ee880800d"
+    },
+    {
+      "path": "native/arrange_core/src/ModifierGeometry.cpp",
+      "size": 6561,
+      "sha256": "8fe1b8231612a41adcb315c92de8055e0d3ee548f0f85ad51ba1c29a19d047b8"
+    },
+    {
+      "path": "native/arrange_core/src/Mutation.cpp",
+      "size": 278,
+      "sha256": "8b65051c338e1d5fdb22ff360dac6dcbb4c7fe0d5a4476490196ab828494aef9"
+    },
+    {
+      "path": "native/arrange_core/src/MutationTransaction.cpp",
+      "size": 2052,
+      "sha256": "68f223cdcfa0ce5f259fc83f3d300fe0cf0d43e707d62a67fc34d3232991e2c4"
+    },
+    {
+      "path": "native/arrange_core/src/NativeScene.cpp",
+      "size": 6163,
+      "sha256": "1eaaca9879e438525348d17af824e84d8f6ce70169ce4d06105728bf5ee8d17a"
+    },
+    {
+      "path": "native/arrange_core/src/Paint.cpp",
+      "size": 26233,
+      "sha256": "2982d9d95e3a30d0f7c5878dd20ffa84a2526d377b0a3cb8c3a491a8180ee7b5"
+    },
+    {
+      "path": "native/arrange_core/src/PointerInputProcessor.cpp",
+      "size": 2175,
+      "sha256": "b767ec81816e99bc62409aa114ac8efb7daea6f7d103d4299907790b01ea51f5"
+    },
+    {
+      "path": "native/arrange_core/src/PropSchema.cpp",
+      "size": 2550,
+      "sha256": "7dd2056cfc28c6812e621db51c044e35008c2790402c28294f0b1228f913c7b7"
+    },
+    {
+      "path": "native/arrange_core/src/PropValue.cpp",
+      "size": 3824,
+      "sha256": "ddb0efc6f5375a41ff0e8705b3ea04c6008c117d0dec004225962d2f305c1166"
+    },
+    {
+      "path": "native/arrange_core/src/SceneFramePipeline.cpp",
+      "size": 12007,
+      "sha256": "043c561374a908e1e41dfc5c799c0147f19675cb3943b29cf258dcc89b0e33aa"
+    },
+    {
+      "path": "native/arrange_core/src/Scroll.cpp",
+      "size": 6286,
+      "sha256": "3225aeac70db7476dfb0d2bca4318925e0c3031b7eaf668ba609154b8f6026d6"
+    },
+    {
+      "path": "native/arrange_core/src/SlotUpdate.cpp",
+      "size": 249,
+      "sha256": "77b22a8543fee557ab3b0315a973b59753c5fd6ff10faabff354766bbbbb0c7f"
+    },
+    {
+      "path": "native/arrange_core/src/TextLayoutService.cpp",
+      "size": 12106,
+      "sha256": "4cdfa88f9e97c1cedadf726eefbc5407ec20a4062ea483336967295bc58d91d5"
+    },
+    {
+      "path": "native/arrange_core/src/Version.cpp",
+      "size": 137,
+      "sha256": "60fd89a9c79bb670ec9026104d47837c60819e26ea692909fa4a20b1bb48238f"
+    },
+    {
+      "path": "native/arrange_juce/CMakeLists.txt",
+      "size": 1753,
+      "sha256": "20188b78d7f75385140e52aea6debbdf3af0d6b6c6ce00b37113d38e16e490ae"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/App.h",
+      "size": 1139,
+      "sha256": "fdc127242e0ad8c3142560e22dc8a4c7c574bca0301d3b09c001783bc36eb19e"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/AppResolver.h",
+      "size": 1224,
+      "sha256": "f40d6ea342e1658b42fc5ea3c82794c4124f0b0728b18364c4a97856050f1985"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/ArrangeEditor.h",
+      "size": 4631,
+      "sha256": "59f6da0a01f689e234e7c5a9a30c95543a0e4f9e13a6e572341c26e6d1602948"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/ArrangeRuntime.h",
+      "size": 6172,
+      "sha256": "31d778a2a1c27d04b9ec957c1812d4f0cb2464aaf30b64f83010ce44c20fc32d"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DevServerClient.h",
+      "size": 1478,
+      "sha256": "0eab846b2306d57ab40e301c41a891da0bab3511f12138c0db7e92a6260aa600"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DiagnosticsModel.h",
+      "size": 1417,
+      "sha256": "d9c0d054168864233a72e49c8dc173b3298d688e2fde545b6978ff4e16cc87ca"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DiagnosticsScene.h",
+      "size": 1378,
+      "sha256": "83e74bac17d767c30b1ed5d7ab13b7b9b182d017333743a5627f61de24f9f022"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DiagnosticsState.h",
+      "size": 2467,
+      "sha256": "c6853b583dcf41e2dc2f9d3639653a9345ee446476e2f5b2a6d0ace11c9f2e68"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DiagnosticsToast.h",
+      "size": 2199,
+      "sha256": "c1cf62114045c9a820b20784222afa700973d94debfd9f019251ffe1bef4c5b9"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/DiagnosticsTypes.h",
+      "size": 891,
+      "sha256": "d80367c1795adcdc58e46b5c240ab6c5c1a1a7dde8b5d3b0df21a58a04b1bcd1"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/EditorChromeModel.h",
+      "size": 821,
+      "sha256": "73711f385a4f62c86bac6ae682f1f9079bb79f609eee1640680cbb2a61e6013f"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/EditorDebugActions.h",
+      "size": 1172,
+      "sha256": "31f6909c334ef3b70e1356a845a62a528c95e02c77f78fe9b60d4d2dbc5fe51b"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/EditorFrameClock.h",
+      "size": 723,
+      "sha256": "c8f84417d3ca8031a1402e705a4ecaa2c4c7d79832f06266874ee05d459cd610"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/EditorSceneHost.h",
+      "size": 2586,
+      "sha256": "c59574e8b556f2b318ff17c83e25b65b741207a364a08022ac071d1e13d25033"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/ErrorScreenModel.h",
+      "size": 784,
+      "sha256": "0be2a95ae6abae9f372b31445ab75357f98c430a200d21f7df83dbad9aeea15c"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/FramePlanner.h",
+      "size": 1014,
+      "sha256": "9fb428ca2b898df5a3fc2d6c6e62ac5a0140aab338c7935dcafbb2f4042340a1"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/FramePumpDriver.h",
+      "size": 1016,
+      "sha256": "7de3bfd406d1651500ccfd5dcd51b1b0f7eb8a4446f7728e3c6495dd9660d4f7"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/HeadlessArrangeEditor.h",
+      "size": 1048,
+      "sha256": "d1f98cdc785b09cd7a8e1d0d9d00b69ee07a7b75d8419f019fe9b331460f8fe0"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/InputTextSession.h",
+      "size": 1714,
+      "sha256": "0394da16e8e916e4513936bf985580e62cd223337fe203bc0865a25dcdfc6a8e"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/InteractionStateOwner.h",
+      "size": 4239,
+      "sha256": "9013f6feba3b037ddc73240e8dc2ff254dd2319793a3c879f4da6a809b8dae69"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/JuceDrawOpsPainter.h",
+      "size": 2111,
+      "sha256": "46e025b64b18b1876ab92386c49da38b229d944013f9f6cc90da194b91941723"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/JucePointerInputAdapter.h",
+      "size": 1465,
+      "sha256": "b3b5d856ba8c5aa94c9d16b74b22dc50a461e59cbe37603389170bb18c2bbd91"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/JuceRepaintAdapter.h",
+      "size": 415,
+      "sha256": "4a9e58cb95436e50819298f08e8c758cd8532a6f08a78406e75561892274951b"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/JuceTextInputAdapter.h",
+      "size": 3282,
+      "sha256": "f914ab574a1cba1c9f70ce4b639b95b3e6e9d155f756aa3478a13975b3439849"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/JuceTextServices.h",
+      "size": 1418,
+      "sha256": "23d90c1e29ade24217d75e2424193ba9c1f438845b47c72d5823194b995a8e0a"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/LiveModuleClient.h",
+      "size": 1400,
+      "sha256": "d81a949977258fdd440f5d25e1cdfa34e4743142f71ac381461ea15c6af91a1c"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/PackageRuntimeSource.h",
+      "size": 2955,
+      "sha256": "bd36e4e5ec861d496e0b8383be58ab622ba710a0a8740b6df19d04d2d7ac980b"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/PainterResources.h",
+      "size": 878,
+      "sha256": "da57a3fe994ab37532f78bb12dd06dd3d3a0a7b5102257f650a2e7c0f84d61fa"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/PassivePaintRenderer.h",
+      "size": 1734,
+      "sha256": "b6658a12061cdfd6d8dbb5920eef6f767a32d7cda359e80a49f1bf73fbce4508"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/PointerInputState.h",
+      "size": 1352,
+      "sha256": "8c4f4bef5f24468f3109e8b81191eccea9b47d9850e0ef99dbe56af56414f324"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/RearrangeHost.h",
+      "size": 2630,
+      "sha256": "44e5b77786b71c76c48fd7b2f15a168e3edffcb11d1ee01f32d05f45fe5569c9"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/RuntimePackageBinder.h",
+      "size": 960,
+      "sha256": "b996024d72bc9d5dd002ee46ac05c9bed586df3080855246e70682da442e1aa5"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/RuntimePackageLoader.h",
+      "size": 1521,
+      "sha256": "2e4a9d06f237ac5b259ff3e3b295287b7cd78d1c7986f9856089c78299d29a3d"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/RuntimeSessionState.h",
+      "size": 1273,
+      "sha256": "dca7db3f3dc088b4ea35e2a141161ff15e61e925ecf43fc912955fff5d2b5a99"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/ScenePipelineState.h",
+      "size": 2153,
+      "sha256": "58661f6ea10e226622437bb822141ccf6806f1042fd1a98577d82470758571c3"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/ScriptEventDispatcher.h",
+      "size": 1254,
+      "sha256": "4a9b9321abfc394e4a4c05fe4498ef29707fef351f280617fc449f3c68432ed5"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/TextInputLayoutModel.h",
+      "size": 1580,
+      "sha256": "fa6cc22e1584498815a363cb5fd46e8c0bc6efe201b0d3fbc3f31ea426f298db"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/TextInputMutationSink.h",
+      "size": 292,
+      "sha256": "18e3baade9a99604c3032f209b29d9317a40502e35fcbb0bdbdfb389fe419fa8"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/TextInputOwner.h",
+      "size": 5338,
+      "sha256": "8194408b33150834d4187969124b6b0dc759d91c32cbed69d9cbecec09df24b7"
+    },
+    {
+      "path": "native/arrange_juce/include/arrange/juce/VBlankSource.h",
+      "size": 1639,
+      "sha256": "55343981627095a013e8287d9c1a71b657753232dec79acb28d7c45ab5b4c91f"
+    },
+    {
+      "path": "native/arrange_juce/src/AppResolver.cpp",
+      "size": 8282,
+      "sha256": "1ef23da49a3dde4b5d3523139cc4c20b476889d8387613685985d86c289e1080"
+    },
+    {
+      "path": "native/arrange_juce/src/ArrangeEditor.cpp",
+      "size": 7953,
+      "sha256": "957d1aca3ccb559c9a2dfa7a33711f590dfd3b2c61e63b5922a3227adeacc9a0"
+    },
+    {
+      "path": "native/arrange_juce/src/ArrangeRuntime.cpp",
+      "size": 13124,
+      "sha256": "beada48389e3fa2c08b4c3c7b3ca031d83bcf51b1c89b214ffb24531e8c993cc"
+    },
+    {
+      "path": "native/arrange_juce/src/DevServerClient.cpp",
+      "size": 14280,
+      "sha256": "ad5acef4cf35ab0ef7ed8b2fa6d39b37f280be0a5bbd36986f2cad0c4fe9afef"
+    },
+    {
+      "path": "native/arrange_juce/src/DiagnosticsModel.cpp",
+      "size": 4205,
+      "sha256": "dfc5011e053ecc454304f7bdf30deecdc7b1407a1298618b08c824910703d731"
+    },
+    {
+      "path": "native/arrange_juce/src/DiagnosticsScene.cpp",
+      "size": 6734,
+      "sha256": "8520e332e4c01f9c4a46e8939da27462a82362627d303cac665392ffefe1f89a"
+    },
+    {
+      "path": "native/arrange_juce/src/DiagnosticsState.cpp",
+      "size": 4720,
+      "sha256": "6684de82f18ef5295a820f4615194fee1df580db416e6bec3b34e4fa75c374d9"
+    },
+    {
+      "path": "native/arrange_juce/src/DiagnosticsToast.cpp",
+      "size": 659,
+      "sha256": "910f651aa4af1ee8455039122f38c4cbc1d0e4fe83f7c92ddd2bba736ab940de"
+    },
+    {
+      "path": "native/arrange_juce/src/EditorChromeModel.cpp",
+      "size": 2654,
+      "sha256": "524f2752d987e418f45a8ae755e79a4f273ed48f9b8d42ec0f4458e2fd6b47d2"
+    },
+    {
+      "path": "native/arrange_juce/src/EditorDebugActions.cpp",
+      "size": 2377,
+      "sha256": "1b4ebb70a620bb3719ba516462a3d338efd10cb87ca968d98d6a65a83f43adb2"
+    },
+    {
+      "path": "native/arrange_juce/src/EditorFrameClock.cpp",
+      "size": 1803,
+      "sha256": "e31548d691dc6ef1ca031dfe98df627075d3bbdec1af9049e2a09a95dea7b27a"
+    },
+    {
+      "path": "native/arrange_juce/src/EditorSceneHost.cpp",
+      "size": 14293,
+      "sha256": "ff7872dc4341138ff64a30ae1618ed1c915f47e5bc8b91d9e728d4ebd84064ab"
+    },
+    {
+      "path": "native/arrange_juce/src/ErrorScreenModel.cpp",
+      "size": 1830,
+      "sha256": "49d853fbd7f59eb6686fd88863b38d70b98a77f65a1e5f505967641ba2581aaf"
+    },
+    {
+      "path": "native/arrange_juce/src/FramePlanner.cpp",
+      "size": 1685,
+      "sha256": "1b1c1207b285c1a10c0410074e45ec159e45aa12b8c5b0cd8b9a8c9baede9189"
+    },
+    {
+      "path": "native/arrange_juce/src/FramePumpDriver.cpp",
+      "size": 6396,
+      "sha256": "42f1c970054351a16af8f963225c83e8da9a3b0d247065de971dd90747d358f4"
+    },
+    {
+      "path": "native/arrange_juce/src/HeadlessArrangeEditor.cpp",
+      "size": 879,
+      "sha256": "bbd5f941704ef7159716767c4d5e2e3fed3a345fb44f4c2abb88291d3da343b9"
+    },
+    {
+      "path": "native/arrange_juce/src/InputTextSession.cpp",
+      "size": 302,
+      "sha256": "d756a855fc146ad8e046eb15004297db656c33524364fd141017acff1c718f23"
+    },
+    {
+      "path": "native/arrange_juce/src/InteractionStateOwner.cpp",
+      "size": 5035,
+      "sha256": "52aaa21a24e8735f387a73eb4220a933814a133d3fbde8b9899e8a38ece368be"
+    },
+    {
+      "path": "native/arrange_juce/src/JuceDrawOpsPainter.cpp",
+      "size": 15648,
+      "sha256": "df9598f3b0e21942f53ce5489d69e85c698c188e8f38342c4d6fc8789128600c"
+    },
+    {
+      "path": "native/arrange_juce/src/JucePointerInputAdapter.cpp",
+      "size": 3480,
+      "sha256": "1fa285702a777351e3aa3bb4c5f72bbfce8c19003e3479fab3763f0503bbf317"
+    },
+    {
+      "path": "native/arrange_juce/src/JuceRepaintAdapter.cpp",
+      "size": 378,
+      "sha256": "98b7d8795dd378da379c9e44291449466d56f2e8b858c2d505e6705d45c87a4c"
+    },
+    {
+      "path": "native/arrange_juce/src/JuceTextInputAdapter.cpp",
+      "size": 4779,
+      "sha256": "ab38eb8f3c81064ba59ee782d884746324559e8900ebd239c1c68a784f87565e"
+    },
+    {
+      "path": "native/arrange_juce/src/JuceTextServices.cpp",
+      "size": 9436,
+      "sha256": "8ed400bccaf7311be40082f7552863d6c09f5c50a0b344e9bb49f3dbb4ecd6f6"
+    },
+    {
+      "path": "native/arrange_juce/src/LiveModuleClient.cpp",
+      "size": 11555,
+      "sha256": "a9a1bba3c507b65a9df663e59cbe387ead9f6f70721538b1c71d04ac44923589"
+    },
+    {
+      "path": "native/arrange_juce/src/PackageRuntimeSource.cpp",
+      "size": 8583,
+      "sha256": "0b1e96ee75cc499b850e96e09cbc21916178ed2053f922b291186ba675e2e6fd"
+    },
+    {
+      "path": "native/arrange_juce/src/PainterResources.cpp",
+      "size": 18051,
+      "sha256": "f8fb7d428638fed319ddf4f15d24574fdb5acbb586eb6cf7d79ede4fb790d3cb"
+    },
+    {
+      "path": "native/arrange_juce/src/PassivePaintRenderer.cpp",
+      "size": 1867,
+      "sha256": "753ecdd826c54e7d1952473a0994b6974007b642dbf3eecd9633c8d6bb990734"
+    },
+    {
+      "path": "native/arrange_juce/src/PointerInputState.cpp",
+      "size": 1576,
+      "sha256": "2e48f1f82d54ef1655a5fa544543c2b4476e8d4e52a0a9647029f72449c4e8ab"
+    },
+    {
+      "path": "native/arrange_juce/src/RearrangeHost.cpp",
+      "size": 5231,
+      "sha256": "b10e21cbc839340c5394d8748b6e9ce44d4aff10dcdf57f234c21230366b043d"
+    },
+    {
+      "path": "native/arrange_juce/src/RuntimePackageBinder.cpp",
+      "size": 3668,
+      "sha256": "fc0cfc9b651ffe6c058e92ca2352ad6dfa0f32b6dfaa9ed498ec91aa2ce94a3e"
+    },
+    {
+      "path": "native/arrange_juce/src/RuntimePackageLoader.cpp",
+      "size": 5177,
+      "sha256": "35964f249c10b089bba760d6db70884da83cc87ed91e8a2055970e6dbfb9d1b6"
+    },
+    {
+      "path": "native/arrange_juce/src/RuntimeSessionState.cpp",
+      "size": 3694,
+      "sha256": "eeb6d6ef3640c9176583f2cbc56b3b2f2fb282204bc11f205d4e9410614e9a21"
+    },
+    {
+      "path": "native/arrange_juce/src/ScenePipelineState.cpp",
+      "size": 3930,
+      "sha256": "ed32b77476b0204dfe60a03bc22ca19228dc3546292672a72c2669086a12479a"
+    },
+    {
+      "path": "native/arrange_juce/src/ScriptEventDispatcher.cpp",
+      "size": 1957,
+      "sha256": "b3769c1f7d98a35865a54afb505eb5a1952d86b928827d31cde987cfe9899691"
+    },
+    {
+      "path": "native/arrange_juce/src/TextInputLayoutModel.cpp",
+      "size": 3490,
+      "sha256": "35621598107d42d21b3d996f178cb96de1b29869f6b5c3ec1cda3b25cef628c6"
+    },
+    {
+      "path": "native/arrange_juce/src/TextInputMutationSink.cpp",
+      "size": 2208,
+      "sha256": "335945f5eb9819153326ea9827aa2c84537c97359c816e3ec1e8d102307140be"
+    },
+    {
+      "path": "native/arrange_juce/src/TextInputOwner.cpp",
+      "size": 19560,
+      "sha256": "12b6421a11929adf7317a5270d040f951485806a2600e3b88b000ee8eee8bbe7"
+    },
+    {
+      "path": "native/arrange_juce/src/VBlankSource.cpp",
+      "size": 935,
+      "sha256": "203b378b2728d1dcd2021507a50122834137f6cd088d58b49e7e9a2256d68638"
+    },
+    {
+      "path": "native/arrange_quickjs/CMakeLists.txt",
+      "size": 926,
+      "sha256": "18e099a2cfe97ecf676cda739cc06ce01bd53da6c72da4bb56d34c13d909973e"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/Log.h",
+      "size": 1723,
+      "sha256": "3b67fe5d4a1bac89403d775b6f632390566fd35e5116720dc54220278390b952"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/quickjs/AppScriptLoader.h",
+      "size": 484,
+      "sha256": "39c19693ecc12a36166e470d9a6c56c9a56ef8a290668960976911bc2320c703"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/quickjs/LiveModule.h",
+      "size": 1082,
+      "sha256": "385be6c5d22b42bce2e0b8a9651f3e1b13285b1ff64662895438b98b7fcdd2a0"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/quickjs/QuickJsScriptHost.h",
+      "size": 4037,
+      "sha256": "c053da3a4db991fd662e6d29ea30029a2ecb772eaddb3d3124323d36b2b23c9e"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/quickjs/RuntimeHost.h",
+      "size": 250,
+      "sha256": "b7c2eb550355ca83860f0235092fc2648727e7337b17319de6892e52767e505e"
+    },
+    {
+      "path": "native/arrange_quickjs/include/arrange/quickjs/ScriptHost.h",
+      "size": 648,
+      "sha256": "89af16bf9f25e79b94de58bff9112fce9bf2483b48e276361daaadd47028517e"
+    },
+    {
+      "path": "native/arrange_quickjs/src/AppScriptLoader.cpp",
+      "size": 973,
+      "sha256": "6b17602c77fdd513152277b31eb177e6d358e5f8879b240395fb3847ffc096fe"
+    },
+    {
+      "path": "native/arrange_quickjs/src/Log.cpp",
+      "size": 3549,
+      "sha256": "789f82e7717c3fe103a69cecbbf881af2774e28b181e80a3e0bce3b722460b7c"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsEventRegistry.cpp",
+      "size": 5329,
+      "sha256": "6b65e6ffe2bddf2c8d2b1ded12d98117a55d3baf4ead094c75480cea794b7692"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsEventRegistry.h",
+      "size": 2429,
+      "sha256": "f29a4ffef0ca011b69ceb32060cad0178beb3804f32124ea74d1b8db64ff2d76"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsHotTransport.cpp",
+      "size": 8308,
+      "sha256": "d30f0e7303818de223c404a8c09fbd62525f08bf23c0ba735d3301f6d8cf3dc2"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsHotTransport.h",
+      "size": 207,
+      "sha256": "5ccdd2fb62dc381fb5642a317c11143e054acb87f5a9be6b529f7ccfa9104f21"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsModifierReader.cpp",
+      "size": 32001,
+      "sha256": "1172c20e8cb4be3e765740c18cfedfbf1ecd92ee2b03580c11547d3c75745155"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsModifierReader.h",
+      "size": 2179,
+      "sha256": "4a3f1ecede033117e0a792398e1392ecc7e802a8391ee60d6fd001986c95ebc6"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsModuleLoader.cpp",
+      "size": 4243,
+      "sha256": "b4ec7ce760d603ef0e56ae392f286d385366a0f995610e6732894f61d2d53701"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsModuleLoader.h",
+      "size": 1084,
+      "sha256": "7cadfaa012617f7f0fb3edce2d6d005b7a32f72b2b901bf8953c2c188d1a4b2a"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsNativeApi.cpp",
+      "size": 30104,
+      "sha256": "d891d5ac6a16c68d20b87518e26914b24b4797bd393e78f341972a1f51ff3345"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsNativeApi.h",
+      "size": 286,
+      "sha256": "bf383985f3b39f6c32763c2c22904490a44ee3ebe54216ca9954925c11691446"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsPainterResources.cpp",
+      "size": 8195,
+      "sha256": "6aa5b24cf7ca81cf2451884b774ae33dde998d307e040113db97e794df872904"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsPainterResources.h",
+      "size": 1128,
+      "sha256": "0f80b42be3fa2371ae8444bf06c3fbdc64fef07ffc93da5a82be8944ee27ec38"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsRuntimeContext.cpp",
+      "size": 10045,
+      "sha256": "6c8043e714eb746c5c3ca2f55f8bc88a88b13468c4898b7eddbb9aa6accf0e6b"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsRuntimeContext.h",
+      "size": 4892,
+      "sha256": "f42ccd34d62216eb80c6abb0f9b22086cd1553d5913734caf355d218e7ca7106"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsScriptHost.cpp",
+      "size": 25774,
+      "sha256": "e3ccc852028654973b6ee62e0d1a46b90ddec656efc104a5c7b8d2d4dcdc31ab"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsValueReader.cpp",
+      "size": 8177,
+      "sha256": "488c68f5f997bc7f434a53882df0c64c349cc489b4c44d70d3be2de7ac4b9610"
+    },
+    {
+      "path": "native/arrange_quickjs/src/QuickJsValueReader.h",
+      "size": 2621,
+      "sha256": "64ff83aee6aad4ccc639fd0d56fc7cb6ffdf4d59fa954ede913def3a77a5c8db"
+    },
+    {
+      "path": "package.json",
+      "size": 1689,
+      "sha256": "a1367dd4ece28251685d7280a649fadeed2b87796d32ba806fae4739b7ce5bff"
+    },
+    {
+      "path": "packages/compiler/package.json",
+      "size": 879,
+      "sha256": "9787b946a4211590539943d570190df3c87bf50456547ec1f698750c53a8b709"
+    },
+    {
+      "path": "packages/compiler/src/core/ast.ts",
+      "size": 4643,
+      "sha256": "e87aef9bd134ce88ccde6527902e8ccde76fae150a411a1786024a3e34e929fc"
+    },
+    {
+      "path": "packages/compiler/src/core/babelUtils.ts",
+      "size": 13102,
+      "sha256": "d49968e81628d62e5d15be39bfcfbdc78a31496788f55d6224c995749feba4be"
+    },
+    {
+      "path": "packages/compiler/src/core/codegen.ts",
+      "size": 15738,
+      "sha256": "a9662a4cfe9be0821f4b874942c8d7e7f721dce9d99e14aaa17daafcbc221f4f"
+    },
+    {
+      "path": "packages/compiler/src/core/compile.ts",
+      "size": 393,
+      "sha256": "ce1956d5438ffcf3bedd975bb647d4475f39b7ef1d037e4676f3a09c4606565f"
+    },
+    {
+      "path": "packages/compiler/src/core/errors.ts",
+      "size": 3061,
+      "sha256": "18bd1bef27a0da29f5d77abf8c710711abecad6176629c0e390fe97253289ad2"
+    },
+    {
+      "path": "packages/compiler/src/core/index.ts",
+      "size": 456,
+      "sha256": "ffc2197717239858440f9a0feddcf2ca211b6fd27df61044c96f4c0a179a742e"
+    },
+    {
+      "path": "packages/compiler/src/core/options.ts",
+      "size": 1681,
+      "sha256": "37016bbb4d8ade052537e125b28d87b63d7e95035366861256b62188dbc00129"
+    },
+    {
+      "path": "packages/compiler/src/core/parser.ts",
+      "size": 24764,
+      "sha256": "dd69186b51b450083c000d3e049729bb0e8e9bbf382186948aca2dc799b66ca6"
+    },
+    {
+      "path": "packages/compiler/src/core/runtimeHelpers.ts",
+      "size": 197,
+      "sha256": "1264859fe7d2835bae0a59a5021f22be72af48087375eb2807264f98258a4366"
+    },
+    {
+      "path": "packages/compiler/src/core/tokenizer.ts",
+      "size": 34479,
+      "sha256": "4fa29bb11fec0f458b8a19b2239ced1d50f95407bb2c451255421d7f73c2cf70"
+    },
+    {
+      "path": "packages/compiler/src/core/transform.ts",
+      "size": 509,
+      "sha256": "85f22683075d10f38951160c22564bb4e79b6e124325b4b83c0cd16e17ee357b"
+    },
+    {
+      "path": "packages/compiler/src/core/transforms/transformExpression.ts",
+      "size": 11734,
+      "sha256": "4a3342d293164192f2522e403dfaba43815696cd36a1deda8cd83639e08cf204"
+    },
+    {
+      "path": "packages/compiler/src/core/unitSyntax.ts",
+      "size": 7554,
+      "sha256": "793c1a754fddd1507d124682037994e5f32092d6c4f28de2b856b8790692efc0"
+    },
+    {
+      "path": "packages/compiler/src/core/utils.ts",
+      "size": 1345,
+      "sha256": "3535b8b0e268cedbef8b3b699436dc7b5aff45591aaa6b8eb2a46e3a0771d926"
+    },
+    {
+      "path": "packages/compiler/src/sfa/cache.ts",
+      "size": 166,
+      "sha256": "c509a84a98d7b4ad1d6e23f3561d8610b8ee66a75b002f00380731ee95261b4a"
+    },
+    {
+      "path": "packages/compiler/src/sfa/compileScript.ts",
+      "size": 23336,
+      "sha256": "45cfe2f5afe522f6148f0a394549cde30cdbaefe489421f9da61efb1da9a2909"
+    },
+    {
+      "path": "packages/compiler/src/sfa/compileTemplate.ts",
+      "size": 3865,
+      "sha256": "51fc5f9ccbb1c69e1bf378ed5aa3e4c233927911a42f89ddbbcf7c06ddea17cf"
+    },
+    {
+      "path": "packages/compiler/src/sfa/index.ts",
+      "size": 424,
+      "sha256": "c440b287c69e33745f9d5b99581293fb6eaf4b022942f1c961c75100a28722f3"
+    },
+    {
+      "path": "packages/compiler/src/sfa/lowerValues.ts",
+      "size": 55815,
+      "sha256": "54005cfb7bd2a0aba739408b8cc4305d81a23106fbc812e45b4dcc387a4d4b76"
+    },
+    {
+      "path": "packages/compiler/src/sfa/parse.ts",
+      "size": 4222,
+      "sha256": "cd2442ca106022e2cafcae8475241264f2c90db45eeaa95e6492cd7fe278be9e"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/analyzeScriptBindings.ts",
+      "size": 753,
+      "sha256": "be45689f0e6e17f00259825510455be67dc3a3125051fd1a1c43b4641169058f"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/context.ts",
+      "size": 4709,
+      "sha256": "84cc67886fef981d48f2e1fd90dcf190dc14e04808cef3d34d476e9e5e7bf314"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/defineProps.ts",
+      "size": 9785,
+      "sha256": "e8c105e323ea0b2110eb9a2e7a9abdd76aa7cd48943e4dafac8a4c42e2ad7f05"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/definePropsDestructure.ts",
+      "size": 8468,
+      "sha256": "4d32908f2cd132b04fc90d5a10151be19a68b061e646c9d5a0fc6038fc12fea4"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/resolveType.ts",
+      "size": 69370,
+      "sha256": "b12f8d78f2a37265b1e1f82e2c238a7d343e3b559fbceea7b0dcbee928cf0443"
+    },
+    {
+      "path": "packages/compiler/src/sfa/script/utils.ts",
+      "size": 3667,
+      "sha256": "d83fad56c0128e60f97b6da8ce32f7c61b118c6f168eb8151bd85ff2bed80c4c"
+    },
+    {
+      "path": "packages/compiler/src/sfa/valueContracts.ts",
+      "size": 9373,
+      "sha256": "b7daf057ede7d7822ce9d9d0b5cd7f94a735e81f48c7ce7984eada2431dbdbcd"
+    },
+    {
+      "path": "packages/compiler/src/sfa/valueUnits.ts",
+      "size": 22138,
+      "sha256": "db6b595cb418b05767e9ff1f6ea8d881a322c713c270fcd3e9abb5b1e3416293"
+    },
+    {
+      "path": "packages/compiler/src/sfa/warn.ts",
+      "size": 452,
+      "sha256": "9574bbf720bd5fe762348b0b9905af2adc5ac120c931da68b22d7c490e412bb3"
+    },
+    {
+      "path": "packages/compiler/src/template/index.ts",
+      "size": 833,
+      "sha256": "e067191aeecaeeb21b7dab1b351f35bad1df02dcd58073fad92f49df66b1f980"
+    },
+    {
+      "path": "packages/compiler/src/template/parserOptions.ts",
+      "size": 234,
+      "sha256": "7f85af6a91d674441aad5d76cff03f98faefd70547c30aa4914e91198184a24a"
+    },
+    {
+      "path": "packages/compiler/src/template/templateContract.ts",
+      "size": 4063,
+      "sha256": "cf6c6289e7c911541179e3c4f0c103607a06d7b5ee83ef32ab6bfa4ab442a1e8"
+    },
+    {
+      "path": "packages/framework/package.json",
+      "size": 1523,
+      "sha256": "6512e4294688991c5c5e0ff1e290fdb206a5d650404ca0d53b8e729c0cf43ea7"
+    },
+    {
+      "path": "packages/framework/src/animation/index.ts",
+      "size": 82,
+      "sha256": "ae7f557eb07de058aa32db04ea45cfee4ec363f62dec45c4eb10baa386c4fe3b"
+    },
+    {
+      "path": "packages/framework/src/animation/value.ts",
+      "size": 22835,
+      "sha256": "504f99c958f214ed38eea7bc8f2182405a36524d54c6c4f19d65b386395a156c"
+    },
+    {
+      "path": "packages/framework/src/app.ts",
+      "size": 4383,
+      "sha256": "be643ab3e21caedd35ed5ec3784405b2a0f3a5d73bd8f10f7f21c741d9a68efb"
+    },
+    {
+      "path": "packages/framework/src/arrangable/ImageAndIcon.ts",
+      "size": 2013,
+      "sha256": "51bc387d9b5ac3a08cc57cabcd5c073d4e8ccad0d9210a7a8a846989369f4201"
+    },
+    {
+      "path": "packages/framework/src/arrangable/Layout.ts",
+      "size": 2257,
+      "sha256": "da8093b03991c420c00a39fdeff4dac5cc0dd628fc041e1f03b9318bac028339"
+    },
+    {
+      "path": "packages/framework/src/arrangable/LayoutingArrangables.ts",
+      "size": 3355,
+      "sha256": "b73bd6d0fdc1b31ac31d741072b765a088f49e05221fdb665da642448060087a"
+    },
+    {
+      "path": "packages/framework/src/arrangable/TextAndInput.ts",
+      "size": 2841,
+      "sha256": "7b9517610032660623870ab894612b42097ab4d7b988f1aa0bbd6e959f0220e6"
+    },
+    {
+      "path": "packages/framework/src/arrangable/ToolArrangables.ts",
+      "size": 1405,
+      "sha256": "d7ac2557d848ce21ea41626c6f5d6971393e5bc20af369cad7c639edf9ef1856"
+    },
+    {
+      "path": "packages/framework/src/arrangable/TransitionArrangables.ts",
+      "size": 5990,
+      "sha256": "f486d787a9a06197c607680bf5632854d5057f29b29e781228f67a0f9d1e2853"
+    },
+    {
+      "path": "packages/framework/src/color.ts",
+      "size": 399,
+      "sha256": "9425222de73aeee730e9e34a94f2e76a0c08f5f9a3c3fcf2ba0b8dd76c9ebec3"
+    },
+    {
+      "path": "packages/framework/src/density.ts",
+      "size": 1525,
+      "sha256": "d9f9d9a36c6984ded80200bee132faaa5c9607efd658fe9e4ba4be8821ce1407"
+    },
+    {
+      "path": "packages/framework/src/diagnostics.ts",
+      "size": 2435,
+      "sha256": "c0a42566c279a01423ee35d0a53bd7b0772b16dd15b253c1e7c4d280dadb2c52"
+    },
+    {
+      "path": "packages/framework/src/foundation.ts",
+      "size": 229,
+      "sha256": "b7fbd2f2f891ea2ffa3a76fc698068d66eb1f5f367e33c8943c1877cbf4a0c92"
+    },
+    {
+      "path": "packages/framework/src/hotRuntime.ts",
+      "size": 10546,
+      "sha256": "b190b0d193021d54d07d1e03328d8a944bb37cf6f7732a0892230a136f5fe417"
+    },
+    {
+      "path": "packages/framework/src/index.ts",
+      "size": 1607,
+      "sha256": "34a73b1ee45a8f18c2a3dd2c8510f0fe2b5221a9abb0eb702dc4e49fb5f1becc"
+    },
+    {
+      "path": "packages/framework/src/internal.ts",
+      "size": 495,
+      "sha256": "c2e7205060774cd5f20329d357539edebebb6ad7cbe66fcddb3feccf63063b10"
+    },
+    {
+      "path": "packages/framework/src/measurePolicy.ts",
+      "size": 2112,
+      "sha256": "f667062ce3b037e81533b2ba4c701d02645805128429b5526f6c0d7fcad4921a"
+    },
+    {
+      "path": "packages/framework/src/modifier.ts",
+      "size": 11765,
+      "sha256": "fcbf62b4f341fddb252b01e44426e48fdee0c2f298e6683c7cc24d39ac121f7b"
+    },
+    {
+      "path": "packages/framework/src/native.ts",
+      "size": 3428,
+      "sha256": "2d2c36da38f2f6659ac3f1214a1d5de39f8ecc7f0154def64d55ef4f4fd13a92"
+    },
+    {
+      "path": "packages/framework/src/painter.ts",
+      "size": 3384,
+      "sha256": "a4573570938865351b3d9546ff67d42812ea111460b5837caf641970c0782ac4"
+    },
+    {
+      "path": "packages/framework/src/primitives.ts",
+      "size": 5080,
+      "sha256": "ad22fd0ffb3198969e5af9b1a114af6dc18b2e575fbc682a3ec3fbd6fb24fb88"
+    },
+    {
+      "path": "packages/framework/src/rearrangeNode.ts",
+      "size": 13421,
+      "sha256": "c36c2ac0f6fb8e3fb0681e183c3740373a7c3f75b512821ea1ef4254979ad483"
+    },
+    {
+      "path": "packages/framework/src/resolveUnits.ts",
+      "size": 9136,
+      "sha256": "a453a0582bda68090096266b3972692a96f0906441ba4dff8a1a33b06f8ddcc3"
+    },
+    {
+      "path": "packages/framework/src/runtime/animationOwner.ts",
+      "size": 1055,
+      "sha256": "6f6a15897c460ad623f8d46bc325bc20fe715dab810d77bc2030019ad571ba5d"
+    },
+    {
+      "path": "packages/framework/src/runtime/apiDefineArrangable.ts",
+      "size": 2745,
+      "sha256": "1bdb5cc3deb71ac339e0334d38f1ffac613fdd8572922045aa73e898deeedd33"
+    },
+    {
+      "path": "packages/framework/src/runtime/apiInject.ts",
+      "size": 1188,
+      "sha256": "d740ccc9cb9df74c5ca3120385b859f8e80df9593936eb082bdc4b4ff89cb201"
+    },
+    {
+      "path": "packages/framework/src/runtime/apiLifecycle.ts",
+      "size": 1939,
+      "sha256": "b7d9ebb921c031cff8e92a6d9853bf1351b12d0600bed32f3ed0d011a83ae07c"
+    },
+    {
+      "path": "packages/framework/src/runtime/apiSetupHelpers.ts",
+      "size": 3442,
+      "sha256": "85c0226ba41d9d336bdf9cf105db9bf54b5bf7fcc825e42574017ea84a1f8e57"
+    },
+    {
+      "path": "packages/framework/src/runtime/apiWatch.ts",
+      "size": 4747,
+      "sha256": "998e640efc42605f9825d6ea9e9f5f5e59f3e6cfdf114d506981d822dae3e144"
+    },
+    {
+      "path": "packages/framework/src/runtime/arrangable.ts",
+      "size": 3803,
+      "sha256": "8eef3f50a7277790cc022c9ff1975f517fb734dac7cf9ae142f834b62975628d"
+    },
+    {
+      "path": "packages/framework/src/runtime/arrangableHmr.ts",
+      "size": 7888,
+      "sha256": "e23e538b4d7f65b06055b3e1d7d651b078f5c22d5772f375d028e9e3f1885ecc"
+    },
+    {
+      "path": "packages/framework/src/runtime/arrangableProps.ts",
+      "size": 12442,
+      "sha256": "b5d0e90aae01de480154aa0bd32f348952280e9c21f16d8cd8a0db2d96257ae9"
+    },
+    {
+      "path": "packages/framework/src/runtime/arrangableSlots.ts",
+      "size": 73,
+      "sha256": "59b04e551dcd07000da4ee17638a81d973629d07afae1b001b6739782e1f0485"
+    },
+    {
+      "path": "packages/framework/src/runtime/enums.ts",
+      "size": 344,
+      "sha256": "9388150bce00db6a5bf0c769cbf78fceb4e4bd75027fddcc473a266d0ccbe189"
+    },
+    {
+      "path": "packages/framework/src/runtime/errorHandling.ts",
+      "size": 1730,
+      "sha256": "538e2cf3a053868e7e507aa2c7354b763df9007a1a67ce3284b0c170c3bac2c3"
+    },
+    {
+      "path": "packages/framework/src/runtime/executionStats.ts",
+      "size": 680,
+      "sha256": "ad23048f7745bf677642da7dfe73ab15a19f6d034de0540da66359dd183b0f8b"
+    },
+    {
+      "path": "packages/framework/src/runtime/frameDeadline.ts",
+      "size": 1396,
+      "sha256": "1450cc634afc4709dc6fed6821232c02a437371308884f858a065a4da9d2d79d"
+    },
+    {
+      "path": "packages/framework/src/runtime/helpers/resolveAssets.ts",
+      "size": 596,
+      "sha256": "ce549506e91c6368fc450951093960f10256cf9ffe1c8a130b1a2f2d7c455d47"
+    },
+    {
+      "path": "packages/framework/src/runtime/helpers/useId.ts",
+      "size": 247,
+      "sha256": "6c4e310a82f34c7c1df82424967fe1507a22fa0261f4efbc4c9b7cb5d1e87398"
+    },
+    {
+      "path": "packages/framework/src/runtime/index.ts",
+      "size": 1453,
+      "sha256": "dff240f12bce49a47f64637528ac61d0c2eb375593cfc454468724e7ad7b5b5a"
+    },
+    {
+      "path": "packages/framework/src/runtime/internal.ts",
+      "size": 585,
+      "sha256": "a781ca85692b6c07eeb5887dea208abcf9b099ddd4ccad3a05fae63751aa71e7"
+    },
+    {
+      "path": "packages/framework/src/runtime/propDeclarations.ts",
+      "size": 3440,
+      "sha256": "c82de643ea180d4eabf4b73f257af0dab9bcf5456c8ca58f582d9ddf13573965"
+    },
+    {
+      "path": "packages/framework/src/runtime/rearrange.ts",
+      "size": 40026,
+      "sha256": "e714cebdf109ba98e4a1bd6f9f35a004783c996182c12cea6924924196375cc1"
+    },
+    {
+      "path": "packages/framework/src/runtime/rearrangeNode.ts",
+      "size": 736,
+      "sha256": "8adacfb82de2a655b5b8796133c26c55ff6526c17577aa6c877512edc267df6d"
+    },
+    {
+      "path": "packages/framework/src/runtime/scheduler.ts",
+      "size": 8376,
+      "sha256": "7cd124756927934d00fb5664726aa6ebcc608e15a6e4d7eef6eec301aa829b7d"
+    },
+    {
+      "path": "packages/framework/src/runtime/valueBinding.ts",
+      "size": 4651,
+      "sha256": "07a016878bda97291c28732366afcadc1d95b2648cc93d5ae99f58fd7b0ba258"
+    },
+    {
+      "path": "packages/framework/src/runtime/warning.ts",
+      "size": 511,
+      "sha256": "c794a7b7ea1de0ed0bc8df03ad16bd6f6de09fd165880c130503948434a8ad41"
+    },
+    {
+      "path": "packages/framework/src/state.ts",
+      "size": 1774,
+      "sha256": "e7b018290332aeb174be643eca0dba03bc50c00e9966b3740c7be57f4f2d5be8"
+    },
+    {
+      "path": "packages/framework/src/ui.ts",
+      "size": 346,
+      "sha256": "848a605cb55648cb680f94195d5078f4ad82c30c3267298f3d22213fcf31cdea"
+    },
+    {
+      "path": "packages/framework/src/unit.ts",
+      "size": 672,
+      "sha256": "ef4ec605e936010011a50cb61a3c60f681dca6847d47297523fac2976a18c900"
+    },
+    {
+      "path": "packages/framework/src/version.ts",
+      "size": 95,
+      "sha256": "f375885ccdd8cbc800e0fbd5c2d73482d5c4784b4112dc8d68742b34a0f70304"
+    },
+    {
+      "path": "packages/framework/src/vite.ts",
+      "size": 220,
+      "sha256": "b639a6ed4f4c95be1dbfc07fb2024dee156d746962860114e04e2861f11fe4e0"
+    },
+    {
+      "path": "packages/reactivity/README.md",
+      "size": 330,
+      "sha256": "33428df14abad0fcfdf5384cc035fda58ff3f7a573a5d645bed352e96fffb240"
+    },
+    {
+      "path": "packages/reactivity/package.json",
+      "size": 479,
+      "sha256": "6a716dc1da9adafc8168e8145ce689997d93a8b48a261245f05594e26d245a32"
+    },
+    {
+      "path": "packages/reactivity/src/arrayInstrumentations.ts",
+      "size": 8769,
+      "sha256": "8c3089dc1699703080f1d6a2b2dbcd8f8e31551a1684d87632d152e8bfa2c708"
+    },
+    {
+      "path": "packages/reactivity/src/baseHandlers.ts",
+      "size": 6378,
+      "sha256": "205f860f820e7c2af058da95625c046163bbcb371348ae6b46cc3fbc235fab83"
+    },
+    {
+      "path": "packages/reactivity/src/collectionHandlers.ts",
+      "size": 10319,
+      "sha256": "f8472dab81a8fdac0b9636187d4957087a0841296ecb84b1b93f04d1f8909915"
+    },
+    {
+      "path": "packages/reactivity/src/computed.ts",
+      "size": 3347,
+      "sha256": "ffa903ec9595406acea41e83a483b37e4966d44c2edc59e1cc7160ec3786b6ab"
+    },
+    {
+      "path": "packages/reactivity/src/constants.ts",
+      "size": 441,
+      "sha256": "d522a8e68ef7ef5895e0ae85a3dc69dc6ad801b3b606b0b128fe2f59dba69a21"
+    },
+    {
+      "path": "packages/reactivity/src/dep.ts",
+      "size": 8385,
+      "sha256": "c442204b387e0b3d3a263773f272ac6122b467951acb6c208e9dbfd2c1c5f785"
+    },
+    {
+      "path": "packages/reactivity/src/effect.ts",
+      "size": 12414,
+      "sha256": "ce1bc628fcb12c10a7760fdf710daf02dc9d7c0c9862ecc67f0fd784f4c69fb0"
+    },
+    {
+      "path": "packages/reactivity/src/effectScope.ts",
+      "size": 5259,
+      "sha256": "91ef3be65cbe8f483efc49d00454663d0346bd7a7ea4010cb8cd3e84f739b18c"
+    },
+    {
+      "path": "packages/reactivity/src/index.ts",
+      "size": 1693,
+      "sha256": "11e2eb41431c86ebbb413f6629a65f53c45a6650e9c81ed89606bbb7089368bc"
+    },
+    {
+      "path": "packages/reactivity/src/reactive.ts",
+      "size": 6030,
+      "sha256": "024fbb511fcced0cf9018407bde1dda68607397693ef2dede4f618050e8d1b93"
+    },
+    {
+      "path": "packages/reactivity/src/ref.ts",
+      "size": 10267,
+      "sha256": "b8dedc8c8a3da6ba74f271c62778d92cb3596b9bcade5a3944478ae55ff7bb43"
+    },
+    {
+      "path": "packages/reactivity/src/warning.ts",
+      "size": 329,
+      "sha256": "fecbd2b441cde2a4a46780658866194664e4bab594e19e12fa7e5c1a595212d7"
+    },
+    {
+      "path": "packages/reactivity/src/watch.ts",
+      "size": 9149,
+      "sha256": "e31905c3ac9b4cfa29812ae8a239da92f8e3a7a5f92815e50497a48c253cdc10"
+    },
+    {
+      "path": "packages/shared/README.md",
+      "size": 335,
+      "sha256": "508aecf5aa85b64ec1221024c3bdc32e0c20e63dc5449cdd0a9c3396546c6c45"
+    },
+    {
+      "path": "packages/shared/package.json",
+      "size": 440,
+      "sha256": "5b674813e9e52ad781d25220153c73f9f16125191d008b80e26c688f40adcec1"
+    },
+    {
+      "path": "packages/shared/src/build-globals.d.ts",
+      "size": 438,
+      "sha256": "3cf8c79dbd3756bc97d2a4913b686a9f83e741b832693156040db5d3db4d0941"
+    },
+    {
+      "path": "packages/shared/src/codeframe.ts",
+      "size": 1753,
+      "sha256": "9b3b86eb1a6628724779c52d14750c6dd6cb04dbcf3ef54d8a1da2777f6a927f"
+    },
+    {
+      "path": "packages/shared/src/featureFlags.ts",
+      "size": 252,
+      "sha256": "b5890a43a964ef6ddd784877b952e50b4d1cbf4debe6a506bbca2d4a99201655"
+    },
+    {
+      "path": "packages/shared/src/general.ts",
+      "size": 3249,
+      "sha256": "28062072a691d5433ce0f54c1dcb1cba690dabf6f89fcc054a0fa4e106b2e732"
+    },
+    {
+      "path": "packages/shared/src/globalsAllowList.ts",
+      "size": 375,
+      "sha256": "ad44d3838db5f8118e0ff57f43bf9cc2e38860b1204860deeb51c5016c65920b"
+    },
+    {
+      "path": "packages/shared/src/hostSchema.ts",
+      "size": 1307,
+      "sha256": "72060f8470b383fd9c7e941242cc5c2cd9f4695f6266bd2e0224f287a3553e24"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "size": 261,
+      "sha256": "7cd6240e07dd6f2cb3a07477e1df50cc8648cf72a9989948ecc89b5a59692433"
+    },
+    {
+      "path": "packages/shared/src/makeMap.ts",
+      "size": 185,
+      "sha256": "50f07fbe609ae9526991658b3f91b958bd48e3d7ef37c6b9662f70b93aed3b3f"
+    },
+    {
+      "path": "packages/shared/src/typeUtils.ts",
+      "size": 110,
+      "sha256": "02d5bd1f0cdf5af979b964a1bcc159ae7a045e8aac3ce3f6cc5d01787a61c66e"
+    },
+    {
+      "path": "packages/shared/src/unitContract.ts",
+      "size": 3044,
+      "sha256": "10396828f12c59967d81f47fdb97214d85de5b7b03f567f13502a3af6c263f21"
+    },
+    {
+      "path": "packages/vite-plugin/package.json",
+      "size": 726,
+      "sha256": "5a8896f2a492369e1fbf31ceabd60e3f1d5abea7b06a21448793bf1980e6caef"
+    },
+    {
+      "path": "packages/vite-plugin/src/constraints.ts",
+      "size": 524,
+      "sha256": "e15dec53aaa5c8747d85a685ab1d918ea27c7d96f9609c235ab2f0495650a56a"
+    },
+    {
+      "path": "packages/vite-plugin/src/index.ts",
+      "size": 411,
+      "sha256": "65667ec0fbf8385c6575b60fb82f990b078d73b8a5db7253e7a9144bdb5c4388"
+    },
+    {
+      "path": "packages/vite-plugin/src/module-snapshot.ts",
+      "size": 4876,
+      "sha256": "5abd36e6f2620958a16ed2844c2649b49fb2af72a1bfd68177db8e4e6e544dac"
+    },
+    {
+      "path": "packages/vite-plugin/src/plugin.ts",
+      "size": 3699,
+      "sha256": "16e491d1682d6df14bd95ffedd4cfd291c5f64be31ce538642a9f5505d5f942b"
+    },
+    {
+      "path": "packages/vite-plugin/src/public-resource-hmr.ts",
+      "size": 964,
+      "sha256": "edf40ad7f22dc83b5f1f7e4249ae72e88b3c8d282664cbe59666acef97dcee91"
+    },
+    {
+      "path": "packages/vite-plugin/src/sfa-hmr.ts",
+      "size": 7526,
+      "sha256": "bffab08f0dba33efda3497f4eae035e917c9d9a42cff7a0c3c64257e953a5fea"
+    },
+    {
+      "path": "packages/vite-plugin/src/sfa.ts",
+      "size": 2924,
+      "sha256": "e97531c37921aa468b6d05203e05bcde2905763026d50bdbfa7fdf7e5c05d3a8"
+    },
+    {
+      "path": "packages/vite-plugin/src/source-map.ts",
+      "size": 1155,
+      "sha256": "0b752d2054b69496df0d7297c8c976a6ae06da94de85628196e90e1021e20c3a"
+    },
+    {
+      "path": "packages/vite-plugin/src/transform.ts",
+      "size": 1199,
+      "sha256": "ac7109e8bfb1aa827e4cca58817001edce45dbe5a4d212424a375e1de98108e1"
+    },
+    {
+      "path": "packages/vite-plugin/src/typecheck.ts",
+      "size": 7292,
+      "sha256": "f9bb36d2d207548955d831b7f996acad1bbaf90198471f2c100b53eef241dda2"
+    },
+    {
+      "path": "packages/vite-plugin/src/types.ts",
+      "size": 2146,
+      "sha256": "9775671ab7b619ccad770125f7d03b40f3ad1fcfb62c16d00768f054b56a87e2"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "size": 39893,
+      "sha256": "1a99e36880e234fda04e38ef258babceb1c2975cb0c237a9305d6fcdf019e061"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "size": 411,
+      "sha256": "4abb794a87774cebc167ed9be8a30883e87693632d059b59aa3d236f08fb640e"
+    },
+    {
+      "path": "scripts/build-demo-ui.ts",
+      "size": 66,
+      "sha256": "ee6038d5b092f84e893aa7c5111317f3a7d5e21cfbed009c4a5bf5a2308b11a1"
+    },
+    {
+      "path": "scripts/build-demo.ts",
+      "size": 97,
+      "sha256": "3d8f61c73a3d179bfbfdee726472354e5b6b29b70033ef1b81b033bf348285b5"
+    },
+    {
+      "path": "scripts/build-internal-packages.ts",
+      "size": 11123,
+      "sha256": "227cf37d529a5fdad3766c62d1e4faf2db49c9634afc064c8f54657ec90900c9"
+    },
+    {
+      "path": "scripts/build-runtime-fixtures.ts",
+      "size": 547,
+      "sha256": "cb7e2104212a4e6508269d80fa767ea92335be7609a2abcb98457f475415552f"
+    },
+    {
+      "path": "scripts/common.ts",
+      "size": 3927,
+      "sha256": "0b5dc610732de61cbdcfb5f87db9f2e0dda1af7e4c30647e39ad5a0a8f3fe6a3"
+    },
+    {
+      "path": "scripts/demo-build.ts",
+      "size": 2626,
+      "sha256": "c927b283d67ab641b724c8d473f332b46f310477fbf2270d11942e79c7e18e73"
+    },
+    {
+      "path": "scripts/format-code.ts",
+      "size": 13579,
+      "sha256": "6dbabf2ef2518e43d5ec2bf0072d5bfd836e4604b4a7bcf9ecc13a4ee75ba742"
+    },
+    {
+      "path": "scripts/format-native.ts",
+      "size": 661,
+      "sha256": "5495689a27dd2a8b4d4c747b8290b5dd0b18620f9968a414b49cf994b0b56713"
+    },
+    {
+      "path": "scripts/pack-npm-package.ts",
+      "size": 4053,
+      "sha256": "5ebb808d150ea377b4ae377af0994db5eb5b7c4561547b625b303f8f5615398e"
+    },
+    {
+      "path": "scripts/sync-version.ts",
+      "size": 164,
+      "sha256": "d38e0c0569ad802e56b8cb6c4cb0c26e01ddda57f6d4ff2a997f13d5b1e942a7"
+    },
+    {
+      "path": "scripts/test-native.ts",
+      "size": 305,
+      "sha256": "1f1ea9fc2d5785eb9c0750ee613357ca653de05f73735b510343ec0dfcb7f807"
+    },
+    {
+      "path": "scripts/test-quickjs-app.ts",
+      "size": 1216,
+      "sha256": "1c6bf9960e8558b3fd3d8dd8643839edd438861a42630d89be3f8b4641171dc3"
+    },
+    {
+      "path": "scripts/typecheck-sfa.ts",
+      "size": 635,
+      "sha256": "c76034126868377f96e1227fb6b206f53c9b6d121398e6f0c7c2a5d670e67e14"
+    },
+    {
+      "path": "scripts/verify-demo-dev-endpoint.ts",
+      "size": 4123,
+      "sha256": "7eb4786e38f232fc5d74cf9c13c7146e1803abf05586f760dd25321c1731a8c0"
+    },
+    {
+      "path": "scripts/verify-live-hmr.ts",
+      "size": 3550,
+      "sha256": "7a135720552e6cd2f164a0fe58e572503a2eb7eebde774c53e39d91c70d5a8d9"
+    },
+    {
+      "path": "scripts/verify-native-fetchcontent.ts",
+      "size": 2479,
+      "sha256": "aa20e25449ee6d040a48422645fb104b6fdbf98bdfb947b1f2bb89d1cc8f07dd"
+    },
+    {
+      "path": "scripts/verify-npm-package.ts",
+      "size": 4832,
+      "sha256": "57c8e4507d78f7d4d8ede80104307521781282af232b5c198d27c0711089b56f"
+    },
+    {
+      "path": "scripts/verify-npm-registry-package.ts",
+      "size": 7272,
+      "sha256": "56f21a5a2496e7f6536591626ba87fc01ac76ff2c7c3ba5734e43f50e44d8b6c"
+    },
+    {
+      "path": "scripts/verify-version.ts",
+      "size": 416,
+      "sha256": "c733b0648f3dcc6611949930b14a1bcf3cf589105a39ad9bdacacf6d586cfe27"
+    },
+    {
+      "path": "scripts/version-contract.ts",
+      "size": 8033,
+      "sha256": "6e7adeaa8077f4aa003fa5438993ca25c51c4accb1b8798986f09deb4926314e"
+    },
+    {
+      "path": "tests/fixtures/package-consumer/check-entries.ts",
+      "size": 557,
+      "sha256": "bdafbd002a2fa5cc4f89651abb7d004fccf7a4622e1d3c58be1fbae0a514ebb2"
+    },
+    {
+      "path": "tests/fixtures/package-consumer/vite.config.ts",
+      "size": 539,
+      "sha256": "01ada3040a58f0c5511b6ff91b17f455b2a8f9090dac8e9a121331d4cc8963dc"
+    },
+    {
+      "path": "tests/fixtures/rearrange-runtime/FrameApp.sfa",
+      "size": 5718,
+      "sha256": "9cb36b859a95ab87ed69f57971efc6d24d0efe93918d7012029a1869dea3c645"
+    },
+    {
+      "path": "tests/fixtures/rearrange-runtime/main.ts",
+      "size": 113,
+      "sha256": "c331d1cf799003ce03a77b61fdcc93eb0ea52d891d5ead81d6dec93e9826a9dc"
+    },
+    {
+      "path": "tests/fixtures/rearrange-runtime/sfa.d.ts",
+      "size": 118,
+      "sha256": "feeefeb70cf5d7be7e60e6eea5607c6c69ec5e342c9ec7942703b6f2f5a4bc28"
+    },
+    {
+      "path": "tests/fixtures/viewport-runtime/ViewportApp.sfa",
+      "size": 1060,
+      "sha256": "e6815323c6ce6747f025c4539e92230cf35835287b64c1433a13e7a6119c1184"
+    },
+    {
+      "path": "tests/fixtures/viewport-runtime/main.ts",
+      "size": 123,
+      "sha256": "eef98f4b7cf7dce58b3e87d5cffd57a4341f1304acd3e62659c51d4e49cc5ba5"
+    },
+    {
+      "path": "tests/runtime/animation.test.ts",
+      "size": 16107,
+      "sha256": "fb3df211dc93acc6776f722dd65b04fd73d6c7b6b22874df9cc45583413a810f"
+    },
+    {
+      "path": "tests/runtime/format-code.test.ts",
+      "size": 2200,
+      "sha256": "f4247d5e298405f1dc177771f7a732070a074e6d8a6b47a7f7fe39d3f73508c7"
+    },
+    {
+      "path": "tests/runtime/frame-lifecycle.test.ts",
+      "size": 12462,
+      "sha256": "04175c89d65a72d027a09e43203d509667be4e943492b8cda1f87a283718340b"
+    },
+    {
+      "path": "tests/runtime/frameScope.ts",
+      "size": 749,
+      "sha256": "16625e50ccd9ebea4e1455609fff7baf1225802483b6fbb21d6bd7a0e5899a31"
+    },
+    {
+      "path": "tests/runtime/live-hmr.test.ts",
+      "size": 10683,
+      "sha256": "af8bf0e2981737418ae2007fa711ab0dbc496118a8b56d12da7c540d9b509e0d"
+    },
+    {
+      "path": "tests/runtime/m24-contract.test.ts",
+      "size": 37985,
+      "sha256": "79e894c4d494f6c45b8eb85541b89729122d7d4a7adb4a09abf04a27c326245f"
+    },
+    {
+      "path": "tests/runtime/module-boundaries.test.ts",
+      "size": 1261,
+      "sha256": "dad60b29665b20dd4d67a2d50af5ccbd32833800d6b1120075cf3fad4434ad57"
+    },
+    {
+      "path": "tests/runtime/native-composition.test.ts",
+      "size": 9947,
+      "sha256": "c2295b0e7c36d5d119f77642d9d6d242aa8d6b851535513b55f7701688bfa97c"
+    },
+    {
+      "path": "tests/runtime/public-api.test-d.ts",
+      "size": 5289,
+      "sha256": "e8b62df914c890ddd86a16ce6570f7b928ec7ffcf7e7bfededa035b36bca43b4"
+    },
+    {
+      "path": "tests/runtime/reactivity-core.test.ts",
+      "size": 7243,
+      "sha256": "feb65e305507f430e9362c56094cfba3a5125298dcf960eaa3463ac4faf1a6f9"
+    },
+    {
+      "path": "tests/runtime/rearrange-sfa.test.ts",
+      "size": 35784,
+      "sha256": "eb6c19e7624202731a5e6c6278c3e3e06756fe7e713239ee532f3d4cc53504cb"
+    },
+    {
+      "path": "tests/runtime/rearrange-transaction.test.ts",
+      "size": 14557,
+      "sha256": "5d7bd945a35f96dd5f0099a0955bed235eb1aaa1f4c943c729243d5f8187a61d"
+    },
+    {
+      "path": "tests/runtime/recordingNative.ts",
+      "size": 8342,
+      "sha256": "2d8d68df26a5c26b78fd49a1a1a5cf41628955c907e6d70b60cce318736c6756"
+    },
+    {
+      "path": "tests/runtime/sfaModules.ts",
+      "size": 1553,
+      "sha256": "e927f520e5c621224d1a799166363c785a7cb740285eed46adc85333283a546b"
+    },
+    {
+      "path": "tests/runtime/state.test.ts",
+      "size": 2611,
+      "sha256": "4a5456aabfaebbfb77456aee1416455f0f0243e6f5b784a498b64343a59e4aeb"
+    },
+    {
+      "path": "tests/runtime/third-part.test.ts",
+      "size": 26652,
+      "sha256": "996be6155fbe161d4b07fa501415014900c9367ba83b209bac59d045a9120e17"
+    },
+    {
+      "path": "tests/runtime/value-binding.test.ts",
+      "size": 14219,
+      "sha256": "96a9bcd0a6ecdda47de72b0971a7f3bc1ed21d868cd61fd400f1d932336c4f6d"
+    },
+    {
+      "path": "tests/runtime/vite-plugin.test.ts",
+      "size": 11924,
+      "sha256": "761007f990b0f7687adc0daf875536e5fea59508e75d0c7e2d9162206e25483d"
+    },
+    {
+      "path": "tests/runtime/vite-public-resources.test.ts",
+      "size": 6900,
+      "sha256": "5548ef4da154f0eb8e7c337b09bd332205cf30348b7546fcf65c272986015c61"
+    },
+    {
+      "path": "tsconfig.base.json",
+      "size": 233,
+      "sha256": "dd4a395d86b7dba47d0e1f2e4b0cb560e40e532915f46e3a6602c94e01a15b9b"
+    },
+    {
+      "path": "tsconfig.json",
+      "size": 1293,
+      "sha256": "8acbd40d760b2cec2f268356f992cda17d6f9d3c51fdcaf4859f87ee73824ca6"
+    },
+    {
+      "path": "types/arrange-globals.d.ts",
+      "size": 51,
+      "sha256": "054cf091399b9df257acb5af50a6fbf7ffaae93e60e6d42c2bde7cd3d3b97e8a"
+    }
+  ],
+  "initialCommit": "5b2e629ff01a7b98dcd216b2ea1e1f3760e1e90f",
+  "updatedAt": "2026-10-08T21:31:33.567Z",
+  "testPortabilityFix": "cpp_tests/arrange_local_work.cpp: uint32_t mutation indices"
+}

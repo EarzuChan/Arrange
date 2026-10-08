@@ -1,0 +1,994 @@
+{
+  "checkedAt": "2026-10-08T21:42:44.460Z",
+  "package": "@arrange/cli",
+  "version": "1.0.0",
+  "archive": {
+    "path": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-cli-1.0.0.tgz",
+    "sha256": "eaecc13c5fedd90f0dfc7d181bb2efad934bb53f6fc0d3e21931fbbf5f22be01",
+    "sha512Base64": "M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+    "integrity": "sha512-M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+    "bytes": 53947,
+    "entryCount": 75,
+    "entries": [
+      "package/dist/command/Adopt.js",
+      "package/dist/wizard/Adopt.js",
+      "package/dist/packing/ArtifactLocator.js",
+      "package/dist/command/Build.js",
+      "package/dist/building/BuildReceipt.js",
+      "package/dist/building/BuildService.js",
+      "package/dist/managed/CheckResult.js",
+      "package/dist/CliApplication.js",
+      "package/dist/CliEnvironment.js",
+      "package/dist/CliMetadata.js",
+      "package/dist/cmake/CmakeService.js",
+      "package/dist/cmake/CmakeStuffs.js",
+      "package/dist/sync/ConfigApplier.js",
+      "package/dist/sync/ConfigInteraction.js",
+      "package/dist/config/ConfigRegistry.js",
+      "package/dist/sync/ConfigResolver.js",
+      "package/dist/sync/ConfigScanner.js",
+      "package/dist/sync/ConfigScanReport.js",
+      "package/dist/sync/ConfigurationReadiness.js",
+      "package/dist/sync/ConfigWriter.js",
+      "package/dist/command/Create.js",
+      "package/dist/wizard/Create.js",
+      "package/dist/platform/CreatePlatformService.js",
+      "package/dist/project/CreateProject.js",
+      "package/dist/command/Dev.js",
+      "package/dist/building/DevService.js",
+      "package/dist/platform/DevSupervisor.js",
+      "package/dist/Entry.js",
+      "package/dist/platform/Executor.js",
+      "package/dist/util/FileTransaction.js",
+      "package/dist/util/FileUtils.js",
+      "package/dist/framework/FrameworkMamba.js",
+      "package/dist/framework/FrameworkRegistryClient.js",
+      "package/dist/framework/FrameworkService.js",
+      "package/dist/wizard/FrameworkVersion.js",
+      "package/dist/util/JsonFile.js",
+      "package/dist/managed/JsonRegion.js",
+      "package/dist/packing/MacBundleSigner.js",
+      "package/dist/platform/MacPlatformService.js",
+      "package/dist/managed/ManagedFile.js",
+      "package/dist/managed/ManageItems.js",
+      "package/dist/building/NativeBuildService.js",
+      "package/dist/node-js/NodeJsService.js",
+      "package/dist/node-js/NodeJsStuffs.js",
+      "package/dist/command/Package.js",
+      "package/dist/packing/Packer.js",
+      "package/dist/util/PlainDirectoryPath.js",
+      "package/dist/platform/PlatformService.js",
+      "package/dist/platform/ProcessSpec.js",
+      "package/dist/wizard/Project.js",
+      "package/dist/project/ProjectInitializer.js",
+      "package/dist/project/ProjectInteraction.js",
+      "package/dist/wizard/ProjectInteraction.js",
+      "package/dist/project/ProjectPaths.js",
+      "package/dist/project/ProjectService.js",
+      "package/dist/project/ProjectState.js",
+      "package/dist/project/ProjectStateStore.js",
+      "package/dist/util/PromptUtils.js",
+      "package/dist/wizard/Setup.js",
+      "package/dist/sync/SetupInteraction.js",
+      "package/dist/sync/SetupScanReport.js",
+      "package/dist/sync/SetupService.js",
+      "package/dist/project/StarterFiles.js",
+      "package/dist/command/Sync.js",
+      "package/dist/wizard/Sync.js",
+      "package/dist/sync/SyncService.js",
+      "package/dist/managed/TextCluster.js",
+      "package/dist/managed/TextRegion.js",
+      "package/dist/platform/ToolchainService.js",
+      "package/dist/platform/ToolLocator.js",
+      "package/dist/building/UiBuildService.js",
+      "package/dist/util/Utils.js",
+      "package/dist/platform/WindowsPlatformService.js",
+      "package/dist/managed/Wrapper.js",
+      "package/package.json"
+    ],
+    "tarEntryMode": "-rwxr-xr-x  0 0      0        1399 Oct 26  1985 package/dist/Entry.js",
+    "metadata": {
+      "name": "@arrange/cli",
+      "description": "The official CLI of Arrange",
+      "version": "1.0.0",
+      "compatibility": 1,
+      "private": false,
+      "type": "module",
+      "bin": {
+        "arrange": "./dist/Entry.js"
+      },
+      "scripts": {
+        "build": "node scripts/build.ts",
+        "test": "node --import tsx --test tests/*.test.ts",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "prepack": "npm run build"
+      },
+      "dependencies": {
+        "@clack/prompts": "^1.5.0",
+        "commander": "^15.0.0",
+        "vite": "8.0.16",
+        "yaml": "^2.9.0",
+        "zod": "^4.4.3"
+      },
+      "devDependencies": {
+        "@types/node": "^24.12.4",
+        "tsx": "4.22.3",
+        "typescript": "^5.9.0"
+      },
+      "license": "MIT",
+      "files": [
+        "dist"
+      ],
+      "publishConfig": {
+        "access": "public"
+      },
+      "engines": {
+        "node": ">=24"
+      }
+    },
+    "hashesMatchInstallationStart": true,
+    "allowedFilesOnly": true,
+    "allChecksPassed": true
+  },
+  "installation": {
+    "prefix": "/tmp/arrange-release-m24-WKbIAu/cli global prefix",
+    "canonicalPrefix": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix",
+    "workingDirectory": "/tmp/arrange-release-m24-WKbIAu/cli-work",
+    "npmGlobalInstall": true,
+    "newCache": "/tmp/arrange-release-m24-WKbIAu/cli-npm-cache-final-soBW0i",
+    "installExitCode": 0,
+    "installedPackageIsSymlink": false,
+    "filesEqualTar": true,
+    "files": [
+      {
+        "entry": "package/dist/command/Adopt.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Adopt.js",
+        "bytes": 2351,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "ca4fdd8a8ad94b985596a8ca0f207dc49195f2126783bf1146ca647e736bf01b"
+      },
+      {
+        "entry": "package/dist/wizard/Adopt.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/Adopt.js",
+        "bytes": 4494,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "55608ca7a89fb7b751fb105298f77ebf556bf987e8b228f3222341fee2b0384a"
+      },
+      {
+        "entry": "package/dist/packing/ArtifactLocator.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/packing/ArtifactLocator.js",
+        "bytes": 5904,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6def44807ba90a9e6a580bbe852668721b6ce44aee42470b065a4377996807b8"
+      },
+      {
+        "entry": "package/dist/command/Build.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Build.js",
+        "bytes": 1052,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6e38514d6415c99334053b41f2f2179c5a06728fccbd5478658304ebb6eaad2a"
+      },
+      {
+        "entry": "package/dist/building/BuildReceipt.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/building/BuildReceipt.js",
+        "bytes": 994,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "b39cbada3327c69da1a9e011370967807a00eb95ff5f3897ad36894e9c0ac696"
+      },
+      {
+        "entry": "package/dist/building/BuildService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/building/BuildService.js",
+        "bytes": 1533,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6b73ba8d5f669ab04a05af148e7c774a715f652f0c2fe0719413e2cc13c3dfa1"
+      },
+      {
+        "entry": "package/dist/managed/CheckResult.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/CheckResult.js",
+        "bytes": 11,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+      },
+      {
+        "entry": "package/dist/CliApplication.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/CliApplication.js",
+        "bytes": 4552,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "5456d774f583776eda1affe17564d7b79f8442a025fcbf807408aa9c3e4541bb"
+      },
+      {
+        "entry": "package/dist/CliEnvironment.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/CliEnvironment.js",
+        "bytes": 572,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "f34e089ebaa60c88b0deb6960ce3a741a736d8aba65c750b7f449b17887f6690"
+      },
+      {
+        "entry": "package/dist/CliMetadata.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/CliMetadata.js",
+        "bytes": 1638,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "95a9faa636cefd1e542b1d4b9acbcd9f795d70b7fc8ccb90d8a55ea2a29816d9"
+      },
+      {
+        "entry": "package/dist/cmake/CmakeService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/cmake/CmakeService.js",
+        "bytes": 14601,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "f1bb1a7536f827011ccc0bfd5ed6c4c2b4a1c12d3f3bd6894d6c308ef81fc726"
+      },
+      {
+        "entry": "package/dist/cmake/CmakeStuffs.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/cmake/CmakeStuffs.js",
+        "bytes": 4588,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "cb2487022d98dfffe5cfedc9cf277efd3405e41207a2c1c75eafc75b5ca4b975"
+      },
+      {
+        "entry": "package/dist/sync/ConfigApplier.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigApplier.js",
+        "bytes": 2574,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "200b063bc2889b9433eadca7c5ca0222a3ebfa419b67c97fa3840795a50a0c66"
+      },
+      {
+        "entry": "package/dist/sync/ConfigInteraction.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigInteraction.js",
+        "bytes": 11,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+      },
+      {
+        "entry": "package/dist/config/ConfigRegistry.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/config/ConfigRegistry.js",
+        "bytes": 2161,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "369903ccfc58d931954fcdb1acc3fd34a0b3bd8f4f1ade61b5e331309ef15e56"
+      },
+      {
+        "entry": "package/dist/sync/ConfigResolver.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigResolver.js",
+        "bytes": 6659,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "d175dee4b694dee431681700666a12b4bb646104ce12b127fe6a60588d85f03d"
+      },
+      {
+        "entry": "package/dist/sync/ConfigScanner.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigScanner.js",
+        "bytes": 5598,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "395ccfc01e5b2b0f005f70a973295f00a29a86565f4c30b7f8d60564441a73fe"
+      },
+      {
+        "entry": "package/dist/sync/ConfigScanReport.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigScanReport.js",
+        "bytes": 158,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "7bd4585fc634b01c4f7cd42adcc60e487814896661fef57d9d166b4dfaec7e2c"
+      },
+      {
+        "entry": "package/dist/sync/ConfigurationReadiness.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigurationReadiness.js",
+        "bytes": 534,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6350e8459b06c218ab56f21009f06fa8f5f1bb3686123d91cc3fd7fe3c74b0a0"
+      },
+      {
+        "entry": "package/dist/sync/ConfigWriter.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/ConfigWriter.js",
+        "bytes": 116,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "2aeff069974abc07dfcb18961b17ebb58d6656c9e9ba596eabb982ed0a62bd12"
+      },
+      {
+        "entry": "package/dist/command/Create.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Create.js",
+        "bytes": 2088,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "a4b691a058e5ac1c82fc4f2333406e2d9796eaaf94c8a2016edf13bb91dc7fd2"
+      },
+      {
+        "entry": "package/dist/wizard/Create.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/Create.js",
+        "bytes": 1994,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "f331ec4b87514006b649a24a8f037e716ec640a5484d631b55d5a5f153256df9"
+      },
+      {
+        "entry": "package/dist/platform/CreatePlatformService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/CreatePlatformService.js",
+        "bytes": 423,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "4f677a9801ffc4e9fd57de9052725ed11b81c98e981b926b596095c4ea3174fb"
+      },
+      {
+        "entry": "package/dist/project/CreateProject.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/CreateProject.js",
+        "bytes": 1551,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8675cfe3023e7b8d98291a40231a128b5f0990238b38d9d2c112c09a1e7ad9e6"
+      },
+      {
+        "entry": "package/dist/command/Dev.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Dev.js",
+        "bytes": 1073,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "a7091a00215f5f85b07a648260d33dcb8daac97c79fac5de6cf790ff0ee57dc8"
+      },
+      {
+        "entry": "package/dist/building/DevService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/building/DevService.js",
+        "bytes": 3396,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "fef1c6644323f09959789abf2a190419df21df3aadf5aa7414222616c71b208a"
+      },
+      {
+        "entry": "package/dist/platform/DevSupervisor.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/DevSupervisor.js",
+        "bytes": 6892,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "3461521beb09e6a96417abf42f9f259665c743168837298d547dda94781e8596"
+      },
+      {
+        "entry": "package/dist/Entry.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/Entry.js",
+        "bytes": 1399,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "1ba8ecc5872c2454bf3378410f5ce8374e74a10b6f5bafa4436c15fbaee4c033"
+      },
+      {
+        "entry": "package/dist/platform/Executor.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/Executor.js",
+        "bytes": 9472,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "50790e6ff9981550c1bb5812c88cf123b7e6f2c5a9c43af3e3f4a1a29ec0e870"
+      },
+      {
+        "entry": "package/dist/util/FileTransaction.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/FileTransaction.js",
+        "bytes": 4379,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "775394b290cf18c242311c886132535128795740947b68bb4081e041ac6ae1fc"
+      },
+      {
+        "entry": "package/dist/util/FileUtils.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/FileUtils.js",
+        "bytes": 580,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "373da6fc099845a73dacc9022fff705693c76a4494ec5ca85789e11e44deb460"
+      },
+      {
+        "entry": "package/dist/framework/FrameworkMamba.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/framework/FrameworkMamba.js",
+        "bytes": 777,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "070ff0afa356871dd5cfd9e12c813765d66670e5f6796a02b087949114603ab0"
+      },
+      {
+        "entry": "package/dist/framework/FrameworkRegistryClient.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/framework/FrameworkRegistryClient.js",
+        "bytes": 3785,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "f082818d9b9811dceba2f7796b7b340f5a304dac10c701c943e3515360597fb8"
+      },
+      {
+        "entry": "package/dist/framework/FrameworkService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/framework/FrameworkService.js",
+        "bytes": 2218,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "db61327c4bb2d5c4afc2d839f6a2794440ff87c7e8e3c7c3bad374321bbd3c85"
+      },
+      {
+        "entry": "package/dist/wizard/FrameworkVersion.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/FrameworkVersion.js",
+        "bytes": 7600,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6b27e93483e025bad015febc8083fb559524d6a5522b1d5ed4ff3956bfe567aa"
+      },
+      {
+        "entry": "package/dist/util/JsonFile.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/JsonFile.js",
+        "bytes": 822,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "133c5e62566833555a36957fcc48f7e6a5bf00810bee8c18aca63f0c39ee09b3"
+      },
+      {
+        "entry": "package/dist/managed/JsonRegion.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/JsonRegion.js",
+        "bytes": 2940,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "025c42bf1f9ec521b4a85eb84809fc69e7e2eea01444e6620589655d8ea4b717"
+      },
+      {
+        "entry": "package/dist/packing/MacBundleSigner.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/packing/MacBundleSigner.js",
+        "bytes": 3433,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "850fb1386d0f60705e621244857fa4864f38fd2fe3240d1f20ec083fa579fcd7"
+      },
+      {
+        "entry": "package/dist/platform/MacPlatformService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/MacPlatformService.js",
+        "bytes": 3597,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "6400c2d9a2cf398e7e9f6143d50b20dab4ece2482b829419043ddee6feed5768"
+      },
+      {
+        "entry": "package/dist/managed/ManagedFile.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/ManagedFile.js",
+        "bytes": 975,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "08b7dca15d639e29cef9531fbe60264a9fe035906e83f017dd44c91c8e0cfc65"
+      },
+      {
+        "entry": "package/dist/managed/ManageItems.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/ManageItems.js",
+        "bytes": 11,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+      },
+      {
+        "entry": "package/dist/building/NativeBuildService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/building/NativeBuildService.js",
+        "bytes": 492,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "f88be892f2c285fc56f4e8050945358fdfea679769306e4e2201e15c44d9a51e"
+      },
+      {
+        "entry": "package/dist/node-js/NodeJsService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/node-js/NodeJsService.js",
+        "bytes": 6530,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "5c1d8fa7179090efa0d7dd3a51b0f79aa312c64a5de23fc8b2070514ad896654"
+      },
+      {
+        "entry": "package/dist/node-js/NodeJsStuffs.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/node-js/NodeJsStuffs.js",
+        "bytes": 2417,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "cc72ef773e81155a75361ef3375e73d48c037b4db6490c2588fdb0f3ff279154"
+      },
+      {
+        "entry": "package/dist/command/Package.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Package.js",
+        "bytes": 948,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "bece17bf4553e87b3b2291fa2d717b696ddefc6a7f196dfd08272e183a1f67c6"
+      },
+      {
+        "entry": "package/dist/packing/Packer.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/packing/Packer.js",
+        "bytes": 15531,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "39696820f5eb43933c086bcea01b1c22323a03b02380581691b8503400ab5a17"
+      },
+      {
+        "entry": "package/dist/util/PlainDirectoryPath.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/PlainDirectoryPath.js",
+        "bytes": 1081,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "7101b7d345da1c5bf28ba99ed597be5922a0f17258bd3a213d4b08a26f7e6285"
+      },
+      {
+        "entry": "package/dist/platform/PlatformService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/PlatformService.js",
+        "bytes": 115,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "4765c44c29691d24e48c892d1be3a17a37e78060dc2c67388c2fd2947c160bb2"
+      },
+      {
+        "entry": "package/dist/platform/ProcessSpec.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/ProcessSpec.js",
+        "bytes": 249,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "ddc969831366d6629ccba0f021ec35a0b20493d6d1333424461c6b446ed2c25c"
+      },
+      {
+        "entry": "package/dist/wizard/Project.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/Project.js",
+        "bytes": 4837,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "88792f1484dd2e980970dd0e926e4d552928cbbab4b0053cd7e01cdfb957aabe"
+      },
+      {
+        "entry": "package/dist/project/ProjectInitializer.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectInitializer.js",
+        "bytes": 10207,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "1e401e7187d9ed12c9d4236568d6a272dd243a65d6b2a479f17d6f34af88a14c"
+      },
+      {
+        "entry": "package/dist/project/ProjectInteraction.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectInteraction.js",
+        "bytes": 59,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "59e0743e1a1b7832399351a4c43cdedb8b6f6ef9b94c3c3d585f3fa6b57de315"
+      },
+      {
+        "entry": "package/dist/wizard/ProjectInteraction.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/ProjectInteraction.js",
+        "bytes": 765,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "3b7e5f82a647fc31dfb3159b4aa3a50c63074d9b3f8ee913a91d9122b9342d58"
+      },
+      {
+        "entry": "package/dist/project/ProjectPaths.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectPaths.js",
+        "bytes": 1852,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "a083308029e3c36824e51673aaa9c4c150a8cf0d0f356f16fe2bbd602a558e00"
+      },
+      {
+        "entry": "package/dist/project/ProjectService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectService.js",
+        "bytes": 536,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "d8d2f7c436695c3109517b22bc642ea71a77f52745a6291dacfb25230b2f7f73"
+      },
+      {
+        "entry": "package/dist/project/ProjectState.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectState.js",
+        "bytes": 3226,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "96badc47c8b5fe863924cf61d6bad215800d3ce1a8a5a8d734c4a91e43416a31"
+      },
+      {
+        "entry": "package/dist/project/ProjectStateStore.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/ProjectStateStore.js",
+        "bytes": 3376,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "344402a8f80e875aaa0828e329ad2ea3ffb38d828fa620fe48cc7d3ed823a967"
+      },
+      {
+        "entry": "package/dist/util/PromptUtils.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/PromptUtils.js",
+        "bytes": 1202,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "4da8c1fc63bcc394b6f21a99c5d4eb78717a08e9f339f58c3ace75ae8a9820ae"
+      },
+      {
+        "entry": "package/dist/wizard/Setup.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/Setup.js",
+        "bytes": 1641,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "2fc11174c5b5137d14739e6307aeb96f87569805307d5ad70a9aab775a40dead"
+      },
+      {
+        "entry": "package/dist/sync/SetupInteraction.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/SetupInteraction.js",
+        "bytes": 11,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+      },
+      {
+        "entry": "package/dist/sync/SetupScanReport.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/SetupScanReport.js",
+        "bytes": 11,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+      },
+      {
+        "entry": "package/dist/sync/SetupService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/SetupService.js",
+        "bytes": 5323,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "cc955f62347be4bb67e8a9d0da023bac7cecfa21393ac8335ee27c9f8e06b754"
+      },
+      {
+        "entry": "package/dist/project/StarterFiles.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/project/StarterFiles.js",
+        "bytes": 6126,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "d0e8e0d0b93e88f0ce200f051db103740d675e9e2e3e8cae63f74a00896ff55f"
+      },
+      {
+        "entry": "package/dist/command/Sync.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/command/Sync.js",
+        "bytes": 873,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "209a11098605115b43dab1a94eb6afe3563b9f7d33ccaa5f69d86c2becd925f9"
+      },
+      {
+        "entry": "package/dist/wizard/Sync.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/wizard/Sync.js",
+        "bytes": 1780,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "e42b406948cf0ee09f3eacb25a6fc11346c6a6bc6857f17a5c8267a7efbd0526"
+      },
+      {
+        "entry": "package/dist/sync/SyncService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/sync/SyncService.js",
+        "bytes": 4494,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "9fb6ae52f9897fab825afeeda75a43c4f12499644309224b4db7c9989ed782d6"
+      },
+      {
+        "entry": "package/dist/managed/TextCluster.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/TextCluster.js",
+        "bytes": 597,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "e5d0d47a7214e6b91d118335be2d584e9f304c63d6859bb7941fa29311e5c29d"
+      },
+      {
+        "entry": "package/dist/managed/TextRegion.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/TextRegion.js",
+        "bytes": 1337,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "9a1e82ae194bb0233cd91a23791a0770cabf205c4ecaa1e3dc36de03badaff4c"
+      },
+      {
+        "entry": "package/dist/platform/ToolchainService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/ToolchainService.js",
+        "bytes": 4555,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "bdb6dfe02de002ab6fc7652aff1cb6060ae09a746d0f0924853bc41ae4136687"
+      },
+      {
+        "entry": "package/dist/platform/ToolLocator.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/ToolLocator.js",
+        "bytes": 1283,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "0e62e7268288b4f34067a008286d2e5f33493c5b3418633e1efa0b858fb2ff67"
+      },
+      {
+        "entry": "package/dist/building/UiBuildService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/building/UiBuildService.js",
+        "bytes": 277,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "a3c4361c3d4893422e4ebd01e6957f748877d4da7ea86810d6ab89f9c2024a7e"
+      },
+      {
+        "entry": "package/dist/util/Utils.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/util/Utils.js",
+        "bytes": 823,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "9995e4b38b211fb59fab46792645ddf0d996157c35c05ceaadaf944e640fe708"
+      },
+      {
+        "entry": "package/dist/platform/WindowsPlatformService.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/platform/WindowsPlatformService.js",
+        "bytes": 5489,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "fb8a78e7febcad8d52ee7f6f0fa0451337a03c3cc615411bbc2c8fd3a8417dab"
+      },
+      {
+        "entry": "package/dist/managed/Wrapper.js",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/managed/Wrapper.js",
+        "bytes": 3039,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "20c71e031ffd52a8171cff9421de008213229d54c525efa309a45a0dbb4b7130"
+      },
+      {
+        "entry": "package/package.json",
+        "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/package.json",
+        "bytes": 798,
+        "equalsTar": true,
+        "isSymlink": false,
+        "sha256": "3369048991e682b423bb1161efeb4df5a44a633a6cf164172b1eaf6e11202002"
+      }
+    ],
+    "productionDependencies": [
+      {
+        "name": "@clack/prompts",
+        "required": "^1.5.0",
+        "version": "1.8.1",
+        "resolved": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/node_modules/@clack/prompts/dist/index.mjs",
+        "insideIsolatedPrefix": true
+      },
+      {
+        "name": "commander",
+        "required": "^15.0.0",
+        "version": "15.0.0",
+        "resolved": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/node_modules/commander/index.js",
+        "insideIsolatedPrefix": true
+      },
+      {
+        "name": "vite",
+        "required": "8.0.16",
+        "version": "8.0.16",
+        "resolved": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/node_modules/vite/dist/node/index.js",
+        "insideIsolatedPrefix": true
+      },
+      {
+        "name": "yaml",
+        "required": "^2.9.0",
+        "version": "2.9.1",
+        "resolved": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/node_modules/yaml/dist/index.js",
+        "insideIsolatedPrefix": true
+      },
+      {
+        "name": "zod",
+        "required": "^4.4.3",
+        "version": "4.6.5",
+        "resolved": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/node_modules/zod/index.cjs",
+        "insideIsolatedPrefix": true
+      }
+    ],
+    "npmLsExitCode": 0,
+    "dependencyProblems": [],
+    "unresolvedRelativeImports": [],
+    "relativeImportValidation": {
+      "method": "TypeScript JS AST (actual imports/exports/literal dynamic imports only)",
+      "checkedRelativeImports": 172,
+      "parseErrors": [],
+      "parserIsAuditOnly": true
+    }
+  },
+  "bin": {
+    "path": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/bin/arrange",
+    "isSymlink": true,
+    "symlinkTarget": "../lib/node_modules/@arrange/cli/dist/Entry.js",
+    "resolvedPath": "/private/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli/dist/Entry.js",
+    "entryMode": "755",
+    "shebang": "#!/usr/bin/env node"
+  },
+  "runtime": {
+    "nodeEnvironment": {
+      "version": "v24.19.0",
+      "execPath": "/Users/earzuchan/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "stdinIsTTY": true,
+      "stdoutIsTTY": true,
+      "cwd": "/private/tmp/arrange-release-m24-WKbIAu/cli-work"
+    },
+    "help": {
+      "exitCode": 0,
+      "containsCommands": true
+    },
+    "version": {
+      "exitCode": 0,
+      "output": "1.0.0"
+    },
+    "nonTty": {
+      "exitCode": 1,
+      "signal": null,
+      "message": "[ArrangeCLI] Arrange CLI 需要交互终端，stdin 和 stdout 都必须连接 TTY；请在 Windows 或 macOS 终端运行"
+    }
+  },
+  "productionAudit": {
+    "method": "Independent production-only package-lock from exact final CLI tgz; npm audit --omit=dev against public npm registry",
+    "directory": "/tmp/arrange-release-m24-WKbIAu/cli-production-audit-final",
+    "lockExitCode": 0,
+    "auditExitCode": 0,
+    "candidateIntegrity": "sha512-M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+    "candidateIntegrityMatchesTar": true,
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "dependencyCount": {
+      "prod": 24,
+      "dev": 0,
+      "optional": 33,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 56
+    },
+    "installedRuntimeVersionsCoveredByAuditLock": true,
+    "installedRuntimeVersions": [
+      {
+        "name": "@arrange/cli",
+        "version": "1.0.0"
+      },
+      {
+        "name": "@clack/prompts",
+        "version": "1.8.1"
+      },
+      {
+        "name": "@clack/core",
+        "version": "1.5.1"
+      },
+      {
+        "name": "fast-wrap-ansi",
+        "version": "0.2.2"
+      },
+      {
+        "name": "sisteransi",
+        "version": "1.0.5"
+      },
+      {
+        "name": "fast-string-width",
+        "version": "3.0.2"
+      },
+      {
+        "name": "fast-string-truncated-width",
+        "version": "3.0.3"
+      },
+      {
+        "name": "fast-wrap-ansi",
+        "version": "0.2.2"
+      },
+      {
+        "name": "fast-string-width",
+        "version": "3.0.2"
+      },
+      {
+        "name": "sisteransi",
+        "version": "1.0.5"
+      },
+      {
+        "name": "commander",
+        "version": "15.0.0"
+      },
+      {
+        "name": "vite",
+        "version": "8.0.16"
+      },
+      {
+        "name": "lightningcss",
+        "version": "1.33.0"
+      },
+      {
+        "name": "detect-libc",
+        "version": "2.1.2"
+      },
+      {
+        "name": "lightningcss-darwin-arm64",
+        "version": "1.33.0"
+      },
+      {
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "name": "postcss",
+        "version": "8.5.29"
+      },
+      {
+        "name": "nanoid",
+        "version": "3.3.20"
+      },
+      {
+        "name": "picocolors",
+        "version": "1.1.1"
+      },
+      {
+        "name": "source-map-js",
+        "version": "1.2.2"
+      },
+      {
+        "name": "rolldown",
+        "version": "1.0.3"
+      },
+      {
+        "name": "@oxc-project/types",
+        "version": "0.133.0"
+      },
+      {
+        "name": "@rolldown/binding-darwin-arm64",
+        "version": "1.0.3"
+      },
+      {
+        "name": "@rolldown/pluginutils",
+        "version": "1.0.1"
+      },
+      {
+        "name": "tinyglobby",
+        "version": "0.2.17"
+      },
+      {
+        "name": "fdir",
+        "version": "6.5.0"
+      },
+      {
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "name": "yaml",
+        "version": "2.9.1"
+      },
+      {
+        "name": "yaml",
+        "version": "2.9.1"
+      },
+      {
+        "name": "zod",
+        "version": "4.6.5"
+      }
+    ],
+    "versionsMissingFromAuditLock": []
+  },
+  "evidence": [
+    "cli-global-install-final.json",
+    "cli-global-install-final.log",
+    "cli-dependencies-final.json",
+    "cli-node24-pty-environment-final.log",
+    "cli-node24-pty-help-final.log",
+    "cli-node24-pty-version-final.log",
+    "cli-non-tty-final.log",
+    "cli-production-audit-final.json",
+    "cli-production-audit-final/package-lock.json",
+    "verify-cli-installation-final.cjs"
+  ],
+  "boundaries": {
+    "realGlobalInstallationChanged": false,
+    "sourceOrLockfilesChanged": false,
+    "productionPublish": false,
+    "windowsRealMachineValidated": false
+  },
+  "allChecksPassed": true
+}

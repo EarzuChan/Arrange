@@ -1,6 +1,7 @@
 import { cancel, isCancel, text } from "@clack/prompts"
+import { ProjectInteractionCancelled as PromptCancelled } from "../project/ProjectInteraction.ts"
 
-export class PromptCancelled extends Error { }
+export { ProjectInteractionCancelled as PromptCancelled } from "../project/ProjectInteraction.ts"
 
 export async function requiredText(label: string, options: {
     readonly placeholder?: string
@@ -13,7 +14,7 @@ export async function requiredText(label: string, options: {
         initialValue: options.initialValue,
         validate: (input) => {
             const trimmed = input?.trim() ?? ""
-            if (trimmed.length === 0) return "Required."
+            if (trimmed.length === 0) return "此项必填"
             return options.validate?.(trimmed)
         },
     })
@@ -23,11 +24,11 @@ export async function requiredText(label: string, options: {
 }
 
 export function validateSemver(value: string): string | undefined {
-    return semverPattern.test(value) ? undefined : "Enter a valid semver version, for example 0.1.0."
+    return semverPattern.test(value) ? undefined : "请输入有效的 SemVer 版本，例如 0.1.0"
 }
 
 export function validateFourCharCode(value: string): string | undefined {
-    return codePattern.test(value) ? undefined : "Enter exactly four ASCII letters or digits."
+    return codePattern.test(value) ? undefined : "请输入恰好四个 ASCII 字母或数字"
 }
 
 const semverPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/

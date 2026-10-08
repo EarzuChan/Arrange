@@ -1,0 +1,20 @@
+{
+    "platform": "darwin",
+    "architecture": "arm64",
+    "project": "AcceptancePlugin",
+    "version": "1.2.3",
+    "products": [
+        {
+            "product": "standalone",
+            "path": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/standalone/AcceptancePlugin.app",
+            "uiHash": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "signatureVerified": true
+        },
+        {
+            "product": "vst3",
+            "path": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/vst3/AcceptancePlugin.vst3",
+            "uiHash": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "signatureVerified": true
+        }
+    ]
+}

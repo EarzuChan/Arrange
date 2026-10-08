@@ -1,23 +1,10 @@
 import { errorMessage } from "../util/Utils.ts"
-import { readFile, stat } from "node:fs/promises"
 import type { ProjectState } from "../project/ProjectState.ts"
-import { TextCluster } from "./TextCluster.ts"
+import type { TextCluster } from "./TextCluster.ts"
 import { JsonRegion, setJsonPath, type JsonValue } from "./JsonRegion.ts"
+import type { FileCheckResult } from "./CheckResult.ts"
 
 export type ConfigScope = "Global" | "UI" | "Native"
-
-async function readText(path: string) {
-    try {
-        if (!(await stat(path)).isFile()) return { kind: "Fatal" as const, cause: "read-error", message: "目标不是文件" }
-
-        return { kind: "Idle" as const, text: await readFile(path, "utf8") }
-    } catch (error) {
-        const missing = (error as NodeJS.ErrnoException).code === "ENOENT"
-        return missing ? { kind: "Resolvable" as const, cause: "missing" as const, message: "文件不存在" } : { kind: "Fatal" as const, cause: "read-error", message: errorMessage(error) }
-    }
-}
-
-// 以前是自己的check只对自己负责。现在是还会级联探索子级。这不能说不干净，但也是某种设计😂
 
 export abstract class TextFile {
     readonly kind = "text-file"
@@ -30,13 +17,8 @@ export abstract class TextFile {
 
     abstract make(state: ProjectState): string
 
-    async check(state: ProjectState, path: string) {
-        const result = await readText(path)
-        if (result.kind !== "Idle") return result
-
-        const clusters = this.clusters.filter(cluster => cluster.regions.some(region => region.enabled(state))).map(cluster => ({ cluster, result: cluster.check(state, result.text) }))
-
-        return { kind: "Idle" as const, text: result.text, clusters }
+    check(_state: ProjectState, content: string | null): FileCheckResult<string> {
+        return content === null ? { kind: "Resolvable", cause: "missing", message: "文件不存在" } : { kind: "Idle", value: content }
     }
 }
 
@@ -59,16 +41,9 @@ export abstract class JsonFile {
         return `${JSON.stringify(json, null, 2)}\n`
     }
 
-    async check(state: ProjectState, path: string) {
-        const result = await readText(path)
-        if (result.kind !== "Idle") return result
-
-        let json: JsonValue
-        try { json = JSON.parse(result.text) } catch (error) { return { kind: "Fatal" as const, cause: "unparsable", message: errorMessage(error) } }
-
-        const regions = this.regions.filter(region => region.enabled(state)).map(region => ({ region, result: region.check(state, json) }))
-
-        return { kind: "Idle" as const, text: result.text, regions }
+    check(_state: ProjectState, content: string | null): FileCheckResult<JsonValue> {
+        if (content === null) return { kind: "Resolvable", cause: "missing", message: "文件不存在" }
+        try { return { kind: "Idle", value: JSON.parse(content) as JsonValue } } catch (error) { return { kind: "Fatal", cause: "unparsable", message: errorMessage(error) } }
     }
 }
 

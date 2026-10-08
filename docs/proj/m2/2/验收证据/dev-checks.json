@@ -1,0 +1,45 @@
+{
+    "date": "2026-10-09",
+    "project": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces",
+    "sourceCliModes": [
+        {
+            "mode": "debug",
+            "window": "AcceptancePlugin [Debug live]",
+            "liveModules": 37,
+            "hmrModules": 1,
+            "hmrBodyTitle": "LiveHmrChecked",
+            "counterBeforeAndAfterHmr": 14
+        },
+        {
+            "mode": "debug-native-only",
+            "window": "AcceptancePlugin [Debug dist fallback]",
+            "viteLaunched": false,
+            "distFallback": true
+        },
+        {
+            "mode": "release",
+            "window": "AcceptancePlugin",
+            "bodyTitle": "LiveHmrChecked",
+            "viteLaunched": false,
+            "packedDist": true
+        }
+    ],
+    "sourceCliSigintExitCodes": [
+        0,
+        0,
+        0
+    ],
+    "finalInstalledCli": {
+        "registryServerStopped": true,
+        "debugLive": true,
+        "liveModules": 37,
+        "window": "AcceptancePlugin [Debug live]",
+        "sigintExitCode": 0,
+        "childrenStopped": true
+    },
+    "portsClosed": [
+        9178,
+        49681
+    ],
+    "automatedCounterClickVerified": false
+}

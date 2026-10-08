@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-08T21:00:38.875Z",
+  "processes": [],
+  "ports": {
+    "9178": {
+      "responding": false,
+      "reason": "ECONNREFUSED"
+    },
+    "49372": {
+      "responding": false,
+      "reason": "ECONNREFUSED"
+    }
+  },
+  "normalNativeExits": [
+    {
+      "case": "manual Live",
+      "code": 0
+    },
+    {
+      "case": "manual Release Dist",
+      "code": 0
+    }
+  ],
+  "sigintExits": [
+    {
+      "case": "adopt Live",
+      "code": 0
+    },
+    {
+      "case": "manual native-only Debug",
+      "code": 0
+    }
+  ],
+  "originalDemoAndLegacyScriptsGitDiff": "empty"
+}

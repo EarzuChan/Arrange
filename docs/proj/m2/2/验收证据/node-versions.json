@@ -1,0 +1,44 @@
+{
+    "date": "2026-10-09",
+    "os": "27.2",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v26.5.0",
+    "node24": "v24.19.0",
+    "node24CompiledEntryHelpExit": 0,
+    "xcode": "Xcode 27.0\nBuild version 27A5237l",
+    "localTools": {
+        "node": {
+            "path": "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+            "version": "26.5.0"
+        },
+        "packageManager": {
+            "path": "/opt/homebrew/bin/npm",
+            "version": "11.17.0"
+        },
+        "cmake": {
+            "path": "/usr/local/bin/cmake",
+            "version": "4.2.0"
+        },
+        "nativeCompiler": {
+            "path": "/Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++",
+            "version": "Apple clang version 21.0.0 (clang-2100.3.30.1)"
+        },
+        "ninja": {
+            "path": "/opt/homebrew/bin/ninja",
+            "version": "1.13.2"
+        },
+        "native": {
+            "generator": "Ninja",
+            "architecture": "arm64",
+            "developerDirectory": "/Applications/Xcode-beta.app/Contents/Developer",
+            "cmakeDefinitions": {
+                "FETCHCONTENT_SOURCE_DIR_ARRANGE": "/Users/earzuchan/Documents/Sources/ArrangeReal",
+                "JUCE_DIR": "/tmp/arrange-cli-acceptance-5jdrde/dependencies/JUCE",
+                "ARRANGE_QUICKJS_NG_SOURCE_DIR": "/tmp/arrange-cli-acceptance-5jdrde/dependencies/quickjs-ng"
+            }
+        }
+    },
+    "frameworkVersion": "0.0.0-m.2.2",
+    "cliVersion": "1.0.1"
+}

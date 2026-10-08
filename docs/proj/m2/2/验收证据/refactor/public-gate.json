@@ -1,0 +1,33 @@
+[
+    {
+        "args": [
+            "--help"
+        ],
+        "exitCode": 1,
+        "stderr": "[ArrangeCLI] Arrange CLI 需要交互终端，stdin 和 stdout 都必须连接 TTY；请在 Windows 或 macOS 终端运行"
+    },
+    {
+        "args": [
+            "--version"
+        ],
+        "exitCode": 1,
+        "stderr": "[ArrangeCLI] Arrange CLI 需要交互终端，stdin 和 stdout 都必须连接 TTY；请在 Windows 或 macOS 终端运行"
+    },
+    {
+        "args": [
+            "sync",
+            "--scan",
+            "--config"
+        ],
+        "exitCode": 1,
+        "stderr": "[ArrangeCLI] Arrange CLI 需要交互终端，stdin 和 stdout 都必须连接 TTY；请在 Windows 或 macOS 终端运行"
+    },
+    {
+        "args": [
+            "build",
+            "--ui-only"
+        ],
+        "exitCode": 1,
+        "stderr": "[ArrangeCLI] Arrange CLI 需要交互终端，stdin 和 stdout 都必须连接 TTY；请在 Windows 或 macOS 终端运行"
+    }
+]

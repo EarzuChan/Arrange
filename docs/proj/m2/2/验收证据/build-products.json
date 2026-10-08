@@ -1,0 +1,138 @@
+[
+    {
+        "directory": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/debug/1.2.3/macos-arm64/standalone",
+        "manifest": {
+            "format": 1,
+            "project": "AcceptancePlugin",
+            "version": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "nativeTarget": "AcceptancePlugin",
+            "flavor": "debug",
+            "platform": "darwin",
+            "architecture": "arm64",
+            "product": "standalone",
+            "binary": "AcceptancePlugin.app/Contents/MacOS/AcceptancePlugin",
+            "ui": "AcceptancePlugin.app/Contents/Resources/ui",
+            "binarySha256": "1f8caddf04e96cc14cf40bda66ff23970e582c7a0bcb9e43dc09fc8f8433effe",
+            "uiEntrySha256": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "buildRecords": {
+                "ui": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2"
+                },
+                "native": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2",
+                    "target": "AcceptancePlugin",
+                    "products": [
+                        "standalone",
+                        "vst3"
+                    ]
+                }
+            }
+        },
+        "architectures": "arm64"
+    },
+    {
+        "directory": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/debug/1.2.3/macos-arm64/vst3",
+        "manifest": {
+            "format": 1,
+            "project": "AcceptancePlugin",
+            "version": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "nativeTarget": "AcceptancePlugin",
+            "flavor": "debug",
+            "platform": "darwin",
+            "architecture": "arm64",
+            "product": "vst3",
+            "binary": "AcceptancePlugin.vst3/Contents/MacOS/AcceptancePlugin",
+            "ui": "AcceptancePlugin.vst3/Contents/Resources/ui",
+            "binarySha256": "a5983c03509a29956db5f65b3c9f85cefa0b92328941c1799ffffb71f020a4ab",
+            "uiEntrySha256": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "buildRecords": {
+                "ui": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2"
+                },
+                "native": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2",
+                    "target": "AcceptancePlugin",
+                    "products": [
+                        "standalone",
+                        "vst3"
+                    ]
+                }
+            }
+        },
+        "architectures": "arm64"
+    },
+    {
+        "directory": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/standalone",
+        "manifest": {
+            "format": 1,
+            "project": "AcceptancePlugin",
+            "version": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "nativeTarget": "AcceptancePlugin",
+            "flavor": "release",
+            "platform": "darwin",
+            "architecture": "arm64",
+            "product": "standalone",
+            "binary": "AcceptancePlugin.app/Contents/MacOS/AcceptancePlugin",
+            "ui": "AcceptancePlugin.app/Contents/Resources/ui",
+            "binarySha256": "29974e8290199a3271eb3947b79ec8b69df0f1c6aa4401d4cb173be77de06d80",
+            "uiEntrySha256": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "buildRecords": {
+                "ui": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2"
+                },
+                "native": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2",
+                    "target": "AcceptancePlugin",
+                    "products": [
+                        "standalone",
+                        "vst3"
+                    ]
+                }
+            }
+        },
+        "architectures": "arm64"
+    },
+    {
+        "directory": "/tmp/arrange-cli-acceptance-5jdrde/project with spaces/artifacts/release/1.2.3/macos-arm64/vst3",
+        "manifest": {
+            "format": 1,
+            "project": "AcceptancePlugin",
+            "version": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "nativeTarget": "AcceptancePlugin",
+            "flavor": "release",
+            "platform": "darwin",
+            "architecture": "arm64",
+            "product": "vst3",
+            "binary": "AcceptancePlugin.vst3/Contents/MacOS/AcceptancePlugin",
+            "ui": "AcceptancePlugin.vst3/Contents/Resources/ui",
+            "binarySha256": "013f978b15365931d808eba79011e040b040c2a9a1575ec1d49b12be75270767",
+            "uiEntrySha256": "0b597483e2d134ff51d4ffb33aa6608596bf7af5574130d47d7821b48259b4a7",
+            "buildRecords": {
+                "ui": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2"
+                },
+                "native": {
+                    "projectVersion": "1.2.3",
+                    "frameworkVersion": "0.0.0-m.2.2",
+                    "target": "AcceptancePlugin",
+                    "products": [
+                        "standalone",
+                        "vst3"
+                    ]
+                }
+            }
+        },
+        "architectures": "arm64"
+    }
+]

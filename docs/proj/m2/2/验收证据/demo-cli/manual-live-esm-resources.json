@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "modules": [
+    {
+      "url": "/src/resource-probe/imported.svg?import",
+      "source": "export default \"data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20width='24'%20height='24'%3e%3cpath%20fill='%23000000'%20d='M8%205v14l11-7z'%20/%3e%3c/svg%3e\"",
+      "map": null
+    },
+    {
+      "url": "/src/resource-probe/logo 中文.png?import",
+      "source": "export default \"/src/resource-probe/logo%20%E4%B8%AD%E6%96%87.png\"",
+      "map": null
+    }
+  ],
+  "uiDistExists": false,
+  "rawBundleUiExists": false
+}

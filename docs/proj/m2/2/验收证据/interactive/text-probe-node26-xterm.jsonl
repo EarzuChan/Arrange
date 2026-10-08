@@ -1,0 +1,6 @@
+{"event":"start","node":"v26.5.0","executable":"/opt/homebrew/Cellar/node/26.5.0/bin/node","stdinTTY":true,"stdoutTTY":true}
+{"event":"data","codes":[127]}
+{"event":"keypress","inputCodes":[127],"key":{"sequence":"","name":"backspace","ctrl":false,"meta":false,"shift":false}}
+{"event":"data","codes":[13]}
+{"event":"keypress","inputCodes":[13],"key":{"sequence":"\r","name":"return","ctrl":false,"meta":false,"shift":false}}
+{"event":"result","value":"Prob","codes":[80,114,111,98]}

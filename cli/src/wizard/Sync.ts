@@ -1,10 +1,11 @@
 import { confirm, isCancel, log, select } from "@clack/prompts"
 import { targetLabel, type ConfigScanReport, type ResolvableIssue } from "../sync/ConfigScanReport.ts"
 import type { ResolveChoice } from "../sync/ConfigResolver.ts"
+import type { ConfigInteraction } from "../sync/ConfigInteraction.ts"
 
 const labels: Record<ResolveChoice, string> = { create: "确认创建", wrap: "给已有内容补 Wrapper", marker: "放置 Marker，新建内容", edit: "手动编辑修复", abort: "放弃同步" }
 
-export class SyncWizard {
+export class SyncWizard implements ConfigInteraction {
     report(report: ConfigScanReport): void {
         console.log('[ArrangeCLI]', `CONFIG ${report.scope}`)
         for (const issue of report.fatal) console.log('[ArrangeCLI]', `  Fatal ${issue.path}: ${issue.cause} — ${issue.message}`)
@@ -15,10 +16,6 @@ export class SyncWizard {
     }
 
     async choose(issue: ResolvableIssue, choices: readonly ResolveChoice[]): Promise<ResolveChoice> {
-        if (!process.stdin.isTTY || !process.stdout.isTTY) {
-            console.error('[ArrangeCLI]', "需要交互处理，请在终端运行 sync --config。")
-            return "abort"
-        }
         const result = await select({ message: `${targetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({ value, label: labels[value] })) })
         return isCancel(result) ? "abort" : result
     }
@@ -30,4 +27,5 @@ export class SyncWizard {
     }
 
     message(message: string): void { console.log('[ArrangeCLI]', message) }
+    failure(message: string): void { console.error('[ArrangeCLI]', message) }
 }

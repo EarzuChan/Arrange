@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-08T21:42:27.578Z",
+  "installedCli": "/tmp/arrange-release-m24-WKbIAu/cli global prefix/lib/node_modules/@arrange/cli",
+  "rootDir": "/tmp/arrange-release-m24-WKbIAu/cli generated UI final deps project",
+  "tests": [
+    {
+      "name": "SFA脚本类型损坏",
+      "expectedFailure": true,
+      "error": "UI 构建失败，退出码 1",
+      "receipt": {
+        "projectVersion": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.4",
+        "status": "failed",
+        "error": "UI 构建失败，退出码 1"
+      }
+    },
+    {
+      "name": "构建脚本未生成约定app.js",
+      "expectedFailure": true,
+      "error": "ENOENT: no such file or directory, stat '/private/tmp/arrange-release-m24-WKbIAu/cli generated UI final deps project/ui/dist/app.js'",
+      "receipt": {
+        "projectVersion": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.4",
+        "status": "failed",
+        "error": "ENOENT: no such file or directory, stat '/private/tmp/arrange-release-m24-WKbIAu/cli generated UI final deps project/ui/dist/app.js'"
+      }
+    },
+    {
+      "name": "恢复正确源码与Vite配置",
+      "status": "completed",
+      "receipt": {
+        "projectVersion": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.4",
+        "path": "/private/tmp/arrange-release-m24-WKbIAu/cli generated UI final deps project/ui/dist",
+        "status": "completed"
+      }
+    }
+  ],
+  "allChecksPassed": true
+}

@@ -1,0 +1,9 @@
+{
+  "frameworkVersion": "0.0.0-m.2.4",
+  "vite": "8.0.16",
+  "sourceMap": "1.2.2",
+  "installedTarFiles": 125,
+  "integrityMatchesTar": true,
+  "lockIntegrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+  "uiDistExistsBeforeDev": false
+}

@@ -72,7 +72,9 @@ Arrange 工具链应在开发期诊断：
 
 # 资源处理
 
-Vite 侧资源引用优先使用 ESM import；`public/` 里的文件原样复制到输出包根。C++ 只负责按已解析资源引用读取 UI package 内文件，不单独维护第二套资源图。
+Vite 侧资源引用优先使用 ESM import；`public/` 里的文件在构建时原样复制到输出包根，在 Live 时由开发服务提供。Vite 负责将导入解析成资源地址或内联图片；C++ 获取层消费解析结果，不单独维护第二套资源图。
+
+资源来源跟随实际加载成功的 App source，而非构建 flavor。Live 注入当前已配置开发服务的资源获取器；Dist 注入 UI package 文件获取器。两者共享后台加载、图片与 SVG 解码、不可变结果、Painter 状态与生命周期处理，资源读取不进入音频线程或绘制阶段。共享 worker 由 JUCE GUI 关闭流程在消息线程销毁前收回，SVG 消息锁响应任务取消；Mac 每个任务独立释放平台临时对象，运行时退休和应用退出都属于加载生命周期。
 
 资源引用形态：
 
@@ -81,21 +83,30 @@ import logo from "./assets/logo.png"
 import play from "./assets/play.svg"
 ```
 
-Painter 获取层接收以下 package 内资源地址：
+Painter 获取层接收以下资源引用：
 
 - Vite 产出的资源字符串。
 - 显式 `{ path: string }` 资源引用。
 - 指向 UI package 内资源的字符串路径。
+- Vite 产出的 SVG、PNG、JPEG、GIF `data:` 地址；Live 与 Dist 共用内联解码，不发起网络请求。默认字节预算为 16 MiB。
 
-字符串路径规则：
+Dist 字符串路径规则：
 
-- `"/logo.png"` 表示 UI package root 下的 `logo.png`。
-- `"assets/logo.png"` 表示 UI package root 下的相对路径。
+- `"/logo.png"` 表示 UI package root 下的资源 URL：去掉 URL 查询和片段后，单次解码百分号编码，再检查文件边界。Vite 非内联资源中编码后的空格、中文与百分号由此对应实际文件名。
+- `"assets/logo.png"` 表示 UI package root 下的字面相对文件路径；不将其百分号或问号重新解释为 URL 编码或查询。
 - 禁止绝对文件系统路径。
 - 禁止 `../` 逃逸 UI package。
 - 禁止隐式相对当前工作目录查找。
-- 默认不加载远程网络资源；未来若支持 remote resource，必须单独设计缓存、错误、权限和诊断。
+- 不加载网络资源；Live 网络读取是显式选择开发服务后的独立来源能力。
 - 默认不读取用户数据目录、开发者自定义缓存目录或任意外部路径；这类能力必须进入单独的数据、缓存与权限设计。
+
+Live 地址规则：
+
+- 相对地址和以 `/` 开头的地址由已配置开发服务解析；包括 Vite 导出的源码资源地址及查询参数。
+- 绝对 HTTP(S) 地址必须属于同一服务 origin；跨 origin、文件系统地址、路径逃逸和重定向均拒绝。
+- 网络获取在后台执行，检查 HTTP 状态、超时与内容大小；默认字节预算为 16 MiB，每次 HTTP 执行的连接与读取总时限最多 5 秒（可选择更短），不包含后台线程池排队。错误保留资源地址和原因，进入同一 Painter 失败与源码诊断路径。
+- Live 资源不从 Dist 补读，避免热更新模块与旧包内图片混用；源回退到 Dist 后改用包内获取器。
+- ESM 资源更新沿 Vite 模块热更新重新获取；配置的 `publicDir` 内文件增删修改发出标准完整重载，监听随该服务关闭而清理。不开第二套资源图或持久网络缓存。已退休请求的迟到结果不得发布到新一代 Painter。
 
 位图与 SVG 均由 Painter 获取层解析。Image/Icon 只消费 Painter；固有尺寸、绘制、失败与退休规则见 [内建 Arrangable](12-内建Arrangable.md)。
 

@@ -5,19 +5,16 @@ import type { TextCluster } from "../managed/TextCluster.ts"
 import type { TextRegion } from "../managed/TextRegion.ts"
 import { ConfigWriter } from "./ConfigWriter.ts"
 import type { ConfigTarget, ConfigScanReport, ResolvableIssue } from "./ConfigScanReport.ts"
-import type { SyncWizard } from "../wizard/Sync.ts"
+import type { ConfigInteraction, ResolveChoice } from "./ConfigInteraction.ts"
 
-export type ResolveChoice = "create" | "wrap" | "marker" | "edit" | "abort"
+export type { ResolveChoice } from "./ConfigInteraction.ts"
 type TextElement = TextCluster | TextRegion
 
-// 这个Resolve的实现有点化简——把所有的情形先混为一谈，再分类产出方——而不是干干净净的先产出方再看类型。虽然说能跑。
-
 export class ConfigResolver {
-    private readonly writer = new ConfigWriter()
-
-    constructor(private readonly syncWizard: SyncWizard) { }
+    constructor(private readonly writer: ConfigWriter, private readonly syncWizard: ConfigInteraction, private readonly signal: AbortSignal) { }
 
     async resolve(state: ProjectState, report: ConfigScanReport, guards: readonly FileSnapshot[]): Promise<"abort" | "rescan" | "ready-to-apply"> {
+        this.signal.throwIfAborted()
         if (report.fatal.length) return "abort"
 
         const issue = report.resolvable[0]
@@ -31,7 +28,7 @@ export class ConfigResolver {
 
         if (choice === "abort") return "abort"
 
-        return await this.syncWizard.edit(`请编辑 ${issue.target.path}，修复：${issue.message}`) ? "rescan" : "abort"
+        return await this.edit(`请编辑 ${issue.target.path}，修复：${issue.message}`) ? "rescan" : "abort"
     }
 
     private async resolveMissing(state: ProjectState, issue: ResolvableIssue, guards: readonly FileSnapshot[]): Promise<"abort" | "rescan"> {
@@ -53,13 +50,13 @@ export class ConfigResolver {
 
     private async wrapExisting(issue: ResolvableIssue, textElement: TextElement): Promise<"abort" | "rescan"> {
         const instructions = `请在 ${issue.target.path} 的已有内容前后各加一行：\n${textElement.wrapper.begin}\n原有内容\n${textElement.wrapper.end}`
-        return await this.syncWizard.edit(instructions) ? "rescan" : "abort"
+        return await this.edit(instructions) ? "rescan" : "abort"
     }
 
     private async insertMarker(state: ProjectState, issue: ResolvableIssue, textElement: TextElement, guards: readonly FileSnapshot[]): Promise<"abort" | "rescan"> {
         const target = issue.target
         const instructions = `请在 ${target.path} 的${target.region ? "所属 Cluster inner" : "文件"}中新建位置放一行：\n${textElement.wrapper.marker}`
-        if (!await this.syncWizard.edit(instructions)) return "abort"
+        if (!await this.edit(instructions)) return "abort"
         try { await assertSnapshots(guards) } catch { return "rescan" }
         const before = await readSnapshot(target.path)
         if (before.content === null) return "rescan"
@@ -137,9 +134,18 @@ export class ConfigResolver {
     }
 
     private async choose(issue: ResolvableIssue, choices: readonly ResolveChoice[]): Promise<ResolveChoice> {
+        this.signal.throwIfAborted()
         const choice = await this.syncWizard.choose(issue, choices)
+        this.signal.throwIfAborted()
         if (choice === "abort") return "abort"
         if (!choices.includes(choice)) throw new Error("无效的恢复选项")
         return choice
+    }
+
+    private async edit(instructions: string): Promise<boolean> {
+        this.signal.throwIfAborted()
+        const edited = await this.syncWizard.edit(instructions)
+        this.signal.throwIfAborted()
+        return edited
     }
 }

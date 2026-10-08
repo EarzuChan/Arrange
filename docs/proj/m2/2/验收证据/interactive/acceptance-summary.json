@@ -1,0 +1,89 @@
+{
+    "date": "2026-10-09",
+    "registry": "http://127.0.0.1:59991",
+    "create": {
+        "exitCode": 0,
+        "root": "/private/tmp/arrange-cli-acceptance-5jdrde/interactive/create-case/PtyCreated",
+        "projectName": "PtyCreated",
+        "frameworkVersion": "0.0.0-m.2.2",
+        "nativeTarget": "PtyCreated",
+        "products": [
+            "standalone",
+            "vst3"
+        ],
+        "managedItems": "all",
+        "subdirectorySelected": true,
+        "postCreateSync": "No",
+        "log": "/tmp/arrange-cli-acceptance-5jdrde/interactive/create-terminal.log"
+    },
+    "adopt": {
+        "exitCode": 0,
+        "root": "/private/tmp/arrange-cli-acceptance-5jdrde/interactive/adopt-case",
+        "ui": "copy",
+        "native": "copy",
+        "nativeTarget": "PtyCreated",
+        "managedItems": "all",
+        "config": {
+            "fatal": 0,
+            "resolvable": 0,
+            "idle": 15,
+            "applicable": 0
+        },
+        "postAdoptSetup": "No",
+        "log": "/tmp/arrange-cli-acceptance-5jdrde/interactive/adopt-terminal.log"
+    },
+    "copiedFiles": {
+        "ui": {
+            "fileCount": 7,
+            "allBytesIdentical": true
+        },
+        "native": {
+            "fileCount": 3,
+            "allBytesIdentical": true
+        }
+    },
+    "initialization": {
+        "create": {
+            "status": "complete",
+            "copyCount": 0,
+            "localConfigurationAbsent": true,
+            "nodeModulesAbsent": true,
+            "cmakeBuildAbsent": true
+        },
+        "adopt": {
+            "status": "complete",
+            "copyCount": 2,
+            "localConfigurationAbsent": true,
+            "nodeModulesAbsent": true,
+            "cmakeBuildAbsent": true
+        }
+    },
+    "observations": [
+        "Framework menu shows LATEST and the identical exact version; functional, slightly redundant; framework prompt remains English",
+        "UI package name ptycreated is suggested; source shared project name PtyCreated was explicitly entered to keep existing managed regions idle",
+        "Default test PTY TERM=dumb inserts DEL into text on both Node24.18 and Node26.5; TERM=xterm-256color restores expected backspace on bundled Node24.19 and Node26.5; no CLI source defect",
+        "CR submit, arrow menus, No skipping optional setup, and Ctrl+C cancellation work"
+    ],
+    "inputProbe": {
+        "emittedCodePoints": [
+            127
+        ],
+        "observedKeyName": "backspace",
+        "termDumbResults": {
+            "node24.18": "Probe + DEL",
+            "node26.5": "Probe + DEL"
+        },
+        "termXtermResults": {
+            "node24.19": "Prob",
+            "node26.5": "Prob"
+        },
+        "probeFiles": [
+            "text-probe-node24-xterm.jsonl",
+            "text-probe-node24.jsonl",
+            "text-probe-node26-xterm.jsonl",
+            "text-probe-node26.jsonl"
+        ],
+        "cancelledCreateLeftDirectoryEmpty": true
+    },
+    "fullMacToolchainValidationIncluded": false
+}

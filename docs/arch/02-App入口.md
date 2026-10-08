@@ -54,6 +54,7 @@ config.app.useLive("http://host:port");
 - `useLive(...)` 的参数可缺省，缺省时使用 `http://127.0.0.1:9178`。
 - `useDist(path)` 的相对路径由 AppResolver 在运行期按发布包根解析；缺省时等同 `ui/`。
 - `useDist(...)` 不依赖源码文件位置，也不依赖 DAW 当前工作目录。
+- 实际 Live 源的图片与图标也由该开发服务提供，实际 Dist 源的资源由 UI package 提供；内联图片与具体地址规则见[资源契约](14-工具链与App发布包.md#资源处理)。
 - Debug Demo 推荐同时配置 `useLive()` 与 `useDist()`。
 - Release 推荐只配置 `useDist(...)`。
 
@@ -140,6 +141,5 @@ Standalone 应尽量完整尊重这些配置；插件宿主中按宿主允许范
 - 实现上可分 Runtime、SceneHost、VBlankSource adapter、SceneFramePipeline 与 passive paint adapter。
 - 加载 source 必须显式、可诊断、可重试。
 - 必要运行信息写在代码里；工程编排、构建与打包由 Arrange CLI 处理。
-
 
 

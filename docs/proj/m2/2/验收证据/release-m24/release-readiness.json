@@ -1,0 +1,79 @@
+{
+  "status": "passed",
+  "framework": "0.0.0-m.2.4",
+  "cli": "1.0.0",
+  "protocolCode": 5,
+  "cliCompatibility": 1,
+  "platform": "darwin-arm64",
+  "checks": {
+    "rootTests": 178,
+    "cliTests": 188,
+    "cppTests": 17,
+    "directProductionNativeSmokes": 7,
+    "typechecks": "root/CLI/SFA passed",
+    "format": "TS284/native177 passed",
+    "frameworkTarFilesByteEqual": 125,
+    "cliTarFilesByteEqual": 75,
+    "cliRelativeImportsResolved": 172,
+    "node24InstalledCli": "PTY help/version and installed UI create/setup/build passed; non-TTY refused",
+    "frameworkProductionAudit": 0,
+    "cliProductionAudit": 0,
+    "workspaceAudit": 0,
+    "demoProducts": 4,
+    "demoProductStrictSignatures": 4,
+    "demoDebugLiveAndHmr": "passed",
+    "demoReleaseDist": "passed",
+    "publishDryRun": "both passed, integrity equals frozen tarballs",
+    "publishedTarLocalTestPathLeaks": 0
+  },
+  "artifacts": [
+    {
+      "name": "@arrange/framework",
+      "version": "0.0.0-m.2.4",
+      "tag": "m",
+      "tarball": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-framework-0.0.0-m.2.4.tgz",
+      "sha256": "fed388c25df9e4fb8fc16d0faf2c8f4d29adff2f814beafc3b9f8749be741511",
+      "integrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+      "publishDryRunExit": 0,
+      "dryRunMatchesTar": true,
+      "files": 125
+    },
+    {
+      "name": "@arrange/cli",
+      "version": "1.0.0",
+      "tag": "latest",
+      "tarball": "/Users/earzuchan/Documents/Sources/ArrangeReal/artifacts/npm/arrange-cli-1.0.0.tgz",
+      "sha256": "eaecc13c5fedd90f0dfc7d181bb2efad934bb53f6fc0d3e21931fbbf5f22be01",
+      "integrity": "sha512-M76iLqrAC5BlNzkmDLFwBqpvPpAfDEcDvV1F4yGfurPasjIuOzeTKGTXY2+oWkP9fxOKLR/Y4BhRPycY4aGZJA==",
+      "publishDryRunExit": 0,
+      "dryRunMatchesTar": true,
+      "files": 75
+    }
+  ],
+  "nativeCandidateCommit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+  "temporaryRoot": "/tmp/arrange-release-m24-WKbIAu",
+  "cleanup": {
+    "portsClosed": {
+      "9178": true,
+      "54225": true
+    },
+    "demoNativeProcesses": 0,
+    "debugDevExit": 0,
+    "releaseDevExit": 0,
+    "registryStopped": true
+  },
+  "productionPublished": false,
+  "originalCommitOrTagCreated": false,
+  "windowsRealMachineTested": false,
+  "vst3DawHostTested": false,
+  "formalDemoMigrated": false,
+  "nativeEvidence": "native-release-verification.json",
+  "nativeFinalCTestSeconds": 22.32,
+  "workspaceSecurityVersions": {
+    "vite": "8.0.16",
+    "source-map-js": "1.2.2",
+    "esbuild": "0.28.2",
+    "sass>immutable": "5.1.8"
+  },
+  "finalArtifactHashesRechecked": true
+}

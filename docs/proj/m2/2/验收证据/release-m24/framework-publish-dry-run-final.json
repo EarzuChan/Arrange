@@ -1,0 +1,646 @@
+{
+  "@arrange/framework": {
+    "id": "@arrange/framework@0.0.0-m.2.4",
+    "name": "@arrange/framework",
+    "version": "0.0.0-m.2.4",
+    "size": 164744,
+    "unpackedSize": 690434,
+    "shasum": "3ebd60b65e5346e33cb2baac884036196944f839",
+    "integrity": "sha512-0+yVHlbZk8D2gSOLoNxeEjofFg1+cjphw52eei9nQTc0TFR0QxfHZXtCE3be/rtrmZtt3cGKJN9QaDsIiKSL1A==",
+    "filename": "arrange-framework-0.0.0-m.2.4.tgz",
+    "files": [
+      {
+        "path": "node_modules/@arrange/compiler/package.json",
+        "size": 879,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/ast.ts",
+        "size": 4643,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/babelUtils.ts",
+        "size": 13102,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/codegen.ts",
+        "size": 15738,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/compile.ts",
+        "size": 393,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/errors.ts",
+        "size": 3061,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/index.ts",
+        "size": 456,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/options.ts",
+        "size": 1681,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/parser.ts",
+        "size": 24764,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/runtimeHelpers.ts",
+        "size": 197,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/tokenizer.ts",
+        "size": 34479,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/transform.ts",
+        "size": 509,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/transforms/transformExpression.ts",
+        "size": 11734,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/unitSyntax.ts",
+        "size": 7554,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/core/utils.ts",
+        "size": 1345,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/cache.ts",
+        "size": 166,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/compileScript.ts",
+        "size": 23336,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/compileTemplate.ts",
+        "size": 3865,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/index.ts",
+        "size": 424,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/lowerValues.ts",
+        "size": 55815,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/parse.ts",
+        "size": 4222,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/analyzeScriptBindings.ts",
+        "size": 753,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/context.ts",
+        "size": 4709,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/defineProps.ts",
+        "size": 9785,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/definePropsDestructure.ts",
+        "size": 8468,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/resolveType.ts",
+        "size": 69370,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/script/utils.ts",
+        "size": 3667,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/valueContracts.ts",
+        "size": 9373,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/valueUnits.ts",
+        "size": 22138,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/sfa/warn.ts",
+        "size": 452,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/template/index.ts",
+        "size": 833,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/template/parserOptions.ts",
+        "size": 234,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/compiler/src/template/templateContract.ts",
+        "size": 4063,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/package.json",
+        "size": 479,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/README.md",
+        "size": 330,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/arrayInstrumentations.ts",
+        "size": 8769,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/baseHandlers.ts",
+        "size": 6378,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/collectionHandlers.ts",
+        "size": 10319,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/computed.ts",
+        "size": 3347,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/constants.ts",
+        "size": 441,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/dep.ts",
+        "size": 8385,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/effect.ts",
+        "size": 12414,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/effectScope.ts",
+        "size": 5259,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/index.ts",
+        "size": 1693,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/reactive.ts",
+        "size": 6030,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/ref.ts",
+        "size": 10267,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/warning.ts",
+        "size": 329,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/reactivity/src/watch.ts",
+        "size": 9149,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/package.json",
+        "size": 440,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/README.md",
+        "size": 335,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/build-globals.d.ts",
+        "size": 438,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/codeframe.ts",
+        "size": 1753,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/featureFlags.ts",
+        "size": 252,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/general.ts",
+        "size": 3249,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/globalsAllowList.ts",
+        "size": 375,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/hostSchema.ts",
+        "size": 1307,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/index.ts",
+        "size": 261,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/makeMap.ts",
+        "size": 185,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/typeUtils.ts",
+        "size": 110,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/shared/src/unitContract.ts",
+        "size": 3044,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/package.json",
+        "size": 726,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/constraints.ts",
+        "size": 524,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/index.ts",
+        "size": 411,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/module-snapshot.ts",
+        "size": 4876,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/plugin.ts",
+        "size": 3699,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/public-resource-hmr.ts",
+        "size": 964,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/sfa-hmr.ts",
+        "size": 7526,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/sfa.ts",
+        "size": 2924,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/source-map.ts",
+        "size": 1155,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/transform.ts",
+        "size": 1199,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/typecheck.ts",
+        "size": 7292,
+        "mode": 420
+      },
+      {
+        "path": "node_modules/@arrange/vite-plugin/src/types.ts",
+        "size": 2146,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 1523,
+        "mode": 420
+      },
+      {
+        "path": "src/animation/index.ts",
+        "size": 82,
+        "mode": 420
+      },
+      {
+        "path": "src/animation/value.ts",
+        "size": 22835,
+        "mode": 420
+      },
+      {
+        "path": "src/app.ts",
+        "size": 4383,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/ImageAndIcon.ts",
+        "size": 2013,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/Layout.ts",
+        "size": 2257,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/LayoutingArrangables.ts",
+        "size": 3355,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/TextAndInput.ts",
+        "size": 2841,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/ToolArrangables.ts",
+        "size": 1405,
+        "mode": 420
+      },
+      {
+        "path": "src/arrangable/TransitionArrangables.ts",
+        "size": 5990,
+        "mode": 420
+      },
+      {
+        "path": "src/color.ts",
+        "size": 399,
+        "mode": 420
+      },
+      {
+        "path": "src/density.ts",
+        "size": 1525,
+        "mode": 420
+      },
+      {
+        "path": "src/diagnostics.ts",
+        "size": 2435,
+        "mode": 420
+      },
+      {
+        "path": "src/foundation.ts",
+        "size": 229,
+        "mode": 420
+      },
+      {
+        "path": "src/hotRuntime.ts",
+        "size": 10546,
+        "mode": 420
+      },
+      {
+        "path": "src/index.ts",
+        "size": 1607,
+        "mode": 420
+      },
+      {
+        "path": "src/internal.ts",
+        "size": 495,
+        "mode": 420
+      },
+      {
+        "path": "src/measurePolicy.ts",
+        "size": 2112,
+        "mode": 420
+      },
+      {
+        "path": "src/modifier.ts",
+        "size": 11765,
+        "mode": 420
+      },
+      {
+        "path": "src/native.ts",
+        "size": 3428,
+        "mode": 420
+      },
+      {
+        "path": "src/painter.ts",
+        "size": 3384,
+        "mode": 420
+      },
+      {
+        "path": "src/primitives.ts",
+        "size": 5080,
+        "mode": 420
+      },
+      {
+        "path": "src/rearrangeNode.ts",
+        "size": 13421,
+        "mode": 420
+      },
+      {
+        "path": "src/resolveUnits.ts",
+        "size": 9136,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/animationOwner.ts",
+        "size": 1055,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/apiDefineArrangable.ts",
+        "size": 2745,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/apiInject.ts",
+        "size": 1188,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/apiLifecycle.ts",
+        "size": 1939,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/apiSetupHelpers.ts",
+        "size": 3442,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/apiWatch.ts",
+        "size": 4747,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/arrangable.ts",
+        "size": 3803,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/arrangableHmr.ts",
+        "size": 7888,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/arrangableProps.ts",
+        "size": 12442,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/arrangableSlots.ts",
+        "size": 73,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/enums.ts",
+        "size": 344,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/errorHandling.ts",
+        "size": 1730,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/executionStats.ts",
+        "size": 680,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/frameDeadline.ts",
+        "size": 1396,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/helpers/resolveAssets.ts",
+        "size": 596,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/helpers/useId.ts",
+        "size": 247,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/index.ts",
+        "size": 1453,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/internal.ts",
+        "size": 585,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/propDeclarations.ts",
+        "size": 3440,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/rearrange.ts",
+        "size": 40026,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/rearrangeNode.ts",
+        "size": 736,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/scheduler.ts",
+        "size": 8376,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/valueBinding.ts",
+        "size": 4651,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime/warning.ts",
+        "size": 511,
+        "mode": 420
+      },
+      {
+        "path": "src/state.ts",
+        "size": 1774,
+        "mode": 420
+      },
+      {
+        "path": "src/ui.ts",
+        "size": 346,
+        "mode": 420
+      },
+      {
+        "path": "src/unit.ts",
+        "size": 672,
+        "mode": 420
+      },
+      {
+        "path": "src/version.ts",
+        "size": 95,
+        "mode": 420
+      },
+      {
+        "path": "src/vite.ts",
+        "size": 220,
+        "mode": 420
+      }
+    ],
+    "entryCount": 125,
+    "bundled": [
+      "@arrange/compiler",
+      "@arrange/reactivity",
+      "@arrange/shared",
+      "@arrange/vite-plugin"
+    ]
+  }
+}

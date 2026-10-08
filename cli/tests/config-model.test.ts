@@ -1,15 +1,30 @@
-import { registry } from "../src/managed/ManageItems.ts"
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { readFile, rm } from "node:fs/promises"
+import { writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { configRegistry, createConfigRegistry } from "../src/config/ConfigRegistry.ts"
 import { Wrapper } from "../src/managed/Wrapper.ts"
+import { TextFile, JsonFile } from "../src/managed/ManagedFile.ts"
+import { TextCluster } from "../src/managed/TextCluster.ts"
 import { TextRegion } from "../src/managed/TextRegion.ts"
 import { JsonRegion, readJsonPath, setJsonPath, type JsonValue, type JsonExpected } from "../src/managed/JsonRegion.ts"
 import { registryRegion, registryCluster } from "../src/node-js/NodeJsStuffs.ts"
 
 import { projectDefinitionSchema } from "../src/project/ProjectState.ts"
-import { stateFor } from "./fixture.ts"
+import { fixture, stateFor, write } from "./fixture.ts"
+import { pluginVersionRegion } from "../src/cmake/CmakeStuffs.ts"
+import { ConfigScanner } from "../src/sync/ConfigScanner.ts"
 
 const state = stateFor("unused")
+const registry = configRegistry.items.find(item => item.id === registryRegion.managedItemId)!
+
+test("JUCE 插件版本使用 SemVer 数字核心，共享版本保留预发布与构建信息", () => {
+    const project = stateFor("unused")
+    project.project.project.version = "1.2.3-beta.4+local.7"
+    assert.match(pluginVersionRegion.make(project), /VERSION "1\.2\.3"/)
+    assert.equal(project.project.project.version, "1.2.3-beta.4+local.7")
+})
 
 test("文本位置是父级相对的 outer/inner，支持嵌套、中文及 CRLF", () => {
     const text = `前缀🙂\n${registryCluster.make(state)}后缀\n`
@@ -138,4 +153,127 @@ test("同级 Wrapper 嵌套不得提供可重叠的更新区间", () => {
     const text = a.make(b.make("body\n"))
     assert.equal(a.locate(text).kind, "damaged")
     assert.equal(b.locate(text).kind, "damaged")
+})
+
+function definitions() {
+    const region = new class extends TextRegion {
+        readonly id = "test.value"
+        readonly managedItemId = "test.setting"
+        checks = 0
+        protected override makeInner(): string { return "new\n" }
+        override check(state: Parameters<TextRegion["check"]>[0], inner: string) {
+            this.checks++
+            return super.check(state, inner)
+        }
+    }()
+    const cluster = new class extends TextCluster {
+        readonly id = "test.cluster"
+        readonly regions = [region]
+        protected override makeInner(input: typeof state): string { return region.make(input) }
+    }()
+    const file = new class extends TextFile {
+        readonly id = "test.file"
+        readonly scope = "UI"
+        readonly clusters = [cluster]
+        override path(input: typeof state): string { return resolve(input.rootDir, "owned.txt") }
+        override make(input: typeof state): string { return cluster.make(input) }
+    }()
+    return { file, cluster, region, metadata: [{ id: region.managedItemId, label: "测试配置" }] }
+}
+
+test("File 与 Cluster 纯自检不调用子级，父结构有效时子级仍可独立报损坏", () => {
+    const { file, cluster, region } = definitions()
+    const input = stateFor("不存在的路径")
+    input.project["managed-items"] = [region.managedItemId]
+    const text = cluster.wrapper.make(`${region.wrapper.begin}\n损坏子级\n`)
+    assert.deepEqual(file.check(input, null), { kind: "Resolvable", cause: "missing", message: "文件不存在" })
+    assert.deepEqual(file.check(input, text), { kind: "Idle", value: text })
+    const parent = cluster.check(input, text)
+    assert.equal(parent.kind, "Idle")
+    assert.equal("regions" in parent, false)
+    assert.equal(region.checks, 0)
+    if (parent.kind !== "Idle") return
+    assert.equal(region.check(input, text.slice(parent.location.inner.start, parent.location.inner.end)).kind, "Resolvable")
+    assert.equal(region.checks, 1)
+    assert.equal(cluster.check(input, "没有父级 Wrapper").kind, "Resolvable")
+    assert.equal(region.checks, 1)
+})
+
+test("JsonFile 只解析自身，合法 JSON 中缺失字段由 JsonRegion 独立检查", () => {
+    let checks = 0
+    const region = new class extends JsonRegion {
+        readonly id = "test.json"
+        readonly managedItemId = "test.setting"
+        protected readonly path = ["value"]
+        protected override makeValue(): JsonExpected { return "desired" }
+        override check(input: typeof state, json: JsonValue) {
+            checks++
+            return super.check(input, json)
+        }
+    }()
+    const file = new class extends JsonFile {
+        readonly id = "test.json-file"
+        readonly scope = "UI"
+        readonly regions = [region]
+        override path(): string { return "从未读取的文件.json" }
+        protected override makeContent(): JsonValue { return {} }
+    }()
+    assert.equal(file.check(state, null).kind, "Resolvable")
+    assert.equal(file.check(state, "{").kind, "Fatal")
+    const parsed = file.check(state, "{}")
+    assert.deepEqual(parsed, { kind: "Idle", value: {} })
+    assert.equal(checks, 0)
+    if (parsed.kind !== "Idle") return
+    assert.equal(region.check(state, parsed.value).kind, "Resolvable")
+    assert.equal(checks, 1)
+})
+
+test("注册只声明物理树和逻辑元数据，关联自动派生且错误在注册时拒绝", () => {
+    const { file, cluster, region, metadata } = definitions()
+    const registered = createConfigRegistry([file], metadata)
+    assert.deepEqual(registered.items, [{ ...metadata[0], regions: [region] }])
+    assert.deepEqual(registered.files, [file])
+    const projectName = configRegistry.items.find(item => item.id === "project.name")!
+    assert.deepEqual(projectName.regions.map(region => region.kind).sort(), ["json-region", "text-region"])
+    assert.throws(() => createConfigRegistry([file, file], metadata), /File 重复/)
+    assert.throws(() => createConfigRegistry([file], [...metadata, ...metadata]), /ManagedItem 重复/)
+    assert.throws(() => createConfigRegistry([file], []), /未知 ManagedItem/)
+    assert.throws(() => createConfigRegistry([], metadata), /缺少物理 Region/)
+    const other = new class extends TextFile {
+        readonly id = "other"
+        readonly scope = "Native"
+        readonly clusters = [cluster]
+        override path(): string { return "other.txt" }
+        override make(input: typeof state): string { return cluster.make(input) }
+    }()
+    assert.throws(() => createConfigRegistry([file, other], metadata), /Region 物理归属冲突/)
+})
+
+test("Scanner 使用一次读取的共享快照与绝对坐标，父级缺失时不检查子 Region", async t => {
+    const input = await fixture(t, false)
+    const { file, cluster, region, metadata } = definitions()
+    input.project["managed-items"] = [region.managedItemId]
+    const scanner = new ConfigScanner(createConfigRegistry([file], metadata))
+    await write(file.path(input), "没有 Cluster\n")
+    assert.equal((await scanner.scan(input, "UI")).resolvable.length, 1)
+    assert.equal(region.checks, 0)
+    const original = `前缀🙂\r\n${cluster.wrapper.make(region.wrapper.make("old\n"))}`
+    await write(file.path(input), original)
+    const check = cluster.check.bind(cluster)
+    cluster.check = (state, text) => {
+        writeFileSync(file.path(state), "并发修改的新内容\n")
+        return check(state, text)
+    }
+    const report = await scanner.scan(input, "UI")
+    assert.equal(report.applicable.length, 1)
+    assert.equal(region.checks, 1)
+    const update = report.applicable[0]
+    assert.equal(update.target.snapshot.content, original)
+    for (const idle of report.idle) assert.equal(idle.target.snapshot, update.target.snapshot)
+    assert.equal(update.kind, "text")
+    if (update.kind === "text") assert.equal(original.slice(update.span.start, update.span.end), "old\n")
+    assert.equal(await readFile(file.path(input), "utf8"), "并发修改的新内容\n")
+    await rm(file.path(input))
+    assert.equal((await scanner.scan(input, "UI")).resolvable.length, 1)
+    assert.equal(region.checks, 1)
 })

@@ -1,0 +1,266 @@
+{
+  "checkedAt": "2026-10-08T20:59:02.719Z",
+  "projectDirectory": "/tmp/arrange-demo-cli-icPpq0/adopt project",
+  "finalState": "frozen-native-both-flavors-completed-two-product-receipts-and-clean-packages",
+  "parallelLevel": 4,
+  "registryAvailable": false,
+  "uiPreparation": "original business sources and public resources restored by root; final UI dist provided by root",
+  "frameworkIntegrityEvidence": "package-resource-integrity.json",
+  "managedScan": {
+    "evidence": "adopt-final-config-scan.json",
+    "counts": {
+      "Fatal": 0,
+      "Resolvable": 0,
+      "Idle": 15,
+      "Applicable": 0
+    }
+  },
+  "records": [
+    {
+      "flavor": "debug",
+      "nativeBuildExitCode": 0,
+      "cleanPackageExitCode": 0,
+      "buildLog": "adopt-final-native-debug.log",
+      "packageLog": "adopt-final-package-debug.log",
+      "nativeReceipt": {
+        "projectVersion": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.2",
+        "target": "ArrangeDemoPlugin",
+        "products": [
+          "standalone",
+          "vst3"
+        ],
+        "configuration": "Debug",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "status": "completed"
+      },
+      "packageManifest": {
+        "format": 1,
+        "project": "ArrangeDemoAdopt",
+        "version": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.2",
+        "flavor": "debug",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "buildRecords": {
+          "ui": {
+            "projectVersion": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2"
+          },
+          "native": {
+            "projectVersion": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "target": "ArrangeDemoPlugin",
+            "products": [
+              "standalone",
+              "vst3"
+            ]
+          }
+        },
+        "products": [
+          {
+            "product": "standalone",
+            "path": "standalone/ArrangeDemoAdopt.app",
+            "binary": "standalone/ArrangeDemoAdopt.app/Contents/MacOS/ArrangeDemoAdopt",
+            "ui": "standalone/ArrangeDemoAdopt.app/Contents/Resources/ui"
+          },
+          {
+            "product": "vst3",
+            "path": "vst3/ArrangeDemoAdopt.vst3",
+            "binary": "vst3/ArrangeDemoAdopt.vst3/Contents/MacOS/ArrangeDemoAdopt",
+            "ui": "vst3/ArrangeDemoAdopt.vst3/Contents/Resources/ui"
+          }
+        ]
+      },
+      "products": [
+        {
+          "product": "standalone",
+          "path": "standalone/ArrangeDemoAdopt.app",
+          "binary": "standalone/ArrangeDemoAdopt.app/Contents/MacOS/ArrangeDemoAdopt",
+          "ui": "standalone/ArrangeDemoAdopt.app/Contents/Resources/ui",
+          "signatureExitCode": 0,
+          "signatureStdout": "",
+          "signatureStderr": "",
+          "uiFilePathsEqual": true,
+          "files": [
+            {
+              "relative": "app.js",
+              "bytes": 152647,
+              "equalsUiDist": true,
+              "sha256": "fab6a212000efef55bd7d2e5338a7c656cc48c4b5ffcdce42cc7ccc1f80e92e1"
+            },
+            {
+              "relative": "icons/play.svg",
+              "bytes": 134,
+              "equalsUiDist": true,
+              "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd"
+            },
+            {
+              "relative": "logo.png",
+              "bytes": 2408,
+              "equalsUiDist": true,
+              "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+            }
+          ]
+        },
+        {
+          "product": "vst3",
+          "path": "vst3/ArrangeDemoAdopt.vst3",
+          "binary": "vst3/ArrangeDemoAdopt.vst3/Contents/MacOS/ArrangeDemoAdopt",
+          "ui": "vst3/ArrangeDemoAdopt.vst3/Contents/Resources/ui",
+          "signatureExitCode": 0,
+          "signatureStdout": "",
+          "signatureStderr": "",
+          "uiFilePathsEqual": true,
+          "files": [
+            {
+              "relative": "app.js",
+              "bytes": 152647,
+              "equalsUiDist": true,
+              "sha256": "fab6a212000efef55bd7d2e5338a7c656cc48c4b5ffcdce42cc7ccc1f80e92e1"
+            },
+            {
+              "relative": "icons/play.svg",
+              "bytes": 134,
+              "equalsUiDist": true,
+              "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd"
+            },
+            {
+              "relative": "logo.png",
+              "bytes": 2408,
+              "equalsUiDist": true,
+              "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+            }
+          ]
+        }
+      ],
+      "ninjaNoWork": false,
+      "ninjaTotalSteps": 7
+    },
+    {
+      "flavor": "release",
+      "nativeBuildExitCode": 0,
+      "cleanPackageExitCode": 0,
+      "buildLog": "adopt-final-native-release.log",
+      "packageLog": "adopt-final-package-release.log",
+      "nativeReceipt": {
+        "projectVersion": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.2",
+        "target": "ArrangeDemoPlugin",
+        "products": [
+          "standalone",
+          "vst3"
+        ],
+        "configuration": "Release",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "status": "completed"
+      },
+      "packageManifest": {
+        "format": 1,
+        "project": "ArrangeDemoAdopt",
+        "version": "1.2.3",
+        "frameworkVersion": "0.0.0-m.2.2",
+        "flavor": "release",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "buildRecords": {
+          "ui": {
+            "projectVersion": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2"
+          },
+          "native": {
+            "projectVersion": "1.2.3",
+            "frameworkVersion": "0.0.0-m.2.2",
+            "target": "ArrangeDemoPlugin",
+            "products": [
+              "standalone",
+              "vst3"
+            ]
+          }
+        },
+        "products": [
+          {
+            "product": "standalone",
+            "path": "standalone/ArrangeDemoAdopt.app",
+            "binary": "standalone/ArrangeDemoAdopt.app/Contents/MacOS/ArrangeDemoAdopt",
+            "ui": "standalone/ArrangeDemoAdopt.app/Contents/Resources/ui"
+          },
+          {
+            "product": "vst3",
+            "path": "vst3/ArrangeDemoAdopt.vst3",
+            "binary": "vst3/ArrangeDemoAdopt.vst3/Contents/MacOS/ArrangeDemoAdopt",
+            "ui": "vst3/ArrangeDemoAdopt.vst3/Contents/Resources/ui"
+          }
+        ]
+      },
+      "products": [
+        {
+          "product": "standalone",
+          "path": "standalone/ArrangeDemoAdopt.app",
+          "binary": "standalone/ArrangeDemoAdopt.app/Contents/MacOS/ArrangeDemoAdopt",
+          "ui": "standalone/ArrangeDemoAdopt.app/Contents/Resources/ui",
+          "signatureExitCode": 0,
+          "signatureStdout": "",
+          "signatureStderr": "",
+          "uiFilePathsEqual": true,
+          "files": [
+            {
+              "relative": "app.js",
+              "bytes": 152647,
+              "equalsUiDist": true,
+              "sha256": "fab6a212000efef55bd7d2e5338a7c656cc48c4b5ffcdce42cc7ccc1f80e92e1"
+            },
+            {
+              "relative": "icons/play.svg",
+              "bytes": 134,
+              "equalsUiDist": true,
+              "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd"
+            },
+            {
+              "relative": "logo.png",
+              "bytes": 2408,
+              "equalsUiDist": true,
+              "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+            }
+          ]
+        },
+        {
+          "product": "vst3",
+          "path": "vst3/ArrangeDemoAdopt.vst3",
+          "binary": "vst3/ArrangeDemoAdopt.vst3/Contents/MacOS/ArrangeDemoAdopt",
+          "ui": "vst3/ArrangeDemoAdopt.vst3/Contents/Resources/ui",
+          "signatureExitCode": 0,
+          "signatureStdout": "",
+          "signatureStderr": "",
+          "uiFilePathsEqual": true,
+          "files": [
+            {
+              "relative": "app.js",
+              "bytes": 152647,
+              "equalsUiDist": true,
+              "sha256": "fab6a212000efef55bd7d2e5338a7c656cc48c4b5ffcdce42cc7ccc1f80e92e1"
+            },
+            {
+              "relative": "icons/play.svg",
+              "bytes": 134,
+              "equalsUiDist": true,
+              "sha256": "3f02da557aa54f092036dfb4e26d55dd3c937d651c15b1aabf83ec82f8c13bbd"
+            },
+            {
+              "relative": "logo.png",
+              "bytes": 2408,
+              "equalsUiDist": true,
+              "sha256": "a5aacaf117a3f10dabc2e80176ba18445d2fe5a7529bbcd61a9aeb0f41fdb288"
+            }
+          ]
+        }
+      ],
+      "ninjaNoWork": false,
+      "ninjaTotalSteps": 7
+    }
+  ],
+  "allChecksPassed": true,
+  "nativeFinalBoundary": "Owner frozen native after six C++ regressions, including 5s HTTP timeout guard and pending HTTP exit"
+}

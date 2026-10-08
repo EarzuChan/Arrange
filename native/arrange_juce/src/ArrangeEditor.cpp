@@ -3,6 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/juce/EditorSceneHost.h>
+#include "ScrollProbe.h"
 
 #include <utility>
 
@@ -40,6 +41,13 @@ namespace arrange::juce {
     }
 
     void EditorShellDriver::vblankTick(ArrangeEditor& editor, double nowMillis) const {
+        if (ScrollProbe::active()) {
+            ScrollProbe::Sample sample;
+            sample.kind = ScrollProbe::Kind::VBlank;
+            sample.sourceMillis = nowMillis;
+            sample.pending = editor.sceneHost_->wantsVBlank();
+            ScrollProbe::record(sample);
+        }
         // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线
         const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
         editor.updateWindowTitle();
@@ -112,6 +120,17 @@ namespace arrange::juce {
     }
 
     bool ArrangeEditor::keyPressed(const ::juce::KeyPress& key) {
+#if !defined(NDEBUG)
+        if (key.isKeyCode(::juce::KeyPress::F8Key)) {
+            const auto saved = ScrollProbe::toggle();
+            if (ScrollProbe::active()) {
+                if (auto* peer = getPeer()) peer->setTitle(::juce::String::fromUTF8("Arrange 滚动采样中 · F8 结束"));
+            } else if (!saved.empty()) {
+                if (auto* peer = getPeer()) peer->setTitle(::juce::String::fromUTF8("Arrange 采样已保存 · ") + ::juce::String(saved.string()));
+            }
+            return true;
+        }
+#endif
         if (key.isKeyCode(::juce::KeyPress::F5Key)) {
             sceneHost_->manualReload(key.getModifiers().isCommandDown());
             shell_.afterTitleAndFrameRelevantChange(*this);
@@ -208,7 +227,7 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::updateWindowTitle() {
-        const auto title = ::juce::String(sceneHost_->windowTitle(config_.window.title));
+        const auto title = ScrollProbe::active() ? ::juce::String::fromUTF8("Arrange 滚动采样中 · F8 结束") : ::juce::String(sceneHost_->windowTitle(config_.window.title));
         setName(title);
         if (auto* peer = getPeer()) {
             peer->setTitle(title);

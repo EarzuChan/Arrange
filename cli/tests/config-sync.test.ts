@@ -1,16 +1,19 @@
-import { managedItems, projectName, frameworkVersion, fetchContentRepository, pluginVersion, pluginFormats } from "../src/managed/ManageItems.ts"
+import { configRegistry, createConfigRegistry } from "../src/config/ConfigRegistry.ts"
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { readFile, readdir, rm, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { fixture, write, TestSyncWizard } from "./fixture.ts"
 import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
+import { FileTransaction } from "../src/util/FileTransaction.ts"
 import type { ProjectState } from "../src/project/ProjectState.ts"
-import { managedFiles, ConfigScanner } from "../src/sync/ConfigScanner.ts"
+import { ConfigScanner } from "../src/sync/ConfigScanner.ts"
 import { ConfigApplier } from "../src/sync/ConfigApplier.ts"
 import { ConfigWriter } from "../src/sync/ConfigWriter.ts"
 import { SyncService } from "../src/sync/SyncService.ts"
 import { FrameworkRegistryClient } from "../src/framework/FrameworkRegistryClient.ts"
+import { FrameworkService } from "../src/framework/FrameworkService.ts"
+import { ConfigResolver } from "../src/sync/ConfigResolver.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
 import { registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion } from "../src/node-js/NodeJsStuffs.ts"
 import { cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion } from "../src/cmake/CmakeStuffs.ts"
@@ -20,23 +23,24 @@ import { TextRegion } from "../src/managed/TextRegion.ts"
 import { JsonRegion } from "../src/managed/JsonRegion.ts"
 import { readSnapshot, type FileSnapshot } from "../src/util/FileUtils.ts"
 
-const store = new ProjectStateStore()
-const scanner = new ConfigScanner()
+const store = new ProjectStateStore(new FileTransaction())
+const scanner = new ConfigScanner(configRegistry)
+const managedItems = configRegistry.items
+const managedFiles = configRegistry.files
+const projectName = managedItems.find(item => item.id === productNameRegion.managedItemId)!
+const frameworkVersion = managedItems.find(item => item.id === frameworkVersionRegion.managedItemId)!
+const fetchContentRepository = managedItems.find(item => item.id === fetchContentRepositoryRegion.managedItemId)!
+const pluginVersion = managedItems.find(item => item.id === pluginVersionRegion.managedItemId)!
+const pluginFormats = managedItems.find(item => item.id === pluginFormatsRegion.managedItemId)!
 class TestRegistryClient extends FrameworkRegistryClient {
     override async fetchCandidateByVersion(version: string) {
         return { version, cliCompatibility, markedLatest: false, publishedAt: null }
     }
 }
 
-function run(syncWizard: TestSyncWizard, registry: FrameworkRegistryClient = new TestRegistryClient(), projectStore: ProjectStateStore = new ProjectStateStore()): SyncService {
-    const service = new SyncService(projectStore, registry)
-    // 仅替换本实例的交互方法，保留 SyncService 与 Resolver 共享的内部 wizard
-    const wizard = service["syncWizard"]
-    wizard.report = syncWizard.report.bind(syncWizard)
-    wizard.choose = syncWizard.choose.bind(syncWizard)
-    wizard.edit = syncWizard.edit.bind(syncWizard)
-    wizard.message = syncWizard.message.bind(syncWizard)
-    return service
+function run(syncWizard: TestSyncWizard, registry: FrameworkRegistryClient = new TestRegistryClient(), projectStore?: ProjectStateStore, signal = new AbortController().signal): SyncService {
+    const writer = new ConfigWriter(signal)
+    return new SyncService(projectStore ?? new ProjectStateStore(new FileTransaction(signal)), new FrameworkService(registry), new ConfigScanner(configRegistry), new ConfigResolver(writer, syncWizard, signal), new ConfigApplier(writer), { run: async () => ({ status: "blocked" }) }, syncWizard, signal)
 }
 
 async function noJournal(root: string) { await assert.rejects(readdir(join(root, ".arrange")), { code: "ENOENT" }) }
@@ -98,7 +102,7 @@ test("每轮 Resolve 只处理一项，文件创建后重扫，最终 Apply 后�
     assert.deepEqual(ui.reports.map(report => report.resolvable.length), [3, 2, 1, 0])
     for (const file of managedFiles) assert.equal(await readFile(file.path(state), "utf8"), file.make(state))
     const journals = await readdir(join(state.rootDir, ".arrange", "transactions"))
-    assert.equal(journals.length, 3)
+    assert.equal(journals.length, 0)
     assert.equal(await readFile(join(state.rootDir, ".arrange", ".gitignore"), "utf8"), "*\n")
 })
 
@@ -114,7 +118,7 @@ test("文本精确更新多个 Region，保留 Wrapper、自定义内容和关�
     const report = await scanner.scan(state, "Native")
     assert.equal(report.applicable.length, 2)
     const expected = before.replace(pluginVersionRegion.wrapper.make('    VERSION "1.0.0"\n'), pluginVersionRegion.make(state)).replace(pluginFormatsRegion.wrapper.make("    FORMATS Standalone VST3\n"), pluginFormatsRegion.make(state))
-    await new ConfigApplier().apply(state.rootDir, report)
+    await new ConfigApplier(new ConfigWriter()).apply(state.rootDir, report)
     assert.equal(await readFile(path, "utf8"), expected)
     assert.equal((await scanner.scan(state, "Native")).applicable.length, 0)
 })
@@ -333,12 +337,12 @@ test("扫描后文件或 YAML 被外部修改，Apply 拒绝且不覆写", async
     const path = cmakeListsFile.path(state)
     const modified = `${await readFile(path, "utf8")}# 并发编辑\n`
     await write(path, modified)
-    await assert.rejects(new ConfigApplier().apply(state.rootDir, report), /发生变化/)
+    await assert.rejects(new ConfigApplier(new ConfigWriter()).apply(state.rootDir, report), /发生变化/)
     assert.equal(await readFile(path, "utf8"), modified)
     const latest = await scanner.scan(state, "Global")
     const loaded = await store.deepLoad(state.rootDir)
     await write(join(state.rootDir, "arrange.project.yaml"), "changed")
-    await assert.rejects(new ConfigApplier().apply(state.rootDir, latest, loaded.snapshots), /发生变化/)
+    await assert.rejects(new ConfigApplier(new ConfigWriter()).apply(state.rootDir, latest, loaded.snapshots), /发生变化/)
     await noJournal(state.rootDir)
 })
 
@@ -415,21 +419,17 @@ test("同一 ManagedItem 跨文本和 JSON，一支缺失不阻止另一支扫�
         protected override makeContent() { return {} }
     }()
     await write(jsonFile.path(state), '{"value":null,"other":7}')
-    class CustomScanner extends ConfigScanner {
-        override readonly files = [textFile, jsonFile]
-        override readonly items = [{ id: "both", label: "both", regions: [text, json] }]
-    }
-    const custom = new CustomScanner()
+    const custom = new ConfigScanner(createConfigRegistry([textFile, jsonFile], [{ id: "both", label: "both" }]))
     const report = await custom.scan(state, "Global")
     assert.equal(report.resolvable.length, 1)
     assert.equal(report.applicable.length, 1)
-    await assert.rejects(new ConfigApplier().apply(state.rootDir, report), /阻塞/)
+    await assert.rejects(new ConfigApplier(new ConfigWriter()).apply(state.rootDir, report), /阻塞/)
     await write(textFile.path(state), textFile.make(state))
-    await new ConfigApplier().apply(state.rootDir, await custom.scan(state, "Global"))
+    await new ConfigApplier(new ConfigWriter()).apply(state.rootDir, await custom.scan(state, "Global"))
     assert.deepEqual(JSON.parse(await readFile(jsonFile.path(state), "utf8")), { other: 7 })
 })
 
-test("兼容性失败为 Fatal；SETUP 未实现不能伪装成功", async t => {
+test("兼容性失败为 Fatal；SETUP 的失败向上传递", async t => {
     const state = await fixture(t)
     const ui = new TestSyncWizard()
     class FailingRegistryClient extends TestRegistryClient {
@@ -438,7 +438,7 @@ test("兼容性失败为 Fatal；SETUP 未实现不能伪装成功", async t => 
     const service = run(ui, new FailingRegistryClient())
     assert.equal((await service.run({ configOnly: true }, state.rootDir)).status, "blocked")
     assert.equal(ui.reports[0].fatal[0].cause, "framework-incompatible")
-    assert.equal((await run(new TestSyncWizard()).run({}, state.rootDir)).status, "setup-unavailable")
+    assert.equal((await run(new TestSyncWizard()).run({}, state.rootDir)).status, "blocked")
     await assert.rejects(run(new TestSyncWizard()).run({ configOnly: true, setupOnly: true }, state.rootDir), /互斥/)
 })
 
@@ -537,8 +537,8 @@ test("两套同步服务并发执行，各自使用自己的存储、registry �
             return super.fetchCandidateByVersion(version)
         }
     }
-    const firstStore = new RecordingStore()
-    const secondStore = new RecordingStore()
+    const firstStore = new RecordingStore(new FileTransaction())
+    const secondStore = new RecordingStore(new FileTransaction())
     const firstRegistry = new RecordingRegistry()
     const secondRegistry = new RecordingRegistry()
     const firstWizard = new TestSyncWizard()
@@ -561,4 +561,21 @@ test("两套同步服务并发执行，各自使用自己的存储、registry �
     assert.equal(await readFile(packageJsonFile.path(first), "utf8"), packageJsonFile.make(first))
     await assert.rejects(readFile(packageJsonFile.path(second)), { code: "ENOENT" })
     await noJournal(second.rootDir)
+})
+
+test("Resolve 选择返回之前取消，不创建文件或继续 Apply", async t => {
+    const state = await fixture(t)
+    await rm(packageJsonFile.path(state))
+    const controller = new AbortController()
+    const ui = new TestSyncWizard()
+    ui.onChoose = async () => {
+        controller.abort()
+        return "create"
+    }
+    await assert.rejects(run(ui, new TestRegistryClient(), undefined, controller.signal).run({ configOnly: true }, state.rootDir), error => error === controller.signal.reason)
+    assert.equal(ui.choices, 1)
+    assert.deepEqual(ui.messages, [])
+    assert.deepEqual(ui.failures, [])
+    await assert.rejects(readFile(packageJsonFile.path(state)), { code: "ENOENT" })
+    await noJournal(state.rootDir)
 })

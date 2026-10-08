@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createArrangeTransformPlugin } from "./transform.ts"
 import { invalidateSfaTypeDependency } from "./sfa.ts"
+import { bindPublicResourceReload } from "./public-resource-hmr.ts"
 import type { ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule } from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
@@ -42,6 +43,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
             }
         },
         configureServer(server: ArrangeDevServer): void {
+            bindPublicResourceReload(server as ViteDevServer)
             server.middlewares?.use(MODULE_SNAPSHOT_PATH, async (req, res) => {
                 try {
                     const query = new URL((req as { url?: string }).url ?? '/', 'http://arrange').searchParams

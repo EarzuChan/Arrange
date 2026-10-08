@@ -1,0 +1,136 @@
+{
+  "checkedAt": "2026-10-08T20:54:40.665Z",
+  "mode": "read-only offline ConfigScanner and schema load; no registry request",
+  "project": {
+    "project": {
+      "name": "ArrangeDemoAdopt",
+      "version": "1.2.3",
+      "vendorName": "Arrange",
+      "vendorCode": "Arng",
+      "pluginCode": "ArD1",
+      "products": [
+        "standalone",
+        "vst3"
+      ]
+    },
+    "framework": {
+      "version": "0.0.0-m.2.2",
+      "nodeRegistryUrl": "http://127.0.0.1:49372"
+    },
+    "ui": {
+      "directory": "ui",
+      "packageManager": "npm"
+    },
+    "native": {
+      "directory": "native",
+      "target": "ArrangeDemoPlugin",
+      "pluginType": "effect"
+    },
+    "artifacts": {
+      "directory": "artifacts",
+      "includeVersionDirectory": true
+    },
+    "managed-items": [
+      "project.name",
+      "framework.version",
+      "cmake.fetch-content-repository",
+      "cmake.plugin-version",
+      "cmake.plugin-identity",
+      "cmake.plugin-formats",
+      "node.npmrc.arrange-registry"
+    ]
+  },
+  "counts": {
+    "Fatal": 0,
+    "Resolvable": 0,
+    "Idle": 15,
+    "Applicable": 0
+  },
+  "idle": [
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/package.json"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/package.json",
+      "region": "node.package-name",
+      "expected": "arrangedemoadopt",
+      "actual": "arrangedemoadopt"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/package.json",
+      "region": "node.framework-dependency",
+      "expected": "0.0.0-m.2.2",
+      "actual": "0.0.0-m.2.2"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/.npmrc"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/.npmrc",
+      "cluster": "node.registry"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/ui/.npmrc",
+      "cluster": "node.registry",
+      "region": "node.registry",
+      "expected": "@arrange:registry=http://127.0.0.1:49372\n",
+      "actual": "@arrange:registry=http://127.0.0.1:49372\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.fetch-content"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.fetch-content",
+      "region": "cmake.fetch-content-repository",
+      "expected": "    GIT_REPOSITORY \"https://github.com/EarzuChan/Arrange.git\"\n",
+      "actual": "    GIT_REPOSITORY \"https://github.com/EarzuChan/Arrange.git\"\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.fetch-content",
+      "region": "cmake.framework-version",
+      "expected": "    GIT_TAG \"v0.0.0-m.2.2\"\n",
+      "actual": "    GIT_TAG \"v0.0.0-m.2.2\"\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.juce-plugin"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.juce-plugin",
+      "region": "cmake.plugin-version",
+      "expected": "    VERSION \"1.2.3\"\n",
+      "actual": "    VERSION \"1.2.3\"\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.juce-plugin",
+      "region": "cmake.plugin-identity",
+      "expected": "    COMPANY_NAME \"Arrange\"\n    PLUGIN_MANUFACTURER_CODE Arng\n    PLUGIN_CODE ArD1\n    BUNDLE_ID \"com.arrange.arng.ArrangeDemoPlugin\"\n",
+      "actual": "    COMPANY_NAME \"Arrange\"\n    PLUGIN_MANUFACTURER_CODE Arng\n    PLUGIN_CODE ArD1\n    BUNDLE_ID \"com.arrange.arng.ArrangeDemoPlugin\"\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.juce-plugin",
+      "region": "cmake.plugin-formats",
+      "expected": "    FORMATS Standalone VST3\n",
+      "actual": "    FORMATS Standalone VST3\n"
+    },
+    {
+      "path": "/tmp/arrange-demo-cli-icPpq0/adopt project/native/CMakeLists.txt",
+      "cluster": "cmake.juce-plugin",
+      "region": "cmake.product-name",
+      "expected": "    PRODUCT_NAME \"ArrangeDemoAdopt\"\n",
+      "actual": "    PRODUCT_NAME \"ArrangeDemoAdopt\"\n"
+    }
+  ],
+  "fatal": [],
+  "resolvable": [],
+  "applicable": []
+}

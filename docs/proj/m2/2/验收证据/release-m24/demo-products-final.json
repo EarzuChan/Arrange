@@ -1,0 +1,69 @@
+{
+  "status": "passed",
+  "products": [
+    {
+      "flavor": "debug",
+      "product": "standalone",
+      "bundle": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app",
+      "frameworkVersion": "0.0.0-m.2.4",
+      "projectVersion": "1.2.3",
+      "architecture": "arm64",
+      "binaryBytes": 45719088,
+      "uiFileCount": 3,
+      "uiByteEqual": true,
+      "appJsSha256": "6fbe91453293b0d677d983eb0602f09a62ebd16837294ccc1d8cabab7fabc9f8",
+      "strictCodesignExit": 0,
+      "signatureOutput": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app: valid on disk\n/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app: satisfies its Designated Requirement",
+      "nativeCandidateCommit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+      "finalSourceSyncBuildExit": 0
+    },
+    {
+      "flavor": "debug",
+      "product": "vst3",
+      "bundle": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3",
+      "frameworkVersion": "0.0.0-m.2.4",
+      "projectVersion": "1.2.3",
+      "architecture": "arm64",
+      "binaryBytes": 42323712,
+      "uiFileCount": 3,
+      "uiByteEqual": true,
+      "appJsSha256": "6fbe91453293b0d677d983eb0602f09a62ebd16837294ccc1d8cabab7fabc9f8",
+      "strictCodesignExit": 0,
+      "signatureOutput": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3: valid on disk\n/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/debug/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3: satisfies its Designated Requirement",
+      "nativeCandidateCommit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+      "finalSourceSyncBuildExit": 0
+    },
+    {
+      "flavor": "release",
+      "product": "standalone",
+      "bundle": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app",
+      "frameworkVersion": "0.0.0-m.2.4",
+      "projectVersion": "1.2.3",
+      "architecture": "arm64",
+      "binaryBytes": 6914528,
+      "uiFileCount": 3,
+      "uiByteEqual": true,
+      "appJsSha256": "6fbe91453293b0d677d983eb0602f09a62ebd16837294ccc1d8cabab7fabc9f8",
+      "strictCodesignExit": 0,
+      "signatureOutput": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app: valid on disk\n/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/standalone/ArrangeReleaseDemo.app: satisfies its Designated Requirement",
+      "nativeCandidateCommit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+      "finalSourceSyncBuildExit": 0
+    },
+    {
+      "flavor": "release",
+      "product": "vst3",
+      "bundle": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3",
+      "frameworkVersion": "0.0.0-m.2.4",
+      "projectVersion": "1.2.3",
+      "architecture": "arm64",
+      "binaryBytes": 6095712,
+      "uiFileCount": 3,
+      "uiByteEqual": true,
+      "appJsSha256": "6fbe91453293b0d677d983eb0602f09a62ebd16837294ccc1d8cabab7fabc9f8",
+      "strictCodesignExit": 0,
+      "signatureOutput": "/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3: valid on disk\n/tmp/arrange-release-m24-WKbIAu/demo project/artifacts/release/1.2.3/macos-arm64/vst3/ArrangeReleaseDemo.vst3: satisfies its Designated Requirement",
+      "nativeCandidateCommit": "b10ef8d00fdf8e5ce7ff3998d8028b8e5c5b48e1",
+      "finalSourceSyncBuildExit": 0
+    }
+  ]
+}

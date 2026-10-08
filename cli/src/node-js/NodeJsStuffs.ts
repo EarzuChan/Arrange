@@ -1,4 +1,4 @@
-import { frameworkPackageName } from "../CliMetadata.ts"
+import { frameworkPackageName, uiToolchainVersions } from "../CliMetadata.ts"
 import { resolve } from "node:path"
 import { TextFile, JsonFile } from "../managed/ManagedFile.ts"
 import { TextCluster } from "../managed/TextCluster.ts"
@@ -72,7 +72,8 @@ export const packageJsonFile: JsonFile = new class extends JsonFile {
         return {
             private: true,
             type: "module",
-            scripts: { dev: "vite", build: "vite build" },
+            scripts: { dev: "vite --configLoader runner", typecheck: "tsx scripts/check-types.ts", build: "tsx scripts/check-types.ts && vite build --configLoader runner" },
+            devDependencies: { vite: uiToolchainVersions.vite, tsx: uiToolchainVersions.tsx, typescript: uiToolchainVersions.typescript, "@types/node": uiToolchainVersions.nodeTypes },
         }
     }
 }()
