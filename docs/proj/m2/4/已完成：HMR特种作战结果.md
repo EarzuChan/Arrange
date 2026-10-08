@@ -32,4 +32,4 @@
 
 额外回归没有伪装成全绿：全量 runtime 测试发现已有 density 单位检查失败；直接调用未经 HMR 的原始编译入口也能复现。全量 native build 被 `arrange_local_work.cpp` 的 size_t → uint32_t 窄化初始化阻塞；额外 `arrange_frame_submission` 在无 peer 的资源完成/message-thread 断言未通过。这些问题与本次 HMR 测试分别记录，未用跳过断言或改动单位语义掩盖。
 
-Standalone 渲染和 live 重连正常，但 Debug 日志仍出现 `juce_Component.cpp:1658` 断言；本次未定位该断言，不将其报告为已解决。
+Standalone 渲染和 live 重连正常。Debug 日志此前出现的 `juce_Component.cpp:1658` 断言已定位并修复：`packagePainterLoader` 在 `juce::ThreadPool` 工作线程上调用 `Drawable::createFromSVG`，而 `Drawable` 本身也是 `Component`，解析过程中 `setFill`／`setStrokeFill` 会 `repaint`；现于解析处持有 `MessageManagerLock`，启动断言归零且 SVG 仍正常产出 Drawable。

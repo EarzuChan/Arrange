@@ -22,8 +22,12 @@ export interface ModuleSnapshot {
     modules: ModuleSource[]
 }
 
+function hotRuntimeFilePath(): string {
+    return fileURLToPath(new URL(import.meta.resolve('@arrange/framework/internal').replace(/internal\.ts$/, 'hotRuntime.ts'))).replaceAll('\\', '/')
+}
+
 function hotRuntimePath(): string {
-    return `/@fs/${fileURLToPath(new URL(import.meta.resolve('@arrange/framework/internal').replace(/internal\.ts$/, 'hotRuntime.ts'))).replaceAll('\\', '/')}`
+    return `/@fs/${hotRuntimeFilePath().replace(/^\//, '')}`
 }
 
 function moduleUrl(specifier: string, importer: string): string {
@@ -76,8 +80,7 @@ export async function createModuleSnapshot(server: ViteDevServer, entry: string,
         let result: { code: string; map?: unknown } | null
         if (url === BOOT_PATH) result = { code: `import '/@vite/env'\nimport { createHotContext } from ${JSON.stringify(CLIENT_PATH)}\ncreateHotContext(${JSON.stringify(BOOT_PATH)})\nimport ${JSON.stringify('/' + entry.replace(/^\//, ''))}` }
         else if (url === CLIENT_PATH) {
-            const filePath = hotRuntimePath().replace(/^\/@fs\//, '')
-            result = await transformWithOxc(await readFile(filePath, 'utf8'), hotRuntimePath(), { lang: 'ts', target: 'es2022' })
+            result = await transformWithOxc(await readFile(hotRuntimeFilePath(), 'utf8'), hotRuntimePath(), { lang: 'ts', target: 'es2022' })
         }
         else {
             if (/\.(css|less|sass|scss|styl)(?:\?|$)/.test(url)) throw new Error(`Arrange live 不支持 CSS 模块：${url}`)
