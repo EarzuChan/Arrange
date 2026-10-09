@@ -10,6 +10,7 @@ import { Image, Icon } from './arrangable/ImageAndIcon.ts'
 import { DynamicArrangable } from './arrangable/ToolArrangables.ts'
 import { ARRANGE_RUNTIME_VERSION, type NativeTransactionTarget } from './native.ts'
 import { createDensity, DensityKey } from './density.ts'
+import { createNativeFocusManager, FocusManagerKey } from './focus.ts'
 
 declare global {
     var __ARRANGE_NATIVE__: NativeTransactionTarget | undefined
@@ -43,6 +44,8 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
 
     let rearrangeSession: RearrangeSession | undefined
     let native: NativeTransactionTarget | undefined
+    let focusManager: ReturnType<typeof createNativeFocusManager> | undefined
+    let ownerProvides: Record<PropertyKey, unknown> | undefined
 
     const app: ArrangeApp = {
         config,
@@ -55,6 +58,7 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
 
         provide(key, value) {
             provides[key] = value
+            if (ownerProvides) delete ownerProvides[key]
             return app
         },
 
@@ -72,17 +76,23 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
             native = target
             mountedTargets.add(target)
 
-            const context: AppContext = { config, definitions, provides, host: new NativeRearrangeHost(target) }
-
-            rearrangeSession = new RearrangeSession(context, root, Object.fromEntries(Object.entries(props).map(([name, value]) => [name, () => value])))
-
             try {
+                ownerProvides = Object.create(provides) as Record<PropertyKey, unknown>
+                if (!(FocusManagerKey in ownerProvides)) {
+                    focusManager = createNativeFocusManager(target)
+                    ownerProvides[FocusManagerKey] = focusManager.manager
+                }
+                const context: AppContext = { config, definitions, provides: ownerProvides, host: new NativeRearrangeHost(target) }
+                rearrangeSession = new RearrangeSession(context, root, Object.fromEntries(Object.entries(props).map(([name, value]) => [name, () => value])))
                 target.installFrameDriver(rearrangeSession.scheduler.prepare, rearrangeSession.scheduler.complete, () => app.unmount())
                 rearrangeSession.mount()
             } catch (error) {
                 try {
-                    rearrangeSession.dispose()
+                    rearrangeSession?.dispose()
                 } finally {
+                    focusManager?.dispose()
+                    focusManager = undefined
+                    ownerProvides = undefined
                     mountedTargets.delete(target)
                     rearrangeSession = undefined
                     native = undefined
@@ -97,6 +107,9 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
             try {
                 rearrangeSession?.dispose()
             } finally {
+                focusManager?.dispose()
+                focusManager = undefined
+                ownerProvides = undefined
                 rearrangeSession = undefined
                 native = undefined
 

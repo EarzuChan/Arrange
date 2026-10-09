@@ -15,7 +15,7 @@ export { createApp } from './app.ts'
 export type { ArrangeApp } from './app.ts'
 export { createScrollState } from './state.ts'
 export type { ScrollState } from './state.ts'
-export { createFocusRequester, useFocusManager } from './focus.ts'
+export { createFocusRequester, FocusManagerKey } from './focus.ts'
 export type { FocusDirection, FocusRequester, FocusManager, FocusProperties, FocusState } from './focus.ts'
 
 export * from './diagnostics.ts'

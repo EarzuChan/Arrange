@@ -302,10 +302,24 @@ SFA 普通项定义的例子：
 
 ```ts
 createFocusRequester(): FocusRequester
-useFocusManager(): FocusManager
+interface FocusManager {
+    clearFocus(): void
+    moveFocus(direction: FocusDirection): boolean
+}
+const FocusManagerKey: InjectionKey<FocusManager>
 ```
 
-请求器与方向搜索、焦点组、观察回执见 [事件与输入](17-事件与输入.md)。
+焦点 API 从 `@arrange/framework` 根入口导出，管理器通过既有上下文 API 消费：
+
+```ts
+import { FocusManagerKey, inject } from '@arrange/framework'
+
+const manager = inject(FocusManagerKey)!
+manager.clearFocus()
+manager.moveFocus('next')
+```
+
+请求器、管理器归属与覆盖、方向搜索、焦点组和观察回执见 [事件与输入](17-事件与输入.md#focus)。
 
 # 动画 API
 

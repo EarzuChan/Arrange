@@ -86,7 +86,7 @@
 </template>
 
 <script>
-import { computed, createFocusRequester, useFocusManager, createLazyState, ref } from '@arrange/framework'
+import { computed, createFocusRequester, FocusManagerKey, inject, createLazyState, ref } from '@arrange/framework'
 import { M, Arrangement, Color, CircleShape, IntrinsicSize, GridCells, GridItemSpan, PaddingValues, rounded, type Px } from '@arrange/framework/ui'
 import { FlowRow, FlowColumn, LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid } from '@arrange/framework/foundation'
 import GalleryButton from './GalleryButton.sfa'
@@ -104,7 +104,7 @@ const drawingWidth = computed(() => wide.value ? 390 : 280)
 const flowWidth = computed(() => narrow.value ? 220 : 410)
 const tags = ['音轨', '音量自动化', '节奏', '中文标题', '合成器', '混响', '立体声']
 const firstFocus = createFocusRequester(), secondFocus = createFocusRequester()
-const focusManager = useFocusManager()
+const focusManager = inject(FocusManagerKey)!
 const columnState = createLazyState(), rowState = createLazyState(), verticalGridState = createLazyState(), horizontalGridState = createLazyState()
 const activeState = computed(() => lazyMode.value === '纵列' ? columnState : lazyMode.value === '横列' ? rowState : lazyMode.value === '纵网格' ? verticalGridState : horizontalGridState)
 const items = ref(Array.from({ length: 1000 }, (_, index) => ({ id: index + 1, name: `音轨 ${index + 1}`, note: '', height: 68 + index % 3 * 12 })))

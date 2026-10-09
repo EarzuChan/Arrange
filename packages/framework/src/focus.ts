@@ -1,12 +1,15 @@
 import { currentInstance } from './runtime/arrangable.ts'
 import { getCurrentScope, onScopeDispose } from '@arrange/reactivity'
 import type { NativeTransactionTarget } from './native.ts'
+import type { InjectionKey } from './runtime/apiInject.ts'
 
 export type FocusDirection = 'next' | 'previous' | 'up' | 'down' | 'left' | 'right'
 export type FocusState = Readonly<{ isFocused: boolean; hasFocus: boolean }>
 export type FocusProperties = Readonly<Partial<Record<FocusDirection, FocusRequester>> & { canFocus?: boolean }>
 export interface FocusRequester { requestFocus(): boolean }
 export interface FocusManager { clearFocus(): void; moveFocus(direction: FocusDirection): boolean }
+
+export const FocusManagerKey: InjectionKey<FocusManager> = Symbol('Arrange.FocusManager')
 
 let nextIdentity = 1
 const requesters = new WeakMap<FocusRequester, number>()
@@ -36,16 +39,14 @@ export function createFocusRequester(): FocusRequester {
     })
     return requester
 }
-export function useFocusManager(): FocusManager {
-    if (!currentInstance) throw new Error('useFocusManager 必须在 Arrangable setup 中调用')
-    const native = currentNative()
+export function createNativeFocusManager(native: NativeTransactionTarget): { manager: FocusManager; dispose(): void } {
     let alive = true
-    if (getCurrentScope()) onScopeDispose(() => { alive = false })
-    return Object.freeze({
-        clearFocus() { if (alive) native?.focusCommand?.('clear', 0) },
+    const manager: FocusManager = Object.freeze({
+        clearFocus() { if (alive) native.focusCommand?.('clear', 0) },
         moveFocus(direction: FocusDirection) {
             if (!['next', 'previous', 'up', 'down', 'left', 'right'].includes(direction)) throw new TypeError('焦点方向无效')
-            return alive && (native?.focusCommand?.('move', 0, direction) ?? false)
+            return alive && (native.focusCommand?.('move', 0, direction) ?? false)
         },
     })
+    return { manager, dispose() { alive = false } }
 }
