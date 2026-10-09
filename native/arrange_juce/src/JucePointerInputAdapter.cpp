@@ -34,8 +34,8 @@ namespace arrange::juce {
             return;
         }
 
-        runtime.enqueueIntent(arrange::core::InputIntent::pointer("native pointer down"));
-        interaction.pointerDown(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, static_cast<float>(event.x), static_cast<float>(event.y), inputCallbacks);
+        runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针按下"));
+        interaction.pointerDown(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, event.position.x, event.position.y, inputCallbacks, {event.getNumberOfClicks(), event.mods.isShiftDown()});
     }
 
     bool JucePointerInputAdapter::pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const {
@@ -58,7 +58,7 @@ namespace arrange::juce {
             return false;
         }
 
-        runtime.enqueueIntent(arrange::core::InputIntent::pointer("native pointer click", result.eventSlot.node));
+        runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针点击", result.eventSlot.node));
         runtime.enqueueEvent(result.eventSlot);
         return true;
     }

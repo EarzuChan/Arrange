@@ -35,8 +35,9 @@ export interface LazyStateOwner {
 interface StateControl {
     owner?: LazyStateOwner
     pendingOwners?: Set<LazyStateOwner>
-    readonly request: { version: number; index: number; offset: number; workVersion: number }
+    readonly request: { version: number; kind: 'item' | 'pixel'; index: number; offset: number; value: number; workVersion: number }
     appliedRequestVersion: number
+    publishedValue: number
     cancelAnimation?: () => void
     animationOwner?: LazyStateOwner
     animating: boolean
@@ -52,11 +53,12 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
     const initialIndex = args.firstVisibleItemIndex ?? 0
     const initialOffset = args.firstVisibleItemScrollOffset ?? 0
     itemPosition(initialIndex, initialOffset)
-    const control: StateControl = { request: reactive({ version: initialIndex || initialOffset ? 1 : 0, index: initialIndex, offset: initialOffset, workVersion: 0 }), appliedRequestVersion: 0, animating: false }
+    const control: StateControl = { request: reactive({ version: initialIndex || initialOffset ? 1 : 0, kind: 'item', index: initialIndex, offset: initialOffset, value: 0, workVersion: 0 }), appliedRequestVersion: 0, publishedValue: 0, animating: false }
     let state: LazyState
     const jump = (index: number, offset: number) => {
         itemPosition(index, offset)
         batchUpdates(() => {
+            control.request.kind = 'item'
             control.request.index = index
             control.request.offset = offset
             control.request.version++
@@ -70,7 +72,12 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
         scrollTo(value: number) {
             if (!Number.isFinite(value)) throw new RangeError('滚动位置必须是有限 PX 数值')
             control.cancelAnimation?.()
-            state.value = Math.max(0, value)
+            batchUpdates(() => {
+                state.value = Math.max(0, value)
+                control.request.kind = 'pixel'
+                control.request.value = state.value
+                control.request.version++
+            })
         },
         scrollToItem(index: number, offset = 0) {
             control.cancelAnimation?.()
@@ -123,7 +130,10 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
         __arrangeNativeScroll(payload: LazyFeedback) {
             batchUpdates(() => {
                 if (payload.needsMoreItems) control.request.workVersion++
-                if (payload.value !== undefined) state.value = payload.value
+                if (payload.value !== undefined) {
+                    control.publishedValue = payload.value
+                    state.value = payload.value
+                }
                 if (payload.maxValue !== undefined) state.maxValue = payload.maxValue
                 if (payload.viewportSize !== undefined) state.viewportSize = payload.viewportSize
                 if (payload.contentSize !== undefined) state.contentSize = payload.contentSize
@@ -147,10 +157,16 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
 export const createLazyListState = createLazyState
 export const createLazyGridState = createLazyState
 
-export function lazyStateRequest(state: LazyState): Readonly<{ version: number; index: number; offset: number; workVersion: number }> {
+export function lazyStateRequest(state: LazyState): Readonly<{ version: number; kind: 'item' | 'pixel'; index: number; offset: number; value: number; workVersion: number }> {
     const control = controls.get(state)
     if (!control) throw new TypeError('Lazy state 必须通过 createLazyState 创建')
     return control.request
+}
+
+export function lazyStatePublishedValue(state: LazyState): number {
+    const control = controls.get(state)
+    if (!control) throw new TypeError('Lazy state 必须通过 createLazyState 创建')
+    return control.publishedValue
 }
 
 export function lazyStateAppliedRequestVersion(state: LazyState): number {

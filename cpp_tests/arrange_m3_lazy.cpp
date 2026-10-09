@@ -96,6 +96,28 @@ namespace {
         check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex == 9000, "大跳转未在同帧正确材料化请求项");
         check(std::abs(runtime.scene().node(id).lazy->snapshot.firstVisibleItemScrollOffset - 5) < 0.1f, "可变尺寸补测丢失跳转项偏移");
         check(runtime.scene().node(id).children.size() < 64, "大跳转创建了中间所有项");
+        command("hide");
+        command("show");
+        id = lazyNode(runtime.scene());
+        check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex == 9000 && std::abs(runtime.scene().node(id).lazy->snapshot.firstVisibleItemScrollOffset - 5) < 0.1f, "Lazy 退挂重建按旧绝对 PX 恢复导致可变尺寸首项漂移");
+        command("hide");
+        command("prepend");
+        command("show");
+        id = lazyNode(runtime.scene());
+        check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex == 9001 && std::abs(runtime.scene().node(id).lazy->snapshot.firstVisibleItemScrollOffset - 5) < 0.1f && containsText(runtime.scene(), "项:9000:0"), "隐藏期间数据前插丢失已发布首项 key 与偏移");
+        command("unprepend");
+        check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex == 9000, "移除临时前插项后未恢复首项 key");
+        command("hide");
+        command("pixel");
+        command("show");
+        id = lazyNode(runtime.scene());
+        check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex > 1000 && runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex != 9000, "隐藏 PX 定位被旧逻辑位置恢复覆盖");
+        command("hide");
+        command("start");
+        command("show");
+        id = lazyNode(runtime.scene());
+        check(runtime.scene().node(id).lazy->snapshot.firstVisibleItemIndex == 0, "隐藏 item 定位被旧逻辑位置恢复覆盖");
+        command("jump");
         NodeId input = 0;
         for (const auto node : runtime.scene().tree().nodeIds())
             if (test_support::editable(runtime.scene().node(node)) && test_support::textOf(runtime.scene().node(node)) == "焦点9000") input = node;

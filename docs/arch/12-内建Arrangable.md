@@ -72,6 +72,8 @@ itemKey 标识逻辑项，未指定时使用位置索引。稳定 key 在插入�
 
 LazyState 发布 firstVisibleItemIndex、firstVisibleItemScrollOffset、layoutInfo.visibleItemsInfo、总项数和滚动边界。scrollToItem 直接请求索引与 PX 偏移；animateScrollToItem 通过同一 Owner 动画时钟推进，目标尚未测量时采用估计位置并在最终目标材料化后校正。可变尺寸内容的总长度是估计值，已测量前缀与两端到达后不断校正。
 
+条件退挂或 KeepAlive 停用后重建原生 Layout 时，已有 LazyState 通过同一索引请求链恢复最后发布的首项 key 与偏移；key 已删除则回退到原索引，由布局夹到可用范围。尺寸估算重新建立，不把旧绝对 PX 当作逻辑位置。隐藏期间尚未消费的 scrollToItem、scrollTo(PX) 或对 value 的显式改动优先；成功候选只确认自己读取过的请求版本，失败恢复不吞掉后来发出的定位请求。保持存活的 Layout 动态切换 state 仍采用当前几何下的 value。
+
 可见项、预取和交互固定项参与有限缓存；物化窗口、各项预算与几何账本职责见[布局](09-布局.md#lazy-布局)。逻辑缓存淘汰后再次进入会重新 setup，持久业务状态应在列表外按 key 持有。
 
 空项允许；大量零尺寸项按帧推进有限测量工作，达到可见物化保护上限时给出明确诊断，预算仍以[布局](09-布局.md#lazy-布局)为准。

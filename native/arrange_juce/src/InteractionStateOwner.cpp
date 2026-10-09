@@ -57,13 +57,13 @@ namespace arrange::juce {
         return input_.viewportX();
     }
 
-    void InteractionStateOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks) {
+    void InteractionStateOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options) {
         pendingLazyFocus_.reset();
         const auto point = arrange::core::Point{x, y};
         const auto pointerResult = pointer_.pointerDown(snapshot, point, 0);
         focus_.synchronize(tree, true);
         (void)focus_.set(arrange::core::pointerFocusTarget(tree, focus_.snapshot(), pointerResult.hit.node, point));
-        input_.pointerDown(tree, pointerResult.hit, x, y, callbacks);
+        input_.pointerDown(tree, pointerResult.hit, x, y, callbacks, options);
         dispatchCommittedFocus(tree, callbacks);
     }
 

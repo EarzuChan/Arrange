@@ -76,7 +76,7 @@ namespace arrange::juce {
         return node ? &tree.node(node->id) : nullptr;
     }
 
-    void TextInputOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks) {
+    void TextInputOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options) {
         session_.preferredX().reset();
         const auto* instance = hit.hit && tree.contains(hit.node) ? tree.node(hit.node).modifier.find(hit.modifier) : nullptr;
         const auto* field = instance ? std::get_if<arrange::core::TextFieldModifier>(&instance->descriptor.value) : nullptr;
@@ -94,9 +94,20 @@ namespace arrange::juce {
             session_.state().begin(field->value, field->selectAllOnFocus);
         }
         const auto point = arrange::core::rootToNodeContent(tree, hit.node, {x, y}, hit.modifier);
-        const auto cursor = text_.textIndexAtPoint(*instance, session_.state().text(), session_.viewportX(), point.x, point.y, session_.viewportY());
-        if (same || !field->selectAllOnFocus) session_.state().moveCursorTo(cursor);
-        session_.dragAnchor() = cursor;
+        using Granularity = arrange::core::TextSelectionGranularity;
+        const auto granularity = options.clickCount > 3 ? Granularity::All : options.clickCount == 3 ? Granularity::VisualLine : options.clickCount == 2 ? Granularity::Word : Granularity::Character;
+        const auto range = text_.selectionAtPoint(*instance, session_.state().text(), session_.viewportX(), point, session_.viewportY(), granularity);
+        const auto anchor = session_.state().hasSelection() ? session_.state().selectionStart() : session_.state().cursorIndex();
+        if (options.extendSelection && same && granularity != Granularity::All) {
+            session_.state().selectRange(anchor, range.end <= anchor ? range.start : range.end);
+            session_.dragAnchor() = TextDragSelection{{anchor, anchor}, granularity};
+        } else if (granularity != Granularity::Character) {
+            session_.state().selectRange(range.start, range.end);
+            session_.dragAnchor() = TextDragSelection{range, granularity};
+        } else {
+            if (same || !field->selectAllOnFocus) session_.state().moveCursorTo(range.start);
+            session_.dragAnchor() = TextDragSelection{range, granularity};
+        }
         updateFocusedInputViewport(tree, true);
         if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(hit.node, arrange::core::DirtyFlag::Paint, "文本输入焦点改变");
     }
@@ -107,9 +118,16 @@ namespace arrange::juce {
         if (node == nullptr) return false;
 
         const auto point = arrange::core::rootToNodeContent(tree, node->id, {x, y}, focusedModifier_);
-        session_.state().selectRange(*session_.dragAnchor(), text_.textIndexAtPoint(inputInstance(*node), session_.state().text(), session_.viewportX(), point.x, point.y, session_.viewportY()));
+        const auto anchor = *session_.dragAnchor();
+        const auto range = text_.selectionAtPoint(inputInstance(*node), session_.state().text(), session_.viewportX(), point, session_.viewportY(), anchor.granularity);
+        if (range.end <= anchor.range.start)
+            session_.state().selectRange(anchor.range.end, range.start);
+        else if (range.start >= anchor.range.end)
+            session_.state().selectRange(anchor.range.start, range.end);
+        else
+            session_.state().selectRange(anchor.range.start, anchor.range.end);
         updateFocusedInputViewport(tree, runtimeReady);
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "文本输入选区或光标改变");
         return true;
     }
 

@@ -23,6 +23,11 @@ function scrollValue(node: RecordedLayoutNode): number {
     const scroll = (node.inputs.get('modifier') as Modifier).elements.find(element => element.type === 'verticalScroll')!
     return (scroll.value.state as { value: number }).value
 }
+function feedback(node: RecordedLayoutNode, value: object): void {
+    const scroll = (node.inputs.get('modifier') as Modifier).elements.find(element => element.type === 'verticalScroll')!
+    const state = scroll.value.state as { __arrangeNativeScroll(value: object): void }
+    state.__arrangeNativeScroll(value)
+}
 function rootFor(source: { value: LazyState | undefined }) {
     return defineArrangable({
         setup(_props, { call }) {
@@ -271,4 +276,127 @@ test('KeepAlive 成功停用才结束 Lazy 动画，恢复失败保留旧 owner�
     assert.equal(state.isScrollInProgress, true)
     app.unmount()
     await resumed
+})
+
+for (const keepAlive of [false, true]) test(`${keepAlive ? 'KeepAlive' : '条件退挂'} Lazy 恢复已发布 key 与偏移，候选失败不覆盖隐藏定位请求`, async () => {
+    const native = recordingNative(false)
+    const state = createLazyState()
+    const shown = ref(true)
+    const data = shallowRef(items)
+    const errors: unknown[] = []
+    const Page = defineArrangable({
+        setup(_props, { call }) {
+            return () => call(0, LazyColumn, { items: () => data.value, itemKey: () => (item: number) => item, itemContent: () => Item, state: () => state })
+        }
+    })
+    const app = createApp(defineArrangable({
+        setup(_props, { call }) {
+            const content = () => {
+                if (shown.value) call(0, Page, {})
+                else call(1, Text, { text: () => '空页' })
+            }
+            return () => {
+                if (keepAlive) call(0, KeepAlive, { cacheKey: () => shown.value ? 'lazy' : 'empty' }, { default: content })
+                else content()
+            }
+        }
+    }))
+    app.config.errorHandler = error => errors.push(error)
+    app.mount(native.target)
+    native.frame()
+    native.finish()
+    feedback(lazyNodes(native.nodes)[0], { value: 1985, firstVisibleItemIndex: 40, firstVisibleItemScrollOffset: 7, totalItemsCount: 100, visibleItemsInfo: [{ index: 40, offset: -7, size: 55, span: 1 }] })
+    await nextTick()
+    native.frame()
+    native.finish()
+    const hide = async () => {
+        shown.value = false
+        await nextTick()
+        native.frame()
+        native.finish()
+        assert.equal(lazyNodes(native.nodes).length, 0)
+    }
+    const show = async () => {
+        shown.value = true
+        await nextTick()
+        native.frame()
+        return lazyNodes(native.candidateNodes!)[0]
+    }
+    await hide()
+    data.value = [-1, ...items]
+    let candidate = await show()
+    assert.deepEqual([policy(candidate).requestedIndex, policy(candidate).requestedOffset], [41, 7])
+    assert.ok(policy(candidate).requestVersion > 0, '新原生 Layout 必须收到逻辑位置恢复请求')
+    state.scrollToItem(72, 3)
+    native.finish('拒绝逻辑位置恢复')
+    assert.equal(lazyStateAppliedRequestVersion(state), 0)
+    await hide()
+    candidate = await show()
+    assert.deepEqual([policy(candidate).requestedIndex, policy(candidate).requestedOffset], [72, 3], '失败恢复不能覆盖后来发出的 item 请求')
+    native.finish()
+
+    await hide()
+    state.scrollToItem(80, 4)
+    state.scrollTo(777)
+    candidate = await show()
+    assert.equal(scrollValue(candidate), 777)
+    assert.equal(policy(candidate).requestVersion, 0, '隐藏 PX 请求必须优先于旧 item 位置')
+    native.finish()
+    await hide()
+    state.value = 888
+    candidate = await show()
+    assert.equal(scrollValue(candidate), 888)
+    assert.equal(policy(candidate).requestVersion, 0, '隐藏期间直接赋值必须保留 PX 定位')
+    native.finish()
+    assert.equal(errors.length, 1)
+    app.unmount()
+})
+
+test('Lazy 恢复首项 key 被删除时回退到已发布索引，重试仍保留偏移', async () => {
+    const native = recordingNative(false)
+    const state = createLazyState()
+    const shown = ref(true)
+    const data = shallowRef(items)
+    const app = createApp(defineArrangable({
+        setup(_props, { call }) {
+            return () => {
+                if (shown.value) call(0, LazyColumn, { items: () => data.value, itemKey: () => (item: number) => item, itemContent: () => Item, state: () => state })
+            }
+        }
+    }))
+    app.mount(native.target)
+    native.frame()
+    native.finish()
+    feedback(lazyNodes(native.nodes)[0], { value: 1985, firstVisibleItemIndex: 40, firstVisibleItemScrollOffset: 7, totalItemsCount: 100, visibleItemsInfo: [{ index: 40, offset: -7, size: 55, span: 1 }] })
+    shown.value = false
+    await nextTick()
+    native.frame()
+    native.finish()
+    data.value = items.filter(item => item !== 40)
+    shown.value = true
+    await nextTick()
+    native.frame()
+    assert.deepEqual([policy(lazyNodes(native.candidateNodes!)[0]).requestedIndex, policy(lazyNodes(native.candidateNodes!)[0]).requestedOffset], [40, 7])
+    native.finish()
+    app.unmount()
+})
+
+test('Lazy 候选准备后追加 PX 定位，旧帧反馈不能消费或覆盖新请求', async () => {
+    const native = recordingNative(false)
+    const state = createLazyState({ firstVisibleItemIndex: 20 })
+    const source = shallowRef<LazyState | undefined>(state)
+    const app = createApp(rootFor(source))
+    app.mount(native.target)
+    native.frame()
+    state.scrollTo(555)
+    native.finish()
+    assert.equal(lazyStateAppliedRequestVersion(state), 1)
+    feedback(lazyNodes(native.nodes)[0], { value: 980, firstVisibleItemIndex: 20, firstVisibleItemScrollOffset: 0, totalItemsCount: 100, visibleItemsInfo: [{ index: 20, offset: 0, size: 55, span: 1 }] })
+    await nextTick()
+    native.frame()
+    assert.equal(scrollValue(lazyNodes(native.candidateNodes!)[0]), 555)
+    assert.equal(policy(lazyNodes(native.candidateNodes!)[0]).requestVersion, 1)
+    native.finish()
+    assert.equal(lazyStateAppliedRequestVersion(state), 2)
+    app.unmount()
 })

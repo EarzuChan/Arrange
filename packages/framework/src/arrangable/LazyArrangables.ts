@@ -4,7 +4,7 @@ import { currentInstance, retainContent } from '../runtime/internal.ts'
 import { parameterInputs, parameterObject } from '../runtime/rearrange.ts'
 import type { ArrangableDefinition, ArrangableProps, PropType } from '../runtime/index.ts'
 import { isArrangableDefinition } from '../runtime/apiDefineArrangable.ts'
-import { acknowledgeLazyStateRequest, attachLazyState, createLazyState, lazyStateAppliedRequestVersion, lazyStateRequest, pauseLazyState, type LazyItemKey, type LazyState, type LazyStateOwner } from '../lazy.ts'
+import { acknowledgeLazyStateRequest, attachLazyState, createLazyState, lazyStateAppliedRequestVersion, lazyStatePublishedValue, lazyStateRequest, pauseLazyState, type LazyItemKey, type LazyState, type LazyStateOwner } from '../lazy.ts'
 import { LazyMeasurePolicy, BoxMeasurePolicy, ColumnMeasurePolicy, RowMeasurePolicy } from '../measurePolicy.ts'
 import { M, Modifier } from '../modifier.ts'
 import { GridCells, type GridCellsValue, type GridItemSpanValue, type Padding, PaddingValues, type HorizontalAlignment, type VerticalAlignment } from '../primitives.ts'
@@ -61,9 +61,14 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
             let requestState: LazyState | undefined
             let sourceRequestVersion = -1
             let nativeRequestVersion = 0
+            let requestedIndex = 0
+            let requestedOffset = 0
+            let needsRestore = true
             const stateBinding = {}
             const readState = () => {
                 const state = props.state ?? defaultState
+                const request = lazyStateRequest(state)
+                if (request.kind === 'pixel' && request.version > lazyStateAppliedRequestVersion(state) && state.value === lazyStatePublishedValue(state)) state.value = request.value
                 const session = owner.rearrangeSession
                 if (session.preparing) session.preserve(stateBinding, () => {
                     const previousAttachments = new Map(attachments)
@@ -71,8 +76,11 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                     const previousRequestState = requestState
                     const previousSourceRequestVersion = sourceRequestVersion
                     const previousNativeRequestVersion = nativeRequestVersion
+                    const previousRequestedIndex = requestedIndex
+                    const previousRequestedOffset = requestedOffset
                     session.onCommitCleanup(() => {
                         if (selected && requestState === selected.state) acknowledgeLazyStateRequest(selected.state, sourceRequestVersion)
+                        needsRestore = false
                         for (const attachment of attachments.values()) if (attachment !== selected) attachment.detach()
                         attachments = selected ? new Map([[selected.state, selected]]) : new Map()
                     })
@@ -82,6 +90,8 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                         requestState = previousRequestState
                         sourceRequestVersion = previousSourceRequestVersion
                         nativeRequestVersion = previousNativeRequestVersion
+                        requestedIndex = previousRequestedIndex
+                        requestedOffset = previousRequestedOffset
                     }
                 })
                 let attachment = attachments.get(state)
@@ -106,7 +116,14 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                 selected = attachment
                 return state
             }
-            onDeactivated(() => { if (selected) pauseLazyState(selected.state, selected.owner) })
+            onDeactivated(() => {
+                // 原生 Layout 退挂会丢弃尺寸估算，恢复时通过同一 item request 链重建逻辑锚点
+                needsRestore = true
+                requestState = undefined
+                sourceRequestVersion = -1
+                nativeRequestVersion = 0
+                if (selected) pauseLazyState(selected.state, selected.owner)
+            })
             onScopeDispose(() => {
                 for (const attachment of attachments.values()) attachment.detach()
                 attachments.clear()
@@ -160,7 +177,16 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                     const state = readState()
                     const request = lazyStateRequest(state)
                     if (requestState !== state || sourceRequestVersion !== request.version) {
-                        if (request.version > lazyStateAppliedRequestVersion(state)) nativeRequestVersion++
+                        requestedIndex = request.index
+                        requestedOffset = request.offset
+                        const pending = request.version > lazyStateAppliedRequestVersion(state)
+                        if (pending && request.kind === 'item') nativeRequestVersion++
+                        else if (!pending && needsRestore && state.value === lazyStatePublishedValue(state) && state.layoutInfo.totalItemsCount > 0) {
+                            const anchor = state.layoutInfo.visibleItemsInfo.find(item => item.index === state.firstVisibleItemIndex)
+                            requestedIndex = anchor ? dataset.keyToIndex.get(identity(anchor.key, 'Lazy key')) ?? state.firstVisibleItemIndex : state.firstVisibleItemIndex
+                            requestedOffset = state.firstVisibleItemScrollOffset
+                            nativeRequestVersion++
+                        }
                         requestState = state
                         sourceRequestVersion = request.version
                     }
@@ -168,7 +194,7 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                         horizontal, grid, cells: props.cells, horizontalArrangement: props.horizontalArrangement, verticalArrangement: props.verticalArrangement,
                         itemAlignment: horizontal ? props.verticalAlignment : props.horizontalAlignment, contentPadding: props.contentPadding,
                         keys: dataset.keys, contentTypes: dataset.contentTypes, spans: dataset.spans, indices: indices.value, pinnedIndices: [], version: dataset.version,
-                        workVersion: request.workVersion, requestVersion: nativeRequestVersion, requestedIndex: request.index, requestedOffset: request.offset,
+                        workVersion: request.workVersion, requestVersion: nativeRequestVersion, requestedIndex, requestedOffset,
                     })
                 },
             })

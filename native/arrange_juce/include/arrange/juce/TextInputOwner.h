@@ -19,6 +19,11 @@
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
+    struct TextPointerDownOptions {
+        int clickCount = 1;
+        bool extendSelection = false;
+    };
+
     struct TextInputCallbacks {
         std::function<void(const arrange::core::EventSlotId&, const std::string&)> invokeStringEvent;
         std::function<void(arrange::core::NodeId, arrange::core::DirtyFlag, std::string)> invalidateNativeState;
@@ -61,7 +66,7 @@ namespace arrange::juce {
             return focusedModifier_;
         }
 
-        void pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks);
+        void pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options = {});
         [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks);
 
         [[nodiscard]] bool isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const;

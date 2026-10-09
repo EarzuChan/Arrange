@@ -7,6 +7,13 @@
 #include <vector>
 
 namespace arrange::core {
+    enum class TextSelectionGranularity { Character, Word, VisualLine, All };
+
+    struct TextSelectionRange {
+        std::size_t start = 0;
+        std::size_t end = 0;
+    };
+
     struct InputEditResult {
         bool consumed = false;
         bool textChanged = false;

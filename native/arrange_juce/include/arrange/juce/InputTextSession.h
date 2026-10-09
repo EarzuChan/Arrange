@@ -13,6 +13,11 @@
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
+    struct TextDragSelection {
+        arrange::core::TextSelectionRange range;
+        arrange::core::TextSelectionGranularity granularity = arrange::core::TextSelectionGranularity::Character;
+    };
+
     class InputTextSession final {
        public:
         void reset();
@@ -25,11 +30,11 @@ namespace arrange::juce {
             return focusedNode_;
         }
 
-        std::optional<std::size_t>& dragAnchor() noexcept {
+        std::optional<TextDragSelection>& dragAnchor() noexcept {
             return dragAnchor_;
         }
 
-        const std::optional<std::size_t>& dragAnchor() const noexcept {
+        const std::optional<TextDragSelection>& dragAnchor() const noexcept {
             return dragAnchor_;
         }
 
@@ -79,7 +84,7 @@ namespace arrange::juce {
 
        private:
         std::optional<arrange::core::NodeId> focusedNode_;
-        std::optional<std::size_t> dragAnchor_;
+        std::optional<TextDragSelection> dragAnchor_;
         arrange::core::TextInputState state_;
         float viewportX_ = 0.0f;
         float viewportY_ = 0.0f;

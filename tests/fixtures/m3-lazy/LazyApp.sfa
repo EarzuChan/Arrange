@@ -5,7 +5,8 @@
         <LazyColumn a-if="mode === 'column'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :contentType="typeOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
         <LazyRow a-else-if="mode === 'row'" :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
         <LazyVerticalGrid a-else-if="mode === 'verticalGrid'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Fixed(3)" :modifier="M.weight(1).fillMaxWidth()" />
-        <LazyHorizontalGrid a-else :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Adaptive(40.dp)" :modifier="M.weight(1).fillMaxWidth()" />
+        <LazyHorizontalGrid a-else-if="mode === 'horizontalGrid'" :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Adaptive(40.dp)" :modifier="M.weight(1).fillMaxWidth()" />
+        <Text a-else text="已隐藏" />
     </Column>
 </template>
 
@@ -27,9 +28,13 @@ function command(value: string) {
     else if (value === 'pixel') list.scrollTo(220000.px)
     else if (value === 'start') list.scrollToItem(0)
     else if (value === 'insert') items.value = [{ id: -1, height: 50 }, ...items.value]
+    else if (value === 'prepend') items.value = [{ id: -2, height: 75 }, ...items.value]
+    else if (value === 'unprepend') items.value = items.value.filter(item => item.id !== -2)
     else if (value === 'reverse') items.value = [...items.value].reverse()
     else if (value === 'animate') list.animateScrollToItem(100)
     else if (value === 'bad') items.value = [{ id: 0, height: 20 }, { id: 0, height: 30 }]
+    else if (value === 'hide') mode.value = 'hidden'
+    else if (value === 'show') mode.value = 'column'
     else if (value === 'row' || value === 'verticalGrid' || value === 'horizontalGrid' || value === 'column') mode.value = value
 }
 </script>

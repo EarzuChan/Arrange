@@ -3,12 +3,14 @@
 #include <arrange/core/Focus.h>
 #include <arrange/core/InputEditing.h>
 #include <arrange/core/Layout.h>
+#include <arrange/core/ModifierGeometry.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/ArrangeRuntime.h>
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/FramePumpDriver.h>
 #include <arrange/juce/JuceTextServices.h>
+#include <arrange/juce/JucePointerInputAdapter.h>
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/TextInputMutationSink.h>
@@ -244,6 +246,133 @@ namespace {
         check(std::any_of(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::DrawText && op.maxLines == 0 && op.textLayout->lines.size() == 4; }), "覆盖层未保留完整多行排版");
     }
 
+    void verifyMultiClickSelection() {
+        arrange::juce::JuceTextMeasurer measurer;
+        TextLayoutService service(measurer);
+        const std::string source = "alpha beta 中文，🙂  !!!\n第二行 words";
+        auto field = test_support::textField(source);
+        field.presentation.singleLine = false;
+        field.presentation.style = {14, 18};
+        LayoutTree tree;
+        create(tree, 1, {{size(260, 80)}, {field}});
+        LayoutEngine(service).layout(tree, 1, {0, 300, 0, 120});
+        arrange::juce::TextInputOwner input(service);
+        const auto pointAt = [&](const LayoutTree& current, std::size_t byte, float viewportX = 0, float viewportY = 0) {
+            const auto& receiver = *test_support::editable(current.node(1));
+            const auto prepared = arrange::core::TextInputOverlayBuilder::layout(receiver, test_support::textOf(current.node(1)), viewportX, service, viewportY);
+            const auto caret = service.caretRect(*prepared.text, byte, {prepared.metrics.textLeft - prepared.metrics.viewportX, prepared.metrics.textTop - prepared.metrics.viewportY});
+            return nodeContentToRoot(current, 1, {caret.x + 0.1f, caret.y + caret.height * 0.5f}, receiver.handle);
+        };
+        const auto down = [&](std::size_t byte, int clicks, bool shift = false) {
+            const auto point = pointAt(tree, byte, input.viewportX(), input.viewportY());
+            const auto hit = HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), point);
+            check(hit.hit && hit.modifier == test_support::editable(tree.node(1))->handle, "多击夹具没有命中实际编辑受体");
+            input.pointerDown(tree, hit, point.x, point.y, {}, {clicks, shift});
+        };
+        const auto selected = [&] {
+            return input.textInRange(tree, true, input.highlightedRegion(tree, true)).toStdString();
+        };
+        down(2, 2);
+        check(selected() == "alpha", "controller双击未选择英文词");
+        down(source.find("中文") + 3, 2);
+        check(selected() == "中文", "controller双击未选择连续中文");
+        down(source.find("，"), 2);
+        check(selected() == "，", "Unicode标点混入中文词");
+        down(source.find("🙂"), 2);
+        check(selected() == "🙂", "双击非BMP字符切断UTF8边界");
+        down(source.find("  "), 2);
+        check(selected() == "  ", "双击空白未选择同类连续空白");
+        down(source.find("!!!"), 2);
+        check(selected() == "!!!", "双击标点组未保持合理边界");
+        down(source.find("第二行") + 3, 3);
+        check(selected() == "第二行 words", "三击没有选所点硬行或包含了硬换行");
+        down(2, 1);
+        down(8, 1, true);
+        check(input.highlightedRegion(tree, true) == ::juce::Range<int>(2, 8), "Shift单击没有从原光标扩选");
+        down(2, 4);
+        check(selected() == source, "四击没有对齐JUCE选全文语义");
+        const auto& receiver = *test_support::editable(tree.node(1));
+        const auto layout = arrange::core::TextInputOverlayBuilder::layout(receiver, source, 0, service);
+        const auto alphaRun = std::find_if(layout.text->lines.front().runs.begin(), layout.text->lines.front().runs.end(), [](const auto& run) { return run.start == 4; });
+        check(alphaRun != layout.text->lines.front().runs.end(), "词尾字形夹具没有匹配的排版片段");
+        const auto& lastAlpha = *alphaRun;
+        const Point trailingHalf{layout.metrics.textLeft + lastAlpha.x + lastAlpha.width * 0.9f, layout.metrics.textTop + layout.text->lines.front().height * 0.5f};
+        input.pointerDown(tree, HitTester{}.hitTest(buildHitTestSnapshot(tree, 1), trailingHalf), trailingHalf.x, trailingHalf.y, {}, {2});
+        check(selected() == "alpha", "点词尾字形右半边时双击错选了后续空白");
+        field.value = "soft wrapped words continue over lines";
+        tree.setModifierChain(1, {{size(68, 120)}, {field}});
+        LayoutEngine(service).layout(tree, 1, {0, 300, 0, 140});
+        input.reset();
+        input.focus(tree, 1, test_support::editable(tree.node(1))->handle, {});
+        (void)input.setHighlightedRegion(tree, true, {0, 0}, {});
+        const auto soft = arrange::core::TextInputOverlayBuilder::layout(*test_support::editable(tree.node(1)), field.value, 0, service);
+        check(soft.text->lines.size() > 2, "软换行夹具没有产生视觉行");
+        const auto& visualLine = soft.text->lines[1];
+        down(visualLine.start, 3);
+        check(selected() == field.value.substr(visualLine.start, visualLine.end - visualLine.start), "三击按硬段落而非所点软换行视觉行选择");
+
+        arrange::juce::ArrangeRuntime runtime{SceneFramePipeline{LayoutEngine{service}}};
+        arrange::juce::RuntimeSessionState session;
+        arrange::juce::DiagnosticsState diagnostics;
+        arrange::juce::InteractionStateOwner interaction(service);
+        arrange::juce::PassivePaintRenderer paint(service);
+        arrange::juce::FramePumpDriver driver;
+        arrange::juce::JucePointerInputAdapter adapter;
+        session.resize(300, 120, runtime);
+        session.markLoaded();
+        field.value = source;
+        MutationTransaction initial;
+        initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{size(260, 80)}, {field}}}};
+        runtime.enqueue(std::move(initial));
+        double time = 0;
+        const auto pump = [&] {
+            time += 16;
+            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 300, 120}, true, {}, time);
+            check(!diagnostics.hasError(), "多击生产帧失败");
+        };
+        pump();
+        ::juce::Component component;
+        const auto event = [&](std::size_t byte, int clicks = 1, bool shift = false) {
+            const auto point = pointAt(runtime.scene().tree(), byte, interaction.viewportX(), interaction.viewportY());
+            return ::juce::MouseEvent(::juce::Desktop::getInstance().getMainMouseSource(), {point.x, point.y}, ::juce::ModifierKeys(::juce::ModifierKeys::leftButtonModifier | (shift ? ::juce::ModifierKeys::shiftModifier : 0)), 1, 0, 0, 0, 0, &component, &component, {}, {}, {}, clicks, false);
+        };
+        const auto callbacks = arrange::juce::TextInputMutationSink{}.callbacks(runtime);
+        const auto adapterDown = [&](std::size_t byte, int clicks, bool shift = false) {
+            adapter.pointerDown(runtime, session, diagnostics, interaction, 1, event(byte, clicks, shift), callbacks);
+        };
+        const auto adapterUp = [&](std::size_t byte, int clicks) {
+            (void)adapter.pointerUp(runtime, session, diagnostics, interaction, 1, event(byte, clicks));
+            pump();
+        };
+        const auto productionSelected = [&] {
+            return interaction.textInRange(runtime.scene().tree(), true, interaction.highlightedRegion(runtime.scene().tree(), true)).toStdString();
+        };
+        adapterDown(2, 2);
+        adapterUp(2, 2);
+        check(productionSelected() == "alpha", "真实MouseEvent双击在adapter、up或成功帧后丢失选区");
+        check(std::any_of(runtime.publishedFrame().content.overlayDrawOps.begin(), runtime.publishedFrame().content.overlayDrawOps.end(), [](const auto& op) { return op.type == DrawOpType::FillRect; }), "多击选区没有进入发布的Input绘制内容");
+        check(!adapter.pointerDrag(runtime, session, diagnostics, interaction, event(8), callbacks) && productionSelected() == "alpha", "up后移动重置了双击选区");
+        adapterDown(2, 2);
+        check(adapter.pointerDrag(runtime, session, diagnostics, interaction, event(8), callbacks), "双击之后拖动未接受指针");
+        adapterUp(8, 2);
+        check(productionSelected() == "alpha beta", "双击拖动没有维持词粒度");
+        adapterDown(8, 2);
+        (void)adapter.pointerDrag(runtime, session, diagnostics, interaction, event(2), callbacks);
+        adapterUp(2, 2);
+        check(productionSelected() == "alpha beta", "反向双击拖动拆开了原始词");
+        adapterDown(source.find("第二行") + 3, 3);
+        adapterUp(source.find("第二行") + 3, 3);
+        check(productionSelected() == "第二行 words", "真实MouseEvent三击未透传视觉行选择");
+        adapterDown(2, 3);
+        (void)adapter.pointerDrag(runtime, session, diagnostics, interaction, event(source.find("第二行") + 3), callbacks);
+        adapterUp(source.find("第二行") + 3, 3);
+        check(productionSelected() == source, "三击拖动没有维持视觉行粒度或漏掉行间换行");
+        adapterDown(2, 4);
+        (void)adapter.pointerDrag(runtime, session, diagnostics, interaction, event(8), callbacks);
+        adapterUp(8, 4);
+        check(productionSelected() == source, "四击后拖动收缩了全文选区");
+    }
+
     void verifyScrollIntoView() {
         LayoutTree tree;
         LayoutModifierSemantics scroll;
@@ -459,6 +588,7 @@ namespace {
             verifyEditingState();
             verifyImeAndClipboard();
             verifyMultiline();
+            verifyMultiClickSelection();
             verifyScrollIntoView();
             verifyQuickJsFocus();
             verifyLazyFocus();
