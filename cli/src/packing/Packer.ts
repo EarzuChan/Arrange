@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto"
 import { cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path"
-import { localWorkDirectory } from "../CliMetadata.ts"
+import { localWorkDirectory, nativeWindowsIconOwnershipFile } from "../CliMetadata.ts"
 import type { Executor } from "../platform/Executor.ts"
 import type { BuildFlavor, NativeProduct, ProjectState } from "../project/ProjectState.ts"
-import type { ArtifactLocator } from "./ArtifactLocator.ts"
+import type { ArtifactLocator, ProductArtifact } from "./ArtifactLocator.ts"
 import { MacBundleSigner } from "./MacBundleSigner.ts"
 import { uiOutputDirectory, workDirectory } from "../project/ProjectPaths.ts"
 import { isJsonObject } from "../util/Utils.ts"
+import { nativePresentationSignature } from "../project/NativePresentation.ts"
+import { WindowsBundleIcon } from "./WindowsBundleIcon.ts"
 
 export interface PackOptions {
     readonly flavor: BuildFlavor
@@ -111,9 +113,28 @@ async function readBuildRecord(path: string): Promise<Record<string, unknown> | 
     return record
 }
 
-async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: string, architecture: string) {
+// 只替换上次清单明确归属于本产品的入口，显示名改变不影响用户自行放入的其它文件
+async function previousProductName(directory: string, state: ProjectState, artifact: ProductArtifact): Promise<string | undefined> {
+    let manifest: unknown
+    try { manifest = JSON.parse(await readFile(resolve(directory, "arrange-package.json"), "utf8")) } catch (error) {
+        if (error instanceof SyntaxError || (error as NodeJS.ErrnoException).code === "ENOENT") return undefined
+        throw error
+    }
+    if (!isJsonObject(manifest) || manifest.format !== 1 || manifest.project !== state.project.project.name || manifest.nativeTarget !== state.project.native.target || manifest.product !== artifact.product || manifest.platform !== artifact.platform || manifest.architecture !== artifact.architecture || typeof manifest.binary !== "string") return undefined
+    const parts = manifest.binary.replaceAll("\\", "/").split("/")
+    if (parts.some(part => !part || part === "." || part === ".." || part.includes(":"))) return undefined
+    const extension = artifact.product === "vst3" ? ".vst3" : artifact.platform === "darwin" ? ".app" : ".exe"
+    if (!parts[0].toLowerCase().endsWith(extension)) return undefined
+    if (extension === ".exe" ? parts.length !== 1 : parts.length !== 4 || parts[1] !== "Contents" || parts[2] !== (artifact.platform === "darwin" ? "MacOS" : `${artifact.architecture === "x64" ? "x86_64" : "arm64"}-win`)) return undefined
+    return parts[0]
+}
+
+async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string) {
     const ui = await readBuildRecord(resolve(workDirectory(state), "built-ui.json"))
     const native = await readBuildRecord(resolve(workDirectory(state), `built-native-${options.flavor}.json`))
+    const metadata = state.project.project
+    const hasPresentation = metadata.displayName !== undefined || metadata.icon !== undefined || (platform === "darwin" && metadata.bundleId !== undefined)
+    if (!native && hasPresentation) throw new Error("配置了产品显示名、Bundle ID 或图标，需要 CLI 原生构建记录；请先 arrange build --native-only")
     for (const [name, record] of [["UI", ui], ["native", native]] as const) {
         if (!record) continue
         if (record.status !== "completed") throw new Error(`${name} 构建记录未成功完成；请先 arrange build`)
@@ -124,6 +145,9 @@ async function matchingBuildRecords(state: ProjectState, options: PackOptions, p
         if (native.target !== state.project.native.target || typeof native.configuration !== "string" || native.configuration.toLowerCase() !== options.flavor || native.platform !== platform || native.architecture !== architecture) throw new Error("native 构建记录的目标、配置、平台或架构不匹配；请先 arrange build --native-only")
         const products = native.products
         if (!Array.isArray(products) || options.products.some(product => !products.includes(product))) throw new Error("native 构建记录没有覆盖所选 products；请先构建所选产品")
+        if (native.presentationSignature !== undefined || hasPresentation) {
+            if (native.presentationSignature !== await nativePresentationSignature(state, platform)) throw new Error("native 构建记录的显示名、Bundle ID 或图标已变化；请先 arrange build --native-only")
+        }
     }
     return {
         ui: ui ? { projectVersion: ui.projectVersion, frameworkVersion: ui.frameworkVersion } : null,
@@ -133,9 +157,11 @@ async function matchingBuildRecords(state: ProjectState, options: PackOptions, p
 
 export class Packer {
     private readonly signer: MacBundleSigner
+    private readonly windowsIcon: WindowsBundleIcon
 
-    constructor(private readonly artifactLocator: ArtifactLocator, executor: Executor) {
+    constructor(private readonly artifactLocator: ArtifactLocator, executor: Executor, private readonly signal?: AbortSignal) {
         this.signer = new MacBundleSigner(executor)
+        this.windowsIcon = new WindowsBundleIcon(executor)
     }
 
     protected async copy(source: string, destination: string): Promise<void> {
@@ -159,6 +185,7 @@ export class Packer {
     private async commit(replacements: Replacement[]): Promise<void> {
         try {
             for (const replacement of replacements) {
+                this.signal?.throwIfAborted()
                 if (await lstat(replacement.destination).catch(() => undefined)) {
                     await this.move(replacement.destination, replacement.backup)
                     replacement.backedUp = true
@@ -188,6 +215,7 @@ export class Packer {
     }
 
     async pack(state: ProjectState, options: PackOptions): Promise<PackResult> {
+        this.signal?.throwIfAborted()
         const artifacts = await this.artifactLocator.locate(state, options)
         const uiDirectory = resolve(state.rootDir, state.project.ui.directory)
         const uiDist = uiOutputDirectory(state)
@@ -220,6 +248,7 @@ export class Packer {
         let preserveStaging = false
         try {
             for (const artifact of artifacts) {
+                this.signal?.throwIfAborted()
                 const destination = resolve(directory, artifact.product)
                 const staged = resolve(staging, artifact.product)
                 const current = await lstat(destination).catch(() => undefined)
@@ -228,6 +257,8 @@ export class Packer {
                 if (current && !options.clean) {
                     await verifyTree(destination)
                     const replacedNames = new Set([basename(artifact.productPath), "arrange-package.json", ...(artifact.productPath === artifact.binaryPath ? ["ui", ...artifact.runtimeFiles.map(file => basename(file))] : [])])
+                    const previousName = await previousProductName(destination, state, artifact)
+                    if (previousName) replacedNames.add(previousName)
                     for (const name of await readdir(destination)) if (!replacedNames.has(name)) await this.copy(resolve(destination, name), resolve(staged, name))
                 }
                 const productPath = resolve(staged, basename(artifact.productPath))
@@ -243,6 +274,10 @@ export class Packer {
                 await mkdir(dirname(uiPath), { recursive: true })
                 await this.copy(uiDist, uiPath)
                 if (artifact.platform === "darwin") await this.signer.ensureRunnable(artifact.productPath, productPath)
+                else if (artifact.product === "vst3") {
+                    await rm(resolve(productPath, nativeWindowsIconOwnershipFile), { force: true })
+                    await this.windowsIcon.prepare(productPath)
+                }
                 await verifyTree(staged)
                 const binaryRelative = artifact.productPath === artifact.binaryPath ? basename(artifact.binaryPath) : relative(artifact.productPath, artifact.binaryPath)
                 const stagedBinary = artifact.productPath === artifact.binaryPath ? productPath : resolve(productPath, binaryRelative)
@@ -258,6 +293,7 @@ export class Packer {
             await writeFile(stagedManifest, `${JSON.stringify({ format: 1, project: state.project.project.name, version: state.project.project.version, frameworkVersion: state.project.framework.version, flavor: options.flavor, platform, architecture, buildRecords, products: products.map(product => ({ product: product.product, path: relative(directory, product.path), binary: relative(directory, product.binaryPath), ui: relative(directory, product.uiPath) })) }, null, 4)}\n`)
             replacements.push({ staged: stagedManifest, destination: manifestPath, backup: resolve(staging, "backup-manifest.json"), backedUp: false, committed: false })
             try {
+                this.signal?.throwIfAborted()
                 await this.commit(replacements)
             } catch (error) {
                 preserveStaging = String(error).includes("回退未完成")

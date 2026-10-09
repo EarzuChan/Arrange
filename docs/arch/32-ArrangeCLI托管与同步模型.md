@@ -38,7 +38,9 @@ interface ManagedItem {
 
 ManagedItem 的开关决定是否托管，其对应配置值经各 Region 自己的生成规则形成 expect。同一 ManagedItem 的多个 Region 可以生成不同格式的内容，不要求文本与 JSON 表达相同。
 
-`project.name` 共同管理 CMake `PRODUCT_NAME` 和 package.json `name`，后者生成小写；`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [配置注册](../../cli/src/config/ConfigRegistry.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
+`project.name` 托管组共同管理 CMake 产品名称 Region 和 package.json `name`，保持既有工程的托管开关兼容：前者将有效 `displayName` 写入 `PRODUCT_NAME`、`PLUGIN_NAME`，后者仍将机器名 `project.name` 转为小写。名称字段及缺省规则见 [CLI 工程模式](31-ArrangeCLI与工程模式.md#产品标识显示名与图标)。`framework.version` 共同管理 FetchContent `GIT_TAG` 和 npm `@arrange/framework` 依赖版本，前者加 `v` 前缀。FetchContent 仓库地址独立管理。具体关联见 [配置注册](../../cli/src/config/ConfigRegistry.ts)。名称托管的范围仅为上述两个 Region；CMake target 名称和源文件路径属于创建时的初始内容，修改名称配置不代表完整工程重命名。
+
+`cmake.plugin-identity` 管理厂商、插件代码与 macOS Bundle ID 的构建接入。`cmake.product-icon` 独立管理 CLI 派生图标的构建接入；未启用时不接管既有手工图标。Node 侧生成资源属于 SETUP，不属于 CONFIG 文件写入。当前托管文件为 native 根 CMakeLists；图标资源 Region 与 `juce_add_plugin` 必须位于同一 CMake 目录。已有工程将目标放在子目录时，须自行将资源接入放到目标所在目录，不能在根目录直接挂接子目录目标的 POST_BUILD。
 
 | ManagedItem | 对应配置 | CONFIG 中的期望 |
 |---|---|---|

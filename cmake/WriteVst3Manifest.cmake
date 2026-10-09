@@ -1,0 +1,6 @@
+if(NOT ARRANGE_VST3_HELPER OR NOT ARRANGE_VST3_MANIFEST)
+    message(FATAL_ERROR "VST3 manifest 生成缺少 helper 或输出路径")
+endif()
+get_filename_component(_arrange_manifest_directory "${ARRANGE_VST3_MANIFEST}" DIRECTORY)
+file(MAKE_DIRECTORY "${_arrange_manifest_directory}")
+execute_process(COMMAND "${ARRANGE_VST3_HELPER}" OUTPUT_FILE "${ARRANGE_VST3_MANIFEST}" COMMAND_ERROR_IS_FATAL ANY)

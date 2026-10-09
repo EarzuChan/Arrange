@@ -1,10 +1,15 @@
 import type { NativeProduct, PackageManagerName, ProjectState } from "./ProjectState.ts"
+import { defaultProjectIconPath } from "../CliMetadata.ts"
+import { generateDefaultBundleId } from "./ProjectMetadata.ts"
 
 export type PluginType = "effect" | "instrument"
 
 export interface CreateProjectRequest {
     readonly rootDir: string
     readonly projectName: string
+    readonly displayName?: string
+    readonly bundleId?: string
+    readonly iconSource?: string
     readonly projectVersion: string
     readonly frameworkVersion: string
     readonly frameworkNodeRegistryUrl?: string
@@ -28,6 +33,9 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
         project: {
             project: {
                 name: request.projectName,
+                displayName: request.displayName ?? request.projectName,
+                bundleId: request.bundleId ?? generateDefaultBundleId(request),
+                ...(request.iconSource !== undefined ? { icon: defaultProjectIconPath } : {}),
                 version: request.projectVersion,
                 vendorName: request.vendorName,
                 vendorCode: request.vendorCode,

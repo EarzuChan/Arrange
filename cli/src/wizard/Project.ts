@@ -1,4 +1,5 @@
-import { confirm, group, isCancel, log, multiselect, select } from "@clack/prompts"
+import { confirm, group, isCancel, log, multiselect, select, text } from "@clack/prompts"
+import { resolve } from "node:path"
 import type { ManagedItem } from "../managed/ManageItems.ts"
 import type { FrameworkRegistryClient } from "../framework/FrameworkRegistryClient.ts"
 import { assertFrameworkCompatible } from "../framework/FrameworkMamba.ts"
@@ -10,6 +11,7 @@ import { errorMessage } from "../util/Utils.ts"
 import { selectFrameworkVersion } from "./FrameworkVersion.ts"
 import type { ProjectInteractionInput } from "../project/ProjectInteraction.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
+import { effectiveBundleId, effectiveDisplayName, generateDefaultBundleId, validateBundleId, validateDisplayName } from "../project/ProjectMetadata.ts"
 
 export type ProjectWizardInput = ProjectInteractionInput
 
@@ -34,7 +36,16 @@ export async function promptProjectDetails(registry: FrameworkRegistryClient, in
         packageManager: () => select({ message: "UI 包管理器", initialValue: suggestions.packageManager ?? "pnpm", options: [{ label: "pnpm", value: "pnpm" as const }, { label: "npm", value: "npm" as const }] }),
         products: () => multiselect<NativeProduct>({ message: "产品", required: true, options: [{ label: "Standalone", value: "standalone" }, { label: "VST3", value: "vst3" }], initialValues: ["standalone", "vst3"] }),
     }, { onCancel: () => { throw new PromptCancelled() } })
-    return { ...answers, frameworkNodeRegistryUrl: input.nodeRegistryUrl, frameworkCmakeFetchContentUrl: input.cmakeFetchContentUrl }
+    const displayName = await optionalText("产品显示名称（留空使用项目名称）", { placeholder: answers.projectName, validate: validateDisplayName })
+    const bundleId = await optionalText("macOS Bundle ID（留空生成并保存）", { placeholder: generateDefaultBundleId(answers), validate: validateBundleId })
+    const iconSource = await optionalText("PNG 图标源文件（留空使用系统默认或保留已有图标）", { placeholder: "正方形 PNG，边长至少 256 像素" })
+    return { ...answers, displayName: displayName ?? answers.projectName, bundleId, iconSource: iconSource ? resolve(iconSource.trim()) : undefined, frameworkNodeRegistryUrl: input.nodeRegistryUrl, frameworkCmakeFetchContentUrl: input.cmakeFetchContentUrl }
+}
+
+async function optionalText(message: string, options: { readonly placeholder?: string, readonly validate?: (value: string) => string | undefined }): Promise<string | undefined> {
+    const value = await text({ message, placeholder: options.placeholder, validate: input => input?.trim() ? options.validate?.(input) : undefined })
+    if (isCancel(value)) throw new PromptCancelled()
+    return value.trim() ? value : undefined
 }
 
 async function promptFrameworkVersion(registry: FrameworkRegistryClient, input: ProjectWizardInput, suggestion?: string): Promise<string> {
@@ -67,8 +78,9 @@ export async function confirmPrompt(message: string, initialValue = true): Promi
 
 export async function confirmInitialization(plan: InitializationPlan, verb: string): Promise<boolean> {
     const state = plan.state
-    log.info(`工程根：${state.rootDir}\n项目：${state.project.project.name}@${state.project.project.version}\nFramework：${state.project.framework.version}\nNative target：${state.project.native.target}\n产品：${state.project.project.products.join(", ")}\n托管项：${state.project["managed-items"].join(", ") || "无"}`)
+    log.info(`工程根：${state.rootDir}\n项目：${state.project.project.name}@${state.project.project.version}\n产品显示名称：${effectiveDisplayName(state)}\nmacOS Bundle ID：${effectiveBundleId(state)}\nFramework：${state.project.framework.version}\nNative target：${state.project.native.target}\n产品：${state.project.project.products.join(", ")}\n托管项：${state.project["managed-items"].join(", ") || "无"}`)
     for (const copy of plan.copies) log.info(`复制：${copy.source} → ${copy.destination}（跳过 .git、node_modules、本机配置与 .arrange）`)
+    for (const icon of plan.icons) log.info(icon.kind === "existing" ? `引用已有图标：${icon.destination}` : `复制图标：${icon.source} → ${icon.destination}`)
     for (const file of plan.files) log.info(`${file.before.content === null ? "新建" : "更新"}：${file.before.path}`)
     return confirmPrompt(`确认${verb}？`)
 }

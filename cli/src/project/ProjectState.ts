@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { validateBundleId, validateDisplayName, validateIconPath } from "./ProjectMetadata.ts"
 
 export const arrangeSubprojectSchema = z.enum(["ui", "native"])
 export type ArrangeSubproject = z.infer<typeof arrangeSubprojectSchema>
@@ -41,6 +42,9 @@ export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>
 
 export const projectMetadataSchema = z.object({
     name: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/, "名称须以字母开头，仅含字母、数字、下划线"),
+    displayName: validatedText(validateDisplayName).optional(),
+    bundleId: validatedText(validateBundleId).optional(),
+    icon: validatedText(validateIconPath).optional(),
     version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, "需要具体版本号"),
     vendorName: z.string().min(1).refine(value => !/[\r\n]/.test(value), "厂商名称不得包含换行"),
     vendorCode: z.string().regex(/^[A-Za-z0-9]{4}$/),
@@ -91,4 +95,11 @@ export type ProjectState = z.infer<typeof projectStateSchema>
 // 一个小工具方法
 export function isManagedItem(state: ProjectState, key: string): boolean {
     return state.project["managed-items"].includes(key)
+}
+
+function validatedText(validate: (value: string) => string | undefined) {
+    return z.string().superRefine((value, context) => {
+        const message = validate(value)
+        if (message) context.addIssue({ code: "custom", message })
+    })
 }

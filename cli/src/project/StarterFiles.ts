@@ -1,6 +1,7 @@
 import { resolve } from "node:path"
 import { defaultUiOutputDirectory } from "../CliMetadata.ts"
 import type { ProjectState } from "./ProjectState.ts"
+import { effectiveDisplayName } from "./ProjectMetadata.ts"
 
 export interface InitialFile {
     readonly path: string
@@ -20,7 +21,7 @@ createApp(App).mount()
         {
             path: resolve(root, "src/App.sfa"), content: `<template>
     <Column :modifier="M.fillMaxSize().background(Color(0xff17212e)).padding(24.dp)" :vertical-arrangement="Arrangement.spacedBy(16.dp)">
-        <Text text="${state.project.project.name}" :style="{ fontSize: 28.sp, color: Color(0xfff4f6fa) }"/>
+        <Text :text="projectTitle" :style="{ fontSize: 28.sp, color: Color(0xfff4f6fa) }"/>
 
         <Text :text="'点击次数：' + count" :modifier="M.clickable(increment).padding(12.dp).background(Color(0xff336699))" :style="{ fontSize: 18.sp, color: Color(0xffffffff) }"/>
     </Column>
@@ -31,6 +32,7 @@ import { ref } from '@arrange/framework'
 import { Column, Text } from '@arrange/framework/foundation'
 import { Arrangement, Color, M } from '@arrange/framework/ui'
 
+const projectTitle = ${JSON.stringify(effectiveDisplayName(state))}
 const count = ref(0)
 
 function increment() {

@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto"
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
-import { cmakePreparationFileName, cmakeQueryClientName, localWorkDirectory, nativeBuildDirectoryName, productTargetSuffixes } from "../CliMetadata.ts"
+import { cmakePreparationFileName, cmakeQueryClientName, localWorkDirectory, nativeBuildDirectoryName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes } from "../CliMetadata.ts"
 import type { BuildFlavor, NativeProduct, ProjectState } from "../project/ProjectState.ts"
 import type { Executor } from "../platform/Executor.ts"
 import type { PlatformService } from "../platform/PlatformService.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
-import { throwIfProcessCancelled } from "../platform/ProcessSpec.ts"
+import { IconAssetsService } from "../asset/IconAssetsService.ts"
+import { nativePresentationSignature } from "../project/NativePresentation.ts"
+import { isAbortError, throwIfProcessCancelled } from "../platform/ProcessSpec.ts"
 
 export interface CmakeTarget {
     readonly name: string
@@ -67,7 +69,7 @@ function hash(content: string | Buffer): string {
 }
 
 export class CmakeService {
-    constructor(private readonly executor: Executor, private readonly platform: PlatformService) { }
+    constructor(private readonly executor: Executor, private readonly platform: PlatformService, private readonly icons: IconAssetsService) { }
 
     buildDirectory(state: ProjectState, flavor: BuildFlavor): string {
         const arch = state.local?.native?.architecture
@@ -79,14 +81,19 @@ export class CmakeService {
         try {
             await assertPlainDirectoryPath(state.rootDir, this.buildDirectory(state, flavor))
             const preparation = JSON.parse(await readFile(this.preparationPath(state, flavor), "utf8")) as Preparation
-            if (preparation.signature !== this.signature(state, flavor)) return { ready: false, reason: "原生配置或本机工具环境已变化，需要重新 configure" }
+            if (preparation.signature !== await this.signature(state, flavor)) return { ready: false, reason: "原生配置或本机工具环境已变化，需要重新 configure" }
+            const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor))
+            if (!iconInspection.ready) return { ready: false, reason: iconInspection.reason }
             const cache = await readFile(join(this.buildDirectory(state, flavor), "CMakeCache.txt"), "utf8")
             if (!cache.includes(`CMAKE_GENERATOR:INTERNAL=${state.local!.native!.generator}`)) return { ready: false, reason: "CMake 构建缓存与本机生成器不符" }
             for (const [path, previous] of Object.entries(preparation.inputHashes)) if (hash(await readFile(path)) !== previous) return { ready: false, reason: `CMake 输入已变化：${path}` }
             const model = await this.readModel(state, flavor)
             this.productArtifacts(state, model, state.project.project.products)
             return { ready: true, model }
-        } catch (error) { return { ready: false, reason: error instanceof Error ? error.message : String(error) } }
+        } catch (error) {
+            if (isAbortError(error)) throw error
+            return { ready: false, reason: error instanceof Error ? error.message : String(error) }
+        }
     }
 
     async configure(state: ProjectState, flavor: BuildFlavor): Promise<CmakeModel> {
@@ -95,11 +102,14 @@ export class CmakeService {
         const directory = this.buildDirectory(state, flavor)
         await assertPlainDirectoryPath(state.rootDir, directory)
         await this.resetIncompatibleTree(state, flavor)
+        await rm(this.preparationPath(state, flavor), { force: true })
+        const signature = await this.signature(state, flavor)
+        const presentation = await this.presentationSignature(state)
+        const icons = await this.icons.prepare(state, this.iconDirectory(state, flavor))
         const query = join(directory, ".cmake", "api", "v1", "query", `client-${cmakeQueryClientName}`)
         await assertPlainDirectoryPath(state.rootDir, query)
         await mkdir(query, { recursive: true })
         for (const kind of ["codemodel-v2", "cmakeFiles-v1"]) await writeFile(join(query, kind), "")
-        await rm(this.preparationPath(state, flavor), { force: true })
         const args = ["-S", resolve(state.rootDir, state.project.native.directory), "-B", directory, "-G", local.native.generator]
         if (!local.native.generator.startsWith("Visual Studio") && local.native.generator !== "Xcode" && local.native.generator !== "Ninja Multi-Config") args.push(`-DCMAKE_BUILD_TYPE=${this.configuration(flavor)}`)
         if (local.native.generator.startsWith("Ninja")) {
@@ -110,7 +120,8 @@ export class CmakeService {
             args.push(`-DCMAKE_CXX_COMPILER=${local.nativeCompiler.path}`, `-DCMAKE_C_COMPILER=${join(dirname(local.nativeCompiler.path), "clang")}`, `-DCMAKE_OSX_ARCHITECTURES=${local.native.architecture === "x64" ? "x86_64" : "arm64"}`)
         } else if (local.native.generator.startsWith("Visual Studio")) args.push("-A", local.native.architecture === "x64" ? "x64" : "ARM64")
         else args.push(`-DCMAKE_C_COMPILER=${local.nativeCompiler.path}`, `-DCMAKE_CXX_COMPILER=${local.nativeCompiler.path}`)
-        const reserved = new Set(["CMAKE_BUILD_TYPE", "CMAKE_GENERATOR", "CMAKE_GENERATOR_PLATFORM", "CMAKE_MAKE_PROGRAM", "CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_OSX_ARCHITECTURES"])
+        args.push(`-D${nativeIconCmakeDefinitions.ico}=${icons?.ico.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.icns}=${icons?.icns.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.presentation}=${presentation}`)
+        const reserved = new Set([...Object.values(nativeIconCmakeDefinitions), "CMAKE_BUILD_TYPE", "CMAKE_GENERATOR", "CMAKE_GENERATOR_PLATFORM", "CMAKE_MAKE_PROGRAM", "CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_OSX_ARCHITECTURES"])
         for (const [key, value] of Object.entries(local.native.cmakeDefinitions ?? {})) {
             if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || reserved.has(key) || /[\r\n\0]/.test(value)) throw new Error(`不支持的 CMake 自定义选项：${key}`)
             args.push(`-D${key}=${value}`)
@@ -122,7 +133,10 @@ export class CmakeService {
         const model = await this.readModel(state, flavor)
         this.productArtifacts(state, model, state.project.project.products)
         const inputHashes = await this.inputHashes(state, flavor)
-        await writeFile(this.preparationPath(state, flavor), `${JSON.stringify({ signature: this.signature(state, flavor), inputHashes }, null, 4)}\n`)
+        if (signature !== await this.signature(state, flavor)) throw new Error("原生配置或图标源在 configure 期间发生变化，请重新运行 native SETUP")
+        const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor))
+        if (!iconInspection.ready) throw new Error(iconInspection.reason ?? "图标派生资源尚未准备")
+        await writeFile(this.preparationPath(state, flavor), `${JSON.stringify({ signature, inputHashes }, null, 4)}\n`)
         return model
     }
 
@@ -179,7 +193,12 @@ export class CmakeService {
 
     private configuration(flavor: BuildFlavor): string { return flavor === "debug" ? "Debug" : "Release" }
     private preparationPath(state: ProjectState, flavor: BuildFlavor): string { return join(this.buildDirectory(state, flavor), cmakePreparationFileName) }
-    private signature(state: ProjectState, flavor: BuildFlavor): string { return hash(JSON.stringify({ native: state.project.native, products: state.project.project.products, framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor })) }
+    presentationSignature(state: ProjectState): Promise<string> { return nativePresentationSignature(state, this.platform.name) }
+    private iconDirectory(state: ProjectState, flavor: BuildFlavor): string { return join(this.buildDirectory(state, flavor), nativeIconDirectory) }
+    private async signature(state: ProjectState, flavor: BuildFlavor): Promise<string> {
+        const { vendorName, vendorCode, pluginCode, version, products } = state.project.project
+        return hash(JSON.stringify({ native: state.project.native, project: { vendorName, vendorCode, pluginCode, version, products }, presentation: await this.presentationSignature(state), framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor }))
+    }
 
     private async readReply<T>(directory: string, kind: string): Promise<T> {
         const replyDirectory = join(directory, ".cmake", "api", "v1", "reply")

@@ -26,11 +26,11 @@ export async function runAdoptWizard(registry: FrameworkRegistryClient, config: 
         const details = await promptProjectDetails(registry, input, suggestions)
         const target = native.input.kind === "new" ? details.projectName : await requiredText("已有 JUCE 插件根 target（请按 CMake 实际名称填写）", { validate: value => /^[A-Za-z_][A-Za-z0-9_.+-]*$/.test(value) ? undefined : "请输入合法的 CMake target 名称" })
         const artifactsDirectory = await requiredText("Artifacts 目录", { initialValue: defaultProjectDirectories.artifacts, validate: validateRelativeDirectory })
-        const managedItems = await promptManagedItems(config.items)
+        const managedItems = await promptManagedItems(config.items.filter(item => native.input.kind === "new" || details.iconSource !== undefined || item.id !== "cmake.product-icon"))
         const state = createInitialProjectState({ ...details, rootDir, uiDirectory: ui.directory, nativeDirectory: native.directory, artifactsDirectory, managedItems })
         state.project.native.target = target
         log.info("已有源文件不生成或替换；选中的文本托管项将在 CONFIG 中由你补 Wrapper 或放 Marker，受管正文按共享配置更新")
-        return { state, ui: ui.input, native: native.input }
+        return { state, ui: ui.input, native: native.input, iconSource: details.iconSource }
     } catch (error) {
         if (error instanceof PromptCancelled) {
             log.info("已取消接入；未写工程文件")

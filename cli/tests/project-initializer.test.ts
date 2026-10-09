@@ -3,11 +3,11 @@ import { existsSync } from "node:fs"
 import { test, type TestContext } from "node:test"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
+import { cp, lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { defaultProjectDirectories, uiToolchainVersions } from "../src/CliMetadata.ts"
+import { defaultProjectDirectories, defaultProjectIconPath, uiToolchainVersions } from "../src/CliMetadata.ts"
 import { createInitialProjectState, type CreateProjectRequest } from "../src/project/CreateProject.ts"
 import { ProjectInitializer, type CopyPlan } from "../src/project/ProjectInitializer.ts"
 import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
@@ -62,7 +62,7 @@ test("create 生成统一托管文件、SFA 工程与完整 effect/instrument Pr
 })
 
 test("生成的现代 SFA 使用真实公开 API 和 PNG/SVG ESM 资源，并通过隔离类型检查", async t => {
-    const state = await new ProjectInitializer(new FileTransaction()).create(request(await temporaryRoot(t)))
+    const state = await new ProjectInitializer(new FileTransaction()).create({ ...request(await temporaryRoot(t)), displayName: "中文 显示 & 名称" })
     const uiRoot = resolve(state.rootDir, "ui")
     const modules = resolve(uiRoot, "node_modules")
     for (const name of ["framework", "reactivity", "shared", "compiler", "vite-plugin"]) {
@@ -82,6 +82,7 @@ test("生成的现代 SFA 使用真实公开 API 和 PNG/SVG ESM 资源，并通
     await cp(resolve(repoRoot, "demo/ui-src/public/icons/play.svg"), resolve(assets, "play.svg"))
     const appPath = resolve(uiRoot, "src/App.sfa")
     const app = await readFile(appPath, "utf8")
+    assert.match(app, /const projectTitle = "中文 显示 & 名称"/)
     await write(appPath, app.replace("<script>", `<script>
 import logo from './assets/logo.png'
 import play from './assets/play.svg'
@@ -112,6 +113,124 @@ test("create 的只读计划与冲突保护不覆盖源码、不留下工程或�
     assert.equal(await readFile(source, "utf8"), "用户源码\n")
     await assert.rejects(readFile(resolve(root, "arrange.project.yaml")), { code: "ENOENT" })
     await assert.rejects(readdir(resolve(root, ".arrange")), { code: "ENOENT" })
+})
+
+test("外部 PNG 只读验证后原样复制到独立 assets；缺省不创建品牌图标", async t => {
+    const parent = await temporaryRoot(t)
+    const source = resolve(parent, "外部 图标.png")
+    await cp(resolve(repoRoot, "artworks/logo.png"), source)
+    const initializer = new ProjectInitializer(new FileTransaction())
+    const plan = await initializer.planCreate({ ...request(resolve(parent, "with-icon")), iconSource: source, displayName: "中文 产品" })
+    assert.equal(plan.state.project.project.icon, defaultProjectIconPath)
+    assert.deepEqual(await readdir(parent), ["外部 图标.png"])
+    const state = await initializer.apply(plan)
+    assert.deepEqual(await readFile(resolve(state.rootDir, defaultProjectIconPath)), await readFile(source))
+    const loaded = await new ProjectStateStore(new FileTransaction()).load(state.rootDir)
+    assert.equal(loaded.project.project.displayName, "中文 产品")
+    assert.equal(loaded.project.project.bundleId, "com.testcompany.starterplugin")
+    const manifest = JSON.parse(await readFile(resolve(state.rootDir, "ui/package.json"), "utf8"))
+    assert.equal(manifest.name, "starterplugin")
+    assert.equal(loaded.project.native.target, "StarterPlugin")
+    const plain = await initializer.create(request(resolve(parent, "without-icon")))
+    assert.equal(plain.project.project.icon, undefined)
+    await assert.rejects(readdir(resolve(plain.rootDir, "assets")), { code: "ENOENT" })
+})
+
+test("adopt 直接引用同路径 PNG；不重复写入，确认后变更或链接替换仍拒绝", async t => {
+    const initializer = new ProjectInitializer(new FileTransaction())
+    const root = await temporaryRoot(t)
+    const icon = resolve(root, defaultProjectIconPath)
+    await mkdir(dirname(icon), { recursive: true })
+    await cp(resolve(repoRoot, "artworks/logo.png"), icon)
+    await write(resolve(root, "ui/package.json"), "{}\n")
+    await write(resolve(root, "native/CMakeLists.txt"), "project(ExistingTarget)\n")
+    const input = { state: createInitialProjectState(request(root)), ui: { kind: "existing" }, native: { kind: "existing" }, iconSource: icon } as const
+    const plan = await initializer.planAdopt(input)
+    assert.equal(plan.icons[0].kind, "existing")
+    const before = await readFile(icon)
+    await writeFile(icon, "确认后修改")
+    await assert.rejects(initializer.apply(plan), /图标源文件在确认后发生变化/)
+    await assert.rejects(readdir(resolve(root, ".arrange")), { code: "ENOENT" })
+    await writeFile(icon, before)
+    const external = await temporaryRoot(t)
+    const externalIcon = resolve(external, "icon.png")
+    await writeFile(externalIcon, before)
+    await rm(icon)
+    await symlink(externalIcon, icon, "file")
+    await assert.rejects(initializer.apply(plan), /符号链接/)
+    await assert.rejects(initializer.planAdopt(input), /符号链接/)
+    await rm(icon)
+    await writeFile(icon, before)
+    const original = await lstat(icon)
+    const state = await initializer.apply(plan)
+    const after = await lstat(icon)
+    assert.equal(after.ino, original.ino)
+    assert.equal(after.mtimeMs, original.mtimeMs)
+    assert.deepEqual(await readFile(icon), before)
+    assert.equal(state.project.project.icon, defaultProjectIconPath)
+    assert.equal(state.project["managed-items"].includes("cmake.product-icon"), true)
+})
+
+test("图标冲突、无效 PNG、确认后源变动及 assets 与子项目重叠均不写工程", async t => {
+    const parent = await temporaryRoot(t)
+    const source = resolve(parent, "icon.png")
+    await cp(resolve(repoRoot, "artworks/logo.png"), source)
+    const initializer = new ProjectInitializer(new FileTransaction())
+    const occupied = resolve(parent, "occupied")
+    await write(resolve(occupied, defaultProjectIconPath), "用户图标")
+    await assert.rejects(initializer.planCreate({ ...request(occupied), iconSource: source }), /目标已经存在/)
+    assert.equal(await readFile(resolve(occupied, defaultProjectIconPath), "utf8"), "用户图标")
+    await assert.rejects(readdir(resolve(occupied, ".arrange")), { code: "ENOENT" })
+    const invalid = resolve(parent, "invalid")
+    await assert.rejects(initializer.planCreate({ ...request(invalid), iconSource: resolve(repoRoot, "demo/ui-src/public/logo.png") }), /正方形 PNG/)
+    assert.equal(existsSync(invalid), false)
+    const overlap = resolve(parent, "overlap")
+    await assert.rejects(initializer.planCreate({ ...request(overlap), iconSource: source, uiDirectory: "assets" }), /assets 目录必须/)
+    assert.equal(existsSync(overlap), false)
+    const changed = resolve(parent, "changed")
+    const plan = await initializer.planCreate({ ...request(changed), iconSource: source })
+    await writeFile(source, "确认后改动")
+    await assert.rejects(initializer.apply(plan), /图标源文件在确认后发生变化/)
+    assert.equal(existsSync(changed), false)
+})
+
+test("图标发布后配置中途取消保留原 PNG 与准确失败记录，不继续提交 YAML", async t => {
+    const root = await temporaryRoot(t)
+    const source = resolve(repoRoot, "artworks/logo.png")
+    const controller = new AbortController()
+    class CancelledWriter extends FileTransaction {
+        protected override async replaceFile(before: FileSnapshot, after: string, id: string): Promise<void> {
+            await super.replaceFile(before, after, id)
+            controller.abort()
+        }
+    }
+    await assert.rejects(new ProjectInitializer(new CancelledWriter(controller.signal), controller.signal).create({ ...request(root), iconSource: source }), error => error instanceof Error && error.name === "AbortError")
+    assert.deepEqual(await readFile(resolve(root, defaultProjectIconPath)), await readFile(source))
+    await assert.rejects(readFile(resolve(root, "arrange.project.yaml")), { code: "ENOENT" })
+    const paths = await readdir(resolve(root, ".arrange/initializations"))
+    const journal = JSON.parse(await readFile(resolve(root, ".arrange/initializations", paths[0]), "utf8"))
+    assert.equal(journal.status, "failed")
+    assert.equal(journal.icons[0].copied, true)
+    assert.equal(journal.icons[0].destination, resolve(root, defaultProjectIconPath))
+    assert.deepEqual(await readdir(resolve(root, "assets")), ["icon.png"])
+})
+
+test("确认后的目标冲突和 assets 目录链接不会覆盖用户图标或写入外部目录", async t => {
+    const source = resolve(repoRoot, "artworks/logo.png")
+    const initializer = new ProjectInitializer(new FileTransaction())
+    const occupied = await temporaryRoot(t)
+    const plan = await initializer.planCreate({ ...request(occupied), iconSource: source })
+    await write(resolve(occupied, defaultProjectIconPath), "用户后来放入的图标")
+    await assert.rejects(initializer.apply(plan), /目标已经存在/)
+    assert.equal(await readFile(resolve(occupied, defaultProjectIconPath), "utf8"), "用户后来放入的图标")
+    await assert.rejects(readdir(resolve(occupied, ".arrange")), { code: "ENOENT" })
+    const aliased = await temporaryRoot(t)
+    const external = await temporaryRoot(t)
+    await write(resolve(external, "keep.txt"), "外部内容")
+    await symlink(external, resolve(aliased, "assets"), "dir")
+    await assert.rejects(initializer.create({ ...request(aliased), iconSource: source }), /符号链接/)
+    assert.deepEqual(await readdir(external), ["keep.txt"])
+    await assert.rejects(readFile(resolve(aliased, "arrange.project.yaml")), { code: "ENOENT" })
 })
 
 test("确认后才建立不存在的工程根，初始化日志仍拒绝根以下工作目录链接", async t => {
@@ -185,19 +304,21 @@ test("adopt 原位保留现有文件和 target；JSON 候选只作为显式确�
     const root = await temporaryRoot(t)
     const state = createInitialProjectState(request(root))
     state.project.native.target = "ActualJuceTarget"
-    state.project["managed-items"] = []
-    const cmake = "# 自定义 CMake\nadd_subdirectory(custom)\n"
+    state.project["managed-items"] = ["cmake.product-icon"]
+    const cmake = "# 自定义 CMake\nadd_subdirectory(custom)\nset(MY_ICON custom.icns)\n"
     const packageJson = '{"name":"existing-ui","version":"2.3.4","packageManager":"npm@11.0.0","dependencies":{"@arrange/framework":"0.0.0-m.2.2"},"custom":true}\n'
     await write(resolve(root, "native/CMakeLists.txt"), cmake)
     await write(resolve(root, "ui/package.json"), packageJson)
     await write(resolve(root, "ui/src/custom.ts"), "export const custom = true\n")
     assert.deepEqual(await readUiSuggestions(resolve(root, "ui")), { name: "existing-ui", version: "2.3.4", frameworkVersion: "0.0.0-m.2.2", packageManager: "npm" })
-    await new ProjectInitializer(new FileTransaction()).adopt({ state, ui: { kind: "existing" }, native: { kind: "existing" } })
+    const adopted = await new ProjectInitializer(new FileTransaction()).adopt({ state, ui: { kind: "existing" }, native: { kind: "existing" } })
+    assert.equal(adopted.project.project.icon, undefined)
+    assert.equal(adopted.project["managed-items"].includes("cmake.product-icon"), false)
     assert.equal(await readFile(resolve(root, "native/CMakeLists.txt"), "utf8"), cmake)
     assert.equal(await readFile(resolve(root, "ui/package.json"), "utf8"), packageJson)
     assert.equal((await new ProjectStateStore(new FileTransaction()).load(root)).project.native.target, "ActualJuceTarget")
     await assert.rejects(readFile(resolve(root, "ui/src/App.sfa")), { code: "ENOENT" })
-    assert.equal((await new ConfigScanner(configRegistry).scan(state, "Global")).fatal.length, 0)
+    assert.equal((await new ConfigScanner(configRegistry).scan(adopted, "Global")).fatal.length, 0)
 })
 
 test("adopt 复制一侧、新建另一侧；源目录不改、缓存不复制、独立 target 不取产品名", async t => {

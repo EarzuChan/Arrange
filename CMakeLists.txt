@@ -15,6 +15,7 @@ endif()
 
 arrange_fetch_quickjs_ng()
 arrange_fetch_juce()
+include(cmake/JuceVst3Commands.cmake)
 
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 

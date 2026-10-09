@@ -26,6 +26,7 @@ Arrange::framework -> native 唯一公开 target
 | `framework/` | registry metadata、Framework 版本与 CLI 兼容性 |
 | `node-js/` | UI 包管理器、依赖准备与 UI 构建 |
 | `cmake/` | CMake 文件定义、configure/build、File API 模型与准备检查 |
+| `asset/` | 工程图标源校验、Node 侧缩放与 ICO/ICNS 转换、生成资源检查 |
 | `building/` | build/dev 的工程编排 |
 | `packing/` | 真实产物定位、完整 bundle 整理、UI 资源、打包提交与 Mac 签名检查 |
 | `platform/` | 工具探测、平台环境、统一进程执行与开发进程监管 |
@@ -55,6 +56,7 @@ project/
   .arrange/
   ui/
   native/
+  assets/                 # 可选，与 UI/native 并列的共享源资源
   artifacts/
 ```
 
@@ -71,6 +73,30 @@ project/
 本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选 `cmakeDefinitions`。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
 
 运行时统一通过 [ProjectState](32-ArrangeCLI托管与同步模型.md#定义state-与拓扑) 使用配置与工程根。CONFIG 维护文件中的项目事实；SETUP 使用真实工具链准备可执行的工程，不以写一份 local YAML 代替依赖安装与 CMake configure。
+
+### 产品标识、显示名与图标
+
+以下字段位于共享 YAML 的 `project` 下：
+
+```yaml
+project:
+  name: SuperSynth
+  displayName: Super Synth
+  bundleId: com.acme.supersynth
+  icon: assets/icon.png
+```
+
+`bundleId` 仅在 macOS 生效，Windows 不设置 AUMID。create 允许显式填写；跳过时生成 `com.<制造商段>.<产品段>` 并保存：制造商段取 `vendorName` 的 ASCII 字母数字并转小写，结果为空则取小写 `vendorCode`；产品段取 `project.name` 的 ASCII 字母数字并转小写。只在创建时生成，不因后续重命名漂移。旧工程未填写时保留原有的 `com.arrange.<小写 vendorCode>.<经过原规则清理的 native.target>`，避免升级 CLI 意外改变身份。
+
+`displayName` 用于产品文件名、产品显示元数据、默认窗口名称和插件向 DAW 报告的名称。create 跳过时将当时的 `project.name` 保存为显示名；既有 YAML 省略时回退到 `project.name`。允许中文和空格，拒绝跨平台文件名禁用字符、控制字符、Windows 保留名以及末尾点或空格。工程机器名、CMake target、源码名称仍由原字段管理。生成产物为 `<displayName>.app`、`<displayName>.exe`、`<displayName>.vst3`；产物位置仍读取 CMake 模型，不拼接显示名猜测路径。
+
+VST3 名称以 UTF-16 class info 向宿主报告。JUCE 8.0.12 的 VST3 命令对 shell 特殊字符和 Unicode 名称处理不完整；根工程在构建树内应用受版本检查的 CMake 兼容修正，不改写依赖检出。JUCE 对应定义变化时 configure 必须明确失败并要求审查修正。
+
+`icon` 是相对**工程根目录**的 PNG 路径；`assets/` 与 `ui/`、`native/` 并列，`assets/icon.png` 不是 UI 子项目内的资源。create 可选择外部 PNG，将其复制到工程根的 `assets/icon.png` 后保存相对路径。源文件必须是静态正方形 PNG，边长至少 256，推荐 1024，支持透明度；损坏、缺失或不合格时明确失败。省略时新工程使用系统默认图标，adopt 不借此接管或覆盖已有手工图标配置。
+
+图片解码、透明度正确的缩放和格式转换均由 CLI 的 Node 侧完成，生成物置于本机构建树，不要求用户安装图片转换工具，也不调用 JUCE 的图标转换程序。只生成不超过源图尺寸的规格。macOS 的 `.app`、`.vst3` 使用 Resources 中的 ICNS 和 plist 引用；Windows EXE 将 ICO 编译进资源，VST3 使用 `Plugin.ico`、`desktop.ini` 及对应 shell 属性。DAW 内图标呈现由宿主决定。
+
+CONFIG 维护构建接入配置；SETUP/configure 在构建前准备派生图标，build/dev 使用同一链路，package 仅整理并核验既有产物。准备与构建记录包含显示名、适用平台的 Bundle ID 和图标源内容摘要。同路径 PNG 修改、配置删除或显示名变化会使旧记录过期；仅重新 configure 不代表旧二进制已经包含新资源。
 
 ## 命令
 
@@ -124,7 +150,7 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，要求 UI dist 包含普通文件 `app.js`，复制整个 UI 目录。
 
-已有 CLI 构建记录必须为 `completed`，且版本、输出位置、目标与所选产品等事实匹配；缺少记录允许整理手工构建的产物。缺少记录不代表已证明源码或二进制版本一致；打包清单保留可取得的版本与文件摘要。
+已有 CLI 构建记录必须为 `completed`，且版本、输出位置、目标与所选产品等事实匹配。显式配置了产品显示名、图标或 macOS Bundle ID 时，必须有匹配资源身份的 CLI native 构建记录，防止只更新配置便交付旧二进制；缺少记录时提示先执行 native build。未使用这些字段的既有工程继续允许整理手工构建的产物；缺少记录不代表已证明源码或二进制版本一致，打包清单保留可取得的版本与文件摘要。
 
 ## 版本与工具链
 
@@ -150,7 +176,7 @@ build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`�
 
 Windows VST3 的二进制目录按架构核验为 `Contents/x86_64-win` 或 `Contents/arm64-win`；Mac 产品核验 `Contents/MacOS` 和 `Info.plist`。只复制 bundle 内现成的依赖，不尝试改写任意外部 Mac dylib 搜索路径。
 
-所有产物在同文件系统临时目录中整理、核验后再替换。UI 总是整体更新以去除旧资源；`--clean` 仅重建本次 flavor/version/platform/product 的所选产品目录，其它输出保留。不带 clean 时保留所选目录的额外文件，但仍替换当前产品和 UI。提交采用备份和逆序回退；失败不得先删除旧交付物，回退失败保留并报告备份位置。路径重叠、包外/失效符号链接或交付目录中的符号链接别名须在提交前拒绝。
+所有产物在同文件系统临时目录中整理、核验后再替换。UI 总是整体更新以去除旧资源；`--clean` 仅重建本次 flavor/version/platform/product 的所选产品目录，其它输出保留。不带 clean 时保留所选目录的额外文件，但仍替换当前产品和 UI。显示名改变时，依据上次产品清单识别并替换 CLI 原有入口；未被清单确认归属的其它产品或用户文件保留。提交采用备份和逆序回退；失败不得先删除旧交付物，回退失败保留并报告备份位置。路径重叠、包外/失效符号链接或交付目录中的符号链接别名须在提交前拒绝。
 
 产品和交付目录分别生成轻量 `arrange-package.json`，记录项目/Framework 版本、平台架构、相对路径、可用构建记录和入口/二进制摘要。
 

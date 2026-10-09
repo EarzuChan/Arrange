@@ -72,7 +72,7 @@ test("Fatal、Resolvable、Idle、Applicable 完整收集；Fatal 阻止交互�
     assert.equal(result.status, "blocked")
     const report = result.report!
     assert.equal(report.fatal.length, 1)
-    assert.equal(report.resolvable.length, 2)
+    assert.equal(report.resolvable.length, cmakeListsFile.clusters.length)
     assert.equal(report.applicable.length, 1)
     assert.ok(report.idle.length)
     assert.equal(ui.choices, 0)
@@ -163,7 +163,7 @@ test("名称和 Framework 版本共同更新 UI/native，保留 CMake target、�
     assert.equal(ui.choices, 0)
     assert.equal(ui.reports.length, 1)
     assert.deepEqual(new Set(result.report!.applicable.map(update => update.target.region)), new Set([productNameRegion, packageNameRegion, frameworkVersionRegion, frameworkDependencyRegion]))
-    assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), cmakeBefore.replace('PRODUCT_NAME "TestPlugin"', 'PRODUCT_NAME "RenamedPlugin"').replace('GIT_TAG "v0.0.0-m.2.2"', 'GIT_TAG "v0.0.0-m.2.3"'))
+    assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), cmakeBefore.replace('PRODUCT_NAME "TestPlugin"', 'PRODUCT_NAME "RenamedPlugin"').replace('PLUGIN_NAME "TestPlugin"', 'PLUGIN_NAME "RenamedPlugin"').replace('GIT_TAG "v0.0.0-m.2.2"', 'GIT_TAG "v0.0.0-m.2.3"'))
     assert.deepEqual(JSON.parse(await readFile(packageJsonFile.path(state), "utf8")), { ...packageBefore, name: "renamedplugin", dependencies: { ...packageBefore.dependencies, "@arrange/framework": "0.0.0-m.2.3" } })
 })
 

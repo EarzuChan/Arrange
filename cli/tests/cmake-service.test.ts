@@ -1,5 +1,6 @@
+import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
 import assert from "node:assert/strict"
-import { access, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import test from "node:test"
 import { Executor } from "../src/platform/Executor.ts"
 import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
@@ -10,6 +11,8 @@ import { tmpdir } from "node:os"
 import { locateTool } from "../src/platform/ToolLocator.ts"
 import { assertPlainDirectoryPath } from "../src/util/PlainDirectoryPath.ts"
 import { isAbortError, type ProcessResult, type ProcessSpec } from "../src/platform/ProcessSpec.ts"
+import { PNG } from "pngjs"
+import { nativeIconCmakeDefinitions, nativeIconDirectory } from "../src/CliMetadata.ts"
 
 test("native build 尊重 CMake 并行环境变量，未设置时保留默认并行参数", async t => {
     const previous = process.env.CMAKE_BUILD_PARALLEL_LEVEL
@@ -30,7 +33,7 @@ test("native build 尊重 CMake 并行环境变量，未设置时保留默认并
             }
         }
         const executor = new RecordingExecutor()
-        const service = new CmakeService(executor, new MacPlatformService(executor))
+        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
         const model: CmakeModel = { sourceDirectory: join(state.rootDir, "native"), buildDirectory: service.buildDirectory(state, "release"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
         service.configure = async () => model
         service.readModel = async () => model
@@ -53,7 +56,7 @@ test("CMake cancellation stays an AbortError even when a tool reports exit zero"
     const state = await fixture(t, false)
     state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Unix Makefiles", architecture: "arm64" } }
     const executor = new CancelledExecutor()
-    const service = new CmakeService(executor, new MacPlatformService(executor))
+    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
     await assert.rejects(service.configure(state, "debug"), isAbortError)
     assert.equal((await service.inspect(state, "debug")).ready, false)
     service.configure = async () => ({ sourceDirectory: state.rootDir, buildDirectory: service.buildDirectory(state, "debug"), configuration: "Debug", platform: "darwin", architecture: "arm64", targets: [] })
@@ -72,7 +75,7 @@ test("CMake rejects aliased work directories before reading, resetting or runnin
         await mkdir(dirname(alias), { recursive: true })
         await symlink(external, alias, process.platform === "win32" ? "junction" : "dir")
         const executor = new Executor()
-        const service = new CmakeService(executor, new MacPlatformService(executor))
+        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
         const inspected = await service.inspect(state, "debug")
         assert.equal(inspected.ready, false)
         assert.match(inspected.reason!, /符号链接/)
@@ -108,10 +111,19 @@ test("real CMake query keeps target identity separate from product name and refr
     await write(join(native, "main.cpp"), "int plugin(); int main(){ return plugin(); }\n")
     await write(join(native, "module.cpp"), "int plugin(); int module(){ return plugin(); }\n")
     const executor = new Executor()
-    const service = new CmakeService(executor, new MacPlatformService(executor))
+    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
     assert.equal((await service.inspect(state, "debug")).ready, false)
     const model = await service.configure(state, "debug")
     assert.equal((await service.inspect(state, "debug")).ready, true)
+    for (const [key, value] of Object.entries({ displayName: "显示 产品", bundleId: "com.example.test", vendorName: "Other Vendor", vendorCode: "Vend", pluginCode: "Plug", version: "2.0.0" })) {
+        const metadata = state.project.project as unknown as Record<string, string | undefined>
+        const previous = metadata[key]
+        metadata[key] = value
+        assert.equal((await service.inspect(state, "debug")).ready, false, key)
+        if (previous === undefined) delete metadata[key]
+        else metadata[key] = previous
+        assert.equal((await service.inspect(state, "debug")).ready, true, key)
+    }
     state.local.node = { path: "/new/node" }
     state.local.packageManager = { path: "/new/npm" }
     state.project.framework.nodeRegistryUrl = "https://different.example.test/"
@@ -140,6 +152,40 @@ test("real CMake query keeps target identity separate from product name and refr
     assert.equal(multi.configuration, "Debug")
     assert.equal((await service.inspect(state, "debug")).ready, true)
     await access(join(service.buildDirectory(state, "debug"), "build-Debug.ninja"))
+    state.project.project.icon = "assets/icon.png"
+    const png = new PNG({ width: 256, height: 256 })
+    png.data.fill(255)
+    const iconSource = join(state.rootDir, state.project.project.icon)
+    await mkdir(dirname(iconSource), { recursive: true })
+    await writeFile(iconSource, PNG.sync.write(png))
+    assert.equal((await service.inspect(state, "debug")).ready, false)
+    await service.configure(state, "debug")
+    const iconDirectory = join(service.buildDirectory(state, "debug"), nativeIconDirectory)
+    const cacheWithIcon = await readFile(join(service.buildDirectory(state, "debug"), "CMakeCache.txt"), "utf8")
+    assert.ok(cacheWithIcon.includes(`${nativeIconCmakeDefinitions.ico}:UNINITIALIZED=${join(iconDirectory, "icon.ico")}`))
+    assert.equal((await service.inspect(state, "debug")).ready, true)
+    png.data[0] = 0
+    await writeFile(iconSource, PNG.sync.write(png))
+    assert.equal((await service.inspect(state, "debug")).ready, false)
+    await service.configure(state, "debug")
+    assert.equal((await service.inspect(state, "debug")).ready, true)
+    await writeFile(join(iconDirectory, "icon.icns"), "corrupted")
+    assert.equal((await service.inspect(state, "debug")).ready, false)
+    await service.configure(state, "debug")
+    assert.equal((await service.inspect(state, "debug")).ready, true)
+    delete state.project.project.icon
+    assert.equal((await service.inspect(state, "debug")).ready, false)
+    await service.configure(state, "debug")
+    await assert.rejects(access(join(iconDirectory, "icon.ico")), { code: "ENOENT" })
+    await assert.rejects(access(join(iconDirectory, "icon.icns")), { code: "ENOENT" })
+    const cacheWithoutIcon = await readFile(join(service.buildDirectory(state, "debug"), "CMakeCache.txt"), "utf8")
+    assert.ok(cacheWithoutIcon.includes(`${nativeIconCmakeDefinitions.ico}:UNINITIALIZED=\n`))
+    assert.ok(cacheWithoutIcon.includes(`${nativeIconCmakeDefinitions.icns}:UNINITIALIZED=\n`))
+    assert.equal((await service.inspect(state, "debug")).ready, true)
+    for (const key of Object.values(nativeIconCmakeDefinitions)) {
+        state.local.native!.cmakeDefinitions = { [key]: "override" }
+        await assert.rejects(service.configure(state, "debug"), /不支持的 CMake 自定义选项/)
+    }
     state.local = null
     assert.equal((await service.inspect(state, "debug")).ready, false)
 })

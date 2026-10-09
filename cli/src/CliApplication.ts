@@ -38,6 +38,7 @@ import { registerDevCommand } from "./command/Dev.ts"
 import { registerPackageCommand } from "./command/Package.ts"
 import { registerSyncCommand } from "./command/Sync.ts"
 import { FileTransaction } from "./util/FileTransaction.ts"
+import { IconAssetsService } from "./asset/IconAssetsService.ts"
 
 export interface CliInteractions {
     readonly project: ProjectInteraction
@@ -66,13 +67,13 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const configuration = new ConfigurationReadiness(scanner, interactions.config)
     const project = new ProjectService(store, framework, configuration)
     const node = new NodeJsService(executor)
-    const cmake = new CmakeService(executor, platform)
+    const cmake = new CmakeService(executor, platform, new IconAssetsService(options.signal))
     const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, options.signal)
     const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, options.signal)
     const initializer = new ProjectInitializer(fileWriter, options.signal)
     const native = new NativeBuildService(cmake)
     const artifacts = new ArtifactLocator(cmake)
-    const packer = new Packer(artifacts, executor)
+    const packer = new Packer(artifacts, executor, options.signal)
     const ui = new UiBuildService(node)
     const builder = new BuildService(project, tools, ui, native, packer)
     const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer)

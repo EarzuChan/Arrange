@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
-import { lstat, readFile, readdir, rm, symlink } from "node:fs/promises"
+import { lstat, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { basename, dirname, resolve } from "node:path"
 import { test, type TestContext } from "node:test"
 import { CmakeService, type CmakeModel } from "../src/cmake/CmakeService.ts"
@@ -11,6 +11,9 @@ import { Executor } from "../src/platform/Executor.ts"
 import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
 import type { ProcessResult, ProcessSpec } from "../src/platform/ProcessSpec.ts"
 import { fixture, write } from "./fixture.ts"
+import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
+import { nativePresentationSignature } from "../src/project/NativePresentation.ts"
+import { PNG } from "pngjs"
 
 function result(exitCode = 0, stdout = "", stderr = ""): ProcessResult {
     return { exitCode, stdout, stderr, cancelled: false, timedOut: false }
@@ -29,7 +32,7 @@ class ModelCmakeService extends CmakeService {
     ready = true
     constructor(readonly model: CmakeModel) {
         const executor = new RecordingExecutor()
-        super(executor, new MacPlatformService(executor))
+        super(executor, new MacPlatformService(executor), new IconAssetsService())
     }
     override async inspect() { return { ready: this.ready, reason: this.ready ? undefined : "配置已过期", model: this.ready ? this.model : undefined } }
     override async readModel() { return this.model }
@@ -142,6 +145,97 @@ test("无 --clean 保留所选目录额外文件，但当前 bundle/UI 总是完
     assert.equal(await readFile(resolve(packed.products[0].path, "Contents/Resources/moduleinfo.json"), "utf8"), "{\"Name\":\"A Product\"}")
 })
 
+test("显示名改变后按清单替换 CLI 旧产物，同时保留用户额外产品", async t => {
+    for (const platform of ["win32", "darwin"] as const) {
+        const input = await setup(t, platform)
+        const options = { flavor: "release", products: ["standalone", "vst3"] } as const
+        await new Packer(input.locator, input.executor).pack(input.state, options)
+        for (const product of options.products) await write(resolve(input.output, product, "Manual.vst3/notes.txt"), "用户文件")
+        for (const root of [input.standaloneRoot, input.vstRoot]) {
+            const next = root.replaceAll("A Product", "新 产品")
+            await rename(root, next)
+            if (!root.endsWith(".exe")) {
+                const binary = root === input.standaloneRoot ? input.standalone : input.vst
+                await rename(resolve(next, platform === "darwin" ? "Contents/MacOS" : "Contents/x86_64-win", basename(binary)), binary.replaceAll("A Product", "新 产品"))
+            }
+        }
+        input.state.project.project.displayName = "新 产品"
+        await write(resolve(input.state.rootDir, ".arrange/built-native-release.json"), JSON.stringify({ status: "completed", projectVersion: input.state.project.project.version, frameworkVersion: input.state.project.framework.version, target: input.state.project.native.target, products: [...options.products], configuration: "Release", platform, architecture: input.model.architecture, presentationSignature: await nativePresentationSignature(input.state, platform) }))
+        const model = { ...input.model, targets: input.model.targets.map(target => ({ ...target, artifacts: target.artifacts.map(path => path.replaceAll("A Product", "新 产品")) })) }
+        const packed = await new Packer(new ArtifactLocator(new ModelCmakeService(model)), input.executor).pack(input.state, options)
+        for (const product of packed.products) {
+            assert.match(product.path, /新 产品/)
+            assert.equal(await readFile(resolve(input.output, product.product, "Manual.vst3/notes.txt"), "utf8"), "用户文件")
+            assert.ok((await readdir(resolve(input.output, product.product))).every(name => !name.startsWith("A Product")))
+        }
+    }
+})
+
+test("不信任越界或其它工程的旧产物清单", async t => {
+    const input = await setup(t)
+    const directory = resolve(input.output, "standalone")
+    await write(resolve(directory, "Keep.exe"), "用户程序")
+    const manifest = { format: 1, project: input.state.project.project.name, nativeTarget: input.state.project.native.target, product: "standalone", platform: "win32", architecture: "x64", binary: "Keep.exe" }
+    for (const change of [{ project: "Other" }, { binary: "../Keep.exe" }, { binary: "C:\\Keep.exe" }, { binary: "/Keep.exe" }]) {
+        await write(resolve(directory, "arrange-package.json"), JSON.stringify({ ...manifest, ...change }))
+        await new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone"] })
+        assert.equal(await readFile(resolve(directory, "Keep.exe"), "utf8"), "用户程序")
+    }
+})
+
+test("Windows VST3 暂存后恢复图标 shell 属性，失败保留上次交付", async t => {
+    const input = await setup(t)
+    await oldOutput(input.output)
+    await write(resolve(input.vstRoot, "Plugin.ico"), "ico")
+    await write(resolve(input.vstRoot, ".arrange-icon"), "")
+    await write(resolve(input.vstRoot, "desktop.ini"), "[.ShellClassInfo]\nIconResource=Plugin.ico,0\n")
+    input.executor.handler = () => result(1, "", "attrib failed")
+    await assert.rejects(new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["vst3"] }), /图标属性/)
+    assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
+    input.executor.calls.length = 0
+    input.executor.handler = () => result()
+    const packed = await new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["vst3"] })
+    assert.equal(await readFile(resolve(packed.products[0].path, "Plugin.ico"), "utf8"), "ico")
+    await assert.rejects(lstat(resolve(packed.products[0].path, ".arrange-icon")), { code: "ENOENT" })
+    assert.equal(input.executor.calls.length, 3)
+    assert.ok(input.executor.calls.every(call => call.command === "attrib" && call.cwd?.includes(".arrange-package-")))
+})
+
+test("configure 后也不能用旧 receipt 打包改名或换图后的二进制；Windows 忽略 bundleId", async t => {
+    const input = await setup(t)
+    const metadata = input.state.project.project
+    metadata.displayName = "A Product"
+    metadata.bundleId = "com.example.product"
+    const signature = await nativePresentationSignature(input.state, "win32")
+    metadata.bundleId = "com.example.changed"
+    assert.equal(await nativePresentationSignature(input.state, "win32"), signature)
+    const record = { status: "completed", projectVersion: metadata.version, frameworkVersion: input.state.project.framework.version, target: input.state.project.native.target, products: ["standalone"], configuration: "Release", platform: "win32", architecture: "x64", presentationSignature: signature }
+    const path = resolve(input.state.rootDir, ".arrange/built-native-release.json")
+    await write(path, JSON.stringify(record))
+    const packer = new Packer(input.locator, input.executor)
+    const options = { flavor: "release", products: ["standalone"] } as const
+    await packer.pack(input.state, options)
+    metadata.displayName = "Changed"
+    await assert.rejects(packer.pack(input.state, options), /显示名、Bundle ID 或图标/)
+    metadata.displayName = "A Product"
+    metadata.icon = "assets/icon.png"
+    const png = new PNG({ width: 256, height: 256 })
+    png.data.fill(255)
+    const iconPath = resolve(input.state.rootDir, metadata.icon)
+    await write(iconPath, "")
+    await writeFile(iconPath, PNG.sync.write(png))
+    await assert.rejects(packer.pack(input.state, options), /显示名、Bundle ID 或图标/)
+    await write(path, JSON.stringify({ ...record, presentationSignature: await nativePresentationSignature(input.state, "win32") }))
+    await packer.pack(input.state, options)
+    png.data[0] = 0
+    await writeFile(iconPath, PNG.sync.write(png))
+    await assert.rejects(packer.pack(input.state, options), /显示名、Bundle ID 或图标/)
+    delete metadata.icon
+    await assert.rejects(packer.pack(input.state, options), /显示名、Bundle ID 或图标/)
+    await rm(path)
+    await assert.rejects(packer.pack(input.state, options), /需要 CLI 原生构建记录/)
+})
+
 test("暂存仅复制额外内容，保留相对链接及未知 bundle，替换当前产品后清单正确", async t => {
     const input = await setup(t)
     await oldOutput(input.output)
@@ -183,6 +277,22 @@ test("保留额外内容复制失败时不动旧产品与清单", async t => {
     }
     await assert.rejects(new FailedExtraCopy(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone"] }), /额外文件复制失败/)
     assert.equal(await readFile(oldFile, "utf8"), "old-standalone")
+    assert.equal(await readFile(resolve(input.output, "arrange-package.json"), "utf8"), "old-manifest")
+    assert.ok((await readdir(input.output)).every(name => !name.startsWith(".arrange-package-")))
+})
+
+test("无外部工具的 Windows 打包在复制期间取消，也不能提交新产物", async t => {
+    const input = await setup(t)
+    await oldOutput(input.output)
+    const controller = new AbortController()
+    class CancelledCopyPacker extends Packer {
+        protected override async copy(source: string, destination: string): Promise<void> {
+            await super.copy(source, destination)
+            if (source === input.ui) controller.abort()
+        }
+    }
+    await assert.rejects(new CancelledCopyPacker(input.locator, input.executor, controller.signal).pack(input.state, { flavor: "release", products: ["standalone"], clean: true }), error => error instanceof Error && error.name === "AbortError")
+    assert.equal(await readFile(resolve(input.output, "standalone/old.txt"), "utf8"), "old-standalone")
     assert.equal(await readFile(resolve(input.output, "arrange-package.json"), "utf8"), "old-manifest")
     assert.ok((await readdir(input.output)).every(name => !name.startsWith(".arrange-package-")))
 })

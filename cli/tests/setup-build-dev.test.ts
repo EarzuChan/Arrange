@@ -21,6 +21,7 @@ import { SetupService } from "../src/sync/SetupService.ts"
 import type { SetupScope } from "../src/sync/SetupScanReport.ts"
 import type { SetupInteraction } from "../src/sync/SetupInteraction.ts"
 import { fixture, write } from "./fixture.ts"
+import { nativePresentationSignature } from "../src/project/NativePresentation.ts"
 
 const local: LocalDefinition = { node: { path: "/tools/node", version: "26.5.0" }, packageManager: { path: "/tools/npm", version: "11.0.0" } }
 
@@ -208,6 +209,7 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
             }
         } as unknown as NodeJsService)
         const native = new NativeBuildService({
+            presentationSignature: () => nativePresentationSignature(state, model.platform),
             build: async () => {
                 await compile()
                 return model
@@ -227,6 +229,20 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
         assert.equal(failed.path, undefined)
         assert.equal(failed.configuration, undefined)
     })
+})
+
+test("native 构建过程中元数据改变必须留下失败记录", async t => {
+    const state = await preparedState(t)
+    const model: CmakeModel = { sourceDirectory: state.rootDir, buildDirectory: state.rootDir, configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
+    const native = new NativeBuildService({
+        presentationSignature: () => nativePresentationSignature(state, model.platform),
+        build: async () => {
+            state.project.project.displayName = "Changed during build"
+            return model
+        }
+    } as unknown as CmakeService)
+    await assert.rejects(native.build(state, "release", ["standalone"]), /构建期间/)
+    assert.equal(JSON.parse(await readFile(resolve(state.rootDir, ".arrange/built-native-release.json"), "utf8")).status, "failed")
 })
 
 async function devHarness(t: TestContext) {

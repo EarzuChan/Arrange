@@ -1,11 +1,12 @@
-import { defaultFetchUrl, defaultBundleIdPrefix } from "../CliMetadata.ts"
+import { defaultFetchUrl } from "../CliMetadata.ts"
 import { resolve } from "node:path"
 import { TextFile } from "../managed/ManagedFile.ts"
 import { TextCluster } from "../managed/TextCluster.ts"
 import { TextRegion } from "../managed/TextRegion.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
-
-const quote = (value: string): string => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/;/g, "\\;")}"`
+import { effectiveBundleId, effectiveDisplayName } from "../project/ProjectMetadata.ts"
+import { quote } from "./CmakeText.ts"
+import { productIconAssetsRegion, productIconPlistRegion, productIconPreparationRegion } from "./CmakeIconStuffs.ts"
 
 export const fetchContentRepositoryRegion: TextRegion = new class extends TextRegion {
     readonly id = "cmake.fetch-content-repository"
@@ -44,7 +45,7 @@ export const pluginIdentityRegion: TextRegion = new class extends TextRegion {
         return `    COMPANY_NAME ${quote(project.vendorName)}
     PLUGIN_MANUFACTURER_CODE ${project.vendorCode}
     PLUGIN_CODE ${project.pluginCode}
-    BUNDLE_ID ${quote(`${defaultBundleIdPrefix}.${project.vendorCode.toLowerCase()}.${state.project.native.target.replace(/[^A-Za-z0-9.-]/g, "-")}`)}
+    BUNDLE_ID "\${_arrange_bundle_id}"
 `
     }
 }()
@@ -64,7 +65,8 @@ export const productNameRegion: TextRegion = new class extends TextRegion {
     readonly managedItemId = "project.name"
 
     protected override makeInner(state: ProjectState): string {
-        return `    PRODUCT_NAME ${quote(state.project.project.name)}\n`
+        const name = quote(effectiveDisplayName(state))
+        return `    PRODUCT_NAME ${name}\n    PLUGIN_NAME ${name}\n`
     }
 }()
 
@@ -81,9 +83,33 @@ FetchContent_MakeAvailable(arrange)
     }
 }()
 
+export const pluginBundleIdRegion: TextRegion = new class extends TextRegion {
+    readonly id = "cmake.bundle-id"
+    readonly managedItemId = "cmake.plugin-identity"
+
+    protected override makeInner(state: ProjectState): string {
+        const fallbackState = { project: { project: { vendorCode: state.project.project.vendorCode }, native: state.project.native } }
+        return `if(APPLE)
+    set(_arrange_bundle_id ${quote(effectiveBundleId(state))})
+else()
+    set(_arrange_bundle_id ${quote(effectiveBundleId(fallbackState))})
+endif()
+`
+    }
+}()
+
+export const productSettingsCluster: TextCluster = new class extends TextCluster {
+    readonly id = "cmake.product-settings"
+    readonly regions = [pluginBundleIdRegion, productIconPreparationRegion] as const
+
+    protected override makeInner(state: ProjectState): string {
+        return this.regions.map(region => region.make(state)).join("")
+    }
+}()
+
 export const jucePluginCluster: TextCluster = new class extends TextCluster {
     readonly id = "cmake.juce-plugin"
-    readonly regions = [pluginVersionRegion, pluginIdentityRegion, pluginFormatsRegion, productNameRegion] as const
+    readonly regions = [pluginVersionRegion, pluginIdentityRegion, pluginFormatsRegion, productNameRegion, productIconPlistRegion] as const
 
     protected override makeInner(state: ProjectState): string {
         const regions = this.regions.map(region => region.make(state)).join("")
@@ -101,10 +127,19 @@ ${regions}    IS_SYNTH ${isSynth}
     }
 }()
 
+export const productAssetsCluster: TextCluster = new class extends TextCluster {
+    readonly id = "cmake.product-assets"
+    readonly regions = [productIconAssetsRegion] as const
+
+    protected override makeInner(state: ProjectState): string {
+        return productIconAssetsRegion.make(state)
+    }
+}()
+
 export const cmakeListsFile: TextFile = new class extends TextFile {
     readonly id = "cmake-lists"
     readonly scope = "Native"
-    readonly clusters = [fetchContentCluster, jucePluginCluster] as const
+    readonly clusters = [fetchContentCluster, productSettingsCluster, jucePluginCluster, productAssetsCluster] as const
 
     override path(state: ProjectState): string {
         return resolve(state.rootDir, state.project.native.directory, "CMakeLists.txt")
@@ -121,7 +156,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ${fetchContent}
+${productSettingsCluster.make(state)}
 ${plugin}
+${productAssetsCluster.make(state)}
 juce_generate_juce_header(${target})
 target_sources(${target} PRIVATE "Source/${target}Processor.cpp")
 target_compile_definitions(${target} PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
