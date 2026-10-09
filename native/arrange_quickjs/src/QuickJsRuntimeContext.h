@@ -31,11 +31,21 @@ namespace arrange::quickjs {
         JSValue prepareFrame = JS_UNDEFINED;
         JSValue completeFrame = JS_UNDEFINED;
         JSValue disposeApp = JS_UNDEFINED;
+        JSValue materializeLayout = JS_UNDEFINED;
+        bool materializingLayout = false;
         double frameTimeMillis = 0.0;
         static constexpr std::size_t maxJobsPerFrame = 10000;
         std::size_t remainingFrameJobs = maxJobsPerFrame;
         arrange::core::MutationTransactionQueue* pendingTransactions = nullptr;
         QuickJsEventRegistry events;
+
+        struct PreparedDrawCallback {
+            JSValue callback;
+            float width;
+            float height;
+        };
+
+        std::vector<PreparedDrawCallback> preparedDrawCallbacks;
         std::vector<std::pair<JSValue, JSValue>> unhandledRejections;
         std::unordered_map<std::uint64_t, arrange::core::RegisterBinding> bindings;
 
@@ -53,6 +63,7 @@ namespace arrange::quickjs {
         QuickJsModuleLoader moduleLoader;
         arrange::core::PainterLoader painterLoader;
         std::unique_ptr<QuickJsPainterResources> painters;
+        std::unordered_map<arrange::core::NodeId, arrange::core::MeasurePolicy> measurePolicies;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeType> nodeTypes;
         std::unordered_map<arrange::core::NodeId, std::uint64_t> nodeGenerations;
         std::unordered_map<arrange::core::NodeId, std::unordered_map<arrange::core::HostInput, arrange::core::BindingHandle>> hostBindings;
@@ -62,6 +73,7 @@ namespace arrange::quickjs {
         std::vector<QuickJsToastRequest> diagnosticToasts;
         std::vector<QuickJsDiagnosticAction> diagnosticActions;
         std::vector<HotMessage> hotMessages;
+        std::vector<arrange::core::FocusCommand> focusCommands;
         std::string hotSession;
 
         struct RearrangeCheckpoint {
@@ -71,6 +83,7 @@ namespace arrange::quickjs {
             decltype(publishedModifiers) savedPublishedModifiers;
             decltype(modifierInputs) savedModifierInputs;
             decltype(nodeTypes) savedNodeTypes;
+            decltype(measurePolicies) savedMeasurePolicies;
             decltype(nodeGenerations) savedNodeGenerations;
             decltype(hostBindings) savedHostBindings;
             decltype(modifierBindings) savedModifierBindings;

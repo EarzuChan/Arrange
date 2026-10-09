@@ -125,25 +125,29 @@ namespace arrange::juce {
         return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focused, float viewportX) const {
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focused, float, std::span<const arrange::core::DrawOp> focusedInputOps) const {
+        replayScopedOps(g, ops, focused, focusedInputOps, 1);
+        return {};
+    }
+
+    void JuceDrawOpsPainter::replayScopedOps(::juce::Graphics& g, std::span<const arrange::core::DrawOp> ops, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const {
         g.saveState();
         int depth = 1;
         try {
-            replayOps(g, ops, focused, viewportX, 1, depth);
+            replayOps(g, ops, focused, focusedInputOps, alpha, depth);
         } catch (...) {
             while (depth-- > 0) g.restoreState();
             throw;
         }
         while (depth-- > 0) g.restoreState();
+    }
+
+    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focused, float, std::span<const arrange::core::DrawOp> focusedInputOps) const {
+        replayFragment(g, root, focused, focusedInputOps, 1);
         return {};
     }
 
-    JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focused, float viewportX) const {
-        replayFragment(g, root, focused, viewportX, 1);
-        return {};
-    }
-
-    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focused, float viewportX, float alpha) const {
+    void JuceDrawOpsPainter::replayFragment(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const {
         if (!placed.fragment) return;
         ++counters_.fragmentsVisited;
         ::juce::Graphics::ScopedSaveState scope(g);
@@ -156,11 +160,20 @@ namespace arrange::juce {
         g.saveState();
         int depth = 1;
         try {
-            if (fragment.layer) replayOps(g, fragment.layer->before, focused, viewportX, alpha, depth);
-            const auto contentAlpha = alpha * (fragment.layer ? fragment.layer->contentAlpha : 1.0f);
-            if (fragment.content) replayOps(g, *fragment.content, focused, viewportX, contentAlpha, depth);
-            for (const auto& child : fragment.children) replayFragment(g, child, focused, viewportX, contentAlpha);
-            if (fragment.layer) replayOps(g, fragment.layer->after, focused, viewportX, alpha, depth);
+            if (fragment.layer && fragment.layer->drawCommands) {
+                for (const auto& op : fragment.layer->before) {
+                    if (op.type == arrange::core::DrawOpType::ContentMarker) {
+                        for (const auto& child : fragment.children) replayFragment(g, child, focused, focusedInputOps, alpha);
+                    } else
+                        replayOps(g, std::span<const arrange::core::DrawOp>(&op, 1), focused, focusedInputOps, alpha, depth);
+                }
+            } else {
+                if (fragment.layer) replayOps(g, fragment.layer->before, focused, focusedInputOps, alpha, depth);
+                const auto contentAlpha = alpha * (fragment.layer ? fragment.layer->contentAlpha : 1.0f);
+                if (fragment.content) replayOps(g, *fragment.content, focused, focusedInputOps, contentAlpha, depth);
+                for (const auto& child : fragment.children) replayFragment(g, child, focused, focusedInputOps, contentAlpha);
+                if (fragment.layer) replayOps(g, fragment.layer->after, focused, focusedInputOps, alpha, depth);
+            }
         } catch (...) {
             while (depth-- > 0) g.restoreState();
             throw;
@@ -168,7 +181,7 @@ namespace arrange::juce {
         while (depth-- > 0) g.restoreState();
     }
 
-    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier, float focusedInputViewportX, float alpha, int& graphicsStateDepth) const {
+    void JuceDrawOpsPainter::replayOps(::juce::Graphics& g, std::span<const arrange::core::DrawOp> ops, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha, int& graphicsStateDepth) const {
         for (const auto& op : ops) {
             ++counters_.opsVisited;
             const auto state = op.type == arrange::core::DrawOpType::PushClip || op.type == arrange::core::DrawOpType::PopClip || op.type == arrange::core::DrawOpType::PushTransform || op.type == arrange::core::DrawOpType::PopTransform;
@@ -178,6 +191,8 @@ namespace arrange::juce {
             }
             const auto rect = ::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height);
             switch (op.type) {
+                case arrange::core::DrawOpType::ContentMarker:
+                    throw std::logic_error("内容标记必须通过共享绘制片段重放");
                 case arrange::core::DrawOpType::FillRect:
                     g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                     if (op.shape == arrange::core::DrawShapeType::Circle) {
@@ -199,7 +214,12 @@ namespace arrange::juce {
                     }
                     break;
                 case arrange::core::DrawOpType::DrawText:
-                    if (!op.inputText || !focusedInputModifier.valid() || op.textField != focusedInputModifier) drawText(g, op, 0.0f, alpha);
+                    if (op.inputText && focusedInputModifier.valid() && op.textField == focusedInputModifier) {
+                        ::juce::Graphics::ScopedSaveState scope(g);
+                        g.addTransform(::juce::AffineTransform::translation(op.rect.x, op.rect.y));
+                        replayScopedOps(g, focusedInputOps, {}, {}, alpha * op.inputAlpha);
+                    } else
+                        drawText(g, op, 0.0f, alpha);
                     break;
                 case arrange::core::DrawOpType::DrawPainter: {
                     const auto* content = dynamic_cast<const JucePainterContent*>(op.painter.content.get());
@@ -223,7 +243,7 @@ namespace arrange::juce {
                 }
                 case arrange::core::DrawOpType::DrawLine:
                     g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
-                    g.drawLine(rect.getX(), rect.getY(), op.lineEnd.x, op.lineEnd.y, std::max(1.0f, op.strokeWidth));
+                    g.drawLine(rect.getX(), rect.getY(), op.lineEnd.x, op.lineEnd.y, op.strokeWidth > 0 ? op.strokeWidth : 1.0f);
                     break;
                 case arrange::core::DrawOpType::PushClip:
                     g.saveState();
@@ -253,7 +273,10 @@ namespace arrange::juce {
                     const auto pivotY = rect.getY() + rect.getHeight() * op.transformOriginY;
                     const auto radians = op.rotationZ * ::juce::MathConstants<float>::pi / 180.0f;
                     const auto transform = ::juce::AffineTransform::translation(-pivotX, -pivotY).scaled(op.scaleX, op.scaleY).rotated(radians).translated(pivotX + op.translationX, pivotY + op.translationY);
-                    g.addTransform(transform);
+                    if (transform.isSingularity())
+                        g.reduceClipRegion(::juce::Rectangle<int>{});
+                    else
+                        g.addTransform(transform);
                     break;
                 }
                 case arrange::core::DrawOpType::PopTransform:

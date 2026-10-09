@@ -6,30 +6,30 @@ namespace arrange::core {
         const auto hit = hitTester_.hitTestClickable(snapshot, point);
         if (!hit.hit) {
             activePointerId_ = -1;
-            pressedNode_ = 0;
+            pressed_ = {};
             pressedEventSlot_ = {};
             return {};
         }
 
         activePointerId_ = pointerId;
-        pressedNode_ = hit.node;
+        pressed_ = {hit.node, hit.generation};
         pressedEventSlot_ = hit.eventSlot;
         pressedModifier_ = hit.modifier;
         return {true, false, hit.node, pressedEventSlot_};
     }
 
     PointerDispatchResult PointerInputProcessor::pointerUp(const HitTestSnapshot& snapshot, Point point, int pointerId) {
-        if (activePointerId_ != pointerId || pressedNode_ == 0) return {};
+        if (activePointerId_ != pointerId || !pressed_.id) return {};
 
-        const auto pressed = pressedNode_;
+        const auto pressed = pressed_;
         const auto eventSlot = pressedEventSlot_;
         activePointerId_ = -1;
-        pressedNode_ = 0;
+        pressed_ = {};
         pressedEventSlot_ = {};
 
         const auto hit = hitTester_.hitTestClickable(snapshot, point);
-        if (hit.hit && hit.node == pressed && hit.modifier == pressedModifier_ && hit.eventSlot == eventSlot) return {true, true, pressed, eventSlot};
-        return {true, false, pressed, eventSlot};
+        if (hit.hit && hit.node == pressed.id && hit.generation == pressed.generation && hit.modifier == pressedModifier_ && hit.eventSlot.valid()) return {true, true, pressed.id, hit.eventSlot};
+        return {true, false, pressed.id, eventSlot};
     }
 
     PointerDispatchResult PointerInputProcessor::pointerDown(const LayoutTree& tree, NodeId root, Point point, int pointerId) {
@@ -41,11 +41,11 @@ namespace arrange::core {
     }
 
     PointerDispatchResult PointerInputProcessor::pointerCancel(int pointerId) noexcept {
-        if (activePointerId_ != pointerId || pressedNode_ == 0) return {};
-        const auto pressed = pressedNode_;
+        if (activePointerId_ != pointerId || !pressed_.id) return {};
+        const auto pressed = pressed_.id;
         const auto eventSlot = pressedEventSlot_;
         activePointerId_ = -1;
-        pressedNode_ = 0;
+        pressed_ = {};
         pressedEventSlot_ = {};
         return {true, false, pressed, eventSlot};
     }

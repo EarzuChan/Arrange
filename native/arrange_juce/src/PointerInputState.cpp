@@ -118,10 +118,13 @@ namespace arrange::juce {
                 result.sessionCancelled = true;
             }
         } else if (hasDelta) {
-            const auto axisMagnitude = [](float delta, WheelUnit unit) { return std::isfinite(delta) ? std::abs(delta) * (unit == WheelUnit::Lines ? scrollLineDistance : 1.0f) : 0.0f; };
+            const auto axisMagnitude = [](float delta, WheelUnit unit) {
+                return std::isfinite(delta) ? std::abs(delta) * (unit == WheelUnit::Lines ? scrollLineDistance : 1.0f) : 0.0f;
+            };
             result.horizontal = axisMagnitude(input.deltaX, input.unitX) > axisMagnitude(input.deltaY, input.unitY);
             const auto hasAxis = [&](bool horizontal) {
-                for (const auto& target : wheelSession_.initialPath) if (target.horizontal == horizontal && arrange::core::ScrollDispatcher::targetWheel(tree, target, 0, 1).target) return true;
+                for (const auto& target : wheelSession_.initialPath)
+                    if (target.horizontal == horizontal && arrange::core::ScrollDispatcher::targetWheel(tree, target, 0, 1).target) return true;
                 return false;
             };
             // 主轴没有容器才允许改用次轴；边界不能让次轴噪声接管手势

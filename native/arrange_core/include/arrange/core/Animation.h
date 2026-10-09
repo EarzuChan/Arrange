@@ -16,6 +16,8 @@ namespace arrange::core {
         float dampingRatio = 1;
         float threshold = 0.01f;
         std::array<float, 4> bezier{0.4f, 0, 0.2f, 1};
+        int iterations = 1;
+        bool reverse = false;
         bool operator==(const AnimationSpec&) const = default;
     };
 
@@ -82,12 +84,18 @@ namespace arrange::core {
                 current = {std::max(0.0f, target.width + w.first), std::max(0.0f, target.height + h.first)};
                 velocity = {w.second, h.second};
                 running = std::abs(w.first) > spec.threshold || std::abs(h.first) > spec.threshold || std::abs(w.second) > spec.threshold * 10 || std::abs(h.second) > spec.threshold * 10;
-            } else if (elapsed >= spec.delayMillis) {
-                const auto fraction = spec.kind == AnimationKind::Snap || spec.durationMillis == 0 ? 1.0f : std::min(1.0f, static_cast<float>((elapsed - spec.delayMillis) / spec.durationMillis));
-                const auto progress = sampleEasing(fraction, spec.bezier);
+            } else {
+                const auto duration = spec.kind == AnimationKind::Snap ? 0.0 : static_cast<double>(spec.durationMillis);
+                const auto cycleDuration = spec.delayMillis + duration;
+                const auto finished = cycleDuration == 0 || elapsed >= cycleDuration * spec.iterations;
+                const auto cycle = finished ? spec.iterations - 1 : static_cast<int>(elapsed / cycleDuration);
+                const auto local = finished ? cycleDuration : elapsed - cycle * cycleDuration;
+                const auto fraction = local < spec.delayMillis ? 0.0f : duration == 0 ? 1.0f : std::min(1.0f, static_cast<float>((local - spec.delayMillis) / duration));
+                const auto eased = sampleEasing(fraction, spec.bezier);
+                const auto progress = spec.reverse && cycle % 2 == 1 ? 1 - eased : eased;
                 current = {std::max(0.0f, from.width + (target.width - from.width) * progress), std::max(0.0f, from.height + (target.height - from.height) * progress)};
                 velocity = {};
-                running = fraction < 1;
+                running = !finished;
             }
             if (!running) {
                 current = target;

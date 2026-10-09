@@ -125,6 +125,11 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, c
         return 'unknown'
     }
     const matches = (expected: string, actual: string): boolean => expected === 'length' ? actual === 'dp' || actual === 'px' || actual === 'length' : expected === actual
+    const compatibleRule = (expected: Rule, actual: Rule | undefined): boolean => {
+        if (!actual) return false
+        if (typeof expected === 'string' || typeof actual === 'string') return typeof expected === 'string' && typeof actual === 'string' && matches(expected, actual)
+        return Object.entries(expected).every(([name, field]) => compatibleRule(field, actual[name]))
+    }
     const check = (expression: ts.Expression, rule: Rule): void => {
         const node = unwrap(expression)
         let rules = checked.get(node)
@@ -185,7 +190,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, c
             if (isUnrefCall(node)) return check(node.arguments[0], rule)
             return fail(node, rule)
         }
-        if (known === rule) return
+        if (compatibleRule(rule, known)) return
         const init = objectInitializer(node)
         if (init) return check(init, rule)
         if (ts.isObjectLiteralExpression(node)) {
@@ -225,6 +230,10 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, c
     }
     const argumentsOf = (node: ts.CallExpression, rules: readonly (Rule | undefined)[]) => {
         for (const [index, rule] of rules.entries()) if (rule && node.arguments[index]) check(node.arguments[index], rule)
+    }
+    const intrinsicSizeArgument = (argument: ts.Expression): boolean => {
+        const valid = (type: ts.Type): boolean => type.isUnion() ? type.types.every(valid) : type.isStringLiteral() && (type.value === 'IntrinsicSize.Min' || type.value === 'IntrinsicSize.Max')
+        return valid(checker.getTypeAtLocation(argument))
     }
     const parameterRule = (type: ts.Type): Rule | undefined => {
         const own = fieldsOf(type)
@@ -297,7 +306,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, c
             if (declaration && ts.isMethodDeclaration(declaration) && contracts.forDeclaration(declaration.parent)?.modifier) {
                 const name = declaration.name.getText().replaceAll('"', '').replaceAll("'", '')
                 const rules = Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
-                if (rules) {
+                if (rules && !((name === 'width' || name === 'height') && node.arguments.length === 1 && intrinsicSizeArgument(node.arguments[0]))) {
                     if (name === 'border' && node.arguments.length === 1) check(node.arguments[0], unitFieldContracts.border)
                     else if (name === 'padding') check(node.arguments[0], unitFieldContracts.padding)
                     else argumentsOf(node, rules)
@@ -311,6 +320,7 @@ export function validateValueUnits(program: ts.Program, source: ts.SourceFile, c
                     const name = segment.elements[0].text
                     const body = segment.elements[1].body
                     if (!ts.isArrayLiteralExpression(body)) continue
+                    if ((name === 'width' || name === 'height') && body.elements.length === 1 && intrinsicSizeArgument(body.elements[0])) continue
                     const rules = name === 'border' && body.elements.length === 1 ? [unitFieldContracts.border] : Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
                     for (const [index, rule] of (rules ?? []).entries()) if (rule && body.elements[index]) check(body.elements[index], name === 'padding' ? unitFieldContracts.padding : rule)
                 }

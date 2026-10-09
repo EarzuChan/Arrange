@@ -1,0 +1,35 @@
+<template>
+    <Column :modifier="M.fillMaxSize()">
+        <Input value="" :onSubmit="command" :modifier="M.height(30.dp)" />
+        <Text :text="`可见:${list.firstVisibleItemIndex}/${list.firstVisibleItemScrollOffset}/${list.layoutInfo.totalItemsCount}`" :modifier="M.height(20.dp)" />
+        <LazyColumn a-if="mode === 'column'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :contentType="typeOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
+        <LazyRow a-else-if="mode === 'row'" :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
+        <LazyVerticalGrid a-else-if="mode === 'verticalGrid'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Fixed(3)" :modifier="M.weight(1).fillMaxWidth()" />
+        <LazyHorizontalGrid a-else :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Adaptive(40.dp)" :modifier="M.weight(1).fillMaxWidth()" />
+    </Column>
+</template>
+
+<script>
+import { ref, createLazyState } from '@arrange/framework'
+import { M, GridCells, GridItemSpan } from '@arrange/framework/ui'
+import Item from './LazyItem.sfa'
+import RowItem from './RowItem.sfa'
+
+const list = createLazyState()
+const mode = ref('column')
+const items = ref(Array.from({ length: 10000 }, (_, id) => ({ id, height: id % 3 === 0 ? 30 : 20 })))
+const keyOf = (item: { id: number }) => item.id
+const propsOf = (item: { id: number; height: number }) => ({ id: item.id, height: item.height })
+const typeOf = (item: { height: number }) => item.height
+const spanOf = (item: { id: number }) => item.id % 11 === 0 ? GridItemSpan.MaxLineSpan : GridItemSpan(1)
+function command(value: string) {
+    if (value === 'jump') list.scrollToItem(9000, 5.px)
+    else if (value === 'pixel') list.scrollTo(220000.px)
+    else if (value === 'start') list.scrollToItem(0)
+    else if (value === 'insert') items.value = [{ id: -1, height: 50 }, ...items.value]
+    else if (value === 'reverse') items.value = [...items.value].reverse()
+    else if (value === 'animate') list.animateScrollToItem(100)
+    else if (value === 'bad') items.value = [{ id: 0, height: 20 }, { id: 0, height: 30 }]
+    else if (value === 'row' || value === 'verticalGrid' || value === 'horizontalGrid' || value === 'column') mode.value = value
+}
+</script>

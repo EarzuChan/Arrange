@@ -47,7 +47,7 @@ namespace arrange::juce {
 
     bool RearrangeHost::hasPendingVisualWork() const noexcept {
 #if ARRANGE_WITH_QUICKJS_NG
-        return scriptHost_ && scriptHost_->hasPendingVisualWork();
+        return scriptHost_ && (scriptHost_->hasPendingVisualWork() || scriptHost_->hasPendingFocusCommands());
 #else
         return false;
 #endif
@@ -80,7 +80,7 @@ namespace arrange::juce {
 
     RearrangeInvokeResult RearrangeHost::prepareVisualFrame(double nowMillis) {
 #if ARRANGE_WITH_QUICKJS_NG
-        if (!scriptHost_ || !scriptHost_->hasPendingVisualWork()) return {};
+        if (!scriptHost_) return {};
         const auto pumped = scriptHost_->prepareVisualFrame(nowMillis);
         if (!pumped.ok) return {true, false, pumped.error};
         return {true, true, {}};
@@ -98,6 +98,45 @@ namespace arrange::juce {
         }
 #endif
         return {false, true, {}};
+    }
+
+    RearrangeInvokeResult RearrangeHost::prepareDrawModifiers(arrange::core::NativeScene& candidate) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) {
+            const auto result = scriptHost_->prepareDrawModifiers(candidate);
+            return {true, result.ok, result.error};
+        }
+#endif
+        return {false, true, {}};
+    }
+
+    RearrangeInvokeResult RearrangeHost::materializeLayout(arrange::core::NodeId id, const std::vector<int>& indices) {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) {
+            const auto result = scriptHost_->materializeLayout(id, indices);
+            return {true, result.ok, result.error};
+        }
+#endif
+        return {false, false, "Layout 缺少脚本材料化驱动"};
+    }
+
+    std::vector<arrange::core::FocusCommand> RearrangeHost::takeFocusCommands() {
+#if ARRANGE_WITH_QUICKJS_NG
+        if (scriptHost_) return scriptHost_->takeFocusCommands();
+#endif
+        return {};
+    }
+
+    RearrangeInvokeResult RearrangeHost::invokeFocus(const arrange::core::EventSlotId& slot, double nowMillis, bool focused, bool hasFocus) {
+#if ARRANGE_WITH_QUICKJS_NG
+        arrange::quickjs::CallbackInvokeOptions options;
+        options.hasFocusArgument = true;
+        options.focused = focused;
+        options.hasFocus = hasFocus;
+        return fromScriptEventResult(eventDispatcher_.invoke(scriptHost_.get(), slot, nowMillis, options));
+#else
+        return {};
+#endif
     }
 
     RearrangeInvokeResult RearrangeHost::invoke(const arrange::core::EventSlotId& slot, double nowMillis) {

@@ -5,6 +5,7 @@
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Mutation.h>
 #include <arrange/core/Paint.h>
+#include <arrange/core/SceneFramePipeline.h>
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <arrange/juce/PainterResources.h>
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 #include <string_view>
 #include <string>
 #include <variant>
@@ -120,6 +122,7 @@ int main(int argc, char** argv) {
     std::cerr << "未启用 ARRANGE_WITH_QUICKJS_NG\n";
     return 2;
 #else
+    ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
     if (argc < 2) {
         std::cerr << "用法：arrange_quickjs_app_smoke <ui/app.js> [测试选项]\n";
         return 2;
@@ -181,7 +184,10 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    if (const auto prepared = host.prepareVisualFrame(0); !prepared.ok) throw std::runtime_error(prepared.error);
+    if (const auto prepared = host.prepareVisualFrame(0); !prepared.ok) {
+        std::cerr << prepared.error << '\n';
+        return 8;
+    }
     auto initialTransaction = host.takePendingTransaction();
     if (!initialTransaction || !initialTransaction->hasTreeMutations()) return 4;
     const auto initialEventSlotUpdates = std::count_if(initialTransaction->operations.begin(), initialTransaction->operations.end(), [](const auto& op) { return std::holds_alternative<arrange::core::RegisterEventSlot>(op); });
@@ -193,10 +199,29 @@ int main(int argc, char** argv) {
     if (!transactionContainsTypedModifier(*initialTransaction)) return 6;
 
     arrange::core::NativeScene scene;
-    scene.apply(*initialTransaction);
+    arrange::core::SceneFramePipeline pipeline;
+    arrange::core::PublishedFrame published;
+    const arrange::core::FramePreparation preparation{
+        [&](arrange::core::NodeId id, const std::vector<int>& indices) {
+            const auto materialized = host.materializeLayout(id, indices);
+            if (!materialized.ok) throw std::runtime_error(materialized.error);
+            auto transaction = host.takePendingTransaction();
+            if (!transaction) throw std::runtime_error("Layout 材料化未提交原生候选");
+            return std::move(*transaction);
+        },
+        [&](arrange::core::NativeScene& candidate) {
+            const auto prepared = host.prepareDrawModifiers(candidate);
+            if (!prepared.ok) throw std::runtime_error(prepared.error);
+        },
+    };
+    const auto frame = pipeline.run(scene, 1, {0.0f, 520.0f, 0.0f, 300.0f}, &*initialTransaction, true, published, {}, 0, preparation);
+    if (frame.error) {
+        (void)host.completeRearrange(frame.rearrange, *frame.error);
+        (void)host.completeVisualFrame(false);
+        std::cerr << *frame.error << "\n";
+        return 7;
+    }
     auto& tree = scene.tree();
-    arrange::core::LayoutEngine layout;
-    layout.layout(tree, 1, {0.0f, 520.0f, 0.0f, 300.0f});
     if (!tree.contains(1) || !hasInitialDemoVisuals(tree) || !hasInitialDemoEventSlots(tree)) return 7;
 
     host.publishScene(scene);

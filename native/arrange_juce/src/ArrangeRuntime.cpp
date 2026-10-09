@@ -173,6 +173,24 @@ namespace arrange::juce {
         postEvent(std::move(event));
     }
 
+    void ArrangeRuntime::enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused) {
+        enqueueFocusEvent(slot, focused, focused);
+    }
+
+    void ArrangeRuntime::enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused, bool hasFocus) {
+        if (!slot.valid()) return;
+        QueuedEvent event;
+        event.kind = QueuedEventKind::InvokeFocus;
+        event.slot = slot;
+        event.focused = focused;
+        event.hasFocus = hasFocus;
+        postEvent(std::move(event));
+    }
+
+    std::vector<arrange::core::FocusCommand> ArrangeRuntime::takeFocusCommands() {
+        return rearrangeHost_.takeFocusCommands();
+    }
+
     bool ArrangeRuntime::hasPendingEvents() const noexcept {
         return !events_.empty();
     }
@@ -203,7 +221,7 @@ namespace arrange::juce {
     }
 
     RuntimeStepResult ArrangeRuntime::prepareVisualFrame(double nowMillis) {
-        if (!rearrangeHost_.hasPendingVisualWork()) return {};
+        if (!rearrangeHost_.hasScriptHost()) return {};
         enqueueIntent(arrange::core::InputIntent::animationFrame("统一视觉帧"));
         const auto pumped = rearrangeHost_.prepareVisualFrame(nowMillis);
         if (!pumped.ok) return {true, false, pumped.error};
@@ -247,6 +265,9 @@ namespace arrange::juce {
                 case QueuedEventKind::Invoke:
                     invoked = rearrangeHost_.invoke(event.slot, nowMillis);
                     break;
+                case QueuedEventKind::InvokeFocus:
+                    invoked = rearrangeHost_.invokeFocus(event.slot, nowMillis, event.focused, event.hasFocus);
+                    break;
                 case QueuedEventKind::InvokeString:
                     invoked = rearrangeHost_.invokeString(event.slot, nowMillis, event.value);
                     break;
@@ -288,7 +309,21 @@ namespace arrange::juce {
         const auto hasPending = pipelineState_.hasPendingTransactions() || pipelineState_.hasPendingIntents();
         if (!hasPending && !frame_.framePipelineRunRequested()) return {};
 
-        const auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested(), finalize);
+        const arrange::core::FramePreparation preparation{
+            [&](arrange::core::NodeId id, const std::vector<int>& indices) {
+                const auto materialized = rearrangeHost_.materializeLayout(id, indices);
+                if (!materialized.ok) throw std::runtime_error(materialized.error);
+                auto transaction = rearrangeHost_.takePendingTransaction();
+                if (!transaction) throw std::runtime_error("Layout 材料化未提交原生候选");
+                return std::move(*transaction);
+            },
+            [&](arrange::core::NativeScene& candidate) {
+                const auto prepared = rearrangeHost_.prepareDrawModifiers(candidate);
+                if (!prepared.ok) throw std::runtime_error(prepared.error);
+            },
+            interactionPreparation_,
+        };
+        auto result = pipelineState_.run(root, constraints, frame_.framePipelineRunRequested(), finalize, preparation);
         frame_.clearFramePipelineRunRequest();
         if (result.error) {
             const auto completed = rearrangeHost_.completeRearrange(result.rearrange, *result.error);
@@ -328,7 +363,7 @@ namespace arrange::juce {
         if (pipelineState_.scene().tree().activeAnimationCount() > 0) requestFramePipelineRun();
         auto plan = frame_.planTick(frameWorkState());
 
-        if (plan.runAnimation) {
+        if (plan.runAnimation || plan.runPipeline && rearrangeHost_.hasScriptHost()) {
             const auto animation = prepareVisualFrame(nowMillis);
             if (!animation.ok) {
                 result.changed = true;

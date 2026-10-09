@@ -27,8 +27,7 @@ namespace arrange::juce {
         if (content.errorFrame) {
             (void)drawOpsPainter_.paint(g, content.diagnosticsErrorDrawOps);
         } else {
-            (void)drawOpsPainter_.paint(g, content.scenePaint, content.focusedInputModifier, content.focusedInputViewportX);
-            (void)drawOpsPainter_.paint(g, content.overlayDrawOps, content.focusedInputModifier, content.focusedInputViewportX);
+            (void)drawOpsPainter_.paint(g, content.scenePaint, content.focusedInputModifier, content.focusedInputViewportX, content.overlayDrawOps);
         }
         (void)drawOpsPainter_.paint(g, content.diagnosticsBadgeDrawOps);
         (void)drawOpsPainter_.paint(g, content.diagnosticsToastDrawOps);

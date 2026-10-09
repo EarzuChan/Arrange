@@ -44,6 +44,11 @@ namespace arrange::quickjs {
         return it == eventSlots_.end() ? JS_UNDEFINED : it->second;
     }
 
+    JSValueConst QuickJsEventRegistry::candidateCallback(const arrange::core::EventSlotId& slot) const noexcept {
+        const auto found = eventSlots_.find(slot);
+        return found == eventSlots_.end() || retiredEventSlots_.contains(slot) ? JS_UNDEFINED : found->second;
+    }
+
     arrange::core::EventSlotId QuickJsEventRegistry::retain(arrange::core::NodeId node, arrange::core::EventSlotKind kind, JSValueConst callbackValue, arrange::core::MutationTransaction* transaction) {
         // 资源不可变。新闭包获得新 token，旧画面不会提前调用替换后的闭包
         const arrange::core::EventSlotId slot{node, kind, {}, arrange::core::allocateRuntimeIdentity(), 1};

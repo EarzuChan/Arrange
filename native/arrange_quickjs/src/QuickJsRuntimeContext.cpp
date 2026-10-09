@@ -8,7 +8,7 @@ namespace arrange::quickjs {
     void QuickJsRuntimeContext::beginRearrange() {
         if (rearrangeCheckpoint) throw std::logic_error("重排候选不能重入");
         if (!pendingTransactions) throw std::logic_error("重排缺少原生提交队列");
-        rearrangeCheckpoint = RearrangeCheckpoint{rootNodeId, pendingTransactions->pending(), bindings, publishedModifiers, modifierInputs, nodeTypes, nodeGenerations, hostBindings, modifierBindings, childrenByNode, parentByNode};
+        rearrangeCheckpoint = RearrangeCheckpoint{rootNodeId, pendingTransactions->pending(), bindings, publishedModifiers, modifierInputs, nodeTypes, measurePolicies, nodeGenerations, hostBindings, modifierBindings, childrenByNode, parentByNode};
         rearrangeSubmission = std::make_shared<arrange::core::RearrangeSubmission>(arrange::core::RearrangeSubmission{arrange::core::allocateRuntimeIdentity(), false});
         events.beginCandidate();
     }
@@ -26,6 +26,7 @@ namespace arrange::quickjs {
         publishedModifiers = std::move(saved.savedPublishedModifiers);
         modifierInputs = std::move(saved.savedModifierInputs);
         nodeTypes = std::move(saved.savedNodeTypes);
+        measurePolicies = std::move(saved.savedMeasurePolicies);
         nodeGenerations = std::move(saved.savedNodeGenerations);
         hostBindings = std::move(saved.savedHostBindings);
         modifierBindings = std::move(saved.savedModifierBindings);
@@ -166,6 +167,7 @@ namespace arrange::quickjs {
             modifierInputs.erase(current);
             nodeGenerations.erase(current);
             nodeTypes.erase(current);
+            measurePolicies.erase(current);
             childrenByNode.erase(current);
             parentByNode.erase(current);
         }

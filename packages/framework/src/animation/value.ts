@@ -10,7 +10,12 @@ export type AnimationTarget<T> = T | Ref<T> | (() => T)
 
 export type Easing = (fraction: number) => number
 
-export type AnimationSpec = Readonly<{ kind: "tween"; durationMillis: number; delayMillis: number; easing: Easing }> | Readonly<{ kind: "spring"; stiffness: number; dampingRatio: number; visibilityThreshold: number }> | Readonly<{ kind: "snap"; delayMillis: number }>
+export type TweenSpec = Readonly<{ kind: 'tween'; durationMillis: number; delayMillis: number; easing: Easing }>
+export type SpringSpec = Readonly<{ kind: 'spring'; stiffness: number; dampingRatio: number; visibilityThreshold: number }>
+export type SnapSpec = Readonly<{ kind: 'snap'; delayMillis: number }>
+export type DurationBasedAnimationSpec = TweenSpec | SnapSpec
+export type RepeatableSpec = Readonly<{ kind: 'repeatable'; iterations: number; animation: DurationBasedAnimationSpec; repeatMode: RepeatMode }>
+export type AnimationSpec = TweenSpec | SpringSpec | SnapSpec | RepeatableSpec
 
 export type AnimationArgs = { animationSpec?: AnimationSpec; label?: string; finished?: () => void }
 
@@ -74,11 +79,11 @@ export const easing = Object.freeze({
     cubicBezier: cubicBezierEasing,
 })
 
-export function tween(args: { durationMillis?: number; delayMillis?: number; easing?: Easing } = {}): AnimationSpec {
+export function tween(args: { durationMillis?: number; delayMillis?: number; easing?: Easing } = {}): TweenSpec {
     return Object.freeze({ kind: "tween", durationMillis: nonnegative(args.durationMillis ?? 300, "duration"), delayMillis: nonnegative(args.delayMillis ?? 0, "delay"), easing: args.easing ?? easing.fastOutSlowIn })
 }
 
-export function spring(args: { stiffness?: number; dampingRatio?: number; visibilityThreshold?: number } = {}): AnimationSpec {
+export function spring(args: { stiffness?: number; dampingRatio?: number; visibilityThreshold?: number } = {}): SpringSpec {
     const stiffness = nonnegative(args.stiffness ?? 400, "stiffness")
     const dampingRatio = nonnegative(args.dampingRatio ?? 1, "damping ratio")
     const visibilityThreshold = nonnegative(args.visibilityThreshold ?? 0.01, "threshold")
@@ -86,8 +91,23 @@ export function spring(args: { stiffness?: number; dampingRatio?: number; visibi
     return Object.freeze({ kind: "spring", stiffness, dampingRatio, visibilityThreshold })
 }
 
-export function snap(delayMillis = 0): AnimationSpec {
+export function snap(delayMillis = 0): SnapSpec {
     return Object.freeze({ kind: "snap", delayMillis: nonnegative(delayMillis, "delay") })
+}
+
+export function repeatable(args: { iterations: number; animation: DurationBasedAnimationSpec; repeatMode?: RepeatMode }): RepeatableSpec {
+    if (!Number.isSafeInteger(args.iterations) || args.iterations < 1 || args.iterations > 2147483647) throw new RangeError('重复次数必须是 1..2147483647 的整数')
+    if (!args.animation || args.animation.kind !== 'tween' && args.animation.kind !== 'snap') throw new TypeError('有限重复动画只接受 tween 或 snap')
+    const repeatMode = args.repeatMode ?? 'restart'
+    if (repeatMode !== 'restart' && repeatMode !== 'reverse') throw new TypeError('重复模式必须是 restart 或 reverse')
+    nonnegative(args.animation.delayMillis, 'delay')
+    if (args.animation.kind === 'tween') {
+        nonnegative(args.animation.durationMillis, 'duration')
+        if (typeof args.animation.easing !== 'function') throw new TypeError('tween 需要 easing 函数')
+    }
+    const totalDuration = (args.animation.delayMillis + (args.animation.kind === 'tween' ? args.animation.durationMillis : 0)) * args.iterations
+    if (!Number.isFinite(totalDuration)) throw new RangeError('有限重复动画总时长必须是有限数值')
+    return Object.freeze({ kind: 'repeatable', iterations: args.iterations, animation: Object.freeze({ ...args.animation }), repeatMode })
 }
 
 export const animationStats = { activeAnimations: 0, sampledAnimations: 0, sampledFrames: 0 }
@@ -242,11 +262,18 @@ function channel<T>(initial: T, converter: Converter<T>, args: AnimationArgs, in
                 current[index] = target[index] + delta
             }
         } else {
-            if (elapsed < spec.delayMillis) return
-            const duration = spec.kind === "tween" ? spec.durationMillis : 0
-            const fraction = duration ? Math.min(1, (elapsed - spec.delayMillis) / duration) : 1
-            const progress = spec.kind === "tween" ? finite(spec.easing(fraction), "缓动结果") : 1
-            done = fraction >= 1
+            const child = spec.kind === 'repeatable' ? spec.animation : spec
+            const duration = child.kind === 'tween' ? child.durationMillis : 0
+            const cycleDuration = child.delayMillis + duration
+            const iterations = spec.kind === 'repeatable' ? spec.iterations : 1
+            const finished = cycleDuration === 0 || elapsed >= cycleDuration * iterations
+            const cycle = finished ? iterations - 1 : Math.floor(elapsed / cycleDuration)
+            const local = finished ? cycleDuration : elapsed - cycle * cycleDuration
+            const fraction = local < child.delayMillis ? 0 : duration ? Math.min(1, (local - child.delayMillis) / duration) : 1
+            const reverse = spec.kind === 'repeatable' && spec.repeatMode === 'reverse' && cycle % 2 === 1
+            const eased = child.kind === 'tween' ? finite(child.easing(fraction), '缓动结果') : fraction
+            const progress = reverse ? 1 - eased : eased
+            done = finished
             for (let index = 0; index < current.length; index++) current[index] = from[index] + (target[index] - from[index]) * progress
             velocity.fill(0)
         }
@@ -471,6 +498,7 @@ export const infiniteTransition = createInfiniteTransition
 
 // 原生测量不调用任意 JS 曲线，内建及贝塞尔曲线携带无损数值描述
 export function nativeAnimationSpec(spec: AnimationSpec): Readonly<Record<string, unknown>> {
+    if (spec.kind === 'repeatable') return Object.freeze({ ...nativeAnimationSpec(spec.animation), iterations: spec.iterations, repeatMode: spec.repeatMode })
     if (spec.kind !== "tween") return spec
     const points = nativeEasings.get(spec.easing)
     if (!points) throw new TypeError("animateContentSize 需要内建或贝塞尔缓动曲线")

@@ -5,6 +5,7 @@
 #include <arrange/core/InputEditing.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/LayoutTree.h>
+#include <arrange/core/Scroll.h>
 #include <arrange/juce/TextInputLayoutModel.h>
 #include <arrange/juce/InputTextSession.h>
 
@@ -24,6 +25,11 @@ namespace arrange::juce {
         std::function<void(arrange::core::NodeId, std::string)> enqueueKeyIntent;
         std::function<void(arrange::core::NodeId, std::string)> enqueueTextInputIntent;
         std::function<void(arrange::core::NodeId, std::string)> enqueueImeCompositionIntent;
+        std::function<void(const arrange::core::EventSlotId&, bool, bool)> invokeFocusEvent;
+        std::function<void(const arrange::core::EventSlotId&)> invokeEvent;
+        std::function<void(const arrange::core::EventSlotId&, const arrange::core::ScrollResult&)> invokeScrollEvent;
+        std::function<std::string()> readClipboard;
+        std::function<void(const std::string&)> writeClipboard;
     };
 
     class TextInputOwner final {
@@ -43,6 +49,13 @@ namespace arrange::juce {
 
         [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
         [[nodiscard]] float viewportX() const noexcept;
+
+        [[nodiscard]] float viewportY() const noexcept {
+            return session_.viewportY();
+        }
+
+        void focus(const arrange::core::LayoutTree& tree, arrange::core::NodeId node, arrange::core::ModifierHandle receiver, const TextInputCallbacks& callbacks);
+        void dispatchPendingTextEdits(const arrange::core::LayoutTree& tree, const TextInputCallbacks& callbacks);
 
         [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept {
             return focusedModifier_;
@@ -65,7 +78,7 @@ namespace arrange::juce {
 
         [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks);
 
-        void finishFocusedInput(arrange::core::LayoutTree& tree, bool submit, const TextInputCallbacks& callbacks);
+        void finishFocusedInput(const arrange::core::LayoutTree& tree, bool submit, const TextInputCallbacks& callbacks);
         void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady);
         void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady);
         [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(const arrange::core::LayoutTree& tree, bool runtimeReady) const;

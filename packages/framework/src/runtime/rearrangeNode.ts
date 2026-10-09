@@ -17,5 +17,7 @@ export interface RearrangeHost {
     begin(): void
     reconcileRoots(roots: readonly RearrangeNode[]): void
     apply(complete: (error?: Error) => void): void
+    beginContinuation?(): void
+    applyContinuation?(): void
     rollback(): void
 }

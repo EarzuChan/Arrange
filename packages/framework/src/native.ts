@@ -54,7 +54,10 @@ export type NativeBindingHandle = Readonly<{ identity: bigint; generation: bigin
 export type NativeModifierHandle = NativeBindingHandle & Readonly<{ key: string; kind: string }>
 
 export type NativeTransactionTarget = {
+    focusCommand?: (operation: 'request' | 'clear' | 'move' | 'cancel', requester: number, direction?: import('./focus.ts').FocusDirection) => boolean
     installFrameDriver: (prepare: (time: number) => void, complete: (success: boolean) => void, dispose: () => void) => void
+    installLayoutDriver?: (materialize: (id: NodeId, indices: readonly number[]) => void) => void
+    continueRearrange?: () => void
     currentTime: () => number
     requestFrame: (pending: boolean) => void
     beginRearrange: () => void
@@ -63,7 +66,7 @@ export type NativeTransactionTarget = {
     acquirePainter?: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
     releasePainter?: (handle: NativeBindingHandle) => void
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
-    updateBinding: (handle: NativeBindingHandle, value: NativePropValue | PxModifier | ModifierElement | null) => void
+    updateBinding: (handle: NativeBindingHandle, value: NativePropValue | import('./measurePolicy.ts').MeasurePolicy | PxModifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void
     modifierInstances: (id: NodeId) => readonly NativeModifierHandle[]
     registerModifierBinding: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle

@@ -63,6 +63,10 @@ namespace arrange::core {
         cursorIndex_ = text_.size();
         undoStack_.clear();
         redoStack_.clear();
+        composition_.reset();
+        platformEdit_.reset();
+        lastEditBefore_.reset();
+        breakUndoGroup();
         clearSelection();
         if (selectAll && !text_.empty()) {
             selectionStart_ = 0;
@@ -72,6 +76,10 @@ namespace arrange::core {
     }
 
     void TextInputState::replaceExternal(std::string value) {
+        composition_.reset();
+        platformEdit_.reset();
+        lastEditBefore_.reset();
+        breakUndoGroup();
         text_ = std::move(value);
         committedText_ = text_;
         cursorIndex_ = clampToBoundary(cursorIndex_);
@@ -82,6 +90,10 @@ namespace arrange::core {
     }
 
     void TextInputState::reset() {
+        composition_.reset();
+        platformEdit_.reset();
+        lastEditBefore_.reset();
+        breakUndoGroup();
         text_.clear();
         committedText_.clear();
         cursorIndex_ = 0;
@@ -92,7 +104,7 @@ namespace arrange::core {
 
     InputEditResult TextInputState::insertCodepoint(char32_t codepoint) {
         if (!isSupportedScalar(codepoint)) return {};
-        recordUndoPoint();
+        recordUndoPoint(EditKind::Typing);
         (void)deleteSelection();
         const auto text = encodeUtf8(codepoint);
         text_.insert(cursorIndex_, text);
@@ -117,7 +129,7 @@ namespace arrange::core {
             return {true, true, false};
         }
         if (cursorIndex_ == 0 || text_.empty()) return {};
-        recordUndoPoint();
+        recordUndoPoint(EditKind::Backward);
         const auto start = previousUtf8Boundary(text_, cursorIndex_);
         text_.erase(start, cursorIndex_ - start);
         cursorIndex_ = start;
@@ -132,7 +144,7 @@ namespace arrange::core {
             return {true, true, false};
         }
         if (cursorIndex_ >= text_.size()) return {};
-        recordUndoPoint();
+        recordUndoPoint(EditKind::Forward);
         const auto end = nextUtf8Boundary(text_, cursorIndex_);
         text_.erase(cursorIndex_, end - cursorIndex_);
         clearSelection();
@@ -140,18 +152,31 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::moveLeft() {
+        breakUndoGroup();
+        if (hasSelection()) {
+            cursorIndex_ = std::min(selectionStart_, selectionEnd_);
+            clearSelection();
+            return {true, false, false};
+        }
         cursorIndex_ = previousUtf8Boundary(text_, cursorIndex_);
         clearSelection();
         return {true, false, false};
     }
 
     InputEditResult TextInputState::moveRight() {
+        breakUndoGroup();
+        if (hasSelection()) {
+            cursorIndex_ = std::max(selectionStart_, selectionEnd_);
+            clearSelection();
+            return {true, false, false};
+        }
         cursorIndex_ = nextUtf8Boundary(text_, cursorIndex_);
         clearSelection();
         return {true, false, false};
     }
 
     InputEditResult TextInputState::moveHome() {
+        breakUndoGroup();
         auto start = cursorIndex_;
         while (start > 0 && text_[start - 1] != '\n') --start;
         cursorIndex_ = start;
@@ -160,6 +185,7 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::moveEnd() {
+        breakUndoGroup();
         auto end = cursorIndex_;
         while (end < text_.size() && text_[end] != '\n') ++end;
         cursorIndex_ = end;
@@ -194,12 +220,14 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::moveCursorTo(std::size_t index) {
+        breakUndoGroup();
         cursorIndex_ = clampToBoundary(index);
         clearSelection();
         return {true, false, false};
     }
 
     InputEditResult TextInputState::selectAll() {
+        breakUndoGroup();
         selectionStart_ = 0;
         selectionEnd_ = text_.size();
         cursorIndex_ = selectionEnd_;
@@ -207,6 +235,7 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::selectRange(std::size_t anchor, std::size_t active) {
+        breakUndoGroup();
         selectionStart_ = clampToBoundary(anchor);
         selectionEnd_ = clampToBoundary(active);
         cursorIndex_ = selectionEnd_;
@@ -227,9 +256,9 @@ namespace arrange::core {
         return {true, true, false};
     }
 
-    InputEditResult TextInputState::replaceSelectionWithText(std::string text) {
+    InputEditResult TextInputState::replaceSelectionWithText(std::string text, bool typing) {
         if (text.empty() && !hasSelection()) return {};
-        recordUndoPoint();
+        recordUndoPoint(typing ? EditKind::Typing : EditKind::Atomic);
         (void)deleteSelection();
         text_.insert(cursorIndex_, text);
         cursorIndex_ += text.size();
@@ -238,6 +267,8 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::undo() {
+        if (composing()) return cancelComposition();
+        breakUndoGroup();
         if (undoStack_.empty()) return {};
         redoStack_.push_back(snapshot());
         const auto previous = undoStack_.back();
@@ -247,6 +278,8 @@ namespace arrange::core {
     }
 
     InputEditResult TextInputState::redo() {
+        if (composing()) return {};
+        breakUndoGroup();
         if (redoStack_.empty()) return {};
         undoStack_.push_back(snapshot());
         const auto next = redoStack_.back();
@@ -270,13 +303,87 @@ namespace arrange::core {
         selectionEnd_ = std::min(snapshot.selectionEnd, text_.size());
     }
 
-    void TextInputState::recordUndoPoint() {
+    void TextInputState::breakUndoGroup() noexcept {
+        undoGroup_ = EditKind::Atomic;
+        lastEditTime_ = -1;
+    }
+
+    InputEditResult TextInputState::moveTo(std::size_t index, bool extend) {
+        const auto anchor = hasSelection() ? selectionStart_ : cursorIndex_;
+        return extend ? selectRange(anchor, index) : moveCursorTo(index);
+    }
+
+    void TextInputState::beginPlatformEdit() {
+        if (!composition_ && !platformEdit_) platformEdit_ = PlatformEdit{snapshot(), undoStack_, redoStack_};
+    }
+
+    void TextInputState::finishPlatformEdit() noexcept {
+        platformEdit_.reset();
+    }
+
+    void TextInputState::beginComposition() {
+        if (composition_) return;
+        composition_ = snapshot();
+        platformEdit_.reset();
+        breakUndoGroup();
+    }
+
+    void TextInputState::beginCompositionFromLastEdit() {
+        if (composition_) return;
+        if (platformEdit_) {
+            composition_ = platformEdit_->before;
+            undoStack_ = std::move(platformEdit_->undo);
+            redoStack_ = std::move(platformEdit_->redo);
+            platformEdit_.reset();
+        } else {
+            composition_ = lastEditBefore_.value_or(snapshot());
+            if (lastEditAddedUndo_ && !undoStack_.empty() && sameSnapshot(undoStack_.back(), *composition_)) undoStack_.pop_back();
+        }
+        breakUndoGroup();
+    }
+
+    InputEditResult TextInputState::commitComposition() {
+        if (!composition_) return {};
+        const auto changed = text_ != composition_->text;
+        if (changed) {
+            undoStack_.push_back(*composition_);
+            if (undoStack_.size() > maxUndoStackDepth) undoStack_.erase(undoStack_.begin());
+            redoStack_.clear();
+        }
+        composition_.reset();
+        lastEditBefore_.reset();
+        breakUndoGroup();
+        return {true, changed, false};
+    }
+
+    InputEditResult TextInputState::cancelComposition() {
+        if (!composition_) return {};
+        const auto changed = text_ != composition_->text;
+        restoreSnapshot(*composition_);
+        composition_.reset();
+        lastEditBefore_.reset();
+        breakUndoGroup();
+        return {true, changed, false};
+    }
+
+    void TextInputState::recordUndoPoint(EditKind kind) {
         const auto current = snapshot();
+        lastEditBefore_ = current;
+        lastEditAddedUndo_ = false;
+        if (composition_) return;
+        const auto grouped = kind != EditKind::Atomic && kind == undoGroup_ && !hasSelection() && editTime_ >= 0 && lastEditTime_ >= 0 && editTime_ >= lastEditTime_ && editTime_ - lastEditTime_ <= 750;
+        undoGroup_ = kind;
+        lastEditTime_ = editTime_;
+        if (grouped) {
+            redoStack_.clear();
+            return;
+        }
         if (!undoStack_.empty() && sameSnapshot(undoStack_.back(), current)) {
             redoStack_.clear();
             return;
         }
         undoStack_.push_back(current);
+        lastEditAddedUndo_ = true;
         if (undoStack_.size() > maxUndoStackDepth) undoStack_.erase(undoStack_.begin());
         redoStack_.clear();
     }

@@ -21,6 +21,7 @@ namespace arrange::core {
         PushTransform,
         PopTransform,
         DrawLine,
+        ContentMarker,
     };
 
     enum class DrawShapeType {
@@ -50,6 +51,7 @@ namespace arrange::core {
         bool hasTint = false;
         bool inputText = false;
         ModifierHandle textField;
+        float inputAlpha = 1.0f;
         Point lineEnd;
         float translationX = 0.0f;
         float translationY = 0.0f;
@@ -68,6 +70,7 @@ namespace arrange::core {
         float contentAlpha = 1;
         std::vector<DrawOp> before;
         std::vector<DrawOp> after;
+        std::shared_ptr<const DrawCommands> drawCommands;
     };
 
     struct PaintBounds {
@@ -114,11 +117,10 @@ namespace arrange::core {
         static void prepareText(DrawOp& op, const TextLayoutService& service);
         std::vector<DrawOp> exportScene(const LayoutTree& tree, NodeId root) const;
         PlacedPaintFragment build(LayoutTree& tree, NodeId root, PaintWorkCounters& counters) const;
-        std::vector<DrawOp> collectOverlay(const LayoutTree& tree, NodeId target, const std::vector<DrawOp>& content, ModifierHandle receiver = {}) const;
 
        private:
         const TextLayoutService& textLayoutService_;
-        void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, bool geometryOnly = false, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
+        void collectModifier(const LayoutTree& tree, NodeId id, std::size_t index, std::vector<DrawOp>& ops, float alpha, const std::function<void(float)>& contentOverride = {}, std::size_t stopAt = static_cast<std::size_t>(-1)) const;
         std::shared_ptr<const PaintFragment> buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const;
     };
 
@@ -133,6 +135,7 @@ namespace arrange::core {
         std::size_t selectionStart = 0;
         std::size_t selectionEnd = 0;
         float viewportX = 0.0f;
+        float viewportY = 0.0f;
         std::vector<TextInputOverlayRange> temporaryUnderlines;
 
         [[nodiscard]] bool hasSelection() const noexcept {
@@ -154,6 +157,7 @@ namespace arrange::core {
             float textWidth = 0.0f;
             float textHeight = 0.0f;
             float viewportX = 0.0f;
+            float viewportY = 0.0f;
             float lineHeight = 12.0f;
             float fontSize = 14.0f;
             bool singleLine = true;
@@ -164,8 +168,8 @@ namespace arrange::core {
             std::shared_ptr<const TextLayout> text;
         };
 
-        static Metrics metrics(const ModifierInstance& instance, float viewportX);
-        static Layout layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService);
+        static Metrics metrics(const ModifierInstance& instance, float viewportX, float viewportY = 0);
+        static Layout layout(const ModifierInstance& instance, const std::string& text, float viewportX, const TextLayoutService& textLayoutService, float viewportY = 0);
         static std::vector<Rect> textBoundsForByteRange(const Layout& layout, const std::string& text, std::size_t start, std::size_t end, const TextLayoutService& textLayoutService);
     };
 }

@@ -82,6 +82,10 @@ namespace arrange::juce {
         std::vector<quickjs::HotMessage> takeHotMessages();
 #endif
 
+        void setInteractionPreparation(std::function<void(arrange::core::LayoutTree&)> prepare) {
+            interactionPreparation_ = std::move(prepare);
+        }
+
         void requestFramePipelineRun() noexcept;
         [[nodiscard]] bool framePipelineRunRequested() const noexcept;
 
@@ -93,6 +97,9 @@ namespace arrange::juce {
 
         void enqueueEvent(const arrange::core::EventSlotId& slot);
         void enqueueScrollSnapshotEvent(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& result);
+        void enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused);
+        void enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused, bool hasFocus);
+        std::vector<arrange::core::FocusCommand> takeFocusCommands();
         void enqueueStringEvent(const arrange::core::EventSlotId& slot, std::string value);
 
         [[nodiscard]] bool hasPendingEvents() const noexcept;
@@ -130,6 +137,7 @@ namespace arrange::juce {
         enum class QueuedEventKind {
             Invoke,
             InvokeString,
+            InvokeFocus,
             InvokeScrollSnapshot,
         };
 
@@ -142,6 +150,8 @@ namespace arrange::juce {
             QueuedEventKind kind = QueuedEventKind::Invoke;
             arrange::core::EventSlotId slot;
             std::string value;
+            bool focused = false;
+            bool hasFocus = false;
             arrange::core::ScrollResult scroll;
         };
 
@@ -171,6 +181,7 @@ namespace arrange::juce {
         ScenePipelineState pipelineState_;
         FramePlanner frame_;
         std::deque<QueuedEvent> events_;
+        std::function<void(arrange::core::LayoutTree&)> interactionPreparation_;
     };
 
 #endif

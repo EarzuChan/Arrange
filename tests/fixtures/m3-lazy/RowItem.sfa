@@ -1,0 +1,9 @@
+<template>
+    <Text :text="`横:${id}`" :modifier="M.width(height.dp).height(30.dp)" />
+    <Spacer :modifier="M.width(2.dp)" />
+</template>
+
+<script>
+import { M } from '@arrange/framework/ui'
+const props = defineProps<{ id: number; height: number }>()
+</script>

@@ -31,6 +31,8 @@ export function recordingNative(autoApply = true) {
     let requested = false
     let preparing = false
     let time = 0
+    let materialize: ((id: number, indices: readonly number[]) => void) | undefined
+    let materializing = false
     const frame = (timestamp = time + 16) => {
         if (!requested || completion) return
         requested = false
@@ -69,8 +71,7 @@ export function recordingNative(autoApply = true) {
         }
         candidate = undefined
         candidateBindings = undefined
-        callback(error)
-        completeFrame?.(!error)
+        try { callback(error) } finally { completeFrame?.(!error) }
     }
     const target: NativeTransactionTarget = {
         installFrameDriver(prepareCallback, completeCallback) {
@@ -80,6 +81,10 @@ export function recordingNative(autoApply = true) {
         },
         currentTime: () => time,
         requestFrame(pending) { requested = pending },
+        installLayoutDriver(callback) { materialize = callback },
+        continueRearrange() {
+            if (!materializing || !candidate || !completion) throw new Error('子组合只能继续当前候选')
+        },
         beginRearrange() {
             if (candidate) throw new Error('候选事务不能重入')
             candidate = new Map([...nodes].map(([id, value]) => [id, { ...value, inputs: new Map(value.inputs), children: [...value.children], modifiers: [...value.modifiers] }]))
@@ -140,6 +145,11 @@ export function recordingNative(autoApply = true) {
                 elements[index] = value as ModifierElement
                 owner.inputs.set('modifier', new Modifier(elements))
             } else {
+                if (binding.input === 'measurePolicy') {
+                    const next = value as { kind?: string; version?: number; keys?: unknown }
+                    const previous = owner.inputs.get(binding.input) as typeof next | undefined
+                    if (next.kind === 'Lazy' && !next.keys && previous?.kind === 'Lazy' && previous.version === next.version) value = { ...previous, ...next } as typeof value
+                }
                 owner.inputs.set(binding.input, value)
                 if (binding.input === 'modifier') owner.modifiers = (value as Modifier).elements.map((element, index) => {
                     const previous = owner.modifiers[index]
@@ -175,6 +185,12 @@ export function recordingNative(autoApply = true) {
         get pendingFrame() { return requested },
         finish,
         get nodes() { return nodes },
+        get candidateNodes() { return candidate },
+        materialize(id: number, indices: readonly number[]) {
+            if (!candidate || !completion || !materialize) throw new Error('材料化必须属于已提交候选')
+            materializing = true
+            try { materialize(id, indices) } finally { materializing = false }
+        },
         get submissions() { return submissions },
         get writes() { return writes },
         textNodes() {

@@ -4,6 +4,7 @@
 #include "EventSlot.h"
 #include "Animation.h"
 #include "Geometry.h"
+#include "DrawCommands.h"
 #include "Painter.h"
 #include "TextLayoutService.h"
 
@@ -57,6 +58,8 @@ namespace arrange::core {
         DefaultMinSize,
         VerticalScroll,
         HorizontalScroll,
+        IntrinsicWidth,
+        IntrinsicHeight,
     };
 
     struct LayoutModifierSemantics {
@@ -72,17 +75,19 @@ namespace arrange::core {
         float maxHeight = -1.0f;
         float scrollValue = 0.0f;
         bool enabled = true;
+        bool intrinsicMaximum = false;
         EventSlotId eventSlot;
         bool operator==(const LayoutModifierSemantics&) const = default;
     };
 
-    enum class ParentDataKind { Weight, Align };
+    enum class ParentDataKind { Weight, Align, MatchParentSize };
 
     struct ParentDataModifierSemantics {
         ParentDataKind kind = ParentDataKind::Weight;
         float weight = 0.0f;
         bool weightFill = true;
         std::string align;
+        bool matchParentSize = false;
         bool operator==(const ParentDataModifierSemantics&) const = default;
     };
 
@@ -137,6 +142,17 @@ namespace arrange::core {
         bool operator==(const ZIndexModifier&) const = default;
     };
 
+    enum class FocusModifierKind { Requester, Properties, Group, Observer };
+
+    struct FocusModifier {
+        FocusModifierKind kind = FocusModifierKind::Properties;
+        std::uint32_t requester = 0;
+        std::array<std::uint32_t, 6> directions{};
+        bool canFocus = true;
+        EventSlotId eventSlot;
+        bool operator==(const FocusModifier&) const = default;
+    };
+
     struct AnimateContentSizeModifier {
         AnimationSpec animationSpec;
         bool clip = true;
@@ -182,7 +198,17 @@ namespace arrange::core {
         bool operator==(const TextFieldModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier>;
+    enum class DrawModifierKind { Behind, WithContent, WithCache };
+
+    struct DrawModifier {
+        DrawModifierKind kind = DrawModifierKind::Behind;
+        EventSlotId prepare;
+        std::uint64_t revision = 0;
+        bool transactional = false;
+        bool operator==(const DrawModifier&) const = default;
+    };
+
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier, FocusModifier, DrawModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;
@@ -219,6 +245,10 @@ namespace arrange::core {
         SizeAnimation sizeAnimation;
         std::shared_ptr<const TextLayout> textLayout;
         std::optional<ScrollSnapshot> scrollSnapshot;
+        std::shared_ptr<const DrawCommands> preparedDraw;
+        Size preparedDrawSize;
+        EventSlotId preparedDrawCallback;
+        std::uint64_t preparedDrawRevision = 0;
     };
 
     struct ModifierReconcileResult {
@@ -269,7 +299,9 @@ namespace arrange::core {
         }
         EventSlotId slot;
         if (const auto* input = std::get_if<InputModifierSemantics>(&value)) slot = input->eventSlot;
+        if (const auto* focus = std::get_if<FocusModifier>(&value)) slot = focus->eventSlot;
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value)) slot = layout->eventSlot;
+        if (const auto* draw = std::get_if<DrawModifier>(&value)) slot = draw->prepare;
         return kind == EventSlotKind::None || slot.kind == kind ? slot : EventSlotId{};
     }
 

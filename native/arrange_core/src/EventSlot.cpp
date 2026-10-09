@@ -17,6 +17,10 @@ namespace arrange::core {
                 return "inputChange";
             case EventSlotKind::InputBlur:
                 return "inputBlur";
+            case EventSlotKind::DrawPrepare:
+                return "drawPrepare";
+            case EventSlotKind::FocusChanged:
+                return "focusChanged";
             case EventSlotKind::Custom:
                 return "custom";
             case EventSlotKind::None:
@@ -33,6 +37,8 @@ namespace arrange::core {
         if (name == "inputSubmit") return EventSlotKind::InputSubmit;
         if (name == "inputChange") return EventSlotKind::InputChange;
         if (name == "inputBlur") return EventSlotKind::InputBlur;
+        if (name == "drawPrepare") return EventSlotKind::DrawPrepare;
+        if (name == "focusChanged") return EventSlotKind::FocusChanged;
         if (name == "custom") return EventSlotKind::Custom;
         return EventSlotKind::None;
     }

@@ -489,11 +489,20 @@ export declare const Color: SfaColorFactory
         return `...(() => { ${declarations}; return { ${name}Dp: ${pair.dp}, ${name}Px: ${pair.px} } })()`
     }
 
+    const intrinsicSizeArgument = (argument: ts.Expression): boolean => {
+        const type = checker.getTypeAtLocation(argument)
+        const valid = (value: ts.Type): boolean => value.isUnion() ? value.types.every(valid) : value.isStringLiteral() && (value.value === 'IntrinsicSize.Min' || value.value === 'IntrinsicSize.Max')
+        return valid(type)
+    }
+
     const lowerArguments = (argumentsList: readonly ts.Expression[], rules: readonly (Rule | undefined)[] | Rule): void => {
         const list = Array.isArray(rules) ? rules : [rules]
-        for (const [index, rule] of list.entries()) {
-            const argument = argumentsList[index]
-            if (!argument || !rule) continue
+        for (const [index, argument] of argumentsList.entries()) {
+            const rule = list[index]
+            if (!rule) {
+                visit(argument)
+                continue
+            }
             if (rule === 'length') {
                 const pair = lengthParts(argument)
                 if (!pair) throw new Error(`${filename}：单位参数 ${textOf(argument)} 需要由 DP/PX 表达式组成`)
@@ -593,7 +602,9 @@ export declare const Color: SfaColorFactory
                 const method = node.expression.name.text
                 const rules = Object.hasOwn(modifierArgumentUnits, method) ? modifierArgumentUnits[method] : undefined
                 if (rules) {
-                    if (method === 'padding' && node.arguments.length === 1 && lengthParts(node.arguments[0])) {
+                    if ((method === 'width' || method === 'height') && node.arguments.length === 1 && intrinsicSizeArgument(node.arguments[0])) {
+                        visit(node.arguments[0])
+                    } else if (method === 'padding' && node.arguments.length === 1 && lengthParts(node.arguments[0])) {
                         const pair = lengthParts(node.arguments[0])!
                         output.overwrite(node.arguments[0].getStart(source), node.arguments[0].end, renderLengthPair(pair))
                     } else lowerArguments(node.arguments, rules)
@@ -619,7 +630,9 @@ export declare const Color: SfaColorFactory
                     const rules = Object.hasOwn(modifierArgumentUnits, name) ? modifierArgumentUnits[name] : undefined
                     if (rules && ts.isArrayLiteralExpression(body)) {
                         const argumentsList = body.elements.filter((entry): entry is ts.Expression => !ts.isSpreadElement(entry))
-                        if (name === 'padding' && argumentsList.length === 1 && lengthParts(argumentsList[0])) {
+                        if ((name === 'width' || name === 'height') && argumentsList.length === 1 && intrinsicSizeArgument(argumentsList[0])) {
+                            visit(argumentsList[0])
+                        } else if (name === 'padding' && argumentsList.length === 1 && lengthParts(argumentsList[0])) {
                             const pair = lengthParts(argumentsList[0])!
                             output.overwrite(argumentsList[0].getStart(source), argumentsList[0].end, renderLengthPair(pair))
                         } else lowerArguments(argumentsList, rules)

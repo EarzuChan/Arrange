@@ -161,6 +161,42 @@ namespace {
         check(!pointer.pointerUp(tree, 1, {65, 15}).clickTriggered, "pointer-up clicked replacement instance");
     }
 
+    void verifyPointerCallbackRefresh() {
+        LayoutTree tree;
+        LayoutEngine layout;
+        const auto create = [&] {
+            tree.apply({CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{size(100, 40)}, {click("first"), "button"}}}});
+            layout.layout(tree, 1, {0, 200, 0, 100});
+        };
+        create();
+        const auto snapshot = [&] {
+            return buildHitTestSnapshot(tree, 1);
+        };
+        PointerInputProcessor pointer;
+        const auto first = snapshot();
+        pointer.pointerDown(first, {10, 10});
+        const auto receiver = tree.node(1).modifier.elements()[1].handle;
+        tree.setModifierInput(1, receiver, click("refreshed"));
+        check(tree.node(1).modifier.elements()[1].handle == receiver, "callback刷新夹具误换了受体");
+        const auto refreshed = pointer.pointerUp(snapshot(), {10, 10});
+        check(refreshed.clickTriggered && refreshed.eventSlot.path == "refreshed", "同受体 callback 更新吞掉了 pointer up 或调用旧资源");
+        pointer.pointerDown(snapshot(), {10, 10});
+        auto disabled = click("disabled");
+        disabled.enabled = false;
+        tree.setModifierInput(1, receiver, disabled);
+        check(!pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "disabled receiver 仍触发点击");
+        tree.setModifierInput(1, receiver, click("again"));
+        pointer.pointerDown(snapshot(), {10, 10});
+        const auto generation = tree.node(1).generation;
+        tree.apply({DeleteNodeMutation{1}});
+        create();
+        check(tree.node(1).generation != generation && !pointer.capturedNode(tree) && !pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "同 node id 新代际继承了旧 pointer capture");
+        pointer.pointerDown(snapshot(), {10, 10});
+        tree.setModifierChain(1, {{size(100, 40)}, {click("replacement"), "new button"}});
+        layout.layout(tree, 1, {0, 200, 0, 100});
+        check(!pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "换受体后旧 pointer capture 触发了新 callback");
+    }
+
     void verifyClipRequiredAndOffset() {
         LayoutTree tree;
         LayoutModifierSemantics required = size(120, 80);
@@ -356,9 +392,11 @@ namespace {
         check(!run(&target, 100).error && near(scene.node(2).bounds.height, 20), "content size jumped to target");
         check(scene.tree().activeAnimationCount() == 1, "native animation was not retained by instance");
         const auto before = pipeline.counters();
+        const auto childConstraints = scene.node(3).measuredConstraints;
         check(!run(nullptr, 150).error && near(scene.node(2).bounds.height, 60), "content size did not sample VBlank timestamp");
         check(near(scene.node(4).bounds.y, 60), "animated size did not affect sibling placement");
-        check(pipeline.counters().layoutWork.measuredNodes - before.layoutWork.measuredNodes == 2, "content animation remeasured its stable child or sibling");
+        check(pipeline.counters().layoutWork.measuredNodes - before.layoutWork.measuredNodes == 3 && pipeline.counters().layoutWork.measureCacheHits - before.layoutWork.measureCacheHits == 1 && scene.node(3).measuredConstraints == childConstraints, "content animation did not retain its stable child measurement");
+        check(near(scene.node(4).measuredConstraints.maxHeight, 440), "Column sibling did not receive the animated remaining main-axis constraint");
         check(!HitTester{}.hitTestClickable(*frame.content.hitTest, {5, 80}).hit && HitTester{}.hitTestClickable(*frame.content.hitTest, {5, 40}).hit, "content animation hit clip disagreed with intermediate size");
         const auto revision = frame.revision;
         const auto fail = run(nullptr, 175, [](const auto&, auto&) { throw std::runtime_error("test finalizer failure"); });
@@ -404,6 +442,7 @@ int main() {
         verifyIdentity();
         verifyViewportAndScrollDependencies();
         verifyOnionGeometry();
+        verifyPointerCallbackRefresh();
         verifyClipRequiredAndOffset();
         verifyRepeatedWrappersAndScroll();
         verifyPhaseSeparation();

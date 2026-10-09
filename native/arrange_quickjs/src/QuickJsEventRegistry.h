@@ -32,6 +32,8 @@ namespace arrange::quickjs {
         }
 
         [[nodiscard]] JSValueConst callback(const arrange::core::EventSlotId& slot) const noexcept;
+        // 仅候选准备阶段使用；调用者必须先确认候选场景仍引用此资源。
+        [[nodiscard]] JSValueConst candidateCallback(const arrange::core::EventSlotId& slot) const noexcept;
 
         void release(const arrange::core::EventSlotId& slot, arrange::core::MutationTransaction* transaction);
         void releaseNodes(const std::unordered_set<arrange::core::NodeId>& nodes, arrange::core::MutationTransaction* transaction);

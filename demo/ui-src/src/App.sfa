@@ -48,6 +48,8 @@
         </Row>
 
         <Text text="Arrangeの本格界面" :style="{fontSize: 12.sp, color: Color(0xff91a6b8)}"/>
+
+        <M3Gallery/>
     </Column>
 </template>
 
@@ -62,6 +64,7 @@ import AnimationGallery from './view/AnimationGallery.sfa'
 import ShowcaseGallery from './view/ShowcaseGallery.sfa'
 import PropBoundary from './view/PropBoundary.sfa'
 import RefRelay from './view/RefRelay.sfa'
+import M3Gallery from './view/M3Gallery.sfa'
 
 const TAG = "App"
 

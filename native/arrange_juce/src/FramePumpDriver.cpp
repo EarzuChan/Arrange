@@ -7,6 +7,7 @@
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/PassivePaintRenderer.h>
+#include <arrange/juce/TextInputMutationSink.h>
 #include "ScrollProbe.h"
 #include <stdexcept>
 
@@ -18,7 +19,9 @@ namespace arrange::juce {
     namespace {
         void replacePreparedOps(std::vector<arrange::core::DrawOp>& target, std::vector<arrange::core::DrawOp> source) {
             for (std::size_t index = 0; index < std::min(target.size(), source.size()); ++index) {
-                if (source[index].type == arrange::core::DrawOpType::DrawText && target[index].type == arrange::core::DrawOpType::DrawText) source[index].textLayout = target[index].textLayout;
+                auto& next = source[index];
+                const auto& previous = target[index];
+                if (next.type == arrange::core::DrawOpType::DrawText && previous.type == arrange::core::DrawOpType::DrawText && !next.textLayout && next.text == previous.text && next.fontSize == previous.fontSize && next.lineHeight == previous.lineHeight && next.rect.width == previous.rect.width && next.maxLines == previous.maxLines && next.overflow == previous.overflow) next.textLayout = previous.textLayout;
             }
             target = std::move(source);
         }
@@ -29,6 +32,18 @@ namespace arrange::juce {
 
     bool FramePumpDriver::pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const {
         (void)tickDiagnostics(diagnostics, runtime, nowMillis);
+        interaction.dispatchPendingTextEdits(runtime.scene().tree(), TextInputMutationSink{}.callbacks(runtime));
+        const auto focusCommands = runtime.takeFocusCommands();
+        runtime.setInteractionPreparation([&interaction](auto& tree) { interaction.prepareLazyInteraction(tree); });
+
+        struct ClearInteractionPreparation {
+            ArrangeRuntime& runtime;
+
+            ~ClearInteractionPreparation() {
+                runtime.setInteractionPreparation({});
+            }
+        } clearPreparation{runtime};
+
         std::optional<InteractionStateOwner> candidateInteraction;
         const auto finalize = [&](const arrange::core::NativeScene& scene, arrange::core::PublishedFrame& frame) {
             candidateInteraction.emplace(interaction);
@@ -36,9 +51,10 @@ namespace arrange::juce {
                 throw std::runtime_error("Arrange layout tree is empty after loading UI package.");
             }
             candidateInteraction->synchronizePublishedInput(scene.tree(), session.interactive(diagnostics));
+            candidateInteraction->synchronizePublishedFocus(scene.tree(), session.interactive(diagnostics), focusCommands);
             candidateInteraction->updateFocusedInputViewport(scene.tree(), session.interactive(diagnostics));
             replacePreparedOps(frame.content.overlayDrawOps, candidateInteraction->buildFocusedInputOps(scene.tree(), session.interactive(diagnostics)));
-            frame.content.focusedInputNode = candidateInteraction->focusedNode();
+            frame.content.focusedInputNode = candidateInteraction->textFocusedNode();
             frame.content.focusedInputModifier = candidateInteraction->focusedModifier();
             frame.content.focusedInputViewportX = candidateInteraction->viewportX();
             (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
@@ -73,7 +89,14 @@ namespace arrange::juce {
                 paint.prepareResources(retained.content);
             });
         } else {
-            if (candidateInteraction) interaction.commitState(std::move(*candidateInteraction));
+            if (candidateInteraction) {
+                interaction.commitState(std::move(*candidateInteraction));
+                interaction.dispatchCommittedFocus(runtime.scene().tree(), TextInputMutationSink{}.callbacks(runtime));
+                if (const auto container = interaction.pendingLazyContainer()) {
+                    const auto callbacks = TextInputMutationSink{}.callbacks(runtime);
+                    callbacks.invalidateNativeState(*container, arrange::core::DirtyFlag::Layout, "继续 Lazy 方向焦点搜索");
+                }
+            }
         }
         if (ScrollProbe::active()) {
             auto sample = ScrollProbe::lastConsumed();

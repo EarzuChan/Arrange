@@ -12,6 +12,7 @@ namespace arrange::core {
         Boolean,
         String,
         Object,
+        Array,
     };
 
     struct PropObjectField;
@@ -22,12 +23,18 @@ namespace arrange::core {
         bool boolean = false;
         std::string string;
         std::vector<PropObjectField> fields;
+        std::vector<PropValue> elements;
 
         [[nodiscard]] static PropValue nullValue();
         [[nodiscard]] static PropValue numberValue(double value);
         [[nodiscard]] static PropValue booleanValue(bool value);
         [[nodiscard]] static PropValue stringValue(std::string value);
         [[nodiscard]] static PropValue objectValue(std::vector<PropObjectField> fields);
+        [[nodiscard]] static PropValue arrayValue(std::vector<PropValue> elements);
+
+        [[nodiscard]] bool isArray() const noexcept {
+            return kind == PropValueKind::Array;
+        }
 
         [[nodiscard]] bool isNull() const noexcept {
             return kind == PropValueKind::Null;

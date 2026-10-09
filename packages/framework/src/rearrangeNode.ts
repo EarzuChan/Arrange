@@ -5,6 +5,7 @@ import type { NativeBindingHandle, NativeModifierHandle, NativeMutation, NativeT
 import { Modifier, modifierStats, type ModifierElement } from './modifier.ts'
 import type { MeasurePolicy } from './measurePolicy.ts'
 import { arrangeExecutionStats } from './runtime/internal.ts'
+import type { LayoutContentProvider } from './layoutContent.ts'
 
 export class NativeRearrangeHost implements RearrangeHost {
     private nextId = 2
@@ -17,8 +18,32 @@ export class NativeRearrangeHost implements RearrangeHost {
     private applying = false
     private nativeOpen = false
     private transaction: object | undefined
+    private sentOperations = 0
+    private pendingRoots: readonly LayoutRearrangeNode[] | undefined
+    private readonly providers = new Map<number, { node: LayoutRearrangeNode; provider: LayoutContentProvider }>()
+    preparationEpoch = 0
+    continuing = false
 
-    constructor(readonly native: NativeTransactionTarget) { }
+    constructor(readonly native: NativeTransactionTarget) {
+        native.installLayoutDriver?.((id, indices) => {
+            const entry = this.providers.get(id)
+            if (!entry || entry.node.owner.isUnmounted) throw new Error('子组合目标已退休')
+            const session = entry.node.owner.rearrangeSession
+            session.continuePreparation(() => {
+                entry.provider.prepare(indices)
+                session.enqueue(entry.node.owner.structure, true)
+            })
+        })
+    }
+
+    registerProvider(node: LayoutRearrangeNode, provider: LayoutContentProvider): void {
+        if (!this.native.installLayoutDriver || !this.native.continueRearrange) throw new Error('原生宿主缺少受控子组合驱动')
+        const id = node.id
+        this.providers.set(id, { node, provider })
+        this.onAbort(() => this.providers.delete(id))
+    }
+
+    unregisterProvider(id: number): void { this.providers.delete(id) }
 
     currentTime(): number { return this.native.currentTime() }
     requestFrame(pending: boolean): void { this.native.requestFrame(pending) }
@@ -28,6 +53,8 @@ export class NativeRearrangeHost implements RearrangeHost {
     begin(): void {
         if (this.preparing || this.applying) throw new Error('原生候选提交不能重入')
         this.preparing = true
+        this.preparationEpoch++
+        this.continuing = false
 
         if (!this.rootCreated) {
             this.operations.push(native => {
@@ -49,29 +76,41 @@ export class NativeRearrangeHost implements RearrangeHost {
 
     reconcileRoots(nodes: readonly RearrangeNode[]): void {
         const roots = nodes as readonly LayoutRearrangeNode[]
-        this.reconcile(1, this.roots, roots)
-        this.commits.push(() => { this.roots = roots })
+        this.reconcile(1, this.pendingRoots ?? this.roots, roots)
+        if (!this.pendingRoots) {
+            this.commits.push(() => {
+                this.roots = this.pendingRoots!
+                this.pendingRoots = undefined
+            })
+            this.aborts.push(() => { this.pendingRoots = undefined })
+        }
+        this.pendingRoots = roots
     }
 
     reconcile(parent: number, previous: readonly LayoutRearrangeNode[], next: readonly LayoutRearrangeNode[]): void {
         const retained = new Set(next)
         for (const node of previous) {
             if (retained.has(node)) continue
+            const id = node.id
+            node.detachCandidate()
             this.stage(native => {
-                native.removeChild(parent, node.id)
-                native.deleteNode(node.id)
+                native.removeChild(parent, id)
+                native.deleteNode(id)
                 arrangeExecutionStats.nativeRemoveOperations++
             })
         }
         const order = previous.filter(node => retained.has(node))
         for (let index = 0; index < next.length; index++) {
             const node = next[index]
+            node.ensureAttached()
             if (order[index] === node) continue
             const old = order.indexOf(node)
             if (old >= 0) order.splice(old, 1)
             order.splice(index, 0, node)
+            const id = node.id
             this.stage(native => {
-                native.insertChild(parent, node.id, index)
+                if (node.id !== id) return
+                native.insertChild(parent, id, index)
                 arrangeExecutionStats.nativeInsertOperations++
             })
         }
@@ -85,7 +124,7 @@ export class NativeRearrangeHost implements RearrangeHost {
         try {
             this.native.beginRearrange()
             this.nativeOpen = true
-            for (const operation of this.operations) operation(this.native)
+            this.flushOperations()
             this.native.submitRearrange(message => {
                 if (this.transaction !== transaction) return
                 this.nativeOpen = false
@@ -96,6 +135,8 @@ export class NativeRearrangeHost implements RearrangeHost {
                 this.transaction = undefined
                 const commits = this.commits.splice(0)
                 this.operations.length = 0
+                this.sentOperations = 0
+                this.continuing = false
                 this.aborts.length = 0
                 this.applying = false
                 const errors: unknown[] = []
@@ -111,6 +152,24 @@ export class NativeRearrangeHost implements RearrangeHost {
         }
     }
 
+    beginContinuation(): void {
+        if (!this.applying || !this.nativeOpen || this.preparing) throw new Error('子组合没有待提交的原生候选')
+        this.preparing = true
+        this.continuing = true
+        this.preparationEpoch++
+    }
+
+    applyContinuation(): void {
+        if (!this.preparing || !this.continuing) throw new Error('子组合候选尚未准备')
+        this.native.continueRearrange!()
+        this.flushOperations()
+        this.preparing = false
+    }
+
+    private flushOperations(): void {
+        while (this.sentOperations < this.operations.length) this.operations[this.sentOperations++](this.native)
+    }
+
     rollback(): void {
         this.transaction = undefined
         const errors: unknown[] = []
@@ -121,6 +180,8 @@ export class NativeRearrangeHost implements RearrangeHost {
         } finally {
             this.nativeOpen = false
             this.operations.length = 0
+            this.sentOperations = 0
+            this.continuing = false
             this.commits.length = 0
             this.aborts.length = 0
             this.preparing = false
@@ -136,9 +197,14 @@ export class LayoutRearrangeNode implements RearrangeNode {
     children: readonly LayoutRearrangeNode[] = []
     private retired = false
     private attached = true
+    private nativeDetached = false
     private readonly bindings = new Map<string, NativeBindingHandle>()
     private readonly inputs = new Map<string, unknown>()
     private readonly pendingInputs = new Map<string, unknown>()
+    private readonly sentInputs = new Map<string, unknown>()
+    private readonly stagedEpochs = new Map<string, number>()
+    private pendingChildren: readonly LayoutRearrangeNode[] | undefined
+    private provider: LayoutContentProvider | undefined
     private readonly modifierBindings = new Map<bigint, NativeBindingHandle>()
 
     constructor(readonly owner: ArrangableInstance, private readonly host: NativeRearrangeHost) {
@@ -148,17 +214,30 @@ export class LayoutRearrangeNode implements RearrangeNode {
     }
 
     private stageCreation(): void {
+        const id = this.id
         this.host.stage(native => {
-            if (this.retired) return
-            native.createNode(this.id, 'LayoutNode')
+            if (this.retired || this.id !== id) return
+            native.createNode(id, 'LayoutNode')
             arrangeExecutionStats.nativeCreateOperations++
         })
     }
 
     reconcileChildren(children: readonly RearrangeNode[]): void {
         const next = children as readonly LayoutRearrangeNode[]
-        this.host.reconcile(this.id, this.children, next)
-        this.host.onCommit(() => { this.children = next })
+        this.host.reconcile(this.id, this.pendingChildren ?? this.children, next)
+        if (!this.pendingChildren) {
+            this.host.onCommit(() => {
+                this.children = this.pendingChildren!
+                this.pendingChildren = undefined
+            })
+            this.host.onAbort(() => { this.pendingChildren = undefined })
+        }
+        this.pendingChildren = next
+    }
+
+    setContentProvider(provider: LayoutContentProvider): void {
+        this.provider = provider
+        this.host.registerProvider(this, provider)
     }
 
     updateMeasurePolicy(policy: MeasurePolicy): void {
@@ -173,25 +252,51 @@ export class LayoutRearrangeNode implements RearrangeNode {
         this.update(name, value ?? null)
     }
 
-    private update(name: string, value: unknown): void {
+    private update(name: string, value: unknown, force = false): void {
         if (this.retired) throw new Error('不能更新已退休的重排节点')
         const current = this.pendingInputs.has(name) ? this.pendingInputs : this.inputs
-        if (current.has(name) && Object.is(current.get(name), value)) return
+        if (!force && current.has(name) && Object.is(current.get(name), value)) return
         const staged = this.pendingInputs.has(name)
         this.pendingInputs.set(name, value)
-        if (staged) return
+        if (this.stagedEpochs.get(name) === this.host.preparationEpoch) return
+        this.stagedEpochs.set(name, this.host.preparationEpoch)
+        if (!staged) {
+            this.host.onCommit(() => {
+                this.inputs.set(name, this.pendingInputs.get(name))
+                this.pendingInputs.delete(name)
+                this.stagedEpochs.delete(name)
+                this.sentInputs.delete(name)
+            })
+            this.host.onAbort(() => {
+                this.pendingInputs.delete(name)
+                this.stagedEpochs.delete(name)
+                this.sentInputs.delete(name)
+            })
+        }
 
+        const id = this.id
         this.host.stage(native => {
-            if (this.retired) return
+            if (this.retired || this.id !== id) return
             const value = this.pendingInputs.get(name)
-            if (name === 'modifier' && this.writeModifier(native, value as PxModifier)) return
+            if (name === 'modifier' && this.bindings.has(name) && !this.host.continuing && this.writeModifier(native, value as PxModifier)) return
             let binding = this.bindings.get(name)
+            const freshBinding = !binding
             if (!binding) {
                 binding = native.registerBinding(this.id, name)
                 this.bindings.set(name, binding)
                 this.host.onAbort(() => { this.bindings.delete(name) })
             }
-            try { native.updateBinding(binding, value as Parameters<NativeTransactionTarget['updateBinding']>[1]) } catch (error) {
+            let input = value
+            if (name === 'measurePolicy') {
+                const current = value as MeasurePolicy
+                const previous = freshBinding ? undefined : (this.sentInputs.get(name) ?? this.inputs.get(name)) as MeasurePolicy | undefined
+                if (current.kind === 'Lazy' && previous?.kind === 'Lazy' && current.version === previous.version) {
+                    const { keys, contentTypes, spans, ...reference } = current
+                    input = reference
+                }
+                this.sentInputs.set(name, value)
+            }
+            try { native.updateBinding(binding, input as Parameters<NativeTransactionTarget['updateBinding']>[1]) } catch (error) {
                 const source = this.owner.propStore.source(name)
                 if (error instanceof Error && source && !error.message.includes('来源：')) error.message += `\n来源：${source}`
                 throw error
@@ -202,10 +307,56 @@ export class LayoutRearrangeNode implements RearrangeNode {
                 for (const handle of previousBindings) native.releaseBinding(handle)
                 this.host.onCommit(() => this.modifierBindings.clear())
             }
-        }, () => {
-            this.inputs.set(name, this.pendingInputs.get(name))
-            this.pendingInputs.delete(name)
-        }, () => { this.pendingInputs.delete(name) })
+        })
+    }
+
+    detachCandidate(): void {
+        if (this.nativeDetached) return
+        this.nativeDetached = true
+        this.host.onAbort(() => { this.nativeDetached = false })
+        const id = this.id
+        this.host.onCommit(() => { if (this.nativeDetached || this.id !== id) this.host.unregisterProvider(id) })
+        for (const child of this.pendingChildren ?? this.children) child.detachCandidate()
+    }
+
+    ensureAttached(): void {
+        if (!this.nativeDetached || this.retired) return
+        const previousId = this.id
+        const bindings = new Map(this.bindings)
+        const modifierBindings = new Map(this.modifierBindings)
+        const sentInputs = new Map(this.sentInputs)
+        const stagedEpochs = new Map(this.stagedEpochs)
+        const values = new Map([...this.inputs, ...this.pendingInputs])
+        this.nativeDetached = false
+        this.id = this.host.allocateId()
+        this.bindings.clear()
+        this.modifierBindings.clear()
+        this.sentInputs.clear()
+        this.stagedEpochs.clear()
+        this.stageCreation()
+        if (this.provider) this.host.registerProvider(this, this.provider)
+        this.host.onAbort(() => {
+            this.id = previousId
+            this.nativeDetached = true
+            this.bindings.clear()
+            this.modifierBindings.clear()
+            this.sentInputs.clear()
+            this.stagedEpochs.clear()
+            for (const [key, value] of bindings) this.bindings.set(key, value)
+            for (const [key, value] of modifierBindings) this.modifierBindings.set(key, value)
+            for (const [key, value] of sentInputs) this.sentInputs.set(key, value)
+            for (const [key, value] of stagedEpochs) this.stagedEpochs.set(key, value)
+        })
+        for (const [name, value] of values) this.update(name, value, true)
+        for (const [index, child] of (this.pendingChildren ?? this.children).entries()) {
+            child.ensureAttached()
+            const id = child.id
+            const parent = this.id
+            this.host.stage(native => {
+                native.insertChild(parent, id, index)
+                arrangeExecutionStats.nativeInsertOperations++
+            })
+        }
     }
 
     private writeModifier(native: NativeTransactionTarget, next: PxModifier): boolean {
@@ -240,7 +391,9 @@ export class LayoutRearrangeNode implements RearrangeNode {
     }
 
     deactivate(): void {
+        this.host.unregisterProvider(this.id)
         this.attached = false
+        this.nativeDetached = true
         this.bindings.clear()
         this.modifierBindings.clear()
         this.children = []
@@ -248,24 +401,15 @@ export class LayoutRearrangeNode implements RearrangeNode {
 
     activate(): void {
         if (this.attached || this.retired) return
-        const previousId = this.id
-        const inputs = new Map(this.inputs)
-        this.id = this.host.allocateId()
         this.attached = true
-        this.inputs.clear()
-        this.stageCreation()
-        this.host.onAbort(() => {
-            this.id = previousId
-            this.attached = false
-            this.inputs.clear()
-            for (const [name, value] of inputs) this.inputs.set(name, value)
-        })
-        for (const [name, value] of inputs) this.update(name, value)
+        this.host.onAbort(() => { this.attached = false })
+        this.ensureAttached()
     }
 
     retire(): void {
         if (this.retired) return
         this.retired = true
+        this.host.unregisterProvider(this.id)
         arrangeExecutionStats.rearrangeNodesRetired++
         this.bindings.clear()
         this.inputs.clear()

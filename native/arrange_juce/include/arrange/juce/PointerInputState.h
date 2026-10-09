@@ -37,6 +37,10 @@ namespace arrange::juce {
         void cancelWheel();
         void synchronizePublishedWheel(const arrange::core::LayoutTree& tree, bool interactive);
 
+        std::optional<arrange::core::NodeId> capturedNode(const arrange::core::LayoutTree& tree) const {
+            return pointer_.capturedNode(tree);
+        }
+
        private:
         struct WheelSession {
             std::uint64_t id = 0;

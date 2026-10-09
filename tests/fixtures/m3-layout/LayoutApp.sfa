@@ -1,0 +1,47 @@
+<template>
+    <Column>
+        <Row :modifier="M.height(IntrinsicSize.Min)">
+            <Spacer :modifier="M.size(20.dp, 10.dp)" />
+            <Spacer :modifier="M.size(30.dp, 40.dp)" />
+        </Row>
+        <FlowRow :modifier="M.width(70.dp)" :horizontalArrangement="Arrangement.spacedBy(5.dp)" :verticalArrangement="Arrangement.spacedBy(7.dp)">
+            <Spacer a-for="index in indices" :key="index" :modifier="M.size(30.dp, 10.dp)" />
+        </FlowRow>
+        <FlowColumn :modifier="M.height(30.dp)" :verticalArrangement="Arrangement.spacedBy(5.dp)" :horizontalArrangement="Arrangement.spacedBy(7.dp)" :maxItemsInEachColumn="2">
+            <Spacer a-for="index in indices" :key="index" :modifier="M.size(30.dp, 10.dp)" />
+        </FlowColumn>
+        <FlowRow :modifier="M.width(95.dp)" :horizontalArrangement="Arrangement.spacedBy(5.dp)" :maxItemsInEachRow="2">
+            <Spacer :modifier="M.weight(1).size(20.dp, 10.dp)" />
+            <Spacer :modifier="M.weight(2).size(20.dp, 10.dp)" />
+            <Spacer :modifier="M.weight(1).size(20.dp, 10.dp)" />
+        </FlowRow>
+        <Box>
+            <Spacer :modifier="M.size(20.dp, 10.dp)" />
+            <Spacer :modifier="M.matchParentSize().size(200.dp, 100.dp)" />
+        </Box>
+        <Box :modifier="M.animateContentSize(spec)">
+            <Spacer :modifier="M.size(extent.dp, 10.dp)" />
+        </Box>
+        <Text :text="`动画:${animated.toFixed(1)}`" />
+        <Input value="" :onSubmit="command" />
+    </Column>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { M, IntrinsicSize, Arrangement } from '@arrange/framework/ui'
+import { repeatable, tween, linearEasing, animatedNumberAsRef } from '@arrange/framework/animation'
+
+const extent = ref(30)
+const indices = [0, 1, 2, 3]
+const target = ref(0)
+const spec = repeatable({ iterations: 2, animation: tween({ durationMillis: 100, delayMillis: 20, easing: linearEasing }), repeatMode: 'reverse' })
+const animated = animatedNumberAsRef(target, { animationSpec: spec })
+
+function command(value: string) {
+    if (value === '展开') {
+        extent.value = 60
+        target.value = 10
+    }
+}
+</script>

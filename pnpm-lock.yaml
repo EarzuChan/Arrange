@@ -64,7 +64,7 @@ importers:
   demo/ui-src:
     dependencies:
       '@arrange/framework':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../../packages/framework
     devDependencies:
       tsx:
@@ -77,7 +77,7 @@ importers:
   packages/compiler:
     dependencies:
       '@arrange/shared':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../shared
       '@babel/parser':
         specifier: 7.29.3
@@ -108,16 +108,16 @@ importers:
   packages/framework:
     dependencies:
       '@arrange/compiler':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../compiler
       '@arrange/reactivity':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../reactivity
       '@arrange/shared':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../shared
       '@arrange/vite-plugin':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../vite-plugin
       '@babel/parser':
         specifier: 7.29.3
@@ -147,7 +147,7 @@ importers:
   packages/reactivity:
     dependencies:
       '@arrange/shared':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../shared
 
   packages/shared: {}
@@ -155,10 +155,10 @@ importers:
   packages/vite-plugin:
     dependencies:
       '@arrange/compiler':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../compiler
       '@arrange/shared':
-        specifier: 0.0.0-m.2.4
+        specifier: 0.0.0-m.3.0
         version: link:../shared
       '@babel/parser':
         specifier: 7.29.3

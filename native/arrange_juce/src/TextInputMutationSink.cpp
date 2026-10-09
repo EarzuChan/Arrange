@@ -21,6 +21,15 @@ namespace arrange::juce {
         result.invokeStringEvent = [&runtime](const arrange::core::EventSlotId& slot, const std::string& value) {
             if (slot.valid()) runtime.enqueueStringEvent(slot, value);
         };
+        result.invokeFocusEvent = [&runtime](const auto& slot, bool focused, bool hasFocus) {
+            if (slot.valid()) runtime.enqueueFocusEvent(slot, focused, hasFocus);
+        };
+        result.invokeEvent = [&runtime](const auto& slot) {
+            if (slot.valid()) runtime.enqueueEvent(slot);
+        };
+        result.invokeScrollEvent = [&runtime](const auto& slot, const auto& scroll) {
+            if (slot.valid()) runtime.enqueueScrollSnapshotEvent(slot, scroll);
+        };
         result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag, std::string reason) {
             arrange::core::MutationTransaction transaction;
             transaction.operations.emplace_back(arrange::core::NativeInvalidationMutation{

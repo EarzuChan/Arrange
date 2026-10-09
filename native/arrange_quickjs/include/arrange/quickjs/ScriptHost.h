@@ -19,6 +19,9 @@ namespace arrange::quickjs {
     struct CallbackInvokeOptions {
         bool hasStringArgument = false;
         std::string stringArgument;
+        bool hasFocusArgument = false;
+        bool focused = false;
+        bool hasFocus = focused;
     };
 
     class ScriptHost {

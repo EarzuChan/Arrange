@@ -11,6 +11,7 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Painter.h>
+#include <arrange/core/FocusTypes.h>
 #include <arrange/Log.h>
 #include "ScriptHost.h"
 #include "LiveModule.h"
@@ -64,6 +65,8 @@ namespace arrange::quickjs {
         ScriptExecutionResult executeLiveModules(const LiveModuleSnapshot& snapshot);
         CallbackInvokeResult applyHotUpdate(const LiveModuleSnapshot& snapshot, const HotMessage& message);
         std::vector<HotMessage> takeHotMessages();
+        std::vector<arrange::core::FocusCommand> takeFocusCommands();
+        bool hasPendingFocusCommands() const noexcept;
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll);
 
@@ -83,6 +86,8 @@ namespace arrange::quickjs {
         bool hasPendingSemanticWork() const noexcept;
         bool hasPendingVisualWork() const noexcept;
         CallbackInvokeResult prepareVisualFrame(double nowMillis);
+        CallbackInvokeResult prepareDrawModifiers(arrange::core::NativeScene& candidateScene);
+        CallbackInvokeResult materializeLayout(arrange::core::NodeId id, const std::vector<int>& indices);
         CallbackInvokeResult completeVisualFrame(bool success);
         bool hasPendingDiagnostics() const noexcept;
         std::vector<QuickJsToastRequest> takeDiagnosticToasts();

@@ -4,7 +4,7 @@ import { build, type Plugin } from 'vite'
 import arrange from '../packages/vite-plugin/src/plugin.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-for (const fixture of ['rearrange-runtime', 'viewport-runtime']) await build({
+for (const fixture of ['rearrange-runtime', 'viewport-runtime', 'm3-layout', 'm3-lazy', 'm3-draw']) await build({
     root,
     configFile: false,
     plugins: [arrange({ entry: resolve(root, `tests/fixtures/${fixture}/main.ts`) }) as unknown as Plugin],

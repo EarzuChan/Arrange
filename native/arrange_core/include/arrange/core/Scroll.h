@@ -3,6 +3,7 @@
 #include "EventSlot.h"
 #include "Geometry.h"
 #include "LayoutTree.h"
+#include "LazyLayout.h"
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,7 @@ namespace arrange::core {
         NodeId target = 0;
         EventSlotId eventSlot;
         ModifierHandle modifier;
+        std::optional<LazyScrollSnapshot> lazy;
     };
 
     class ScrollDispatcher {

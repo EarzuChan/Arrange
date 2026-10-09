@@ -66,6 +66,20 @@ namespace arrange::quickjs {
             return static_cast<std::uint32_t>(number);
         }
 
+        bool validateHostValue(QuickJsRuntimeContext& runtime, arrange::core::NodeId id, arrange::core::HostInput input, const arrange::core::PropValue& value, std::string& error) {
+            if (input == arrange::core::HostInput::MeasurePolicy) {
+                const auto previous = runtime.measurePolicies.find(id);
+                try {
+                    runtime.measurePolicies[id] = arrange::core::readMeasurePolicy(value, previous == runtime.measurePolicies.end() ? nullptr : &previous->second);
+                } catch (const std::exception& failure) {
+                    error = failure.what();
+                    return false;
+                }
+                return true;
+            }
+            return arrange::core::validateSetPropMutation(nodeTypeFor(runtime, id), std::string(arrange::core::hostInputName(input)), value, error);
+        }
+
         JSValue nativeBeginRearrange(JSContext* context, JSValueConst, int, JSValueConst*) {
             auto* self = runtime(context);
             try {
@@ -90,6 +104,20 @@ namespace arrange::quickjs {
             self->abortRearrange();
             JS_FreeValue(context, self->rearrangeCompletion);
             self->rearrangeCompletion = JS_UNDEFINED;
+            return JS_UNDEFINED;
+        }
+
+        JSValue nativeContinueRearrange(JSContext* context, JSValueConst, int, JSValueConst*) {
+            auto* self = runtime(context);
+            if (!self || !self->materializingLayout || !self->rearrangeCheckpoint || JS_IsUndefined(self->rearrangeCompletion)) return JS_ThrowTypeError(context, "只有原生测量材料化可以继续已提交候选");
+            self->pendingTransactions->ensurePending().rearrange = self->rearrangeSubmission;
+            return JS_UNDEFINED;
+        }
+
+        JSValue nativeInstallLayoutDriver(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            auto* self = runtime(context);
+            if (!self || argc != 1 || !JS_IsFunction(context, argv[0]) || !JS_IsUndefined(self->materializeLayout)) return JS_ThrowTypeError(context, "一个 Owner 只能安装一个 Layout 材料化驱动");
+            self->materializeLayout = JS_DupValue(context, argv[0]);
             return JS_UNDEFINED;
         }
 
@@ -163,12 +191,12 @@ namespace arrange::quickjs {
             }
             auto value = reader.propValue(argv[2]);
             if (JS_HasException(context)) return JS_EXCEPTION;
-            std::string propError;
-            if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, id), key, value, propError)) {
-                return JS_ThrowTypeError(context, "%s", propError.c_str());
-            }
             const auto input = arrange::core::hostInputFromName(key);
             if (!input) return JS_ThrowTypeError(context, "Arrange unsupported host input: %s", key.c_str());
+            std::string propError;
+            if (!validateHostValue(*self, id, *input, value, propError)) {
+                return JS_ThrowTypeError(context, "%s", propError.c_str());
+            }
             self->setHostInput(id, *input, std::move(value));
             return JS_UNDEFINED;
         }
@@ -305,7 +333,7 @@ namespace arrange::quickjs {
                         auto value = reader.propValue(argv[1]);
                         if (JS_HasException(context)) return JS_EXCEPTION;
                         std::string error;
-                        if (!arrange::core::validateSetPropMutation(nodeTypeFor(*self, input.node.id), std::string(arrange::core::hostInputName(input.input)), value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
+                        if (!validateHostValue(*self, input.node.id, input.input, value, error)) return JS_ThrowTypeError(context, "%s", error.c_str());
                         self->updateBinding(*handle, std::move(value));
                     } else if constexpr (std::is_same_v<T, arrange::core::ModifierChainTarget>) {
                         QuickJsModifierReader reader(context, self->events, self->currentTransaction());
@@ -465,8 +493,37 @@ namespace arrange::quickjs {
             return JS_UNDEFINED;
         }
 
+        JSValue nativeFocusCommand(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+            if (argc < 2 || !JS_IsString(argv[0])) return JS_ThrowTypeError(context, "焦点命令需要操作与请求器身份");
+            auto* self = runtime(context);
+            QuickJsValueReader reader(context);
+            const auto operation = reader.toString(argv[0]);
+            const auto requester = readIndex(context, argv[1], operation != "request" && operation != "cancel");
+            if (JS_HasException(context)) return JS_EXCEPTION;
+            arrange::core::FocusCommand command;
+            command.requester = requester;
+            if (operation == "request")
+                command.kind = arrange::core::FocusCommandKind::Request;
+            else if (operation == "clear")
+                command.kind = arrange::core::FocusCommandKind::Clear;
+            else if (operation == "cancel")
+                command.kind = arrange::core::FocusCommandKind::Cancel;
+            else if (operation == "move") {
+                command.kind = arrange::core::FocusCommandKind::Move;
+                const auto direction = argc > 2 ? reader.toString(argv[2]) : "";
+                constexpr std::string_view names[]{"next", "previous", "up", "down", "left", "right"};
+                const auto found = std::find(std::begin(names), std::end(names), direction);
+                if (found == std::end(names)) return JS_ThrowTypeError(context, "焦点方向无效");
+                command.direction = static_cast<arrange::core::FocusDirection>(found - std::begin(names));
+            } else
+                return JS_ThrowTypeError(context, "焦点操作无效");
+            self->focusCommands.push_back(command);
+            if (self->wakeOwner) self->wakeOwner();
+            return JS_TRUE;
+        }
+
         const JSCFunctionListEntry nativeApiFunctions[] = {
-            JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("log", 3, nativeLog), JS_CFUNC_DEF("diagnosticsToast", 5, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
+            JS_CFUNC_DEF("focusCommand", 3, nativeFocusCommand), JS_CFUNC_DEF("installLayoutDriver", 1, nativeInstallLayoutDriver), JS_CFUNC_DEF("continueRearrange", 0, nativeContinueRearrange), JS_CFUNC_DEF("currentTime", 0, performanceNow), JS_CFUNC_DEF("installFrameDriver", 3, nativeInstallFrameDriver), JS_CFUNC_DEF("requestFrame", 1, nativeRequestFrame), JS_CFUNC_DEF("beginRearrange", 0, nativeBeginRearrange), JS_CFUNC_DEF("submitRearrange", 1, nativeSubmitRearrange), JS_CFUNC_DEF("abortRearrange", 0, nativeAbortRearrange), JS_CFUNC_DEF("createNode", 2, nativeCreateNode), JS_CFUNC_DEF("deleteNode", 1, nativeDeleteNode), JS_CFUNC_DEF("insertChild", 3, nativeInsertChild), JS_CFUNC_DEF("removeChild", 2, nativeRemoveChild), JS_CFUNC_DEF("setProp", 3, nativeSetProp), JS_CFUNC_DEF("setModifier", 2, nativeSetModifier), JS_CFUNC_DEF("registerBinding", 2, nativeRegisterBinding), JS_CFUNC_DEF("modifierInstances", 1, nativeModifierInstances), JS_CFUNC_DEF("registerModifierBinding", 2, nativeRegisterModifierBinding), JS_CFUNC_DEF("updateBinding", 2, nativeUpdateBinding), JS_CFUNC_DEF("releaseBinding", 1, nativeReleaseBinding), JS_CFUNC_DEF("unmount", 0, nativeUnmount), JS_CFUNC_DEF("reload", 1, nativeReload), JS_CFUNC_DEF("log", 3, nativeLog), JS_CFUNC_DEF("diagnosticsToast", 5, nativeDiagnosticsToast), JS_CFUNC_DEF("diagnosticsRequestReload", 1, nativeReload), JS_CFUNC_DEF("diagnosticsTriggerFakeError", 1, nativeDiagnosticsTriggerFakeError), JS_CFUNC_DEF("diagnosticsSetToastsEnabled", 1, nativeDiagnosticsSetToastsEnabled),
         };
     }
 

@@ -15,5 +15,10 @@ export { createApp } from './app.ts'
 export type { ArrangeApp } from './app.ts'
 export { createScrollState } from './state.ts'
 export type { ScrollState } from './state.ts'
+export { createFocusRequester, useFocusManager } from './focus.ts'
+export type { FocusDirection, FocusRequester, FocusManager, FocusProperties, FocusState } from './focus.ts'
 
 export * from './diagnostics.ts'
+
+export { createLazyState, createLazyListState, createLazyGridState } from './lazy.ts'
+export type { LazyState, LazyItemKey, LazyVisibleItemInfo, LazyLayoutInfo } from './lazy.ts'

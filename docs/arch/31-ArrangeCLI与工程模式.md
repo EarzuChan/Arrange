@@ -164,5 +164,5 @@ Windows VST3 的二进制目录按架构核验为 `Contents/x86_64-win` 或 `Con
 
 - 用户可见 CLI、工程目录、命令、平台和交付整理：本文。
 - File/Cluster/Region、ManagedItem、CONFIG/SETUP 状态机与 `.arrange/`：[托管与同步模型](32-ArrangeCLI托管与同步模型.md)。
-- 本期实现状态与验收证据：[M2.2 第三期工作区](../proj/m2/2/第三期M2.2的工作.md)。
+- 本期实现状态与验收证据：[M2.2 第三期工作区](../proj/m2：已完成，某些待测试和收尾/2：已完成，待Win测/第三期M2.2的工作.md)。
 - 本轮工程能力与交付边界的决策原因：[ADR 016](../adr/016-M2.2%20CLI工程准备与交付整理.md)。

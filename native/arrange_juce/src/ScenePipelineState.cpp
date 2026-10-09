@@ -34,7 +34,7 @@ namespace arrange::juce {
         pendingTransactions_.clear();
     }
 
-    arrange::core::SceneFramePipelineResult ScenePipelineState::run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize) {
+    arrange::core::SceneFramePipelineResult ScenePipelineState::run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize, const arrange::core::FramePreparation& preparation) {
         for (auto& intent : pendingIntents_.take()) {
             if (intent.transaction && (!intent.transaction->rearrange || !intent.transaction->rearrange->cancelled)) pendingTransactions_.push(std::move(*intent.transaction));
             if (intent.kind == arrange::core::InputIntentKind::DiagnosticsEvent) {
@@ -58,8 +58,8 @@ namespace arrange::juce {
         auto transaction = hasPending ? pendingTransactions_.take() : std::optional<arrange::core::MutationTransaction>{};
         if (transaction && transaction->rearrange && transaction->rearrange->cancelled) transaction.reset();
         // 失败候选由提交回执撤销，已提交的 JS 账本与 scene 都保持不变
-        auto result = pipeline_.run(scene_, root, constraints, transaction ? &*transaction : nullptr, framePipelineRequested, publishedFrame_, finalize, frameTimeMillis_);
-        if (transaction) result.rearrange = transaction->rearrange;
+        auto result = pipeline_.run(scene_, root, constraints, transaction ? &*transaction : nullptr, framePipelineRequested, publishedFrame_, finalize, frameTimeMillis_, preparation);
+
         return result;
     }
 

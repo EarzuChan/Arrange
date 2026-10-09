@@ -18,6 +18,8 @@ namespace arrange::core {
         InputSubmit = 5,
         InputChange = 6,
         InputBlur = 7,
+        DrawPrepare = 9,
+        FocusChanged = 8,
         Custom = 100,
     };
 

@@ -473,7 +473,9 @@ n.insertChild(1, 2, 0)
             const auto frame = runtime.pumpFrame(1, session.constraints(), timestamp);
             if (!frame.ok) throw std::runtime_error(frame.error);
         });
-        const auto tick = [&] { source.pulse(time += 16); };
+        const auto tick = [&] {
+            source.pulse(time += 16);
+        };
         tick();
         check(runtime.scene().contains(2) && runtime.publishedFrame().content.scenePaint.fragment && ScrollDispatcher::verticalScrollValue(runtime.scene().node(1)) == 0, "滚动夹具首个授权帧没有发布完整场景");
         check(runtime.takeDiagnosticToasts().empty(), "初始范围反馈被当成实际滚动回调");

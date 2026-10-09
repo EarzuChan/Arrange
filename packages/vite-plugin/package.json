@@ -1,6 +1,6 @@
 {
   "name": "@arrange/vite-plugin",
-  "version": "0.0.0-m.2.4",
+  "version": "0.0.0-m.3.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -19,8 +19,8 @@
   },
   "dependencies": {
     "typescript": "^5.9.0",
-    "@arrange/compiler": "0.0.0-m.2.4",
-    "@arrange/shared": "0.0.0-m.2.4",
+    "@arrange/compiler": "0.0.0-m.3.0",
+    "@arrange/shared": "0.0.0-m.3.0",
     "@babel/parser": "7.29.3",
     "entities": "7.0.1",
     "estree-walker": "2.0.2",

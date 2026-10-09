@@ -22,7 +22,7 @@ namespace arrange::juce {
         [[nodiscard]] bool hasPendingTransactions() const noexcept;
         void clearPendingTransactions() noexcept;
 
-        [[nodiscard]] arrange::core::SceneFramePipelineResult run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize = {});
+        [[nodiscard]] arrange::core::SceneFramePipelineResult run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize = {}, const arrange::core::FramePreparation& preparation = {});
 
         void setFrameTime(double timeMillis) noexcept {
             frameTimeMillis_ = timeMillis;

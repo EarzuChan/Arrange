@@ -8,11 +8,12 @@ import { M, Modifier } from '../modifier.ts'
 import { inject } from '../runtime/apiInject.ts'
 import { DensityKey } from '../density.ts'
 import { UnitResolver } from '../resolveUnits.ts'
+import type { LayoutContentProvider } from '../layoutContent.ts'
 
 export type LayoutProps = ArrangableProps<typeof Layout>
 export const Layout = defineArrangable({
     name: 'Layout',
-    props: { modifier: { type: Modifier, default: M }, measurePolicy: { type: Object as PropType<MeasurePolicy>, required: true, validator: isMeasurePolicy }, enabled: Boolean, contentDescription: String },
+    props: { modifier: { type: Modifier, default: M }, measurePolicy: { type: Object as PropType<MeasurePolicy>, required: true, validator: isMeasurePolicy }, contentProvider: Object as PropType<LayoutContentProvider>, enabled: Boolean, contentDescription: String },
     slotNames: ['default'],
     setup(props, { slot, source }) {
         const instance = currentInstance!
@@ -20,7 +21,7 @@ export const Layout = defineArrangable({
         const density = inject(DensityKey)
         if (!density) throw new Error('Layout 缺少 App 的 Density 服务')
 
-        const units = new UnitResolver(density)
+        const units = new UnitResolver(density, instance)
 
         // TIPS：唯一真豪组件，可以直撅NativeRearrangeHost
         const host = instance.appContext.host
@@ -28,6 +29,7 @@ export const Layout = defineArrangable({
 
         const node = new LayoutRearrangeNode(instance, host)
         instance.node = node
+        if (props.contentProvider) node.setContentProvider(props.contentProvider)
 
         new ValueBinding(() => units.measurePolicy(props.measurePolicy), instance, value => node.updateMeasurePolicy(value as MeasurePolicy), source('measurePolicy'))
         new ValueBinding(() => units.modifier(props.modifier), instance, value => node.updateModifier(value as import('../resolveUnits.ts').PxModifier), source('modifier'))
@@ -35,6 +37,6 @@ export const Layout = defineArrangable({
         new ValueBinding(() => props.contentDescription, instance, value => node.updateInput('contentDescription', value as string | undefined), source('contentDescription'))
 
         const content = slot()
-        return () => invokeContent(0, content)
+        return () => props.contentProvider ? props.contentProvider.render() : invokeContent(0, content)
     },
 })

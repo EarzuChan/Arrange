@@ -16,6 +16,16 @@ namespace arrange::core {
             return rect.width > 0.0f && rect.height > 0.0f;
         }
 
+        std::vector<float> scrollValues(const LayoutNode& node) {
+            std::vector<float> values;
+            if (!std::holds_alternative<LazyMeasurePolicy>(node.measurePolicy)) return values;
+            for (const auto& instance : node.modifier.elements()) {
+                const auto* input = std::get_if<LayoutModifierSemantics>(&instance.descriptor.value);
+                if (input && (input->kind == LayoutModifierKind::VerticalScroll || input->kind == LayoutModifierKind::HorizontalScroll)) values.push_back(input->scrollValue);
+            }
+            return values;
+        }
+
         Rect unionRect(Rect left, Rect right) {
             const auto x1 = std::min(left.x, right.x);
             const auto y1 = std::min(left.y, right.y);
@@ -115,7 +125,7 @@ namespace arrange::core {
         auto& node = require(id);
         const auto name = std::string(hostInputName(input));
         if (input == HostInput::MeasurePolicy) {
-            const auto policy = readMeasurePolicy(value);
+            const auto policy = readMeasurePolicy(value, &node.measurePolicy);
             const auto mask = measurePolicyInvalidation(node.measurePolicy, policy);
             node.measurePolicy = policy;
             markInputDirty(id, mask);
@@ -137,13 +147,19 @@ namespace arrange::core {
     }
 
     std::uint32_t LayoutTree::setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value) {
-        const auto mask = require(id).modifier.update(handle, value);
+        auto& node = require(id);
+        const auto previousScroll = scrollValues(node);
+        auto mask = node.modifier.update(handle, value);
+        if (previousScroll != scrollValues(node)) mask |= dirtyMask(DirtyFlag::Layout);
         markInputDirty(id, mask);
         return mask;
     }
 
     std::uint32_t LayoutTree::setModifierChain(NodeId id, const ModifierDescriptors& descriptors) {
-        const auto result = require(id).modifier.reconcile(descriptors);
+        auto& node = require(id);
+        const auto previousScroll = scrollValues(node);
+        auto result = node.modifier.reconcile(descriptors);
+        if (previousScroll != scrollValues(node)) result.dirty |= dirtyMask(DirtyFlag::Layout);
         markInputDirty(id, result.dirty);
         return result.dirty;
     }
@@ -363,14 +379,14 @@ namespace arrange::core {
     LayoutNode& LayoutTree::require(NodeId id) {
         ++nodeAccesses_;
         const auto it = nodes_.find(id);
-        if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
+        if (it == nodes_.end()) throw std::runtime_error("Arrange 布局节点不存在：" + std::to_string(id));
         return it->second;
     }
 
     const LayoutNode& LayoutTree::require(NodeId id) const {
         ++nodeAccesses_;
         const auto it = nodes_.find(id);
-        if (it == nodes_.end()) throw std::runtime_error("Arrange layout tree node does not exist");
+        if (it == nodes_.end()) throw std::runtime_error("Arrange 布局节点不存在：" + std::to_string(id));
         return it->second;
     }
 

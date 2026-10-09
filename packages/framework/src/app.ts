@@ -3,7 +3,8 @@ import { RearrangeSession } from './runtime/internal.ts'
 import { isArrangableDefinition } from './runtime/internal.ts'
 import { NativeRearrangeHost } from './rearrangeNode.ts'
 import { Layout } from './arrangable/Layout.ts'
-import { Box, Row, Column, Spacer } from './arrangable/LayoutingArrangables.ts'
+import { Box, Row, Column, Spacer, FlowRow, FlowColumn } from './arrangable/LayoutingArrangables.ts'
+import { LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid } from './arrangable/LazyArrangables.ts'
 import { Text, Input } from './arrangable/TextAndInput.ts'
 import { Image, Icon } from './arrangable/ImageAndIcon.ts'
 import { DynamicArrangable } from './arrangable/ToolArrangables.ts'
@@ -27,7 +28,7 @@ export interface ArrangeApp {
 }
 
 // 这个滚木又有何意味！
-const foundationArrangables = { Layout, Box, Row, Column, Spacer, Text, Input, Image, Icon, DynamicArrangable }
+const foundationArrangables = { Layout, Box, Row, Column, Spacer, FlowRow, FlowColumn, LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid, Text, Input, Image, Icon, DynamicArrangable }
 
 const mountedTargets = new WeakSet<NativeTransactionTarget>()
 

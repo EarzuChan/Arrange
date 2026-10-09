@@ -49,6 +49,26 @@ namespace arrange::juce {
             return viewportX_;
         }
 
+        float& viewportY() noexcept {
+            return viewportY_;
+        }
+
+        float viewportY() const noexcept {
+            return viewportY_;
+        }
+
+        std::optional<float>& preferredX() noexcept {
+            return preferredX_;
+        }
+
+        bool& pendingPlatformEdit() noexcept {
+            return pendingPlatformEdit_;
+        }
+
+        bool& compositionCancelled() noexcept {
+            return compositionCancelled_;
+        }
+
         std::vector<::juce::Range<int>>& temporaryUnderlines() noexcept {
             return temporaryUnderlines_;
         }
@@ -62,6 +82,10 @@ namespace arrange::juce {
         std::optional<std::size_t> dragAnchor_;
         arrange::core::TextInputState state_;
         float viewportX_ = 0.0f;
+        float viewportY_ = 0.0f;
+        std::optional<float> preferredX_;
+        bool pendingPlatformEdit_ = false;
+        bool compositionCancelled_ = false;
         std::vector<::juce::Range<int>> temporaryUnderlines_;
     };
 

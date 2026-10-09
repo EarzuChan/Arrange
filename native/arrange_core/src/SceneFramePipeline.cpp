@@ -47,7 +47,7 @@ namespace arrange::core {
         return plan;
     }
 
-    SceneFramePipelineResult SceneFramePipeline::run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize, double timeMillis) {
+    SceneFramePipelineResult SceneFramePipeline::run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize, double timeMillis, const FramePreparation& prepare) {
         SceneFramePipelineResult result;
         (void)layout_.takeScrollUpdates();
         result.ran = true;
@@ -58,10 +58,20 @@ namespace arrange::core {
         candidateFrame.changes = {};
         candidateFrame.error.reset();
         if (transaction) ++counters_.submissions;
+        result.rearrange = transaction ? transaction->rearrange : nullptr;
+        layout_.setMaterializer(prepare.materialize ? LayoutMaterializer{[&](NodeId id, const std::vector<int>& indices) {
+            auto continuation = prepare.materialize(id, indices);
+            if (result.rearrange && continuation.rearrange != result.rearrange) throw std::runtime_error("Layout 子组合必须继续同一候选事务");
+            if (!result.rearrange) result.rearrange = continuation.rearrange;
+            candidateScene.validateLayoutMaterialization(id, continuation);
+            candidateScene.applyUncommitted(continuation);
+        }}
+                                                    : LayoutMaterializer{});
         try {
             if (transaction) candidateScene.applyUncommitted(*transaction);
             recordPhase(result.phases, FramePhase::ApplyMutations, transaction != nullptr, transaction ? "applied structural and typed input submission" : "no submission");
             auto& tree = candidateScene.tree();
+            if (prepare.interaction) prepare.interaction(tree);
             tree.advanceAnimations(timeMillis);
             if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::Resize, "constraints", "root constraints changed");
             result.plan = planFrame(candidateScene, root, transaction != nullptr, framePipelineRequested);
@@ -101,6 +111,7 @@ namespace arrange::core {
                 }
                 recordPhase(result.phases, FramePhase::Layout, result.plan.layout, result.plan.layout ? "placed root subtree" : "retained placement");
                 if (result.plan.buildPaint) {
+                    if (prepare.draw) prepare.draw(candidateScene);
                     const auto started = std::chrono::steady_clock::now();
                     candidateFrame.content.scenePaint = drawOpsBuilder_.build(tree, root, counters_.paintWork);
                     ++counters_.paintBuilds;
@@ -136,6 +147,7 @@ namespace arrange::core {
             result.error = exception.what();
             // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何
         }
+        layout_.setMaterializer({});
         return result;
     }
 
@@ -144,7 +156,7 @@ namespace arrange::core {
         const auto& after = candidate.content;
         candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps || before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
         candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
-        // 变换后的覆盖层与场景绘制都需重绘整个视口，未变换的局部矩形无法安全界定其范围
+        // 编辑内容继承场景变换，局部矩形无法安全界定重绘范围
         if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
             candidate.plan.publishFrame = true;
             candidate.plan.passivePaint = true;

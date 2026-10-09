@@ -92,7 +92,22 @@ namespace arrange::quickjs {
             return arrange::core::PropValue::numberValue(number);
         }
         if (JS_IsString(value)) return arrange::core::PropValue::stringValue(toString(value));
-        if (!JS_IsObject(value) || JS_IsArray(value) || JS_IsFunction(context_, value)) {
+        if (JS_IsArray(value)) {
+            const auto count = arrayLength(value);
+            if (count > 1000000) {
+                JS_ThrowTypeError(context_, "Arrange 数组超过 1000000 项保护上限");
+                return arrange::core::PropValue::nullValue();
+            }
+            std::vector<arrange::core::PropValue> elements;
+            elements.reserve(count);
+            for (std::uint32_t index = 0; index < count; ++index) {
+                ScopedValue item(context_, JS_GetPropertyUint32(context_, value, index));
+                elements.push_back(propValue(item.get(), depth + 1));
+                if (JS_HasException(context_)) return arrange::core::PropValue::nullValue();
+            }
+            return arrange::core::PropValue::arrayValue(std::move(elements));
+        }
+        if (!JS_IsObject(value) || JS_IsFunction(context_, value)) {
             JS_ThrowTypeError(context_, "Arrange input has unsupported value type");
             return arrange::core::PropValue::nullValue();
         }

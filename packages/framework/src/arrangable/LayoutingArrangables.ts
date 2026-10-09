@@ -1,6 +1,6 @@
 import { defineArrangable } from '../runtime/index.ts'
 import type { ArrangableProps, PropType } from '../runtime/index.ts'
-import { BoxMeasurePolicy, ColumnMeasurePolicy, MinSizeMeasurePolicy, RowMeasurePolicy } from '../measurePolicy.ts'
+import { BoxMeasurePolicy, ColumnMeasurePolicy, MinSizeMeasurePolicy, RowMeasurePolicy, FlowRowMeasurePolicy, FlowColumnMeasurePolicy } from '../measurePolicy.ts'
 import { M, Modifier } from '../modifier.ts'
 import type { HorizontalArrangementProp, VerticalArrangementProp } from '../native.ts'
 import type { BoxAlignment, HorizontalAlignment, VerticalAlignment } from '../primitives.ts'
@@ -47,4 +47,26 @@ export const Spacer = defineArrangable({
     props: { modifier: { type: Modifier, default: M } },
     slotNames: [],
     setup: (props, { call, source }) => () => call(0, Layout, { measurePolicy: () => MinSizeMeasurePolicy, modifier: () => props.modifier }, {}, { sources: { modifier: source('modifier') } }),
+})
+
+export type FlowRowProps = ArrangableProps<typeof FlowRow>
+export const FlowRow = defineArrangable({
+    name: 'FlowRow',
+    props: { modifier: { type: Modifier, default: M }, horizontalArrangement: [String, Object] as PropType<HorizontalArrangementProp>, verticalArrangement: [String, Object] as PropType<VerticalArrangementProp>, itemVerticalAlignment: String as PropType<VerticalAlignment>, maxItemsInEachRow: Number },
+    slotNames: ['default'],
+    setup: (props, { call, slot, source }) => () => call(0, Layout, {
+        measurePolicy: () => FlowRowMeasurePolicy({ horizontalArrangement: props.horizontalArrangement, verticalArrangement: props.verticalArrangement, itemVerticalAlignment: props.itemVerticalAlignment, maxItemsInEachRow: props.maxItemsInEachRow }),
+        modifier: () => props.modifier,
+    }, { default: slot('default') }, { sources: { modifier: source('modifier'), measurePolicy: source('maxItemsInEachRow') ?? source('horizontalArrangement') ?? source('verticalArrangement') } }),
+})
+
+export type FlowColumnProps = ArrangableProps<typeof FlowColumn>
+export const FlowColumn = defineArrangable({
+    name: 'FlowColumn',
+    props: { modifier: { type: Modifier, default: M }, verticalArrangement: [String, Object] as PropType<VerticalArrangementProp>, horizontalArrangement: [String, Object] as PropType<HorizontalArrangementProp>, itemHorizontalAlignment: String as PropType<HorizontalAlignment>, maxItemsInEachColumn: Number },
+    slotNames: ['default'],
+    setup: (props, { call, slot, source }) => () => call(0, Layout, {
+        measurePolicy: () => FlowColumnMeasurePolicy({ verticalArrangement: props.verticalArrangement, horizontalArrangement: props.horizontalArrangement, itemHorizontalAlignment: props.itemHorizontalAlignment, maxItemsInEachColumn: props.maxItemsInEachColumn }),
+        modifier: () => props.modifier,
+    }, { default: slot('default') }, { sources: { modifier: source('modifier'), measurePolicy: source('maxItemsInEachColumn') ?? source('verticalArrangement') ?? source('horizontalArrangement') } }),
 })

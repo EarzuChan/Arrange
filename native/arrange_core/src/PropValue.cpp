@@ -41,6 +41,13 @@ namespace arrange::core {
         return result;
     }
 
+    PropValue PropValue::arrayValue(std::vector<PropValue> elements) {
+        PropValue result;
+        result.kind = PropValueKind::Array;
+        result.elements = std::move(elements);
+        return result;
+    }
+
     const PropValue* PropValue::field(std::string_view key) const noexcept {
         if (kind != PropValueKind::Object) return nullptr;
         for (const auto& item : fields) {

@@ -34,6 +34,11 @@ namespace arrange::core {
                 return left.boolean == right.boolean;
             case PropValueKind::String:
                 return left.string == right.string;
+            case PropValueKind::Array:
+                if (left.elements.size() != right.elements.size()) return false;
+                for (std::size_t index = 0; index < left.elements.size(); ++index)
+                    if (!samePropValue(left.elements[index], right.elements[index])) return false;
+                return true;
             case PropValueKind::Object:
                 if (left.fields.size() != right.fields.size()) return false;
                 for (const auto& field : left.fields) {

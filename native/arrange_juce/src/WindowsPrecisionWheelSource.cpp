@@ -159,8 +159,10 @@ namespace arrange::juce {
                     state_->lastY = transform[5];
                     if (input.deltaX == 0.0f && input.deltaY == 0.0f) return S_OK;
                     input.inertial = state_->inertial;
-                    if (state_->inertial) input.momentumPhase = WheelPhase::Changed;
-                    else input.phase = WheelPhase::Changed;
+                    if (state_->inertial)
+                        input.momentumPhase = WheelPhase::Changed;
+                    else
+                        input.phase = WheelPhase::Changed;
                     state_->append(input);
                 }
                 state_->wake();
@@ -405,11 +407,24 @@ namespace arrange::juce {
     };
 
     WindowsPrecisionWheelSource::WindowsPrecisionWheelSource(InputCallback onInput, WakeCallback onWake) : impl_(std::make_unique<Impl>(std::move(onInput), std::move(onWake))) {}
+
     WindowsPrecisionWheelSource::~WindowsPrecisionWheelSource() = default;
-    void WindowsPrecisionWheelSource::sync(::juce::Component& owner) { impl_->sync(owner); }
-    void WindowsPrecisionWheelSource::tick() { impl_->tick(); }
-    bool WindowsPrecisionWheelSource::needsTicks() const noexcept { return impl_->state->ticks.load(); }
-    void WindowsPrecisionWheelSource::cancel() { impl_->detach(); }
+
+    void WindowsPrecisionWheelSource::sync(::juce::Component& owner) {
+        impl_->sync(owner);
+    }
+
+    void WindowsPrecisionWheelSource::tick() {
+        impl_->tick();
+    }
+
+    bool WindowsPrecisionWheelSource::needsTicks() const noexcept {
+        return impl_->state->ticks.load();
+    }
+
+    void WindowsPrecisionWheelSource::cancel() {
+        impl_->detach();
+    }
 }
 
 #endif

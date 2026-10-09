@@ -8,6 +8,10 @@ namespace arrange::juce {
         dragAnchor_.reset();
         state_.reset();
         viewportX_ = 0.0f;
+        viewportY_ = 0.0f;
+        preferredX_.reset();
+        pendingPlatformEdit_ = false;
+        compositionCancelled_ = false;
         temporaryUnderlines_.clear();
     }
 }

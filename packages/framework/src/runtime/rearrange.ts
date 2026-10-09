@@ -223,6 +223,8 @@ export class RearrangeSession {
     private readonly activeScopes = new Map<RearrangeScope, boolean>()
     private readonly created = new Set<Entry>()
     private readonly commits: (() => void)[] = []
+    private readonly commitCleanups: (() => void)[] = []
+    private readonly prepareChecks: (() => void)[] = []
     private readonly rollbacks: (() => void)[] = []
     private readonly notifications = new Map<ArrangableInstance, Set<LifecycleHooks>>()
     private readonly deferred = new Map<RearrangeScope, boolean>()
@@ -276,6 +278,8 @@ export class RearrangeSession {
         this.activeScopes.clear()
     }
 
+    isScopeActive(scope: RearrangeScope): boolean { return this.isActive(scope) }
+
     private isActive(scope: RearrangeScope): boolean {
         const pending: RearrangeScope[] = []
         let current: RearrangeScope | null = scope
@@ -325,6 +329,9 @@ export class RearrangeSession {
     onCommit(callback: () => void): void {
         this.commits.push(callback)
     }
+
+    onCommitCleanup(callback: () => void): void { this.commitCleanups.push(callback) }
+    beforeApply(callback: () => void): void { this.prepareChecks.push(callback) }
 
     onRollback(callback: () => void): void {
         this.rollbacks.push(callback)
@@ -379,42 +386,8 @@ export class RearrangeSession {
         const transaction = this.transaction = {}
         try {
             this.context.host.begin()
-            const executions = new Map<RearrangeScope | ValueTask, number>()
-            const visit = (target: RearrangeScope | ValueTask) => {
-                const count = (executions.get(target) ?? 0) + 1
-                if (count > 100) throw new Error(`重排候选反复失效，未能稳定${target instanceof RearrangeScope && target.source ? `\n来源：${target.source}` : ''}`)
-                executions.set(target, count)
-            }
-            while (this.values.size || this.work.size || this.scheduler.hasPreWork) {
-                this.scheduler.drainPre()
-                if (this.disposed) return
-                let scope: RearrangeScope | undefined
-                for (const candidate of this.work.keys()) if (!scope || candidate.identity < scope.identity) scope = candidate
-                let update: ValueTask | undefined
-                for (const candidate of this.values) if (!update || candidate.scope().identity < update.scope().identity) update = candidate
-                if (update && (!scope || update.scope().identity <= scope.identity)) {
-                    this.values.delete(update)
-                    if (this.isActive(update.scope()) && update.dirty()) {
-                        visit(update)
-                        update.run()
-                    }
-                } else if (scope) {
-                    const force = this.work.get(scope)!
-                    this.work.delete(scope)
-                    if (this.isActive(scope)) {
-                        visit(scope)
-                        scope.prepare(force)
-                    }
-                }
-                if (this.disposed) return
-            }
-            if (this.failed) throw this.failed.error
-            this.discardUnusedCandidates()
-            for (const owner of this.dirtyParents) {
-                if (owner && !this.isActive(owner.structure)) continue
-                if (owner) owner.node!.reconcileChildren(collectNodes(owner.structure))
-                else this.context.host.reconcileRoots(collectNodes(this.root))
-            }
+            this.prepareCandidate()
+            if (this.disposed) return
             this.applying = true
             this.context.host.apply(error => { if (this.transaction === transaction) this.complete(error) })
         } catch (error) {
@@ -427,6 +400,78 @@ export class RearrangeSession {
             this.running = false
             this.work.clear()
         }
+    }
+
+    // 只有 Layout 的材料化驱动能够在原生测量过程中继续这一候选
+    continuePreparation(work: () => void): void {
+        if (this.disposed || this.running) throw new Error('子组合不能重入重排准备')
+        this.scheduler.continuePreparation(() => {
+            if (!this.applying) {
+                work()
+                this.run(null)
+                return
+            }
+            const host = this.context.host
+            if (!host.beginContinuation || !host.applyContinuation) throw new Error('宿主不支持受控子组合')
+            this.running = true
+            this.applying = false
+            try {
+                host.beginContinuation()
+                work()
+                this.prepareCandidate()
+                if (this.disposed) return
+                this.applying = true
+                host.applyContinuation()
+            } catch (error) {
+                this.applying = true
+                this.invalidate(error)
+                throw error
+            } finally {
+                this.running = false
+                this.work.clear()
+            }
+        })
+    }
+
+    private prepareCandidate(): void {
+        const executions = new Map<RearrangeScope | ValueTask, number>()
+        const visit = (target: RearrangeScope | ValueTask) => {
+            const count = (executions.get(target) ?? 0) + 1
+            if (count > 100) throw new Error(`重排候选反复失效，未能稳定${target instanceof RearrangeScope && target.source ? `\n来源：${target.source}` : ''}`)
+            executions.set(target, count)
+        }
+        while (this.values.size || this.work.size || this.scheduler.hasPreWork) {
+            this.scheduler.drainPre()
+            if (this.disposed) return
+            let scope: RearrangeScope | undefined
+            for (const candidate of this.work.keys()) if (!scope || candidate.identity < scope.identity) scope = candidate
+            let update: ValueTask | undefined
+            for (const candidate of this.values) if (!update || candidate.scope().identity < update.scope().identity) update = candidate
+            if (update && (!scope || update.scope().identity <= scope.identity)) {
+                this.values.delete(update)
+                if (this.isActive(update.scope()) && update.dirty()) {
+                    visit(update)
+                    update.run()
+                }
+            } else if (scope) {
+                const force = this.work.get(scope)!
+                this.work.delete(scope)
+                if (this.isActive(scope)) {
+                    visit(scope)
+                    scope.prepare(force)
+                }
+            }
+            if (this.disposed) return
+        }
+        if (this.failed) throw this.failed.error
+        this.discardUnusedCandidates()
+        for (const owner of this.dirtyParents) {
+            if (owner && !this.isActive(owner.structure)) continue
+            if (owner) owner.node!.reconcileChildren(collectNodes(owner.structure))
+            else this.context.host.reconcileRoots(collectNodes(this.root))
+        }
+        this.dirtyParents.clear()
+        for (const check of this.prepareChecks) check()
     }
 
     private complete(error?: Error): void {
@@ -447,6 +492,7 @@ export class RearrangeSession {
             scope.publish(entries)
         }
         for (const commit of this.commits) safely(commit)
+        for (const cleanup of this.commitCleanups) safely(cleanup)
         const notifications = new Map(this.notifications)
         this.clearCandidate()
 
@@ -515,6 +561,8 @@ export class RearrangeSession {
         this.activeScopes.clear()
         this.created.clear()
         this.commits.length = 0
+        this.commitCleanups.length = 0
+        this.prepareChecks.length = 0
         this.rollbacks.length = 0
         this.notifications.clear()
         this.dirtyParents.clear()
@@ -679,6 +727,18 @@ export function arrangeScope(position: CallPosition, program: StructureProgram, 
 class RetainedContents {
     readonly entries = new Map<RearrangeKey, ScopeEntry>()
     closed = false
+    limit = 1
+
+    trim(parent: RearrangeScope): void {
+        const active = new Set(parent.entries.filter(entry => entry.kind === 'scope' && entry.retention === this))
+        const maximum = Math.max(this.limit, active.size)
+        for (const [key, entry] of this.entries) {
+            if (this.entries.size <= maximum) break
+            if (active.has(entry)) continue
+            this.entries.delete(key)
+            retireEntries([entry])
+        }
+    }
 
     deactivate(entry: ScopeEntry): void {
         entry.scope.pause()
@@ -703,6 +763,12 @@ export function retainContent(position: CallPosition, key: RearrangeKey, content
         parent.rearrangeSession.onRollback(() => { parent.retainedContents.delete(position) })
     }
     const retained = cache
+    parent.rearrangeSession.preserve(retained, () => {
+        const previousLimit = retained.limit
+        parent.rearrangeSession.onCommitCleanup(() => retained.trim(parent))
+        return () => { retained.limit = previousLimit }
+    })
+    retained.limit = max
     const candidate = parent.rearrangeSession.entries(parent).find(entry => entry.kind === 'scope' && entry.retention === retained && entry.position === position && Object.is(entry.key, key))
     let entry = candidate?.kind === 'scope' ? candidate : retained.entries.get(key)
     if (entry) {
@@ -726,11 +792,7 @@ export function retainContent(position: CallPosition, key: RearrangeKey, content
         if (retained.closed || selected.scope.retired || !parent.rearrangeSession.entries(parent).includes(selected)) return
         retained.entries.delete(key)
         retained.entries.set(key, selected)
-        while (retained.entries.size > max) {
-            const [oldKey, old] = retained.entries.entries().next().value!
-            retained.entries.delete(oldKey)
-            retireEntries([old])
-        }
+
     })
 }
 

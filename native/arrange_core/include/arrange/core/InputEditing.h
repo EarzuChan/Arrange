@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace arrange::core {
@@ -17,6 +18,24 @@ namespace arrange::core {
         void begin(std::string value, bool selectAll);
         void reset();
         void replaceExternal(std::string value);
+
+        void setEditTime(double timeMillis) noexcept {
+            editTime_ = timeMillis;
+        }
+
+        void breakUndoGroup() noexcept;
+        void beginPlatformEdit();
+        void finishPlatformEdit() noexcept;
+        void beginComposition();
+        void beginCompositionFromLastEdit();
+
+        [[nodiscard]] bool composing() const noexcept {
+            return composition_.has_value();
+        }
+
+        InputEditResult commitComposition();
+        InputEditResult cancelComposition();
+        InputEditResult moveTo(std::size_t index, bool extend);
 
         [[nodiscard]] const std::string& text() const noexcept {
             return text_;
@@ -63,7 +82,7 @@ namespace arrange::core {
         InputEditResult selectRange(std::size_t anchor, std::size_t active);
         [[nodiscard]] std::string selectedText() const;
         InputEditResult cutSelection();
-        InputEditResult replaceSelectionWithText(std::string text);
+        InputEditResult replaceSelectionWithText(std::string text, bool typing = false);
         InputEditResult undo();
         InputEditResult redo();
         InputEditResult submit() const noexcept;
@@ -78,7 +97,8 @@ namespace arrange::core {
 
         [[nodiscard]] Snapshot snapshot() const;
         void restoreSnapshot(const Snapshot& snapshot);
-        void recordUndoPoint();
+        enum class EditKind { Atomic, Typing, Backward, Forward };
+        void recordUndoPoint(EditKind kind = EditKind::Atomic);
         static bool sameSnapshot(const Snapshot& left, const Snapshot& right);
         [[nodiscard]] std::size_t clampToBoundary(std::size_t index) const;
         void clearSelection();
@@ -91,5 +111,19 @@ namespace arrange::core {
         std::size_t selectionEnd_ = 0;
         std::vector<Snapshot> undoStack_;
         std::vector<Snapshot> redoStack_;
+        std::optional<Snapshot> composition_;
+        std::optional<Snapshot> lastEditBefore_;
+
+        struct PlatformEdit {
+            Snapshot before;
+            std::vector<Snapshot> undo;
+            std::vector<Snapshot> redo;
+        };
+
+        std::optional<PlatformEdit> platformEdit_;
+        bool lastEditAddedUndo_ = false;
+        EditKind undoGroup_ = EditKind::Atomic;
+        double editTime_ = -1;
+        double lastEditTime_ = -1;
     };
 }

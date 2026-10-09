@@ -44,6 +44,10 @@ namespace arrange::juce {
         RearrangeInvokeResult semanticCheckpoint(double nowMillis);
         [[nodiscard]] RearrangeInvokeResult prepareVisualFrame(double nowMillis);
         RearrangeInvokeResult completeVisualFrame(bool success);
+        RearrangeInvokeResult prepareDrawModifiers(arrange::core::NativeScene& candidate);
+        RearrangeInvokeResult materializeLayout(arrange::core::NodeId id, const std::vector<int>& indices);
+        std::vector<arrange::core::FocusCommand> takeFocusCommands();
+        RearrangeInvokeResult invokeFocus(const arrange::core::EventSlotId& slot, double nowMillis, bool focused, bool hasFocus);
         [[nodiscard]] RearrangeInvokeResult invoke(const arrange::core::EventSlotId& slot, double nowMillis);
         [[nodiscard]] RearrangeInvokeResult invokeString(const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value);
 

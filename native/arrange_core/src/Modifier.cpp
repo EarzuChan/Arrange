@@ -36,7 +36,9 @@ namespace arrange::core {
             if (std::holds_alternative<PaintModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::Resource);
             if (std::holds_alternative<OffsetModifier>(value)) return kPlace;
             if (std::holds_alternative<PaintStyleSemantics>(value)) return kPaint;
+            if (std::holds_alternative<DrawModifier>(value)) return kPaint | dirtyMask(DirtyFlag::EventSlot);
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
+            if (std::holds_alternative<FocusModifier>(value)) return dirtyMask(DirtyFlag::Focus) | dirtyMask(DirtyFlag::EventSlot);
             return kPaint | kHit;
         }
     }
@@ -46,7 +48,7 @@ namespace arrange::core {
             [](const auto& input) -> std::string_view {
                 using T = std::decay_t<decltype(input)>;
                 if constexpr (std::is_same_v<T, LayoutModifierSemantics>) {
-                    constexpr std::string_view names[]{"padding", "width", "height", "size", "requiredWidth", "requiredHeight", "requiredSize", "fillMaxWidth", "fillMaxHeight", "fillMaxSize", "widthIn", "heightIn", "sizeIn", "defaultMinSize", "verticalScroll", "horizontalScroll"};
+                    constexpr std::string_view names[]{"padding", "width", "height", "size", "requiredWidth", "requiredHeight", "requiredSize", "fillMaxWidth", "fillMaxHeight", "fillMaxSize", "widthIn", "heightIn", "sizeIn", "defaultMinSize", "verticalScroll", "horizontalScroll", "intrinsicWidth", "intrinsicHeight"};
                     return names[static_cast<std::size_t>(input.kind)];
                 }
                 if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
@@ -57,7 +59,11 @@ namespace arrange::core {
                     constexpr std::string_view names[]{"clickable", "hoverable", "focusable"};
                     return names[static_cast<std::size_t>(input.kind)];
                 }
-                if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : "align";
+                if constexpr (std::is_same_v<T, FocusModifier>) {
+                    constexpr std::string_view names[]{"focusRequester", "focusProperties", "focusGroup", "onFocusChanged"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
+                if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) return input.kind == ParentDataKind::Weight ? "weight" : input.kind == ParentDataKind::Align ? "align" : "matchParentSize";
                 if constexpr (std::is_same_v<T, PaintModifier>) return "paint";
                 if constexpr (std::is_same_v<T, TextModifier>) return "text";
                 if constexpr (std::is_same_v<T, TextFieldModifier>) return "textField";
@@ -66,6 +72,10 @@ namespace arrange::core {
                 if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
                 if constexpr (std::is_same_v<T, ZIndexModifier>) return "zIndex";
                 if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) return "animateContentSize";
+                if constexpr (std::is_same_v<T, DrawModifier>) {
+                    constexpr std::string_view names[]{"drawBehind", "drawWithContent", "drawWithCache"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
                 return "";
             },
             value);
@@ -100,6 +110,7 @@ namespace arrange::core {
                     for (auto value : {spec.durationMillis, spec.delayMillis, spec.stiffness, spec.dampingRatio, spec.threshold}) finite(value);
                     for (auto value : spec.bezier) finite(value);
                     if (spec.durationMillis < 0 || spec.delayMillis < 0 || spec.stiffness <= 0 || spec.dampingRatio <= 0 || spec.threshold <= 0 || spec.bezier[0] < 0 || spec.bezier[0] > 1 || spec.bezier[2] < 0 || spec.bezier[2] > 1) throw std::invalid_argument("Arrange invalid content-size animation spec");
+                    if (spec.iterations < 1 || spec.kind == AnimationKind::Spring && (spec.iterations != 1 || spec.reverse)) throw std::invalid_argument("有限重复动画需要正次数及 tween 或 snap");
                 } else if constexpr (std::is_same_v<T, PaintModifier>) {
                     finite(input.alpha);
                     if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("paint alpha 必须在 0..1 之间");
@@ -127,7 +138,7 @@ namespace arrange::core {
                     finite(input.value);
                 else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
                     finite(input.weight);
-                    if (input.weight < 0) throw std::invalid_argument("Arrange weight must be nonnegative");
+                    if (input.kind == ParentDataKind::Weight && input.weight <= 0) throw std::invalid_argument("weight 必须为正数");
                     if (input.kind == ParentDataKind::Align && !isImageAlignment(input.align) && input.align != "Baseline") throw std::invalid_argument("Arrange Modifier.align 不支持对齐值：'" + input.align + "'");
                 }
             },
@@ -136,6 +147,8 @@ namespace arrange::core {
 
     std::uint32_t modifierInvalidation(const ModifierValue& before, const ModifierValue& after) {
         if (before == after) return 0;
+        if (const auto* a = std::get_if<DrawModifier>(&before))
+            if (const auto* b = std::get_if<DrawModifier>(&after)) return kPaint | (a->prepare != b->prepare ? dirtyMask(DirtyFlag::EventSlot) : 0u);
         if (const auto* a = textPresentation(before)) {
             if (const auto* b = textPresentation(after); b && sameModifierKind(before, after)) {
                 auto previous = *a;
@@ -291,8 +304,10 @@ namespace arrange::core {
                 if (input->kind == ParentDataKind::Weight) {
                     result.weight = input->weight;
                     result.weightFill = input->weightFill;
-                } else
+                } else if (input->kind == ParentDataKind::Align)
                     result.align = input->align;
+                else
+                    result.matchParentSize = true;
             }
         }
         return result;

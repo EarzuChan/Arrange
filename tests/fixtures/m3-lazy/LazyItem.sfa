@@ -1,0 +1,14 @@
+<template>
+    <Text :text="`项:${id}:${local}`" :modifier="M.height(height.dp).fillMaxWidth().clickable(bump)" />
+    <Spacer :modifier="M.height(2.dp)" />
+    <Input a-if="id === 9000" value="焦点9000" :modifier="M.height(24.dp).fillMaxWidth()" />
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { M } from '@arrange/framework/ui'
+
+const props = defineProps<{ id: number; height: number }>()
+const local = ref(0)
+function bump() { local.value++ }
+</script>

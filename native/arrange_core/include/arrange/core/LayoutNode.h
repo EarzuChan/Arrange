@@ -12,6 +12,7 @@
 namespace arrange::core {
     enum class NodeType { Root, Layout, Unknown };
 
+    struct LazyLayoutState;
     struct PaintFragment;
     struct HitFragment;
     struct TextLayout;
@@ -28,6 +29,8 @@ namespace arrange::core {
         Rect bounds;
         float baseline = -1.0f;
         std::vector<NodeId> children;
+        std::vector<std::vector<NodeId>> flowLines;
+        std::shared_ptr<LazyLayoutState> lazy;
         std::uint32_t dirty = 0;
         std::uint32_t subtreeDirty = 0;
         Constraints measuredConstraints;

@@ -144,7 +144,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto overlay = input.buildFocusedInputOps(tree, true);
         const auto transforms = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushTransform; });
         const auto clips = std::count_if(overlay.begin(), overlay.end(), [](const auto& op) { return op.type == DrawOpType::PushClip; });
-        check(transforms == 2 && clips >= 2, "Caret overlay escaped ancestor onion geometry");
+        check(transforms == 0 && clips == 1 && overlay.front().rect.x == 0 && overlay.front().rect.y == 0, "编辑内容没有保留 TextField 局部几何");
         const auto receiver = test_support::editable(tree.node(2))->handle;
 
         std::vector<std::pair<EventSlotId, std::string>> edits;
@@ -160,6 +160,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto compositionOps = input.buildFocusedInputOps(tree, true);
         check(compositionOps.size() > overlay.size(), "选区及 IME 下划线没有产生绘制操作");
         check(input.insertTextAtCaret(tree, true, ::juce::String::fromUTF8("中"), callbacks), "IME 提交未替换当前选区");
+        check(input.setTemporaryUnderlining(tree, true, {}, callbacks), "IME 完成未清理组合事务");
         check(edits.size() == 1 && edits[0].first == field.onValueChange && edits[0].second == "a中def", "IME 回调未使用 TextField Modifier 的字段或字符边界错误");
         check(input.caretPosition(tree, true) == 2 && test_support::textOf(tree.node(2)) == "abcdef", "IME 编辑越过回调直接修改了已发布模型");
 

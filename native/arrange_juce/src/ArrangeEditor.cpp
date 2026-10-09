@@ -68,9 +68,7 @@ namespace arrange::juce {
         sceneHost_->setWorkAvailable([this] { updateFrameClockState(); });
 #if JUCE_WINDOWS
         // 未测试！
-        precisionWheelSource_ = std::make_unique<WindowsPrecisionWheelSource>([this](arrange::core::Point point, const WheelInput& input) {
-            (void)sceneHost_->wheelMove(point, input);
-        }, [this] { requestFrameClockResyncAsync(); });
+        precisionWheelSource_ = std::make_unique<WindowsPrecisionWheelSource>([this](arrange::core::Point point, const WheelInput& input) { (void)sceneHost_->wheelMove(point, input); }, [this] { requestFrameClockResyncAsync(); });
 #endif
         configure(std::move(config));
     }

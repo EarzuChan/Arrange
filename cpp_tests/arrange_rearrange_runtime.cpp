@@ -184,6 +184,7 @@ int main(int argc, char** argv) {
         check(interaction.focusedNode() == focusedInput, "gallery input could not acquire focus");
         const auto inputHandles = handles(runtime.scene().node(focusedInput));
         check(interaction.insertTextAtCaret(inputTree, true, ::juce::String::fromUTF8("收尾编辑"), arrange::juce::TextInputMutationSink{}.callbacks(runtime)), "真实 Gallery 输入编辑未被消费");
+        interaction.dispatchPendingTextEdits(inputTree, arrange::juce::TextInputMutationSink{}.callbacks(runtime));
         const auto editedFrame = runtime.pumpFrame(1, constraints, timestamp += 16);
         check(editedFrame.ok, "真实 Gallery 输入编辑发布失败");
         if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {

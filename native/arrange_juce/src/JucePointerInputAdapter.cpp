@@ -99,7 +99,9 @@ namespace arrange::juce {
         const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision);
         const auto& result = wheelResult.scroll;
         if (ScrollProbe::active()) {
-            const auto logicalDistance = [&](float delta, WheelUnit unit) { return delta * (unit == WheelUnit::Lines ? scrollLineDistance : unit == WheelUnit::Pages ? result.viewportSize : 1.0f); };
+            const auto logicalDistance = [&](float delta, WheelUnit unit) {
+                return delta * (unit == WheelUnit::Lines ? scrollLineDistance : unit == WheelUnit::Pages ? result.viewportSize : 1.0f);
+            };
             ScrollProbe::Sample sample;
             sample.kind = ScrollProbe::Kind::Route;
             sample.deltaX = logicalDistance(input.deltaX, input.unitX);

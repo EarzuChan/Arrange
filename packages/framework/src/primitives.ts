@@ -70,23 +70,33 @@ export function PaddingValues(value: PaddingValue): Padding {
 }
 
 export const IntrinsicSize = Object.freeze({ Min: "IntrinsicSize.Min", Max: "IntrinsicSize.Max" })
+export type IntrinsicSizeValue = typeof IntrinsicSize[keyof typeof IntrinsicSize]
 export const ContentScale = Object.freeze({ Fit: "Fit", Crop: "Crop", FillBounds: "FillBounds", Inside: "Inside", None: "None", FillWidth: "FillWidth", FillHeight: "FillHeight" })
 export type ContentScaleValue = typeof ContentScale[keyof typeof ContentScale]
 export const Role = Object.freeze({ Button: "Button", Checkbox: "Checkbox", Slider: "Slider", TextField: "TextField", Image: "Image" })
 export const Orientation = Object.freeze({ Horizontal: "Horizontal", Vertical: "Vertical" })
+export type GridCellsValue = Readonly<{ type: 'Fixed'; count: number }> | Readonly<{ type: 'Adaptive'; minSizeDp: number; minSizePx: number }>
 export const GridCells = Object.freeze({
-    Fixed(count: number) {
-        return Object.freeze({ type: "Fixed", count })
-    }, Adaptive(minSize: number) {
-        return Object.freeze({ type: "Adaptive", minSize })
-    }
+    Fixed(count: number): Extract<GridCellsValue, { type: 'Fixed' }> {
+        if (!Number.isSafeInteger(count) || count < 1 || count > 4096) throw new RangeError('网格数量必须是 1..4096 的整数')
+        return Object.freeze({ type: 'Fixed', count })
+    },
+    Adaptive(minSizeDp: number, minSizePx: number): Extract<GridCellsValue, { type: 'Adaptive' }> {
+        if (!Number.isFinite(minSizeDp) || !Number.isFinite(minSizePx) || minSizeDp < 0 || minSizePx < 0 || minSizeDp + minSizePx <= 0) throw new RangeError('网格最小尺寸必须是非负且总和大于零的 DP/PX 长度')
+        return Object.freeze({ type: 'Adaptive', minSizeDp, minSizePx })
+    },
 })
+
+export type GridItemSpanValue = Readonly<{ type: 'GridItemSpan'; count: number }> | Readonly<{ type: 'GridItemSpan.MaxLineSpan' }>
 
 type GridItemSpanFactory = ((count: number) => Readonly<{ type: "GridItemSpan"; count: number }>) & {
     MaxLineSpan: Readonly<{ type: "GridItemSpan.MaxLineSpan" }>
 }
 
 export const GridItemSpan: GridItemSpanFactory = Object.assign(
-    (count: number) => Object.freeze({ type: "GridItemSpan" as const, count }),
+    (count: number) => {
+        if (!Number.isSafeInteger(count) || count < 1 || count > 4096) throw new RangeError('网格跨度必须是 1..4096 的整数')
+        return Object.freeze({ type: 'GridItemSpan' as const, count })
+    },
     { MaxLineSpan: Object.freeze({ type: "GridItemSpan.MaxLineSpan" as const }) },
 )

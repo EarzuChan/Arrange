@@ -33,6 +33,7 @@ target_sources(arrange_juce PRIVATE
   src/EditorSceneHost.cpp
   src/FramePumpDriver.cpp
   src/PainterResources.cpp
+  src/FocusOwner.cpp
   src/InteractionStateOwner.cpp
   src/TextInputOwner.cpp
   src/TextInputMutationSink.cpp

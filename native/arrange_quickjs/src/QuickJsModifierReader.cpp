@@ -41,6 +41,7 @@ namespace arrange::quickjs {
             if (type == "paint") return check({"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"});
             if (type == "padding") return check({"start", "top", "end", "bottom"});
             if (type == "width" || type == "height" || type == "alpha" || type == "zIndex") return check({"value"});
+            if (type == "intrinsicWidth" || type == "intrinsicHeight") return check({"maximum"});
             if (type == "requiredWidth") return check({"width"});
             if (type == "requiredHeight") return check({"height"});
             if (type == "size" || type == "requiredSize") return check({"width", "height"});
@@ -52,13 +53,19 @@ namespace arrange::quickjs {
             if (type == "animateContentSize") return check({"animationSpec", "clip"});
             if (type == "weight") return check({"weight", "fill"});
             if (type == "align") return check({"alignment"});
+            if (type == "matchParentSize") return check({});
             if (type == "offset" || type == "absoluteOffset") return check({"x", "y"});
             if (type == "graphicsLayer") return check({"translationX", "translationY", "scaleX", "scaleY", "rotationZ", "transformOrigin", "alpha", "clip"});
+            if (type == "drawBehind" || type == "drawWithContent" || type == "drawWithCache") return check({"prepare", "revision", "transactional"});
             if (type == "background") return check({"color", "brush", "shape"});
             if (type == "border") return check({"width", "color", "brush", "shape"});
             if (type == "clip") return check({"shape"});
             if (type == "clickable") return check({"enabled", "focusable", "onClick"});
             if (type == "hoverable" || type == "focusable") return check({"enabled"});
+            if (type == "focusRequester") return check({"requester"});
+            if (type == "focusGroup") return check({});
+            if (type == "onFocusChanged") return check({"callback"});
+            if (type == "focusProperties") return check({"canFocus", "next", "previous", "up", "down", "left", "right"});
 
             JS_ThrowTypeError(context, "Arrange Modifier 类型 '%.*s' 未定义", static_cast<int>(type.size()), type.data());
             return false;
@@ -261,6 +268,11 @@ namespace arrange::quickjs {
                 item.padding = readPadding(payload);
                 if (failed_) return {};
                 result.push_back({item, key});
+            } else if (type == "intrinsicWidth" || type == "intrinsicHeight") {
+                arrange::core::LayoutModifierSemantics item;
+                item.kind = type == "intrinsicWidth" ? arrange::core::LayoutModifierKind::IntrinsicWidth : arrange::core::LayoutModifierKind::IntrinsicHeight;
+                item.intrinsicMaximum = boolField(payload, "maximum", false);
+                result.push_back({item, key});
             } else if (type == "width" || type == "height" || type == "requiredWidth" || type == "requiredHeight") {
                 arrange::core::LayoutModifierSemantics item;
                 if (type == "width")
@@ -331,7 +343,7 @@ namespace arrange::quickjs {
                     return {};
                 }
                 const auto kind = requiredStringField(spec.get(), "kind", "animationSpec");
-                const auto fields = kind == "tween" ? std::initializer_list<std::string_view>{"kind", "durationMillis", "delayMillis", "x1", "y1", "x2", "y2"} : kind == "spring" ? std::initializer_list<std::string_view>{"kind", "stiffness", "dampingRatio", "visibilityThreshold"} : std::initializer_list<std::string_view>{"kind", "delayMillis"};
+                const auto fields = kind == "tween" ? std::initializer_list<std::string_view>{"kind", "durationMillis", "delayMillis", "x1", "y1", "x2", "y2", "iterations", "repeatMode"} : kind == "spring" ? std::initializer_list<std::string_view>{"kind", "stiffness", "dampingRatio", "visibilityThreshold"} : std::initializer_list<std::string_view>{"kind", "delayMillis", "iterations", "repeatMode"};
                 if (!fieldsMatch(context_, spec.get(), fields, "animationSpec")) {
                     failed_ = true;
                     return {};
@@ -353,6 +365,23 @@ namespace arrange::quickjs {
                 input.dampingRatio = numberField(spec.get(), "dampingRatio", 1);
                 input.threshold = numberField(spec.get(), "visibilityThreshold", 0.01f);
                 input.bezier = {numberField(spec.get(), "x1", 0.4f), numberField(spec.get(), "y1", 0), numberField(spec.get(), "x2", 0.2f), numberField(spec.get(), "y2", 1)};
+                double iterations = 1;
+                ScopedValue iterationValue(context_, JS_GetPropertyStr(context_, spec.get(), "iterations"));
+                if (!JS_IsUndefined(iterationValue.get()) && (!JS_IsNumber(iterationValue.get()) || JS_ToFloat64(context_, &iterations, iterationValue.get()) < 0)) {
+                    (void)throwTypeError("动画重复次数必须是数字");
+                    return {};
+                }
+                if (!std::isfinite(iterations) || iterations < 1 || iterations > 2147483647.0 || std::floor(iterations) != iterations) {
+                    (void)throwTypeError("动画重复次数必须是正整数");
+                    return {};
+                }
+                input.iterations = static_cast<int>(iterations);
+                const auto repeatMode = reader_.stringField(spec.get(), "repeatMode", "restart");
+                if (repeatMode != "restart" && repeatMode != "reverse") {
+                    (void)throwTypeError("动画重复模式未定义");
+                    return {};
+                }
+                input.reverse = repeatMode == "reverse";
                 item.clip = boolField(payload, "clip", true);
                 result.push_back({item, key});
             } else if (type == "text" || type == "textField") {
@@ -434,18 +463,41 @@ namespace arrange::quickjs {
                     }
                 }
                 result.push_back({item, key});
-            } else if (type == "weight" || type == "align") {
+            } else if (type == "weight" || type == "align" || type == "matchParentSize") {
                 arrange::core::ParentDataModifierSemantics item;
                 if (type == "weight") {
                     item.weight = requiredNumberField(payload, "weight", type);
                     item.weightFill = boolField(payload, "fill", true);
-                } else {
+                } else if (type == "align") {
                     item.kind = arrange::core::ParentDataKind::Align;
                     item.align = requiredStringField(payload, "alignment", type);
-                }
+                } else
+                    item.kind = arrange::core::ParentDataKind::MatchParentSize;
                 result.push_back({item, key});
             } else if (type == "offset" || type == "absoluteOffset") {
                 result.push_back({arrange::core::OffsetModifier{numberField(payload, "x"), numberField(payload, "y")}, key});
+            } else if (type == "drawBehind" || type == "drawWithContent" || type == "drawWithCache") {
+                arrange::core::DrawModifier item;
+                item.kind = type == "drawBehind" ? arrange::core::DrawModifierKind::Behind : type == "drawWithContent" ? arrange::core::DrawModifierKind::WithContent : arrange::core::DrawModifierKind::WithCache;
+                ScopedValue revisionValue(context_, JS_GetPropertyStr(context_, payload, "revision"));
+                if (!JS_IsUndefined(revisionValue.get()) && !JS_IsNumber(revisionValue.get())) {
+                    (void)throwTypeError("绘制 revision 需要数值");
+                    return {};
+                }
+                const auto revision = JS_IsUndefined(revisionValue.get()) ? 0.0 : reader_.toDouble(revisionValue.get());
+                if (!std::isfinite(revision) || revision < 0 || std::floor(revision) != revision || revision > 9007199254740991.0) {
+                    (void)throwTypeError("绘制 revision 需要非负安全整数");
+                    return {};
+                }
+                item.revision = static_cast<std::uint64_t>(revision);
+                item.transactional = boolField(payload, "transactional", false);
+                ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "prepare"));
+                if (!JS_IsFunction(context_, callback.get())) {
+                    (void)throwTypeError("绘制 prepare 需要函数");
+                    return {};
+                }
+                callbacks.push_back({result.size(), arrange::core::EventSlotKind::DrawPrepare, std::move(callback)});
+                result.push_back({item, key});
             } else if (type == "graphicsLayer") {
                 arrange::core::TransformModifierSemantics item;
                 item.translationX = numberField(payload, "translationX");
@@ -470,6 +522,35 @@ namespace arrange::quickjs {
                 result.push_back({paintStyle(payload, kind), key});
             } else if (type == "clip") {
                 result.push_back({arrange::core::ClipModifier{paintStyle(payload, arrange::core::PaintStyleKind::Background)}, key});
+            } else if (type == "focusRequester" || type == "focusProperties" || type == "focusGroup" || type == "onFocusChanged") {
+                arrange::core::FocusModifier item;
+                item.kind = type == "focusRequester" ? arrange::core::FocusModifierKind::Requester : type == "focusGroup" ? arrange::core::FocusModifierKind::Group : type == "onFocusChanged" ? arrange::core::FocusModifierKind::Observer : arrange::core::FocusModifierKind::Properties;
+                const auto identity = [&](const char* name, bool required = false) -> std::uint32_t {
+                    ScopedValue input(context_, JS_GetPropertyStr(context_, payload, name));
+                    if (!required && JS_IsUndefined(input.get())) return 0;
+                    double value = 0;
+                    if (!JS_IsNumber(input.get()) || JS_ToFloat64(context_, &value, input.get()) < 0 || !std::isfinite(value) || std::floor(value) != value || value < (required ? 1 : 0) || value > static_cast<double>(UINT32_MAX)) {
+                        (void)throwTypeError("焦点请求器身份必须是有效整数");
+                        return 0;
+                    }
+                    return static_cast<std::uint32_t>(value);
+                };
+                if (item.kind == arrange::core::FocusModifierKind::Requester) item.requester = identity("requester", true);
+                if (item.kind == arrange::core::FocusModifierKind::Properties) {
+                    item.canFocus = boolField(payload, "canFocus", true);
+                    constexpr const char* directions[]{"next", "previous", "up", "down", "left", "right"};
+                    for (std::size_t i = 0; i < 6; ++i) item.directions[i] = identity(directions[i]);
+                }
+                if (JS_HasException(context_)) return {};
+                if (item.kind == arrange::core::FocusModifierKind::Observer) {
+                    ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "callback"));
+                    if (!JS_IsFunction(context_, callback.get())) {
+                        (void)throwTypeError("onFocusChanged 需要函数");
+                        return {};
+                    }
+                    callbacks.push_back({result.size(), arrange::core::EventSlotKind::FocusChanged, std::move(callback)});
+                }
+                result.push_back({item, key});
             } else if (type == "clickable" || type == "hoverable" || type == "focusable") {
                 arrange::core::InputModifierSemantics item;
                 item.enabled = boolField(payload, "enabled", true);
@@ -513,7 +594,9 @@ namespace arrange::quickjs {
             const auto oldSlot = prior ? arrange::core::modifierEventSlot(*prior, pending.kind) : arrange::core::EventSlotId{};
             const auto slot = events_.updateModifierCallback(id, pending.kind, pending.callback.get(), oldSlot, transaction_);
             auto& input = result[pending.index].value;
-            if (auto* scroll = std::get_if<arrange::core::LayoutModifierSemantics>(&input))
+            if (auto* draw = std::get_if<arrange::core::DrawModifier>(&input))
+                draw->prepare = slot;
+            else if (auto* scroll = std::get_if<arrange::core::LayoutModifierSemantics>(&input))
                 scroll->eventSlot = slot;
             else if (auto* field = std::get_if<arrange::core::TextFieldModifier>(&input)) {
                 using Kind = arrange::core::EventSlotKind;
@@ -525,7 +608,9 @@ namespace arrange::quickjs {
                     field->onChange = slot;
                 else if (pending.kind == Kind::InputBlur)
                     field->onBlur = slot;
-            } else
+            } else if (auto* focus = std::get_if<arrange::core::FocusModifier>(&input))
+                focus->eventSlot = slot;
+            else
                 std::get<arrange::core::InputModifierSemantics>(input).eventSlot = slot;
             if (slot.valid()) retained.push_back(slot);
         }

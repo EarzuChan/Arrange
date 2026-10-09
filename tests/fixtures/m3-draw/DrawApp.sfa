@@ -1,0 +1,71 @@
+<template>
+    <Column>
+        <Layout :measurePolicy="BoxMeasurePolicy()" :modifier="M.size(width.dp, height.dp).then(shown ? drawing : M)">
+            <Spacer :modifier="M.size(20.dp, 20.dp).background(Color(0xffff0000))" />
+        </Layout>
+        <Input value="" :onSubmit="command" />
+        <Spacer :modifier="M.size(60.dp, 20.dp).onFocusChanged(buttonFocus).clickable(buttonClick)" />
+    </Column>
+</template>
+
+<script>
+import { computed, ref, type FocusState } from '@arrange/framework'
+import { M, BoxMeasurePolicy, Color, type Px } from '@arrange/framework/ui'
+import { Layout } from '@arrange/framework/foundation'
+
+const width = ref(100), height = ref(40), shown = ref(true)
+const color = ref(0xff445566), geometry = ref(8)
+const probe = { builds: 0, draws: 0, width: 0, height: 0 }
+const buttonVersion = ref(0), clickedVersion = ref(-1)
+const buttonClick = computed(() => {
+    const version = buttonVersion.value
+    return () => { clickedVersion.value = version }
+})
+function buttonFocus(state: FocusState) { if (state.isFocused) buttonVersion.value++ }
+const drawing = M.drawWithCache(cache => {
+    probe.builds++
+    const radius: Px = geometry.value.px
+    return {
+        onDrawWithContent(scope, drawContent) {
+            probe.draws++
+            probe.width = scope.size.width
+            probe.height = scope.size.height
+            scope.drawRect({ color: Color(color.value) })
+            drawContent()
+            scope.drawCircle({ color: Color(0xffffff00), centerX: (cache.size.width - radius).px, centerY: radius, radius })
+        }
+    }
+}).keyed('绘制')
+
+function command(value: string) {
+    if (value === '校验焦点点击' && (buttonVersion.value !== 1 || clickedVersion.value !== 1)) throw new Error('焦点通知更新 callback 后点击丢失或调用旧闭包')
+    const check = (builds: number, draws: number, width?: number, height?: number) => {
+        if (probe.builds !== builds || probe.draws !== draws || width !== undefined && probe.width !== width || height !== undefined && probe.height !== height) throw new Error(`绘制次数或尺寸错误：${JSON.stringify(probe)}`)
+    }
+    if (value === '校验首次') check(1, 1, 100, 40)
+    if (value === '校验颜色' || value === '校验稳定') check(1, 2)
+    if (value === '校验尺寸') check(2, 3, 140, 60)
+    if (value === '校验恢复' || value === '校验退休') check(4, 5, 140, 60)
+    if (value === '颜色') color.value = 0xff667788
+    if (value === '尺寸') {
+        width.value = 140
+        height.value = 60
+    }
+    if (value === '失败候选') {
+        width.value = 150
+        height.value = 70
+        geometry.value = 12
+    }
+    if (value === '恢复') {
+        check(3, 4, 150, 70)
+        width.value = 140
+        height.value = 60
+        geometry.value = 8
+    }
+    if (value === '移除') shown.value = false
+    if (value === '退休依赖') {
+        color.value = 0xff998877
+        geometry.value = 10
+    }
+}
+</script>

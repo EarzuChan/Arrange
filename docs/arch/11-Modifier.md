@@ -31,7 +31,7 @@ Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型�
 
 TS 方法使用明确的参数类型；原生 reader 校验字段集合、类型及取值，不忽略未知字段。新增能力必须同时实现 TS 参数、JSValue 解码、原生语义、失效、生命周期和真实链路测试。源码定位与 authoring 契约见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
-下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影、自定义绘制、InteractionState、程序化焦点、pointerInput 等尚属后续能力。
+下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影、InteractionState、pointerInput 等尚属后续能力。
 
 # 便捷组合
 
@@ -61,7 +61,7 @@ Modifier 可作用于：
 | Modifier 类型 | dirty 影响 |
 | --- | --- |
 | size / padding / weight / text style | Layout + Paint |
-| background / border / alpha / shadow | Paint |
+| background / border / alpha / shadow / drawBehind / drawWithContent / drawWithCache | Paint |
 | clickable / hoverable / focusable / pointerInput | HitTest / Input |
 | zIndex | Paint + HitTest |
 | offset / translation / scale / rotation | Transform + Paint + HitTest |
@@ -128,7 +128,7 @@ M.zIndex(10)
 
 - `offset` 不改变测量尺寸，只影响放置位置。
 - `align`、`weight`、`matchParentSize` 是父布局数据。
-- `zIndex` 同时影响绘制顺序和默认命中顺序。
+- `zIndex` 同时影响绘制顺序和默认命中顺序。同一链条中多个 `zIndex` 累加；同值保留父布局的放置顺序，命中从绘制的最后一项向前搜索。
 
 # 背景、边框、裁剪
 
@@ -142,7 +142,7 @@ M.border(1, 0, 0xFF606060, rounded(8, 0))
 M.clip(rounded(8, 0))
 ```
 
-`background` 与 `border` 绘制在对应 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中测试默认仍按布局 bounds，精确形状命中后续另行设计。
+`background` 与 `border` 绘制在对应 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中也受该层精确形状约束，矩形、圆形/椭圆及圆角矩形分别按对应形状判断。每层 clip 在其局部坐标中判断，沿命中路径共同生效。
 
 普通容器默认不裁剪子内容。子节点、阴影、显式绘制、图层变换等可以在视觉上超出父容器 bounds；最终仍受祖先显式 clip、滚动 viewport clip 与宿主窗口根裁剪影响。
 
@@ -188,15 +188,30 @@ M.innerShadow({
 # 绘制
 
 ```ts
-M.drawBehind((scope) => {})
-M.drawWithContent((scope, drawContent) => {})
+M.drawBehind((scope) => {
+  scope.drawRect({ color: 0xFF202020 })
+})
+M.drawWithContent((scope, drawContent) => {
+  scope.clipRoundRect({ radius: 8 }, () => drawContent())
+})
 M.drawWithCache((cache) => ({
-  onDrawBehind(scope) {},
-  onDrawWithContent(scope, drawContent) {},
+  onDrawBehind(scope) {
+    scope.drawCircle({ color: 0xFF202020, radius: cache.size.height / 2 })
+  },
 }))
 ```
 
-复杂路径、渐变、波形等应尽量使用缓存绘制。
+`DrawScope.size` 是当前候选中该 Modifier 层的只读尺寸。所有绘制坐标、尺寸、半径、线宽和平移使用 JUCE 逻辑 PX；纯 TS 传数字，SFA 使用 `.px` 或声明为 PX 的值，颜色按既有 `Color(...)` 值契约编写。需要 DP/SP 换算时显式读取 Density，不由绘制作用域隐式推断单位。
+
+作用域提供纯色 `drawRect`、`drawRoundRect`、`drawOval`、`drawCircle` 和 `drawLine`。形状参数包含 `color` 与可选 `strokeWidth`，形状的线宽为零表示填充；线条默认线宽为 1，必须大于零。矩形默认从 `(0, 0)` 填满当前层；圆形默认中心在当前层中心，半径为较短边的一半。圆角矩形另需 `radius`。坐标、尺寸和变换须有限，尺寸、半径和线宽不得为负数。
+
+`clipRect`、`clipRoundRect`、`clipOval` 及 `withTransform` 接收嵌套同步回调，退出时恢复前一绘制状态。变换支持 `translationX/Y`、`scaleX/Y`、`rotationZ` 及比例原点 `originX/Y`（默认中心）。这些局部绘制状态只影响绘制，不改布局或输入几何；需要移动交互范围时使用 `graphicsLayer`。作用域在回调返回后失效，不能保留后异步调用。
+
+`drawBehind` 在后续内容前绘制，并自动保留一次内容。`drawWithContent` 的 `drawContent()` 可调用零次、一次或多次，每次在当时 clip/transform 状态下绘制同一后续内容；零次隐藏后续绘制，不删除布局或交互节点。输入光标与选区覆盖层遵守同一内容次数和绘制状态。实现通过共享内容片段引用保存这些调用，不能复制后续节点或逐条重建其绘制命令。
+
+`drawWithCache` 构建函数可返回 `onDrawBehind`、`onDrawWithContent` 或两者；前者先执行，后者控制内容，未提供后者时默认绘制一次内容。缓存归最终 Layout 的对应 Modifier 实例所有；层尺寸变化或构建函数读取的响应式依赖变化时重建，绘制回调自身读取的依赖只刷新绘制命令。构建和绘制分别追踪依赖，显式读取 Density 时其变化自然进入对应依赖。keyed 移动保留缓存，替换回调、移除或退休释放缓存和订阅；内容停用冻结工作，恢复读取最新值。失败候选恢复已发布缓存及订阅，不泄漏候选依赖。
+
+全部回调在统一候选的绘制准备阶段同步执行，应只读取状态并录制绘制，不能产生事件、改变响应式状态或异步工作。准备将命令解码为原生类型化不可变片段，JUCE `paint()` 只重放；尺寸更新与录制属于同一候选，失败遵守 [统一发布边界](26-调度线程与帧阶段.md)。更完整的路径、渐变、文字、图片及通用 Canvas 能力在独立绘图 API 中定义。
 
 # 图层与变换
 
@@ -214,19 +229,20 @@ M.graphicsLayer({
 })
 ```
 
-图层变换不改变测量尺寸；绘制与命中消费同一层变换及裁剪，命中通过逆变换转换坐标。当前 graphicsLayer.clip 使用矩形裁剪，形状裁剪由独立 M.clip(shape) 表达。
+图层变换不改变测量尺寸；绘制与命中消费同一层变换及裁剪，命中通过逆变换转换坐标。原点按当前层宽高计算，支持镜像和零缩放；不可逆变换不参与命中。重复图层按 Modifier 顺序组合，不合并为一次参数覆盖。`graphicsLayer.clip` 使用矩形裁剪，形状裁剪由独立 `M.clip(shape)` 表达。`alpha` 的逐操作透明度规则见 [渲染设计](05-渲染设计.md#片段发布与重放)。
 
 # 输入与交互
 
-通用交互走 Modifier；交互视觉由响应式交互状态驱动。
+通用交互走 Modifier；焦点视觉可由显式响应式状态驱动，核心不注入设计系统样式。
 
 ```ts
-const interaction = createInteractionState()
+const focused = ref(false)
 
 const modifier = computed(() =>
-  M.background(interaction.hovered ? hoverBg : normalBg)
-   .border(interaction.focused ? 2 : 1, 0, interaction.focused ? focusColor : outline)
-   .clickable({ interactionState: interaction, onClick })
+  M.background(normalBg)
+   .border(focused.value ? 2 : 1, 0, focused.value ? focusColor : outline)
+   .onFocusChanged(state => { focused.value = state.isFocused })
+   .clickable(onClick)
 )
 ```
 
@@ -235,35 +251,28 @@ M.clickable(() => {})
 M.clickable({
   enabled: true,
   onClick,
-  onDoubleClick,
-  onLongClick,
-  interactionState,
-  role: Role.Button,
   focusable: true,
 })
 
-M.hoverable({ interactionState, onEnter, onExit })
-M.focusable({ enabled: true, interactionState })
+M.hoverable({ enabled: true })
+M.focusable({ enabled: true })
 M.focusRequester(requester)
 M.onFocusChanged((state) => {})
 M.focusProperties({ canFocus, next, previous, up, down, left, right })
 M.focusGroup()
 
-M.pointerInput((scope) => {
-  scope.onPointerDown(...)
-  scope.onPointerMove(...)
-  scope.onPointerUp(...)
-  scope.onWheel(...)
-})
 ```
+
+完整 `InteractionState`、hover 的 onEnter/onExit、onDoubleClick/onLongClick、role 与低级 `pointerInput` 回调仍是后续设计，当前不接受这些参数或构造器。
 
 语义：
 
 - `clickable` 默认可获得焦点，支持鼠标左键、Enter、Space 激活。
-- `clickable` 内部维护 hover / press / focus 状态；用户只有传入 `InteractionState` 才会把这些状态暴露给 JS。
+- `clickable` 的 press / focus 由原生 Owner 维护；当前可用 `onFocusChanged` 观察 `{isFocused,hasFocus}`。完整 `InteractionState` 仍是后续设计。
 - `hoverable` 只处理进入 / 离开；连续 hover move 用 `pointerInput`。
 - `focusable` 加入焦点遍历；`focusRequester` 提供程序化请求焦点。
 - `focusGroup` 影响方向焦点搜索，不改变布局、绘制或命中。
+- 程序化焦点的成功发布、请求器生命周期、父级 hasFocus、遍历/几何与 Lazy 按需导航规则见 [事件与输入](17-事件与输入.md#focus)。
 - 核心不提供 ripple、Material state layer 或默认 hover 色；Arrangable库可在外部封装。
 
 # 滚动
@@ -319,6 +328,3 @@ transition(...)
 `M.animateContentSize()` 复用同一 VBlankSource、JS Value Phase、SlotUpdateBatch 与 FramePlan。Canvas `frame` invalidation、meter / waveform 等 UI-thread 高频显示也复用同一底座。
 
 详见 [动画与Transition](28-动画与Transition.md)、[运行时](04-运行时.md) 与 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
-
-
-

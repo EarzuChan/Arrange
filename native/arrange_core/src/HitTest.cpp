@@ -10,7 +10,7 @@ namespace arrange::core {
             if (!nodeInteractionEnabled(tree, id)) return;
             const auto& node = tree.node(id);
             const auto generic = snapshot.regions.size();
-            snapshot.regions.push_back({node.contentBounds, {true, id, false, {}, {}}, constraint});
+            snapshot.regions.push_back({node.contentBounds, {true, id, false, {}, {}, node.generation}, constraint});
             for (const auto& instance : node.modifier.elements()) {
                 const auto& value = instance.descriptor.value;
                 const auto* layout = std::get_if<LayoutModifierSemantics>(&value);
@@ -19,9 +19,9 @@ namespace arrange::core {
                     snapshot.constraints.push_back({instance, constraint});
                     constraint = snapshot.constraints.size();
                 }
-                if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) snapshot.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle}, constraint});
+                if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) snapshot.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle, node.generation}, constraint});
                 if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) {
-                    snapshot.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle}, constraint});
+                    snapshot.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle, node.generation}, constraint});
                 }
             }
             snapshot.regions[generic].constraint = constraint;
@@ -81,7 +81,7 @@ namespace arrange::core {
                     auto geometry = std::make_shared<HitGeometry>();
                     auto& local = *geometry;
                     std::size_t constraint = 0;
-                    local.regions.push_back({node.contentBounds, {true, id, false, {}, {}}, 0});
+                    local.regions.push_back({node.contentBounds, {true, id, false, {}, {}, node.generation}, 0});
                     for (const auto& instance : node.modifier.elements()) {
                         const auto& value = instance.descriptor.value;
                         const auto* layout = std::get_if<LayoutModifierSemantics>(&value);
@@ -93,8 +93,8 @@ namespace arrange::core {
                             local.constraints.push_back({std::move(geometry), constraint});
                             constraint = local.constraints.size();
                         }
-                        if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) local.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle}, constraint});
-                        if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) local.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle}, constraint});
+                        if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) local.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle, node.generation}, constraint});
+                        if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) local.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle, node.generation}, constraint});
                     }
                     local.regions[0].constraint = fragment->contentConstraint = constraint;
                     counters.emittedRegions += local.regions.size();

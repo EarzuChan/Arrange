@@ -22,6 +22,8 @@ MeasurePolicy 是与 Foundation Arrangable 解耦的布局算法值。策略输�
 | Box | 调用 Layout，选择 BoxMeasurePolicy，接受默认内容 |
 | Row | 调用 Layout，选择 RowMeasurePolicy，接受默认内容 |
 | Column | 调用 Layout，选择 ColumnMeasurePolicy，接受默认内容 |
+| FlowRow / FlowColumn | 调用 Layout，选择 FlowMeasurePolicy，接受默认内容 |
+| LazyColumn / LazyRow / LazyVerticalGrid / LazyHorizontalGrid | 调用同一 Layout 的受控子组合服务，按需要调用普通项定义 |
 | Spacer | 调用 Layout，选择 MinSizeMeasurePolicy，不接受内容 |
 | Text | 组合显示文本 Modifier，调用 Layout，使用 MinSizeMeasurePolicy 处理空内容，不接受内容 |
 | Input | 组合文本编辑 Modifier，调用 Layout，使用 MinSizeMeasurePolicy 处理空内容，不接受内容 |
@@ -54,9 +56,26 @@ Painter 在创建作用域退出时释放，也可显式 dispose。释放后取�
 
 首版获取层处理 package 内资源，支持位图和 JUCE SVG 解码，不承诺任意网络加载、任意 SVG 特性或资源热刷新服务。资源完成的具体调度入口遵守 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
 
+## Flow
+
+FlowRow / FlowColumn 按主轴有限约束或 maxItemsInEachRow / maxItemsInEachColumn 换行。逐行测量、weight 分配、交叉轴对齐和无界行为见 [布局](09-布局.md)。它们不附带滚动与样式。
+
+## Lazy
+
+四个 Lazy 定义都是普通 Foundation 组合。items 提供数据数组；itemContent 是普通 SFA 或代码 Arrangable 定义；itemProps(item, index) 只提供该定义显式声明的普通参数。不存在隐藏 item/index，也不恢复带参数 Slot。用户需要把某项多个根视为整体时，可在项定义中加 Row / Column / Box；列表默认沿主轴排列多根，网格默认在同一单元中叠放多根。
+
+可见内容由 Layout 的同一候选事务材料化，再经同一原生 LayoutEngine 测量、放置和发布。失败候选同时撤销结构、业务实例、绑定与原生几何，不能提前发布空范围或半帧。所有权与继续候选的边界见 [运行时](04-运行时.md)；帧阶段见 [调度线程与帧阶段](26-调度线程与帧阶段.md)。
+
+Lazy 需要两轴有界视口，拒绝同轴无界 Scroll 包裹与完整内容 intrinsic 查询；显式尺寸前层可以短路该 intrinsic 查询。滚动使用现有 ScrollTarget、受体 handle、PX 回执和滚动会话锁定链路，规则见 [事件与输入](17-事件与输入.md)。
+
+itemKey 标识逻辑项，未指定时使用位置索引。稳定 key 在插入、删除、重排时保持首个可见项及其 PX 偏移；key 删除时就近保留可用位置。contentType 标识测量兼容类别，类型、内容版本或交叉轴约束变化使相应缓存失效；不同 key 不共享业务状态或回调。网格采用 Fixed / Adaptive 单元，默认 span 为 1，支持 MaxLineSpan；同一行的主轴尺寸取该行项最大值。
+
+LazyState 发布 firstVisibleItemIndex、firstVisibleItemScrollOffset、layoutInfo.visibleItemsInfo、总项数和滚动边界。scrollToItem 直接请求索引与 PX 偏移；animateScrollToItem 通过同一 Owner 动画时钟推进，目标尚未测量时采用估计位置并在最终目标材料化后校正。可变尺寸内容的总长度是估计值，已测量前缀与两端到达后不断校正。
+
+可见项、预取和交互固定项参与有限缓存；物化窗口、各项预算与几何账本职责见[布局](09-布局.md#lazy-布局)。逻辑缓存淘汰后再次进入会重新 setup，持久业务状态应在列表外按 key 持有。
+
+空项允许；大量零尺寸项按帧推进有限测量工作，达到可见物化保护上限时给出明确诊断，预算仍以[布局](09-布局.md#lazy-布局)为准。
+
 ## 后续能力
 
-Canvas、Flow、Lazy 与复杂图像滤镜尚未公开。Canvas 必须采用受控绘制描述与缓存；不能以任意 onDraw JS 回调穿透原生绘制阶段。Lazy 必须设计可视范围物化、稳定条目身份、滚动与回收能力；不沿用已经删除的带参 Slot 协议，也不把普通 q-for 冒充虚拟化。
-
-
-
+Canvas 与复杂图像滤镜尚未公开。Canvas 必须采用受控绘制描述与缓存；不能以任意 onDraw JS 回调穿透原生绘制阶段。基础 draw 修饰器的公开边界见 [Modifier](11-Modifier.md)。

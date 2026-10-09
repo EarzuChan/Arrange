@@ -10,6 +10,7 @@
 
 #include <optional>
 #include <vector>
+#include <span>
 
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
@@ -29,9 +30,9 @@ namespace arrange::juce {
             std::optional<ErrorScreenModel> error;
         };
 
-        PaintResult paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier = {}, float focusedInputViewportX = 0.0f) const;
+        PaintResult paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier = {}, float focusedInputViewportX = 0.0f, std::span<const arrange::core::DrawOp> focusedInputOps = {}) const;
 
-        PaintResult paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focusedInputModifier = {}, float viewportX = 0) const;
+        PaintResult paint(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& root, arrange::core::ModifierHandle focusedInputModifier = {}, float viewportX = 0, std::span<const arrange::core::DrawOp> focusedInputOps = {}) const;
 
         void setCullingEnabled(bool enabled) noexcept {
             cullingEnabled_ = enabled;
@@ -47,8 +48,9 @@ namespace arrange::juce {
 
        private:
         bool invisible(::juce::Graphics& graphics, arrange::core::PaintBounds bounds) const;
-        void replayFragment(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focusedInputModifier, float viewportX, float alpha) const;
-        void replayOps(::juce::Graphics& graphics, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focusedInputModifier, float viewportX, float alpha, int& depth) const;
+        void replayFragment(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& placed, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const;
+        void replayScopedOps(::juce::Graphics& graphics, std::span<const arrange::core::DrawOp> ops, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const;
+        void replayOps(::juce::Graphics& graphics, std::span<const arrange::core::DrawOp> ops, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha, int& depth) const;
         void drawText(::juce::Graphics& g, const arrange::core::DrawOp& op, float viewportX, float alpha) const;
         bool cullingEnabled_ = true;
         mutable PaintReplayCounters counters_;

@@ -1,6 +1,6 @@
 {
   "name": "@arrange/reactivity",
-  "version": "0.0.0-m.2.4",
+  "version": "0.0.0-m.3.0",
   "description": "Arrange 响应式核心",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@arrange/shared": "0.0.0-m.2.4"
+    "@arrange/shared": "0.0.0-m.3.0"
   },
   "license": "MIT",
   "files": [

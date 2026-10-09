@@ -1,12 +1,18 @@
 import { computed } from "@arrange/reactivity"
 import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation/value.ts"
-import { PaddingValues } from "./primitives.ts"
+import { IntrinsicSize, PaddingValues } from "./primitives.ts"
+import type { IntrinsicSizeValue } from "./primitives.ts"
 import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts"
 import type { ScrollState } from "./state.ts"
 import { painterSnapshot } from './painter.ts'
 import type { Painter } from './painter.ts'
 import type { ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
 import type { TextStyleProp } from './native.ts'
+import { focusRequesterIdentity } from './focus.ts'
+import type { FocusRequester, FocusProperties, FocusState } from './focus.ts'
+import type { DrawCallback, DrawContentCallback, DrawCacheBuilder } from './draw.ts'
+export type { DrawSize, DrawRect, DrawPaint, DrawTransform, DrawCallback, DrawContentCallback, DrawCacheResult, DrawCacheBuilder } from './draw.ts'
+export { DrawScope } from './draw.ts'
 
 export type ModifierValue = Readonly<Record<string, unknown>>
 
@@ -63,11 +69,17 @@ export class Modifier {
         return this.#add("animateContentSize", { animationSpec: nativeAnimationSpec(animationSpec), clip: args.clip ?? true })
     }
 
-    width(dp: number, px: number): Modifier {
+    width(value: IntrinsicSizeValue): Modifier
+    width(dp: number, px: number): Modifier
+    width(dp: number | IntrinsicSizeValue, px?: number): Modifier {
+        if (typeof dp === 'string') return this.#intrinsic('intrinsicWidth', dp)
         return this.#add("width", { valueDp: dp, valuePx: px })
     }
 
-    height(dp: number, px: number): Modifier {
+    height(value: IntrinsicSizeValue): Modifier
+    height(dp: number, px: number): Modifier
+    height(dp: number | IntrinsicSizeValue, px?: number): Modifier {
+        if (typeof dp === 'string') return this.#intrinsic('intrinsicHeight', dp)
         return this.#add("height", { valueDp: dp, valuePx: px })
     }
 
@@ -113,6 +125,10 @@ export class Modifier {
 
     fillMaxSize(fraction = 1): Modifier {
         return this.#add("fillMaxSize", checkedFraction(fraction))
+    }
+
+    matchParentSize(): Modifier {
+        return this.#add('matchParentSize', {})
     }
 
     padding(dp: number, px: number): Modifier
@@ -177,6 +193,18 @@ export class Modifier {
         return this.#add("graphicsLayer", { ...args })
     }
 
+    drawBehind(draw: DrawCallback): Modifier {
+        return this.#add('drawBehind', checkedDraw(draw))
+    }
+
+    drawWithContent(draw: DrawContentCallback): Modifier {
+        return this.#add('drawWithContent', checkedDraw(draw))
+    }
+
+    drawWithCache(draw: DrawCacheBuilder): Modifier {
+        return this.#add('drawWithCache', checkedDraw(draw))
+    }
+
     clickable(arg: (() => void) | ClickableOptions): Modifier {
         return this.#add("clickable", typeof arg === "function" ? { onClick: arg, enabled: true, focusable: true } : { enabled: true, focusable: true, ...arg })
     }
@@ -187,6 +215,18 @@ export class Modifier {
 
     focusable(arg: boolean | EnabledOptions = true): Modifier {
         return this.#add("focusable", typeof arg === "boolean" ? { enabled: arg } : { enabled: true, ...arg })
+    }
+
+    focusRequester(requester: FocusRequester): Modifier { return this.#add('focusRequester', { requester: focusRequesterIdentity(requester) }) }
+    focusGroup(): Modifier { return this.#add('focusGroup', {}) }
+    onFocusChanged(callback: (state: FocusState) => void): Modifier {
+        if (typeof callback !== 'function') throw new TypeError('onFocusChanged 需要函数')
+        return this.#add('onFocusChanged', { callback })
+    }
+    focusProperties(properties: FocusProperties): Modifier {
+        const value: Record<string, unknown> = { canFocus: properties.canFocus ?? true }
+        for (const direction of ['next', 'previous', 'up', 'down', 'left', 'right'] as const) if (properties[direction]) value[direction] = focusRequesterIdentity(properties[direction])
+        return this.#add('focusProperties', value)
     }
 
     // pointerInput 将来会在 native typed pointer event slot、派发、释放与测试齐全后再正规添加回来；当前故意不公开半支持 API
@@ -201,11 +241,21 @@ export class Modifier {
     #add(type: string, value: Record<string, unknown>): Modifier {
         return new Modifier([...this.elements, Object.freeze({ type, value: Object.freeze(value) })])
     }
+
+    #intrinsic(type: string, value: IntrinsicSizeValue): Modifier {
+        if (value !== IntrinsicSize.Min && value !== IntrinsicSize.Max) throw new TypeError('固有尺寸必须是 IntrinsicSize.Min 或 Max')
+        return this.#add(type, { maximum: value === IntrinsicSize.Max })
+    }
 }
 
 function checkedFraction(fraction: number): Readonly<{ fraction: number }> {
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) throw new RangeError("fillMax* 的比例必须在 0..1 之间")
     return { fraction }
+}
+
+function checkedDraw(draw: unknown): { draw: unknown } {
+    if (typeof draw !== 'function') throw new TypeError('绘制 Modifier 需要函数')
+    return { draw }
 }
 
 export function toModifier(value: Modifier | null | undefined): Modifier {

@@ -121,6 +121,31 @@ export class FrameScheduler {
         if ([...this.participants].some(participant => participant.active())) this.request(true)
     }
 
+    // 受控子组合继续当前候选，不重新采样动画，也不提前交付提交后通知
+    continuePreparation(work: () => void): void {
+        if (this.phase !== 'awaiting') throw new Error('子组合只能继续尚未发布的视觉帧')
+        let count = 0
+        this.phase = 'values'
+        this.executeCurrent = job => {
+            if (job.flags! & SchedulerJobFlags.DISPOSED || job.i?.isUnmounted || job.i?.isDeactivated) return
+            if (++count > 10000) throw new Error('子组合响应式任务超过帧内执行上限')
+            this.counters.jobs++
+            callWithErrorHandling(job, job.i, job.i ? ErrorCodes.ARRANGABLE_UPDATE : ErrorCodes.SCHEDULER)
+        }
+        try {
+            work()
+            while (this.queues.pre.size || this.queues.collect.size || this.queues.rearrange.size) {
+                const phase = this.queues.pre.size ? 'pre' : this.queues.collect.size ? 'collect' : 'rearrange'
+                const job = this.queues[phase].values().next().value!
+                this.queues[phase].delete(job)
+                this.executeCurrent(job)
+            }
+        } finally {
+            this.executeCurrent = undefined
+            if (!this.disposed) this.phase = 'awaiting'
+        }
+    }
+
     // 提交后观察只处理已截取的一批，通知引出的失效全部留到下一帧
     complete = (success = true): void => {
         if (this.phase === 'disposed') return

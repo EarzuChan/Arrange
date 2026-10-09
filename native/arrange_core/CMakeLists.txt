@@ -15,6 +15,10 @@ add_library(arrange_core STATIC
   src/SceneFramePipeline.cpp
   src/Modifier.cpp
   src/ModifierGeometry.cpp
+  src/IntrinsicLayout.cpp
+  src/FlowLayout.cpp
+  src/LazyLayout.cpp
+  src/Focus.cpp
   src/Layout.cpp
   src/MeasurePolicy.cpp
   src/HitTest.cpp

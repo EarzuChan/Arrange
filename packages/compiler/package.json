@@ -1,6 +1,6 @@
 {
   "name": "@arrange/compiler",
-  "version": "0.0.0-m.2.4",
+  "version": "0.0.0-m.3.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -24,7 +24,7 @@
     "source-map-js": "1.2.2",
     "magic-string": "0.30.21",
     "typescript": "^5.9.0",
-    "@arrange/shared": "0.0.0-m.2.4",
+    "@arrange/shared": "0.0.0-m.3.0",
     "lru-cache": "10.1.0"
   },
   "license": "MIT",

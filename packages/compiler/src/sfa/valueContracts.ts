@@ -52,9 +52,20 @@ export function createSfaValueContracts(checker: ts.TypeChecker, source: ts.Sour
     register(color, { value: 'color' })
     register(property(color, 'hsl'), { value: 'color' })
     const fields = {
-        Shape: 'shape', Brush: 'brush', PaddingValue: 'padding', Padding: 'padding', SizeRange: 'sizeRange', BorderOptions: 'border', PaintOptions: 'paint', TextOptions: 'text', TextFieldOptions: 'textField', GraphicsLayerOptions: 'graphics', TextStyleProp: 'style', ArrangementProp: 'arrangement', RowPolicyOptions: 'row', ColumnPolicyOptions: 'column', PainterSize: 'pxSize',
+        Shape: 'shape', Brush: 'brush', PaddingValue: 'padding', Padding: 'padding', SizeRange: 'sizeRange', BorderOptions: 'border', PaintOptions: 'paint', TextOptions: 'text', TextFieldOptions: 'textField', GraphicsLayerOptions: 'graphics', TextStyleProp: 'style', ArrangementProp: 'arrangement', RowPolicyOptions: 'row', ColumnPolicyOptions: 'column', FlowRowPolicyOptions: 'flow', FlowColumnPolicyOptions: 'flow', PainterSize: 'pxSize',
     }
     for (const [name, field] of Object.entries(fields)) register(exported(ui, name), { fields: unitFieldContracts[field] })
+    for (const [name, field] of [['DrawSize', 'pxSize'], ['DrawRect', 'drawRect'], ['DrawPaint', 'drawPaint'], ['DrawTransform', 'graphics']] as const) register(exported(ui, name), { fields: unitFieldContracts[field] })
+    const drawScope = exported(ui, 'DrawScope')
+    const drawType = drawScope && checker.getDeclaredTypeOfSymbol(drawScope)
+    const drawRect = { ...unitFieldContracts.drawRect, ...unitFieldContracts.drawPaint }
+    for (const method of ['drawRect', 'drawOval']) register(drawType?.getProperty(method), { arguments: [drawRect] })
+    register(drawType?.getProperty('drawRoundRect'), { arguments: [unitFieldContracts.drawRoundRect] })
+    register(drawType?.getProperty('drawCircle'), { arguments: [unitFieldContracts.drawCircle] })
+    register(drawType?.getProperty('drawLine'), { arguments: [unitFieldContracts.drawLine] })
+    for (const method of ['clipRect', 'clipOval']) register(drawType?.getProperty(method), { arguments: [unitFieldContracts.drawRect] })
+    register(drawType?.getProperty('clipRoundRect'), { arguments: [{ ...unitFieldContracts.drawRect, radius: 'px' }] })
+    register(drawType?.getProperty('withTransform'), { arguments: [unitFieldContracts.graphics] })
     for (const [name, field] of [['Offset', 'dpOffset'], ['Size', 'dpSize'], ['Rect', 'dpRect']] as const) register(exported(animation, name), { fields: unitFieldContracts[field] })
     register(exported(animation, 'VisibilityTransform'), { fields: unitFieldContracts.graphics })
     const scroll = exported(root, 'ScrollState')
@@ -62,6 +73,13 @@ export function createSfaValueContracts(checker: ts.TypeChecker, source: ts.Sour
     const scrollType = scroll && checker.getDeclaredTypeOfSymbol(scroll)
     register(scrollType?.getProperty('scrollTo'), { arguments: ['px'] })
     register(exported(root, 'createScrollState'), { arguments: [unitFieldContracts.scrollOptions] })
+    register(property(exported(ui, 'GridCells'), 'Adaptive'), { arguments: ['length'] })
+    const lazyState = exported(root, 'LazyState')
+    register(lazyState, { fields: { ...unitFieldContracts.scroll, firstVisibleItemScrollOffset: 'px' } })
+    const lazyType = lazyState && checker.getDeclaredTypeOfSymbol(lazyState)
+    register(lazyType?.getProperty('scrollToItem'), { arguments: [undefined, 'px'] })
+    register(lazyType?.getProperty('animateScrollToItem'), { arguments: [undefined, 'px'] })
+    for (const method of ['createLazyState', 'createLazyListState', 'createLazyGridState']) register(exported(root, method), { arguments: [{ firstVisibleItemScrollOffset: 'px' }] })
     register(exported(root, 'unref'), { unref: true })
     register(exported(ui, 'Modifier'), { modifier: true })
     register(exported(internal, 'arrangeModifier'), { modifierCall: true })

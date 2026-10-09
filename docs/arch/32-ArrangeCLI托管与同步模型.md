@@ -1,6 +1,6 @@
 # Arrange CLI 托管与同步模型
 
-本文是定义、拓扑、ManagedItem、CONFIG/SETUP 扫描矩阵和 LSRA 的唯一长期事实源。用户可见命令见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，当期执行流程见 [命令定义](../proj/m2/2/命令定义.md)。
+本文是定义、拓扑、ManagedItem、CONFIG/SETUP 扫描矩阵和 LSRA 的唯一长期事实源。用户可见命令见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，当期执行流程见 [命令定义](../proj/m2：已完成，某些待测试和收尾/2：已完成，待Win测/命令定义.md)。
 
 ## 定义、State 与拓扑
 

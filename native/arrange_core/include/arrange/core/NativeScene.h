@@ -69,6 +69,7 @@ namespace arrange::core {
        private:
         friend class SceneFramePipeline;
         void applyUncommitted(const MutationTransaction& transaction);
+        void validateLayoutMaterialization(NodeId layout, const MutationTransaction& transaction) const;
         bool targetIsLive(const BindingTarget& target) const;
         void retireInvalidBindings();
         std::uint32_t applySlot(const BindingTarget& target, const SlotValue& value);

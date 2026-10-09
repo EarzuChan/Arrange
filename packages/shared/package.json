@@ -1,6 +1,6 @@
 {
   "name": "@arrange/shared",
-  "version": "0.0.0-m.2.4",
+  "version": "0.0.0-m.3.0",
   "description": "Arrange 编译器与运行时共享契约和工具",
   "private": true,
   "type": "module",

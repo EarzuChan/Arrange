@@ -10,6 +10,7 @@ namespace arrange::core {
         bool clickable = false;
         EventSlotId eventSlot;
         ModifierHandle modifier;
+        std::uint64_t generation = 0;
     };
 
     struct HitConstraint {

@@ -79,10 +79,15 @@ Transition 需要支持：
 tween(...)
 spring(...)
 snap(...)
+repeatable({ iterations, animation, repeatMode: 'restart' | 'reverse' })
 easing(...)
 ```
 
 `tween` 表达固定 duration、delay 与 easing。`spring` 表达弹簧系统。`snap` 表达在下一授权采样中到达目标值。`easing` 提供常用曲线。
+
+`repeatable` 组合有限次数的 tween 或 snap，`iterations` 必须为 1..2147483647 的整数，周期总时长乘次数必须保持有限数值，默认 `repeatMode='restart'`，不接收 spring 或嵌套 repeatable。每个周期都包含内层 delay；restart 的每周期从起点运行到目标，reverse 的奇数序号周期从目标返回起点，延迟期间保持该周期起点。总时间结束时一次性发布逻辑目标值并调用该次目标的完成回调；reverse 偶数次在最后周期趋近原起点，完成时跳到逻辑目标，通常使用奇数次以使终点连续。零时长且零延迟的有限规格在下一授权采样直接结束。
+
+有限重复适用于所有 animated 值、Transition、Crossfade/AnimatedVisibility 及原生 `animateContentSize`。它们按绝对时间选择当前周期，不因跳帧补跑中间状态。重定向从最近显示值开始重新计次；停止、作用域停用与销毁沿统一动画生命周期处理。原生尺寸消费者接收展平后的 tween/snap、次数及方向，只使用 typed 数值描述，不回调 JS 曲线。
 
 自定义曲线、keyframesWithSpline、复杂 path-based animation 与命令式 animation controller 不属于基础语义；进入里程碑前必须单独设计 API、生命周期、可测试性与 lowering 规则。
 
@@ -149,4 +154,3 @@ KeepAlive 停用时保留最近采样值并冻结动画进度，不申请持续�
 - 不让动画 tick 默认穿越结构重排。
 - 不把动画过程值直接塞进 generic prop patch。
 - 不在 paint 中推进动画。
-

@@ -297,8 +297,7 @@ insert / remove / delete subtree 时必须同步维护 parent index 与 order in
 
 # Transform 与命中
 
-`graphicsLayer`、平移、缩放、旋转等 transform 会影响默认命中测试；非平移变换的精确命中可后续再细化，但不能完全无视。
-
+`graphicsLayer` 等 transform 的绘制与命中规则见 [Modifier](11-Modifier.md)。
 
 
 

@@ -76,6 +76,8 @@ interface Modifier {
     if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier): Modifier
     width(dp: number, px: number): Modifier
     height(dp: number, px: number): Modifier
+    width(value: IntrinsicSizeValue): Modifier
+    height(value: IntrinsicSizeValue): Modifier
     size(widthDp: number, widthPx: number, heightDp?: number, heightPx?: number): Modifier
     requiredWidth(dp: number, px: number): Modifier
     requiredHeight(dp: number, px: number): Modifier
@@ -92,6 +94,7 @@ interface Modifier {
     absoluteOffset(args: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }): Modifier
     align(alignment: string): Modifier
     weight(weight: number, args?: { fill?: boolean }): Modifier
+    matchParentSize(): Modifier
     zIndex(value: number): Modifier
     background(brush: Brush | number, shape?: Shape): Modifier
     paint(painter: Painter, options?: PaintOptions): Modifier
@@ -103,13 +106,20 @@ interface Modifier {
     clickable(arg: (() => void) | ClickableOptions): Modifier
     hoverable(args?: EnabledOptions): Modifier
     focusable(arg?: boolean | EnabledOptions): Modifier
+    focusRequester(requester: FocusRequester): Modifier
+    focusProperties(properties: FocusProperties): Modifier
+    focusGroup(): Modifier
+    onFocusChanged(callback: (state: FocusState) => void): Modifier
+    drawBehind(draw: (scope: DrawScope) => void): Modifier
+    drawWithContent(draw: (scope: DrawScope, drawContent: () => void) => void): Modifier
+    drawWithCache(builder: (scope: Readonly<{ size: DrawSize }>) => DrawCacheResult): Modifier
     verticalScroll(state: ScrollStateLike, args?: EnabledOptions): Modifier
     horizontalScroll(state: ScrollStateLike, args?: EnabledOptions): Modifier
     animateContentSize(animationSpec?: AnimationSpec, args?: { clip?: boolean }): Modifier
 }
 ```
 
-参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，ClickableOptions 包含 onClick、enabled、focusable，EnabledOptions 只包含 enabled。完整类型见包声明。阴影、渐变、自定义绘制、pointerInput 与程序化焦点为后续能力，目前不导出。
+参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，ClickableOptions 包含 onClick、enabled、focusable，EnabledOptions 只包含 enabled。完整类型见包声明。阴影、渐变与 pointerInput 为后续能力，目前不导出。基础绘制类型从 UI 入口导出，焦点类型从根入口导出，具体字段以包内正式 TypeScript 声明为准。
 
 Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 
@@ -218,7 +228,7 @@ Painter 获取 API 为 painter(resource: string | {path: string}): Painter。Pai
 
 ## 后续能力的签名草案
 
-Canvas、Flow、Lazy、InputState、交互状态、焦点请求器及 Interop hooks 尚未形成完整的原生消费者，以下相关形态为后续设计，不属于当前可导入能力。只有所有权、提交、读取与退休链路俱全后才公开入口。
+Canvas、InputState、独立交互状态及 Interop hooks 为后续设计。Flow、Lazy 和焦点 API 已有完整消费者，列在下面的正式公开 API 中。
 
 ### Canvas
 
@@ -238,82 +248,64 @@ Canvas 行为见 [文本输入与绘制](18-文本输入与绘制.md) 与 [内�
 ```ts
 interface FlowRowProps {
     modifier?: Modifier
-    horizontalArrangement?: Arrangement.Horizontal
-    verticalArrangement?: Arrangement.Vertical
+    horizontalArrangement?: HorizontalArrangementProp
+    verticalArrangement?: VerticalArrangementProp
+    itemVerticalAlignment?: VerticalAlignment
     maxItemsInEachRow?: number
 }
-
 interface FlowColumnProps {
     modifier?: Modifier
-    verticalArrangement?: Arrangement.Vertical
-    horizontalArrangement?: Arrangement.Horizontal
+    verticalArrangement?: VerticalArrangementProp
+    horizontalArrangement?: HorizontalArrangementProp
+    itemHorizontalAlignment?: HorizontalAlignment
     maxItemsInEachColumn?: number
 }
 ```
 
-## Lazy list
+## Lazy
+
+LazyColumn、LazyRow、LazyVerticalGrid 和 LazyHorizontalGrid 从 foundation 入口导出，四者共享显式参数形态：
 
 ```ts
-interface LazyColumnProps<T> {
-    items: T[]
+interface LazyProps<T> {
+    modifier?: Modifier
+    items: readonly T[]
+    itemContent: ArrangableDefinition
+    itemProps?: (item: T, index: number) => Record<string, unknown>
     itemKey?: (item: T, index: number) => string | number
-    itemContentType?: (item: T, index: number) => string | number | undefined
-    state?: LazyListState
-    contentPadding?: PaddingValues | Dp
-    verticalArrangement?: Arrangement.Vertical
-    horizontalAlignment?: Alignment.Horizontal
-    reverseLayout?: boolean
+    contentType?: (item: T, index: number) => string | number | null
+    span?: (item: T, index: number) => GridItemSpanValue
+    state?: LazyState
+    cells?: GridCellsValue
+    contentPadding?: Padding
+    horizontalArrangement?: HorizontalArrangementProp
+    verticalArrangement?: VerticalArrangementProp
+    horizontalAlignment?: HorizontalAlignment
+    verticalAlignment?: VerticalAlignment
     userScrollEnabled?: boolean
-    beyondBoundsItemCount?: number
 }
-
-interface LazyRowProps<T> {
-    items: T[]
-    itemKey?: (item: T, index: number) => string | number
-    itemContentType?: (item: T, index: number) => string | number | undefined
-    state?: LazyListState
-    contentPadding?: PaddingValues | Dp
-    horizontalArrangement?: Arrangement.Horizontal
-    verticalAlignment?: Alignment.Vertical
-    reverseLayout?: boolean
-    userScrollEnabled?: boolean
-    beyondBoundsItemCount?: number
-}
+GridCells.Fixed(count: number): GridCellsValue
+GridCells.Adaptive(minSizeDp: number, minSizePx: number): GridCellsValue
+GridItemSpan(count: number): GridItemSpanValue
+GridItemSpan.MaxLineSpan: GridItemSpanValue
 ```
 
-## Lazy grid
+cells 默认 Fixed(1)，仅网格消费；span 默认 1。列表的交叉轴 alignment 与网格的另一方向 arrangement 按方向消费。contentPadding 默认四边为零。Lazy 行为和缓存规则见 [内建 Arrangable](12-内建Arrangable.md)。
+
+SFA 普通项定义的例子：
+
+```xml
+<LazyColumn :items="rows" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :state="list" />
+```
+
+## 焦点
 
 ```ts
-interface LazyVerticalGridProps<T> {
-    items: T[]
-    columns: GridCells
-    itemKey?: (item: T, index: number) => string | number
-    itemContentType?: (item: T, index: number) => string | number | undefined
-    itemSpan?: (item: T, index: number) => GridItemSpan | number
-    state?: LazyGridState
-    contentPadding?: PaddingValues | Dp
-    verticalArrangement?: Arrangement.Vertical
-    horizontalArrangement?: Arrangement.Horizontal
-    userScrollEnabled?: boolean
-    beyondBoundsItemCount?: number
-}
-
-interface LazyHorizontalGridProps<T> {
-    items: T[]
-    rows: GridCells
-    itemKey?: (item: T, index: number) => string | number
-    itemContentType?: (item: T, index: number) => string | number | undefined
-    itemSpan?: (item: T, index: number) => GridItemSpan | number
-    state?: LazyGridState
-    contentPadding?: PaddingValues | Dp
-    verticalArrangement?: Arrangement.Vertical
-    horizontalArrangement?: Arrangement.Horizontal
-    userScrollEnabled?: boolean
-    beyondBoundsItemCount?: number
-}
+createFocusRequester(): FocusRequester
+useFocusManager(): FocusManager
 ```
 
-Lazy 行为见 [内建 Arrangable](12-内建Arrangable.md)。
+请求器与方向搜索、焦点组、观察回执见 [事件与输入](17-事件与输入.md)。
 
 # 动画 API
 
@@ -326,7 +318,8 @@ animatedSizeAsRef(...): AnimatedRef<Size>
 animatedRectAsRef(...): AnimatedRef<Rect>
 animatedNumberArrayAsRef(...): AnimatedRef<readonly number[]>
 
-transition(...): Transition
+createTransition(...): Transition
+repeatable(args: { iterations: number; animation: TweenSpec | SnapSpec; repeatMode?: "restart" | "reverse" }): RepeatableSpec
 createInfiniteTransition(args?: { label?: string }): InfiniteTransition
 ```
 
@@ -338,9 +331,19 @@ AnimatedRef 为只读值，附带 isRunning、label 和 stop；DP、颜色及字
 
 ```ts
 createScrollState(args?: {initial?: number}): ScrollState
+createLazyState(args?: {firstVisibleItemIndex?: number; firstVisibleItemScrollOffset?: number}): LazyState
+createLazyListState: typeof createLazyState
+createLazyGridState: typeof createLazyState
+interface LazyState extends ScrollState {
+    firstVisibleItemIndex: number
+    firstVisibleItemScrollOffset: number
+    layoutInfo: LazyLayoutInfo
+    scrollToItem(index: number, scrollOffset?: number): void
+    animateScrollToItem(index: number, scrollOffset?: number, animationSpec?: AnimationSpec): Promise<void>
+}
 ```
 
-在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。其它状态 helper 属于后续设计，未以空壳函数导出。
+在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。LazyState 的索引、可见项与缓存语义归属 [内建 Arrangable](12-内建Arrangable.md)。
 
 # Interop hooks（后续设计）
 
@@ -391,6 +394,4 @@ interface RuntimeHello {
 ```
 
 生产 native transaction 细节见 [LayoutTree与NativeTransaction](15-LayoutTree与NativeTransaction.md)。
-
-
 
