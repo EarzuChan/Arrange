@@ -40,9 +40,9 @@ function summarize(source: IconSourceSummary): IconSourceSummary { return { path
 export class IconAssetsService {
     constructor(private readonly signal?: AbortSignal) { }
 
-    private async paths(state: ProjectState, outputDirectory: string): Promise<{ directory: string, ico: string, icns: string, manifest: string }> {
-        const directory = containedDirectory(state.rootDir, outputDirectory, "图标派生目录")
-        await assertPlainDirectoryPath(state.rootDir, directory)
+    private async paths(state: ProjectState, outputDirectory: string, anchor: string): Promise<{ directory: string, ico: string, icns: string, manifest: string }> {
+        const directory = containedDirectory(anchor, outputDirectory, "图标派生目录")
+        await assertPlainDirectoryPath(anchor, directory)
         const paths = { directory, ico: join(directory, derivedFileNames.ico), icns: join(directory, derivedFileNames.icns), manifest: join(directory, derivedFileNames.manifest) }
         for (const path of [paths.ico, paths.icns, paths.manifest]) {
             const info = await lstat(path).catch(error => {
@@ -54,10 +54,10 @@ export class IconAssetsService {
         return paths
     }
 
-    async inspect(state: ProjectState, outputDirectory: string): Promise<IconAssetsInspection> {
+    async inspect(state: ProjectState, outputDirectory: string, anchor: string = state.rootDir): Promise<IconAssetsInspection> {
         this.signal?.throwIfAborted()
         const source = await loadProjectIconSource(state)
-        const paths = await this.paths(state, outputDirectory)
+        const paths = await this.paths(state, outputDirectory, anchor)
         const files = await Promise.all([paths.ico, paths.icns, paths.manifest].map(async path => {
             try { return await readFile(path) } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
@@ -75,9 +75,9 @@ export class IconAssetsService {
         return { source: summarize(source), ready: true, assets: { ico: paths.ico, icns: paths.icns, fingerprint: source.fingerprint, size: source.size } }
     }
 
-    async prepare(state: ProjectState, outputDirectory: string): Promise<PreparedIconAssets | null> {
+    async prepare(state: ProjectState, outputDirectory: string, anchor: string = state.rootDir): Promise<PreparedIconAssets | null> {
         this.signal?.throwIfAborted()
-        const paths = await this.paths(state, outputDirectory)
+        const paths = await this.paths(state, outputDirectory, anchor)
         const sourcePath = await projectIconSourcePath(state)
         if (!sourcePath) {
             for (const path of [paths.ico, paths.icns, paths.manifest]) {
@@ -88,7 +88,7 @@ export class IconAssetsService {
         }
         const sourceRelative = relative(paths.directory, resolve(sourcePath))
         if (!sourceRelative || sourceRelative !== ".." && !sourceRelative.startsWith(`..${sep}`) && !isAbsolute(sourceRelative)) throw new Error("图标派生目录不能包含图标源")
-        const previous = await this.inspect(state, outputDirectory)
+        const previous = await this.inspect(state, outputDirectory, anchor)
         if (previous.ready) return previous.assets
         const { source, pixels } = await readDecodedPngIconSource(sourcePath)
         const sizes = [...new Set([...icoSizes, ...icnsSlots.map(slot => slot.size)])].filter(size => size <= pixels.size)
@@ -113,7 +113,7 @@ export class IconAssetsService {
                 await writeFile(file.temporary, file.content, { flag: "wx" })
             }
             if (iconFingerprint(await readFile(sourcePath)) !== source.fingerprint) throw new Error("图标源在生成过程中发生变化，请重新运行 native SETUP")
-            await this.paths(state, outputDirectory)
+            await this.paths(state, outputDirectory, anchor)
             for (const file of staged) {
                 this.signal?.throwIfAborted()
                 await rename(file.temporary, file.path)

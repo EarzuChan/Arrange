@@ -2,9 +2,12 @@ import { devReadinessTimeoutMs } from "../CliMetadata.ts"
 import type { Executor } from "./Executor.ts"
 import type { ProcessResult, ProcessSpec, RunningProcess } from "./ProcessSpec.ts"
 import { isAbortError } from "./ProcessSpec.ts"
+import type { PaneOutput, PaneSession } from "../ui/Tasks.ts"
 
 export interface LongRunningProcessSpec extends ProcessSpec {
     readonly name: string
+    readonly title?: string
+    readonly detail?: string
     readonly readyUrl?: string
     readonly readyHeader?: { readonly name: string, readonly value: string }
     readonly readyCheck?: (response: Response) => Promise<boolean>
@@ -14,6 +17,9 @@ export interface LongRunningProcessSpec extends ProcessSpec {
 export interface DevSupervisorOptions {
     readonly signal?: AbortSignal
     readonly readinessTimeoutMs?: number
+    // 提供时每个进程的输出进入各自的窗格；否则直接继承终端
+    readonly panes?: PaneSession
+    readonly rootDir?: string
 }
 
 export class DevSupervisor {
@@ -51,19 +57,23 @@ export class DevSupervisor {
                 if (index < 0) throw new Error("开发进程存在循环依赖")
                 const spec = pending.splice(index, 1)[0]!
                 if (spec.readyUrl && await Promise.race([this.responds(spec.readyUrl, abortSignal), prematureExit])) throw new Error(`开发地址已被占用：${spec.readyUrl}`)
-                const child = this.executor.start({ ...spec, signal: abortSignal, stdio: spec.stdio ?? "inherit" })
+                const pane: PaneOutput | undefined = options.panes ? await options.panes.open({ id: spec.name, title: spec.title ?? spec.name, detail: spec.detail, rootDir: options.rootDir }) : undefined
+                pane?.status("启动中", "info")
+                const child = this.executor.start(pane ? pane.process({ ...spec, signal: abortSignal }) : { ...spec, signal: abortSignal, stdio: spec.stdio ?? "inherit" })
                 children.push({ name: spec.name, process: child })
                 void child.completion.then(result => {
+                    // 会话结束时其余进程被停止，不算各自退出
+                    if (pane && !abortSignal.aborted && !result.cancelled) pane.finish(result.exitCode === 0 ? { kind: "exited", message: "已退出" } : { kind: "failed", message: `已退出（退出码 ${result.exitCode}${result.signal ? `，信号 ${result.signal}` : ""}）` })
                     const exit = { name: spec.name, result }
                     firstCompleted ??= exit
                     resolveExit(exit)
                 }, error => rejectExit(new Error(`开发进程 ${spec.name} 执行失败：${String(error)}`, { cause: error })))
                 if (spec.readyUrl) await Promise.race([this.waitReady(spec, abortSignal, options.readinessTimeoutMs ?? devReadinessTimeoutMs), prematureExit])
                 if (firstCompleted) await prematureExit
+                pane?.status(spec.readyUrl ? "就绪" : "运行中", "success")
                 ready.add(spec.name)
             }
-            const { name, result } = await firstExit
-            if (!abortSignal.aborted && !result.cancelled) console.log("[ArrangeCLI]", `开发进程 ${name} 已退出（退出码 ${result.exitCode}${result.signal ? `，信号 ${result.signal}` : ""}）`)
+            const { result } = await firstExit
             return abortSignal.aborted && result.cancelled ? 0 : result.exitCode
         } catch (error) {
             if (abortSignal.aborted && (error === abortSignal.reason || isAbortError(error))) return 0

@@ -1,5 +1,6 @@
 import type { ProjectStateStore } from "../project/ProjectStateStore.ts"
 import type { FrameworkService } from "../framework/FrameworkService.ts"
+import { RegistryUnreachableError } from "../framework/FrameworkErrors.ts"
 import { errorMessage } from "../util/Utils.ts"
 import { ConfigScanner } from "./ConfigScanner.ts"
 import { ConfigApplier } from "./ConfigApplier.ts"
@@ -9,6 +10,7 @@ import type { SetupService } from "./SetupService.ts"
 import type { SetupScanReport } from "./SetupScanReport.ts"
 import type { ConfigInteraction } from "./ConfigInteraction.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
+import type { TaskRunner } from "../ui/Tasks.ts"
 
 export interface SyncRunOptions {
     readonly scanOnly?: boolean
@@ -25,7 +27,7 @@ export interface SyncResult {
 }
 
 export class SyncService {
-    constructor(private readonly projectStateStore: ProjectStateStore, private readonly framework: FrameworkService, private readonly configScanner: ConfigScanner, private readonly configResolver: ConfigResolver, private readonly configApplier: ConfigApplier, private readonly setupService: Pick<SetupService, "run">, private readonly interaction: ConfigInteraction, private readonly signal: AbortSignal) { }
+    constructor(private readonly projectStateStore: ProjectStateStore, private readonly framework: FrameworkService, private readonly configScanner: ConfigScanner, private readonly configResolver: ConfigResolver, private readonly configApplier: ConfigApplier, private readonly setupService: Pick<SetupService, "run">, private readonly interaction: ConfigInteraction, private readonly signal: AbortSignal, private readonly tasks: Pick<TaskRunner, "status">) { }
 
     async run(options: SyncRunOptions, rootDir: string): Promise<SyncResult> {
         this.signal.throwIfAborted()
@@ -51,30 +53,33 @@ export class SyncService {
                 this.signal.throwIfAborted()
                 // 深度加载状态和校验阶段
 
-                const loadedStuff = await this.projectStateStore.deepLoad(rootDir)
-                const state = loadedStuff.state
+                const { loadedStuff, state, report } = await this.tasks.status("检查工程配置", async () => {
+                    const loadedStuff = await this.projectStateStore.deepLoad(rootDir)
+                    const state = loadedStuff.state
+                    if (!state) return { loadedStuff, state, report: { scope, fatal: loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })), resolvable: [], idle: [], applicable: [] } satisfies ConfigScanReport }
+
+                    // 扫描阶段
+
+                    const report = await this.configScanner.scan(state, scope)
+
+                    report.fatal.push(...loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })))
+
+                    try {
+                        await this.framework.assertCompatible(state, "installed-first")
+                    } catch (error) {
+                        if (isAbortError(error)) throw error
+                        // 连不上 registry 只是“无法验证”，与 registry 明确给出的“不兼容”分开
+                        report.fatal.push({ path: "arrange.project.yaml", cause: error instanceof RegistryUnreachableError ? "framework-unverifiable" : "framework-incompatible", message: errorMessage(error) })
+                    }
+                    return { loadedStuff, state, report }
+                })
 
                 if (!state) {
-                    const report: ConfigScanReport = { scope, fatal: loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })), resolvable: [], idle: [], applicable: [] }
-
-                    this.interaction.report(report)
+                    this.interaction.report(report, { listIdle: options.scanOnly })
                     return { status: "blocked", report }
                 }
 
-                // 扫描阶段
-
-                const report = await this.configScanner.scan(state, scope)
-
-                report.fatal.push(...loadedStuff.errors.map(error => ({ ...error, cause: "config-invalid" })))
-
-                try {
-                    await this.framework.assertCompatible(state, "remote")
-                } catch (error) {
-                    if (isAbortError(error)) throw error
-                    report.fatal.push({ path: "arrange.project.yaml", cause: "framework-incompatible", message: errorMessage(error) })
-                }
-
-                this.interaction.report(report)
+                this.interaction.report(report, { listIdle: options.scanOnly })
                 this.signal.throwIfAborted()
 
                 if (report.fatal.length) return { status: "blocked", report }

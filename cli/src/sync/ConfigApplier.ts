@@ -2,6 +2,7 @@ import { setJsonPath, type JsonValue } from "../managed/JsonRegion.ts"
 import type { ConfigScanReport, ApplicableUpdate } from "./ConfigScanReport.ts"
 import { ConfigWriter, type FileChange } from "./ConfigWriter.ts"
 import type { FileSnapshot } from "../util/FileUtils.ts"
+import { detectJsonLayout, detectLineEnding, serializeJson, toLineEnding } from "../util/LineEnding.ts"
 
 export class ConfigApplier {
     constructor(private readonly writer: ConfigWriter) { }
@@ -18,6 +19,7 @@ export class ConfigApplier {
             if (before.content === null || updates.some(update => update.target.snapshot.content !== before.content)) throw new Error("更新基于不同文件快照")
 
             let after = before.content
+            const lineEnding = detectLineEnding(before.content)
 
             if (updates.every(update => update.kind === "text")) {
                 const sorted = updates.sort((a, b) => b.span.start - a.span.start)
@@ -25,7 +27,7 @@ export class ConfigApplier {
 
                 for (const update of sorted) {
                     if (update.span.end > boundary || update.span.start < 0 || update.span.end < update.span.start || after.slice(update.span.start, update.span.end) !== update.actual) throw new Error("Region 更新区间重叠或已失效")
-                    after = after.slice(0, update.span.start) + update.expected + after.slice(update.span.end)
+                    after = after.slice(0, update.span.start) + toLineEnding(update.expected, lineEnding) + after.slice(update.span.end)
                     boundary = update.span.start
                 }
             } else if (updates.every(update => update.kind === "json")) {
@@ -35,10 +37,7 @@ export class ConfigApplier {
                 updates.sort((a, b) => typeof a.jsonPath.at(-1) === "number" && typeof b.jsonPath.at(-1) === "number" ? Number(b.jsonPath.at(-1)) - Number(a.jsonPath.at(-1)) : 0)
                 for (const update of updates) setJsonPath(json, update.jsonPath, update.expected)
 
-                const indent = before.content.match(/\n([\t ]+)"/)?.[1] ?? "  "
-                after = `${JSON.stringify(json, null, indent)}\n`
-
-                if (before.content.includes("\r\n")) after = after.replace(/\n/g, "\r\n")
+                after = serializeJson(json, detectJsonLayout(before.content))
             } else throw new Error("同一文件混用了文本和 JSON 更新")
 
             changes.push({ before, after })

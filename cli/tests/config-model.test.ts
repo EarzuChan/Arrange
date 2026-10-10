@@ -79,14 +79,16 @@ for (const value of [undefined, null, "", "https://registry.example"]) {
     })
 }
 
-test("受管正文逐字符比较，不 trim，不解析语义", () => {
+test("受管正文除换行风格外逐字符比较，不 trim，不解析语义", () => {
     const region = new class extends TextRegion {
         readonly id = "test"
         readonly managedItemId = registry.id
         protected override makeInner(): string { return "value\n" }
     }()
     assert.equal(region.check(state, region.wrapper.make("value\n")).kind, "Idle")
-    for (const body of ["value \n", "\nvalue\n", "value\n# 注释\n", "value\r\n"]) assert.equal(region.check(state, region.wrapper.make(body)).kind, "Applicable")
+    // 文件为 CRLF 时，仅换行风格不同不算过期
+    assert.equal(region.check(state, "# arrange:begin region:test\r\nvalue\r\n# arrange:end region:test\r\n").kind, "Idle")
+    for (const body of ["value \n", "\nvalue\n", "value\n# 注释\n"]) assert.equal(region.check(state, region.wrapper.make(body)).kind, "Applicable")
 })
 
 for (const [label, expected, json, kind, cause] of [

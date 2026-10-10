@@ -5,6 +5,7 @@ import { FrameworkRegistryClient } from "./framework/FrameworkRegistryClient.ts"
 import { SyncService } from "./sync/SyncService.ts"
 import { SetupService } from "./sync/SetupService.ts"
 import { FrameworkService } from "./framework/FrameworkService.ts"
+import { FrameworkSourceProbe } from "./framework/FrameworkSourceProbe.ts"
 import { ConfigurationReadiness } from "./sync/ConfigurationReadiness.ts"
 import { ConfigScanner } from "./sync/ConfigScanner.ts"
 import { ConfigResolver } from "./sync/ConfigResolver.ts"
@@ -35,10 +36,11 @@ import { registerAdoptCommand } from "./command/Adopt.ts"
 import { registerBuildCommand } from "./command/Build.ts"
 import { registerCreateCommand } from "./command/Create.ts"
 import { registerDevCommand } from "./command/Dev.ts"
-import { registerPackageCommand } from "./command/Package.ts"
+import { registerPackCommand } from "./command/Pack.ts"
 import { registerSyncCommand } from "./command/Sync.ts"
 import { FileTransaction } from "./util/FileTransaction.ts"
 import { IconAssetsService } from "./asset/IconAssetsService.ts"
+import type { CliTerminal } from "./ui/Terminal.ts"
 
 export interface CliInteractions {
     readonly project: ProjectInteraction
@@ -49,15 +51,18 @@ export interface CliInteractions {
 export interface CliApplicationOptions {
     readonly signal: AbortSignal
     readonly interactions: CliInteractions | "terminal"
+    // 持久消息与实时任务的输出终端，由入口创建
+    readonly terminal: CliTerminal
 }
 
 export function createCliApplication(options: CliApplicationOptions): Command {
+    const { terminal } = options
     const executor = new Executor(process.platform, options.signal)
     const platform = createPlatformService(executor)
     const fileWriter = new FileTransaction(options.signal)
     const store = new ProjectStateStore(fileWriter)
     const registry = new FrameworkRegistryClient(options.signal)
-    const interactions = options.interactions === "terminal" ? { project: new TerminalProjectInteraction(registry, configRegistry), config: new SyncWizard(), setup: new SetupWizard() } : options.interactions
+    const interactions = options.interactions === "terminal" ? { project: new TerminalProjectInteraction(registry, configRegistry, terminal), config: new SyncWizard(terminal), setup: new SetupWizard(terminal) } : options.interactions
     const scanner = new ConfigScanner(configRegistry)
     const writer = new ConfigWriter(options.signal)
     const resolver = new ConfigResolver(writer, interactions.config, options.signal)
@@ -68,21 +73,22 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const project = new ProjectService(store, framework, configuration)
     const node = new NodeJsService(executor)
     const cmake = new CmakeService(executor, platform, new IconAssetsService(options.signal))
-    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, options.signal)
-    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, options.signal)
+    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, options.signal, new FrameworkSourceProbe(executor))
+    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, options.signal, terminal.tasks)
     const initializer = new ProjectInitializer(fileWriter, options.signal)
     const native = new NativeBuildService(cmake)
     const artifacts = new ArtifactLocator(cmake)
     const packer = new Packer(artifacts, executor, options.signal)
     const ui = new UiBuildService(node)
-    const builder = new BuildService(project, tools, ui, native, packer)
-    const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer)
+    const builder = new BuildService(project, tools, ui, native, packer, terminal.tasks)
+    const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, terminal.tasks)
     const cli = new Command().name(cliName).description(cliDescription).version(cliVersion)
-    registerCreateCommand(cli, initializer, sync, interactions.project)
-    registerAdoptCommand(cli, initializer, sync, interactions.project)
-    registerSyncCommand(cli, sync)
-    registerDevCommand(cli, dev, options.signal)
-    registerBuildCommand(cli, builder)
-    registerPackageCommand(cli, project, packer)
+    const { reporter } = terminal
+    registerCreateCommand(cli, initializer, sync, interactions.project, reporter)
+    registerAdoptCommand(cli, initializer, sync, interactions.project, reporter)
+    registerSyncCommand(cli, sync, reporter)
+    registerDevCommand(cli, dev, options.signal, reporter)
+    registerBuildCommand(cli, builder, reporter)
+    registerPackCommand(cli, project, packer, terminal.tasks, reporter)
     return cli
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { readFile, readdir, rm, mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import { fixture, write, TestSyncWizard } from "./fixture.ts"
+import { fixture, write, TestSyncWizard, quietTerminal } from "./fixture.ts"
 import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
 import { FileTransaction } from "../src/util/FileTransaction.ts"
 import type { ProjectState } from "../src/project/ProjectState.ts"
@@ -40,7 +40,7 @@ class TestRegistryClient extends FrameworkRegistryClient {
 
 function run(syncWizard: TestSyncWizard, registry: FrameworkRegistryClient = new TestRegistryClient(), projectStore?: ProjectStateStore, signal = new AbortController().signal): SyncService {
     const writer = new ConfigWriter(signal)
-    return new SyncService(projectStore ?? new ProjectStateStore(new FileTransaction(signal)), new FrameworkService(registry), new ConfigScanner(configRegistry), new ConfigResolver(writer, syncWizard, signal), new ConfigApplier(writer), { run: async () => ({ status: "blocked" }) }, syncWizard, signal)
+    return new SyncService(projectStore ?? new ProjectStateStore(new FileTransaction(signal)), new FrameworkService(registry), new ConfigScanner(configRegistry), new ConfigResolver(writer, syncWizard, signal), new ConfigApplier(writer), { run: async () => ({ status: "blocked" }) }, syncWizard, signal, quietTerminal().tasks)
 }
 
 async function noJournal(root: string) { await assert.rejects(readdir(join(root, ".arrange")), { code: "ENOENT" }) }

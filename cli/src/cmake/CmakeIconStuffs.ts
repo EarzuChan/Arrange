@@ -76,7 +76,7 @@ foreach(_arrange_product IN ITEMS ${target}_Standalone ${target}_VST3)
                 target_sources(\${_arrange_product} PRIVATE "\${CMAKE_CURRENT_BINARY_DIR}/arrange-icon.rc")
             endif()
         elseif(${ico})
-            file(WRITE "\${CMAKE_CURRENT_BINARY_DIR}/arrange-desktop.ini" "[.ShellClassInfo]\\r\\nIconResource=Plugin.ico,0\\r\\nIconFile=Plugin.ico\\r\\nIconIndex=0\\r\\n")
+            file(CONFIGURE OUTPUT "\${CMAKE_CURRENT_BINARY_DIR}/arrange-desktop.ini" CONTENT "[.ShellClassInfo]\\nIconResource=Plugin.ico,0\\nIconFile=Plugin.ico\\nIconIndex=0\\n" @ONLY NEWLINE_STYLE CRLF)
             add_custom_command(TARGET \${_arrange_product} POST_BUILD
                 COMMAND "\${CMAKE_COMMAND}" -E copy_if_different "\${${ico}}" "$<TARGET_FILE_DIR:\${_arrange_product}>/../../Plugin.ico"
                 COMMAND "\${CMAKE_COMMAND}" -E copy_if_different "\${CMAKE_CURRENT_BINARY_DIR}/arrange-desktop.ini" "$<TARGET_FILE_DIR:\${_arrange_product}>/../../desktop.ini"

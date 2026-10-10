@@ -20,6 +20,8 @@ setup 按实例执行一次，该 Arrangable 不退场的重排**不会重新执
 | `.sfa` 的 `<script>` | 支持相同的单位与颜色转换，以及脚本宏 | 保留脚本读取规则，显式使用 `.value` |
 | 独立 `.ts` 模块 | 使用原始 TypeScript 和真实 API 签名，没有 SFA 转换 | 显式使用 `.value` |
 
+SFA 编译期解析 props 类型里导入的类型时，模块解析固定使用 Bundler 规则，不随用户 `tsconfig.json` 的 `moduleResolution` 变化。Arrange 自己的包只通过 `package.json` 的 `exports` 暴露子路径（如 `@arrange/framework/ui`），Node10 解析不读 `exports`，无 tsconfig 时 TypeScript 的默认值正是 Node10。用户 tsconfig 的其它选项（`paths`、`baseUrl`、`customConditions` 等）照常生效；没有 `tsconfig.json` 时使用同一组默认值，所以 tsconfig 只服务于编辑器提示和 SFA 类型检查，缺少它不影响构建。解析失败的报错会写明采用的规则和 tsconfig 的实际状态。
+
 模板中的自动解包不扩展到脚本或被导入的 `.ts` 函数内部；独立 `.ts` 也不会因为被 SFA 导入而获得特色语法。以下 SFA 在脚本中声明单位与颜色，并在模板中消费：
 
 ```sfa

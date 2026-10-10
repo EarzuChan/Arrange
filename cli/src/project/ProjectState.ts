@@ -80,6 +80,7 @@ export const localDefinitionSchema = z.object({
         architecture: z.enum(["x64", "arm64"]),
         developerCommand: z.string().optional(),
         developerDirectory: z.string().optional(),
+        buildRoot: z.string().min(1).optional(),
         cmakeDefinitions: z.record(z.string(), z.string()).optional(),
     }).optional(),
 })

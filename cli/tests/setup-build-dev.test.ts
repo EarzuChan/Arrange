@@ -20,7 +20,8 @@ import { FileTransaction } from "../src/util/FileTransaction.ts"
 import { SetupService } from "../src/sync/SetupService.ts"
 import type { SetupScope } from "../src/sync/SetupScanReport.ts"
 import type { SetupInteraction } from "../src/sync/SetupInteraction.ts"
-import { fixture, write } from "./fixture.ts"
+import type { FrameworkSourceProbe } from "../src/framework/FrameworkSourceProbe.ts"
+import { fixture, quietTerminal, testTask, write } from "./fixture.ts"
 import { nativePresentationSignature } from "../src/project/NativePresentation.ts"
 
 const local: LocalDefinition = { node: { path: "/tools/node", version: "26.5.0" }, packageManager: { path: "/tools/npm", version: "11.0.0" } }
@@ -49,7 +50,7 @@ async function setupHarness(t: TestContext) {
         message: message => { messages.push(message) },
         failure: message => { failures.push(message) },
     }
-    const setup = new SetupService(store, tools, node, cmake, framework, wizard, new AbortController().signal)
+    const setup = new SetupService(store, tools, node, cmake, framework, wizard, quietTerminal().tasks, new AbortController().signal)
     return { state, store, tools, node, cmake, framework, setup, wizard, applied, messages, failures }
 }
 
@@ -86,12 +87,38 @@ test("SETUP 的 Framework/UI Fatal 阻止全范围所有 APPLY 和 Resolve", asy
     })
 })
 
-test("SETUP 安装取消会停止后续 native configure 并向命令入口传递取消", async t => {
+test("SETUP 任务被取消时向命令入口传递取消，而不是报告为失败", async t => {
     const input = await setupHarness(t)
     const cancellation = new DOMException("操作已取消", "AbortError")
     input.node.install = async () => { throw cancellation }
     await assert.rejects(input.setup.run(input.state.rootDir, "Global"), error => error === cancellation)
-    assert.deepEqual(input.applied, [])
+    assert.deepEqual(input.failures, [])
+})
+
+test("SETUP 并行执行：UI 安装失败时各 flavor 的 configure 仍跑完，最后一起报告失败", async t => {
+    const input = await setupHarness(t)
+    let release: () => void = () => { }
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const started: string[] = []
+    input.node.install = async () => {
+        started.push("ui")
+        if (started.length === 3) release()
+        await gate
+        throw new Error("网络中断")
+    }
+    input.cmake.configure = (async (_state: ProjectState, flavor: BuildFlavor) => {
+        started.push(flavor)
+        // 三个任务都已开始才放行，证明是并行而不是依次执行
+        if (started.length === 3) release()
+        await gate
+        input.applied.push(flavor)
+    }) as unknown as CmakeService["configure"]
+    const result = await input.setup.run(input.state.rootDir, "Global")
+    assert.equal(result.status, "failed")
+    assert.deepEqual([...started].sort(), ["debug", "release", "ui"])
+    assert.deepEqual([...input.applied].sort(), ["debug", "release"])
+    assert.equal(input.failures.length, 1)
+    assert.match(input.failures[0]!, /安装 UI 依赖：网络中断/)
 })
 
 test("SETUP 每次 Resolve 后重载状态，安装使用确认保存后的 local", async t => {
@@ -119,7 +146,7 @@ test("SETUP 每次 Resolve 后重载状态，安装使用确认保存后的 loca
     const result = await input.setup.run(input.state.rootDir, "Global")
     assert.equal(result.status, "completed")
     assert.equal(confirmations, 1)
-    assert.deepEqual(input.applied, ["ui", "debug", "release"])
+    assert.deepEqual([...input.applied].sort(), ["debug", "release", "ui"])
     assert.deepEqual((await input.store.load(input.state.rootDir)).local, proposed)
 })
 
@@ -136,14 +163,15 @@ test("SETUP Resolve 确认期间 YAML 改动阻止保存，APPLY 间改动阻止
         assert.equal(await readFile(resolve(input.state.rootDir, "arrange.project.yaml"), "utf8"), "# 用户的新内容\n")
         assert.deepEqual((await input.store.deepLoad(input.state.rootDir)).state, null)
     })
-    await t.test("执行间并发修改", async t => {
+    await t.test("执行期间并发修改", async t => {
         const input = await setupHarness(t)
         input.node.install = async () => {
             input.applied.push("ui")
             await write(resolve(input.state.rootDir, "arrange.local.yaml"), "# 用户切换工具链\n")
         }
         assert.equal((await input.setup.run(input.state.rootDir, "Global")).status, "failed")
-        assert.deepEqual(input.applied, ["ui"])
+        assert.ok(input.applied.includes("ui"))
+        assert.equal(input.messages.includes("SETUP 完成"), false)
     })
 })
 
@@ -152,27 +180,49 @@ function buildHarness(state: ProjectState) {
     const calls: { kind: "ui" | "native" | "pack", products?: readonly NativeProduct[], clean?: boolean }[] = []
     const project = { load: async () => state, requireConfiguration: async (_state: ProjectState, scope: SetupScope) => { scopes.push(scope) } } as unknown as ProjectService
     const tools = { inspect: async () => ({ local: state.local!, issues: [] }) } as unknown as ToolchainService
-    const ui = { build: async (_state: ProjectState, clean?: boolean) => { calls.push({ kind: "ui", clean }) } } as unknown as UiBuildService
-    const native = { build: async (_state: ProjectState, _flavor: BuildFlavor, products: readonly NativeProduct[], clean?: boolean) => { calls.push({ kind: "native", products, clean }) } } as unknown as NativeBuildService
-    const packer = { pack: async (_state: ProjectState, options: PackOptions) => { calls.push({ kind: "pack", products: options.products, clean: options.clean }) } } as unknown as Packer
-    return { service: new BuildService(project, tools, ui, native, packer), project, tools, ui, native, packer, scopes, calls }
+    const ui = { build: async (_state: ProjectState, _task: unknown, clean?: boolean) => { calls.push({ kind: "ui", clean }) } } as unknown as UiBuildService
+    const native = { build: async (_state: ProjectState, _flavor: BuildFlavor, products: readonly NativeProduct[], _task: unknown, clean?: boolean) => { calls.push({ kind: "native", products, clean }) } } as unknown as NativeBuildService
+    const packer = {
+        pack: async (state: ProjectState, options: PackOptions) => {
+            calls.push({ kind: "pack", products: options.products, clean: options.clean })
+            const directory = resolve(state.rootDir, "artifacts", options.flavor)
+            return { directory, products: [], manifestPath: resolve(directory, "arrange-package.json") }
+        }
+    } as unknown as Packer
+    return { service: new BuildService(project, tools, ui, native, packer, quietTerminal().tasks), project, tools, ui, native, packer, scopes, calls }
 }
 
-test("Build 的 UI/native 范围独立，全量默认交付、--no-package 禁止交付", async t => {
+test("Build 的 UI/native 范围独立，全量默认交付、--no-pack 禁止交付", async t => {
     const cases: { name: string, options: BuildOptions, scope: SetupScope, kinds: string[] }[] = [
         { name: "UI only", options: { flavor: "release", ui: true, native: false, clean: true }, scope: "UI", kinds: ["ui"] },
         { name: "native only", options: { flavor: "debug", ui: false, native: true, products: ["vst3", "vst3"] }, scope: "Native", kinds: ["native"] },
         { name: "全量默认", options: { flavor: "release", ui: true, native: true, clean: true }, scope: "Global", kinds: ["ui", "native", "pack"] },
-        { name: "不交付", options: { flavor: "release", ui: true, native: true, package: false }, scope: "Global", kinds: ["ui", "native"] },
+        { name: "不交付", options: { flavor: "release", ui: true, native: true, pack: false }, scope: "Global", kinds: ["ui", "native"] },
     ]
     for (const entry of cases) await t.test(entry.name, async t => {
         const state = await preparedState(t)
         const input = buildHarness(state)
         await input.service.build(state.rootDir, entry.options)
         assert.deepEqual(input.scopes, [entry.scope])
-        assert.deepEqual(input.calls.map(call => call.kind), entry.kinds)
+        assert.deepEqual(input.calls.map(call => call.kind).sort(), [...entry.kinds].sort())
+        if (entry.kinds.includes("pack")) assert.equal(input.calls.at(-1)?.kind, "pack")
         for (const call of input.calls.filter(call => call.products)) assert.deepEqual(call.products, entry.options.products ? ["vst3"] : state.project.project.products)
         for (const call of input.calls) assert.equal(call.clean, entry.options.clean)
+    })
+})
+
+test("Build 结果说明打包去向：已打包、跳过或因范围未打包", async t => {
+    const cases: { name: string, options: BuildOptions, expected: string }[] = [
+        { name: "全量", options: { flavor: "release", ui: true, native: true }, expected: "packed" },
+        { name: "--no-pack", options: { flavor: "release", ui: true, native: true, pack: false }, expected: "no-pack" },
+        { name: "仅 UI", options: { flavor: "release", ui: true, native: false }, expected: "partial-scope" },
+        { name: "仅 native", options: { flavor: "release", ui: false, native: true }, expected: "partial-scope" },
+    ]
+    for (const entry of cases) await t.test(entry.name, async t => {
+        const state = await preparedState(t)
+        const outcome = await buildHarness(state).service.build(state.rootDir, entry.options)
+        assert.equal(outcome.kind === "packed" ? "packed" : outcome.reason, entry.expected)
+        if (outcome.kind === "packed") assert.equal(outcome.state, state)
     })
 })
 
@@ -188,8 +238,9 @@ test("Build 拒绝未启用产品、配置或工具变化，且失败后不进�
     assert.deepEqual(input.calls, [])
     input.tools.inspect = async () => ({ local: state.local!, issues: [] })
     input.ui.build = async () => { throw new Error("UI 构建失败") }
-    await assert.rejects(input.service.build(state.rootDir, options), /UI 构建失败/)
-    assert.deepEqual(input.calls, [])
+    await assert.rejects(input.service.build(state.rootDir, options), /构建 UI：UI 构建失败/)
+    // UI 与 native 并行：UI 失败时 native 照常跑完，但不进入交付
+    assert.deepEqual((input.calls as { kind: string }[]).map(call => call.kind), ["native"])
 })
 
 test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间也不保留 completed", async t => {
@@ -215,7 +266,7 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
                 return model
             }
         } as unknown as CmakeService)
-        const build = () => kind === "ui" ? ui.build(state) : native.build(state, "release", ["standalone"])
+        const build = () => kind === "ui" ? ui.build(state, testTask()) : native.build(state, "release", ["standalone"], testTask())
         await build()
         const completed = JSON.parse(await readFile(receiptPath, "utf8"))
         assert.equal(completed.status, "completed")
@@ -241,7 +292,7 @@ test("native 构建过程中元数据改变必须留下失败记录", async t =>
             return model
         }
     } as unknown as CmakeService)
-    await assert.rejects(native.build(state, "release", ["standalone"]), /构建期间/)
+    await assert.rejects(native.build(state, "release", ["standalone"], testTask()), /构建期间/)
     assert.equal(JSON.parse(await readFile(resolve(state.rootDir, ".arrange/built-native-release.json"), "utf8")).status, "failed")
 })
 
@@ -295,7 +346,7 @@ async function devHarness(t: TestContext) {
             return { products: [{ binaryPath: packedBinary }] }
         }
     } as unknown as Packer
-    return { state, node, cmake, native, artifacts, ui, packer, builds, packages, actions, scopes, nativeBinary, packedBinary, processes: () => processes, service: new DevService(project, tools, node, cmake, native, artifacts, supervisor, ui, packer) }
+    return { state, node, cmake, native, artifacts, ui, packer, builds, packages, actions, scopes, nativeBinary, packedBinary, processes: () => processes, service: new DevService(project, tools, node, cmake, native, artifacts, supervisor, ui, packer, quietTerminal().tasks) }
 }
 
 test("Release dev 先构建 UI 并交付 Standalone，运行交付二进制；native-only 使用已有 UI", async t => {
@@ -304,7 +355,7 @@ test("Release dev 先构建 UI 并交付 Standalone，运行交付二进制；na
         input.node.inspect = async () => { throw new Error("本模式不应启动 Vite") }
         const code = await input.service.run(input.state.rootDir, { ...entry, native: true })
         assert.equal(code, 7)
-        assert.deepEqual(input.builds, entry.ui ? ["native", "ui"] : ["native"])
+        assert.deepEqual([...input.builds].sort(), entry.ui ? ["native", "ui"] : ["native"])
         assert.deepEqual(input.packages, [{ flavor: entry.flavor, products: ["standalone"] }])
         assert.deepEqual(input.processes().map(process => process.name), ["native"])
         assert.equal(input.processes()[0].command, input.packedBinary)
@@ -362,7 +413,7 @@ test("Release dev 的 UI 构建或打包失败时不启动 native", async t => {
         if (stage === "ui") input.ui.build = async () => { throw new Error("UI 构建失败") }
         else input.packer.pack = async () => { throw new Error("UI 资源交付失败") }
         await assert.rejects(input.service.run(input.state.rootDir, { flavor: "release", ui: true, native: true }), stage === "ui" ? /UI 构建失败/ : /UI 资源交付失败/)
-        assert.deepEqual(input.builds, stage === "ui" ? ["native"] : ["native", "ui"])
+        assert.deepEqual([...input.builds].sort(), stage === "ui" ? ["native"] : ["native", "ui"])
         assert.deepEqual(input.packages, [])
         assert.deepEqual(input.processes(), [])
         assert.ok(!input.actions.includes("launch"))
@@ -391,4 +442,37 @@ test("UI-only dev 只启动模块协议服务器，不构建或准备 native bun
     assert.deepEqual(input.packages, [])
     assert.deepEqual(input.actions, ["launch"])
     assert.deepEqual(input.processes().map(process => process.name), ["ui"])
+})
+
+test("SETUP 在配置构建树前预检 Arrange 原生源码，不通过时先于 UI 安装阻止全部动作", async t => {
+    const input = await setupHarness(t)
+    let checks = 0
+    const probe = {
+        check: async () => {
+            checks++
+            return { kind: "tag-missing", url: "https://example.invalid/Arrange.git", tag: "v1.0.0", version: "1.0.0" }
+        }
+    } as unknown as FrameworkSourceProbe
+    const setup = new SetupService(input.store, input.tools, input.node, input.cmake, input.framework, input.wizard, quietTerminal().tasks, new AbortController().signal, probe)
+    const result = await setup.run(input.state.rootDir, "Global")
+    assert.equal(result.status, "blocked")
+    assert.equal(result.report?.fatal.some(issue => issue.key === "native-source" && /没有 tag v1\.0\.0/.test(issue.message)), true)
+    assert.deepEqual(input.applied, [])
+    assert.equal(checks, 1)
+})
+
+test("SETUP 只在需要配置构建树时才联网预检：仅 UI 范围或构建树已就绪都不检查", async t => {
+    const input = await setupHarness(t)
+    let checks = 0
+    const probe = {
+        check: async () => {
+            checks++
+            return { kind: "tag-missing", url: "x", tag: "v1", version: "1" }
+        }
+    } as unknown as FrameworkSourceProbe
+    const setup = new SetupService(input.store, input.tools, input.node, input.cmake, input.framework, input.wizard, quietTerminal().tasks, new AbortController().signal, probe)
+    assert.equal((await setup.scan(input.state.rootDir, "UI")).fatal.length, 0)
+    input.cmake.inspect = async () => ({ ready: true })
+    assert.equal((await setup.scan(input.state.rootDir, "Global")).fatal.length, 0)
+    assert.equal(checks, 0)
 })

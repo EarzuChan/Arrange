@@ -1,10 +1,11 @@
-import { confirm, isCancel, log, select, spinner } from "@clack/prompts"
+import { confirm, isCancel, select } from "@clack/prompts"
 import { cliCompatibility, frameworkPackageName } from "../CliMetadata.ts"
 import { type FrameworkRegistryClient, normalizeRegistryUrl } from "../framework/FrameworkRegistryClient.ts"
 import { assertFrameworkCompatible, addIncompatibilityIfPresenceFor, type FrameworkVersionSelectionCandidate, type FrameworkVersionCandidate } from "../framework/FrameworkMamba.ts"
 import { PromptCancelled, requiredText, validateSemver } from "../util/PromptUtils.ts"
 import { formatTimestampToDate } from "../util/Utils.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
+import type { CliTerminal } from "../ui/Terminal.ts"
 
 export interface FrameworkVersionWizardInput {
     readonly registryUrl?: string
@@ -17,16 +18,17 @@ const skipVerificationValue = "skip-verification"
 const cancelValue = "cancel"
 
 // 本方法执行版本选择
-export async function selectFrameworkVersion(registryClient: FrameworkRegistryClient, input: FrameworkVersionWizardInput = {}): Promise<string> {
+export async function selectFrameworkVersion(terminal: CliTerminal, registryClient: FrameworkRegistryClient, input: FrameworkVersionWizardInput = {}): Promise<string> {
     const registryUrl = normalizeRegistryUrl(input.registryUrl)
 
-    const tryLoadCandidatesResult = await tryLoadRegistryCandidates(registryClient, registryUrl)
+    const tryLoadCandidatesResult = await tryLoadRegistryCandidates(terminal, registryClient, registryUrl)
 
     if (tryLoadCandidatesResult === false) while (true) {
-        const customCandidate = await promptCustomFrameworkVersion(registryClient, registryUrl)
+        const customCandidate = await promptCustomFrameworkVersion(terminal, registryClient, registryUrl)
         if (customCandidate === false) throw new PromptCancelled()
 
         const useCustomVersion = await confirm({
+            ...terminal.prompt,
             message: `使用 ${frameworkPackageName}@${customCandidate.version}？选择“否”可以重新输入版本`,
             initialValue: true,
             active: "是",
@@ -41,6 +43,7 @@ export async function selectFrameworkVersion(registryClient: FrameworkRegistryCl
 
     while (true) {
         const selected = await select({
+            ...terminal.prompt,
             message: `选择 Arrange Framework 版本（CLI 兼容契约 ${cliCompatibility}）`,
             options: [
                 ...toCandidateOptions([...tryLoadCandidatesResult, ...customCandidates]),
@@ -51,34 +54,29 @@ export async function selectFrameworkVersion(registryClient: FrameworkRegistryCl
         if (isCancel(selected)) throw new PromptCancelled()
         if (selected !== customVersionValue) return selected
 
-        const customCandidate = await promptCustomFrameworkVersion(registryClient, registryUrl)
+        const customCandidate = await promptCustomFrameworkVersion(terminal, registryClient, registryUrl)
         if (customCandidate === false) continue
 
-        if (hasCandidateVersion(tryLoadCandidatesResult, customCandidate.version) || hasCandidateVersion(customCandidates, customCandidate.version)) log.info(`${customCandidate.version} 已在版本列表中`)
+        if (hasCandidateVersion(tryLoadCandidatesResult, customCandidate.version) || hasCandidateVersion(customCandidates, customCandidate.version)) terminal.reporter.info(`${customCandidate.version} 已在版本列表中`)
         else {
             customCandidates.push(customCandidate)
-            log.success(`${customCandidate.version} 已加入版本列表`)
+            terminal.reporter.success(`${customCandidate.version} 已加入版本列表`)
         }
     }
 }
 
-async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate[] | false> {
+async function tryLoadRegistryCandidates(terminal: CliTerminal, registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate[] | false> {
     while (true) {
-        const loading = spinner()
-        loading.start("正在读取 Arrange Framework 版本……")
         try {
-            const candidates = await registryClient.fetchCandidates(5, registryUrl)
-            loading.stop("已读取 Arrange Framework 版本")
+            const candidates = await terminal.tasks.status("正在读取 Arrange Framework 版本", () => registryClient.fetchCandidates(5, registryUrl))
+            terminal.reporter.step("已读取 Arrange Framework 版本")
             return addIncompatibilityIfPresenceFor(candidates)
         } catch (error) {
-            if (isAbortError(error)) {
-                loading.stop("已取消读取 Framework 版本")
-                throw error
-            }
-            loading.error("读取 Arrange Framework 版本失败")
-            log.error(formatError(error))
+            if (isAbortError(error)) throw error
+            terminal.reporter.error(["读取 Arrange Framework 版本失败", formatError(error)])
 
             const action = await select({
+                ...terminal.prompt,
                 message: "无法读取 Framework 版本列表",
                 options: [
                     { label: "重试", value: retryValue },
@@ -93,17 +91,17 @@ async function tryLoadRegistryCandidates(registryClient: FrameworkRegistryClient
     }
 }
 
-async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate | false> {
+async function promptCustomFrameworkVersion(terminal: CliTerminal, registryClient: FrameworkRegistryClient, registryUrl: string): Promise<FrameworkVersionSelectionCandidate | false> {
     while (true) {
         let version
         try {
-            version = await requiredText("自定义 Arrange Framework 版本", {
+            version = await requiredText(terminal.prompt, "自定义 Arrange Framework 版本", {
                 placeholder: "例如 1.0.0",
                 validate: validateSemver,
             })
         } catch (error) {
             if (error instanceof PromptCancelled) {
-                log.info("已取消自定义版本输入")
+                terminal.reporter.info("已取消自定义版本输入")
                 return false
             }
 
@@ -111,24 +109,18 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
         }
 
         while (true) {
-            const checking = spinner()
-            checking.start(`正在验证 ${version}……`)
-
             try {
-                const candidate = await registryClient.fetchCandidateByVersion(version, registryUrl)
+                const candidate = await terminal.tasks.status(`正在验证 ${version}`, () => registryClient.fetchCandidateByVersion(version, registryUrl))
                 assertFrameworkCompatible(candidate)
 
-                checking.stop(`${candidate.version} 与当前 CLI 兼容`)
+                terminal.reporter.step(`${candidate.version} 与当前 CLI 兼容`)
                 return { ...candidate, incompatibility: null }
             } catch (error) {
-                if (isAbortError(error)) {
-                    checking.stop("已取消验证 Framework 版本")
-                    throw error
-                }
-                checking.error(`无法验证 ${version}`)
-                log.error(formatError(error))
+                if (isAbortError(error)) throw error
+                terminal.reporter.error([`无法验证 ${version}`, formatError(error)])
 
                 const action = await select({
+                    ...terminal.prompt,
                     message: "如何处理这个自定义版本？",
                     options: [
                         { label: "重新验证此版本", value: retryValue },
@@ -142,7 +134,7 @@ async function promptCustomFrameworkVersion(registryClient: FrameworkRegistryCli
                 else if (action === retryValue) continue
                 else if (action === enterAnotherVersionValue) break
 
-                log.warn(`将使用未经验证的 ${frameworkPackageName}@${version}；版本不存在或不兼容时，后续同步或安装可能失败`)
+                terminal.reporter.warn(`将使用未经验证的 ${frameworkPackageName}@${version}；版本不存在或不兼容时，后续同步或安装可能失败`)
                 return {
                     version,
                     cliCompatibility: cliCompatibility, // 强行认为它以兼容

@@ -16,8 +16,24 @@ export function parseWindowsEnvironment(output: string): Record<string, string> 
     return result
 }
 
+// cl.exe 的横幅随系统语言本地化（如“用于 x64 的 … 编译器 19.50.35728 版”），不能依赖其中的词。
+// 横幅行同时含编译器版本号与目标架构记号，按这两种与语言无关的形态提取。
+// 无参数运行时用法行写在 stdout、横幅写在 stderr，拼接顺序不固定，所以逐行找第一个含版本号的行，并只从该行取架构记号
+export interface MsvcBanner {
+    readonly version?: string
+    readonly architecture?: "x64" | "arm64" | "x86" | "arm"
+}
+
+export function parseMsvcBanner(output: string): MsvcBanner {
+    for (const line of output.split(/\r?\n/)) {
+        const version = line.match(/\b(\d{2}\.\d{2}\.\d{4,6}(?:\.\d+)?)\b/)?.[1]
+        if (version) return { version, architecture: line.match(/\b(x64|x86|ARM64|ARM)\b/i)?.[1]?.toLowerCase() as MsvcBanner["architecture"] }
+    }
+    return {}
+}
+
 export function parseMsvcArchitecture(output: string): "x64" | "arm64" | undefined {
-    const architecture = output.match(/\bfor\s+(x64|ARM64)\b/i)?.[1]?.toLowerCase()
+    const architecture = parseMsvcBanner(output).architecture
     return architecture === "x64" || architecture === "arm64" ? architecture : undefined
 }
 
@@ -60,7 +76,7 @@ export class WindowsPlatformService extends PlatformService {
             const compiler = await this.executor.run({ command: compilerPath, args: [], env, timeoutMs: toolProbeTimeoutMs })
             throwIfProcessCancelled(compiler)
             const output = `${compiler.stdout}\n${compiler.stderr}`
-            const version = output.match(/Version\s+([\d.]+)/i)?.[1]
+            const { version } = parseMsvcBanner(output)
             if (compiler.exitCode !== 0 || !version) throw new Error(`无法验证 MSVC：${compilerPath}`)
             if (parseMsvcArchitecture(output) !== candidate.native.architecture) throw new Error(`MSVC 实际目标架构与 ${candidate.native.architecture} 配置不符：${compilerPath}`)
             candidate.nativeCompiler = { path: compilerPath, version }

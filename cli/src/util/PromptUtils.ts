@@ -1,14 +1,16 @@
-import { cancel, isCancel, text } from "@clack/prompts"
+import { isCancel, text } from "@clack/prompts"
 import { ProjectInteractionCancelled as PromptCancelled } from "../project/ProjectInteraction.ts"
+import type { PromptIo } from "../ui/Terminal.ts"
 
 export { ProjectInteractionCancelled as PromptCancelled } from "../project/ProjectInteraction.ts"
 
-export async function requiredText(label: string, options: {
+export async function requiredText(io: PromptIo, label: string, options: {
     readonly placeholder?: string
     readonly initialValue?: string
     readonly validate?: (value: string) => string | undefined
 } = {}): Promise<string> {
     const value = await text({
+        ...io,
         message: label,
         placeholder: options.placeholder,
         initialValue: options.initialValue,

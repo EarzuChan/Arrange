@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { join } from "node:path"
+import { StringDecoder } from "node:string_decoder"
 import { processStopGraceMs } from "../CliMetadata.ts"
 import type { ProcessResult, ProcessSpec, RunningProcess } from "./ProcessSpec.ts"
 
@@ -47,15 +48,16 @@ export class Executor {
                     pipeTimer.unref()
                 }
             })
+            const retain = spec.retainOutput !== false
+            const stdoutDecoder = new StringDecoder("utf8")
+            const stderrDecoder = new StringDecoder("utf8")
             child.stdout?.on("data", (chunk: Buffer) => {
-                const text = chunk.toString("utf8")
-                stdout += text
-                spec.onStdout?.(text)
+                if (retain) stdout += stdoutDecoder.write(chunk)
+                spec.onOutput?.(chunk, "stdout")
             })
             child.stderr?.on("data", (chunk: Buffer) => {
-                const text = chunk.toString("utf8")
-                stderr += text
-                spec.onStderr?.(text)
+                if (retain) stderr += stderrDecoder.write(chunk)
+                spec.onOutput?.(chunk, "stderr")
             })
             const cleanup = (): void => {
                 if (timer) clearTimeout(timer)
@@ -72,6 +74,14 @@ export class Executor {
             })
             child.once("close", (code, childSignal) => {
                 cleanup()
+                if (retain) {
+                    stdout += stdoutDecoder.end()
+                    stderr += stderrDecoder.end()
+                }
+                try { spec.onOutputEnd?.() } catch (error) {
+                    reject(error)
+                    return
+                }
                 resolve({ exitCode: cancelled ? 130 : timedOut ? 124 : code ?? (childSignal === "SIGINT" ? 130 : 1), stdout, stderr, ...(childSignal ? { signal: childSignal } : {}), cancelled, timedOut })
             })
         })

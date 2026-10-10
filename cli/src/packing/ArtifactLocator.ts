@@ -86,7 +86,7 @@ export class ArtifactLocator {
                 const info = await lstat(path).catch(() => undefined)
                 if (info?.isFile()) binaries.push(resolve(path))
             }
-            if (binaries.length !== 1) throw new Error(`${record.target} 应有一个已构建的运行二进制，实际找到 ${binaries.length} 个；请先 arrange build`)
+            if (binaries.length !== 1) throw new Error(`${record.target} 应有一个已构建的运行二进制，实际找到 ${binaries.length} 个；请先 arrange build --flavor ${options.flavor}${options.flavor === "release" ? "（arrange dev 只构建 debug）" : ""}`)
             const binaryPath = binaries[0]
             let productPath = binaryPath
             let resourceRoot = dirname(binaryPath)

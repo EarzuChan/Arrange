@@ -41,6 +41,8 @@ CLI 不使用全局服务容器。`Entry.ts` 检查正式运行环境，管理�
 
 所有外部进程经过 `Executor`；`DevSupervisor` 在完成、失败和取消时释放子进程与监听器。平台差异集中于平台服务及 bundle/signing 适配，命令不直接拼接平台工具链。
 
+交互层的全部输出与输入经过入口创建的 `CliTerminal`（屏幕、消息、任务与提问输入），由装配显式传给命令、向导与需要呈现任务的服务；服务只产生日志行、阶段与进度，不直接写终端。规则见[终端输出与交互](#终端输出与交互)。
+
 ### 正式入口与自动化
 
 正式 `arrange` 入口只允许 Windows/macOS，且标准输入、标准输出都必须为 TTY；包括 help/version 在内的所有调用都先经过这一检查。拒绝发生在服务装配、工程读取、网络请求和外部工具调用之前。平台选择明确区分 `win32` 与 `darwin`，其它平台报告不支持，不回退到 Mac 实现。
@@ -70,7 +72,7 @@ project/
 
 共享配置中的 `native.target` 必须明确指定 JUCE 插件共享代码根 target；它不从产品显示名称或 CMake 正文反推。CLI 使用 JUCE 的 `<target>_Standalone` 与 `<target>_VST3` 格式 target，通过 CMake 模型核验类型、依赖和真实产物路径。`ui.outputDirectory` 可指定 UI 构建目录，默认 `dist`，必须是 UI 子项目内的独立产物目录。
 
-本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选 `cmakeDefinitions`。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
+本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选的 `cmakeDefinitions` 和 Windows 构建树根目录 `buildRoot`（见同篇“版本与工具链”一节的构建树位置说明）。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
 
 运行时统一通过 [ProjectState](32-ArrangeCLI托管与同步模型.md#定义state-与拓扑) 使用配置与工程根。CONFIG 维护文件中的项目事实；SETUP 使用真实工具链准备可执行的工程，不以写一份 local YAML 代替依赖安装与 CMake configure。
 
@@ -96,7 +98,7 @@ VST3 名称以 UTF-16 class info 向宿主报告。JUCE 8.0.12 的 VST3 命令�
 
 图片解码、透明度正确的缩放和格式转换均由 CLI 的 Node 侧完成，生成物置于本机构建树，不要求用户安装图片转换工具，也不调用 JUCE 的图标转换程序。只生成不超过源图尺寸的规格。macOS 的 `.app`、`.vst3` 使用 Resources 中的 ICNS 和 plist 引用；Windows EXE 将 ICO 编译进资源，VST3 使用 `Plugin.ico`、`desktop.ini` 及对应 shell 属性。DAW 内图标呈现由宿主决定。
 
-CONFIG 维护构建接入配置；SETUP/configure 在构建前准备派生图标，build/dev 使用同一链路，package 仅整理并核验既有产物。准备与构建记录包含显示名、适用平台的 Bundle ID 和图标源内容摘要。同路径 PNG 修改、配置删除或显示名变化会使旧记录过期；仅重新 configure 不代表旧二进制已经包含新资源。
+CONFIG 维护构建接入配置；SETUP/configure 在构建前准备派生图标，build/dev 使用同一链路，pack 仅整理并核验既有产物。准备与构建记录包含显示名、适用平台的 Bundle ID 和图标源内容摘要。同路径 PNG 修改、配置删除或显示名变化会使旧记录过期；仅重新 configure 不代表旧二进制已经包含新资源。
 
 ## 命令
 
@@ -106,17 +108,17 @@ arrange adopt  [--registry <url>] [--fetch-content <url>]
 arrange sync   [--scan] [--config | --setup] [--ui | --native]
 arrange dev    [--ui-only | --native-only] [--flavor debug|release]
 arrange build  [--flavor debug|release] [--ui-only | --native-only]
-                [--no-package] [--product standalone|vst3 ...] [--clean]
-arrange package [--flavor debug|release] [--product standalone|vst3 ...] [--clean]
+                [--no-pack] [--product standalone|vst3 ...] [--clean]
+arrange pack [--flavor debug|release] [--product standalone|vst3 ...] [--clean]
 ```
 
-范围参数互斥；省略范围表示同时处理 UI 与 native。product 只能选择工程已启用的产品，省略时使用共享配置的 products。dev 默认 `debug`；build/package 默认 `release`。
+范围参数互斥；省略范围表示同时处理 UI 与 native。product 只能选择工程已启用的产品，省略时使用共享配置的 products。dev 默认 `debug`；build/pack 默认 `release`。
 
 ### create 与 adopt
 
 create 交互收集并确认配置，通过共用的 File/Cluster/Region 定义生成工程文件，同时生成最小 UI/native 源文件、Vite/SFA 类型检查入口及 `.gitignore`。初始化先展示计划，避免覆盖既有文件；写入失败保留已写内容与事务记录，明确报告继续处理方式。
 
-adopt 支持新建、复制或原位引用 UI/native 子项目。已有 native 由用户提供准确 target；已有 UI 可读取 JSON 展示现状。接入文本托管使用共用 Wrapper/Marker 交互，不解析正文反推项目配置。复制排除 `.git`、`.arrange`、`node_modules` 和本机配置；未托管内容保留。
+adopt 支持新建、复制或原位引用 UI/native 子项目。已有 native 由用户提供准确 target；已有 UI 可读取 JSON 展示现状，并在 UI 目录没有 `tsconfig.json` 时给出不阻塞的提示（缺它不影响构建，只影响编辑器提示与 SFA 类型检查；不替用户生成已有工程的文件）。接入文本托管使用共用 Wrapper/Marker 交互，不解析正文反推项目配置。复制排除 `.git`、`.arrange`、`node_modules` 和本机配置；未托管内容保留。
 
 两者保存工程后可选择立即同步。取消后续准备不会撤销已经完成的工程初始化。未启用 ManagedItem 的初始生成及后续忽略规则见[托管模型](32-ArrangeCLI托管与同步模型.md)。
 
@@ -128,9 +130,9 @@ SETUP 使用实际工具和准备记录判断工程能否执行后续命令；�
 
 ### dev
 
-检查配置、工具链及所选范围的准备状态。默认 `debug` 启动 UI dev server 和 Standalone；`--ui-only` 在任何 flavor 下都只启动 UI 服务。native dev 要求工程启用 standalone；每次启动前都执行正式 Standalone 增量构建，再使用与 package 共用的定位器，避免将同名旧二进制误当作最新代码。
+检查配置、工具链及所选范围的准备状态。默认 `debug` 启动 UI dev server 和 Standalone；`--ui-only` 在任何 flavor 下都只启动 UI 服务。native dev 要求工程启用 standalone；每次启动前都执行正式 Standalone 增量构建，再使用与 pack 共用的定位器，避免将同名旧二进制误当作最新代码。
 
-完整 Debug dev 不要求已有 UI dist，也不先构建 UI 或打包；UI 服务就绪后启动构建树中的 Standalone，由 Framework 按实际 Live 源获取模块与图片、图标资源。完整 `release` dev 先构建 UI，再打包 Standalone 并启动整理后的二进制。`--native-only` 在两种 flavor 下都使用现有 UI dist 打包 Standalone 后启动，缺少 UI 产物时提示先执行 UI build。这两种方式都不由 CLI 启动 UI dev server。
+完整 Debug dev 不要求已有 UI dist，也不先构建 UI 或打包；UI 服务就绪后启动构建树中的 Standalone，由 Framework 按实际 Live 源获取模块与图片、图标资源。完整 `release` dev 并行构建 UI 与 Standalone，都成功后打包 Standalone 并启动整理后的二进制。`--native-only` 在两种 flavor 下都使用现有 UI dist 打包 Standalone 后启动，缺少 UI 产物时提示先执行 UI build。这两种方式都不由 CLI 启动 UI dev server。
 
 CLI 不覆盖 native 程序的 App source 选择。生成的 Debug 模板仍采用 Live 优先、Dist 回退；native-only 可以连接已经运行的约定服务，无 Live 时读取打包资源。source API 的行为以 [App 入口](02-App入口.md#app-source-api)为准。
 
@@ -140,21 +142,57 @@ Debug 完整模式在 UI 服务就绪后才启动依赖它的 native 进程。�
 
 ### build
 
-按 flavor、范围和 products 构建真实产物。UI 调用所选包管理器的 build 脚本并检查 `app.js`；native configure 后按所选格式 targets 构建。完整构建默认继续 package；单范围构建不 package，`--no-package` 可关闭完整构建的整理。
+按 flavor、范围和 products 构建真实产物。UI 调用所选包管理器的 build 脚本并检查 `app.js`；native configure 后按所选格式 targets 构建。完整构建时 UI 与 native 并行，任一失败时另一个跑完后一起报告，不进入 pack。完整构建默认继续 pack；单范围构建不 pack，`--no-pack` 可关闭完整构建的整理。build 结尾总是说明打包去向：打包完成时与 pack 同样列出交付目录、各产品位置、二进制大小与清单；跳过或因范围未打包时明确说明原因。
 
 CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/Framework 版本、UI 输出或 native target/configuration/platform/architecture/products。记录用于识别 CLI 已知的失败或明显版本失配，不构建全仓源码指纹系统。
 
 `--clean` 只清理本次所选范围：UI 为独立产物目录，native 为所选平台、架构与 flavor 的 CMake 构建树内清理。不得清理源文件、依赖目录或其它 flavor/platform 的产物。
 
-### package
+### pack
 
 只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，要求 UI dist 包含普通文件 `app.js`，复制整个 UI 目录。
 
 已有 CLI 构建记录必须为 `completed`，且版本、输出位置、目标与所选产品等事实匹配。显式配置了产品显示名、图标或 macOS Bundle ID 时，必须有匹配资源身份的 CLI native 构建记录，防止只更新配置便交付旧二进制；缺少记录时提示先执行 native build。未使用这些字段的既有工程继续允许整理手工构建的产物；缺少记录不代表已证明源码或二进制版本一致，打包清单保留可取得的版本与文件摘要。
 
+## 终端输出与交互
+
+### 输出
+
+交互层输出统一采用 @clack/prompts 的引导线样式，提问与结果在同一条线上，不加命令前缀。命令以标题行开头，以完成、失败或取消行结束。非 TTY（程序化调用与测试）时退化为纯文本，失败信息写标准错误。
+
+扫描报告的标题行给出 Fatal、Resolvable、Applicable、Idle 计数，下面只列需要处理的条目；`--scan` 同时列出 Idle。区块组按托管标记写作 `cluster:<id>`，与同名区域区分。路径相对当前目录显示。
+
+### 任务与子进程输出
+
+安装、configure、构建等子进程的输出经任务捕获，不直通终端。输出按行解码：先按严格 UTF-8，失败再按控制台代码页（Windows 上 `cl` 等原生工具经管道时使用控制台代码页，简体中文默认 936），只保留颜色序列，去掉光标移动、清屏等控制序列。子进程默认收到 `FORCE_COLOR`、`CLICOLOR_FORCE`（用户设置 `NO_COLOR` 时不强制），CMake 配置打开 `CMAKE_COLOR_DIAGNOSTICS`；不输出颜色的工具（如 MSVC）由 CLI 为错误、警告行着色。pnpm 在没有终端时需要确认才能清理 `node_modules`，CLI 以 `npm_config_confirm_modules_purge=false` 允许。
+
+任务运行时，输出末尾显示实时区域：每个任务一行标题（状态、阶段、用时；ninja 的 `[n/N]` 作为真实进度条）和一个固定高度、宽度撑满的日志框。框内按可见宽度折行，可回看全部日志：滚轮按所在位置命中对应的框并移入焦点，方向键、翻页、Home/End 作用于焦点框，Tab 切换焦点，点击框也可聚焦；向上滚动后停止跟随，新输出不移动内容，End 或滚到底恢复跟随。实时区域期间开启鼠标上报，选中文字需按住 Shift（iTerm 为 Option）拖动。没有日志的等待（扫描、工程加载、读取版本）只显示一行临时状态，结束后不留痕。
+
+任务结束后从实时区域移除，摘要写进滚动历史：成功为一行与用时；失败附原因、日志末尾最多 200 行的静态框与完整日志路径；取消单独标注。完整日志写入工程 `.arrange/logs/<运行时间>/<任务>.log`（去掉颜色），保留最近 20 次运行；框内内存中保留最近 5 万行。
+
+SETUP 的 UI 安装与各 flavor configure、build 的 UI 与 native 构建、release dev 的 UI 与 Standalone 构建都并行执行。一个任务失败时其余照常跑完，最后一起报告失败并停止后续步骤；取消使全部任务停止。
+
+dev 的 UI 服务与 Standalone 各占一个常驻窗格，标题显示启动中、就绪或运行中，日志分开呈现。会话结束时写入各自的停止、退出或失败摘要与日志路径。
+
+### 输入与结束
+
+终端输入由唯一的控制台输入持有：第一次需要输入时进入原始模式，保持到命令结束前才恢复，期间不切换模式。Windows 上在读取过程中切回行模式会留下一个阻塞在 ReadConsole、等回车才返回的读取，之后的按键、滚轮和光标位置应答都会被它截住，进程退出时也会一直等它。clack 提问读取控制台输入提供的代理流（其原始模式开关不触碰真实终端）；任务会话期间输入交给会话解析；两者都不在时只响应 Ctrl+C。
+
+原始模式下 Ctrl+C 由 CLI 转为中断：取消全部任务并清理子进程树；连按三次强制退出，避免清理卡住时无法离开。入口结束时恢复输入模式，等输出写完后明确结束进程。
+
+### 重绘
+
+实时区域每帧以换行结束，光标停在区域下方的空行行首；重绘时上移区域所占行数并清除到屏幕底部。区域每行限制在列数减一以内，不触发终端自动折行；TTY 中换行写作回车加换行，不依赖终端驱动转换。缩窄窗口后按当前列数计算旧帧重排后的行数；光标所在行为空，因此无论终端是否重排光标行（Windows Terminal 会，xterm.js 不会）都能正确擦除。已知边界：缩窄后重排出的区域若高于整个屏幕，溢出部分已被终端推进滚动历史，无法擦除，会留下一段旧帧。
+
+符号是否使用 Unicode 沿用 clack 的判定：Windows Terminal、VS Code 等为 Unicode，其余终端用 ASCII 替代。
+
 ## 版本与工具链
 
-工程使用具体 Framework 版本，不使用 `latest`。sync、dev、build、package 均拒绝不兼容组合。兼容检查的来源选择和编排统一归 FrameworkService，registry 获取与兼容规则分别由底层组件负责。dev/build/package 优先读取本机 UI 已安装 Framework 的 `package.json`，核验确切版本与 `arrange.cliCompatibility`；版本完全匹配时无需在线 registry，缺失或版本不同时才查询 registry，JSON 损坏或匹配版本的兼容契约无效时明确失败。CONFIG/SETUP 及工程创建、接入时的版本选择仍查询 registry 元数据。依赖安装完成后另核验实际安装包，不能以远程候选通过检查代替安装结果。
+工程使用具体 Framework 版本，不使用 `latest`。sync、dev、build、pack 均拒绝不兼容组合。兼容检查的来源选择和编排统一归 FrameworkService，registry 获取与兼容规则分别由底层组件负责。sync（CONFIG 与 SETUP）、dev、build、pack 都优先读取本机 UI 已安装 Framework 的 `package.json`，核验确切版本与 `arrange.cliCompatibility`；版本完全匹配时无需在线 registry，缺失或版本不同时才查询 registry，JSON 损坏或匹配版本的兼容契约无效时明确失败。工程创建、接入时的版本选择仍查询 registry 元数据。依赖安装完成后另核验实际安装包，不能以远程候选通过检查代替安装结果。
+
+registry 没有给出答案（连接失败、超时）与 registry 明确给出否定答案是两类结果：前者无法判定兼容性，报告为 `framework-unverifiable`，信息带 registry 地址与真实原因（如 `ECONNREFUSED`）以及“本机没有可用于离线验证的已安装版本”；后者（版本不存在、契约不兼容）是确定的结论，仍报告为 `framework-incompatible`。因此网络不通时，已安装匹配版本的工程仍可以重试 sync。
+
+SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrange 原生源码：用 `git ls-remote --tags` 确认 git 可用、仓库可达、`v<Framework 版本>` tag 存在，不通过时作为 Fatal 报告，说明仓库地址、缺失的 tag 或失败原因，并指出可在本机配置的 `native.cmakeDefinitions` 里用 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 指向本地源码。仓库地址与 tag 由 CLI 托管（`cmake.fetch-content-repository` 与 `framework.version` 都启用）且未被该变量覆盖时才预检；构建树已就绪时不联网。仓库地址里的凭据不出现在报错中。
 
 项目版本保留完整 SemVer，包括 prerelease/build metadata；传入 JUCE 插件 `VERSION` 时使用其中的 `major.minor.patch` 数字部分，以满足 JUCE 的版本计算。交付目录和打包清单仍记录完整项目版本。
 
@@ -162,7 +200,13 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 原生构建尊重 `CMAKE_BUILD_PARALLEL_LEVEL`，由 CMake 解释其值；未设置时使用工具链默认并行构建。
 
-build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`，不隐式改写 local 配置。SETUP 才负责发现、交互确认、安装依赖和配置构建树。package 读取已存在的 CMake 模型，不重新探测或准备工具链；Mac 签名检查与修复仍使用系统 `codesign`。
+工具定位：Windows 上无扩展名的命令只按 `PATHEXT` 顺序解析，不选同目录下无扩展名的 sh 垫片（npm、pnpm 的安装目录里 `pnpm` 与 `pnpm.cmd` 并存，前者不能执行），并返回磁盘上的真实文件名；`.cmd`、`.bat` 由 Executor 经 `cmd` 执行。MSVC 验证实际运行 `cl.exe`，从横幅首行取版本号与目标架构记号；横幅随系统语言本地化（中文版是“用于 x64 的 … 编译器 19.50.35728 版”），所以解析只依赖与语言无关的数字版本和架构记号，不依赖其中的词，架构另与 Developer 环境的 `VSCMD_ARG_TGT_ARCH` 核对。
+
+构建树位置：macOS 位于工程内 `.arrange/build/mac-<arch>/<flavor>`。Windows 的 `cl`、`link`、`rc` 不声明长路径支持，即使系统已启用 `LongPathsEnabled`，完整路径超过 259 字符仍无法打开文件。因此 Windows 构建树不放在工程内，而放在 `%LOCALAPPDATA%\Arrange\b\<工程根小写路径哈希前 8 位>\<x|a><d|r>`（架构 x64 或 arm64，配置 debug 或 release），长度与工程位置无关。哈希目录内的 `owner.json` 记录所属工程根，被另一个工程占用时报错，不共用。本机配置的 `native.buildRoot` 可改用其它根目录。`artifacts/` 仍在工程内。
+
+configure 前预检构建目录长度，超限时给出明确错误与 `buildRoot` 指引，不让用户面对 `cl` 的晦涩报错。预算是构建树内最长相对路径（实测）加余量，按 JUCE 源码布局区分：FetchContent 把 JUCE 取到构建树内时对象路径形如 `…\arrange_juce.dir\__\__\__\juce-src\modules\…`，最长 173，预算 180，构建目录不超过 78 个字符，默认目录可容纳约 33 个字符的用户名；本机配置用外部 JUCE 源码（`JUCE_DIR`、`FETCHCONTENT_SOURCE_DIR_JUCE`）时，CMake 把源码绝对路径内嵌进对象路径，最长 193，预算 200，构建目录不超过 58 个字符。
+
+build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`，不隐式改写 local 配置。SETUP 才负责发现、交互确认、安装依赖和配置构建树。pack 读取已存在的 CMake 模型，不重新探测或准备工具链；Mac 签名检查与修复仍使用系统 `codesign`。
 
 ## 交付物布局与提交
 

@@ -15,7 +15,7 @@ import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
 import { FileTransaction } from "../src/util/FileTransaction.ts"
 import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
-import { fixture, TestSyncWizard } from "./fixture.ts"
+import { fixture, quietTerminal, TestSyncWizard } from "./fixture.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
@@ -72,7 +72,7 @@ test("正式入口包括 help/version 都拒绝非 TTY，且不读取工程或�
 
 test("程序化装配显式接受交互策略，不自启动或注册全局信号监听器", async () => {
     const listeners = [process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")]
-    const cli = createCliApplication({ signal: new AbortController().signal, interactions: interactions() })
+    const cli = createCliApplication({ signal: new AbortController().signal, interactions: interactions(), terminal: quietTerminal() })
     assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], listeners)
     let output = ""
     cli.configureOutput({ writeOut: value => { output += value } }).exitOverride()
@@ -101,7 +101,7 @@ test("registry 请求期间取消 CONFIG，不报告完成或发布文件", asyn
     await new ProjectStateStore(new FileTransaction()).save(state)
     const before = await readFile(cmakeListsFile.path(state), "utf8")
     const config = new TestSyncWizard()
-    const cli = createCliApplication({ signal: controller.signal, interactions: interactions(config) }).exitOverride()
+    const cli = createCliApplication({ signal: controller.signal, interactions: interactions(config), terminal: quietTerminal() }).exitOverride()
     const cwd = process.cwd()
     process.chdir(state.rootDir)
     try {

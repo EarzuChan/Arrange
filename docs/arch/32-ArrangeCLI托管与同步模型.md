@@ -95,7 +95,11 @@ CMake/.npmrc 的标记独占一行，身份为 `cluster:<id>` 或 `region:<id>`�
 # arrange:end region:<id>
 ```
 
-Marker 写作 `# arrange:insert region:<id>`，Cluster 同理。生成使用 LF，非空正文以换行结束；定位支持 LF/CRLF，正文仍逐字符比较。
+Marker 写作 `# arrange:insert region:<id>`，Cluster 同理。非空正文以换行结束。
+
+换行规则：CLI 内部的生成文本和期望值一律是 LF 逻辑文本；新建文件使用 LF。写入已有文件时遵循该文件自己的换行风格（CRLF 多于孤立 LF 视为 CRLF，否则为 LF）：区块正文、Marker 新建内容和 JSON 补入字段都先转为该风格再拼入，JSON 另保留检测到的缩进。Wrapper 的定位同时支持 LF 与 CRLF；正文比较前先归一化换行，除此之外逐字符比较，所以仅换行风格不同不算过期。混合换行的文件只让新写入部分跟随主导风格，不改动其它行。
+
+全新工程（UI 与 native 都新建）创建时生成 `* text=auto eol=lf` 的 `.gitattributes`，已存在则不改；接入已有工程不生成，已有仓库的换行规则不由 CLI 决定。
 
 没有 Wrapper 就是 `missing`，即使旁边似乎已有相应内容也不分析。文本 CONFIG 不识别 CMake、npmrc 等正文结构，不产生 `unwrapped-existing`、智能内容候选或 `extraneous`，也不从恢复内容反推 YAML 配置。
 
@@ -217,7 +221,8 @@ SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原�
 
 | 检查项 | 当前事实 | 分类与处理 |
 |---|---|---|
-| 共享/local YAML、Framework 兼容契约 | 无法解析、版本或 CLI 契约不兼容 | Fatal，停止本次准备 |
+| 共享/local YAML、Framework 兼容契约 | 无法解析、版本或 CLI 契约不兼容；或 registry 连不上且本机没有可用于离线验证的已安装版本 | Fatal，停止本次准备（后者的判定与信息见[版本与工具链](31-ArrangeCLI与工程模式.md#版本与工具链)） |
+| Arrange 原生源码 | 需要配置构建树时，git 缺失、仓库不可达或缺少 `v<Framework 版本>` tag | Fatal，在安装 UI 依赖之前报告；已用 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 覆盖或地址与版本不由 CLI 托管时不检查 |
 | UI manifest、dev/build 脚本、Framework 精确依赖、产物路径 | 缺失、损坏或与工程配置不符 | Fatal，用户先整理 UI 工程或运行 CONFIG |
 | Node、包管理器、CMake、Ninja、Xcode/MSVC 环境 | 工具缺失、不能执行、版本/架构不满足需求 | Resolvable，用户安装工具或修正 local YAML，继续后重载并重扫 |
 | 本机工具 | 探测验证通过，但本机路径或版本尚未保存 | Resolvable，展示并确认后写 local YAML，随后重载并重扫 |
@@ -227,7 +232,7 @@ SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原�
 
 SETUP SCAN 可以执行只读的工具查询，例如 `--version`、Xcode 查找和 Visual Studio 环境查询；不安装、不 configure、不保存 local YAML。工具缺失时阻断依赖它的 native 检查，UI 结构检查仍可独立报告。范围仅为 UI 时不要求原生工具，范围仅为 native 时不要求 Node 或包管理器。
 
-RESOLVE 先拒绝全报告中的 Fatal；无 Fatal 时一次处理一个 Resolvable，任何确认写入或用户修改后重新加载整个所选范围。APPLY 前核对 YAML 快照，依次安装 UI、configure debug/release；失败即停止并保留已完成的本机准备。正常完成不追加扫描循环。正式入口的终端限制见 [CLI 入口](31-ArrangeCLI与工程模式.md#正式入口与自动化)；业务服务通过注入的交互接口处理确认与修正，不自行判断 TTY。
+RESOLVE 先拒绝全报告中的 Fatal；无 Fatal 时一次处理一个 Resolvable，任何确认写入或用户修改后重新加载整个所选范围。APPLY 前核对 YAML 快照，并行执行 UI 安装与各 flavor 的 configure；任一失败时其余跑完后一起报告失败，保留已完成的本机准备。全部结束后再次核对快照，执行期间工程或本机配置被改动则不宣告完成。正常完成不追加扫描循环。正式入口的终端限制见 [CLI 入口](31-ArrangeCLI与工程模式.md#正式入口与自动化)；业务服务通过注入的交互接口处理确认与修正，不自行判断 TTY。
 
 UI 准备记录关联 package.json、npmrc 和所选包管理器的 lockfile，安装前使旧记录失效，成功验证后记录新输入。它只描述依赖准备，不证明源码已构建。原生准备记录关联 native 配置、原生工具、CMake 输入和查询模型；UI 工具的变化不使 native 准备失效。工程移动、生成器/编译器变更或 CMake 输入变更后需重新准备；互不兼容的缓存仅在 CLI 拥有的对应构建目录内重建。
 

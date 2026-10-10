@@ -130,6 +130,7 @@ test('真实 Vite restart 后资源重载只保留当前服务监听', { timeout
     await value.server.restart()
     assert.notEqual(value.server.watcher, previousWatcher)
     assert.equal(previousWatcher.listenerCount('change'), 0)
+    await Promise.race([new Promise<void>(resolve => value.server.watcher.once('ready', () => resolve())), delay(2000)])
     value.sockets.push(await connect(value.server, value.messages))
     const from = value.messages.length
     await writeFile(join(value.assets, 'play.svg'), value.svg + '\n')

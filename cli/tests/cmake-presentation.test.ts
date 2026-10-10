@@ -54,7 +54,7 @@ ${jucePluginCluster.make(state)}
 `)
         const result = await executor.run({ command: cmake, args: ["-S", directory, "-B", join(directory, "build")] })
         assert.equal(result.exitCode, 0, result.stderr)
-        assert.equal(await readFile(resultFile, "utf8"), `控制 台 $value\n控制 台 $value\n${apple ? "com.example.product" : "com.arrange.test.TestPlugin"}\n`)
+        assert.equal((await readFile(resultFile, "utf8")).replaceAll("\r\n", "\n"), `控制 台 $value\n控制 台 $value\n${apple ? "com.example.product" : "com.arrange.test.TestPlugin"}\n`)
     }
 })
 

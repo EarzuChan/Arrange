@@ -6,8 +6,12 @@ export interface ProcessSpec {
     readonly signal?: AbortSignal
     readonly timeoutMs?: number
     readonly stdio?: "capture" | "inherit"
-    readonly onStdout?: (text: string) => void
-    readonly onStderr?: (text: string) => void
+    // 捕获模式下收到的原始字节；解码由调用方负责（原生工具可能不是 UTF-8）
+    readonly onOutput?: (chunk: Buffer, stream: "stdout" | "stderr") => void
+    // 两条输出流都已关闭
+    readonly onOutputEnd?: () => void
+    // 为 false 时不在结果里累积 stdout/stderr，供长时间、大量输出的任务使用
+    readonly retainOutput?: boolean
     readonly windowsVerbatimArguments?: boolean
 }
 

@@ -8,8 +8,9 @@ import { SourceMapConsumer, SourceMapGenerator, type RawSourceMap } from 'source
 import { normalizeSfaUnitSyntax } from '../core/unitSyntax.ts'
 import { modifierArgumentUnits, unitFieldContracts, type UnitFields, type ValueUnit } from '@arrange/shared'
 import { createSfaValueContracts } from './valueContracts.ts'
+import { sfaTypeResolutionOptions } from './typeResolutionOptions.ts'
 
-const compilerOptions: ts.CompilerOptions = { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, allowImportingTsExtensions: true, noLib: true, skipLibCheck: true }
+const compilerOptions: ts.CompilerOptions = { ...sfaTypeResolutionOptions(ts), noLib: true, skipLibCheck: true }
 
 // 根据真实声明身份识别值壳，局部同名函数和参数遮蔽不会被改写
 export function lowerSfaValues(content: string, filename: string, previousMap?: RawSourceMap): { content: string; map?: RawSourceMap; deps: string[] } {

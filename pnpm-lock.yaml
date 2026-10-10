@@ -41,6 +41,9 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      fast-string-width:
+        specifier: 3.0.2
+        version: 3.0.2
       pngjs:
         specifier: 7.0.0
         version: 7.0.0
@@ -60,6 +63,9 @@ importers:
       '@types/pngjs':
         specifier: ^6.0.5
         version: 6.0.5
+      '@xterm/headless':
+        specifier: 5.5.0
+        version: 5.5.0
       tsx:
         specifier: 4.22.3
         version: 4.22.3
@@ -590,6 +596,9 @@ packages:
   '@types/pngjs@6.0.5':
     resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
 
+  '@xterm/headless@5.5.0':
+    resolution: {integrity: sha512-5xXB7kdQlFBP82ViMJTwwEc3gKCLGKR/eoxQm4zge7GPBl86tCdI0IdPJjoKd8mUSFXz5V7i/25sfsEkP4j46g==}
+
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
     engines: {node: '>= 14.16.0'}
@@ -1100,6 +1109,8 @@ snapshots:
   '@types/pngjs@6.0.5':
     dependencies:
       '@types/node': 24.12.4
+
+  '@xterm/headless@5.5.0': {}
 
   chokidar@4.0.3:
     dependencies:

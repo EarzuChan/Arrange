@@ -31,5 +31,3 @@ export interface ConfigScanReport {
     readonly idle: IdleResult[]
     readonly applicable: ApplicableUpdate[]
 }
-
-export function targetLabel(target: ConfigTarget): string { return `${target.path}${target.region ? ` / ${target.region.id}` : target.cluster ? ` / ${target.cluster.id}` : ""}` }

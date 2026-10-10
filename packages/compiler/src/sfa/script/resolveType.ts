@@ -7,6 +7,7 @@ import * as process from 'process'
 import type TS from 'typescript'
 import TypeScript from 'typescript'
 import { createCache } from '../cache.ts'
+import { withSfaTypeResolution } from '../typeResolutionOptions.ts'
 import type { ImportBinding, SFAScriptCompileOptions } from '../compileScript.ts'
 import { parse } from '../parse.ts'
 import { type ScriptCompileContext, resolveParserPlugins } from './context.ts'
@@ -759,8 +760,16 @@ function importSourceToScope(ctx: TypeResolveContext, node: Node, scope: TypeSco
         }
         return fileToScope(ctx, resolved)
     } else {
-        return ctx.error(`Failed to resolve import source ${JSON.stringify(source)}.`, node, scope)
+        return ctx.error(describeUnresolvedImport(source, scope.filename, fs), node, scope)
     }
+}
+
+// 解析失败时说明实际采用的规则，避免只给一句“找不到”让用户无从下手
+function describeUnresolvedImport(source: string, containingFile: string, fs: FS): string {
+    const head = `无法解析类型导入 ${JSON.stringify(source)}（位于 ${containingFile}）。`
+    if (source[0] === '.') return `${head}请确认相对路径与扩展名正确，目标文件存在。`
+    const config = ts?.findConfigFile(containingFile, fs.fileExists)
+    return `${head}SFA 按 Bundler 模块解析规则查找（遵循包的 exports，不随 tsconfig 的 moduleResolution 变化），tsconfig.json ${config ? `使用 ${config}` : '未找到，使用内置默认值'}。请确认依赖已安装到 node_modules，且该包通过 exports 或 types 提供了这个子路径。`
 }
 
 function resolveExt(filename: string, fs: FS) {
@@ -833,10 +842,10 @@ function resolveWithTS(containingFile: string, source: string, ts: typeof TS, fs
                 matchedConfig = configs[configs.length - 1]
             }
         }
-        tsCompilerOptions = matchedConfig.config.options
+        tsCompilerOptions = withSfaTypeResolution(ts, matchedConfig.config.options)
         tsResolveCache = matchedConfig.cache || (matchedConfig.cache = ts.createModuleResolutionCache(process.cwd(), createGetCanonicalFileName(ts.sys.useCaseSensitiveFileNames), tsCompilerOptions))
     } else {
-        tsCompilerOptions = {}
+        tsCompilerOptions = withSfaTypeResolution(ts)
     }
 
     const res = ts.resolveModuleName(source, containingFile, tsCompilerOptions, fs, tsResolveCache)

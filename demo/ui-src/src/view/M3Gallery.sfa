@@ -2,6 +2,7 @@
     <Column :modifier="M.width(460.dp).padding(16.dp).background(Color(0xff172331))" :vertical-arrangement="Arrangement.spacedBy(10.dp)">
         <Text text="高级 UI 实验室" :style="{ fontSize: 21.sp, color: Color(0xffedf4fa) }" />
         <Text text="点按钮、变换图形、编辑文本，再滚动长列表" :style="hintStyle" />
+
         <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
             <GalleryButton a-for="name in pages" :key="name" :text="name" :active="page === name" :on-click="() => page = name" />
         </Row>
@@ -12,41 +13,52 @@
                 <GalleryButton text="改宽度" :on-click="() => wide = !wide" />
                 <GalleryButton text="内容次数" :on-click="() => copies = (copies + 1) % 3" />
             </Row>
+
             <Box :modifier="M.size(drawingWidth.dp, 94.dp).then(gridDrawing).then(contentDrawing)">
                 <Text text="内容" :style="{ fontSize: 20.sp, color: Color(0xffedf4fa) }" :modifier="M.padding(14.dp).then(behindDrawing)" />
             </Box>
+
             <Text :text="`内容绘制 ${copies} 次；换色与宽度立即更新网格。`" :style="hintStyle" />
+
             <Row :horizontal-arrangement="Arrangement.spacedBy(5.dp)">
                 <GalleryButton text="旋转" :on-click="() => rotation = (rotation + 30) % 360" />
                 <GalleryButton text="镜像" :on-click="() => mirror = !mirror" />
                 <GalleryButton text="交换层级" :on-click="() => front = !front" />
             </Row>
+
             <Row :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
                 <Box :modifier="M.size(116.dp, 100.dp)">
                     <Text text="点我" :style="{ fontSize: 12.sp, color: Color(0xff142631) }" :modifier="M.size(76.dp, 58.dp).graphicsLayer({ rotationZ: rotation, scaleX: mirror ? -1 : 1 }).clip(CircleShape).background(Color(0xff61d6bb)).padding(18.dp).clickable(() => status = '命中了变换后的椭圆')" />
-                </Box>
+                </Box> // 变幻后椭圆的HitBox或有点问题？需要确认
+
                 <Box :modifier="M.size(150.dp, 100.dp)">
                     <Box :modifier="M.size(86.dp, 64.dp).background(Color(0xffef9a74)).zIndex(front ? 2 : -1).clickable(() => status = '点中了橙色块')" />
                     <Box :modifier="M.size(86.dp, 64.dp).offset({ x: 28.dp, y: 20.dp }).background(Color(0xff79a8ea)).zIndex(front ? -1 : 2).clickable(() => status = '点中了蓝色块')" />
                 </Box>
             </Row>
+
             <Text text="旋转后点击椭圆；在两块的重叠处点击，上层颜色接收点击。" :style="hintStyle" />
         </Column>
 
         <Column a-if="page === '布局'" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
             <GalleryButton text="收窄 / 展宽" :on-click="() => narrow = !narrow" />
+
             <FlowRow :modifier="M.width(flowWidth.dp).background(Color(0xff203344)).padding(6.dp)" :horizontal-arrangement="Arrangement.spacedBy(6.dp)" :vertical-arrangement="Arrangement.spacedBy(6.dp)">
                 <Text a-for="label in tags" :key="label" :text="label" :style="{ fontSize: 12.sp, color: Color(0xffd7e6ef) }" :modifier="M.padding({ horizontal: 10.dp, vertical: 6.dp }).background(Color(0xff3b5568), rounded(6.dp))" />
             </FlowRow>
+
             <Text text="标签按可用宽度换行；下面的列布局按高度换列。" :style="hintStyle" />
+
             <FlowColumn :modifier="M.height(80.dp)" :vertical-arrangement="Arrangement.spacedBy(5.dp)" :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
                 <Text a-for="label in tags" :key="label" :text="label" :style="{ fontSize: 11.sp, color: Color(0xffbfd4e4) }" :modifier="M.padding(5.dp).background(Color(0xff293e52))" />
             </FlowColumn>
+
             <Row :modifier="M.height(IntrinsicSize.Min).background(Color(0xff223647))" :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
                 <Text text="短列" :style="bodyStyle" :modifier="M.padding(8.dp)" />
                 <Spacer :modifier="M.width(2.dp).fillMaxHeight().background(Color(0xff61d6bb))" />
                 <Text :text="'这列有两行\n分隔线跟随内容高度'" :style="bodyStyle" :modifier="M.padding(8.dp)" />
             </Row>
+
             <Box :modifier="M.width(280.dp)">
                 <Spacer :modifier="M.matchParentSize().border(1.dp, Color(0xff61d6bb))" />
                 <Text text="边框匹配父尺寸，内容决定高度" :style="bodyStyle" :modifier="M.padding(12.dp)" />
@@ -59,8 +71,11 @@
                 <GalleryButton text="下一个" :on-click="() => focusManager.moveFocus('next')" />
                 <GalleryButton text="清除焦点" :on-click="() => focusManager.clearFocus()" />
             </Row>
+
             <Input value="双击选词，三击选行" :single-line="true" :onSubmit="value => status = `提交：${value}`" :text-style="bodyStyle" :modifier="M.fillMaxWidth().height(32.dp).background(Color(0xff26394c)).padding(6.dp).focusRequester(firstFocus).focusProperties({ next: secondFocus }).onFocusChanged(state => status = state.isFocused ? '第一框获得焦点' : '第一框离开焦点')" />
+
             <Input :value="'中文输入与换行\n拖动选区，试试 Shift + 方向键'" :single-line="false" :min-lines="3" :max-lines="5" :text-style="bodyStyle" :modifier="M.fillMaxWidth().height(96.dp).background(Color(0xff26394c)).padding(6.dp).focusRequester(secondFocus).focusProperties({ previous: firstFocus }).onFocusChanged(state => status = state.isFocused ? '第二框获得焦点' : '第二框离开焦点')" />
+
             <Text text="Tab / Shift+Tab 切换焦点；框内支持选择、复制、粘贴、中文组合输入。" :style="hintStyle" />
         </Column>
 
@@ -68,19 +83,26 @@
             <Row :horizontal-arrangement="Arrangement.spacedBy(4.dp)">
                 <GalleryButton a-for="name in lazyModes" :key="name" :text="name" :active="lazyMode === name" :on-click="() => lazyMode = name" />
             </Row>
+
             <Row :horizontal-arrangement="Arrangement.spacedBy(4.dp)">
                 <GalleryButton text="到第 500 项" :on-click="() => activeState.scrollToItem(499)" />
                 <GalleryButton text="平滑回顶部" :on-click="() => activeState.animateScrollToItem(0)" />
                 <GalleryButton text="重排" :on-click="() => items.reverse()" />
                 <GalleryButton text="删除选中" :on-click="removeSelected" />
             </Row>
+
             <LazyColumn a-if="lazyMode === '纵列'" :items="items" :item-key="itemKey" :item-content="M3LazyItem" :item-props="itemProps" :content-type="contentType" :state="columnState" :modifier="lazyViewport" :vertical-arrangement="Arrangement.spacedBy(6.dp)" :content-padding="listPadding" />
+
             <LazyRow a-if="lazyMode === '横列'" :items="items" :item-key="itemKey" :item-content="M3LazyItem" :item-props="itemProps" :content-type="contentType" :state="rowState" :modifier="lazyViewport" :horizontal-arrangement="Arrangement.spacedBy(6.dp)" :content-padding="listPadding" />
+
             <LazyVerticalGrid a-if="lazyMode === '纵网格'" :items="items" :item-key="itemKey" :item-content="M3LazyItem" :item-props="itemProps" :content-type="contentType" :span="itemSpan" :cells="GridCells.Fixed(2)" :state="verticalGridState" :modifier="lazyViewport" :vertical-arrangement="Arrangement.spacedBy(6.dp)" :horizontal-arrangement="Arrangement.spacedBy(6.dp)" :content-padding="listPadding" />
             <LazyHorizontalGrid a-if="lazyMode === '横网格'" :items="items" :item-key="itemKey" :item-content="M3LazyItem" :item-props="itemProps" :content-type="contentType" :span="itemSpan" :cells="GridCells.Fixed(2)" :state="horizontalGridState" :modifier="lazyViewport" :vertical-arrangement="Arrangement.spacedBy(6.dp)" :horizontal-arrangement="Arrangement.spacedBy(6.dp)" :content-padding="listPadding" />
+
             <Text :text="`共 ${items.length} 项 · 首项 ${activeState.firstVisibleItemIndex + 1} · 选中 ${selected}`" :style="hintStyle" />
+
             <Text text="滚轮或触控板滚动；可编辑每项，重排保留文本，分组占满网格一行。" :style="hintStyle" />
         </Column>
+        
         <Text :text="status" :style="{ fontSize: 11.sp, color: Color(0xff61d6bb) }" />
     </Column>
 </template>

@@ -18,6 +18,13 @@
 #include <stdexcept>
 #include <vector>
 
+#if JUCE_WINDOWS
+#include <windows.h>
+// windows.h 残留的 16 位时代指针宏会吞掉下文的 near
+#undef near
+#undef far
+#endif
+
 using namespace arrange::core;
 
 namespace {
@@ -508,30 +515,43 @@ n.insertChild(1, 2, 0)
         };
 
 #if JUCE_MAC
-        constexpr float preciseScale = 512;
+        // 没有匹配的原生事件时走回退路径：精细 JUCE 单位按 512 还原逻辑点，离散滚轮每单位 48
+        const float deltaPerPixel = 1.0f / 512.0f;
+        const float mouseStep = 1.0f;
+        const float mouseDistance = 48.0f;
 #else
-        constexpr float preciseScale = 48;
+        // Windows：JUCE 把原始滚轮值除以 512；读取层还原格数，乘系统“每格行数”和框架行距。
+        // 一格对应原始值 120。滚轮被设为禁用或整页滚动时，行距换算不适用，明确跳过而不是静默通过
+        UINT wheelLines = 3;
+        SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &wheelLines, 0);
+        if (wheelLines == 0 || wheelLines == WHEEL_PAGESCROLL) {
+            std::cerr << "跳过 Windows 滚轮换算断言：系统滚轮设置为禁用或整页滚动\n";
+            return;
+        }
+        const float mouseDistance = arrange::juce::scrollLineDistance * static_cast<float>(wheelLines);
+        const float deltaPerPixel = static_cast<float>(WHEEL_DELTA) / (512.0f * mouseDistance);
+        const float mouseStep = static_cast<float>(WHEEL_DELTA) / 512.0f;
 #endif
         ::juce::MouseWheelDetails precise{};
-        precise.deltaX = 0.03125f / preciseScale;
-        precise.deltaY = -0.125f / preciseScale;
+        precise.deltaX = 0.03125f * deltaPerPixel;
+        precise.deltaY = -0.125f * deltaPerPixel;
         precise.isSmooth = true;
         precise.isReversed = true;
         deliver({precise, precise}, 0.25f);
         precise.deltaX = 0;
         precise.isInertial = true;
         deliver({precise}, 0.375f);
-        precise.deltaX = 1 / preciseScale;
-        precise.deltaY = -213 / preciseScale;
+        precise.deltaX = 1 * deltaPerPixel;
+        precise.deltaY = -213 * deltaPerPixel;
         precise.isInertial = false;
         deliver({precise}, 213.375f);
         ::juce::MouseWheelDetails mouse{};
-        mouse.deltaY = -1;
-        deliver({mouse}, 261.375f);
-        mouse.deltaY = 1;
+        mouse.deltaY = -mouseStep;
+        deliver({mouse}, 213.375f + mouseDistance);
+        mouse.deltaY = mouseStep;
         deliver({mouse}, 213.375f);
         mouse.isReversed = true;
-        deliver({mouse}, 165.375f);
+        deliver({mouse}, 213.375f - mouseDistance);
         ::juce::MouseWheelDetails zero{};
         zero.isSmooth = true;
         zero.isInertial = true;

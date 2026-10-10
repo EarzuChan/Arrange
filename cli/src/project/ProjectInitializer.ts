@@ -56,6 +56,7 @@ interface InitializationJournal {
 }
 
 const excludedCopyNames = new Set([".git", localWorkDirectory, "node_modules", projectFileNames.local])
+const newProjectGitAttributes = "* text=auto eol=lf\n"
 
 export class ProjectInitializer {
     constructor(private readonly writer: FileTransaction, private readonly defaultSignal?: AbortSignal) { }
@@ -147,6 +148,12 @@ export class ProjectInitializer {
         if (missingPatterns.length) {
             const newline = original.includes("\r\n") ? "\r\n" : "\n"
             files.push({ before: gitignore, after: original + (original && !original.endsWith("\n") ? newline : "") + missingPatterns.join(newline) + newline })
+        }
+
+        // 全新工程（UI 与 native 都新建）才生成 .gitattributes，让仓库规范形态与工作区一致使用 LF；已有仓库的换行规则不由 CLI 决定
+        if (request.ui.kind === "new" && request.native.kind === "new") {
+            const attributes = await readSnapshot(resolve(state.rootDir, ".gitattributes"))
+            if (attributes.content === null) files.push({ before: attributes, after: newProjectGitAttributes })
         }
 
         files.push({ before: guards[0], after: stringify(state.project) })

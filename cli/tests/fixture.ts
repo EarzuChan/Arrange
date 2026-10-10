@@ -9,6 +9,57 @@ import { configRegistry } from "../src/config/ConfigRegistry.ts"
 import type { ResolveChoice } from "../src/sync/ConfigResolver.ts"
 import type { ConfigInteraction } from "../src/sync/ConfigInteraction.ts"
 import type { ConfigScanReport, ResolvableIssue } from "../src/sync/ConfigScanReport.ts"
+import { Writable } from "node:stream"
+import { createTerminal, type CliTerminal } from "../src/ui/Terminal.ts"
+import type { TaskOutput } from "../src/ui/Tasks.ts"
+import { LineDecoder } from "../src/ui/LineDecoder.ts"
+
+// 非 TTY 的输出汇：测试里收集界面输出，不写到真实终端
+export class OutputSink extends Writable {
+    text = ""
+    override _write(chunk: Buffer | string, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
+        this.text += chunk.toString()
+        callback()
+    }
+}
+
+export function quietTerminal(): CliTerminal & { readonly output: OutputSink } {
+    const output = new OutputSink()
+    return { ...createTerminal({ out: output, err: output }), output }
+}
+
+export interface RecordedTask extends TaskOutput {
+    readonly lines: string[]
+    readonly stages: (string | undefined)[]
+    readonly progresses: [number, number][]
+}
+
+// 记录型任务输出：子进程输出按真实规则逐行解码后收集，供断言
+export function testTask(title = "test"): RecordedTask {
+    const task: RecordedTask = {
+        title,
+        lines: [],
+        stages: [],
+        progresses: [],
+        line(text) { task.lines.push(text) },
+        stage(text) { task.stages.push(text) },
+        progress(done, total) { task.progresses.push([done, total]) },
+        process(spec, parser) {
+            const sink = (line: string): void => {
+                task.line(line)
+                parser?.(line, task)
+            }
+            const decoders = { stdout: new LineDecoder(sink), stderr: new LineDecoder(sink) }
+            return {
+                ...spec, stdio: "capture", retainOutput: false, onOutput: (chunk, stream) => decoders[stream].push(chunk), onOutputEnd: () => {
+                    decoders.stdout.flush()
+                    decoders.stderr.flush()
+                }
+            }
+        },
+    }
+    return task
+}
 
 export function stateFor(rootDir: string): ProjectState {
     return { rootDir, project: { project: { name: "TestPlugin", version: "1.0.0", vendorName: "Test Vendor", vendorCode: "Test", pluginCode: "TstP", products: ["standalone", "vst3"] }, framework: { version: "0.0.0-m.2.2" }, ui: { directory: "ui", packageManager: "npm" }, native: { directory: "native", target: "TestPlugin", pluginType: "effect" }, artifacts: { directory: "artifacts", includeVersionDirectory: true }, "managed-items": configRegistry.items.map(item => item.id) }, local: null }

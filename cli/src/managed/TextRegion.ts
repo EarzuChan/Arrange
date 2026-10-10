@@ -1,4 +1,5 @@
 import { errorMessage } from "../util/Utils.ts"
+import { normalizeLineEndings } from "../util/LineEnding.ts"
 import { isManagedItem, type ProjectState } from "../project/ProjectState.ts"
 import { type CheckResult, type Located } from "./CheckResult.ts"
 import { Wrapper, type WrappedLocation } from "./Wrapper.ts"
@@ -26,6 +27,7 @@ export abstract class TextRegion {
         const location = this.locate(state, clusterInnerText)
         if (location.kind !== "located") return { kind: "Resolvable", cause: location.kind, message: location.kind === "missing" ? `缺少 ${this.id} Wrapper` : location.message, expected }
         const actual = clusterInnerText.slice(location.inner.start, location.inner.end)
-        return actual === expected ? { kind: "Idle", actual, expected, location } : { kind: "Applicable", cause: "outdated", actual, expected, location }
+        // 期望值是 LF 逻辑文本；文件为 CRLF 时仅换行风格不同不算过期
+        return normalizeLineEndings(actual) === expected ? { kind: "Idle", actual, expected, location } : { kind: "Applicable", cause: "outdated", actual, expected, location }
     }
 }

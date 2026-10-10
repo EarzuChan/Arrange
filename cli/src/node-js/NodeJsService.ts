@@ -6,6 +6,7 @@ import { uiDirectory, safeUiOutputDirectory, workDirectory } from "../project/Pr
 import { Executor } from "../platform/Executor.ts"
 import { throwIfProcessCancelled, type ProcessSpec } from "../platform/ProcessSpec.ts"
 import { readJsonFile, writeJsonFile } from "../util/JsonFile.ts"
+import type { TaskOutput } from "../ui/Tasks.ts"
 import { hashText, isJsonObject } from "../util/Utils.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 
@@ -22,7 +23,10 @@ export class NodeJsService {
         const local = state.local
         if (!local?.node || !local.packageManager) throw new Error("Node 或包管理器尚未准备，请运行 arrange sync --setup")
         const path = [dirname(local.node.path), dirname(local.packageManager.path), process.env.PATH ?? ""].join(delimiter)
-        return { command: local.packageManager.path, args, cwd: uiDirectory(state), env: { PATH: path, npm_config_update_notifier: "false" } }
+        // 输出经管道捕获、没有终端：pnpm 需要清理 node_modules 时默认要求终端确认，这里明确允许
+        const env: Record<string, string> = { PATH: path, npm_config_update_notifier: "false" }
+        if (state.project.ui.packageManager === "pnpm") env.npm_config_confirm_modules_purge = "false"
+        return { command: local.packageManager.path, args, cwd: uiDirectory(state), env }
     }
 
     async inspect(state: ProjectState): Promise<UiPreparation> {
@@ -48,13 +52,13 @@ export class NodeJsService {
         }
     }
 
-    async install(state: ProjectState): Promise<void> {
+    async install(state: ProjectState, task: TaskOutput): Promise<void> {
         const manifest = await readJsonFile(join(uiDirectory(state), "package.json"))
         if (!isJsonObject(manifest) || !isJsonObject(manifest.scripts) || typeof manifest.scripts.dev !== "string" || typeof manifest.scripts.build !== "string") throw new Error("UI package.json 需要 dev 和 build 脚本，请先整理 UI 工程")
         await safeUiOutputDirectory(state)
         await assertPlainDirectoryPath(state.rootDir, workDirectory(state))
         await rm(join(workDirectory(state), uiPreparationFileName), { force: true })
-        const result = await this.executor.run({ ...this.packageManagerSpec(state, ["install"]), stdio: "inherit" })
+        const result = await this.executor.run(task.process(this.packageManagerSpec(state, ["install"])))
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 依赖安装失败，退出码 ${result.exitCode}`)
         const installed = await readJsonFile(join(uiDirectory(state), "node_modules", frameworkPackageName, "package.json"))
@@ -62,12 +66,12 @@ export class NodeJsService {
         await writeJsonFile(join(workDirectory(state), uiPreparationFileName), { inputHash: await this.installInputHash(state), frameworkVersion: installed.version, packageManager: state.project.ui.packageManager })
     }
 
-    async build(state: ProjectState, clean = false): Promise<string> {
+    async build(state: ProjectState, task: TaskOutput, clean = false): Promise<string> {
         const prepared = await this.inspect(state)
         if (!prepared.ready) throw new Error(`${prepared.reason}；请运行 arrange sync --setup --ui`)
         const output = await safeUiOutputDirectory(state)
         if (clean) await rm(output, { recursive: true, force: true })
-        const result = await this.executor.run({ ...this.packageManagerSpec(state, ["run", "build"]), stdio: "inherit" })
+        const result = await this.executor.run(task.process(this.packageManagerSpec(state, ["run", "build"])))
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 构建失败，退出码 ${result.exitCode}`)
         if (!(await stat(join(output, "app.js"))).isFile()) throw new Error(`UI 构建未生成 ${join(output, "app.js")}，请核对 outputDirectory 和 Vite 配置`)

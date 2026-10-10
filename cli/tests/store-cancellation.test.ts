@@ -35,7 +35,8 @@ test("saveLocal 准备好临时内容后取消不提交本机配置，保留失�
             assert.ok(error instanceof Error)
             assert.equal(error.name, "AbortError")
             assert.equal(error.cause, controller.signal.reason)
-            assert.match(error.message, /写入已取消.*\.arrange\/transactions/)
+            assert.ok(error.message.startsWith("写入已取消"))
+            assert.ok(error.message.includes(resolve(root, ".arrange", "transactions")))
             return true
         })
         assert.equal(await readFile(projectPath, "utf8"), originalProject)

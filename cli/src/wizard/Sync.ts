@@ -1,31 +1,31 @@
-import { confirm, isCancel, log, select } from "@clack/prompts"
-import { targetLabel, type ConfigScanReport, type ResolvableIssue } from "../sync/ConfigScanReport.ts"
+import { confirm, isCancel, select } from "@clack/prompts"
+import type { ConfigScanReport, ResolvableIssue } from "../sync/ConfigScanReport.ts"
 import type { ResolveChoice } from "../sync/ConfigResolver.ts"
 import type { ConfigInteraction } from "../sync/ConfigInteraction.ts"
+import type { CliTerminal } from "../ui/Terminal.ts"
+import { configTargetLabel, renderConfigReport, type ScanReportOptions } from "./ScanReports.ts"
 
 const labels: Record<ResolveChoice, string> = { create: "确认创建", wrap: "给已有内容补 Wrapper", marker: "放置 Marker，新建内容", edit: "手动编辑修复", abort: "放弃同步" }
 
 export class SyncWizard implements ConfigInteraction {
-    report(report: ConfigScanReport): void {
-        console.log('[ArrangeCLI]', `CONFIG ${report.scope}`)
-        for (const issue of report.fatal) console.log('[ArrangeCLI]', `  Fatal ${issue.path}: ${issue.cause} — ${issue.message}`)
-        for (const issue of report.resolvable) console.log('[ArrangeCLI]', `  Resolvable ${targetLabel(issue.target)}: ${issue.cause} — ${issue.message}`)
-        for (const result of report.idle) console.log('[ArrangeCLI]', `  Idle ${targetLabel(result.target)}`)
-        for (const update of report.applicable) console.log('[ArrangeCLI]', `  Applicable ${targetLabel(update.target)}: outdated`)
-        console.log('[ArrangeCLI]', `  Fatal ${report.fatal.length}, Resolvable ${report.resolvable.length}, Idle ${report.idle.length}, Applicable ${report.applicable.length}`)
+    constructor(private readonly output: CliTerminal) { }
+
+    report(report: ConfigScanReport, options?: ScanReportOptions): void {
+        const rendered = renderConfigReport(report, this.output.screen.palette, options)
+        this.output.reporter.toned(rendered.tone, rendered.lines)
     }
 
     async choose(issue: ResolvableIssue, choices: readonly ResolveChoice[]): Promise<ResolveChoice> {
-        const result = await select({ message: `${targetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({ value, label: labels[value] })) })
+        const result = await select({ ...this.output.prompt, message: `${configTargetLabel(issue.target)}：${issue.message}`, options: choices.map(value => ({ value, label: labels[value] })) })
         return isCancel(result) ? "abort" : result
     }
 
     async edit(instructions: string): Promise<boolean> {
-        log.info(instructions)
-        const result = await confirm({ message: "编辑完成，继续扫描？", initialValue: true })
+        this.output.reporter.info(instructions)
+        const result = await confirm({ ...this.output.prompt, message: "编辑完成，继续扫描？", initialValue: true })
         return !isCancel(result) && result
     }
 
-    message(message: string): void { console.log('[ArrangeCLI]', message) }
-    failure(message: string): void { console.error('[ArrangeCLI]', message) }
+    message(message: string): void { this.output.reporter.step(message) }
+    failure(message: string): void { this.output.reporter.error(message) }
 }

@@ -3,6 +3,7 @@ import { readSnapshot, assertSnapshots, type FileSnapshot } from "../util/FileUt
 import { setJsonPath, type JsonValue } from "../managed/JsonRegion.ts"
 import type { TextCluster } from "../managed/TextCluster.ts"
 import type { TextRegion } from "../managed/TextRegion.ts"
+import { detectJsonLayout, detectLineEnding, serializeJson, toLineEnding } from "../util/LineEnding.ts"
 import { ConfigWriter } from "./ConfigWriter.ts"
 import type { ConfigTarget, ConfigScanReport, ResolvableIssue } from "./ConfigScanReport.ts"
 import type { ConfigInteraction, ResolveChoice } from "./ConfigInteraction.ts"
@@ -73,7 +74,7 @@ export class ConfigResolver {
 
         const start = parent.offset + marker.start
         const end = parent.offset + marker.end
-        const after = before.content.slice(0, start) + textElement.make(state) + before.content.slice(end)
+        const after = before.content.slice(0, start) + toLineEnding(textElement.make(state), detectLineEnding(before.content)) + before.content.slice(end)
         await this.writer.write(state.rootDir, [{ before, after }], guards)
         return "rescan"
     }
@@ -116,7 +117,7 @@ export class ConfigResolver {
         if (before.content === null || target.region?.kind !== "json-region") return "rescan"
         const json = JSON.parse(before.content) as JsonValue
         setJsonPath(json, target.region.locate(state), target.region.make(state))
-        await this.writer.write(state.rootDir, [{ before, after: `${JSON.stringify(json, null, 2)}\n` }], guards)
+        await this.writer.write(state.rootDir, [{ before, after: serializeJson(json, detectJsonLayout(before.content)) }], guards)
         return "rescan"
     }
 

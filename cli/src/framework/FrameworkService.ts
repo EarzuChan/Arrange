@@ -4,6 +4,7 @@ import type { ProjectState } from "../project/ProjectState.ts"
 import { uiDirectory } from "../project/ProjectPaths.ts"
 import { readSnapshot } from "../util/FileUtils.ts"
 import { isJsonObject } from "../util/Utils.ts"
+import { RegistryUnreachableError } from "./FrameworkErrors.ts"
 import { FrameworkRegistryClient } from "./FrameworkRegistryClient.ts"
 import { assertFrameworkCompatible } from "./FrameworkMamba.ts"
 
@@ -14,7 +15,14 @@ export class FrameworkService {
 
     async assertCompatible(state: ProjectState, mode: FrameworkCompatibilityMode): Promise<void> {
         if (mode === "installed-first" && await this.assertInstalledCompatible(state)) return
-        const candidate = await this.registry.fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
+        let candidate
+        try {
+            candidate = await this.registry.fetchCandidateByVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
+        } catch (error) {
+            // 联网也不行时说明为什么没能用本机已装的版本判定，让用户知道还差一步安装或联网
+            if (mode === "installed-first" && error instanceof RegistryUnreachableError) throw error.withNote(`本机 UI 目录里没有可用于离线验证的 ${frameworkPackageName}@${state.project.framework.version}`)
+            throw error
+        }
         if (candidate.version !== state.project.framework.version) throw new Error("registry 返回的 Framework 版本与配置不符")
         assertFrameworkCompatible(candidate)
     }

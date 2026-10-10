@@ -16,6 +16,7 @@ import { configRegistry } from "../src/config/ConfigRegistry.ts"
 import { FileTransaction } from "../src/util/FileTransaction.ts"
 import type { FileSnapshot } from "../src/util/FileUtils.ts"
 import { readUiSuggestions } from "../src/wizard/Adopt.ts"
+import { quietTerminal } from "./fixture.ts"
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url))
 
@@ -310,7 +311,7 @@ test("adopt 原位保留现有文件和 target；JSON 候选只作为显式确�
     await write(resolve(root, "native/CMakeLists.txt"), cmake)
     await write(resolve(root, "ui/package.json"), packageJson)
     await write(resolve(root, "ui/src/custom.ts"), "export const custom = true\n")
-    assert.deepEqual(await readUiSuggestions(resolve(root, "ui")), { name: "existing-ui", version: "2.3.4", frameworkVersion: "0.0.0-m.2.2", packageManager: "npm" })
+    assert.deepEqual(await readUiSuggestions(resolve(root, "ui"), quietTerminal().reporter), { name: "existing-ui", version: "2.3.4", frameworkVersion: "0.0.0-m.2.2", packageManager: "npm" })
     const adopted = await new ProjectInitializer(new FileTransaction()).adopt({ state, ui: { kind: "existing" }, native: { kind: "existing" } })
     assert.equal(adopted.project.project.icon, undefined)
     assert.equal(adopted.project["managed-items"].includes("cmake.product-icon"), false)
@@ -414,8 +415,8 @@ test("初始化配置写入中途取消停止后续文件，两类失败记录�
     }
     await assert.rejects(new ProjectInitializer(new CancelledWriter(controller.signal), controller.signal).create(request(root)), error => {
         assert.ok(error instanceof Error && error.name === "AbortError")
-        assert.match(error.message, /\.arrange\/initializations/)
-        assert.match(error.message, /\.arrange\/transactions/)
+        assert.ok(error.message.includes(resolve(root, ".arrange", "initializations")))
+        assert.ok(error.message.includes(resolve(root, ".arrange", "transactions")))
         return true
     })
     assert.equal(JSON.parse(await readFile(resolve(root, "ui/package.json"), "utf8")).name, "starterplugin")

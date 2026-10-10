@@ -1,4 +1,6 @@
 import { defaultNodeRegistryUrl, frameworkPackageName, frameworkRegistryTimeoutMs } from "../CliMetadata.ts"
+import { isAbortError } from "../platform/ProcessSpec.ts"
+import { RegistryUnreachableError, describeFetchFailure } from "./FrameworkErrors.ts"
 import type { FrameworkVersionCandidate } from "./FrameworkMamba.ts"
 
 export function normalizeRegistryUrl(registryUrl?: string): string { // 是否带派
@@ -27,11 +29,21 @@ export class FrameworkRegistryClient {
         return this.signal ? AbortSignal.any([this.signal, timeout]) : timeout
     }
 
+    // 连接失败与超时归为 RegistryUnreachableError，带上 registry 地址和真实原因；用户取消照常以 AbortError 传出
+    private async request(registry: string, path: string): Promise<Response> {
+        try {
+            return await fetch(`${registry}${path}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
+        } catch (error) {
+            if (isAbortError(error)) throw error
+            throw new RegistryUnreachableError(registry, describeFetchFailure(error), { cause: error })
+        }
+    }
+
     // 对于一个特定版本。缺陷：无法获得版本发布时间
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
         // 原 fetchManifest 逻辑
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
+        const response = await this.request(registry, `/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`)
 
         if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName}@${version}：HTTP ${response.status}`)
 
@@ -48,7 +60,7 @@ export class FrameworkRegistryClient {
     // 对于所有版本
     async fetchCandidates(recentLimit = 5, registryUrl?: string): Promise<FrameworkVersionCandidate[]> {
         const registry = normalizeRegistryUrl(registryUrl)
-        const response = await fetch(`${registry}/${frameworkPackageName.replace("/", "%2f")}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
+        const response = await this.request(registry, `/${frameworkPackageName.replace("/", "%2f")}`)
 
         if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName} 版本列表：HTTP ${response.status}`)
 
