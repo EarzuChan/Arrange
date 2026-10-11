@@ -11,11 +11,16 @@ const interrupt = (): void => controller.abort()
 
 try {
     assertCliEnvironment({ platform: process.platform, stdinIsTTY: process.stdin.isTTY === true, stdoutIsTTY: process.stdout.isTTY === true })
+
     const { createCliApplication } = await import("./CliApplication.ts")
+
     const cli = createCliApplication({ signal: controller.signal, interactions: "terminal", terminal })
+
     process.on("SIGINT", interrupt)
     process.on("SIGTERM", interrupt)
+
     cli.exitOverride()
+
     await cli.parseAsync(process.argv)
 } catch (error) {
     if (error instanceof CommanderError) process.exitCode = error.exitCode
@@ -34,5 +39,7 @@ try {
 
 // 命令已结束：恢复终端输入模式，等输出写完后明确结束进程，不依赖其余句柄自然关闭
 terminal.close()
+
 await Promise.all([process.stdout, process.stderr].map(stream => new Promise<void>(resolve => stream.write("", () => resolve()))))
+
 process.exit(process.exitCode ?? 0)
