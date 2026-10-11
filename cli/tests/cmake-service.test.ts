@@ -4,6 +4,7 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:f
 import test from "node:test"
 import { Executor } from "../src/platform/Executor.ts"
 import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
+import type { PlatformService } from "../src/platform/PlatformService.ts"
 import { CmakeService, type CmakeModel } from "../src/cmake/CmakeService.ts"
 import { fixture, testTask, write } from "./fixture.ts"
 import { dirname, join } from "node:path"
@@ -63,6 +64,78 @@ test("CMake cancellation stays an AbortError even when a tool reports exit zero"
     assert.equal((await service.inspect(state, "debug")).ready, false)
     service.configure = async () => ({ sourceDirectory: state.rootDir, buildDirectory: service.buildDirectory(state, "debug"), configuration: "Debug", platform: "darwin", architecture: "arm64", targets: [] })
     await assert.rejects(service.build(state, "debug", ["standalone"], testTask()), isAbortError)
+})
+
+test("Windows native configure cancellation can retry when CMake reports path casing differently", { skip: process.platform !== "win32" }, async t => {
+    const state = await fixture(t, false)
+    const buildRoot = join(tmpdir(), "a")
+    const compiler = join(state.rootDir, "tools", "cl.exe")
+    state.local = { cmake: { path: "fake-cmake.exe" }, ninja: { path: "fake-ninja.exe" }, nativeCompiler: { path: compiler }, native: { generator: "Ninja", architecture: "x64", developerCommand: "fake-vsdevcmd.bat", buildRoot } }
+    const platform = {
+        name: "win32",
+        nativeEnvironment: async () => ({}),
+        discoverNative: async () => ({ local: state.local!, issues: [] }),
+    } as unknown as PlatformService
+    const caseVariant = (path: string): string => [...path].map((character, index) => /[a-z]/i.test(character) ? (index % 2 ? character.toLowerCase() : character.toUpperCase()) : character).join("")
+    const source = join(state.rootDir, state.project.native.directory)
+    const executor = new class extends Executor {
+        calls = 0
+        override async run(spec: ProcessSpec): Promise<ProcessResult> {
+            this.calls++
+            if (this.calls === 1) return { exitCode: 130, stdout: "", stderr: "", cancelled: true, timedOut: false }
+
+            const build = spec.args[spec.args.indexOf("-B") + 1]!
+            const sourceVariant = caseVariant(source)
+            const buildVariant = caseVariant(build)
+            await write(join(build, "CMakeCache.txt"), [
+                "CMAKE_GENERATOR:INTERNAL=Ninja",
+                `CMAKE_CXX_COMPILER:FILEPATH=${compiler}`,
+                `CMAKE_HOME_DIRECTORY:INTERNAL=${sourceVariant}`,
+                "",
+            ].join("\n"))
+
+            const reply = join(build, ".cmake", "api", "v1", "reply")
+            const targets = [
+                { name: "TestPlugin", id: "root", jsonFile: "target-root.json" },
+                { name: "TestPlugin_Standalone", id: "standalone", jsonFile: "target-standalone.json" },
+                { name: "TestPlugin_VST3", id: "vst3", jsonFile: "target-vst3.json" },
+            ]
+            await write(join(reply, "index-test.json"), JSON.stringify({ reply: { "client-arrange": {
+                "codemodel-v2": { jsonFile: "codemodel.json" },
+                "cmakeFiles-v1": { jsonFile: "cmakeFiles.json" },
+            } } }))
+            await write(join(reply, "codemodel.json"), JSON.stringify({
+                paths: { source: sourceVariant, build: buildVariant },
+                configurations: [{ name: "Debug", targets }],
+            }))
+            await write(join(reply, "cmakeFiles.json"), JSON.stringify({ paths: { source: sourceVariant }, inputs: [] }))
+            await write(join(reply, "target-root.json"), JSON.stringify({ name: "TestPlugin", type: "STATIC_LIBRARY" }))
+            await write(join(reply, "target-standalone.json"), JSON.stringify({ name: "TestPlugin_Standalone", type: "EXECUTABLE", artifacts: [{ path: "TestPlugin.exe" }], dependencies: [{ id: "root" }] }))
+            await write(join(reply, "target-vst3.json"), JSON.stringify({ name: "TestPlugin_VST3", type: "MODULE_LIBRARY", artifacts: [{ path: "TestPlugin.vst3" }], dependencies: [{ id: "root" }] }))
+            return { exitCode: 0, stdout: "", stderr: "", cancelled: false, timedOut: false }
+        }
+    }()
+    const service = new CmakeService(executor, platform, new IconAssetsService())
+    const build = service.buildDirectory(state, "debug")
+    await write(join(build, "CMakeCache.txt"), [
+        "CMAKE_GENERATOR:INTERNAL=Ninja",
+        `CMAKE_CXX_COMPILER:FILEPATH=${compiler}`,
+        `CMAKE_HOME_DIRECTORY:INTERNAL=${caseVariant(source)}`,
+        "",
+    ].join("\n"))
+    const dependencySentinel = join(build, "_deps", "quickjs_ng-src", "preserved-after-cancel.txt")
+    await write(dependencySentinel, "already fetched")
+
+    await assert.rejects(service.configure(state, "debug", testTask()), isAbortError)
+    assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "cancelled setup must retain a compatible CMake tree")
+    assert.equal((await service.inspect(state, "debug")).ready, false, "cancellation must leave SETUP incomplete")
+
+    const model = await service.configure(state, "debug", testTask())
+    assert.equal(executor.calls, 2)
+    assert.equal(model.configuration, "Debug")
+    assert.equal((await service.inspect(state, "debug")).ready, true)
+    assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "retry must reuse fetched dependencies")
+    await access(join(build, "preparation.json"))
 })
 
 test("CMake rejects aliased work directories before reading, resetting or running tools", async t => {

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
-import { basename, dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve, win32 } from "node:path"
 import { cmakePreparationFileName, cmakeQueryClientName, localWorkDirectory, nativeBuildDirectoryName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildOwnerFileName, windowsBuildPathTailBudget, windowsBuildRootName, windowsExternalSourceTailBudget, windowsBuildRootSubdirectory, windowsMaxPathLength } from "../CliMetadata.ts"
 import type { BuildFlavor, NativeProduct, ProjectState } from "../project/ProjectState.ts"
 import type { Executor } from "../platform/Executor.ts"
@@ -68,6 +68,15 @@ interface CmakeFilesReply {
 
 function hash(content: string | Buffer): string {
     return createHash("sha256").update(content).digest("hex")
+}
+
+// 根据项目打开方式的不同，CMake 可能会报告同一个 Win 路径，但其大小写或斜杠风格可能不同。Win 路径不区分大小写。
+function normalizedPath(path: string, platform: PlatformService["name"]): string {
+    return platform === "win32" ? win32.resolve(path).toLowerCase() : resolve(path)
+}
+
+function samePath(actual: string, expected: string, platform: PlatformService["name"]): boolean {
+    return normalizedPath(actual, platform) === normalizedPath(expected, platform)
 }
 
 // 完整路径 = 构建目录 + 分隔符 + 构建树内最长相对路径；超限时 cl、link、rc 打不开文件，错误信息晦涩，所以在 configure 前明确检查
@@ -219,7 +228,8 @@ export class CmakeService {
         await this.assertBuildDirectory(state, flavor)
         await this.assertCacheArchitecture(state, flavor)
         const codemodel = await this.readReply<CodeModelReply>(directory, "codemodel-v2")
-        if (resolve(codemodel.paths.source) !== resolve(state.rootDir, state.project.native.directory) || resolve(codemodel.paths.build) !== directory) throw new Error("CMake 查询模型的源码或构建目录不匹配")
+        const sourceDirectory = resolve(state.rootDir, state.project.native.directory)
+        if (!samePath(codemodel.paths.source, sourceDirectory, this.platform.name) || !samePath(codemodel.paths.build, directory, this.platform.name)) throw new Error(`CMake 查询模型的源码或构建目录不匹配：源码 ${codemodel.paths.source}（期望 ${sourceDirectory}）；构建 ${codemodel.paths.build}（期望 ${directory}）`)
         const configuration = codemodel.configurations.find(item => item.name === this.configuration(flavor))
         if (!configuration) throw new Error(`CMake 模型缺少 ${this.configuration(flavor)} 配置`)
         const names = new Map(configuration.targets.map(target => [target.id, target.name]))
@@ -314,23 +324,22 @@ export class CmakeService {
         const local = state.local!
         const previousCompiler = value("CMAKE_CXX_COMPILER")
         const previousSource = value("CMAKE_HOME_DIRECTORY")
-        const incompatible = value("CMAKE_GENERATOR") !== local.native!.generator || !previousSource || resolve(previousSource) !== resolve(state.rootDir, state.project.native.directory) || (previousCompiler && resolve(previousCompiler) !== resolve(local.nativeCompiler!.path))
+        const incompatible = value("CMAKE_GENERATOR") !== local.native!.generator || !previousSource || !samePath(previousSource, resolve(state.rootDir, state.project.native.directory), this.platform.name) || (previousCompiler && !samePath(previousCompiler, local.nativeCompiler!.path, this.platform.name))
         if (incompatible) await rm(directory, { recursive: true, force: true })
     }
 
     private async assertCacheArchitecture(state: ProjectState, flavor: BuildFlavor): Promise<void> {
         const local = state.local!
         const cache = await readFile(join(this.buildDirectory(state, flavor), "CMakeCache.txt"), "utf8")
+
         const value = (key: string): string | undefined => cache.match(new RegExp(`^${key}:[^=]+=([^\\r\\n]*)`, "m"))?.[1]
         if (value("CMAKE_GENERATOR") !== local.native!.generator) throw new Error("CMake 实际生成器与本机配置不符")
         if (this.platform.name === "darwin") {
             const expected = local.native!.architecture === "x64" ? "x86_64" : "arm64"
             if (value("CMAKE_OSX_ARCHITECTURES") !== expected) throw new Error("CMake 实际 macOS 架构与本机配置不符")
-        } else if (local.native!.generator.startsWith("Visual Studio")) {
-            if (value("CMAKE_GENERATOR_PLATFORM")?.toLowerCase() !== local.native!.architecture.toLowerCase()) throw new Error("CMake 实际 Visual Studio 架构与本机配置不符")
-        }
+        } else if (local.native!.generator.startsWith("Visual Studio")) if (value("CMAKE_GENERATOR_PLATFORM")?.toLowerCase() !== local.native!.architecture.toLowerCase()) throw new Error("CMake 实际 Visual Studio 架构与本机配置不符")
+
         const compiler = value("CMAKE_CXX_COMPILER")
-        const normalize = (path: string): string => this.platform.name === "win32" ? resolve(path).toLowerCase() : resolve(path)
-        if (!compiler || !local.nativeCompiler || normalize(compiler) !== normalize(local.nativeCompiler.path)) throw new Error("CMake 实际编译器与已验证的本机编译器不符")
+        if (!compiler || !local.nativeCompiler || !samePath(compiler, local.nativeCompiler.path, this.platform.name)) throw new Error("CMake 实际编译器与已验证的本机编译器不符")
     }
 }
