@@ -1,3 +1,4 @@
+import { hostPlatform, hostArchitecture } from "./native-fixture.ts"
 import assert from "node:assert/strict"
 import { readFile, readdir, rm } from "node:fs/promises"
 import { resolve } from "node:path"
@@ -245,8 +246,9 @@ test("Build 拒绝未启用产品、配置或工具变化，且失败后不进�
 
 test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间也不保留 completed", async t => {
     const state = await preparedState(t)
-    const model: CmakeModel = { sourceDirectory: resolve(state.rootDir, "native"), buildDirectory: resolve(state.rootDir, "user/builds/project"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
-    for (const kind of ["ui", "native-release"] as const) await t.test(kind, async () => {
+    state.local!.native = { generator: "Ninja", architecture: hostArchitecture }
+    const model: CmakeModel = { sourceDirectory: resolve(state.rootDir, "native"), buildDirectory: resolve(state.rootDir, "user/builds/project"), configuration: "Release", platform: hostPlatform!, architecture: hostArchitecture, targets: [] }
+    for (const kind of ["ui", `native-${hostPlatform}-${hostArchitecture}-release`] as const) await t.test(kind, async () => {
         const receiptPath = resolve(state.rootDir, ".arrange", `built-${kind}.json`)
         let fail = false
         const compile = async () => {
@@ -260,6 +262,7 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
             }
         } as unknown as NodeJsService)
         const native = new NativeBuildService({
+            platformName: hostPlatform!,
             presentationSignature: () => nativePresentationSignature(state, model.platform),
             build: async () => {
                 await compile()
@@ -284,8 +287,10 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
 
 test("native 构建过程中元数据改变必须留下失败记录", async t => {
     const state = await preparedState(t)
-    const model: CmakeModel = { sourceDirectory: state.rootDir, buildDirectory: state.rootDir, configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
+    state.local!.native = { generator: "Ninja", architecture: hostArchitecture }
+    const model: CmakeModel = { sourceDirectory: state.rootDir, buildDirectory: state.rootDir, configuration: "Release", platform: hostPlatform!, architecture: hostArchitecture, targets: [] }
     const native = new NativeBuildService({
+        platformName: hostPlatform!,
         presentationSignature: () => nativePresentationSignature(state, model.platform),
         build: async () => {
             state.project.project.displayName = "Changed during build"
@@ -293,7 +298,7 @@ test("native 构建过程中元数据改变必须留下失败记录", async t =>
         }
     } as unknown as CmakeService)
     await assert.rejects(native.build(state, "release", ["standalone"], testTask()), /构建期间/)
-    assert.equal(JSON.parse(await readFile(resolve(state.rootDir, ".arrange/built-native-release.json"), "utf8")).status, "failed")
+    assert.equal(JSON.parse(await readFile(resolve(state.rootDir, `.arrange/built-native-${hostPlatform}-${hostArchitecture}-release.json`), "utf8")).status, "failed")
 })
 
 async function devHarness(t: TestContext) {

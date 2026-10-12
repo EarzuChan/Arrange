@@ -4,7 +4,7 @@ import type { Reporter } from "../ui/Reporter.ts"
 
 export interface SyncCommandOptions { scan?: boolean, config?: boolean, setup?: boolean, ui?: boolean, native?: boolean }
 
-export function registerSyncCommand(program: Command, syncService: SyncService, reporter: Reporter): void {
+export function registerSyncCommand(program: Command, syncService: Pick<SyncService, "run">, reporter: Reporter): void {
     program.command("sync").description("同步工程文件与开发准备状态").option("--scan", "只扫描；有 Fatal 或 Resolvable 时返回非零状态").addOption(new Option("--config", "只同步工程配置文件").conflicts("setup")).addOption(new Option("--setup", "只准备开发环境").conflicts("config")).addOption(new Option("--ui", "仅 UI 范围").conflicts("native")).addOption(new Option("--native", "仅 native 范围").conflicts("ui"))
         .action(async (options: SyncCommandOptions) => {
             reporter.intro(`arrange sync${options.scan ? " --scan" : ""}`)

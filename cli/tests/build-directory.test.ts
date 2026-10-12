@@ -9,8 +9,8 @@ import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
 import { windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength } from "../src/CliMetadata.ts"
 import { CmakeService, windowsBuildPathProblem, windowsTailBudget } from "../src/cmake/CmakeService.ts"
 import { Executor } from "../src/platform/Executor.ts"
-import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
-import { WindowsPlatformService } from "../src/platform/WindowsPlatformService.ts"
+import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
+import { hostPlatform, windowsOnly, macOnly } from "./native-fixture.ts"
 import type { ProjectState } from "../src/project/ProjectState.ts"
 import { fixture } from "./fixture.ts"
 import { UserDirectories } from "../src/user/UserDirectories.ts"
@@ -20,15 +20,15 @@ function services(root = resolve("/arrange-user")) {
     const executor = new Executor()
     const icons = new IconAssetsService()
     const user = new UserDirectories(root)
-    return { windows: new CmakeService(executor, new WindowsPlatformService(executor), icons, user), mac: new CmakeService(executor, new MacPlatformService(executor), icons, user) }
+    return new CmakeService(executor, createPlatformService(executor), icons, user)
 }
 
 function withNative(state: ProjectState, architecture: "x64" | "arm64", buildRoot?: string): void {
     state.local = { native: { generator: "Ninja", architecture, ...(buildRoot ? { buildRoot } : {}) } }
 }
 
-test("Windows 构建树位于用户级目录下的短哈希目录，与工程路径长度无关", async t => {
-    const { windows } = services()
+test("Windows 构建树位于用户级目录下的短哈希目录，与工程路径长度无关", windowsOnly, async t => {
+    const windows = services()
     const state = await fixture(t, false)
     withNative(state, "x64")
     const digest = createHash("sha256").update(resolve(state.rootDir).toLowerCase()).digest("hex").slice(0, 8)
@@ -41,8 +41,8 @@ test("Windows 构建树位于用户级目录下的短哈希目录，与工程路
     assert.equal(windows.buildDirectory(state, "debug").startsWith(state.rootDir), false)
 })
 
-test("Windows 构建目录由工程根唯一确定：同根相同，异根不同，大小写不敏感", async t => {
-    const { windows } = services()
+test("Windows 构建目录由工程根唯一确定：同根相同，异根不同，大小写不敏感", windowsOnly, async t => {
+    const windows = services()
     const first = await fixture(t, false)
     const second = await fixture(t, false)
     withNative(first, "x64")
@@ -53,14 +53,14 @@ test("Windows 构建目录由工程根唯一确定：同根相同，异根不同
 })
 
 test("native.buildRoot 覆盖默认用户级位置", async t => {
-    const { windows } = services()
+    const windows = services()
     const state = await fixture(t, false)
     withNative(state, "x64", resolve("/short-root"))
     assert.equal(windows.buildDirectory(state, "release").startsWith(resolve("/short-root") + sep), true)
 })
 
-test("macOS 构建树归属用户级目录，并与 Windows 配置隔离", async t => {
-    const { mac } = services()
+test("macOS 构建树归属用户级目录，并与 Windows 配置隔离", macOnly, async t => {
+    const mac = services()
     const state = await fixture(t, false)
     withNative(state, "arm64")
     assert.equal(mac.buildDirectory(state, "debug"), join(resolve("/arrange-user"), "builds", createHash("sha256").update(resolve(state.rootDir)).digest("hex").slice(0, 8), "mac-ad"))
@@ -70,17 +70,17 @@ test("构建目录认领并发一致，损坏或冲突的所有权记录拒绝�
     const state = await fixture(t, false)
     withNative(state, "x64")
     const user = new UserDirectories(join(state.rootDir, "user"))
-    const first = new BuildDirectories("win32", user)
-    const second = new BuildDirectories("win32", user)
+    const first = new BuildDirectories(hostPlatform!, user)
+    const second = new BuildDirectories(hostPlatform!, user)
     await Promise.all([first.claim(state), second.claim(state)])
     const owner = join(first.directory(state, "debug"), "..", "owner.json")
     await writeFile(owner, JSON.stringify({ rootDir: join(state.rootDir, "other") }))
-    await assert.rejects(new BuildDirectories("win32", user).claim(state), /另一个工程占用/)
+    await assert.rejects(new BuildDirectories(hostPlatform!, user).claim(state), /另一个工程占用/)
     await writeFile(owner, "broken")
-    await assert.rejects(new BuildDirectories("win32", user).claim(state), /所有权记录不可读/)
+    await assert.rejects(new BuildDirectories(hostPlatform!, user).claim(state), /所有权记录不可读/)
 })
 
-test("Windows 路径预检：最坏对象文件路径不超过 259 字符，超限给出明确指引", () => {
+test("Windows 路径预检：最坏对象文件路径不超过 259 字符，超限给出明确指引", windowsOnly, () => {
     const limit = windowsMaxPathLength - windowsBuildPathTailBudget - 1
     assert.equal(windowsBuildPathProblem("C".repeat(limit)), undefined)
     const message = windowsBuildPathProblem("C".repeat(limit + 1))
@@ -89,7 +89,7 @@ test("Windows 路径预检：最坏对象文件路径不超过 259 字符，超�
     assert.match(message, new RegExp(`不超过 ${limit} 个字符`))
 })
 
-test("使用外部 JUCE 源码时预检采用更大的尾部预算（对象路径内嵌源码绝对路径）", () => {
+test("使用外部 JUCE 源码时预检采用更大的尾部预算（对象路径内嵌源码绝对路径）", windowsOnly, () => {
     assert.equal(windowsTailBudget(undefined), windowsBuildPathTailBudget)
     assert.equal(windowsTailBudget({ ARRANGE_OTHER: "1" }), windowsBuildPathTailBudget)
     assert.equal(windowsTailBudget({ JUCE_DIR: "E:/juce" }), windowsExternalSourceTailBudget)
@@ -117,11 +117,11 @@ test("构建树在工程外时，图标派生按构建锚点包含检查；默�
     assert.equal((await icons.inspect(state, directory, anchor)).ready, true)
 })
 
-test("默认构建目录在常见与较长的用户名下都留有路径余量", async t => {
+test("默认构建目录在常见与较长的用户名下都留有路径余量", windowsOnly, async t => {
     const state = await fixture(t, false)
     withNative(state, "x64")
     for (const user of ["a", "Earzu Chan", "A Very Long User Name 20"]) {
-        const { windows } = services(`C:\\Users\\${user}\\.arrange`)
+        const windows = services(`C:\\Users\\${user}\\.arrange`)
         const directory = windows.buildDirectory(state, "release")
         assert.equal(windowsBuildPathProblem(directory), undefined, `${user}: ${directory.length}`)
     }

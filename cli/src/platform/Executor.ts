@@ -10,7 +10,7 @@ export function quoteWindowsArgument(value: string): string {
 }
 
 export class Executor {
-    constructor(private readonly executionPlatform: NodeJS.Platform = process.platform, private readonly defaultSignal?: AbortSignal) { }
+    constructor(private readonly executionPlatform: NodeJS.Platform = process.platform, private readonly defaultSignal?: AbortSignal, private readonly host?: { start(spec: ProcessSpec): RunningProcess }) { }
 
     async run(spec: ProcessSpec): Promise<ProcessResult> {
         return this.start(spec).completion
@@ -19,6 +19,7 @@ export class Executor {
     start(spec: ProcessSpec): RunningProcess {
         const signal = spec.signal ?? this.defaultSignal
         if (signal?.aborted) return { pid: undefined, completion: Promise.resolve({ exitCode: 130, stdout: "", stderr: "", cancelled: true, timedOut: false }), stop: async () => { } }
+        if (this.host) return this.host.start({ ...spec, signal })
         const batch = this.executionPlatform === "win32" && /\.(cmd|bat)$/i.test(spec.command)
         const command = batch ? process.env.ComSpec ?? "cmd.exe" : spec.command
         const args = batch ? ["/d", "/v:off", "/s", "/c", `"${[spec.command, ...spec.args].map(quoteWindowsArgument).join(" ")}"`] : [...spec.args]

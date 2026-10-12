@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { stripAnsi, visibleWidth } from "../src/ui/Ansi.ts"
 import { TaskBoard } from "../src/ui/TaskBoard.ts"
-import { colorPalette, plainPalette } from "../src/ui/Theme.ts"
+import { colorPalette, plainPalette, symbols } from "../src/ui/Theme.ts"
 
 function board(now = 0) {
     let clock = now
@@ -22,11 +22,11 @@ test("每个运行中的任务一行标题加一个日志框，框内跟随最�
     const installHeader = rows.findIndex(row => row.includes("安装 UI 依赖 · pnpm install"))
     assert.ok(installHeader > 0)
     assert.match(rows[installHeader]!, /12s$/)
-    assert.match(rows[installHeader + 1]!, /^│  ╭─+╮$/)
+    assert.match(rows[installHeader + 1]!, /^[│|]  [╭+][─-]+[╮+]$/)
     // 框高 8 行：显示最后 8 行输出
-    assert.match(rows[installHeader + 2]!, /│ Progress: resolved 12 +│$/)
-    assert.match(rows[installHeader + 9]!, /│ Progress: resolved 19 +│$/)
-    assert.match(rows[installHeader + 10]!, /╰─+ 20 行 ─╯$/)
+    assert.match(rows[installHeader + 2]!, /[│|] Progress: resolved 12 +[│|]$/)
+    assert.match(rows[installHeader + 9]!, /[│|] Progress: resolved 19 +[│|]$/)
+    assert.match(rows[installHeader + 10]!, /[╰+][─-]+ 20 行 [─-][╯+]$/)
     assert.ok(rows.some(row => row.includes("配置 native · debug · cmake")))
     assert.ok(rows.some(row => row.includes("-- Fetching JUCE 8.0.12")))
 })
@@ -39,8 +39,8 @@ test("有进度时标题显示进度条与计数；框为空时提示等待输�
     const rows = view.render(90, 20).map(stripAnsi)
     const header = rows.find(row => row.includes("构建 native · release"))!
     assert.match(header, /· 编译/)
-    assert.match(header, /━+╸─+ {2}86\/148/)
-    assert.ok(rows.some(row => row.includes("等待输出…")))
+    assert.match(header, /[━=]+[╸>][─-]+ {2}86\/148/)
+    assert.ok(rows.some(row => /等待输出(?:…|\.{3})/.test(row)))
 })
 
 test("空间不够放框时退化为只显示标题行；任务过多时提示其余数量", () => {
@@ -48,7 +48,7 @@ test("空间不够放框时退化为只显示标题行；任务过多时提示�
     for (let index = 0; index < 6; index++) view.add({ id: `t${index}`, title: `任务 ${index}` })
     const rows = view.render(60, 6).map(stripAnsi)
     assert.ok(rows.length <= 6)
-    assert.ok(!rows.some(row => row.includes("╭")))
+    assert.ok(!rows.some(row => row.includes(symbols.cornerTopLeft)))
     assert.match(rows.at(-1)!, /还有 \d+ 个任务/)
 })
 
@@ -62,8 +62,8 @@ test("键盘：方向键与翻页滚动焦点框，Tab 切换焦点，End 恢复
     view.render(60, 40)
     assert.equal(view.handle({ kind: "key", key: "pageup" }, undefined), true)
     let rows = view.render(60, 40).map(stripAnsi)
-    assert.ok(rows.some(row => /↓ 7 行 · End 跟随/.test(row)), "A 框向上翻了一页")
-    assert.ok(rows.some(row => /↑ 35 行/.test(row)))
+    assert.ok(rows.some(row => row.includes(`${symbols.arrowDown} 7 行 · End 跟随`)), "A 框向上翻了一页")
+    assert.ok(rows.some(row => row.includes(`${symbols.arrowUp} 35 行`)))
     assert.equal(second.viewport.following, true)
     view.handle({ kind: "key", key: "tab" }, undefined)
     view.handle({ kind: "key", key: "up" }, undefined)
@@ -111,7 +111,7 @@ test("点击框把焦点移过去，焦点框边框高亮", () => {
     colored.showHints = true
     colored.add({ id: "a", title: "A" })
     colored.add({ id: "b", title: "B" })
-    assert.ok(colored.render(60, 40).some(line => line.includes("\x1b[36m╭")), "焦点框以青色边框绘制")
+    assert.ok(colored.render(60, 40).some(line => line.includes(`\x1b[36m${symbols.cornerTopLeft}`)), "焦点框以青色边框绘制")
 })
 
 test("任务结束摘要：成功一行带用时；失败带原因、日志末尾静态框与完整日志路径；取消单独标注", () => {
@@ -120,22 +120,22 @@ test("任务结束摘要：成功一行带用时；失败带原因、日志末�
     advance(3100)
     ok.status = "succeeded"
     ok.endedAt = 3100
-    assert.deepEqual(view.summary(ok, 60).map(stripAnsi), ["│", "◇  安装 UI 依赖 · pnpm install  3.1s"])
+    assert.deepEqual(view.summary(ok, 60).map(stripAnsi), [symbols.bar, `${symbols.step}  安装 UI 依赖 · pnpm install  3.1s`])
     const failed = view.add({ id: "bad", title: "配置 native · debug" })
     for (let index = 0; index < 300; index++) view.append(failed, `line ${index}`)
     failed.status = "failed"
     failed.failure = "CMake configure 未成功（1）"
     failed.logPath = ".arrange/logs/x/configure-native-debug.log"
     const lines = view.summary(failed, 60).map(stripAnsi)
-    assert.match(lines[1]!, /■  配置 native · debug 失败/)
-    assert.equal(lines[2], "│  CMake configure 未成功（1）")
-    assert.ok(lines.includes("│  │ line 299" + " ".repeat(60 - 3 - 4 - 8) + " │"))
+    assert.match(lines[1]!, /[■x]  配置 native · debug 失败/)
+    assert.equal(lines[2], `${symbols.bar}  CMake configure 未成功（1）`)
+    assert.ok(lines.includes(`${symbols.bar}  ${symbols.bar} line 299` + " ".repeat(60 - 3 - 4 - 8) + ` ${symbols.bar}`))
     assert.ok(!lines.some(line => line.includes("line 99 ")), "只保留末尾 200 行")
     assert.match(lines.at(-2)!, /共 300 行 · 最后 200 行/)
-    assert.equal(lines.at(-1), "│  完整日志：.arrange/logs/x/configure-native-debug.log")
+    assert.equal(lines.at(-1), `${symbols.bar}  完整日志：.arrange/logs/x/configure-native-debug.log`)
     const cancelled = view.add({ id: "c", title: "构建 UI" })
     cancelled.status = "cancelled"
-    assert.match(view.summary(cancelled, 60).map(stripAnsi)[1]!, /■  构建 UI 已取消/)
+    assert.match(view.summary(cancelled, 60).map(stripAnsi)[1]!, /[■x]  构建 UI 已取消/)
 })
 
 test("没有颜色的工具输出里，错误与警告行被着色；自带颜色的行保持原样", () => {

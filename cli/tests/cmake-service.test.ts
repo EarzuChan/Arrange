@@ -1,21 +1,20 @@
+import { nativeState, nativeTools, hostPlatform, hostArchitecture, windowsOnly } from "./native-fixture.ts"
 import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
 import assert from "node:assert/strict"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import test from "node:test"
 import { Executor } from "../src/platform/Executor.ts"
-import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
-import type { PlatformService } from "../src/platform/PlatformService.ts"
+import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
 import { CmakeService, type CmakeModel } from "../src/cmake/CmakeService.ts"
 import { fixture, testTask, write } from "./fixture.ts"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
-import { locateTool } from "../src/platform/ToolLocator.ts"
 import { assertPlainDirectoryPath } from "../src/util/PlainDirectoryPath.ts"
 import { isAbortError, type ProcessResult, type ProcessSpec } from "../src/platform/ProcessSpec.ts"
 import { PNG } from "pngjs"
 import { UserDirectories } from "../src/user/UserDirectories.ts"
 import { BuildDirectories } from "../src/cmake/BuildDirectories.ts"
-import { nativeIconCmakeDefinitions, nativeIconDirectory } from "../src/CliMetadata.ts"
+import { cmakeDefinitionsFileName, nativeIconCmakeDefinitions, nativeIconDirectory } from "../src/CliMetadata.ts"
 
 test("native build 尊重 CMake 并行环境变量，未设置时保留默认并行参数", async t => {
     const previous = process.env.CMAKE_BUILD_PARALLEL_LEVEL
@@ -26,23 +25,23 @@ test("native build 尊重 CMake 并行环境变量，未设置时保留默认并
     for (const limit of [undefined, "2", "", "invalid"]) await t.test(limit === undefined ? "未设置" : `设置为 ${JSON.stringify(limit)}`, async t => {
         if (limit === undefined) delete process.env.CMAKE_BUILD_PARALLEL_LEVEL
         else process.env.CMAKE_BUILD_PARALLEL_LEVEL = limit
-        const state = await fixture(t, false)
-        state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Ninja", architecture: "arm64" } }
+        const state = await nativeState(t)
         const calls: ProcessSpec[] = []
         class RecordingExecutor extends Executor {
             override async run(spec: ProcessSpec): Promise<ProcessResult> {
+                if (!spec.args.includes("--build")) return super.run(spec)
                 calls.push(spec)
                 return { exitCode: 0, stdout: "", stderr: "", cancelled: false, timedOut: false }
             }
         }
         const executor = new RecordingExecutor()
-        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
-        const model: CmakeModel = { sourceDirectory: join(state.rootDir, "native"), buildDirectory: service.buildDirectory(state, "release"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
+        const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+        const model: CmakeModel = { sourceDirectory: join(state.rootDir, "native"), buildDirectory: service.buildDirectory(state, "release"), configuration: "Release", platform: hostPlatform!, architecture: hostArchitecture, targets: [] }
         service.configure = async () => model
         service.readModel = async () => model
         await service.build(state, "release", ["standalone"], testTask(), true)
         assert.equal(calls.length, 1)
-        assert.equal(calls[0].command, state.local.cmake!.path)
+        assert.equal(calls[0].command, state.local!.cmake!.path)
         assert.equal(calls[0].cwd, state.rootDir)
         // 输出经任务捕获、逐行呈现，不直通终端
         assert.equal(calls[0].stdio, "capture")
@@ -59,114 +58,82 @@ test("CMake cancellation stays an AbortError even when a tool reports exit zero"
         }
     }
     const state = await fixture(t, false)
-    state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Unix Makefiles", architecture: "arm64" } }
+    state.local = structuredClone((await nativeTools()).local)
     const executor = new CancelledExecutor()
-    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+    const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+    state.local!.native!.buildRoot = join(tmpdir(), "a")
     await assert.rejects(service.configure(state, "debug", testTask()), isAbortError)
     assert.equal((await service.inspect(state, "debug")).ready, false)
-    service.configure = async () => ({ sourceDirectory: state.rootDir, buildDirectory: service.buildDirectory(state, "debug"), configuration: "Debug", platform: "darwin", architecture: "arm64", targets: [] })
+    service.configure = async () => ({ sourceDirectory: state.rootDir, buildDirectory: service.buildDirectory(state, "debug"), configuration: "Debug", platform: hostPlatform!, architecture: hostArchitecture, targets: [] })
     await assert.rejects(service.build(state, "debug", ["standalone"], testTask()), isAbortError)
 })
 
-test("Windows native configure cancellation can retry when CMake reports path casing differently", { skip: process.platform !== "win32" }, async t => {
-    const state = await fixture(t, false)
-    const buildRoot = join(tmpdir(), "a")
-    const compiler = join(state.rootDir, "tools", "cl.exe")
-    state.local = { cmake: { path: "fake-cmake.exe" }, ninja: { path: "fake-ninja.exe" }, nativeCompiler: { path: compiler }, native: { generator: "Ninja", architecture: "x64", developerCommand: "fake-vsdevcmd.bat", buildRoot } }
-    const platform = {
-        name: "win32",
-        nativeEnvironment: async () => ({}),
-        discoverNative: async () => ({ local: state.local!, issues: [] }),
-    } as unknown as PlatformService
-    const caseVariant = (path: string): string => [...path].map((character, index) => /[a-z]/i.test(character) ? (index % 2 ? character.toLowerCase() : character.toUpperCase()) : character).join("")
-    const source = join(state.rootDir, state.project.native.directory)
-    let sourceDirectories: Record<string, string> = { FETCHCONTENT_SOURCE_DIR_JUCE: join(state.rootDir, "shared-juce") }
-    const executor = new class extends Executor {
-        calls = 0
-        override async run(spec: ProcessSpec): Promise<ProcessResult> {
-            this.calls++
-            if (this.calls === 1) return { exitCode: 130, stdout: "", stderr: "", cancelled: true, timedOut: false }
-            assert.ok(spec.args.includes("-UFETCHCONTENT_SOURCE_DIR_JUCE"), "retry must clear a cancelled configure's injected source override when ownership changes")
-
-            const build = spec.args[spec.args.indexOf("-B") + 1]!
-            const sourceVariant = caseVariant(source)
-            const buildVariant = caseVariant(build)
-            await write(join(build, "CMakeCache.txt"), [
-                "CMAKE_GENERATOR:INTERNAL=Ninja",
-                `CMAKE_CXX_COMPILER:FILEPATH=${compiler}`,
-                `CMAKE_HOME_DIRECTORY:INTERNAL=${sourceVariant}`,
-                "",
-            ].join("\n"))
-
-            const reply = join(build, ".cmake", "api", "v1", "reply")
-            const targets = [
-                { name: "TestPlugin", id: "root", jsonFile: "target-root.json" },
-                { name: "TestPlugin_Standalone", id: "standalone", jsonFile: "target-standalone.json" },
-                { name: "TestPlugin_VST3", id: "vst3", jsonFile: "target-vst3.json" },
-            ]
-            await write(join(reply, "index-test.json"), JSON.stringify({
-                reply: {
-                    "client-arrange": {
-                        "codemodel-v2": { jsonFile: "codemodel.json" },
-                        "cmakeFiles-v1": { jsonFile: "cmakeFiles.json" },
-                    }
+test("Windows 真实 CMake 取消后用大小写不同的工程路径重试，保留同一构建树", windowsOnly, async t => {
+    const state = await nativeState(t)
+    const native = join(state.rootDir, "native")
+    await write(join(native, "CMakeLists.txt"), `cmake_minimum_required(VERSION 3.24)
+project(Test LANGUAGES C CXX)
+if(EXISTS "\${CMAKE_CURRENT_SOURCE_DIR}/pause")
+    message(STATUS "ARRANGE_PAUSE_READY")
+    execute_process(COMMAND "\${CMAKE_COMMAND}" -E sleep 60)
+endif()
+add_library(TestPlugin STATIC plugin.cpp)
+add_executable(TestPlugin_Standalone main.cpp)
+add_library(TestPlugin_VST3 MODULE plugin.cpp)
+target_link_libraries(TestPlugin_Standalone PRIVATE TestPlugin)
+target_link_libraries(TestPlugin_VST3 PRIVATE TestPlugin)
+`)
+    await write(join(native, "plugin.cpp"), "int plugin(){ return 0; }\n")
+    await write(join(native, "main.cpp"), "int plugin(); int main(){ return plugin(); }\n")
+    class CancellingExecutor extends Executor {
+        cancel = false
+        override run(spec: ProcessSpec): Promise<ProcessResult> {
+            if (!this.cancel || !spec.args.includes("-S")) return super.run(spec)
+            this.cancel = false
+            const controller = new AbortController()
+            return super.run({
+                ...spec, signal: controller.signal, onOutput: (chunk, stream) => {
+                    spec.onOutput?.(chunk, stream)
+                    if (chunk.toString().includes("ARRANGE_PAUSE_READY")) controller.abort()
                 }
-            }))
-            await write(join(reply, "codemodel.json"), JSON.stringify({
-                paths: { source: sourceVariant, build: buildVariant },
-                configurations: [{ name: "Debug", targets }],
-            }))
-            await write(join(reply, "cmakeFiles.json"), JSON.stringify({ paths: { source: sourceVariant }, inputs: [] }))
-            await write(join(reply, "target-root.json"), JSON.stringify({ name: "TestPlugin", type: "STATIC_LIBRARY" }))
-            await write(join(reply, "target-standalone.json"), JSON.stringify({ name: "TestPlugin_Standalone", type: "EXECUTABLE", artifacts: [{ path: "TestPlugin.exe" }], dependencies: [{ id: "root" }] }))
-            await write(join(reply, "target-vst3.json"), JSON.stringify({ name: "TestPlugin_VST3", type: "MODULE_LIBRARY", artifacts: [{ path: "TestPlugin.vst3" }], dependencies: [{ id: "root" }] }))
-            return { exitCode: 0, stdout: "", stderr: "", cancelled: false, timedOut: false }
+            })
         }
-    }()
-    const service = new CmakeService(executor, platform, new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")), { prepare: async () => sourceDirectories })
-    const build = service.buildDirectory(state, "debug")
-    await write(join(build, "CMakeCache.txt"), [
-        "CMAKE_GENERATOR:INTERNAL=Ninja",
-        `CMAKE_CXX_COMPILER:FILEPATH=${compiler}`,
-        `CMAKE_HOME_DIRECTORY:INTERNAL=${caseVariant(source)}`,
-        "",
-    ].join("\n"))
-    const dependencySentinel = join(build, "_deps", "quickjs_ng-src", "preserved-after-cancel.txt")
-    await write(dependencySentinel, "already fetched")
-
+    }
+    const executor = new CancellingExecutor()
+    const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+    await service.configure(state, "debug", testTask())
+    const sentinel = join(service.buildDirectory(state, "debug"), "preserve-after-cancel")
+    await write(sentinel, "incremental tree")
+    await write(join(native, "pause"), "pause")
+    executor.cancel = true
     await assert.rejects(service.configure(state, "debug", testTask()), isAbortError)
-    assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "cancelled setup must retain a compatible CMake tree")
-    assert.equal((await service.inspect(state, "debug")).ready, false, "cancellation must leave SETUP incomplete")
-
-    sourceDirectories = {}
+    assert.equal((await service.inspect(state, "debug")).ready, false)
+    await rm(join(native, "pause"))
+    state.rootDir = state.rootDir.toUpperCase()
     const model = await service.configure(state, "debug", testTask())
-    assert.equal(executor.calls, 2)
     assert.equal(model.configuration, "Debug")
     assert.equal((await service.inspect(state, "debug")).ready, true)
-    assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "retry must reuse fetched dependencies")
-    await access(join(build, "preparation.json"))
-    const managed = state.project["managed-items"]
-    state.project["managed-items"] = []
-    assert.equal((await service.inspect(state, "debug")).ready, false, "changing source ownership invalidates preparation")
-    state.project["managed-items"] = managed
+    assert.equal(await readFile(sentinel, "utf8"), "incremental tree")
 })
 
 test("CMake rejects aliased work directories before reading, resetting or running tools", async t => {
     for (const level of ["builds", "project", "configuration"]) await t.test(level, async t => {
-        const state = await fixture(t, false)
-        state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Ninja", architecture: "arm64" } }
+        const state = await nativeState(t)
         const external = await mkdtemp(join(tmpdir(), "arrange-external-build-"))
         t.after(() => rm(external, { recursive: true, force: true }))
         await write(join(external, "CMakeCache.txt"), "CMAKE_GENERATOR:INTERNAL=Other\n")
         await write(join(external, "keep"), "outside project")
-        const user = new UserDirectories(join(state.rootDir, "user"))
-        const paths = new BuildDirectories("darwin", user)
+        const root = await mkdtemp(join(tmpdir(), "a"))
+        t.after(() => rm(root, { recursive: true, force: true }))
+        const user = new UserDirectories(root)
+        delete state.local!.native!.buildRoot
+        const paths = new BuildDirectories(hostPlatform!, user)
         const directory = paths.directory(state, "debug")
         const alias = level === "builds" ? user.builds : level === "project" ? dirname(directory) : directory
         await mkdir(dirname(alias), { recursive: true })
         await symlink(external, alias, process.platform === "win32" ? "junction" : "dir")
         const executor = new Executor()
-        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+        const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), user)
         const inspected = await service.inspect(state, "debug")
         assert.equal(inspected.ready, false)
         assert.match(inspected.reason!, /符号链接/)
@@ -189,12 +156,8 @@ test("plain working directory permits a project-root alias and rejects escapes o
     await assert.rejects(assertPlainDirectoryPath(state.rootDir, join(state.rootDir, "user/builds/project")), /不是目录/)
 })
 
-test("real CMake query keeps target identity separate from product name and refreshes inputs", { skip: process.platform !== "darwin" }, async t => {
-    const cmakePath = await locateTool("cmake")
-    const ninjaPath = await locateTool("ninja")
-    if (!cmakePath || !ninjaPath) return t.skip("需要 CMake 与 Ninja")
-    const state = await fixture(t, false)
-    state.local = { cmake: { path: cmakePath }, ninja: { path: ninjaPath }, nativeCompiler: { path: "/usr/bin/clang++" }, native: { generator: "Ninja", architecture: process.arch === "arm64" ? "arm64" : "x64" } }
+test("real CMake query keeps target identity separate from product name and refreshes inputs", async t => {
+    const state = await nativeState(t)
     const native = join(state.rootDir, "native")
     const source = `cmake_minimum_required(VERSION 3.24)\nproject(Test LANGUAGES C CXX)\nset(CMAKE_POSITION_INDEPENDENT_CODE ON)\nadd_library(TestPlugin STATIC plugin.cpp)\nadd_executable(TestPlugin_Standalone main.cpp)\ntarget_link_libraries(TestPlugin_Standalone PRIVATE TestPlugin)\nset_target_properties(TestPlugin_Standalone PROPERTIES OUTPUT_NAME "Visible Product")\nadd_library(TestPlugin_VST3 MODULE module.cpp)\ntarget_link_libraries(TestPlugin_VST3 PRIVATE TestPlugin)\n`
     await write(join(native, "CMakeLists.txt"), source)
@@ -202,7 +165,7 @@ test("real CMake query keeps target identity separate from product name and refr
     await write(join(native, "main.cpp"), "int plugin(); int main(){ return plugin(); }\n")
     await write(join(native, "module.cpp"), "int plugin(); int module(){ return plugin(); }\n")
     const executor = new Executor()
-    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
+    const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
     assert.equal((await service.inspect(state, "debug")).ready, false)
     const model = await service.configure(state, "debug", testTask())
     assert.equal((await service.inspect(state, "debug")).ready, true)
@@ -210,19 +173,19 @@ test("real CMake query keeps target identity separate from product name and refr
         const metadata = state.project.project as unknown as Record<string, string | undefined>
         const previous = metadata[key]
         metadata[key] = value
-        assert.equal((await service.inspect(state, "debug")).ready, false, key)
+        assert.equal((await service.inspect(state, "debug")).ready, key === "bundleId" && hostPlatform === "win32", key)
         if (previous === undefined) delete metadata[key]
         else metadata[key] = previous
         assert.equal((await service.inspect(state, "debug")).ready, true, key)
     }
-    state.local.node = { path: "/new/node" }
-    state.local.packageManager = { path: "/new/npm" }
+    state.local!.node = { path: "/new/node" }
+    state.local!.packageManager = { path: "/new/npm" }
     state.project.framework.nodeRegistryUrl = "https://different.example.test/"
     assert.equal((await service.inspect(state, "debug")).ready, true)
     assert.equal(model.configuration, "Debug")
     const artifact = service.productArtifacts(state, model, ["standalone"])[0]!
     assert.equal(artifact.target, "TestPlugin_Standalone")
-    assert.equal(artifact.paths.some(path => path.endsWith("Visible Product")), true)
+    assert.equal(artifact.paths.some(path => path.endsWith(`Visible Product${hostPlatform === "win32" ? ".exe" : ""}`)), true)
     const built = await service.build(state, "debug", ["standalone"], testTask())
     await access(service.productArtifacts(state, built, ["standalone"])[0]!.paths[0]!)
     assert.notEqual(service.buildDirectory(state, "debug"), service.buildDirectory(state, "release"))
@@ -230,14 +193,14 @@ test("real CMake query keeps target identity separate from product name and refr
     assert.equal((await service.inspect(state, "debug")).ready, false)
     const refreshed = await service.build(state, "debug", ["standalone"], testTask())
     assert.equal((await service.inspect(state, "debug")).ready, true)
-    assert.equal(service.productArtifacts(state, refreshed, ["standalone"])[0]!.paths.some(path => path.endsWith("Renamed Product")), true)
+    assert.equal(service.productArtifacts(state, refreshed, ["standalone"])[0]!.paths.some(path => path.endsWith(`Renamed Product${hostPlatform === "win32" ? ".exe" : ""}`)), true)
     await write(join(native, "CMakeLists.txt"), "invalid cmake input")
     await assert.rejects(service.configure(state, "debug", testTask()), /configure 未成功/)
     assert.equal((await service.inspect(state, "debug")).ready, false)
     const cmakeLists = await readFile(join(native, "CMakeLists.txt"), "utf8")
     assert.equal(cmakeLists, "invalid cmake input")
     await write(join(native, "CMakeLists.txt"), source)
-    state.local.native!.generator = "Ninja Multi-Config"
+    state.local!.native!.generator = "Ninja Multi-Config"
     await assert.rejects(service.readModel(state, "debug"), /生成器/)
     const multi = await service.configure(state, "debug", testTask())
     assert.equal(multi.configuration, "Debug")
@@ -253,7 +216,7 @@ test("real CMake query keeps target identity separate from product name and refr
     await service.configure(state, "debug", testTask())
     const iconDirectory = join(service.buildDirectory(state, "debug"), nativeIconDirectory)
     const cacheWithIcon = await readFile(join(service.buildDirectory(state, "debug"), "CMakeCache.txt"), "utf8")
-    assert.ok(cacheWithIcon.includes(`${nativeIconCmakeDefinitions.ico}:UNINITIALIZED=${join(iconDirectory, "icon.ico")}`))
+    assert.ok(cacheWithIcon.includes(`${nativeIconCmakeDefinitions.ico}:UNINITIALIZED=${join(iconDirectory, "icon.ico").replaceAll("\\", "/")}`))
     assert.equal((await service.inspect(state, "debug")).ready, true)
     png.data[0] = 0
     await writeFile(iconSource, PNG.sync.write(png))
@@ -269,12 +232,12 @@ test("real CMake query keeps target identity separate from product name and refr
     await service.configure(state, "debug", testTask())
     await assert.rejects(access(join(iconDirectory, "icon.ico")), { code: "ENOENT" })
     await assert.rejects(access(join(iconDirectory, "icon.icns")), { code: "ENOENT" })
-    const cacheWithoutIcon = await readFile(join(service.buildDirectory(state, "debug"), "CMakeCache.txt"), "utf8")
+    const cacheWithoutIcon = (await readFile(join(service.buildDirectory(state, "debug"), "CMakeCache.txt"), "utf8")).replaceAll("\r\n", "\n")
     assert.ok(cacheWithoutIcon.includes(`${nativeIconCmakeDefinitions.ico}:UNINITIALIZED=\n`))
     assert.ok(cacheWithoutIcon.includes(`${nativeIconCmakeDefinitions.icns}:UNINITIALIZED=\n`))
     assert.equal((await service.inspect(state, "debug")).ready, true)
     for (const key of Object.values(nativeIconCmakeDefinitions)) {
-        state.local.native!.cmakeDefinitions = { [key]: "override" }
+        state.local!.native!.cmakeDefinitions = { [key]: "override" }
         await assert.rejects(service.configure(state, "debug", testTask()), /不支持的 CMake 自定义选项/)
     }
     state.local = null

@@ -8,7 +8,7 @@ import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import type { TaskOutput } from "../ui/Tasks.ts"
 import { GitSource } from "./GitSource.ts"
 import { sourceHash, sourceIdentity, sourceSpecSchema, type SourceSpec } from "./SourceSpec.ts"
-import { withDirectoryLock } from "../util/DirectoryLock.ts"
+import type { Operations } from "../operation/Operations.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
 
 const recordSchema = z.object({ schema: z.literal(sourceCacheSchema), identity: z.string().regex(/^[a-f0-9]{64}$/), key: z.string().regex(/^[a-f0-9]{16}$/), contentIdentity: z.string().regex(/^[a-f0-9]{64}$/), commit: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i) })
@@ -18,7 +18,7 @@ export interface CachedSource { readonly directory: string, readonly commit: str
 export class SourceCache {
     private readonly verified = new Map<string, Promise<void>>()
 
-    constructor(private readonly directories: UserDirectories, private readonly git: Pick<GitSource, "checkout" | "verify">, private readonly signal: AbortSignal) { }
+    constructor(private readonly directories: UserDirectories, private readonly git: Pick<GitSource, "checkout" | "verify">, private readonly signal: AbortSignal, private readonly operations: Pick<Operations, "source">) { }
 
     private get requests(): string { return join(this.directories.sources, "requests") }
     private get entries(): string { return join(this.directories.sources, "entries") }
@@ -97,7 +97,7 @@ export class SourceCache {
         for (const directory of [this.requests, this.entries, this.staging, this.locks]) await this.directories.ensure(directory)
         const identity = sourceIdentity(spec)
         task.stage(`准备 ${label} 源码`)
-        return withDirectoryLock(join(this.locks, identity), this.signal, async signal => {
+        return this.operations.source(join(this.locks, identity), `获取 ${label} 源码`, async signal => {
             const ready = await this.find(spec)
             if (ready) {
                 await this.verify(ready)
@@ -120,7 +120,7 @@ export class SourceCache {
                 const contentIdentity = sourceHash([spec.repository, commit])
                 const record = recordSchema.parse({ schema: sourceCacheSchema, identity, key: contentIdentity.slice(0, 16), contentIdentity, commit })
                 await writeFile(join(temporary, "complete.json"), `${JSON.stringify(record, null, 4)}\n`)
-                await withDirectoryLock(join(this.locks, record.key), signal, async publishSignal => {
+                await this.operations.source(join(this.locks, record.key), `发布 ${label} 源码`, async publishSignal => {
                     if (!await this.entry(record)) {
                         publishSignal.throwIfAborted()
                         await rename(temporary, join(this.entries, record.key))

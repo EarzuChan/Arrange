@@ -1,17 +1,12 @@
 import type { Executor } from "../platform/Executor.ts"
 import { throwIfProcessCancelled } from "../platform/ProcessSpec.ts"
 import { toolProbeTimeoutMs } from "../CliMetadata.ts"
-
-interface SignatureInfo {
-    readonly kind: "unsigned" | "adhoc" | "identity"
-    readonly details: string
-    readonly entitlements: string
-}
+import { assertAutomaticMacResign, type MacSignatureInfo } from "./MacSignature.ts"
 
 export class MacBundleSigner {
     constructor(private readonly executor: Executor) { }
 
-    private async inspect(path: string): Promise<SignatureInfo> {
+    private async inspect(path: string): Promise<MacSignatureInfo> {
         const result = await this.executor.run({ command: "/usr/bin/codesign", args: ["--display", "--verbose=4", path], timeoutMs: toolProbeTimeoutMs })
         throwIfProcessCancelled(result)
         const details = result.stdout + result.stderr
@@ -31,8 +26,7 @@ export class MacBundleSigner {
         const verification = await this.executor.run({ command: "/usr/bin/codesign", args: ["--verify", "--deep", "--strict", staged], timeoutMs: toolProbeTimeoutMs })
         throwIfProcessCancelled(verification)
         if (verification.exitCode === 0) return
-        if (signature.kind === "identity") throw new Error(`加入 UI 后 macOS 身份签名失效：${staged}。请在资源整理后使用原身份签名；不会自动替换为 ad-hoc。`)
-        if (/linker-signed/i.test(signature.details) && signature.entitlements.trim()) throw new Error(`linker-signed bundle 带有 entitlements，不能安全自动重签：${staged}`)
+        assertAutomaticMacResign(signature, staged)
         const args = ["--force", "--sign", "-", "--timestamp=none"]
         if (signature.kind === "adhoc") args.push("--preserve-metadata=identifier,entitlements,flags,runtime")
         const identifier = signature.details.match(/^Identifier=(.+)$/m)?.[1]

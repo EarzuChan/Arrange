@@ -13,6 +13,8 @@ import { isAbortError, type ProcessSpec } from "../src/platform/ProcessSpec.ts"
 import { testTask, write, stateFor } from "./fixture.ts"
 import { readNativeDependencies } from "../src/source/NativeDependencies.ts"
 import { NativeSourceService } from "../src/source/NativeSourceService.ts"
+import { OperationHost } from "../src/operation/OperationHost.ts"
+import { Operations } from "../src/operation/Operations.ts"
 import { FrameworkSourceProbe } from "../src/framework/FrameworkSourceProbe.ts"
 
 const commit = "a".repeat(40)
@@ -20,9 +22,15 @@ const spec: SourceSpec = { repository: "https://example.invalid/source.git", ref
 
 async function cacheFixture(t: TestContext) {
     const root = await mkdtemp(join(tmpdir(), "arrange-source-"))
-    t.after(() => rm(root, { recursive: true, force: true }))
     const user = new UserDirectories(join(root, "user"))
     const signal = new AbortController()
+    const host = new OperationHost(user)
+    const hosts = [host]
+    t.after(async () => {
+        await Promise.all(hosts.map(host => host.close()))
+        await rm(root, { recursive: true, force: true })
+    })
+    const operations = new Operations(host, signal.signal, () => { })
     let calls = 0
     const git = {
         verify: async () => { }, checkout: async (request: SourceSpec, directory: string, _task: unknown, held: AbortSignal) => {
@@ -34,8 +42,8 @@ async function cacheFixture(t: TestContext) {
             return hash
         }
     }
-    const cache = new SourceCache(user, git, signal.signal)
-    return { root, user, signal, git, cache, calls: () => calls }
+    const cache = new SourceCache(user, git, signal.signal, operations)
+    return { root, user, signal, git, cache, operations, hosts, calls: () => calls }
 }
 
 test("用户目录解析不写磁盘，拒绝相对路径，统一区分用户与工程作用域", async t => {
@@ -49,11 +57,11 @@ test("用户目录解析不写磁盘，拒绝相对路径，统一区分用户�
 
 test("同一设备的多个服务并发只获取一次；缓存命中不联网，源码版本相互隔离", async t => {
     const input = await cacheFixture(t)
-    const second = new SourceCache(input.user, input.git, input.signal.signal)
+    const second = new SourceCache(input.user, input.git, input.signal.signal, input.operations)
     const [first, other] = await Promise.all([input.cache.ensure(spec, "Fixture", testTask()), second.ensure(spec, "Fixture", testTask())])
     assert.deepEqual(first, other)
     assert.equal(input.calls(), 1)
-    const offline = new SourceCache(input.user, { verify: async () => { }, checkout: async () => { throw new Error("断网") } }, input.signal.signal)
+    const offline = new SourceCache(input.user, { verify: async () => { }, checkout: async () => { throw new Error("断网") } }, input.signal.signal, input.operations)
     assert.deepEqual(await offline.ensure(spec, "Fixture", testTask()), first)
     const newer = await input.cache.ensure({ ...spec, ref: "v2", commit: "b".repeat(40) }, "Fixture", testTask())
     assert.notEqual(newer.directory, first.directory)
@@ -70,31 +78,10 @@ test("取消未完成的获取不发布缓存，重试成功且清理临时内�
     setTimeout(() => input.signal.abort(), 10)
     await assert.rejects(pending, isAbortError)
     assert.equal(await input.cache.find(spec), undefined)
-    const retry = new SourceCache(input.user, input.git, new AbortController().signal)
+    const retryHost = new OperationHost(input.user)
+    input.hosts.push(retryHost)
+    const retry = new SourceCache(input.user, input.git, new AbortController().signal, new Operations(retryHost, new AbortController().signal, () => { }))
     assert.equal((await retry.ensure(spec, "Fixture", testTask())).commit, commit)
-    assert.deepEqual(await readdir(join(input.user.sources, "tmp")), [])
-})
-
-test("等待其他进程时可取消，不会移除另一个持有者的锁", async t => {
-    const input = await cacheFixture(t)
-    const lock = join(input.user.sources, "locks", `${sourceIdentity(spec)}.lock`)
-    await mkdir(lock, { recursive: true })
-    const pending = input.cache.ensure(spec, "Fixture", testTask())
-    setTimeout(() => input.signal.abort(), 40)
-    await assert.rejects(pending, isAbortError)
-    assert.deepEqual(await readdir(lock), [])
-    assert.equal(input.calls(), 0)
-})
-
-test("失去心跳的进程锁与它留下的半成品可恢复", async t => {
-    const input = await cacheFixture(t)
-    const identity = sourceIdentity(spec)
-    const lock = join(input.user.sources, "locks", `${identity}.lock`)
-    await mkdir(lock, { recursive: true })
-    const old = new Date(Date.now() - 60000)
-    await utimes(lock, old, old)
-    await write(join(input.user.sources, "tmp", `${identity}-abandoned`, "partial"), "incomplete")
-    assert.equal((await input.cache.ensure(spec, "Fixture", testTask())).commit, commit)
     assert.deepEqual(await readdir(join(input.user.sources, "tmp")), [])
 })
 
@@ -170,14 +157,14 @@ test("真实 Git 获取固定 tag，缓存复用不 fetch，错误 commit 不发
             return super.run(process)
         }
     }()
-    const cache = new SourceCache(input.user, new GitSource(recording), input.signal.signal)
+    const cache = new SourceCache(input.user, new GitSource(recording), input.signal.signal, input.operations)
     const request = { repository, ref: "v1", commit: revision }
     const source = await cache.ensure(request, "Fixture", testTask())
     assert.equal(source.commit, revision)
     assert.deepEqual(await cache.ensure(request, "Fixture", testTask()), source)
     assert.equal(fetches, 1)
     await write(join(source.directory, "CMakeLists.txt"), "modified cached source\n")
-    const modified = new SourceCache(input.user, new GitSource(recording), input.signal.signal)
+    const modified = new SourceCache(input.user, new GitSource(recording), input.signal.signal, input.operations)
     await assert.rejects(modified.ensure(request, "Fixture", testTask()), /已被修改/)
     await assert.rejects(cache.ensure({ ...request, commit }, "Fixture", testTask()), /commit 与依赖清单不符/)
     assert.equal(await cache.find({ ...request, commit }), undefined)
@@ -226,7 +213,7 @@ test("真实 Git 相对子模块完整获取，原子移动后仍可校验和复
     await run(parent, ["commit", "--quiet", "-am", "relative submodule"])
     await run(parent, ["tag", "v1"])
     const request = { repository: parent, ref: "v1", commit: await run(parent, ["rev-parse", "HEAD"]) }
-    const cache = new SourceCache(input.user, new GitSource(executor), input.signal.signal)
+    const cache = new SourceCache(input.user, new GitSource(executor), input.signal.signal, input.operations)
     const cached = await cache.ensure(request, "Fixture", testTask())
     assert.equal(await readFile(join(cached.directory, "modules", "child", "CMakeLists.txt"), "utf8"), "project(Fixture NONE)\n")
     assert.deepEqual(await cache.ensure(request, "Fixture", testTask()), cached)

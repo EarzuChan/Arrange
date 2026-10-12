@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises"
 import { userDirectoryEnvironment, userDirectoryName } from "../CliMetadata.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 
-// 用户级根与工程级 .arrange 各自独立；解析路径不创建目录，SCAN 保持只读
+// 用户级根与工程级 .arrange 各自独立；路径解析不创建目录，资源协调由操作层按需建立
 export class UserDirectories {
     readonly root: string
 
@@ -17,6 +17,7 @@ export class UserDirectories {
     get sources(): string { return join(this.root, "sources") }
     get temporary(): string { return join(this.root, "tmp") }
     get runtime(): string { return join(this.root, "runtime") }
+    get operations(): string { return join(this.root, "operations") }
 
     async ensure(directory: string): Promise<void> {
         await mkdir(this.root, { recursive: true })

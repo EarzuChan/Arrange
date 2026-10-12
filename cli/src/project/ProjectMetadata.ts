@@ -1,4 +1,4 @@
-import { defaultBundleIdPrefix, defaultGeneratedBundleIdPrefix } from "../CliMetadata.ts"
+import { defaultBundleIdPrefix } from "../CliMetadata.ts"
 
 interface DisplayNameState {
     readonly project: { readonly project: { readonly name: string, readonly displayName?: string } }
@@ -6,8 +6,7 @@ interface DisplayNameState {
 
 interface BundleIdState {
     readonly project: {
-        readonly project: { readonly bundleId?: string, readonly vendorCode: string }
-        readonly native: { readonly target: string }
+        readonly project: { readonly bundleId?: string, readonly name: string, readonly vendorName: string, readonly vendorCode: string }
     }
 }
 
@@ -17,12 +16,12 @@ export function effectiveDisplayName(state: DisplayNameState): string {
 
 export function effectiveBundleId(state: BundleIdState): string {
     const metadata = state.project.project
-    return metadata.bundleId ?? `${defaultBundleIdPrefix}.${metadata.vendorCode.toLowerCase()}.${state.project.native.target.replace(/[^A-Za-z0-9.-]/g, "-")}`
+    return metadata.bundleId ?? generateDefaultBundleId({ vendorName: metadata.vendorName, vendorCode: metadata.vendorCode, projectName: metadata.name })
 }
 
 export function generateDefaultBundleId(input: { readonly vendorName: string, readonly vendorCode: string, readonly projectName: string }): string {
     const manufacturer = asciiComponent(input.vendorName) || input.vendorCode.toLowerCase()
-    return `${defaultGeneratedBundleIdPrefix}.${manufacturer}.${asciiComponent(input.projectName)}`
+    return `${defaultBundleIdPrefix}.${manufacturer}.${asciiComponent(input.projectName)}`
 }
 
 export function validateBundleId(value: string): string | undefined {

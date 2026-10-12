@@ -140,15 +140,15 @@ async function probeState(t: TestContext, url: string, version = "1.2.3") {
 }
 
 const probe = new FrameworkSourceProbe(new Executor())
-const needsGit = git ? false : "需要 git"
+assert.ok(git, "本机源码预检需要 git；缺少工具不能计为通过")
 
-test("预检：仓库可达且 tag 存在 → ok", { skip: needsGit }, async t => {
+test("预检：仓库可达且 tag 存在 → ok", async t => {
     const state = await probeState(t, await repository(t, ["v1.2.3"]))
     assert.deepEqual(await probe.check(state), { kind: "ok" })
     assert.equal(frameworkSourceProblem({ kind: "ok" }), undefined)
 })
 
-test("预检：仓库可达但没有对应 tag → tag-missing，说明 tag、版本与本地源码出路", { skip: needsGit }, async t => {
+test("预检：仓库可达但没有对应 tag → tag-missing，说明 tag、版本与本地源码出路", async t => {
     const url = await repository(t, ["v9.9.9"])
     const check = await probe.check(await probeState(t, url))
     assert.equal(check.kind, "tag-missing")
@@ -158,21 +158,21 @@ test("预检：仓库可达但没有对应 tag → tag-missing，说明 tag、�
     assert.match(message, /FETCHCONTENT_SOURCE_DIR_ARRANGE/)
 })
 
-test("预检：仓库不存在或连不上 → unreachable，带地址与 git 的原因", { skip: needsGit }, async t => {
+test("预检：仓库不存在或连不上 → unreachable，带地址与 git 的原因", async t => {
     const url = join(tmpdir(), "arrange-no-such-repository")
     const check = await probe.check(await probeState(t, url))
     assert.equal(check.kind, "unreachable")
     assert.match(frameworkSourceProblem(check)!, /无法访问 Arrange 源码仓库/)
 })
 
-test("预检：仓库地址里的凭据不出现在报错中", { skip: needsGit }, async t => {
+test("预检：仓库地址里的凭据不出现在报错中", async t => {
     const check = await probe.check(await probeState(t, `http://user:secret-token@127.0.0.1:${await closedPort()}/Arrange.git`))
     assert.equal(check.kind, "unreachable")
     assert.doesNotMatch(JSON.stringify(check), /secret-token/)
     assert.doesNotMatch(frameworkSourceProblem(check)!, /secret-token/)
 })
 
-test("预检：已用 FETCHCONTENT_SOURCE_DIR_ARRANGE 覆盖本地源码时跳过，不联网", { skip: needsGit }, async t => {
+test("预检：已用 FETCHCONTENT_SOURCE_DIR_ARRANGE 覆盖本地源码时跳过，不联网", async t => {
     const state = await probeState(t, join(tmpdir(), "arrange-no-such-repository"))
     state.local = { native: { generator: "Ninja", architecture: "x64", cmakeDefinitions: { FETCHCONTENT_SOURCE_DIR_ARRANGE: "/local/arrange" } } }
     assert.deepEqual(await probe.check(state), { kind: "skipped" })

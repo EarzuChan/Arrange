@@ -52,4 +52,4 @@ package.json 下的 JsonRegion 与缺失 Cluster 下的 TextRegion 不产生结�
 | `--scan --config` | 输出完整报告，无文件、配置或外部工具副作用 |
 | CONFIG Apply 成功 | 当前 CONFIG LSRA 结束，不自动追加复检循环 |
 
-对应自动化测试与执行结果见[第三期工作区](第三期M2.2的工作.md#config-验证)。
+对应自动化测试与执行结果见[第三期工作区](M2.2的最后工作中.md#config-验证)。

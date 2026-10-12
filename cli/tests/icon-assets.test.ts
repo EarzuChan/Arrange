@@ -201,7 +201,7 @@ test("非标准源尺寸不放大、不裁切，低分辨率 ICNS 不伪造高�
     assert.ok(images.every(image => image.size <= 300))
 })
 
-test("macOS 系统解码 ICNS 后小尺寸标准/Retina 图像均保留透明与半透明边缘", { skip: process.platform !== "darwin" }, async t => {
+test("macOS 系统解码 ICNS 后小尺寸标准/Retina 图像均保留透明与半透明边缘", { skip: process.platform !== "darwin" ? "不适用：仅 macOS 实机" : false }, async t => {
     const input = await iconFixture(t, 256, pngBytes(256, (x, y) => (x - 128) ** 2 + (y - 128) ** 2 < 80 ** 2 ? [255, 255, 255, 255] : [0, 0, 0, 0]))
     const assets = (await input.service.prepare(input.state, input.output))!
     const iconset = join(input.root, "decoded.iconset")

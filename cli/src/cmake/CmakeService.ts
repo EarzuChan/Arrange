@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, join, resolve, win32 } from "node:path"
-import { cmakePreparationFileName, cmakeSourceRoutingFileName, cmakeQueryClientName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength, windowsObjectPathMax } from "../CliMetadata.ts"
+import { cmakePreparationFileName, cmakeQueryClientName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength, windowsObjectPathMax } from "../CliMetadata.ts"
 import { isManagedItem, type BuildFlavor, type NativeProduct, type ProjectState } from "../project/ProjectState.ts"
 import type { Executor } from "../platform/Executor.ts"
 import type { PlatformService } from "../platform/PlatformService.ts"
@@ -14,6 +14,7 @@ import { UserDirectories } from "../user/UserDirectories.ts"
 import type { NativeSourceService } from "../source/NativeSourceService.ts"
 import { BuildDirectories } from "./BuildDirectories.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
+import { CmakeDefinitions, mergeCmakeDefinitions, type CmakeDefinitionValues } from "./CmakeDefinitions.ts"
 
 export interface CmakeTarget {
     readonly name: string
@@ -103,12 +104,14 @@ export class CmakeService {
     }
 
     buildDirectory(state: ProjectState, flavor: BuildFlavor): string { return this.directories.directory(state, flavor) }
+    get platformName(): PlatformService["name"] { return this.platform.name }
     private buildAnchor(state: ProjectState): string { return this.directories.anchor(state) }
     private assertBuildDirectory(state: ProjectState, flavor: BuildFlavor): Promise<void> { return this.directories.assert(state, flavor) }
 
     async inspect(state: ProjectState, flavor: BuildFlavor): Promise<CmakeInspection> {
         try {
             await this.assertBuildDirectory(state, flavor)
+            if (await new CmakeDefinitions(this.buildDirectory(state, flavor)).readKeys() === undefined) return { ready: false, reason: "缺少 CMake definitions 归属记录，需要重新 configure" }
             const preparation = JSON.parse(await readFile(this.preparationPath(state, flavor), "utf8")) as Preparation
             if (preparation.signature !== await this.signature(state, flavor)) return { ready: false, reason: "原生配置或本机工具环境已变化，需要重新 configure" }
             const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
@@ -137,14 +140,9 @@ export class CmakeService {
         }
         await this.directories.claim(state)
         await this.assertBuildDirectory(state, flavor)
-        await this.resetIncompatibleTree(state, flavor)
-        const routingPath = join(directory, cmakeSourceRoutingFileName)
-        let previousSourceKeys: string[] = []
-        try {
-            const keys: unknown = JSON.parse(await readFile(routingPath, "utf8"))
-            if (!Array.isArray(keys) || keys.some(key => typeof key !== "string" || !/^FETCHCONTENT_SOURCE_DIR_(ARRANGE|JUCE|QUICKJS_NG)$/.test(key))) throw new Error(`CMake 源码覆盖记录损坏：${routingPath}`)
-            previousSourceKeys = keys as string[]
-        } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error }
+        const definitions = new CmakeDefinitions(directory)
+        let previousKeys = await definitions.readKeys()
+        if (await this.resetIncompatibleTree(state, flavor, previousKeys === undefined)) previousKeys = undefined
         await rm(this.preparationPath(state, flavor), { force: true })
         const sourceDirectories = await this.sources?.prepare(state, task) ?? {}
         const signature = await this.signature(state, flavor)
@@ -155,27 +153,22 @@ export class CmakeService {
         await mkdir(query, { recursive: true })
         for (const kind of ["codemodel-v2", "cmakeFiles-v1"]) await writeFile(join(query, kind), "")
         // 输出经管道捕获时编译器默认不输出颜色；工具链支持时由 CMake 打开彩色诊断
-        const args = ["-S", resolve(state.rootDir, state.project.native.directory), "-B", directory, "-G", local.native.generator, "-DCMAKE_COLOR_DIAGNOSTICS=ON"]
-        if (!local.native.generator.startsWith("Visual Studio") && local.native.generator !== "Xcode" && local.native.generator !== "Ninja Multi-Config") args.push(`-DCMAKE_BUILD_TYPE=${this.configuration(flavor)}`)
+        const args = ["-S", resolve(state.rootDir, state.project.native.directory), "-B", directory, "-G", local.native.generator]
+        const managed: Record<string, string> = { CMAKE_COLOR_DIAGNOSTICS: "ON" }
+        if (!local.native.generator.startsWith("Visual Studio") && local.native.generator !== "Xcode" && local.native.generator !== "Ninja Multi-Config") managed.CMAKE_BUILD_TYPE = this.configuration(flavor)
         if (local.native.generator.startsWith("Ninja")) {
             if (!local.ninja) throw new Error("Ninja 路径未配置")
-            args.push(`-DCMAKE_MAKE_PROGRAM=${local.ninja.path}`)
+            managed.CMAKE_MAKE_PROGRAM = local.ninja.path
         }
         if (this.platform.name === "darwin") {
-            args.push(`-DCMAKE_CXX_COMPILER=${local.nativeCompiler.path}`, `-DCMAKE_C_COMPILER=${join(dirname(local.nativeCompiler.path), "clang")}`, `-DCMAKE_OSX_ARCHITECTURES=${local.native.architecture === "x64" ? "x86_64" : "arm64"}`)
+            Object.assign(managed, { CMAKE_CXX_COMPILER: local.nativeCompiler.path, CMAKE_C_COMPILER: join(dirname(local.nativeCompiler.path), "clang"), CMAKE_OSX_ARCHITECTURES: local.native.architecture === "x64" ? "x86_64" : "arm64" })
         } else if (local.native.generator.startsWith("Visual Studio")) args.push("-A", local.native.architecture === "x64" ? "x64" : "ARM64")
-        else args.push(`-DCMAKE_C_COMPILER=${local.nativeCompiler.path}`, `-DCMAKE_CXX_COMPILER=${local.nativeCompiler.path}`)
-        args.push(`-D${nativeIconCmakeDefinitions.ico}=${icons?.ico.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.icns}=${icons?.icns.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.presentation}=${presentation}`)
-        const reserved = new Set([...Object.values(nativeIconCmakeDefinitions), "CMAKE_BUILD_TYPE", "CMAKE_GENERATOR", "CMAKE_GENERATOR_PLATFORM", "CMAKE_MAKE_PROGRAM", "CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_OSX_ARCHITECTURES"])
-        if (this.platform.name === "win32" && local.native.cmakeDefinitions?.CMAKE_OBJECT_PATH_MAX === undefined) args.push(`-DCMAKE_OBJECT_PATH_MAX=${windowsObjectPathMax}`)
-        for (const key of previousSourceKeys) if (sourceDirectories[key] === undefined && local.native.cmakeDefinitions?.[key] === undefined && /^FETCHCONTENT_SOURCE_DIR_(ARRANGE|JUCE|QUICKJS_NG)$/.test(key)) args.push(`-U${key}`)
-        for (const [key, value] of Object.entries({ ...sourceDirectories, ...local.native.cmakeDefinitions })) {
-            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || reserved.has(key) || /[\r\n\0]/.test(value)) throw new Error(`不支持的 CMake 自定义选项：${key}`)
-            args.push(`-D${key}=${value}`)
-        }
+        else Object.assign(managed, { CMAKE_C_COMPILER: local.nativeCompiler.path, CMAKE_CXX_COMPILER: local.nativeCompiler.path })
+        Object.assign(managed, { [nativeIconCmakeDefinitions.ico]: icons?.ico.replace(/\\/g, "/") ?? "", [nativeIconCmakeDefinitions.icns]: icons?.icns.replace(/\\/g, "/") ?? "", [nativeIconCmakeDefinitions.presentation]: presentation })
+        if (this.platform.name === "win32") managed.CMAKE_OBJECT_PATH_MAX = String(windowsObjectPathMax)
+        const current: CmakeDefinitionValues = mergeCmakeDefinitions({ ...managed, ...sourceDirectories }, local.native.cmakeDefinitions)
         const env = await this.platform.nativeEnvironment(local)
-        // 取消时 preparation 会缺失，仍须记住曾注入的变量，下一次才能清理 CMake 的持久缓存
-        await writeAtomicText(routingPath, `${JSON.stringify([...new Set([...previousSourceKeys, ...Object.keys(sourceDirectories)])])}\n`)
+        args.push(...await definitions.begin(current, previousKeys ?? []))
         task.stage("配置")
         const result = await this.executor.run(task.process({ command: local.cmake.path, args, cwd: state.rootDir, env }))
         throwIfProcessCancelled(result)
@@ -186,8 +179,8 @@ export class CmakeService {
         if (signature !== await this.signature(state, flavor)) throw new Error("原生配置或图标源在 configure 期间发生变化，请重新运行 native SETUP")
         const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
         if (!iconInspection.ready) throw new Error(iconInspection.reason ?? "图标派生资源尚未准备")
+        await definitions.complete(current)
         await writeAtomicText(this.preparationPath(state, flavor), `${JSON.stringify({ signature, inputHashes, sourceDirectories }, null, 4)}\n`)
-        await writeAtomicText(routingPath, `${JSON.stringify(Object.keys(sourceDirectories))}\n`)
         return model
     }
 
@@ -280,20 +273,21 @@ export class CmakeService {
         return result
     }
 
-    private async resetIncompatibleTree(state: ProjectState, flavor: BuildFlavor): Promise<void> {
+    private async resetIncompatibleTree(state: ProjectState, flavor: BuildFlavor, missingDefinitions: boolean): Promise<boolean> {
         const directory = this.buildDirectory(state, flavor)
         await this.assertBuildDirectory(state, flavor)
         let cache: string
         try { cache = await readFile(join(directory, "CMakeCache.txt"), "utf8") } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
             throw error
         }
         const value = (key: string): string | undefined => cache.match(new RegExp(`^${key}:[^=]+=([^\\r\\n]*)`, "m"))?.[1]
         const local = state.local!
         const previousCompiler = value("CMAKE_CXX_COMPILER")
         const previousSource = value("CMAKE_HOME_DIRECTORY")
-        const incompatible = value("CMAKE_GENERATOR") !== local.native!.generator || !previousSource || !samePath(previousSource, resolve(state.rootDir, state.project.native.directory), this.platform.name) || (previousCompiler && !samePath(previousCompiler, local.nativeCompiler!.path, this.platform.name))
-        if (incompatible) await rm(directory, { recursive: true, force: true })
+        if (!missingDefinitions && value("CMAKE_GENERATOR") === local.native!.generator && previousSource && samePath(previousSource, resolve(state.rootDir, state.project.native.directory), this.platform.name) && (!previousCompiler || samePath(previousCompiler, local.nativeCompiler!.path, this.platform.name))) return false
+        await rm(directory, { recursive: true, force: true })
+        return true
     }
 
     private async assertCacheArchitecture(state: ProjectState, flavor: BuildFlavor): Promise<void> {

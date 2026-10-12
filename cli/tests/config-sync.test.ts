@@ -16,7 +16,7 @@ import { FrameworkService } from "../src/framework/FrameworkService.ts"
 import { ConfigResolver } from "../src/sync/ConfigResolver.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
 import { registryRegion, registryCluster, npmrcFile, packageJsonFile, packageNameRegion, frameworkDependencyRegion } from "../src/node-js/NodeJsStuffs.ts"
-import { cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion } from "../src/cmake/CmakeStuffs.ts"
+import { cmakeListsFile, jucePluginCluster, pluginVersionRegion, pluginFormatsRegion, productNameRegion, frameworkVersionRegion, fetchContentRepositoryRegion, pluginBundleIdRegion } from "../src/cmake/CmakeStuffs.ts"
 import { TextFile, JsonFile } from "../src/managed/ManagedFile.ts"
 import { TextCluster } from "../src/managed/TextCluster.ts"
 import { TextRegion } from "../src/managed/TextRegion.ts"
@@ -162,8 +162,8 @@ test("名称和 Framework 版本共同更新 UI/native，保留 CMake target、�
     assert.equal(result.status, "completed")
     assert.equal(ui.choices, 0)
     assert.equal(ui.reports.length, 1)
-    assert.deepEqual(new Set(result.report!.applicable.map(update => update.target.region)), new Set([productNameRegion, packageNameRegion, frameworkVersionRegion, frameworkDependencyRegion]))
-    assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), cmakeBefore.replace('PRODUCT_NAME "TestPlugin"', 'PRODUCT_NAME "RenamedPlugin"').replace('PLUGIN_NAME "TestPlugin"', 'PLUGIN_NAME "RenamedPlugin"').replace('GIT_TAG "v0.0.0-m.2.2"', 'GIT_TAG "v0.0.0-m.2.3"'))
+    assert.deepEqual(new Set(result.report!.applicable.map(update => update.target.region)), new Set([productNameRegion, packageNameRegion, frameworkVersionRegion, frameworkDependencyRegion, pluginBundleIdRegion]))
+    assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), cmakeBefore.replace('PRODUCT_NAME "TestPlugin"', 'PRODUCT_NAME "RenamedPlugin"').replace('PLUGIN_NAME "TestPlugin"', 'PLUGIN_NAME "RenamedPlugin"').replace('GIT_TAG "v0.0.0-m.2.2"', 'GIT_TAG "v0.0.0-m.2.3"').replaceAll('com.testvendor.testplugin', 'com.testvendor.renamedplugin'))
     assert.deepEqual(JSON.parse(await readFile(packageJsonFile.path(state), "utf8")), { ...packageBefore, name: "renamedplugin", dependencies: { ...packageBefore.dependencies, "@arrange/framework": "0.0.0-m.2.3" } })
 })
 

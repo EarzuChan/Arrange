@@ -1,18 +1,19 @@
 import { resolve } from 'node:path'
 import { buildDemoUi } from './demo-build.ts'
-import { cmakeExe, configureSmokeBuild, run, runInVsDev } from './common.ts'
+import { run } from './common.ts'
+import { configureSmokeBuild, nativeCmake, nativeExecutable, nativeTestDirectory } from './native-toolchain.ts'
 
-const buildDir = process.env.ARRANGE_NATIVE_TEST_BUILD_DIR ?? 'build/quickjs-app-smoke-ninja'
-const smokeExe = resolve(buildDir, 'cpp_tests/arrange_quickjs_app_smoke.exe')
+const buildDir = nativeTestDirectory()
+const smokeExe = nativeExecutable(resolve(buildDir, 'cpp_tests'), 'arrange_quickjs_app_smoke')
 const appBundle = resolve('build/demo-ui-dist/app.js')
 
 await buildDemoUi()
 await configureSmokeBuild(buildDir)
-await runInVsDev(`"${cmakeExe()}" --build "${buildDir}" --target arrange_quickjs_app_smoke arrange_juce_runtime_smoke --parallel 6`)
+await nativeCmake(["--build", buildDir, "--target", "arrange_quickjs_app_smoke", "arrange_juce_runtime_smoke", "--parallel", "4"])
 
 // 交互验证使用生产 ArrangeRuntime，QuickJS 边界测试不另造发布与回执循环
 await run(smokeExe, [appBundle])
-await run(resolve(buildDir, 'cpp_tests/arrange_juce_runtime_smoke.exe'), [appBundle])
+await run(nativeExecutable(resolve(buildDir, 'cpp_tests'), 'arrange_juce_runtime_smoke'), [appBundle])
 await run(smokeExe, [appBundle, '--expect-strict-modifier-ok', '{ elements: [] }'])
 for (const expression of ["{ elements: 'not-array' }", "{ elements: [{ type: 'unknownModifier', value: {} }] }"]) {
     await run(smokeExe, [appBundle, '--expect-strict-modifier-error', expression])

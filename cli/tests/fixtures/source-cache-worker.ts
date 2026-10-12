@@ -1,11 +1,15 @@
 import { appendFile } from "node:fs/promises"
 import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
+import { OperationHost } from "../../src/operation/OperationHost.ts"
+import { Operations } from "../../src/operation/Operations.ts"
 import { SourceCache } from "../../src/source/SourceCache.ts"
 import { UserDirectories } from "../../src/user/UserDirectories.ts"
 import { testTask, write } from "../fixture.ts"
 
 const [root, counter] = process.argv.slice(2) as [string, string]
+const host = new OperationHost(new UserDirectories(root))
+const operations = new Operations(host, new AbortController().signal, () => { })
 const commit = "a".repeat(40)
 const cache = new SourceCache(new UserDirectories(root), {
     verify: async () => { }, checkout: async (_spec, directory, _task, signal) => {
@@ -15,6 +19,8 @@ const cache = new SourceCache(new UserDirectories(root), {
         await write(join(directory, ".git", "HEAD"), `${commit}\n`)
         return commit
     }
-}, new AbortController().signal)
+}, new AbortController().signal, operations)
 const source = await cache.ensure({ repository: "fixture", ref: "v1", commit }, "Fixture", testTask())
 process.stdout.write(`${JSON.stringify(source)}\n`)
+
+await host.close()

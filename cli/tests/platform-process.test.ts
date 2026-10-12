@@ -1,3 +1,5 @@
+import { windowsOnly, nativeTools, hostArchitecture } from "./native-fixture.ts"
+import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
 import assert from "node:assert/strict"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { createServer } from "node:net"
@@ -9,10 +11,10 @@ import { Executor, quoteWindowsArgument } from "../src/platform/Executor.ts"
 import { DevSupervisor } from "../src/platform/DevSupervisor.ts"
 import { parseMsvcArchitecture, parseWindowsEnvironment, WindowsPlatformService } from "../src/platform/WindowsPlatformService.ts"
 import { satisfiesMinimumVersion, ToolchainService } from "../src/platform/ToolchainService.ts"
-import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
 import type { ProcessResult, ProcessSpec } from "../src/platform/ProcessSpec.ts"
 import { isAbortError, throwIfProcessCancelled } from "../src/platform/ProcessSpec.ts"
 import { stateFor } from "./fixture.ts"
+import { minimumNodeMajor } from "../src/CliMetadata.ts"
 
 async function freePort(): Promise<number> {
     const server = createServer()
@@ -178,7 +180,7 @@ test("supervisor readiness timeout reports HTTP errors with a bounded first line
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
-test("Windows command and environment boundaries preserve paths and reject expansion", () => {
+test("Windows command and environment boundaries preserve paths and reject expansion", windowsOnly, () => {
     assert.equal(quoteWindowsArgument("C:\\Program Files\\pnpm.cmd"), '"C:\\Program Files\\pnpm.cmd"')
     assert.throws(() => quoteWindowsArgument("%PATH%"))
     assert.throws(() => quoteWindowsArgument('x" & exit'))
@@ -190,40 +192,32 @@ test("Windows command and environment boundaries preserve paths and reject expan
     assert.equal(satisfiesMinimumVersion("cmake version 3.23.9", "3.24.0"), false)
 })
 
-test("tool discovery validates package manager under the selected Node environment", async () => {
-    class ProbeExecutor extends Executor {
-        readonly calls: ProcessSpec[] = []
-        override async run(spec: ProcessSpec): Promise<ProcessResult> {
-            this.calls.push(spec)
-            return { exitCode: 0, stdout: spec.command.endsWith("node") ? "v24.18.0" : "10.33.0", stderr: "", cancelled: false, timedOut: false }
-        }
-    }
-    const executor = new ProbeExecutor()
-    const state = stateFor("/tmp/unused")
-    state.local = { node: { path: "/selected/node/bin/node" }, packageManager: { path: "/tools/npm" } }
-    const inspection = await new ToolchainService(executor, new MacPlatformService(executor)).inspect(state, "UI")
+test("本机真实工具发现：Node 与包管理器路径、版本及 Node 环境", async () => {
+    const executor = new Executor()
+    const state = stateFor(process.cwd())
+    const node = process.execPath
+    const { locateTool } = await import("../src/platform/ToolLocator.ts")
+    const npm = await locateTool("npm")
+    assert.ok(npm, "需要本机 npm")
+    state.local = { node: { path: node }, packageManager: { path: npm } }
+    const inspection = await new ToolchainService(executor, createPlatformService(executor)).inspect(state, "UI")
     assert.deepEqual(inspection.issues, [])
-    assert.equal(executor.calls[1]!.env?.PATH?.startsWith("/selected/node/bin"), true)
-    state.project.ui.packageManager = "pnpm"
-    assert.equal((await new ToolchainService(executor, new MacPlatformService(executor)).inspect(state, "UI")).issues.some(issue => issue.key === "packageManager"), true)
+    assert.equal(inspection.local.node!.path, node)
+    assert.equal(satisfiesMinimumVersion(inspection.local.node!.version!, `${minimumNodeMajor}.0.0`), true)
+    assert.ok(inspection.local.packageManager!.version)
 })
 
-test("Windows native environment checks Developer Prompt target architecture", async () => {
-    class EnvironmentExecutor extends Executor {
-        output = "VCToolsInstallDir=C:\\VS\\VC\\Tools\\MSVC\\\r\nVSCMD_ARG_TGT_ARCH=x64\r\nPath=C:\\VS\\bin"
-        override async run(spec: ProcessSpec): Promise<ProcessResult> {
-            assert.equal(spec.windowsVerbatimArguments, true)
-            assert.match(spec.args.at(-1)!, /-arch=amd64 -host_arch=amd64/)
-            return { exitCode: 0, stdout: this.output, stderr: "", cancelled: false, timedOut: false }
-        }
-    }
-    const executor = new EnvironmentExecutor()
+test("Windows 真实 Developer Prompt 环境与 cl 架构一致", windowsOnly, async () => {
+    const { local } = await nativeTools()
+    const executor = new Executor()
     const platform = new WindowsPlatformService(executor)
-    const local = { native: { generator: "Ninja", architecture: "x64" as const, developerCommand: "C:\\Program Files\\VS\\VsDevCmd.bat" } }
     const env = await platform.nativeEnvironment(local)
-    assert.equal(env.Path, "C:\\VS\\bin")
-    executor.output = executor.output.replace("VSCMD_ARG_TGT_ARCH=x64", "VSCMD_ARG_TGT_ARCH=x86")
-    await assert.rejects(platform.nativeEnvironment(local), /目标架构/)
+    assert.ok(env.VCToolsInstallDir)
+    const actual = await executor.run({ command: local.nativeCompiler!.path, args: [], env })
+    assert.equal(parseMsvcArchitecture(actual.stdout + actual.stderr), hostArchitecture)
+    const broken = structuredClone(local)
+    broken.native!.developerCommand = "missing-vsdevcmd.bat"
+    await assert.rejects(platform.nativeEnvironment(broken), /工具环境初始化失败/)
 })
 
 test("tool probes preserve cancellation rather than producing toolchain issues", async () => {
@@ -236,7 +230,6 @@ test("tool probes preserve cancellation rather than producing toolchain issues",
     const state = stateFor("/tmp/unused")
     state.local = { node: { path: process.execPath }, native: { generator: "Ninja", architecture: "x64" } }
     assert.throws(() => throwIfProcessCancelled({ exitCode: 0, stdout: "", stderr: "", cancelled: true, timedOut: false }), isAbortError)
-    await assert.rejects(new ToolchainService(executor, new MacPlatformService(executor)).inspect(state, "UI"), isAbortError)
-    await assert.rejects(new MacPlatformService(executor).discoverNative(state.local), isAbortError)
-    await assert.rejects(new WindowsPlatformService(executor).discoverNative(state.local), isAbortError)
+    await assert.rejects(new ToolchainService(executor, createPlatformService(executor)).inspect(state, "UI"), isAbortError)
+    await assert.rejects(createPlatformService(executor).discoverNative(state.local), isAbortError)
 })

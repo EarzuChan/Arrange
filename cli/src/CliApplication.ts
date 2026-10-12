@@ -45,6 +45,11 @@ import { UserDirectories } from "./user/UserDirectories.ts"
 import { SourceCache } from "./source/SourceCache.ts"
 import { GitSource } from "./source/GitSource.ts"
 import { NativeSourceService } from "./source/NativeSourceService.ts"
+import { OperationHost } from "./operation/OperationHost.ts"
+import { Operations } from "./operation/Operations.ts"
+import { ProjectOperations } from "./operation/ProjectOperations.ts"
+import { ApplicationOperations } from "./operation/ApplicationOperations.ts"
+import { ApplicationCommand } from "./operation/ApplicationCommand.ts"
 
 export interface CliInteractions {
     readonly project: ProjectInteraction
@@ -61,40 +66,47 @@ export interface CliApplicationOptions {
 
 export function createCliApplication(options: CliApplicationOptions): Command {
     const { terminal } = options
-    const executor = new Executor(process.platform, options.signal)
+    const directories = new UserDirectories()
+    const host = new OperationHost(directories)
+    const signal = AbortSignal.any([options.signal, host.failureSignal])
+    const operations = new Operations(host, signal, message => terminal.reporter.info(message))
+    const executor = new Executor(process.platform, signal, host)
     const platform = createPlatformService(executor)
-    const fileWriter = new FileTransaction(options.signal)
+    const fileWriter = new FileTransaction(signal)
     const store = new ProjectStateStore(fileWriter)
-    const registry = new FrameworkRegistryClient(options.signal)
+    const registry = new FrameworkRegistryClient(signal)
     const interactions = options.interactions === "terminal" ? { project: new TerminalProjectInteraction(registry, configRegistry, terminal), config: new SyncWizard(terminal), setup: new SetupWizard(terminal) } : options.interactions
     const scanner = new ConfigScanner(configRegistry)
-    const writer = new ConfigWriter(options.signal)
-    const resolver = new ConfigResolver(writer, interactions.config, options.signal)
+    const writer = new ConfigWriter(signal)
+    const resolver = new ConfigResolver(writer, interactions.config, signal)
     const applier = new ConfigApplier(writer)
     const tools = new ToolchainService(executor, platform)
     const framework = new FrameworkService(registry)
     const configuration = new ConfigurationReadiness(scanner, interactions.config)
     const project = new ProjectService(store, framework, configuration)
     const node = new NodeJsService(executor)
-    const directories = new UserDirectories()
-    const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), options.signal))
-    const cmake = new CmakeService(executor, platform, new IconAssetsService(options.signal), directories, sources, options.signal)
-    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, options.signal, new FrameworkSourceProbe(executor, undefined, sources))
-    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, options.signal, terminal.tasks)
-    const initializer = new ProjectInitializer(fileWriter, options.signal)
+    const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), signal, operations))
+    const cmake = new CmakeService(executor, platform, new IconAssetsService(signal), directories, sources, signal)
+    const projectOperations = new ProjectOperations(operations, store, cmake)
+    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, signal, new FrameworkSourceProbe(executor, undefined, sources), (state, scope) => projectOperations.assertSetup(state, scope))
+    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, signal, terminal.tasks)
+    const initializer = new ProjectInitializer(fileWriter, signal)
     const native = new NativeBuildService(cmake)
     const artifacts = new ArtifactLocator(cmake)
-    const packer = new Packer(artifacts, executor, options.signal)
+    const packer = new Packer(artifacts, executor, signal)
     const ui = new UiBuildService(node)
     const builder = new BuildService(project, tools, ui, native, packer, terminal.tasks)
     const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, terminal.tasks)
-    const cli = new Command().name(cliName).description(cliDescription).version(cliVersion)
+    const actions = new ApplicationOperations(operations, projectOperations)
+    const cli = new ApplicationCommand(host).name(cliName).description(cliDescription).version(cliVersion)
     const { reporter } = terminal
-    registerCreateCommand(cli, initializer, sync, interactions.project, reporter)
-    registerAdoptCommand(cli, initializer, sync, interactions.project, reporter)
-    registerSyncCommand(cli, sync, reporter)
-    registerDevCommand(cli, dev, options.signal, reporter)
-    registerBuildCommand(cli, builder, reporter)
-    registerPackCommand(cli, project, packer, terminal.tasks, reporter)
+    const protectedInitializer = { planCreate: initializer.planCreate.bind(initializer), planAdopt: initializer.planAdopt.bind(initializer), apply: (plan: Parameters<ProjectInitializer["apply"]>[0]) => actions.initialize(initializer, plan) }
+    const protectedSync = { run: (options: Parameters<SyncService["run"]>[0], root: string) => actions.sync(sync, options, root) }
+    registerCreateCommand(cli, protectedInitializer, protectedSync, interactions.project, reporter)
+    registerAdoptCommand(cli, protectedInitializer, protectedSync, interactions.project, reporter)
+    registerSyncCommand(cli, protectedSync, reporter)
+    registerDevCommand(cli, { run: (root, options) => actions.dev(dev, root, options) }, signal, reporter)
+    registerBuildCommand(cli, { build: (root, options) => actions.build(builder, root, options) }, reporter)
+    registerPackCommand(cli, (root, options) => actions.pack(project, packer, root, options), terminal.tasks, reporter)
     return cli
 }

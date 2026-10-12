@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { cmakeExe, configureSmokeBuild, npmSubprocessEnv, repoRoot, run, runInVsDev } from "./common.ts"
+import { npmSubprocessEnv, repoRoot, run } from "./common.ts"
+import { configureSmokeBuild, nativeCmake, nativeExecutable, nativeTestDirectory } from "./native-toolchain.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
 import { ARRANGE_MACRO_PATTERN } from '../packages/vite-plugin/src/constraints.ts'
 
@@ -63,14 +64,9 @@ const macro = source.match(ARRANGE_MACRO_PATTERN)
 if (macro) throw new Error(`发布包产物残留未替换的编译宏： ${macro[0]}`)
 
 // 原生宿主必须加载本次安装包生成的产物，源码侧 Demo 不能代替发布包验收
-const nativeBuildDir = process.env.ARRANGE_NATIVE_TEST_BUILD_DIR ?? "build/native-smoke-ninja"
-if (process.platform === "win32") {
-    await configureSmokeBuild(nativeBuildDir)
-    await runInVsDev(`"${cmakeExe()}" --build "${nativeBuildDir}" --target arrange_juce_runtime_smoke --parallel 6`)
-} else {
-    await run(cmakeExe(), ["-S", ".", "-B", nativeBuildDir, "-DCMAKE_BUILD_TYPE=Debug", "-DARRANGE_BUILD_TESTS=ON"])
-    await run(cmakeExe(), ["--build", nativeBuildDir, "--target", "arrange_juce_runtime_smoke", "--parallel", "6"])
-}
-await run(resolve(repoRoot, nativeBuildDir, "cpp_tests", `arrange_juce_runtime_smoke${process.platform === "win32" ? ".exe" : ""}`), [appBundle])
+const nativeBuildDir = nativeTestDirectory()
+await configureSmokeBuild(nativeBuildDir)
+await nativeCmake(["--build", nativeBuildDir, "--target", "arrange_juce_runtime_smoke", "--parallel", "4"])
+await run(nativeExecutable(resolve(nativeBuildDir, "cpp_tests"), "arrange_juce_runtime_smoke"), [appBundle])
 
 console.log('[ArrangePackageVerify]', `Framework ${contract.frameworkVersion} 发布包安装、分层入口、真实 SFA 类型检查、Vite 构建及原生运行通过，CLI ${cliManifest.version} 已验证安装`)

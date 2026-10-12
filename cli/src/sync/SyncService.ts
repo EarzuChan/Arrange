@@ -11,6 +11,7 @@ import type { SetupScanReport } from "./SetupScanReport.ts"
 import type { ConfigInteraction } from "./ConfigInteraction.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
 import type { TaskRunner } from "../ui/Tasks.ts"
+import { ResourcePlanChanged } from "../util/ResourcePlanChanged.ts"
 
 export interface SyncRunOptions {
     readonly scanOnly?: boolean
@@ -104,6 +105,7 @@ export class SyncService {
                 return { status: "completed", report }
             }
         } catch (error) {
+            if (error instanceof ResourcePlanChanged) throw error
             if (isAbortError(error)) throw error
             this.interaction.failure(`CONFIG 失败：${errorMessage(error)}`)
             return { status: "failed" }

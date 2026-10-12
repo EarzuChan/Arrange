@@ -3,12 +3,11 @@ import { mkdir, readFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import test from "node:test"
 import { Executor } from "../src/platform/Executor.ts"
-import { locateTool } from "../src/platform/ToolLocator.ts"
+import { nativeTools } from "./native-fixture.ts"
 import { fixture, write } from "./fixture.ts"
 
 test("真实 CMake 读取与 CLI 相同的依赖清单，默认 commit 校验且尊重显式覆盖", async t => {
-    const cmake = await locateTool("cmake")
-    if (!cmake) return t.skip("需要 CMake")
+    const cmake = (await nativeTools()).local.cmake!.path
     const state = await fixture(t, false)
     const executor = new Executor()
     const source = join(state.rootDir, "source")

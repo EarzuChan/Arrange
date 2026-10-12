@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { cmakeExe, ninjaExe, repoRoot, runInVsDev } from "./common.ts"
+import { repoRoot, run } from "./common.ts"
+import { configureNativeBuild, nativeCmake, nativeExecutable } from "./native-toolchain.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
 
 const contract = readArrangeVersionContract()
@@ -49,9 +50,9 @@ int main() {
 }
 `.trimStart())
 
-await runInVsDev(`"${cmakeExe()}" -S "${consumerRoot}" -B "${buildDir}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninjaExe()}" -DCMAKE_BUILD_TYPE=Debug`)
-await runInVsDev(`"${cmakeExe()}" --build "${buildDir}"`)
-await runInVsDev(`"${resolve(buildDir, "arrange_fetchcontent_consumer.exe")}"`)
+await configureNativeBuild(consumerRoot, buildDir, "Debug")
+await nativeCmake(["--build", buildDir])
+await run(nativeExecutable(buildDir, "arrange_fetchcontent_consumer"))
 
 const sourceLabel = gitRepository && gitTag ? `${gitRepository}#${gitTag}` : arrangeSource
 console.log('[ArrangeNativeVerify]', `verified native FetchContent consumer for Arrange ${contract.frameworkVersion} from ${sourceLabel}`)

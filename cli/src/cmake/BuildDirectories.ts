@@ -6,7 +6,7 @@ import type { PlatformService } from "../platform/PlatformService.ts"
 import { UserDirectories } from "../user/UserDirectories.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import { buildOwnerFileName } from "../CliMetadata.ts"
-import { withDirectoryLock } from "../util/DirectoryLock.ts"
+import { withKernelLock } from "../operation/KernelLock.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
 
 export class BuildDirectories {
@@ -63,7 +63,7 @@ export class BuildDirectories {
         await mkdir(base, { recursive: true })
         const ownerPath = join(base, buildOwnerFileName)
         const rootDir = resolve(state.rootDir)
-        await withDirectoryLock(ownerPath, this.signal, async signal => {
+        await withKernelLock(`${ownerPath}.kernel`, this.signal, async signal => {
             let existing: { rootDir?: unknown } | undefined
             try { existing = JSON.parse(await readFile(ownerPath, "utf8")) as { rootDir?: unknown } } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new Error(`构建目录所有权记录不可读：${ownerPath}`, { cause: error })

@@ -521,13 +521,10 @@ n.insertChild(1, 2, 0)
         const float mouseDistance = 48.0f;
 #else
         // Windows：JUCE 把原始滚轮值除以 512；读取层还原格数，乘系统“每格行数”和框架行距。
-        // 一格对应原始值 120。滚轮被设为禁用或整页滚动时，行距换算不适用，明确跳过而不是静默通过
+        // 一格对应原始值 120；本测试要求系统启用按行滚动，缺少前提必须报告未完成验证
         UINT wheelLines = 3;
-        SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &wheelLines, 0);
-        if (wheelLines == 0 || wheelLines == WHEEL_PAGESCROLL) {
-            std::cerr << "跳过 Windows 滚轮换算断言：系统滚轮设置为禁用或整页滚动\n";
-            return;
-        }
+        check(SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &wheelLines, 0) != FALSE, "未完成 Windows 滚轮验证：无法读取系统滚轮设置");
+        check(wheelLines != 0 && wheelLines != WHEEL_PAGESCROLL, "未完成 Windows 滚轮验证：请在系统设置中启用按行滚动后重跑");
         const float mouseDistance = arrange::juce::scrollLineDistance * static_cast<float>(wheelLines);
         const float deltaPerPixel = static_cast<float>(WHEEL_DELTA) / (512.0f * mouseDistance);
         const float mouseStep = static_cast<float>(WHEEL_DELTA) / 512.0f;

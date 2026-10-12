@@ -1,3 +1,4 @@
+import { windowsOnly, macOnly } from "./native-fixture.ts"
 import assert from "node:assert/strict"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -6,7 +7,7 @@ import test from "node:test"
 import { parseMsvcArchitecture, parseMsvcBanner } from "../src/platform/WindowsPlatformService.ts"
 import { locateTool } from "../src/platform/ToolLocator.ts"
 
-// cl.exe 横幅会随系统语言本地化；以下样本取自各语言的真实横幅形态，解析不得依赖其中的词
+// 以下样本只验证本地化文本解析；本机 cl.exe 另有真实执行测试，不据此宣称其它语言环境已验
 const banners = [
     ["英文", "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35728 for x64\r\nCopyright (C) Microsoft Corporation.  All rights reserved.\r\n\r\nusage: cl [ option... ] filename... [ /link linkoption... ]\r\n", "19.50.35728", "x64"],
     ["简体中文", "用于 x64 的 Microsoft (R) C/C++ 优化编译器 19.50.35728 版\r\n版权所有(C) Microsoft Corporation。保留所有权利。\r\n\r\n用法: cl [ 选项... ] 文件名... [ /link 链接选项... ]\r\n", "19.50.35728", "x64"],
@@ -19,13 +20,13 @@ const banners = [
 ] as const
 
 for (const [label, banner, version, architecture] of banners) {
-    test(`MSVC 横幅解析与语言无关：${label}`, () => {
+    test(`MSVC 横幅解析与语言无关：${label}`, windowsOnly, () => {
         assert.deepEqual(parseMsvcBanner(banner), { version, architecture })
         assert.equal(parseMsvcArchitecture(banner), architecture)
     })
 }
 
-test("MSVC 横幅：x86 不是受支持的目标，缺少版本或架构时不臆测", () => {
+test("MSVC 横幅：x86 不是受支持的目标，缺少版本或架构时不臆测", windowsOnly, () => {
     assert.equal(parseMsvcArchitecture("用于 x86 的 Microsoft (R) C/C++ 优化编译器 19.50.35728 版"), undefined)
     assert.deepEqual(parseMsvcBanner("some other tool 1.2"), {})
     assert.deepEqual(parseMsvcBanner(""), {})
@@ -40,37 +41,37 @@ async function toolDirectory(...files: string[]): Promise<{ directory: string, d
     return { directory, dispose: () => rm(directory, { recursive: true, force: true }) }
 }
 
-test("Windows 定位：无扩展名命令按 PATHEXT 解析，不选同目录下无扩展名的 sh 垫片", async t => {
+test("Windows 定位：无扩展名命令按 PATHEXT 解析，不选同目录下无扩展名的 sh 垫片", windowsOnly, async t => {
     const { directory, dispose } = await toolDirectory("pnpm", "pnpm.cmd", "pnpm.ps1")
     t.after(dispose)
     const env = { PATH: directory, PATHEXT: ".COM;.EXE;.BAT;.CMD" }
-    assert.equal(await locateTool("pnpm", env, "win32"), join(directory, "pnpm.cmd"))
+    assert.equal(await locateTool("pnpm", env), join(directory, "pnpm.cmd"))
 })
 
-test("Windows 定位：只有无扩展名文件时视为不存在", async t => {
+test("Windows 定位：只有无扩展名文件时视为不存在", windowsOnly, async t => {
     const { directory, dispose } = await toolDirectory("pnpm")
     t.after(dispose)
-    assert.equal(await locateTool("pnpm", { PATH: directory, PATHEXT: ".EXE;.CMD" }, "win32"), undefined)
+    assert.equal(await locateTool("pnpm", { PATH: directory, PATHEXT: ".EXE;.CMD" }), undefined)
 })
 
-test("Windows 定位：遵循 PATHEXT 顺序，.exe 先于 .cmd，目录顺序先于扩展名顺序", async t => {
+test("Windows 定位：遵循 PATHEXT 顺序，.exe 先于 .cmd，目录顺序先于扩展名顺序", windowsOnly, async t => {
     const first = await toolDirectory("tool.cmd")
     const second = await toolDirectory("tool.exe", "tool.cmd")
     t.after(first.dispose)
     t.after(second.dispose)
-    assert.equal(await locateTool("tool", { PATH: `${second.directory};${first.directory}`, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, "win32"), join(second.directory, "tool.exe"))
-    assert.equal(await locateTool("tool", { PATH: `${first.directory};${second.directory}`, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, "win32"), join(first.directory, "tool.cmd"))
+    assert.equal(await locateTool("tool", { PATH: `${second.directory};${first.directory}`, PATHEXT: ".COM;.EXE;.BAT;.CMD" }), join(second.directory, "tool.exe"))
+    assert.equal(await locateTool("tool", { PATH: `${first.directory};${second.directory}`, PATHEXT: ".COM;.EXE;.BAT;.CMD" }), join(first.directory, "tool.cmd"))
 })
 
-test("Windows 定位：未设置 PATHEXT 时使用默认值，已带扩展名或完整路径的命令不受影响", async t => {
+test("Windows 定位：未设置 PATHEXT 时使用默认值，已带扩展名或完整路径的命令不受影响", windowsOnly, async t => {
     const { directory, dispose } = await toolDirectory("npm", "npm.cmd")
     t.after(dispose)
-    assert.equal(await locateTool("npm", { PATH: directory }, "win32"), join(directory, "npm.cmd"))
-    assert.equal(await locateTool("npm.cmd", { PATH: directory }, "win32"), join(directory, "npm.cmd"))
-    assert.equal(await locateTool(join(directory, "npm"), {}, "win32"), join(directory, "npm.cmd"))
+    assert.equal(await locateTool("npm", { PATH: directory }), join(directory, "npm.cmd"))
+    assert.equal(await locateTool("npm.cmd", { PATH: directory }), join(directory, "npm.cmd"))
+    assert.equal(await locateTool(join(directory, "npm"), {}), join(directory, "npm.cmd"))
 })
 
-test("非 Windows 定位仍可使用无扩展名可执行文件", { skip: process.platform === "win32" ? "Windows 上以真实环境验证，见下一项" : false }, async t => {
+test("非 Windows 定位仍可使用无扩展名可执行文件", macOnly, async t => {
     const { directory, dispose } = await toolDirectory("pnpm")
     t.after(dispose)
     const path = join(directory, "pnpm")
@@ -78,7 +79,7 @@ test("非 Windows 定位仍可使用无扩展名可执行文件", { skip: proces
     assert.equal(await locateTool("pnpm", { PATH: directory }, process.platform), path)
 })
 
-test("Windows 真机：Node 自带的 npm 解析为 .cmd，node 解析为 .exe", { skip: process.platform === "win32" ? false : "仅在 Windows 真机运行" }, async () => {
+test("Windows 真机：Node 自带的 npm 解析为 .cmd，node 解析为 .exe", windowsOnly, async () => {
     assert.match((await locateTool("npm"))!, /npm\.cmd$/i)
     assert.match((await locateTool("node"))!, /node\.exe$/i)
 })

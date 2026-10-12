@@ -11,7 +11,7 @@ export interface CreateCommandOptions {
     fetchContent?: string
 }
 
-export function registerCreateCommand(program: Command, initializer: ProjectInitializer, syncService: SyncService, interaction: ProjectInteraction, reporter: Reporter): void {
+export function registerCreateCommand(program: Command, initializer: Pick<ProjectInitializer, "planCreate" | "apply">, syncService: Pick<SyncService, "run">, interaction: ProjectInteraction, reporter: Reporter): void {
     program.command("create").description("创建完整 Arrange 工程").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: CreateCommandOptions) => {
             let created = false

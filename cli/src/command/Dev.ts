@@ -10,7 +10,7 @@ export interface DevCommandOptions {
     flavor?: "debug" | "release" | string
 }
 
-export function registerDevCommand(program: Command, service: DevService, signal: AbortSignal, reporter: Reporter): void {
+export function registerDevCommand(program: Command, service: Pick<DevService, "run">, signal: AbortSignal, reporter: Reporter): void {
     program.command("dev").description("启动并监管 UI 开发服务和 Standalone").addOption(new Option("--ui-only", "只启动 UI").conflicts("native-only")).addOption(new Option("--native-only", "只启动 native").conflicts("ui-only")).addOption(new Option("--flavor <flavor>", "native 构建配置").choices(["debug", "release"]).default("debug"))
         .action(async (options: DevCommandOptions) => {
             const flavor = buildFlavorSchema.parse(options.flavor)

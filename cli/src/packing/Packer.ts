@@ -10,6 +10,7 @@ import { uiOutputDirectory, workDirectory } from "../project/ProjectPaths.ts"
 import { isJsonObject } from "../util/Utils.ts"
 import { nativePresentationSignature } from "../project/NativePresentation.ts"
 import { WindowsBundleIcon } from "./WindowsBundleIcon.ts"
+import { nativeBuildRecordName } from "../building/BuildReceipt.ts"
 
 export interface PackOptions {
     readonly flavor: BuildFlavor
@@ -131,7 +132,7 @@ async function previousProductName(directory: string, state: ProjectState, artif
 
 async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string) {
     const ui = await readBuildRecord(resolve(workDirectory(state), "built-ui.json"))
-    const native = await readBuildRecord(resolve(workDirectory(state), `built-native-${options.flavor}.json`))
+    const native = await readBuildRecord(resolve(workDirectory(state), `built-${nativeBuildRecordName(state, options.flavor, platform)}.json`))
     const metadata = state.project.project
     const hasPresentation = metadata.displayName !== undefined || metadata.icon !== undefined || (platform === "darwin" && metadata.bundleId !== undefined)
     if (!native && hasPresentation) throw new Error("配置了产品显示名、Bundle ID 或图标，需要 CLI 原生构建记录；请先 arrange build --native-only")

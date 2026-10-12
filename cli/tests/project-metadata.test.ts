@@ -23,14 +23,17 @@ test("新工程显示名与 Bundle ID 一次生成；重命名不改变持久化
     assert.equal(projectStateSchema.safeParse(state).success, true)
 })
 
-test("旧 YAML 可省略新增字段；既有 Bundle ID 大小写与 target 替换规则保持", () => {
+test("省略 Bundle ID 时与创建共用生成规则；显式身份保留大小写且不依赖 target", () => {
     const state = createInitialProjectState(request())
     delete state.project.project.bundleId
     delete state.project.project.displayName
     state.project.native.target = "Original_Target+1"
     const loaded = projectStateSchema.parse(state)
     assert.equal(effectiveDisplayName(loaded), "My_Plugin2")
-    assert.equal(effectiveBundleId(loaded), "com.arrange.abcd.Original-Target-1")
+    assert.equal(effectiveBundleId(loaded), generateDefaultBundleId(request()))
+    assert.equal(effectiveBundleId(loaded), "com.arrangeco.myplugin2")
+    loaded.project.project.vendorName = "中文厂商"
+    assert.equal(effectiveBundleId(loaded), "com.abcd.myplugin2")
     loaded.project.project.bundleId = "com.Manufacturer.Product-1"
     assert.equal(effectiveBundleId(loaded), "com.Manufacturer.Product-1")
 })

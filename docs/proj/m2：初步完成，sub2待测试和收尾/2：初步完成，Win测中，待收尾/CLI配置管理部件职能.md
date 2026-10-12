@@ -12,4 +12,4 @@
 
 RESOLVE 可返回 `abort`、`rescan` 或 `ready-to-apply`，由 SyncService 继续编排。返回后如何处置 State、结果与定位，遵循[LSRA](../../../arch/32-ArrangeCLI托管与同步模型.md#config-与-setup-的-lsra)；写入失败按[事务约定](../../../arch/32-ArrangeCLI托管与同步模型.md#arrange-与写入失败)处理。
 
-CONFIG/SETUP 实现与验证状态见[第三期工作区](第三期M2.2的工作.md)，准备检查与交互规则见[SETUP 母文档](../../../arch/32-ArrangeCLI托管与同步模型.md#setup-扫描与准备)。
+CONFIG/SETUP 实现与验证状态见[第三期工作区](M2.2的最后工作中.md)，准备检查与交互规则见[SETUP 母文档](../../../arch/32-ArrangeCLI托管与同步模型.md#setup-扫描与准备)。

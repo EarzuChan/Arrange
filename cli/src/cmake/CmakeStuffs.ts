@@ -4,7 +4,7 @@ import { TextFile } from "../managed/ManagedFile.ts"
 import { TextCluster } from "../managed/TextCluster.ts"
 import { TextRegion } from "../managed/TextRegion.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
-import { effectiveBundleId, effectiveDisplayName } from "../project/ProjectMetadata.ts"
+import { effectiveBundleId, effectiveDisplayName, generateDefaultBundleId } from "../project/ProjectMetadata.ts"
 import { quote } from "./CmakeText.ts"
 import { productIconAssetsRegion, productIconPlistRegion, productIconPreparationRegion } from "./CmakeIconStuffs.ts"
 
@@ -88,11 +88,12 @@ export const pluginBundleIdRegion: TextRegion = new class extends TextRegion {
     readonly managedItemId = "cmake.plugin-identity"
 
     protected override makeInner(state: ProjectState): string {
-        const fallbackState = { project: { project: { vendorCode: state.project.project.vendorCode }, native: state.project.native } }
+        const metadata = state.project.project
+        const defaultBundleId = generateDefaultBundleId({ vendorName: metadata.vendorName, vendorCode: metadata.vendorCode, projectName: metadata.name })
         return `if(APPLE)
     set(_arrange_bundle_id ${quote(effectiveBundleId(state))})
 else()
-    set(_arrange_bundle_id ${quote(effectiveBundleId(fallbackState))})
+    set(_arrange_bundle_id ${quote(defaultBundleId)})
 endif()
 `
     }

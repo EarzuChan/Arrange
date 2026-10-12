@@ -4,6 +4,7 @@ import { join, relative, isAbsolute } from "node:path"
 import { localWorkDirectory } from "../CliMetadata.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import { stripAnsi } from "./Ansi.ts"
+import { randomUUID } from "node:crypto"
 
 // 每次命令运行的任务日志写在工程 .arrange/logs/<运行时间>/<任务>.log；只保留最近若干次运行
 const keptRuns = 20
@@ -16,7 +17,7 @@ function timestamp(date: Date): string {
 
 export class TaskLogRun {
     private directory: Promise<string> | undefined
-    private readonly name = timestamp(new Date())
+    private readonly name = `${timestamp(new Date())}-${process.pid}-${randomUUID()}`
 
     // 同一次运行的所有任务共用一个目录；目录首次使用时创建并清理旧运行
     async open(rootDir: string, id: string): Promise<TaskLogFile> {
@@ -31,7 +32,16 @@ export class TaskLogRun {
         const directory = join(root, this.name)
         await mkdir(directory, { recursive: true })
         const runs = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort()
-        for (const stale of runs.slice(0, Math.max(0, runs.length - keptRuns))) await rm(join(root, stale), { recursive: true, force: true }).catch(() => { })
+        for (const stale of runs.slice(0, Math.max(0, runs.length - keptRuns))) {
+            const pid = stale.match(/^\d{8}-\d{6}-\d{3}-(\d+)-/)?.[1]
+            if (pid) {
+                try {
+                    process.kill(Number(pid), 0)
+                    continue
+                } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") continue }
+            }
+            await rm(join(root, stale), { recursive: true, force: true }).catch(() => { })
+        }
         return directory
     }
 }

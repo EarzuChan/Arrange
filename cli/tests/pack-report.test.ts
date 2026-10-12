@@ -10,9 +10,9 @@ import type { ProjectState } from "../src/project/ProjectState.ts"
 test("打包报告列出目录、各产品位置、二进制大小与清单，路径相对工程根", async t => {
     const root = await mkdtemp(resolve(tmpdir(), "arrange-pack-report-"))
     t.after(() => rm(root, { recursive: true, force: true }))
-    const directory = resolve(root, "artifacts", "release", "1.0.0", "windows-x64")
+    const directory = resolve(root, "artifacts", "release", "1.0.0", "products")
     await mkdir(resolve(directory, "standalone"), { recursive: true })
-    const exe = resolve(directory, "standalone", "App.exe")
+    const exe = resolve(directory, "standalone", "payload.bin")
     await writeFile(exe, Buffer.alloc(3 * 1024 * 1024))
     const result: PackResult = {
         directory,
@@ -24,10 +24,10 @@ test("打包报告列出目录、各产品位置、二进制大小与清单，�
     }
     const state = { rootDir: root, project: { project: { version: "1.0.0" } } } as unknown as ProjectState
     const lines = await describePackResult(state, "release", result)
-    const at = (...parts: string[]) => join("artifacts", "release", "1.0.0", "windows-x64", ...parts)
+    const at = (...parts: string[]) => join("artifacts", "release", "1.0.0", "products", ...parts)
     assert.deepEqual(lines, [
         `交付物（release · 1.0.0）：${at()}`,
-        `standalone  ${at("standalone", "App.exe")}，二进制 3.0 MB`,
+        `standalone  ${at("standalone", "payload.bin")}，二进制 3.0 MB`,
         `vst3        ${at("vst3", "App.vst3")}`,
         `清单        ${at("arrange-package.json")}`,
     ])

@@ -1,7 +1,10 @@
-import { cmakeExe, configureSmokeBuild, runInVsDev } from "./common.ts"
+import { buildDemoUi } from "./demo-build.ts"
+import { configureSmokeBuild, nativeCmake, nativeCtest, nativeTestDirectory } from "./native-toolchain.ts"
 
-const buildDir = "build\\native-smoke-ninja"
-
-await configureSmokeBuild(buildDir)
-await runInVsDev(`"${cmakeExe()}" --build ${buildDir} --target arrange_core_smoke`)
-await runInVsDev(`${buildDir}\\cpp_tests\\arrange_core_smoke.exe`)
+const flavor = process.env.ARRANGE_NATIVE_TEST_FLAVOR ?? "Debug"
+if (flavor !== "Debug" && flavor !== "Release") throw new Error("ARRANGE_NATIVE_TEST_FLAVOR 只接受 Debug 或 Release")
+const build = nativeTestDirectory(flavor)
+await buildDemoUi()
+await configureSmokeBuild(build, flavor)
+await nativeCmake(["--build", build, "--config", flavor, "--parallel", process.env.CMAKE_BUILD_PARALLEL_LEVEL ?? "4"])
+await nativeCtest(build, flavor)

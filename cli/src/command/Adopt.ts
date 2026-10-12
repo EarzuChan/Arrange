@@ -11,7 +11,7 @@ export interface AdoptCommandOptions {
     fetchContent?: string
 }
 
-export function registerAdoptCommand(program: Command, initializer: ProjectInitializer, syncService: SyncService, interaction: ProjectInteraction, reporter: Reporter): void {
+export function registerAdoptCommand(program: Command, initializer: Pick<ProjectInitializer, "planAdopt" | "apply">, syncService: Pick<SyncService, "run">, interaction: ProjectInteraction, reporter: Reporter): void {
     program.command("adopt").description("接入已有 UI/native 工程").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
         .action(async (options: AdoptCommandOptions) => {
             let initialized = false

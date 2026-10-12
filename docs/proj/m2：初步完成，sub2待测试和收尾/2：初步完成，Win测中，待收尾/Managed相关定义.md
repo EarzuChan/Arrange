@@ -10,4 +10,4 @@
 | CMake 具体定义 | [CmakeStuffs.ts](../../../../cli/src/cmake/CmakeStuffs.ts) |
 | Node 具体定义 | [NodeJsStuffs.ts](../../../../cli/src/node-js/NodeJsStuffs.ts) |
 
-实现顺序见[第三期工作区](第三期M2.2的工作.md)，验收见[CONFIG 扫描验收用例](SCAN结果各项+对策.md)。
+实现顺序见[第三期工作区](M2.2的最后工作中.md)，验收见[CONFIG 扫描验收用例](SCAN结果各项+对策.md)。

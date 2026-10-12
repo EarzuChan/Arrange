@@ -11,9 +11,10 @@ import type { SetupScanReport, SetupScope, SetupResult, SetupTask } from "./Setu
 import { isAbortError } from "../platform/ProcessSpec.ts"
 import type { TaskEntry, TaskRunner } from "../ui/Tasks.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
+import { ResourcePlanChanged } from "../util/ResourcePlanChanged.ts"
 
 export class SetupService {
-    constructor(private readonly store: ProjectStateStore, private readonly tools: ToolchainService, private readonly node: NodeJsService, private readonly cmake: CmakeService, private readonly framework: FrameworkService, private readonly interaction: SetupInteraction, private readonly tasks: TaskRunner, private readonly signal: AbortSignal, private readonly source?: FrameworkSourceProbe) { }
+    constructor(private readonly store: ProjectStateStore, private readonly tools: ToolchainService, private readonly node: NodeJsService, private readonly cmake: CmakeService, private readonly framework: FrameworkService, private readonly interaction: SetupInteraction, private readonly tasks: TaskRunner, private readonly signal: AbortSignal, private readonly source?: FrameworkSourceProbe, private readonly beforeApply?: (state: ProjectState, scope: SetupScope) => Promise<void>) { }
 
     async scan(rootDir: string, scope: SetupScope): Promise<SetupScanReport> {
         this.signal.throwIfAborted()
@@ -86,6 +87,7 @@ export class SetupService {
                     continue
                 }
                 if (!report.state) return { status: "blocked", report }
+                await this.beforeApply?.(report.state, scope)
                 await assertSnapshots(report.snapshots)
                 this.signal.throwIfAborted()
                 // UI 依赖安装与各 flavor 的 configure 互不依赖，并行执行；任一失败时其余跑完再一起报告
@@ -96,6 +98,7 @@ export class SetupService {
                 return { status: "completed", report }
             }
         } catch (error) {
+            if (error instanceof ResourcePlanChanged) throw error
             if (isAbortError(error)) throw error
             this.interaction.failure(`SETUP 失败：${errorMessage(error)}`)
             return { status: "failed" }

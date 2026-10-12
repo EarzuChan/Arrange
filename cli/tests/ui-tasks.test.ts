@@ -1,3 +1,4 @@
+import { symbols } from "../src/ui/Theme.ts"
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
@@ -12,6 +13,7 @@ import { createTerminal } from "../src/ui/Terminal.ts"
 import { ninjaProgress, TaskFailures, type TaskOutput } from "../src/ui/Tasks.ts"
 import { quietTerminal } from "./fixture.ts"
 import { EmulatedTty } from "./terminal-emulator.ts"
+import { TaskLogRun } from "../src/ui/TaskLog.ts"
 
 function gate() {
     let open: () => void = () => { }
@@ -43,11 +45,11 @@ test("并行任务：一个失败时其余跑完，最后一起报告失败；�
     assert.equal(error.message, "任务 A：A 出错")
     assert.deepEqual(finished.sort(), ["B", "C"])
     const output = terminal.output.text
-    assert.match(output, /◇  任务 B/)
-    assert.match(output, /◇  任务 C/)
-    assert.match(output, /■  任务 A 失败/)
-    assert.match(output, /│  A 出错/)
-    assert.match(output, /│ A 输出/)
+    assert.match(output, /[◇o]  任务 B/)
+    assert.match(output, /[◇o]  任务 C/)
+    assert.match(output, /[■x]  任务 A 失败/)
+    assert.match(output, /[│|]  A 出错/)
+    assert.match(output, /[│|] A 输出/)
 })
 
 test("全部成功时按输入顺序返回结果；单个任务失败时原样抛出原错误", async () => {
@@ -79,7 +81,7 @@ test("任一任务被取消时整体以取消结束（不当作失败），其�
         },
     ]), error => error === cancellation)
     assert.equal(otherDone, true)
-    assert.match(terminal.output.text, /■  A 已取消/)
+    assert.match(terminal.output.text, /[■x]  A 已取消/)
 })
 
 test("任务日志写入工程 .arrange/logs/<运行>/<任务>.log（去掉颜色），只保留最近 20 次运行", async t => {
@@ -99,6 +101,23 @@ test("任务日志写入工程 .arrange/logs/<运行>/<任务>.log（去掉颜�
     assert.deepEqual(await readdir(join(logs, latest)), ["configure-native-debug.log"])
     assert.equal(await readFile(join(logs, latest, "configure-native-debug.log"), "utf8"), "error: 失败原因\n")
     assert.match(terminal.output.text, /完整日志：.*configure-native-debug\.log/)
+})
+
+test("并发日志运行身份独立，清理不删除存活 CLI 的日志", async t => {
+    const root = await mkdtemp(join(tmpdir(), "arrange-concurrent-log-"))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const logs = join(root, ".arrange", "logs")
+    const active = `20000101-000000-000-${process.pid}-active`
+    await mkdir(join(logs, active), { recursive: true })
+    for (let index = 1; index < 25; index++) await mkdir(join(logs, `20000101-0000${String(index).padStart(2, "0")}-000`), { recursive: true })
+    const [first, second] = await Promise.all([new TaskLogRun().open(root, "task"), new TaskLogRun().open(root, "task")])
+    assert.notEqual(first.path, second.path)
+    first.write("first")
+    second.write("second")
+    await Promise.all([first.close(), second.close()])
+    assert.equal(await readFile(first.path, "utf8"), "first\n")
+    assert.equal(await readFile(second.path, "utf8"), "second\n")
+    assert.ok((await readdir(logs)).includes(active))
 })
 
 test("子进程输出经任务逐行接收：保留颜色、拆块的多字节字符、回车刷新、标准错误与结尾无换行的行", async () => {
@@ -163,16 +182,16 @@ test("实时会话（xterm 模拟终端）：任务框绘制在屏幕上，滚�
     const ui = tasks.find(task => task.id === "ui")!
     assert.equal(native.viewport.following, false, "滚轮命中 native 框")
     assert.equal(ui.viewport.following, true)
-    assert.ok((await tty.screen()).some(line => /↓ 3 行 · End 跟随/.test(line)))
+    assert.ok((await tty.screen()).some(line => line.includes(`${symbols.arrowDown} 3 行 · End 跟随`)))
     release.open()
     await running
     terminal.reporter.outro("同步完成")
     const lines = await tty.lines()
-    assert.equal(lines[0], "┌  arrange sync")
-    assert.ok(lines.some(line => /^◇  安装 UI 依赖/.test(line)))
-    assert.ok(lines.some(line => /^◇  配置 native · debug/.test(line)))
-    assert.ok(!lines.some(line => line.includes("╭") || line.includes("-line-")), `不残留任务框：${lines.join("\n")}`)
-    assert.equal(lines.at(-1), "└  同步完成")
+    assert.equal(lines[0], `${symbols.barStart}  arrange sync`)
+    assert.ok(lines.some(line => /^[◇o]  安装 UI 依赖/.test(line)))
+    assert.ok(lines.some(line => /^[◇o]  配置 native · debug/.test(line)))
+    assert.ok(!lines.some(line => line.includes(symbols.cornerTopLeft) || line.includes("-line-")), `不残留任务框：${lines.join("\n")}`)
+    assert.equal(lines.at(-1), `${symbols.barEnd}  同步完成`)
     // 原始模式保持到终端关闭（进程退出前），期间不来回切换
     assert.equal(stdin.raw, true)
     terminal.close()

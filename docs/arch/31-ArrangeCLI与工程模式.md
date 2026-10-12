@@ -26,8 +26,10 @@ Arrange::framework -> native 唯一公开 target
 | `framework/` | registry metadata、Framework 版本与 CLI 兼容性 |
 | `node-js/` | UI 包管理器、依赖准备与 UI 构建 |
 | `cmake/` | CMake 文件定义、工程独立构建目录、configure/build、File API 模型与准备检查 |
+| `packing/MacSignature` | macOS 自动重签的纯策略；系统签名检查与执行由 `MacBundleSigner` 负责 |
 | `user/` | Arrange 用户级目录解析与按需创建 |
 | `source/` | 原生依赖清单、共享源码缓存与 Git 获取 |
+| `operation/` | 命令资源计划、跨进程占用、内核锁与工具工作进程 |
 | `asset/` | 工程图标源校验、Node 侧缩放与 ICO/ICNS 转换、生成资源检查 |
 | `building/` | build/dev 的工程编排 |
 | `packing/` | 真实产物定位、完整 bundle 整理、UI 资源、打包提交与 Mac 签名检查 |
@@ -41,7 +43,7 @@ CLI 不使用全局服务容器。`Entry.ts` 检查正式运行环境，管理�
 
 默认直接使用具体类，不为单一实现机械抽取接口。业务流程的询问、报告和提示通过小型领域交互接口注入，终端实现由上层创建；业务服务不实例化 Wizard，也不判断 TTY。依赖必须显式提供，不回退到全局实例，也不通过懒加载规避循环依赖。构造过程只组装对象，不启动网络请求、外部进程或交互。工程根、State、报告和快照通过操作参数或局部变量传递。测试创建自己的服务和交互替代实例，不修改私有成员、全局服务或类原型。
 
-所有外部进程经过 `Executor`；`DevSupervisor` 在完成、失败和取消时释放子进程与监听器。平台差异集中于平台服务及 bundle/signing 适配，命令不直接拼接平台工具链。
+命令资源与异常退出保护见 [CLI 资源占用与进程生命周期](36-ArrangeCLI资源占用与进程生命周期.md)。所有外部进程经过 `Executor`；`DevSupervisor` 在完成、失败和取消时释放子进程与监听器。平台差异集中于平台服务及 bundle/signing 适配，命令不直接拼接平台工具链。
 
 交互层的全部输出与输入经过入口创建的 `CliTerminal`（屏幕、消息、任务与提问输入），由装配显式传给命令、向导与需要呈现任务的服务；服务只产生日志行、阶段与进度，不直接写终端。规则见[终端输出与交互](#终端输出与交互)。
 
@@ -76,6 +78,10 @@ project/
 
 本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选的 `cmakeDefinitions` 和构建树根目录 `buildRoot`（见同篇“版本与工具链”一节的构建树位置说明）。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
 
+CLI 的全部 `-D` 参数由当前配置、工具链与默认规则统一生成。每个构建树中的 `definitions.json` 仅保存 CLI 可能写入过的键，不保存配置值；自动源码覆盖也纳入这份记录。configure 前以精确 `-UKEY` 清除已删除的键，再以 `-DKEY=value` 写入当前值；仍有 CLI 默认值的键直接恢复该默认值。CMake 自身创建或用户手工写入的其它缓存键不属于 CLI 的日常清理范围。
+
+启动 CMake 前原子保存新旧键的并集，整个 configure 验证成功后收缩为当前键集合，最后发布准备凭据。失败、取消或异常退出不会丢失待清理键；这些写入遵守[构建树资源占用](36-ArrangeCLI资源占用与进程生命周期.md)。已有 CMakeCache 却缺少归属记录时重建该构建树，避免继承无法追溯的旧值；共享源码缓存保留。归属记录损坏时明确拒绝，不猜测或迁移旧格式。
+
 运行时统一通过 [ProjectState](32-ArrangeCLI托管与同步模型.md#定义state-与拓扑) 使用配置与工程根。CONFIG 维护文件中的项目事实；SETUP 使用真实工具链准备可执行的工程，不以写一份 local YAML 代替依赖安装与 CMake configure。
 
 ### 产品标识、显示名与图标
@@ -90,7 +96,7 @@ project:
   icon: assets/icon.png
 ```
 
-`bundleId` 仅在 macOS 生效，Windows 不设置 AUMID。create 允许显式填写；跳过时生成 `com.<制造商段>.<产品段>` 并保存：制造商段取 `vendorName` 的 ASCII 字母数字并转小写，结果为空则取小写 `vendorCode`；产品段取 `project.name` 的 ASCII 字母数字并转小写。只在创建时生成，不因后续重命名漂移。旧工程未填写时保留原有的 `com.arrange.<小写 vendorCode>.<经过原规则清理的 native.target>`，避免升级 CLI 意外改变身份。
+`bundleId` 仅在 macOS 生效，Windows 不设置 AUMID。创建向导、工程创建和缺省字段读取共用 `generateDefaultBundleId`：生成 `com.<制造商段>.<产品段>`，制造商段取 `vendorName` 的 ASCII 字母数字并转小写，结果为空则取小写 `vendorCode`；产品段取 `project.name` 的 ASCII 字母数字并转小写，不使用 native target。create 跳过时将生成值保存到 YAML，后续重命名不改变已保存身份；其它工程省略时按当前字段生成，需要固定身份时显式填写。显式值保留原样。Windows 的 JUCE 构建参数也使用同一函数生成默认标识，忽略仅用于 macOS 的显式值。
 
 `displayName` 用于产品文件名、产品显示元数据、默认窗口名称和插件向 DAW 报告的名称。create 跳过时将当时的 `project.name` 保存为显示名；既有 YAML 省略时回退到 `project.name`。允许中文和空格，拒绝跨平台文件名禁用字符、控制字符、Windows 保留名以及末尾点或空格。工程机器名、CMake target、源码名称仍由原字段管理。生成产物为 `<displayName>.app`、`<displayName>.exe`、`<displayName>.vst3`；产物位置仍读取 CMake 模型，不拼接显示名猜测路径。
 
@@ -170,7 +176,7 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 任务运行时，输出末尾显示实时区域：每个任务一行标题（状态、阶段、用时；ninja 的 `[n/N]` 作为真实进度条）和一个固定高度、宽度撑满的日志框。框内按可见宽度折行，可回看全部日志：滚轮按所在位置命中对应的框并移入焦点，方向键、翻页、Home/End 作用于焦点框，Tab 切换焦点，点击框也可聚焦；向上滚动后停止跟随，新输出不移动内容，End 或滚到底恢复跟随。实时区域期间开启鼠标上报，选中文字需按住 Shift（iTerm 为 Option）拖动。没有日志的等待（扫描、工程加载、读取版本）只显示一行临时状态，结束后不留痕。
 
-任务结束后从实时区域移除，摘要写进滚动历史：成功为一行与用时；失败附原因、日志末尾最多 200 行的静态框与完整日志路径；取消单独标注。完整日志写入工程 `.arrange/logs/<运行时间>/<任务>.log`（去掉颜色），保留最近 20 次运行；框内内存中保留最近 5 万行。
+任务结束后从实时区域移除，摘要写进滚动历史：成功为一行与用时；失败附原因、日志末尾最多 200 行的静态框与完整日志路径；取消单独标注。完整日志写入工程 `.arrange/logs/<运行时间>/<任务>.log`（去掉颜色），保留最近 20 次运行，额外保护仍存活 CLI 的较旧运行目录；运行目录名附带 PID 和随机身份，避免并发日志混写。框内内存中保留最近 5 万行。
 
 SETUP 的 UI 安装与各 flavor configure、build 的 UI 与 native 构建、release dev 的 UI 与 Standalone 构建都并行执行。一个任务失败时其余照常跑完，最后一起报告失败并停止后续步骤；取消使全部任务停止。
 
@@ -237,5 +243,5 @@ Windows VST3 的二进制目录按架构核验为 `Contents/x86_64-win` 或 `Con
 
 - 用户可见 CLI、工程目录、命令、平台和交付整理：本文。
 - File/Cluster/Region、ManagedItem、CONFIG/SETUP 状态机与 `.arrange/`：[托管与同步模型](32-ArrangeCLI托管与同步模型.md)。
-- 本期实现状态与验收证据：[M2.2 第三期工作区](../proj/m2：初步完成，sub2待测试和收尾/2：初步完成，Win测中，待收尾/第三期M2.2的工作.md)。
+- 本期实现状态与验收证据：[M2.2 第三期工作区](../proj/m2：初步完成，sub2待测试和收尾/2：初步完成，Win测中，待收尾/M2.2的最后工作中.md)。
 - 本轮工程能力与交付边界的决策原因：[ADR 016](../adr/016-M2.2%20CLI工程准备与交付整理.md)。

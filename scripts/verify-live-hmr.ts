@@ -4,8 +4,14 @@ import { spawn } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 import arrange from '../packages/vite-plugin/src/plugin.ts'
+import { configureSmokeBuild, nativeCmake, nativeExecutable, nativeTestDirectory } from './native-toolchain.ts'
 
-const executable = resolve(process.argv[2] ?? 'build/m2-native-debug/cpp_tests/arrange_live_server')
+const build = nativeTestDirectory()
+if (!process.argv[2]) {
+    await configureSmokeBuild(build)
+    await nativeCmake(['--build', build, '--target', 'arrange_live_server', '--parallel', '4'])
+}
+const executable = process.argv[2] ? resolve(process.argv[2]) : nativeExecutable(resolve(build, 'cpp_tests'), 'arrange_live_server')
 const directory = await mkdtemp(resolve('build/live-hmr-'))
 const server = await createServer({ root: directory, configFile: false, plugins: [arrange({ entry: 'main.ts', port: 0 })], optimizeDeps: { noDiscovery: true }, server: { watch: { awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 } } } })
 let child: ReturnType<typeof spawn> | undefined
