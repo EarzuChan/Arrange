@@ -13,6 +13,8 @@ import { locateTool } from "../src/platform/ToolLocator.ts"
 import { assertPlainDirectoryPath } from "../src/util/PlainDirectoryPath.ts"
 import { isAbortError, type ProcessResult, type ProcessSpec } from "../src/platform/ProcessSpec.ts"
 import { PNG } from "pngjs"
+import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { BuildDirectories } from "../src/cmake/BuildDirectories.ts"
 import { nativeIconCmakeDefinitions, nativeIconDirectory } from "../src/CliMetadata.ts"
 
 test("native build 尊重 CMake 并行环境变量，未设置时保留默认并行参数", async t => {
@@ -34,7 +36,7 @@ test("native build 尊重 CMake 并行环境变量，未设置时保留默认并
             }
         }
         const executor = new RecordingExecutor()
-        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
+        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
         const model: CmakeModel = { sourceDirectory: join(state.rootDir, "native"), buildDirectory: service.buildDirectory(state, "release"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
         service.configure = async () => model
         service.readModel = async () => model
@@ -59,7 +61,7 @@ test("CMake cancellation stays an AbortError even when a tool reports exit zero"
     const state = await fixture(t, false)
     state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Unix Makefiles", architecture: "arm64" } }
     const executor = new CancelledExecutor()
-    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
+    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
     await assert.rejects(service.configure(state, "debug", testTask()), isAbortError)
     assert.equal((await service.inspect(state, "debug")).ready, false)
     service.configure = async () => ({ sourceDirectory: state.rootDir, buildDirectory: service.buildDirectory(state, "debug"), configuration: "Debug", platform: "darwin", architecture: "arm64", targets: [] })
@@ -78,11 +80,13 @@ test("Windows native configure cancellation can retry when CMake reports path ca
     } as unknown as PlatformService
     const caseVariant = (path: string): string => [...path].map((character, index) => /[a-z]/i.test(character) ? (index % 2 ? character.toLowerCase() : character.toUpperCase()) : character).join("")
     const source = join(state.rootDir, state.project.native.directory)
+    let sourceDirectories: Record<string, string> = { FETCHCONTENT_SOURCE_DIR_JUCE: join(state.rootDir, "shared-juce") }
     const executor = new class extends Executor {
         calls = 0
         override async run(spec: ProcessSpec): Promise<ProcessResult> {
             this.calls++
             if (this.calls === 1) return { exitCode: 130, stdout: "", stderr: "", cancelled: true, timedOut: false }
+            assert.ok(spec.args.includes("-UFETCHCONTENT_SOURCE_DIR_JUCE"), "retry must clear a cancelled configure's injected source override when ownership changes")
 
             const build = spec.args[spec.args.indexOf("-B") + 1]!
             const sourceVariant = caseVariant(source)
@@ -100,10 +104,14 @@ test("Windows native configure cancellation can retry when CMake reports path ca
                 { name: "TestPlugin_Standalone", id: "standalone", jsonFile: "target-standalone.json" },
                 { name: "TestPlugin_VST3", id: "vst3", jsonFile: "target-vst3.json" },
             ]
-            await write(join(reply, "index-test.json"), JSON.stringify({ reply: { "client-arrange": {
-                "codemodel-v2": { jsonFile: "codemodel.json" },
-                "cmakeFiles-v1": { jsonFile: "cmakeFiles.json" },
-            } } }))
+            await write(join(reply, "index-test.json"), JSON.stringify({
+                reply: {
+                    "client-arrange": {
+                        "codemodel-v2": { jsonFile: "codemodel.json" },
+                        "cmakeFiles-v1": { jsonFile: "cmakeFiles.json" },
+                    }
+                }
+            }))
             await write(join(reply, "codemodel.json"), JSON.stringify({
                 paths: { source: sourceVariant, build: buildVariant },
                 configurations: [{ name: "Debug", targets }],
@@ -115,7 +123,7 @@ test("Windows native configure cancellation can retry when CMake reports path ca
             return { exitCode: 0, stdout: "", stderr: "", cancelled: false, timedOut: false }
         }
     }()
-    const service = new CmakeService(executor, platform, new IconAssetsService())
+    const service = new CmakeService(executor, platform, new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")), { prepare: async () => sourceDirectories })
     const build = service.buildDirectory(state, "debug")
     await write(join(build, "CMakeCache.txt"), [
         "CMAKE_GENERATOR:INTERNAL=Ninja",
@@ -130,27 +138,35 @@ test("Windows native configure cancellation can retry when CMake reports path ca
     assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "cancelled setup must retain a compatible CMake tree")
     assert.equal((await service.inspect(state, "debug")).ready, false, "cancellation must leave SETUP incomplete")
 
+    sourceDirectories = {}
     const model = await service.configure(state, "debug", testTask())
     assert.equal(executor.calls, 2)
     assert.equal(model.configuration, "Debug")
     assert.equal((await service.inspect(state, "debug")).ready, true)
     assert.equal(await readFile(dependencySentinel, "utf8"), "already fetched", "retry must reuse fetched dependencies")
     await access(join(build, "preparation.json"))
+    const managed = state.project["managed-items"]
+    state.project["managed-items"] = []
+    assert.equal((await service.inspect(state, "debug")).ready, false, "changing source ownership invalidates preparation")
+    state.project["managed-items"] = managed
 })
 
 test("CMake rejects aliased work directories before reading, resetting or running tools", async t => {
-    for (const parent of [".arrange", ".arrange/build", ".arrange/build/mac-arm64", ".arrange/build/mac-arm64/debug"]) await t.test(parent, async t => {
+    for (const level of ["builds", "project", "configuration"]) await t.test(level, async t => {
         const state = await fixture(t, false)
         state.local = { cmake: { path: "/unused/cmake" }, nativeCompiler: { path: "/unused/clang++" }, native: { generator: "Ninja", architecture: "arm64" } }
         const external = await mkdtemp(join(tmpdir(), "arrange-external-build-"))
         t.after(() => rm(external, { recursive: true, force: true }))
         await write(join(external, "CMakeCache.txt"), "CMAKE_GENERATOR:INTERNAL=Other\n")
         await write(join(external, "keep"), "outside project")
-        const alias = join(state.rootDir, parent)
+        const user = new UserDirectories(join(state.rootDir, "user"))
+        const paths = new BuildDirectories("darwin", user)
+        const directory = paths.directory(state, "debug")
+        const alias = level === "builds" ? user.builds : level === "project" ? dirname(directory) : directory
         await mkdir(dirname(alias), { recursive: true })
         await symlink(external, alias, process.platform === "win32" ? "junction" : "dir")
         const executor = new Executor()
-        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
+        const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
         const inspected = await service.inspect(state, "debug")
         assert.equal(inspected.ready, false)
         assert.match(inspected.reason!, /符号链接/)
@@ -167,10 +183,10 @@ test("plain working directory permits a project-root alias and rejects escapes o
     const alias = `${state.rootDir}-alias`
     await symlink(state.rootDir, alias, process.platform === "win32" ? "junction" : "dir")
     t.after(() => rm(alias, { force: true }))
-    await assertPlainDirectoryPath(alias, join(alias, ".arrange/build/mac-arm64/debug"))
+    await assertPlainDirectoryPath(alias, join(alias, "user/builds/project/mac-ad"))
     await assert.rejects(assertPlainDirectoryPath(state.rootDir, dirname(state.rootDir)), /超出工程根/)
-    await write(join(state.rootDir, ".arrange"), "file")
-    await assert.rejects(assertPlainDirectoryPath(state.rootDir, join(state.rootDir, ".arrange/build")), /不是目录/)
+    await write(join(state.rootDir, "user"), "file")
+    await assert.rejects(assertPlainDirectoryPath(state.rootDir, join(state.rootDir, "user/builds/project")), /不是目录/)
 })
 
 test("real CMake query keeps target identity separate from product name and refreshes inputs", { skip: process.platform !== "darwin" }, async t => {
@@ -186,7 +202,7 @@ test("real CMake query keeps target identity separate from product name and refr
     await write(join(native, "main.cpp"), "int plugin(); int main(){ return plugin(); }\n")
     await write(join(native, "module.cpp"), "int plugin(); int module(){ return plugin(); }\n")
     const executor = new Executor()
-    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService())
+    const service = new CmakeService(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
     assert.equal((await service.inspect(state, "debug")).ready, false)
     const model = await service.configure(state, "debug", testTask())
     assert.equal((await service.inspect(state, "debug")).ready, true)

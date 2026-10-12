@@ -41,6 +41,10 @@ import { registerSyncCommand } from "./command/Sync.ts"
 import { FileTransaction } from "./util/FileTransaction.ts"
 import { IconAssetsService } from "./asset/IconAssetsService.ts"
 import type { CliTerminal } from "./ui/Terminal.ts"
+import { UserDirectories } from "./user/UserDirectories.ts"
+import { SourceCache } from "./source/SourceCache.ts"
+import { GitSource } from "./source/GitSource.ts"
+import { NativeSourceService } from "./source/NativeSourceService.ts"
 
 export interface CliInteractions {
     readonly project: ProjectInteraction
@@ -72,8 +76,10 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const configuration = new ConfigurationReadiness(scanner, interactions.config)
     const project = new ProjectService(store, framework, configuration)
     const node = new NodeJsService(executor)
-    const cmake = new CmakeService(executor, platform, new IconAssetsService(options.signal))
-    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, options.signal, new FrameworkSourceProbe(executor))
+    const directories = new UserDirectories()
+    const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), options.signal))
+    const cmake = new CmakeService(executor, platform, new IconAssetsService(options.signal), directories, sources, options.signal)
+    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, options.signal, new FrameworkSourceProbe(executor, undefined, sources))
     const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, options.signal, terminal.tasks)
     const initializer = new ProjectInitializer(fileWriter, options.signal)
     const native = new NativeBuildService(cmake)

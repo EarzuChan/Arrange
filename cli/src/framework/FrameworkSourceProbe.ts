@@ -21,7 +21,7 @@ function redactUrl(url: string): string {
 // native 的 CMake 用 FetchContent 按 `v<Framework 版本>` 去 Arrange 仓库取原生源码。
 // 在花时间装 UI 依赖和配置构建树之前先确认：git 可用、仓库可达、对应 tag 存在。
 export class FrameworkSourceProbe {
-    constructor(private readonly executor: Executor, private readonly locate: typeof locateTool = locateTool) { }
+    constructor(private readonly executor: Executor, private readonly locate: typeof locateTool = locateTool, private readonly sources?: { hasFramework(state: ProjectState): Promise<boolean> }) { }
 
     // 只有仓库地址与 tag 都由 CLI 托管时才知道 CMake 会取什么；已用本地源码覆盖时不需要联网
     applies(state: ProjectState): boolean {
@@ -31,6 +31,7 @@ export class FrameworkSourceProbe {
 
     async check(state: ProjectState): Promise<FrameworkSourceCheck> {
         if (!this.applies(state)) return { kind: "skipped" }
+        if (await this.sources?.hasFramework(state)) return { kind: "ok" }
         const url = state.project.framework.cmakeFetchContentUrl ?? defaultFetchUrl
         const version = state.project.framework.version
         const tag = `v${version}`

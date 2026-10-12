@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { test, type TestContext } from "node:test"
+import { test } from "node:test"
 import { join, resolve, sep } from "node:path"
 import { PNG } from "pngjs"
 import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
@@ -13,33 +13,26 @@ import { MacPlatformService } from "../src/platform/MacPlatformService.ts"
 import { WindowsPlatformService } from "../src/platform/WindowsPlatformService.ts"
 import type { ProjectState } from "../src/project/ProjectState.ts"
 import { fixture } from "./fixture.ts"
+import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { BuildDirectories } from "../src/cmake/BuildDirectories.ts"
 
-function services() {
+function services(root = resolve("/arrange-user")) {
     const executor = new Executor()
     const icons = new IconAssetsService()
-    return { windows: new CmakeService(executor, new WindowsPlatformService(executor), icons), mac: new CmakeService(executor, new MacPlatformService(executor), icons) }
-}
-
-async function localAppData(t: TestContext, value: string): Promise<void> {
-    const previous = process.env["LOCALAPPDATA"]
-    t.after(() => {
-        if (previous === undefined) delete process.env["LOCALAPPDATA"]
-        else process.env["LOCALAPPDATA"] = previous
-    })
-    process.env["LOCALAPPDATA"] = value
+    const user = new UserDirectories(root)
+    return { windows: new CmakeService(executor, new WindowsPlatformService(executor), icons, user), mac: new CmakeService(executor, new MacPlatformService(executor), icons, user) }
 }
 
 function withNative(state: ProjectState, architecture: "x64" | "arm64", buildRoot?: string): void {
     state.local = { native: { generator: "Ninja", architecture, ...(buildRoot ? { buildRoot } : {}) } }
 }
 
-test("Windows 构建树位于 LOCALAPPDATA 下的短哈希目录，与工程路径长度无关", async t => {
-    await localAppData(t, resolve("/tmp-local-app-data"))
+test("Windows 构建树位于用户级目录下的短哈希目录，与工程路径长度无关", async t => {
     const { windows } = services()
     const state = await fixture(t, false)
     withNative(state, "x64")
     const digest = createHash("sha256").update(resolve(state.rootDir).toLowerCase()).digest("hex").slice(0, 8)
-    const base = join(resolve("/tmp-local-app-data"), "Arrange", "b", digest)
+    const base = join(resolve("/arrange-user"), "builds", digest)
     assert.equal(windows.buildDirectory(state, "debug"), join(base, "xd"))
     assert.equal(windows.buildDirectory(state, "release"), join(base, "xr"))
     withNative(state, "arm64")
@@ -49,7 +42,6 @@ test("Windows 构建树位于 LOCALAPPDATA 下的短哈希目录，与工程路�
 })
 
 test("Windows 构建目录由工程根唯一确定：同根相同，异根不同，大小写不敏感", async t => {
-    await localAppData(t, resolve("/tmp-local-app-data"))
     const { windows } = services()
     const first = await fixture(t, false)
     const second = await fixture(t, false)
@@ -60,19 +52,32 @@ test("Windows 构建目录由工程根唯一确定：同根相同，异根不同
     assert.equal(windows.buildDirectory(upper, "debug"), windows.buildDirectory(first, "debug"))
 })
 
-test("native.buildRoot 覆盖默认的 LOCALAPPDATA 位置", async t => {
-    await localAppData(t, resolve("/tmp-local-app-data"))
+test("native.buildRoot 覆盖默认用户级位置", async t => {
     const { windows } = services()
     const state = await fixture(t, false)
     withNative(state, "x64", resolve("/short-root"))
     assert.equal(windows.buildDirectory(state, "release").startsWith(resolve("/short-root") + sep), true)
 })
 
-test("macOS 构建树仍在工程内的 .arrange/build", async t => {
+test("macOS 构建树归属用户级目录，并与 Windows 配置隔离", async t => {
     const { mac } = services()
     const state = await fixture(t, false)
     withNative(state, "arm64")
-    assert.equal(mac.buildDirectory(state, "debug"), join(state.rootDir, ".arrange", "build", "mac-arm64", "debug"))
+    assert.equal(mac.buildDirectory(state, "debug"), join(resolve("/arrange-user"), "builds", createHash("sha256").update(resolve(state.rootDir)).digest("hex").slice(0, 8), "mac-ad"))
+})
+
+test("构建目录认领并发一致，损坏或冲突的所有权记录拒绝覆盖", async t => {
+    const state = await fixture(t, false)
+    withNative(state, "x64")
+    const user = new UserDirectories(join(state.rootDir, "user"))
+    const first = new BuildDirectories("win32", user)
+    const second = new BuildDirectories("win32", user)
+    await Promise.all([first.claim(state), second.claim(state)])
+    const owner = join(first.directory(state, "debug"), "..", "owner.json")
+    await writeFile(owner, JSON.stringify({ rootDir: join(state.rootDir, "other") }))
+    await assert.rejects(new BuildDirectories("win32", user).claim(state), /另一个工程占用/)
+    await writeFile(owner, "broken")
+    await assert.rejects(new BuildDirectories("win32", user).claim(state), /所有权记录不可读/)
 })
 
 test("Windows 路径预检：最坏对象文件路径不超过 259 字符，超限给出明确指引", () => {
@@ -113,11 +118,10 @@ test("构建树在工程外时，图标派生按构建锚点包含检查；默�
 })
 
 test("默认构建目录在常见与较长的用户名下都留有路径余量", async t => {
-    const { windows } = services()
     const state = await fixture(t, false)
     withNative(state, "x64")
     for (const user of ["a", "Earzu Chan", "A Very Long User Name 20"]) {
-        await localAppData(t, `C:\\Users\\${user}\\AppData\\Local`)
+        const { windows } = services(`C:\\Users\\${user}\\.arrange`)
         const directory = windows.buildDirectory(state, "release")
         assert.equal(windowsBuildPathProblem(directory), undefined, `${user}: ${directory.length}`)
     }

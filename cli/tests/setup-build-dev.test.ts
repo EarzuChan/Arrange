@@ -245,7 +245,7 @@ test("Build 拒绝未启用产品、配置或工具变化，且失败后不进�
 
 test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间也不保留 completed", async t => {
     const state = await preparedState(t)
-    const model: CmakeModel = { sourceDirectory: resolve(state.rootDir, "native"), buildDirectory: resolve(state.rootDir, ".arrange/build"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
+    const model: CmakeModel = { sourceDirectory: resolve(state.rootDir, "native"), buildDirectory: resolve(state.rootDir, "user/builds/project"), configuration: "Release", platform: "darwin", architecture: "arm64", targets: [] }
     for (const kind of ["ui", "native-release"] as const) await t.test(kind, async () => {
         const receiptPath = resolve(state.rootDir, ".arrange", `built-${kind}.json`)
         let fail = false

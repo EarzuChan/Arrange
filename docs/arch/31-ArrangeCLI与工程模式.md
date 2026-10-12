@@ -25,7 +25,9 @@ Arrange::framework -> native 唯一公开 target
 | `sync/` | CONFIG 与 SETUP 的独立编排 |
 | `framework/` | registry metadata、Framework 版本与 CLI 兼容性 |
 | `node-js/` | UI 包管理器、依赖准备与 UI 构建 |
-| `cmake/` | CMake 文件定义、configure/build、File API 模型与准备检查 |
+| `cmake/` | CMake 文件定义、工程独立构建目录、configure/build、File API 模型与准备检查 |
+| `user/` | Arrange 用户级目录解析与按需创建 |
+| `source/` | 原生依赖清单、共享源码缓存与 Git 获取 |
 | `asset/` | 工程图标源校验、Node 侧缩放与 ICO/ICNS 转换、生成资源检查 |
 | `building/` | build/dev 的工程编排 |
 | `packing/` | 真实产物定位、完整 bundle 整理、UI 资源、打包提交与 Mac 签名检查 |
@@ -72,7 +74,7 @@ project/
 
 共享配置中的 `native.target` 必须明确指定 JUCE 插件共享代码根 target；它不从产品显示名称或 CMake 正文反推。CLI 使用 JUCE 的 `<target>_Standalone` 与 `<target>_VST3` 格式 target，通过 CMake 模型核验类型、依赖和真实产物路径。`ui.outputDirectory` 可指定 UI 构建目录，默认 `dist`，必须是 UI 子项目内的独立产物目录。
 
-本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选的 `cmakeDefinitions` 和 Windows 构建树根目录 `buildRoot`（见同篇“版本与工具链”一节的构建树位置说明）。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
+本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选的 `cmakeDefinitions` 和构建树根目录 `buildRoot`（见同篇“版本与工具链”一节的构建树位置说明）。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
 
 运行时统一通过 [ProjectState](32-ArrangeCLI托管与同步模型.md#定义state-与拓扑) 使用配置与工程根。CONFIG 维护文件中的项目事实；SETUP 使用真实工具链准备可执行的工程，不以写一份 local YAML 代替依赖安装与 CMake configure。
 
@@ -192,7 +194,7 @@ dev 的 UI 服务与 Standalone 各占一个常驻窗格，标题显示启动中
 
 registry 没有给出答案（连接失败、超时）与 registry 明确给出否定答案是两类结果：前者无法判定兼容性，报告为 `framework-unverifiable`，信息带 registry 地址与真实原因（如 `ECONNREFUSED`）以及“本机没有可用于离线验证的已安装版本”；后者（版本不存在、契约不兼容）是确定的结论，仍报告为 `framework-incompatible`。因此网络不通时，已安装匹配版本的工程仍可以重试 sync。
 
-SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrange 原生源码：用 `git ls-remote --tags` 确认 git 可用、仓库可达、`v<Framework 版本>` tag 存在，不通过时作为 Fatal 报告，说明仓库地址、缺失的 tag 或失败原因，并指出可在本机配置的 `native.cmakeDefinitions` 里用 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 指向本地源码。仓库地址与 tag 由 CLI 托管（`cmake.fetch-content-repository` 与 `framework.version` 都启用）且未被该变量覆盖时才预检；构建树已就绪时不联网。仓库地址里的凭据不出现在报错中。
+SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrange 原生源码：完整用户级缓存存在时直接通过；缺失时用 `git ls-remote --tags` 确认 git 可用、仓库可达和 `v<Framework 版本>` tag 存在。该检查仅适用于仓库地址与版本均由 CLI 托管、且没有显式本地源码覆盖的工程。缺失源码在 APPLY 的任务中获取；SCAN 不创建缓存或锁。目录、版本锁定、复用与失败恢复规则见 [Arrange 用户目录与源码缓存](35-Arrange用户目录与源码缓存.md)。
 
 项目版本保留完整 SemVer，包括 prerelease/build metadata；传入 JUCE 插件 `VERSION` 时使用其中的 `major.minor.patch` 数字部分，以满足 JUCE 的版本计算。交付目录和打包清单仍记录完整项目版本。
 
@@ -202,9 +204,10 @@ SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrang
 
 工具定位：Windows 上无扩展名的命令只按 `PATHEXT` 顺序解析，不选同目录下无扩展名的 sh 垫片（npm、pnpm 的安装目录里 `pnpm` 与 `pnpm.cmd` 并存，前者不能执行），并返回磁盘上的真实文件名；`.cmd`、`.bat` 由 Executor 经 `cmd` 执行。MSVC 验证实际运行 `cl.exe`，从横幅首行取版本号与目标架构记号；横幅随系统语言本地化（中文版是“用于 x64 的 … 编译器 19.50.35728 版”），所以解析只依赖与语言无关的数字版本和架构记号，不依赖其中的词，架构另与 Developer 环境的 `VSCMD_ARG_TGT_ARCH` 核对。
 
-构建树位置：macOS 位于工程内 `.arrange/build/mac-<arch>/<flavor>`。Windows 的 `cl`、`link`、`rc` 不声明长路径支持，即使系统已启用 `LongPathsEnabled`，完整路径超过 259 字符仍无法打开文件。因此 Windows 构建树不放在工程内，而放在 `%LOCALAPPDATA%\Arrange\b\<工程根小写路径哈希前 8 位>\<x|a><d|r>`（架构 x64 或 arm64，配置 debug 或 release），长度与工程位置无关。哈希目录内的 `owner.json` 记录所属工程根，被另一个工程占用时报错，不共用。本机配置的 `native.buildRoot` 可改用其它根目录。`artifacts/` 仍在工程内。
+构建树在 Windows 与 macOS 上统一归属用户级 `~/.arrange/builds`，按工程、平台、架构与配置隔离；`native.buildRoot` 仍可显式覆盖。目录所有权与根目录覆盖见 [Arrange 用户目录与源码缓存](35-Arrange用户目录与源码缓存.md)。`artifacts/` 仍在工程内。
 
-configure 前预检构建目录长度，超限时给出明确错误与 `buildRoot` 指引，不让用户面对 `cl` 的晦涩报错。预算是构建树内最长相对路径（实测）加余量，按 JUCE 源码布局区分：FetchContent 把 JUCE 取到构建树内时对象路径形如 `…\arrange_juce.dir\__\__\__\juce-src\modules\…`，最长 173，预算 180，构建目录不超过 78 个字符，默认目录可容纳约 33 个字符的用户名；本机配置用外部 JUCE 源码（`JUCE_DIR`、`FETCHCONTENT_SOURCE_DIR_JUCE`）时，CMake 把源码绝对路径内嵌进对象路径，最长 193，预算 200，构建目录不超过 58 个字符。
+Windows 的 `cl`、`link`、`rc` 有完整路径长度限制，configure 前继续检查构建目录长度。使用共享或显式外部 JUCE 源码时采用外部源码预算，并默认传入 `CMAKE_OBJECT_PATH_MAX=200`，让 CMake 缩短过长对象路径；用户显式设置时尊重其值。超限时提示在本机配置中指定更短的构建根，不能认为系统开启长路径选项就足够。
+
 
 build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`，不隐式改写 local 配置。SETUP 才负责发现、交互确认、安装依赖和配置构建树。pack 读取已存在的 CMake 模型，不重新探测或准备工具链；Mac 签名检查与修复仍使用系统 `codesign`。
 

@@ -222,7 +222,7 @@ SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原�
 | 检查项 | 当前事实 | 分类与处理 |
 |---|---|---|
 | 共享/local YAML、Framework 兼容契约 | 无法解析、版本或 CLI 契约不兼容；或 registry 连不上且本机没有可用于离线验证的已安装版本 | Fatal，停止本次准备（后者的判定与信息见[版本与工具链](31-ArrangeCLI与工程模式.md#版本与工具链)） |
-| Arrange 原生源码 | 需要配置构建树时，git 缺失、仓库不可达或缺少 `v<Framework 版本>` tag | Fatal，在安装 UI 依赖之前报告；已用 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 覆盖或地址与版本不由 CLI 托管时不检查 |
+| Arrange 原生源码 | 需要配置构建树且没有完整用户级缓存时，git 缺失、仓库不可达或缺少 `v<Framework 版本>` tag | Fatal，在安装 UI 依赖之前报告；已用 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 覆盖或地址与版本不由 CLI 托管时不检查 |
 | UI manifest、dev/build 脚本、Framework 精确依赖、产物路径 | 缺失、损坏或与工程配置不符 | Fatal，用户先整理 UI 工程或运行 CONFIG |
 | Node、包管理器、CMake、Ninja、Xcode/MSVC 环境 | 工具缺失、不能执行、版本/架构不满足需求 | Resolvable，用户安装工具或修正 local YAML，继续后重载并重扫 |
 | 本机工具 | 探测验证通过，但本机路径或版本尚未保存 | Resolvable，展示并确认后写 local YAML，随后重载并重扫 |

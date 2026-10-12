@@ -1,0 +1,13 @@
+{
+    "schema": 1,
+    "juce": {
+        "repository": "https://github.com/juce-framework/JUCE.git",
+        "ref": "8.0.12",
+        "commit": "29396c22c93392d6738e021b83196283d6e4d850"
+    },
+    "quickjs_ng": {
+        "repository": "https://github.com/quickjs-ng/quickjs.git",
+        "ref": "v0.14.0",
+        "commit": "3c051980ab7e783dfbfb1c70c014ce5e05ecf24c"
+    }
+}

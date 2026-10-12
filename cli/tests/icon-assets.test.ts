@@ -26,7 +26,7 @@ async function iconFixture(t: TestContext, size = 256, bytes = pngBytes(size)) {
     const source = join(root, state.project.project.icon)
     await mkdir(join(root, "assets"))
     await writeFile(source, bytes)
-    const output = join(root, ".arrange/build/generated/icon")
+    const output = join(root, "user/builds/project/xd/generated/icon")
     const service = new IconAssetsService()
     return { root, state, source, output, service }
 }

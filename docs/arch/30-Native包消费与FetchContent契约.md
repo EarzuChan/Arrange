@@ -18,7 +18,7 @@ FetchContent source package
 
 # 消费边界
 
-- 用户通过 CMake `FetchContent` 拉取 Arrange 源码包。
+- 用户通过 CMake `FetchContent` 接入 Arrange 源码包；CLI 可用[用户级共享源码缓存](35-Arrange用户目录与源码缓存.md)提供源码目录，CMake 仍负责构建。
 - 用户只链接公开 target `Arrange::framework`。
 - 用户工程不应依赖仓库内部路径、临时 demo 特供路径或旧 `_deps` 缓存。
 - 原生消费面必须可在干净检出和显式源码覆盖条件下复现。
@@ -41,6 +41,7 @@ Arrange::framework
 - JUCE 是 Arrange 当前唯一面向的平台。
 - QuickJS-NG 与 JUCE 不作为外部 feature toggle。
 - 用户可以通过显式源码目录覆盖依赖来源。
+- `cmake/NativeDependencies.json` 是 JUCE、QuickJS-NG 默认来源、tag 与 commit 的共同事实源，CMake 与 CLI 读取同一清单；默认获取固定 commit，显式来源或版本覆盖仍受支持。
 - 不要求用户先安装到系统包管理器。
 - 不把 demo 构建当作原生消费前提。
 

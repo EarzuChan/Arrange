@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto"
 import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
-import { homedir } from "node:os"
 import { basename, dirname, join, resolve, win32 } from "node:path"
-import { cmakePreparationFileName, cmakeQueryClientName, localWorkDirectory, nativeBuildDirectoryName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildOwnerFileName, windowsBuildPathTailBudget, windowsBuildRootName, windowsExternalSourceTailBudget, windowsBuildRootSubdirectory, windowsMaxPathLength } from "../CliMetadata.ts"
-import type { BuildFlavor, NativeProduct, ProjectState } from "../project/ProjectState.ts"
+import { cmakePreparationFileName, cmakeSourceRoutingFileName, cmakeQueryClientName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength, windowsObjectPathMax } from "../CliMetadata.ts"
+import { isManagedItem, type BuildFlavor, type NativeProduct, type ProjectState } from "../project/ProjectState.ts"
 import type { Executor } from "../platform/Executor.ts"
 import type { PlatformService } from "../platform/PlatformService.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
@@ -11,6 +10,10 @@ import { IconAssetsService } from "../asset/IconAssetsService.ts"
 import { nativePresentationSignature } from "../project/NativePresentation.ts"
 import { isAbortError, throwIfProcessCancelled } from "../platform/ProcessSpec.ts"
 import { ninjaProgress, type TaskOutput } from "../ui/Tasks.ts"
+import { UserDirectories } from "../user/UserDirectories.ts"
+import type { NativeSourceService } from "../source/NativeSourceService.ts"
+import { BuildDirectories } from "./BuildDirectories.ts"
+import { writeAtomicText } from "../util/AtomicFile.ts"
 
 export interface CmakeTarget {
     readonly name: string
@@ -43,6 +46,7 @@ export interface CmakeInspection {
 interface Preparation {
     readonly signature: string
     readonly inputHashes: Record<string, string>
+    readonly sourceDirectories: Readonly<Record<string, string>>
 }
 
 interface ReplyIndex {
@@ -92,65 +96,15 @@ export function windowsTailBudget(definitions: Readonly<Record<string, string>> 
 }
 
 export class CmakeService {
-    private readonly claims = new Map<string, Promise<void>>()
+    private readonly directories: BuildDirectories
 
-    constructor(private readonly executor: Executor, private readonly platform: PlatformService, private readonly icons: IconAssetsService) { }
-
-    // Windows：构建树放在 %LOCALAPPDATA%\Arrange\b\<工程根哈希前 8 位>\<架构 x/a><配置 d/r>，与工程路径长度无关；其它平台仍在工程内的 .arrange/build 下
-    buildDirectory(state: ProjectState, flavor: BuildFlavor): string {
-        const arch = state.local?.native?.architecture
-        if (!arch) throw new Error("本机 native 工具环境尚未准备，请先运行 arrange sync --setup")
-        if (this.platform.name === "win32") return join(this.windowsBuildBase(state), `${arch === "arm64" ? "a" : "x"}${flavor === "debug" ? "d" : "r"}`)
-        return resolve(state.rootDir, localWorkDirectory, nativeBuildDirectoryName, `${this.platform.name === "darwin" ? "mac" : "win"}-${arch}`, flavor)
+    constructor(private readonly executor: Executor, private readonly platform: PlatformService, private readonly icons: IconAssetsService, user: UserDirectories, private readonly sources?: Pick<NativeSourceService, "prepare">, signal = new AbortController().signal) {
+        this.directories = new BuildDirectories(platform.name, user, signal)
     }
 
-    private windowsBuildAnchor(state: ProjectState): string {
-        const configured = state.local?.native?.buildRoot
-        if (configured) return resolve(configured)
-        return join(process.env["LOCALAPPDATA"] || join(homedir(), "AppData", "Local"), windowsBuildRootName, windowsBuildRootSubdirectory)
-    }
-
-    private windowsBuildBase(state: ProjectState): string {
-        const digest = createHash("sha256").update(resolve(state.rootDir).toLowerCase()).digest("hex").slice(0, 8)
-        return join(this.windowsBuildAnchor(state), digest)
-    }
-
-    private buildAnchor(state: ProjectState): string {
-        return this.platform.name === "win32" ? this.windowsBuildAnchor(state) : state.rootDir
-    }
-
-    private async assertBuildDirectory(state: ProjectState, flavor: BuildFlavor): Promise<void> {
-        const anchor = this.buildAnchor(state)
-        if (anchor !== state.rootDir) {
-            try { await access(anchor) } catch { return }
-        }
-        await assertPlainDirectoryPath(anchor, this.buildDirectory(state, flavor))
-    }
-
-    // debug 与 release 并行 configure 时共用同一个哈希目录：同一进程内只认领一次
-    private claimWindowsBuildBase(state: ProjectState): Promise<void> {
-        const base = this.windowsBuildBase(state)
-        let claim = this.claims.get(base)
-        if (!claim) {
-            claim = this.claimBase(state, base)
-            this.claims.set(base, claim)
-            claim.catch(() => this.claims.delete(base))
-        }
-        return claim
-    }
-
-    // 哈希目录记录所属工程根；极小概率的哈希碰撞或工程被拷贝到别处时，不静默共用同一棵构建树
-    private async claimBase(state: ProjectState, base: string): Promise<void> {
-        await mkdir(base, { recursive: true })
-        const ownerPath = join(base, windowsBuildOwnerFileName)
-        const root = resolve(state.rootDir)
-        let owner: { rootDir?: string } | undefined
-        try { owner = JSON.parse(await readFile(ownerPath, "utf8")) as { rootDir?: string } } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "ENOENT" && !(error instanceof SyntaxError)) throw error
-        }
-        if (owner?.rootDir && resolve(owner.rootDir).toLowerCase() !== root.toLowerCase()) throw new Error(`构建目录已被另一个工程占用：${base}（${owner.rootDir}）。请在 arrange.local.yaml 的 native.buildRoot 指定其它位置`)
-        if (!owner?.rootDir) await writeFile(ownerPath, `${JSON.stringify({ rootDir: root }, null, 4)}\n`)
-    }
+    buildDirectory(state: ProjectState, flavor: BuildFlavor): string { return this.directories.directory(state, flavor) }
+    private buildAnchor(state: ProjectState): string { return this.directories.anchor(state) }
+    private assertBuildDirectory(state: ProjectState, flavor: BuildFlavor): Promise<void> { return this.directories.assert(state, flavor) }
 
     async inspect(state: ProjectState, flavor: BuildFlavor): Promise<CmakeInspection> {
         try {
@@ -162,6 +116,7 @@ export class CmakeService {
             const cache = await readFile(join(this.buildDirectory(state, flavor), "CMakeCache.txt"), "utf8")
             if (!cache.includes(`CMAKE_GENERATOR:INTERNAL=${state.local!.native!.generator}`)) return { ready: false, reason: "CMake 构建缓存与本机生成器不符" }
             for (const [path, previous] of Object.entries(preparation.inputHashes)) if (hash(await readFile(path)) !== previous) return { ready: false, reason: `CMake 输入已变化：${path}` }
+            for (const directory of Object.values(preparation.sourceDirectories)) await access(join(directory, "CMakeLists.txt"))
             const model = await this.readModel(state, flavor)
             this.productArtifacts(state, model, state.project.project.products)
             return { ready: true, model }
@@ -177,13 +132,21 @@ export class CmakeService {
         task.stage("准备构建目录与图标")
         const directory = this.buildDirectory(state, flavor)
         if (this.platform.name === "win32") {
-            const problem = windowsBuildPathProblem(directory, windowsTailBudget(local.native.cmakeDefinitions))
+            const problem = windowsBuildPathProblem(directory, this.sources ? windowsExternalSourceTailBudget : windowsTailBudget(local.native.cmakeDefinitions))
             if (problem) throw new Error(problem)
-            await this.claimWindowsBuildBase(state)
         }
+        await this.directories.claim(state)
         await this.assertBuildDirectory(state, flavor)
         await this.resetIncompatibleTree(state, flavor)
+        const routingPath = join(directory, cmakeSourceRoutingFileName)
+        let previousSourceKeys: string[] = []
+        try {
+            const keys: unknown = JSON.parse(await readFile(routingPath, "utf8"))
+            if (!Array.isArray(keys) || keys.some(key => typeof key !== "string" || !/^FETCHCONTENT_SOURCE_DIR_(ARRANGE|JUCE|QUICKJS_NG)$/.test(key))) throw new Error(`CMake 源码覆盖记录损坏：${routingPath}`)
+            previousSourceKeys = keys as string[]
+        } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error }
         await rm(this.preparationPath(state, flavor), { force: true })
+        const sourceDirectories = await this.sources?.prepare(state, task) ?? {}
         const signature = await this.signature(state, flavor)
         const presentation = await this.presentationSignature(state)
         const icons = await this.icons.prepare(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
@@ -204,11 +167,15 @@ export class CmakeService {
         else args.push(`-DCMAKE_C_COMPILER=${local.nativeCompiler.path}`, `-DCMAKE_CXX_COMPILER=${local.nativeCompiler.path}`)
         args.push(`-D${nativeIconCmakeDefinitions.ico}=${icons?.ico.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.icns}=${icons?.icns.replace(/\\/g, "/") ?? ""}`, `-D${nativeIconCmakeDefinitions.presentation}=${presentation}`)
         const reserved = new Set([...Object.values(nativeIconCmakeDefinitions), "CMAKE_BUILD_TYPE", "CMAKE_GENERATOR", "CMAKE_GENERATOR_PLATFORM", "CMAKE_MAKE_PROGRAM", "CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER", "CMAKE_OSX_ARCHITECTURES"])
-        for (const [key, value] of Object.entries(local.native.cmakeDefinitions ?? {})) {
+        if (this.platform.name === "win32" && local.native.cmakeDefinitions?.CMAKE_OBJECT_PATH_MAX === undefined) args.push(`-DCMAKE_OBJECT_PATH_MAX=${windowsObjectPathMax}`)
+        for (const key of previousSourceKeys) if (sourceDirectories[key] === undefined && local.native.cmakeDefinitions?.[key] === undefined && /^FETCHCONTENT_SOURCE_DIR_(ARRANGE|JUCE|QUICKJS_NG)$/.test(key)) args.push(`-U${key}`)
+        for (const [key, value] of Object.entries({ ...sourceDirectories, ...local.native.cmakeDefinitions })) {
             if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || reserved.has(key) || /[\r\n\0]/.test(value)) throw new Error(`不支持的 CMake 自定义选项：${key}`)
             args.push(`-D${key}=${value}`)
         }
         const env = await this.platform.nativeEnvironment(local)
+        // 取消时 preparation 会缺失，仍须记住曾注入的变量，下一次才能清理 CMake 的持久缓存
+        await writeAtomicText(routingPath, `${JSON.stringify([...new Set([...previousSourceKeys, ...Object.keys(sourceDirectories)])])}\n`)
         task.stage("配置")
         const result = await this.executor.run(task.process({ command: local.cmake.path, args, cwd: state.rootDir, env }))
         throwIfProcessCancelled(result)
@@ -219,7 +186,8 @@ export class CmakeService {
         if (signature !== await this.signature(state, flavor)) throw new Error("原生配置或图标源在 configure 期间发生变化，请重新运行 native SETUP")
         const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
         if (!iconInspection.ready) throw new Error(iconInspection.reason ?? "图标派生资源尚未准备")
-        await writeFile(this.preparationPath(state, flavor), `${JSON.stringify({ signature, inputHashes }, null, 4)}\n`)
+        await writeAtomicText(this.preparationPath(state, flavor), `${JSON.stringify({ signature, inputHashes, sourceDirectories }, null, 4)}\n`)
+        await writeAtomicText(routingPath, `${JSON.stringify(Object.keys(sourceDirectories))}\n`)
         return model
     }
 
@@ -282,7 +250,7 @@ export class CmakeService {
     private iconDirectory(state: ProjectState, flavor: BuildFlavor): string { return join(this.buildDirectory(state, flavor), nativeIconDirectory) }
     private async signature(state: ProjectState, flavor: BuildFlavor): Promise<string> {
         const { vendorName, vendorCode, pluginCode, version, products } = state.project.project
-        return hash(JSON.stringify({ native: state.project.native, project: { vendorName, vendorCode, pluginCode, version, products }, presentation: await this.presentationSignature(state), framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor }))
+        return hash(JSON.stringify({ native: state.project.native, project: { vendorName, vendorCode, pluginCode, version, products }, presentation: await this.presentationSignature(state), framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl, sourceManaged: isManagedItem(state, "cmake.fetch-content-repository") && isManagedItem(state, "framework.version") }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor }))
     }
 
     private async readReply<T>(directory: string, kind: string): Promise<T> {

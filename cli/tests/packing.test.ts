@@ -14,6 +14,7 @@ import { fixture, write } from "./fixture.ts"
 import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
 import { nativePresentationSignature } from "../src/project/NativePresentation.ts"
 import { PNG } from "pngjs"
+import { UserDirectories } from "../src/user/UserDirectories.ts"
 
 function result(exitCode = 0, stdout = "", stderr = ""): ProcessResult {
     return { exitCode, stdout, stderr, cancelled: false, timedOut: false }
@@ -32,7 +33,7 @@ class ModelCmakeService extends CmakeService {
     ready = true
     constructor(readonly model: CmakeModel) {
         const executor = new RecordingExecutor()
-        super(executor, new MacPlatformService(executor), new IconAssetsService())
+        super(executor, new MacPlatformService(executor), new IconAssetsService(), new UserDirectories(resolve(model.buildDirectory, "user")))
     }
     override async inspect() { return { ready: this.ready, reason: this.ready ? undefined : "配置已过期", model: this.ready ? this.model : undefined } }
     override async readModel() { return this.model }
@@ -41,7 +42,7 @@ class ModelCmakeService extends CmakeService {
 async function setup(t: TestContext, platform: "darwin" | "win32" = "win32") {
     const state = await fixture(t, false)
     state.local = { native: { generator: "Ninja", architecture: platform === "darwin" ? "arm64" : "x64" } }
-    const buildDirectory = resolve(state.rootDir, ".arrange/build/fixture")
+    const buildDirectory = resolve(state.rootDir, "user/builds/project/xd")
     const sourceDirectory = resolve(state.rootDir, state.project.native.directory)
     const standaloneRoot = resolve(buildDirectory, "Standalone", platform === "darwin" ? "A Product.app" : "A Product.exe")
     const standalone = platform === "darwin" ? resolve(standaloneRoot, "Contents/MacOS/A Product") : standaloneRoot
