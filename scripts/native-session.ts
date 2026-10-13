@@ -25,7 +25,7 @@ export async function withNativeSession(body: () => Promise<void>, builds: reado
     session = { host, operations, signal, builds: new Set(builds.map(path => resolve(path))) }
     process.on("SIGINT", interrupt)
     process.on("SIGTERM", interrupt)
-    try { await operations.run([{ kind: "directory", path: user.sources, mode: "read" }, ...builds.map(path => ({ kind: "directory" as const, path: resolve(path), mode: "write" as const }))], "原生验收", body) } finally {
+    try { await operations.run([{ kind: "directory", path: user.dependencySources, mode: "read" }, ...builds.map(path => ({ kind: "directory" as const, path: resolve(path), mode: "write" as const }))], "原生验收", body) } finally {
         session = undefined
         try {
             await host.close()

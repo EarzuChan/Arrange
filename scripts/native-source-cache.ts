@@ -25,7 +25,7 @@ export async function cachedNativeDefinitions(definitions: Readonly<Record<strin
             }
         }
     }
-    return operations.run([{ kind: "directory", path: user.sources, mode: "read" }], "准备验收依赖源码", async () => {
+    return operations.run([{ kind: "directory", path: user.dependencySources, mode: "read" }], "准备验收依赖源码", async () => {
         const manifest = await readNativeDependencies(repoRoot)
         const result: Record<string, string> = { ...definitions }
         for (const [name, key, override] of [["juce", "FETCHCONTENT_SOURCE_DIR_JUCE", "JUCE_DIR"], ["quickjs_ng", "FETCHCONTENT_SOURCE_DIR_QUICKJS_NG", "ARRANGE_QUICKJS_NG_SOURCE_DIR"]] as const) {

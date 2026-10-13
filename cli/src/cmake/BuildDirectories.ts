@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto"
-import { access, mkdir, readFile } from "node:fs/promises"
+import { access, mkdir } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import type { BuildFlavor, ProjectState } from "../project/ProjectState.ts"
 import type { PlatformService } from "../platform/PlatformService.ts"
@@ -8,6 +7,8 @@ import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import { buildOwnerFileName } from "../CliMetadata.ts"
 import { withKernelLock } from "../operation/KernelLock.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
+import { buildOwnerRecordSchema, nativeBuildRootIdentity, nativeBuildRootKey } from "./BuildOwnerRecord.ts"
+import { readCurrentRecord } from "../util/RecordInspection.ts"
 
 export class BuildDirectories {
     private readonly claims = new Map<string, Promise<void>>()
@@ -19,12 +20,11 @@ export class BuildDirectories {
     }
 
     private identity(root: string): string {
-        const path = resolve(root)
-        return this.platform === "win32" ? path.toLowerCase() : path
+        return nativeBuildRootIdentity(root, this.platform)
     }
 
     private base(state: ProjectState): string {
-        const digest = createHash("sha256").update(this.identity(state.rootDir)).digest("hex").slice(0, 8)
+        const digest = nativeBuildRootKey(state.rootDir, this.platform)
         return join(this.anchor(state), digest)
     }
 
@@ -65,7 +65,7 @@ export class BuildDirectories {
         const rootDir = resolve(state.rootDir)
         await withKernelLock(`${ownerPath}.kernel`, this.signal, async signal => {
             let existing: { rootDir?: unknown } | undefined
-            try { existing = JSON.parse(await readFile(ownerPath, "utf8")) as { rootDir?: unknown } } catch (error) {
+            try { existing = await readCurrentRecord(ownerPath, buildOwnerRecordSchema) } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new Error(`构建目录所有权记录不可读：${ownerPath}`, { cause: error })
             }
             if (existing) {

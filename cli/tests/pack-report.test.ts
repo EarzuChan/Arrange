@@ -6,6 +6,7 @@ import test from "node:test"
 import { describePackResult } from "../src/packing/PackReport.ts"
 import type { PackResult } from "../src/packing/Packer.ts"
 import type { ProjectState } from "../src/project/ProjectState.ts"
+import { formatFileSize } from "../src/ui/FileSize.ts"
 
 test("打包报告列出目录、各产品位置、二进制大小与清单，路径相对工程根", async t => {
     const root = await mkdtemp(resolve(tmpdir(), "arrange-pack-report-"))
@@ -13,7 +14,7 @@ test("打包报告列出目录、各产品位置、二进制大小与清单，�
     const directory = resolve(root, "artifacts", "release", "1.0.0", "products")
     await mkdir(resolve(directory, "standalone"), { recursive: true })
     const exe = resolve(directory, "standalone", "payload.bin")
-    await writeFile(exe, Buffer.alloc(3 * 1024 * 1024))
+    await writeFile(exe, Buffer.alloc(3 * 1000 * 1000))
     const result: PackResult = {
         directory,
         manifestPath: resolve(directory, "arrange-package.json"),
@@ -27,10 +28,18 @@ test("打包报告列出目录、各产品位置、二进制大小与清单，�
     const at = (...parts: string[]) => join("artifacts", "release", "1.0.0", "products", ...parts)
     assert.deepEqual(lines, [
         `交付物（release · 1.0.0）：${at()}`,
-        `standalone  ${at("standalone", "payload.bin")}，二进制 3.0 MB`,
+        `standalone  ${at("standalone", "payload.bin")}，二进制 3 MB`,
         `vst3        ${at("vst3", "App.vst3")}`,
         `清单        ${at("arrange-package.json")}`,
     ])
+})
+
+test("文件大小自动进位至 GB 和 TB，舍入跨单位时不显示 1000 KB", () => {
+    assert.equal(formatFileSize(987265696), "987.3 MB")
+    assert.equal(formatFileSize(999950), "1 MB")
+    assert.equal(formatFileSize(2000000000), "2 GB")
+    assert.equal(formatFileSize(1500000000000), "1.5 TB")
+    assert.equal(formatFileSize(0), "0 B")
 })
 
 test("交付目录在工程根之外时显示绝对路径", async () => {

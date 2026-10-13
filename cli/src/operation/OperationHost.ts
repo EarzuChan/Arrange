@@ -14,6 +14,12 @@ interface Pending {
     waiting?: (message: string) => void
 }
 
+export interface AcquisitionOptions {
+    readonly observe?: boolean
+    // null 表示只响应取消，不设等待期限
+    readonly timeoutMs?: number | null
+}
+
 export class OperationHost {
     private worker: ChildProcess | undefined
     private opening: Promise<void> | undefined
@@ -94,20 +100,21 @@ export class OperationHost {
         })
     }
 
-    async acquire(resources: readonly Resource[], label: string, signal: AbortSignal, waiting: (message: string) => void, observe = false): Promise<() => Promise<void>> {
+    async acquire(resources: readonly Resource[], label: string, signal: AbortSignal, waiting: (message: string) => void, options: AcquisitionOptions = {}): Promise<() => Promise<void>> {
         signal.throwIfAborted()
         await this.open()
         signal.throwIfAborted()
         const id = randomUUID()
         const cancel = (): void => { if (this.worker?.connected) this.send({ kind: "cancel", id }) }
         let timedOut = false
-        const timeout = setTimeout(() => {
+        const timeoutMs = options.timeoutMs === undefined ? operationWaitMs : options.timeoutMs
+        const timeout = timeoutMs === null ? undefined : setTimeout(() => {
             timedOut = true
             cancel()
-        }, operationWaitMs)
+        }, timeoutMs)
         signal.addEventListener("abort", cancel, { once: true })
         try {
-            const pending = this.request({ kind: "acquire", id, label, resources, observe }, { waiting })
+            const pending = this.request({ kind: "acquire", id, label, resources, observe: options.observe ?? false }, { waiting })
             if (signal.aborted) cancel()
             await pending
             if (signal.aborted) {
@@ -116,7 +123,7 @@ export class OperationHost {
             }
             return async () => { await this.request({ kind: "release", id }) }
         } catch (error) {
-            if (timedOut) throw new Error(`等待资源超过 ${operationWaitMs / 60000} 分钟：${label}`)
+            if (timedOut && timeoutMs !== null) throw new Error(`等待资源超过 ${timeoutMs / 60000} 分钟：${label}`)
             if (signal.aborted) throw new DOMException("操作已取消", "AbortError")
             throw error
         } finally {

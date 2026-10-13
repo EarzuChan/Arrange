@@ -14,6 +14,10 @@ import type { StorageMaintenance } from "../storage/StorageMaintenance.ts"
 import { RecoveryService } from "../transaction/RecoveryService.ts"
 import { TransactionStore } from "../transaction/TransactionStore.ts"
 import { treeIdentity } from "../transaction/TreeState.ts"
+import { formatFileSize } from "../ui/FileSize.ts"
+import { describeStorageItem, describeCleanupBlockers } from "../ui/StorageReport.ts"
+import type { StorageItem } from "../storage/StorageFacts.ts"
+import type { InspectionFact } from "../util/RecordInspection.ts"
 
 interface Dependencies {
     readonly terminal: CliTerminal
@@ -32,6 +36,23 @@ interface Dependencies {
 
 export function registerMaintenanceCommands(program: Command, input: Dependencies): void {
     const { terminal, signal } = input
+    const inspectStorage = async (): Promise<readonly StorageItem[]> => {
+        const items = await input.inventory.inspect()
+        const occupied = new Map<string, InspectionFact>()
+        for (const item of items) if (item.kind !== "project") try {
+            await input.operations.run([{ kind: "directory", path: item.path, mode: "read" }], "检查存储占用", async () => { }, true)
+        } catch (error) {
+            signal.throwIfAborted()
+            occupied.set(item.id, { state: "unavailable", path: item.path, reason: error instanceof Error ? error.message : String(error) })
+        }
+        const blockedBuilds = items.flatMap(item => item.kind === "build" && occupied.has(item.id) ? [occupied.get(item.id)!] : [])
+        return items.map(item => {
+            const busy = occupied.get(item.id)
+            const blocked = item.kind === "deps-src" && blockedBuilds.length > 0
+            if (!busy && !blocked) return item
+            return { ...item, facts: busy ? [...item.facts, { label: "occupancy" as const, check: busy }] : item.facts, references: blocked ? { ...item.references, complete: false, blockers: [...item.references.blockers, ...blockedBuilds] } : item.references, cleanup: { allowed: false, reason: busy ? "资源正在使用，无法稳定查看或清理" : "存在忙构建，无法完整确认引用" }, repairable: false }
+        })
+    }
     const ask = async (message: string): Promise<boolean> => {
         if (!input.interactive) throw new Error("需要交互确认；请使用 --scan 查看计划")
         const answer = await confirm({ ...terminal.prompt, message, active: "确认", inactive: "取消" })
@@ -59,47 +80,46 @@ export function registerMaintenanceCommands(program: Command, input: Dependencie
         })
     const storage = program.command("storage").description("管理本用户 Arrange 存储")
     storage.command("inspect").description("查看工程登记与受管资源").action(async () => {
-        for (const item of await input.inventory.inspect()) {
-            let occupied = ""
-            if (item.kind !== "project") try {
-                await input.operations.run([{ kind: "directory", path: item.path, mode: "read" }], "查看存储占用", async () => { }, true)
-            } catch (error) { occupied = ` · 无法稳定查看：${String(error)}` }
-            const labels: Record<string, string> = { present: "正常", missing: "工程失联", unavailable: "无法检查", replaced: "登记失效", unknown: "归属或引用无法确认" }
-            const size = item.kind === "project" ? "" : ` · ${item.sizeComplete ? "" : "至少 "}${item.bytes} 字节`
-            terminal.reporter.info(`${item.id} · ${labels[item.status] ?? item.status}${occupied}${size}\n${item.path}${item.references.length ? `\n引用：${item.references.join("、")}` : ""}`)
-        }
+        const items = await inspectStorage()
+        if (!items.length) return terminal.reporter.outro("存储为空，没有内容")
+        for (const item of items) terminal.reporter.info(describeStorageItem(item))
     })
     storage.command("clean").description("选择清理可释放的用户级资源").option("--scan", "只查看计划").action(async (options: { scan?: boolean }) => {
-        const candidates = (await input.inventory.inspect()).filter(item => item.cleanable)
-        for (const item of candidates) terminal.reporter.info(`${item.id} · ${item.bytes} 字节 · ${item.path}`)
-        if (!candidates.length || options.scan) return terminal.reporter.outro(candidates.length ? "候选已展示，未修改" : "没有可清理内容")
+        const items = await inspectStorage()
+        const candidates = items.filter(item => item.cleanup.allowed)
+        for (const item of candidates) terminal.reporter.info(`${item.id} · ${item.sizeComplete ? "" : "至少 "}${formatFileSize(item.bytes)} · ${item.path}`)
+        if (options.scan || !candidates.length) {
+            for (const reason of describeCleanupBlockers(items)) terminal.reporter.info(`未列入候选：${reason}`)
+            return terminal.reporter.outro(candidates.length ? "候选及排除原因已展示，未修改" : items.length ? "没有可安全清理的候选，排除原因见上方" : "存储为空，没有内容")
+        }
         if (!input.interactive) throw new Error("需要交互选择；请使用 --scan 查看计划")
         const selected = await multiselect({ ...terminal.prompt, message: "选择要释放的资源", required: false, options: candidates.map(item => ({ value: item.id, label: `${item.id} · ${item.path}` })) })
         if (isCancel(selected) || !selected.length) return terminal.reporter.cancelled("已取消清理")
-        const items = candidates.filter(item => selected.includes(item.id))
-        const identities = await Promise.all(items.map(item => treeIdentity(item.path)))
+        const selectedItems = candidates.filter(item => selected.includes(item.id))
+        const identities = await Promise.all(selectedItems.map(item => treeIdentity(item.path)))
         if (!await ask("确认清理所选资源？")) return terminal.reporter.cancelled("已取消清理")
-        await input.operations.run([{ ...input.lifetime, mode: "write" }, ...items.map(item => ({ kind: "directory" as const, path: item.path, mode: "write" as const }))], "arrange storage clean", async () => {
-            if (JSON.stringify(identities) !== JSON.stringify(await Promise.all(items.map(item => treeIdentity(item.path))))) throw new Error("所选资源在确认后变化，请重新查看")
-            await input.maintenance.clean(items)
+        await input.operations.run([{ ...input.lifetime, mode: "write" }, ...selectedItems.map(item => ({ kind: "directory" as const, path: item.path, mode: "write" as const }))], "arrange storage clean", async () => {
+            if (JSON.stringify(identities) !== JSON.stringify(await Promise.all(selectedItems.map(item => treeIdentity(item.path))))) throw new Error("所选资源在确认后变化，请重新查看")
+            await input.maintenance.clean(selectedItems)
         }, true)
         terminal.reporter.outro("用户级清理完成")
     })
-    storage.command("repair <id>").description("按确切 commit 修复源码缓存").option("--scan", "只查看影响").action(async (id: string, options: { scan?: boolean }) => {
-        const key = id.replace(/^source:/, "")
-        const item = (await input.inventory.inspect()).find(item => item.id === `source:${key}`)
-        if (!item) throw new Error("未找到源码条目")
-        terminal.reporter.info(`${item.path}\n受影响构建：${item.references.join("、") || "无"}`)
+    storage.command("repair <id>").description("按确切 commit 修复依赖源码缓存").option("--scan", "只查看影响").action(async (id: string, options: { scan?: boolean }) => {
+        const key = id.replace(/^deps-src:/, "")
+        const item = (await inspectStorage()).find(item => item.id === `deps-src:${key}`)
+        if (!item) throw new Error("未找到依赖源码条目")
+        terminal.reporter.info(describeStorageItem(item))
         if (options.scan) return
+        if (!item.repairable) throw new Error(`此依赖源码不能自动修复：${item.cleanup.reason}；请使用 storage inspect 查看具体原因`)
         if (!await ask("确认重新获取此源码快照，并使相关准备状态失效？")) return terminal.reporter.cancelled("已取消修复")
-        await input.operations.run([{ ...input.lifetime, mode: "write" }, ...item.references.map(path => ({ kind: "directory" as const, path, mode: "write" as const }))], "arrange storage repair", () => terminal.tasks.run({ id: "source-repair", title: "修复共享源码" }, task => input.maintenance.repair(key, task)))
-        terminal.reporter.outro("源码修复完成，请重新运行 native SETUP")
+        await input.operations.run([{ ...input.lifetime, mode: "write" }, ...item.references.paths.map(path => ({ kind: "directory" as const, path, mode: "write" as const }))], "arrange storage repair", () => terminal.tasks.run({ id: "source-repair", title: "修复共享依赖源码" }, task => input.maintenance.repair(key, task)))
+        terminal.reporter.outro("依赖源码修复完成，请重新运行 native SETUP")
     })
     const registerRecovery = (command: Command, user: boolean): void => {
         command.command("recover [id]").description(user ? "恢复用户级维护事务" : "恢复当前工程事务").option("--scan", "只查看事务").action(async (id: string | undefined, options: { scan?: boolean }) => {
             const store = user ? new TransactionStore(input.directories.root, input.directories.transactions) : new TransactionStore(resolve(process.cwd()))
             const current = user ? undefined : (await input.store.deepLoad(store.root)).state
-            const allowedRoots = user ? [input.directories.sources, input.directories.projects, input.directories.builds] : [store.root]
+            const allowedRoots = user ? [input.directories.dependencySources, input.directories.projects, input.directories.builds] : [store.root]
             if (current) allowedRoots.push(resolve(current.rootDir, current.project.ui.directory), resolve(current.rootDir, current.project.native.directory), ...(current.local?.native?.buildRoot ? [resolve(current.rootDir, current.local.native.buildRoot)] : [input.directories.builds]))
             if (user) for (const registration of await input.registry.list()) if (registration.record) allowedRoots.push(...registration.record.buildRoots, ...registration.record.buildTrees.map(path => dirname(path)))
             const recovery = new RecoveryService(store, input.operations, signal, { ...input.lifetime, mode: "write" }, allowedRoots)

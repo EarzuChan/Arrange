@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { lstat, mkdir, readFile, readdir, rm } from "node:fs/promises"
+import { lstat, mkdir, readdir, rm } from "node:fs/promises"
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import { z } from "zod"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
@@ -9,8 +9,9 @@ import { nativeVerificationFileName, nativeVerificationSchema } from "../CliMeta
 import { UserDirectories } from "../user/UserDirectories.ts"
 import { TransactionStore } from "../transaction/TransactionStore.ts"
 import { DeleteTransaction } from "../transaction/DeleteTransaction.ts"
+import { nativeVerificationRecordSchema as schema } from "./NativeVerificationRecord.ts"
+import { readCurrentRecord } from "../util/RecordInspection.ts"
 
-const schema = z.object({ version: z.literal(nativeVerificationSchema), source: z.string(), identity: z.string(), complete: z.boolean() })
 
 // 验收目录只在可信归属下整体重建，连同第三方独立子构建缓存一起处理
 export class NativeBuildTree {
@@ -35,7 +36,7 @@ export class NativeBuildTree {
         const identity = createHash("sha256").update(JSON.stringify(configuration)).digest("hex")
         const recordPath = resolve(directory, nativeVerificationFileName)
         let previous: z.infer<typeof schema> | undefined
-        try { previous = schema.parse(JSON.parse(await readFile(recordPath, "utf8"))) } catch (error) {
+        try { previous = await readCurrentRecord(recordPath, schema, { field: "version", supported: nativeVerificationSchema }) } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new Error(`验收构建归属记录损坏：${recordPath}`, { cause: error })
         }
         if (previous && previous.source !== source) throw new Error(`验收构建目录属于其它源码：${directory}`)

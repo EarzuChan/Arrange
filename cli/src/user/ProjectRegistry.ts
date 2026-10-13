@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { lstat, readFile, readdir, rm } from "node:fs/promises"
+import { lstat, readdir, rm } from "node:fs/promises"
 import { dirname, join, parse, resolve } from "node:path"
 import { z } from "zod"
 import { projectRegistrySchema } from "../CliMetadata.ts"
@@ -8,6 +8,7 @@ import { writeAtomicText } from "../util/AtomicFile.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import { canonicalResource } from "../operation/Resource.ts"
 import type { UserDirectories } from "./UserDirectories.ts"
+import { readCurrentRecord, inspectionFailure, type InspectionFact } from "../util/RecordInspection.ts"
 
 const schema = z.object({ schema: z.literal(projectRegistrySchema), root: z.string(), volume: z.object({ root: z.string(), device: z.number() }), kind: z.enum(["project", "verification"]), firstSeen: z.string(), lastUsed: z.string(), buildRoots: z.array(z.string()), buildTrees: z.array(z.string()) })
 export type ProjectRegistration = z.infer<typeof schema>
@@ -37,14 +38,14 @@ export class ProjectRegistry {
         try {
             const info = await lstat(path)
             if (!info.isFile() || info.isSymbolicLink()) throw new Error("登记必须为普通文件")
-            return schema.parse(JSON.parse(await readFile(path, "utf8")))
+            return await readCurrentRecord(path, schema, { field: "schema", supported: projectRegistrySchema })
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
-            throw new Error(`工程登记损坏：${path}`, { cause: error })
+            throw error
         }
     }
 
-    async list(): Promise<readonly { path: string, record?: ProjectRegistration, error?: string }[]> {
+    async list(): Promise<readonly { path: string, record?: ProjectRegistration, issue?: InspectionFact }[]> {
         const names = await readdir(this.user.projects).catch(error => {
             if ((error as NodeJS.ErrnoException).code === "ENOENT") return []
             throw error
@@ -55,16 +56,17 @@ export class ProjectRegistry {
             try {
                 if ((await lstat(path)).isSymbolicLink()) throw new Error("登记不能为链接")
                 const record = await this.read(path)
-                if (record && createHash("sha256").update(record.root).digest("hex") !== name.slice(0, -5)) throw new Error("路径身份不匹配")
+                if (record && createHash("sha256").update(record.root).digest("hex") !== name.slice(0, -5)) return { path, issue: { state: "damaged" as const, path, reason: "登记路径身份与文件名不匹配" } }
                 if (record) this.volumes.set(record.root, record.volume)
                 return { path, record }
-            } catch (error) { return { path, error: String(error) } }
+            } catch (error) { return { path, issue: inspectionFailure(error, path) } }
         }))
     }
 
     async availability(root: string, verification = false): Promise<ProjectAvailability> {
         try { await lstat(parse(resolve(root)).root) } catch { return "unavailable" }
-        const identity = process.platform === "win32" ? resolve(root).toLowerCase() : resolve(root)
+        let identity: string
+        try { identity = (await canonicalResource({ kind: "configuration", path: root, mode: "read" })).path } catch { return "unavailable" }
         const volume = this.volumes.get(identity)
         if (volume) try {
             if ((await lstat(volume.root)).dev !== volume.device) return "unavailable"

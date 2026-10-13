@@ -10,10 +10,19 @@ import { GitSource } from "./GitSource.ts"
 import { sourceHash, sourceIdentity, sourceRepositoryIdentity, sourceSpecSchema, type SourceSpec } from "./SourceSpec.ts"
 import type { Operations } from "../operation/Operations.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
+import { readCurrentRecord, InspectionError } from "../util/RecordInspection.ts"
 
 export const sourceRecordSchema = z.object({ schema: z.literal(sourceCacheSchema), identity: z.string().regex(/^[a-f0-9]{64}$/), key: z.string().regex(/^[a-f0-9]{16}$/), contentIdentity: z.string().regex(/^[a-f0-9]{64}$/), commit: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i), source: sourceSpecSchema })
 const recordSchema = sourceRecordSchema
 type SourceRecord = z.infer<typeof recordSchema>
+export function assertSourceRecordIdentity(record: SourceRecord, path: string): void {
+    if (record.source.commit !== record.commit || sourceHash([record.source.repository, record.commit]) !== record.contentIdentity || record.contentIdentity.slice(0, 16) !== record.key) throw new InspectionError({ state: "damaged", path, reason: "依赖源码记录的来源、commit 与内容身份不匹配" })
+}
+export async function readSourceRecord(path: string): Promise<SourceRecord> {
+    const record = await readCurrentRecord(path, sourceRecordSchema, { field: "schema", supported: sourceCacheSchema })
+    assertSourceRecordIdentity(record, path)
+    return record
+}
 export interface CachedSource { readonly directory: string, readonly commit: string, readonly key: string }
 
 export class SourceCache {
@@ -21,21 +30,19 @@ export class SourceCache {
 
     constructor(private readonly directories: UserDirectories, private readonly git: Pick<GitSource, "checkout" | "verify">, private readonly signal: AbortSignal, private readonly operations: Pick<Operations, "source">) { }
 
-    private get requests(): string { return join(this.directories.sources, "requests") }
-    private get entries(): string { return join(this.directories.sources, "entries") }
-    private get staging(): string { return join(this.directories.sources, "tmp") }
-    private get locks(): string { return join(this.directories.sources, "locks") }
+    private get requests(): string { return join(this.directories.dependencySources, "requests") }
+    private get entries(): string { return join(this.directories.dependencySources, "entries") }
+    private get staging(): string { return join(this.directories.dependencySources, "tmp") }
+    private get locks(): string { return join(this.directories.dependencySources, "locks") }
 
     private async readRecord(path: string): Promise<SourceRecord | undefined> {
         try {
             const info = await lstat(path)
             if (!info.isFile() || info.isSymbolicLink()) throw new Error("源码记录必须为普通文件")
-            const record = recordSchema.parse(JSON.parse(await readFile(path, "utf8")))
-            if (record.source.commit !== record.commit || sourceHash([record.source.repository, record.commit]) !== record.contentIdentity || record.contentIdentity.slice(0, 16) !== record.key) throw new Error("源码记录来源与内容身份不匹配")
-            return record
+            return await readSourceRecord(path)
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
-            throw new Error(`共享源码缓存记录损坏或版本不支持：${path}；请人工检查，不自动迁移旧格式`, { cause: error })
+            throw new Error(`共享依赖源码缓存记录损坏或版本不支持：${path}；请人工检查，不自动迁移旧格式`, { cause: error })
         }
     }
 
@@ -55,7 +62,7 @@ export class SourceCache {
         }
         const record = await this.readRecord(join(this.requests, `${identity}.json`))
         if (!record) return undefined
-        if (record.identity !== identity || (spec.commit && record.commit.toLowerCase() !== spec.commit.toLowerCase()) || record.contentIdentity !== sourceHash([sourceRepositoryIdentity(spec.repository), record.commit]) || record.key !== record.contentIdentity.slice(0, 16)) throw new Error("共享源码缓存身份不匹配")
+        if (record.identity !== identity || (spec.commit && record.commit.toLowerCase() !== spec.commit.toLowerCase()) || record.contentIdentity !== sourceHash([sourceRepositoryIdentity(spec.repository), record.commit]) || record.key !== record.contentIdentity.slice(0, 16)) throw new Error("共享依赖源码缓存身份不匹配")
         return this.entry(record)
     }
 
@@ -68,15 +75,15 @@ export class SourceCache {
                 if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
                 throw error
             }
-            throw new Error(`共享源码缓存缺少发布记录：${directory}`)
+            throw new Error(`共享依赖源码缓存缺少发布记录：${directory}`)
         }
-        if (marker.contentIdentity !== record.contentIdentity || marker.key !== record.key || marker.commit !== record.commit) throw new Error(`共享源码缓存条目身份不匹配：${directory}`)
+        if (marker.contentIdentity !== record.contentIdentity || marker.key !== record.key || marker.commit !== record.commit) throw new Error(`共享依赖源码缓存条目身份不匹配：${directory}`)
         try {
             await access(join(directory, "source", "CMakeLists.txt"))
             const head = (await readFile(join(directory, "source", ".git", "HEAD"), "utf8")).trim()
-            if (head !== record.commit) throw new Error(`共享源码缓存 checkout 已被修改：${directory}`)
+            if (head !== record.commit) throw new Error(`共享依赖源码缓存 checkout 已被修改：${directory}`)
         } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`共享源码缓存内容缺失：${directory}`, { cause: error })
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`共享依赖源码缓存内容缺失：${directory}`, { cause: error })
             throw error
         }
         return { directory: join(directory, "source"), key: record.key, commit: record.commit }

@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { createServer } from "node:http"
+import type { Socket } from "node:net"
 import test, { type TestContext } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import { UserDirectories } from "../src/user/UserDirectories.ts"
@@ -16,6 +18,7 @@ import { NativeSourceService } from "../src/source/NativeSourceService.ts"
 import { OperationHost } from "../src/operation/OperationHost.ts"
 import { Operations } from "../src/operation/Operations.ts"
 import { FrameworkSourceProbe } from "../src/framework/FrameworkSourceProbe.ts"
+import { sourceLocalTimeoutMs } from "../src/CliMetadata.ts"
 
 const commit = "a".repeat(40)
 const spec: SourceSpec = { repository: "https://example.invalid/source.git", ref: "v1", commit }
@@ -82,7 +85,7 @@ test("取消未完成的获取不发布缓存，重试成功且清理临时内�
     input.hosts.push(retryHost)
     const retry = new SourceCache(input.user, input.git, new AbortController().signal, new Operations(retryHost, new AbortController().signal, () => { }))
     assert.equal((await retry.ensure(spec, "Fixture", testTask())).commit, commit)
-    assert.deepEqual(await readdir(join(input.user.sources, "tmp")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "tmp")), [])
 })
 
 test("缓存损坏或目录别名明确失败，不清理目录之外的内容", async t => {
@@ -153,6 +156,7 @@ test("真实 Git 获取固定 tag，缓存复用不 fetch，错误 commit 不发
     let fetches = 0
     const recording = new class extends Executor {
         override async run(process: ProcessSpec) {
+            assert.equal(process.timeoutMs, process.args.includes("fetch") || process.args.includes("submodule") ? undefined : sourceLocalTimeoutMs)
             if (process.args.includes("fetch")) fetches++
             return super.run(process)
         }
@@ -168,7 +172,44 @@ test("真实 Git 获取固定 tag，缓存复用不 fetch，错误 commit 不发
     await assert.rejects(modified.ensure(request, "Fixture", testTask()), /已被修改/)
     await assert.rejects(cache.ensure({ ...request, commit }, "Fixture", testTask()), /commit 与依赖清单不符/)
     assert.equal(await cache.find({ ...request, commit }), undefined)
-    assert.deepEqual(await readdir(join(input.user.sources, "tmp")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "tmp")), [])
+})
+
+test("真实 Git 网络获取无总时长上限，静默等待可取消且不发布半成品", { timeout: 15000 }, async t => {
+    const input = await cacheFixture(t)
+    const sockets = new Set<Socket>()
+    let requested!: () => void
+    const request = new Promise<void>(resolve => { requested = resolve })
+    const server = createServer(() => requested())
+    server.on("connection", socket => {
+        sockets.add(socket)
+        socket.once("close", () => sockets.delete(socket))
+    })
+    t.after(async () => {
+        input.signal.abort()
+        for (const socket of sockets) socket.destroy()
+        await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    })
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    assert.ok(address && typeof address !== "string")
+    const host = new OperationHost(input.user)
+    input.hosts.push(host)
+    const executor = new class extends Executor {
+        override async run(process: ProcessSpec) {
+            if (process.args.includes("fetch")) assert.equal(process.timeoutMs, undefined)
+            return super.run(process)
+        }
+    }(process.platform, input.signal.signal, host)
+    const cache = new SourceCache(input.user, new GitSource(executor), input.signal.signal, input.operations)
+    const pending = cache.ensure({ repository: `http://127.0.0.1:${address.port}/source.git`, ref: "v1", commit }, "网络等待夹具", testTask())
+    const cancelled = assert.rejects(pending, isAbortError)
+    await Promise.race([request, pending])
+    input.signal.abort()
+    await cancelled
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "entries")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "requests")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "tmp")), [])
 })
 
 test("两个真实 CLI 工作进程共享同一缓存，只获取一份源码", async t => {

@@ -23,12 +23,12 @@ export function registerCreateCommand(program: Command, initializer: Pick<Projec
                 const state = await initializer.apply(plan)
                 created = true
                 interaction.message(`工程已创建：${state.rootDir}`)
-                const elsewhere = state.rootDir !== process.cwd() ? `；后续命令在 ${state.rootDir} 运行` : ""
+                const elsewhere = state.rootDir !== process.cwd() ? `；您的工程根位于： ${state.rootDir}` : ""
                 if (!await interaction.confirm("立即运行完整 sync，准备开发环境？")) return reporter.outro(`工程已创建，运行 arrange sync 准备开发环境${elsewhere}`)
                 const result = await syncService.run({}, state.rootDir)
                 if (result.status !== "completed") {
                     process.exitCode = 1
-                    return reporter.fail(`工程已创建；同步未完成，请进入工程根运行 arrange sync 继续${elsewhere}`)
+                    return reporter.fail(`工程已创建；同步未完成，请在工程根运行 arrange sync 继续${elsewhere}`)
                 }
                 reporter.outro(`工程已创建，开发环境已就绪${elsewhere}`)
             } catch (error) {

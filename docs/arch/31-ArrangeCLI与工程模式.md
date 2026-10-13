@@ -30,7 +30,7 @@ Arrange::framework -> native 唯一公开 target
 | `user/` | Arrange 用户级目录与工程登记；登记用于发现，不复制工程配置 |
 | `storage/` | 存储扫描、归属与引用判断、工程清理和用户级维护 |
 | `transaction/` | 持久记录、文件/初始化/替换/删除恢复处理器与恢复编排 |
-| `source/` | 原生依赖清单、共享源码缓存与 Git 获取 |
+| `source/` | 原生依赖清单、共享依赖源码缓存与 Git 获取 |
 | `operation/` | 命令资源计划、跨进程占用、内核锁与工具工作进程 |
 | `asset/` | 工程图标源校验、Node 侧缩放与 ICO/ICNS 转换、生成资源检查 |
 | `building/` | build/dev 的工程编排 |
@@ -82,7 +82,7 @@ project/
 
 CLI 的全部 `-D` 参数由当前配置、工具链与默认规则统一生成。每个构建树中的 `definitions.json` 仅保存 CLI 可能写入过的键，不保存配置值；自动源码覆盖也纳入这份记录。configure 前以精确 `-UKEY` 清除已删除的键，再以 `-DKEY=value` 写入当前值；仍有 CLI 默认值的键直接恢复该默认值。CMake 自身创建或用户手工写入的其它缓存键不属于 CLI 的日常清理范围。
 
-启动 CMake 前原子保存新旧键的并集，整个 configure 验证成功后收缩为当前键集合，最后发布准备凭据。失败、取消或异常退出不会丢失待清理键；这些写入遵守[构建树资源占用](36-ArrangeCLI资源占用与进程生命周期.md)。已有 CMakeCache 却缺少归属记录时重建该构建树，避免继承无法追溯的旧值；共享源码缓存保留。归属记录损坏时明确拒绝，不猜测或迁移旧格式。
+启动 CMake 前原子保存新旧键的并集，整个 configure 验证成功后收缩为当前键集合，最后发布准备凭据。失败、取消或异常退出不会丢失待清理键；这些写入遵守[构建树资源占用](36-ArrangeCLI资源占用与进程生命周期.md)。已有 CMakeCache 却缺少归属记录时重建该构建树，避免继承无法追溯的旧值；共享依赖源码缓存保留。归属记录损坏时明确拒绝，不猜测或迁移旧格式。
 
 运行时统一通过 [ProjectState](32-ArrangeCLI托管与同步模型.md#定义state-与拓扑) 使用配置与工程根。CONFIG 维护文件中的项目事实；SETUP 使用真实工具链准备可执行的工程，不以写一份 local YAML 代替依赖安装与 CMake configure。
 
@@ -170,6 +170,8 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 交互层输出统一采用 @clack/prompts 的引导线样式，提问与结果在同一条线上，不加命令前缀。命令以标题行开头，以完成、失败或取消行结束。非 TTY（程序化调用与测试）时退化为纯文本，失败信息写标准错误。
 
+CLI 自有输出中的文件大小统一使用十进制 B、KB、MB、GB 等单位自动显示，最多一位小数，省略末尾零；统计不完整时保留“至少”提示。
+
 扫描报告的标题行给出 Fatal、Resolvable、Applicable、Idle 计数，下面只列需要处理的条目；`--scan` 同时列出 Idle。区块组按托管标记写作 `cluster:<id>`，与同名区域区分。路径相对当前目录显示。
 
 ### 任务与子进程输出
@@ -202,7 +204,7 @@ dev 的 UI 服务与 Standalone 各占一个常驻窗格，标题显示启动中
 
 registry 没有给出答案（连接失败、超时）与 registry 明确给出否定答案是两类结果：前者无法判定兼容性，报告为 `framework-unverifiable`，信息带 registry 地址与真实原因（如 `ECONNREFUSED`）以及“本机没有可用于离线验证的已安装版本”；后者（版本不存在、契约不兼容）是确定的结论，仍报告为 `framework-incompatible`。因此网络不通时，已安装匹配版本的工程仍可以重试 sync。
 
-SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrange 原生源码：完整用户级缓存存在时直接通过；缺失时用 `git ls-remote --tags` 确认 git 可用、仓库可达和 `v<Framework 版本>` tag 存在。该检查仅适用于仓库地址与版本均由 CLI 托管、且没有显式本地源码覆盖的工程。缺失源码在 APPLY 的任务中获取；SCAN 不创建缓存或锁。目录、版本锁定、复用与失败恢复规则见 [Arrange 用户目录与源码缓存](35-Arrange用户目录与源码缓存.md)。
+SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrange 原生源码：完整用户级缓存存在时直接通过；缺失时用 `git ls-remote --tags` 确认 git 可用、仓库可达和 `v<Framework 版本>` tag 存在。该检查仅适用于仓库地址与版本均由 CLI 托管、且没有显式本地源码覆盖的工程。缺失源码在 APPLY 的任务中获取；SCAN 不创建缓存或锁。目录、版本锁定、复用与失败恢复规则见 [Arrange 用户目录与依赖源码缓存](35-Arrange用户目录与源码缓存.md)。
 
 项目版本保留完整 SemVer，包括 prerelease/build metadata；传入 JUCE 插件 `VERSION` 时使用其中的 `major.minor.patch` 数字部分，以满足 JUCE 的版本计算。交付目录和打包清单仍记录完整项目版本。
 
@@ -212,7 +214,7 @@ SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrang
 
 工具定位：Windows 上无扩展名的命令只按 `PATHEXT` 顺序解析，不选同目录下无扩展名的 sh 垫片（npm、pnpm 的安装目录里 `pnpm` 与 `pnpm.cmd` 并存，前者不能执行），并返回磁盘上的真实文件名；`.cmd`、`.bat` 由 Executor 经 `cmd` 执行。MSVC 验证实际运行 `cl.exe`，从横幅首行取版本号与目标架构记号；横幅随系统语言本地化（中文版是“用于 x64 的 … 编译器 19.50.35728 版”），所以解析只依赖与语言无关的数字版本和架构记号，不依赖其中的词，架构另与 Developer 环境的 `VSCMD_ARG_TGT_ARCH` 核对。
 
-构建树在 Windows 与 macOS 上统一归属用户级 `~/.arrange/builds`，按工程、平台、架构与配置隔离；`native.buildRoot` 仍可显式覆盖。目录所有权与根目录覆盖见 [Arrange 用户目录与源码缓存](35-Arrange用户目录与源码缓存.md)。`artifacts/` 仍在工程内。
+构建树在 Windows 与 macOS 上统一归属用户级 `~/.arrange/builds`，按工程、平台、架构与配置隔离；`native.buildRoot` 仍可显式覆盖。目录所有权与根目录覆盖见 [Arrange 用户目录与依赖源码缓存](35-Arrange用户目录与源码缓存.md)。`artifacts/` 仍在工程内。
 
 Windows 的 `cl`、`link`、`rc` 有完整路径长度限制，configure 前继续检查构建目录长度。使用共享或显式外部 JUCE 源码时采用外部源码预算，并默认传入 `CMAKE_OBJECT_PATH_MAX=200`，让 CMake 缩短过长对象路径；用户显式设置时尊重其值。超限时提示在本机配置中指定更短的构建根，不能认为系统开启长路径选项就足够。
 
@@ -252,6 +254,6 @@ Windows x64 VST3 的二进制目录核验为 `Contents/x86_64-win`；Mac 产品�
 
 `clean` 默认清当前工程 UI 输出与本平台当前架构 Debug/Release 构建树；`--ui-only`、`--native-only`、`--artifacts-only` 互斥，`--artifacts` 将受管交付物加入默认范围，`--flavor debug|release` 只限制 native。默认保留交付物、依赖、源码、日志和恢复材料。所有修改命令先展示计划确认，`--scan` 只查看，不能绕过路径核验或资源占用。
 
-`storage inspect` 查看登记与受管资源；`storage clean` 选择孤儿构建、无引用源码及无人使用的获取临时内容；`storage repair <条目ID>` 按确切 commit 修复；`recover [事务ID]` 与 `storage recover [事务ID]` 分别处理工程与用户级未完成事务。目录规则见[用户目录](35-Arrange用户目录与源码缓存.md)，恢复见[托管模型](32-ArrangeCLI托管与同步模型.md)，互斥见[资源协议](36-ArrangeCLI资源占用与进程生命周期.md)。
+`storage inspect` 查看登记与受管资源；`storage clean` 选择孤儿构建、无引用依赖源码及无人使用的获取临时内容；`storage repair <条目ID>` 按确切 commit 修复；`recover [事务ID]` 与 `storage recover [事务ID]` 分别处理工程与用户级未完成事务。目录规则见[用户目录](35-Arrange用户目录与源码缓存.md)，恢复见[托管模型](32-ArrangeCLI托管与同步模型.md)，互斥见[资源协议](36-ArrangeCLI资源占用与进程生命周期.md)。
 
 维护参数：`clean [--ui-only|--native-only|--artifacts-only] [--artifacts] [--flavor debug|release] [--scan]`。单范围与 --artifacts 不混用，--flavor 不用于 UI/交付物单范围。storage clean/repair 与两个 recover 入口均接受 --scan；无事务 ID 时只列记录，有 ID 时展示目标、冲突和实际可用动作。没有 --force 或另一个 prune 别名。源码格式与旧记录边界见用户目录母文档。

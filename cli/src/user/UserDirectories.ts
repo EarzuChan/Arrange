@@ -14,7 +14,7 @@ export class UserDirectories {
     }
 
     get builds(): string { return join(this.root, "builds") }
-    get sources(): string { return join(this.root, "sources") }
+    get dependencySources(): string { return join(this.root, "deps-src") }
     get temporary(): string { return join(this.root, "tmp") }
     get runtime(): string { return join(this.root, "runtime") }
     get operations(): string { return join(this.root, "operations") }

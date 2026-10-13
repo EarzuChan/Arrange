@@ -94,7 +94,7 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), signal, operations))
     const cmake = new CmakeService(executor, platform, new IconAssetsService(signal), directories, sources, signal)
     const projectRegistry = new ProjectRegistry(directories, signal)
-    const lifetime = { kind: "directory" as const, path: directories.sources, mode: "read" as const }
+    const lifetime = { kind: "directory" as const, path: directories.dependencySources, mode: "read" as const }
     const projectOperations = new ProjectOperations(operations, store, cmake, projectRegistry, lifetime)
     const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, signal, new FrameworkSourceProbe(executor, undefined, sources), (state, scope) => projectOperations.assertSetup(state, scope))
     const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, signal, terminal.tasks)
@@ -117,7 +117,7 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     registerBuildCommand(cli, { build: (root, options) => actions.build(builder, root, options) }, reporter)
     registerPackCommand(cli, (root, options) => actions.pack(project, packer, root, options), terminal.tasks, reporter)
     const storageGit = new GitSource(executor)
-    const inventory = new StorageInventory(directories, projectRegistry, storageGit, signal)
+    const inventory = new StorageInventory(directories, projectRegistry, storageGit, signal, store, cmake)
     registerMaintenanceCommands(cli, { terminal, store, projects: projectOperations, operations, directories, registry: projectRegistry, inventory, cleaner: new ProjectCleaner(cmake, signal), maintenance: new StorageMaintenance(directories, inventory, storageGit, signal, projectRegistry), lifetime, signal, interactive: options.interactions === "terminal" })
     return cli
 }

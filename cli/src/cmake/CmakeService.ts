@@ -16,6 +16,8 @@ import { BuildReferences } from "../source/BuildReferences.ts"
 import { BuildDirectories } from "./BuildDirectories.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
 import { CmakeDefinitions, mergeCmakeDefinitions, type CmakeDefinitionValues } from "./CmakeDefinitions.ts"
+import { preparationRecordSchema } from "./PreparationRecord.ts"
+import { readCurrentRecord, inspectionFailure, type InspectionFact } from "../util/RecordInspection.ts"
 
 export interface CmakeTarget {
     readonly name: string
@@ -43,12 +45,7 @@ export interface CmakeInspection {
     readonly ready: boolean
     readonly reason?: string
     readonly model?: CmakeModel
-}
-
-interface Preparation {
-    readonly signature: string
-    readonly inputHashes: Record<string, string>
-    readonly sourceDirectories: Readonly<Record<string, string>>
+    readonly issue?: InspectionFact
 }
 
 interface ReplyIndex {
@@ -110,10 +107,12 @@ export class CmakeService {
     private assertBuildDirectory(state: ProjectState, flavor: BuildFlavor): Promise<void> { return this.directories.assert(state, flavor) }
 
     async inspect(state: ProjectState, flavor: BuildFlavor): Promise<CmakeInspection> {
+        let inspectionPath = state.rootDir
         try {
             await this.assertBuildDirectory(state, flavor)
+            inspectionPath = this.preparationPath(state, flavor)
             if (await new CmakeDefinitions(this.buildDirectory(state, flavor)).readKeys() === undefined) return { ready: false, reason: "缺少 CMake definitions 归属记录，需要重新 configure" }
-            const preparation = JSON.parse(await readFile(this.preparationPath(state, flavor), "utf8")) as Preparation
+            const preparation = await readCurrentRecord(this.preparationPath(state, flavor), preparationRecordSchema)
             if (preparation.signature !== await this.signature(state, flavor)) return { ready: false, reason: "原生配置或本机工具环境已变化，需要重新 configure" }
             const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
             if (!iconInspection.ready) return { ready: false, reason: iconInspection.reason }
@@ -126,7 +125,7 @@ export class CmakeService {
             return { ready: true, model }
         } catch (error) {
             if (isAbortError(error)) throw error
-            return { ready: false, reason: error instanceof Error ? error.message : String(error) }
+            return { ready: false, reason: error instanceof Error ? error.message : String(error), issue: inspectionFailure(error, inspectionPath) }
         }
     }
 

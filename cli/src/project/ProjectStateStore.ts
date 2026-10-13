@@ -5,9 +5,10 @@ import { writeTextFile } from "../util/Utils.ts"
 import { errorMessage } from "../util/Utils.ts"
 import { readSnapshot, type FileSnapshot } from "../util/FileUtils.ts"
 import type { FileTransaction } from "../util/FileTransaction.ts"
+import { inspectionFailure, InspectionError, type InspectionState } from "../util/RecordInspection.ts"
 
 export const projectFileNames = { project: "arrange.project.yaml", local: "arrange.local.yaml" } as const
-export interface StateDiagnostic { readonly path: string, readonly message: string }
+export interface StateDiagnostic { readonly path: string, readonly message: string, readonly state: InspectionState }
 
 export class ProjectStateStore {
     constructor(private readonly writer: FileTransaction) { }
@@ -26,7 +27,7 @@ export class ProjectStateStore {
                 snapshots.push(snapshot)
 
                 if (snapshot.content === null) {
-                    if (!optional) throw new Error("配置文件不存在")
+                    if (!optional) throw new InspectionError({ state: "missing", path, reason: "配置文件不存在" })
                     return null
                 }
 
@@ -35,18 +36,18 @@ export class ProjectStateStore {
 
                 return doc.toJS()
             } catch (error) {
-                errors.push({ path, message: errorMessage(error) })
+                errors.push({ path, message: errorMessage(error), state: inspectionFailure(error, path).state })
                 return undefined
             }
         }
 
         const projectRaw = await read(projectFileNames.project, false)
         const project = projectDefinitionSchema.safeParse(projectRaw)
-        if (!project.success && projectRaw !== undefined) errors.push({ path: join(root, projectFileNames.project), message: project.error.message })
+        if (!project.success && projectRaw !== undefined) errors.push({ path: join(root, projectFileNames.project), message: project.error.message, state: "damaged" })
 
         const localRaw = await read(projectFileNames.local, true)
         const local = localDefinitionSchema.nullable().safeParse(localRaw)
-        if (!local.success && localRaw !== undefined) errors.push({ path: join(root, projectFileNames.local), message: local.error.message })
+        if (!local.success && localRaw !== undefined) errors.push({ path: join(root, projectFileNames.local), message: local.error.message, state: "damaged" })
 
         // CONFIG 不依赖本机工具状态；local 的诊断仍阻止任何写入
         const state: ProjectState | null = project.success ? { rootDir: root, project: project.data, local: local.success ? local.data : null } : null

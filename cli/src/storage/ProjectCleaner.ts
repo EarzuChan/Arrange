@@ -10,6 +10,8 @@ import { TransactionStore } from "../transaction/TransactionStore.ts"
 import { DeleteTransaction } from "../transaction/DeleteTransaction.ts"
 import { nativeBuildRecordName } from "../building/BuildReceipt.ts"
 import { defaultNativeGenerator } from "../CliMetadata.ts"
+import { buildOwnerRecordSchema } from "../cmake/BuildOwnerRecord.ts"
+import { readCurrentRecord } from "../util/RecordInspection.ts"
 
 export interface CleanOptions { readonly ui: boolean, readonly native: boolean, readonly artifacts: boolean, readonly flavor?: BuildFlavor }
 export interface CleanEntry { readonly root: string, readonly path: string, readonly reason: string }
@@ -40,7 +42,7 @@ export class ProjectCleaner {
                 })
                 if (info) {
                     await assertPlainDirectoryPath(root, path)
-                    const owner = z.object({ rootDir: z.string() }).parse(JSON.parse(await readFile(ownerPath, "utf8")))
+                    const owner = await readCurrentRecord(ownerPath, buildOwnerRecordSchema)
                     const normalize = (value: string) => process.platform === "win32" ? resolve(value).toLowerCase() : resolve(value)
                     if (normalize(owner.rootDir) !== normalize(state.rootDir)) throw new Error(`构建归属不符：${path}`)
                     entries.push({ root, path, reason: `原生 ${flavor} 构建树` })

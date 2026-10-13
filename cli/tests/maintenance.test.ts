@@ -7,6 +7,10 @@ import { OperationHost } from "../src/operation/OperationHost.ts"
 import { Operations } from "../src/operation/Operations.ts"
 import { canonicalResource } from "../src/operation/Resource.ts"
 import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
+import { CmakeService } from "../src/cmake/CmakeService.ts"
+import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
+import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
 import { ProjectRegistry } from "../src/user/ProjectRegistry.ts"
 import { TransactionStore } from "../src/transaction/TransactionStore.ts"
 import { DeleteTransaction } from "../src/transaction/DeleteTransaction.ts"
@@ -42,7 +46,7 @@ async function harness(t: { after: (callback: () => Promise<void>) => void }) {
     const host = new OperationHost(user)
     const operations = new Operations(host, signal, () => { })
     const transactions = new TransactionStore(root)
-    const lifetime = { kind: "directory" as const, path: user.sources, mode: "write" as const }
+    const lifetime = { kind: "directory" as const, path: user.dependencySources, mode: "write" as const }
     t.after(async () => {
         await host.close()
         await rm(root, { recursive: true, force: true })
@@ -235,17 +239,17 @@ test("真实 Git 缓存损坏后按确切 commit 修复，无引用条目清理�
     const source = await cache.ensure({ repository, ref: commit, commit }, "测试依赖", testTask())
     await write(join(source.directory, "CMakeLists.txt"), "用户改坏了缓存")
     const registry = new ProjectRegistry(input.user, input.signal)
-    const inventory = new StorageInventory(input.user, registry, git, input.signal)
+    const inventory = new StorageInventory(input.user, registry, git, input.signal, new ProjectStateStore(new FileTransaction(input.signal)), new CmakeService(executor, createPlatformService(executor), new IconAssetsService(input.signal), input.user))
     const maintenance = new StorageMaintenance(input.user, inventory, git, input.signal, registry)
     await input.operations.run([input.lifetime], "修复测试", () => maintenance.repair(source.key, testTask()))
     assert.equal(await readFile(join(source.directory, "CMakeLists.txt"), "utf8"), "project(Fixture NONE)\n")
     const unknownBuild = join(input.user.builds, "12345678", "xd")
     await mkdir(unknownBuild, { recursive: true })
-    const uncertain = (await inventory.inspect()).find(item => item.id === `source:${source.key}`)!
-    assert.equal(uncertain.cleanable, false)
-    assert.equal(uncertain.referencesComplete, false)
+    const uncertain = (await inventory.inspect()).find(item => item.id === `deps-src:${source.key}`)!
+    assert.equal(uncertain.cleanup.allowed, false)
+    assert.equal(uncertain.references.complete, false)
     await rm(join(input.user.builds, "12345678"), { recursive: true })
-    const candidates = (await inventory.inspect()).filter(item => item.cleanable)
+    const candidates = (await inventory.inspect()).filter(item => item.cleanup.allowed)
     assert.equal(candidates.length, 1)
     const peer = new OperationHost(input.user)
     const release = await peer.acquire([await canonicalResource({ ...input.lifetime, mode: "read" })], "模拟存活构建", input.signal, () => { })
@@ -255,8 +259,8 @@ test("真实 Git 缓存损坏后按确切 commit 修复，无引用条目清理�
     }
     await write(join(input.user.runtime, "keep"), "运行时数据")
     await input.operations.run([input.lifetime], "清理测试", () => maintenance.clean(candidates))
-    assert.deepEqual(await readdir(join(input.user.sources, "entries")), [])
-    assert.deepEqual(await readdir(join(input.user.sources, "requests")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "entries")), [])
+    assert.deepEqual(await readdir(join(input.user.dependencySources, "requests")), [])
     assert.equal(await readFile(join(input.user.runtime, "keep"), "utf8"), "运行时数据")
 })
 
