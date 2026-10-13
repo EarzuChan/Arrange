@@ -12,6 +12,7 @@ import { isAbortError, throwIfProcessCancelled } from "../platform/ProcessSpec.t
 import { ninjaProgress, type TaskOutput } from "../ui/Tasks.ts"
 import { UserDirectories } from "../user/UserDirectories.ts"
 import type { NativeSourceService } from "../source/NativeSourceService.ts"
+import { BuildReferences } from "../source/BuildReferences.ts"
 import { BuildDirectories } from "./BuildDirectories.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
 import { CmakeDefinitions, mergeCmakeDefinitions, type CmakeDefinitionValues } from "./CmakeDefinitions.ts"
@@ -105,7 +106,7 @@ export class CmakeService {
 
     buildDirectory(state: ProjectState, flavor: BuildFlavor): string { return this.directories.directory(state, flavor) }
     get platformName(): PlatformService["name"] { return this.platform.name }
-    private buildAnchor(state: ProjectState): string { return this.directories.anchor(state) }
+    buildAnchor(state: ProjectState): string { return this.directories.anchor(state) }
     private assertBuildDirectory(state: ProjectState, flavor: BuildFlavor): Promise<void> { return this.directories.assert(state, flavor) }
 
     async inspect(state: ProjectState, flavor: BuildFlavor): Promise<CmakeInspection> {
@@ -167,6 +168,7 @@ export class CmakeService {
         Object.assign(managed, { [nativeIconCmakeDefinitions.ico]: icons?.ico.replace(/\\/g, "/") ?? "", [nativeIconCmakeDefinitions.icns]: icons?.icns.replace(/\\/g, "/") ?? "", [nativeIconCmakeDefinitions.presentation]: presentation })
         if (this.platform.name === "win32") managed.CMAKE_OBJECT_PATH_MAX = String(windowsObjectPathMax)
         const current: CmakeDefinitionValues = mergeCmakeDefinitions({ ...managed, ...sourceDirectories }, local.native.cmakeDefinitions)
+        const completeReferences = await new BuildReferences(directory).begin(current, state.rootDir)
         const env = await this.platform.nativeEnvironment(local)
         args.push(...await definitions.begin(current, previousKeys ?? []))
         task.stage("配置")
@@ -180,6 +182,7 @@ export class CmakeService {
         const iconInspection = await this.icons.inspect(state, this.iconDirectory(state, flavor), this.buildAnchor(state))
         if (!iconInspection.ready) throw new Error(iconInspection.reason ?? "图标派生资源尚未准备")
         await definitions.complete(current)
+        await completeReferences()
         await writeAtomicText(this.preparationPath(state, flavor), `${JSON.stringify({ signature, inputHashes, sourceDirectories }, null, 4)}\n`)
         return model
     }

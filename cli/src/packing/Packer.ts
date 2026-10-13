@@ -11,6 +11,8 @@ import { isJsonObject } from "../util/Utils.ts"
 import { nativePresentationSignature } from "../project/NativePresentation.ts"
 import { WindowsBundleIcon } from "./WindowsBundleIcon.ts"
 import { nativeBuildRecordName } from "../building/BuildReceipt.ts"
+import { TransactionStore } from "../transaction/TransactionStore.ts"
+import { ReplacementTransaction } from "../transaction/ReplacementTransaction.ts"
 
 export interface PackOptions {
     readonly flavor: BuildFlavor
@@ -35,8 +37,6 @@ interface Replacement {
     readonly staged: string
     readonly destination: string
     readonly backup: string
-    backedUp: boolean
-    committed: boolean
 }
 
 function contains(parent: string, child: string): boolean {
@@ -183,38 +183,6 @@ export class Packer {
         }
     }
 
-    private async commit(replacements: Replacement[]): Promise<void> {
-        try {
-            for (const replacement of replacements) {
-                this.signal?.throwIfAborted()
-                if (await lstat(replacement.destination).catch(() => undefined)) {
-                    await this.move(replacement.destination, replacement.backup)
-                    replacement.backedUp = true
-                }
-                await this.move(replacement.staged, replacement.destination)
-                replacement.committed = true
-            }
-        } catch (error) {
-            const failures: string[] = []
-            for (const replacement of [...replacements].reverse()) {
-                try {
-                    if (replacement.committed) {
-                        await rm(replacement.destination, { recursive: true, force: true })
-                        replacement.committed = false
-                    }
-                    if (replacement.backedUp) {
-                        await this.move(replacement.backup, replacement.destination)
-                        replacement.backedUp = false
-                    }
-                } catch (failure) {
-                    failures.push(`${replacement.destination}：${String(failure)}`)
-                }
-            }
-            if (failures.length) throw new Error(`打包提交失败：${String(error)}；回退未完成，备份仍保留：${failures.join("；")}`)
-            throw error
-        }
-    }
-
     async pack(state: ProjectState, options: PackOptions): Promise<PackResult> {
         this.signal?.throwIfAborted()
         const artifacts = await this.artifactLocator.locate(state, options)
@@ -244,6 +212,10 @@ export class Packer {
 
         await mkdir(directory, { recursive: true })
         const staging = await mkdtemp(resolve(directory, ".arrange-package-"))
+        const transactionStore = new TransactionStore(state.rootDir)
+        const transaction = new ReplacementTransaction(transactionStore, this.signal, this.move.bind(this))
+        const cleanup = [{ root: outputRoot, path: staging }]
+        const record = await transaction.begin(cleanup)
         const replacements: Replacement[] = []
         const products: PackedProduct[] = []
         let preserveStaging = false
@@ -286,24 +258,30 @@ export class Packer {
                 if (stagedUiEntrySha256 !== uiEntrySha256) throw new Error("UI 复制验证失败")
                 const path = resolve(destination, basename(artifact.productPath))
                 products.push({ product: artifact.product, path, binaryPath: artifact.productPath === artifact.binaryPath ? path : resolve(path, binaryRelative), uiPath: artifact.productPath === artifact.binaryPath ? resolve(destination, "ui") : resolve(path, artifact.uiRelativePath) })
-                await writeFile(resolve(staged, "arrange-package.json"), `${JSON.stringify({ format: 1, project: state.project.project.name, version: state.project.project.version, frameworkVersion: state.project.framework.version, nativeTarget: state.project.native.target, flavor: options.flavor, platform, architecture, product: artifact.product, binary: relative(staged, stagedBinary), ui: relative(staged, uiPath), binarySha256: await digest(stagedBinary), uiEntrySha256: stagedUiEntrySha256, buildRecords }, null, 4)}\n`)
-                replacements.push({ staged, destination, backup: resolve(staging, `backup-${artifact.product}`), backedUp: false, committed: false })
+                await writeFile(resolve(staged, "arrange-package.json"), `${JSON.stringify({ format: 1, project: state.project.project.name, version: state.project.project.version, frameworkVersion: state.project.framework.version, nativeTarget: state.project.native.target, flavor: options.flavor, platform, architecture, product: artifact.product, ownedEntries: [basename(artifact.productPath), ...(artifact.productPath === artifact.binaryPath ? ["ui", ...artifact.runtimeFiles.map(file => basename(file))] : [])], binary: relative(staged, stagedBinary), ui: relative(staged, uiPath), binarySha256: await digest(stagedBinary), uiEntrySha256: stagedUiEntrySha256, buildRecords }, null, 4)}\n`)
+                replacements.push({ staged, destination, backup: resolve(staging, `backup-${artifact.product}`) })
             }
             const manifestPath = resolve(directory, "arrange-package.json")
             const stagedManifest = resolve(staging, "arrange-package.json")
             await writeFile(stagedManifest, `${JSON.stringify({ format: 1, project: state.project.project.name, version: state.project.project.version, frameworkVersion: state.project.framework.version, flavor: options.flavor, platform, architecture, buildRecords, products: products.map(product => ({ product: product.product, path: relative(directory, product.path), binary: relative(directory, product.binaryPath), ui: relative(directory, product.uiPath) })) }, null, 4)}\n`)
-            replacements.push({ staged: stagedManifest, destination: manifestPath, backup: resolve(staging, "backup-manifest.json"), backedUp: false, committed: false })
+            replacements.push({ staged: stagedManifest, destination: manifestPath, backup: resolve(staging, "backup-manifest.json") })
             try {
                 this.signal?.throwIfAborted()
-                await this.commit(replacements)
+                await transaction.prepare(replacements.map(replacement => ({ ...replacement, root: outputRoot })), cleanup, record)
+                await transaction.apply(record)
             } catch (error) {
-                preserveStaging = String(error).includes("回退未完成")
-                if (preserveStaging) throw new Error(`${String(error)}；恢复备份目录：${staging}`)
+                try { await new ReplacementTransaction(transactionStore, undefined, this.move.bind(this)).apply(record, true) } catch (rollback) {
+                    preserveStaging = true
+                    throw new Error(`打包提交失败：${String(error)}；回退未完成：${String(rollback)}；事务 ${record.id}，备份目录：${staging}`, { cause: error })
+                }
                 throw error
             }
             return { directory, products, manifestPath }
         } finally {
-            if (!preserveStaging) await rm(staging, { recursive: true, force: true })
+            if (!preserveStaging) {
+                await rm(staging, { recursive: true, force: true })
+                await transactionStore.remove(record.id).catch(error => { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error })
+            }
         }
     }
 }

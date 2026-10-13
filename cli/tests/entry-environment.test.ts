@@ -16,6 +16,7 @@ import { FileTransaction } from "../src/util/FileTransaction.ts"
 import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
 import { fixture, quietTerminal, TestSyncWizard } from "./fixture.ts"
+import { UserDirectories } from "../src/user/UserDirectories.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
@@ -101,7 +102,7 @@ test("registry 请求期间取消 CONFIG，不报告完成或发布文件", asyn
     await new ProjectStateStore(new FileTransaction()).save(state)
     const before = await readFile(cmakeListsFile.path(state), "utf8")
     const config = new TestSyncWizard()
-    const cli = createCliApplication({ signal: controller.signal, interactions: interactions(config), terminal: quietTerminal() }).exitOverride()
+    const cli = createCliApplication({ signal: controller.signal, interactions: interactions(config), terminal: quietTerminal(), userDirectories: new UserDirectories(join(state.rootDir, "test-user")) }).exitOverride()
     const cwd = process.cwd()
     process.chdir(state.rootDir)
     try {

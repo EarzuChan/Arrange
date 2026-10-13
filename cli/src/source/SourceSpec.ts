@@ -6,8 +6,10 @@ export const sourceSpecSchema = z.object({ repository: singleLine, ref: singleLi
 export type SourceSpec = z.infer<typeof sourceSpecSchema>
 
 export function sourceIdentity(spec: SourceSpec): string {
-    return sourceHash([spec.repository, spec.ref, spec.commit ?? null])
+    return sourceHash([sourceRepositoryIdentity(spec.repository), spec.ref, spec.commit ?? null])
 }
+
+export function sourceRepositoryIdentity(repository: string): string { return repository.replace(/(\/\/)[^/@\s]+@/g, "$1") }
 
 export function sourceHash(parts: readonly unknown[]): string {
     return createHash("sha256").update(JSON.stringify(parts)).digest("hex")

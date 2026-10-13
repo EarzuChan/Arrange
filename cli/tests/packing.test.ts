@@ -1,10 +1,10 @@
-import { nativeProducts, cmakeRun, hostPlatform, hostArchitecture, windowsOnly, macOnly } from "./native-fixture.ts"
+import { NativeProductSeed, nativeProducts, cmakeRun, hostPlatform, hostArchitecture, windowsOnly, macOnly } from "./native-fixture.ts"
 import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { lstat, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { basename, dirname, resolve } from "node:path"
-import { test, type TestContext } from "node:test"
+import { after, test, type TestContext } from "node:test"
 import { CmakeService, type CmakeModel } from "../src/cmake/CmakeService.ts"
 import { ArtifactLocator } from "../src/packing/ArtifactLocator.ts"
 import { Packer } from "../src/packing/Packer.ts"
@@ -41,8 +41,13 @@ class ModelCmakeService extends CmakeService {
     override async readModel() { return this.model }
 }
 
-async function setup(t: TestContext) {
-    const { state, model, cmake: actualCmake } = await nativeProducts(t)
+const productSeed = new NativeProductSeed()
+after(() => productSeed.close())
+
+async function setup(t: TestContext, rebuild = false) {
+    const input = rebuild ? await nativeProducts(t) : await productSeed.copy(t)
+    const { state, model } = input
+    const actualCmake = "cmake" in input ? input.cmake : undefined
     const platform = hostPlatform!
     const standalone = model.targets.find(target => target.name.endsWith("_Standalone"))!.artifacts.find(path => hostPlatform !== "win32" || path.endsWith(".exe"))!
     const vst = model.targets.find(target => target.name.endsWith("_VST3"))!.artifacts.find(path => hostPlatform !== "win32" || path.endsWith(".vst3"))!
@@ -140,14 +145,14 @@ test("无 --clean 保留所选目录额外文件，但当前 bundle/UI 总是完
 
 test("显示名改变后按清单替换 CLI 旧产物，同时保留用户额外产品", async t => {
     for (const platform of [hostPlatform!] as const) {
-        const input = await setup(t)
+        const input = await setup(t, true)
         const options = { flavor: "release", products: ["standalone", "vst3"] } as const
         await new Packer(input.locator, input.executor).pack(input.state, options)
         for (const product of options.products) await write(resolve(input.output, product, "Manual.vst3/notes.txt"), "用户文件")
         input.state.project.project.displayName = "新 产品"
         const cmakePath = resolve(input.state.rootDir, "native/CMakeLists.txt")
         await write(cmakePath, (await readFile(cmakePath, "utf8")).replaceAll("A Product", "新 产品"))
-        const model = await new NativeBuildService(input.actualCmake).build(input.state, "release", [...options.products], testTask())
+        const model = await new NativeBuildService(input.actualCmake!).build(input.state, "release", [...options.products], testTask())
         const packed = await new Packer(new ArtifactLocator(new ModelCmakeService(model)), input.executor).pack(input.state, options)
         for (const product of packed.products) {
             assert.match(product.path, /新 产品/)
@@ -390,8 +395,6 @@ test("Windows 只复制目标图中明确的 DLL，文件名冲突拒绝", windo
     const locator = new ArtifactLocator(new ModelCmakeService({ ...input.model, targets }))
     const packed = await new Packer(locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone"] })
     assert.deepEqual(await readFile(resolve(dirname(packed.products[0].binaryPath), "Effect.dll")), await readFile(library))
-    const compiled = await cmakeRun(["--build", input.model.buildDirectory, "--target", "Another"])
-    assert.equal(compiled.exitCode, 0, compiled.stdout + compiled.stderr)
     const index = targets.findIndex(target => target.name.endsWith("_Standalone"))
     targets[index] = { ...targets[index], dependencies: [...targets[index].dependencies, "Another"] }
     await assert.rejects(new ArtifactLocator(new ModelCmakeService({ ...input.model, targets })).locateStandalone(input.state, "release"), /文件名冲突/)

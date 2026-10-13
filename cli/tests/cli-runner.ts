@@ -3,6 +3,8 @@ import { createCliApplication, type CliInteractions } from "../src/CliApplicatio
 import { SyncWizard } from "../src/wizard/Sync.ts"
 import { SetupWizard } from "../src/wizard/Setup.ts"
 import { createTerminal } from "../src/ui/Terminal.ts"
+import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { resolve } from "node:path"
 
 // 程序化验收入口：输出走与正式入口相同的终端层，颜色遵循环境设置，任何需要询问的步骤直接失败
 const terminal = createTerminal()
@@ -19,7 +21,7 @@ const interactions: CliInteractions = {
 }
 
 try {
-    const cli = createCliApplication({ signal: new AbortController().signal, interactions, terminal })
+    const cli = createCliApplication({ signal: new AbortController().signal, interactions, terminal, userDirectories: new UserDirectories(resolve(process.cwd(), "cli-test-user")) })
     cli.exitOverride()
     await cli.parseAsync(process.argv)
 } catch (error) {

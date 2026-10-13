@@ -7,6 +7,7 @@ import { Operations } from "./Operations.ts"
 import { ResourcePlanChanged } from "../util/ResourcePlanChanged.ts"
 import type { Resource } from "./Resource.ts"
 import { defaultDevServerUrl, defaultNativeGenerator } from "../CliMetadata.ts"
+import type { ProjectRegistry } from "../user/ProjectRegistry.ts"
 
 export interface ProjectAccess {
     readonly configuration: "read" | "write"
@@ -20,12 +21,13 @@ export interface ProjectAccess {
 }
 
 export class ProjectOperations {
-    constructor(private readonly operations: Operations, private readonly store: ProjectStateStore, private readonly cmake: CmakeService) { }
+    constructor(private readonly operations: Operations, private readonly store: ProjectStateStore, private readonly cmake: CmakeService, private readonly registry?: ProjectRegistry, private readonly sourceLifetime?: Resource) { }
 
     async run<T>(root: string, access: ProjectAccess, label: string, body: () => Promise<T>): Promise<T> {
         for (; ;) {
             const planned = await this.store.deepLoad(root)
             const resources: Resource[] = [{ kind: "configuration", path: resolve(root), mode: access.configuration }]
+            if (this.sourceLifetime) resources.push(this.sourceLifetime)
             const state = planned.state
             if (state) resources.push(...this.resources(state, access))
             let retry = false
@@ -37,6 +39,7 @@ export class ProjectOperations {
                         return undefined
                     }
                     await this.operations.assert(resources)
+                    if (!access.observe && current.state) await this.registry?.register(current.state.rootDir, this.cmake.buildAnchor(current.state))
                     return body()
                 }, access.observe)
                 if (!retry) return result as T

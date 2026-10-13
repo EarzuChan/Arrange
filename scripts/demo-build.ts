@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs"
 import { resolve } from "node:path"
 import { repoRoot, run } from "./common.ts"
 import { configureNativeBuild, nativeCmake } from "./native-toolchain.ts"
+import { withNativeSession } from "./native-session.ts"
 
 const demoUiRoot = resolve(repoRoot, "demo/ui-src")
 const demoUiDistDir = resolve(repoRoot, "build/demo-ui-dist")
@@ -36,11 +37,13 @@ export async function buildDemoUi(): Promise<void> {
 }
 
 export async function buildDemoNative(buildType: string | undefined): Promise<void> {
-    const normalizedBuildType = normalizeBuildType(buildType)
-    const buildDir = buildDirFor(normalizedBuildType)
-    cleanBuildDir(buildDir)
-    await configureNativeBuild(resolve(repoRoot, "demo/plugin-src"), buildDir, normalizedBuildType, [`-DARRANGE_DEMO_ARRANGE_SOURCE_DIR=${repoRoot}`, `-DARRANGE_DEMO_UI_DIST_DIR=${demoUiDistDir}`])
-    await nativeCmake(["--build", buildDir])
+    const buildDir = buildDirFor(normalizeBuildType(buildType))
+    await withNativeSession(async () => {
+        const normalizedBuildType = normalizeBuildType(buildType)
+        cleanBuildDir(buildDir)
+        await configureNativeBuild(resolve(repoRoot, "demo/plugin-src"), buildDir, normalizedBuildType, [`-DARRANGE_DEMO_ARRANGE_SOURCE_DIR=${repoRoot}`, `-DARRANGE_DEMO_UI_DIST_DIR=${demoUiDistDir}`])
+        await nativeCmake(["--build", buildDir])
+    }, [buildDir])
 }
 
 export async function buildDemo(buildType: string | undefined): Promise<void> {

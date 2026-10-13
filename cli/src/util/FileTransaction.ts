@@ -1,36 +1,31 @@
 import { localWorkDirectory } from "../CliMetadata.ts"
-import { randomUUID } from "node:crypto"
 import { mkdir, readFile, rename, rm, writeFile, stat, link } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { assertSnapshots, readSnapshot, type FileSnapshot } from "./FileUtils.ts"
 import { assertPlainDirectoryPath } from "./PlainDirectoryPath.ts"
-import { writeJsonFile } from "./JsonFile.ts"
+import { TransactionStore, type TransactionRecord } from "../transaction/TransactionStore.ts"
+import { writePayloadSchema, type WritePayload } from "../transaction/WritePayload.ts"
 
 export interface FileChange {
     readonly before: FileSnapshot,
     readonly after: string
 }
 
-export interface WriteJournal {
-    readonly id: string
-    status: "writing" | "complete" | "failed"
-    error?: string
-    readonly files: { path: string, original: string | null, expected: string, written: boolean }[]
-}
-
 export class FileTransaction {
     constructor(private readonly defaultSignal?: AbortSignal) { }
 
-    async write(rootDir: string, changes: readonly FileChange[], guards: readonly FileSnapshot[] = []): Promise<void> {
+    async write(rootDir: string, changes: readonly FileChange[], guards: readonly FileSnapshot[] = [], existing?: TransactionRecord): Promise<void> {
         this.defaultSignal?.throwIfAborted()
         if (!changes.length) return
 
         await assertSnapshots([...guards, ...changes.map(change => change.before)])
         this.defaultSignal?.throwIfAborted()
 
-        const id = randomUUID()
-        const journalPath = join(rootDir, localWorkDirectory, "transactions", `${id}.json`)
-        const journal: WriteJournal = { id, status: "writing", files: changes.map(change => ({ path: change.before.path, original: change.before.content, expected: change.after, written: false })) }
+        const store = new TransactionStore(rootDir)
+        const record = existing ?? await store.create("write", { files: changes.map(change => ({ path: change.before.path, original: change.before.content, expected: change.after, written: false })) })
+        const id = record.id
+        const journalPath = store.path(id)
+        const payload = record.payload as WritePayload
         await assertPlainDirectoryPath(rootDir, dirname(journalPath))
         await mkdir(join(rootDir, localWorkDirectory), { recursive: true })
 
@@ -40,36 +35,39 @@ export class FileTransaction {
             if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
         }
 
-        await writeJsonFile(journalPath, journal)
+        record.status = "running"
+        await store.save(record)
 
         try {
             for (const change of changes) {
                 this.defaultSignal?.throwIfAborted()
                 await assertSnapshots(guards)
                 await this.replaceFile(change.before, change.after, id)
-                journal.files.find(file => file.path === change.before.path)!.written = true
-                await writeJsonFile(journalPath, journal)
+                payload.files.find(file => file.path === change.before.path)!.written = true
+                await store.save(record)
             }
         } catch (error) {
-            journal.status = "failed"
-            journal.error = error instanceof Error ? error.message : String(error)
+            record.status = "failed"
+            record.error = error instanceof Error ? error.message : String(error)
 
             if ((this.defaultSignal?.aborted && error === this.defaultSignal.reason) || (error instanceof Error && error.name === "AbortError")) {
-                await writeJsonFile(journalPath, journal).catch(() => { })
-                const cancelled = new Error(`写入已取消，原文、目标内容及进度保存在 ${journalPath}：${journal.error}`, { cause: error })
+                await store.save(record).catch(() => { })
+                const cancelled = new Error(`写入已取消，原文、目标内容及进度保存在 ${journalPath}：${record.error}`, { cause: error })
                 cancelled.name = "AbortError"
                 throw cancelled
             }
-            await writeJsonFile(journalPath, journal)
+            await store.save(record)
 
-            throw new Error(`写入未完成，原文、目标内容及进度保存在 ${journalPath}：${journal.error}`, { cause: error })
+            throw new Error(`写入未完成，原文、目标内容及进度保存在 ${journalPath}：${record.error}`, { cause: error })
         }
 
-        journal.status = "complete"
+        if (existing) return
+        record.status = "complete"
+        await store.save(record)
         try {
             await this.removeJournal(journalPath)
         } catch {
-            await writeJsonFile(journalPath, journal).catch(() => { })
+            await store.save(record).catch(() => { })
         }
     }
 
@@ -93,19 +91,21 @@ export class FileTransaction {
     }
 
     protected async removeJournal(path: string): Promise<void> {
-        await rm(path, { force: true })
+        await rm(dirname(path), { recursive: true })
     }
 
-    async inspectJournal(path: string): Promise<{ journal: WriteJournal, states: ("original" | "expected" | "conflict")[] }> {
-        const journal = JSON.parse(await readFile(path, "utf8")) as WriteJournal
+    async inspectTransaction(directory: string): Promise<{ record: TransactionRecord, files: WritePayload["files"], states: ("original" | "expected" | "conflict")[] }> {
+        const root = dirname(dirname(dirname(directory)))
+        const record = await new TransactionStore(root).read(basename(directory))
+        const payload = writePayloadSchema.parse(record.payload)
 
         const states: ("original" | "expected" | "conflict")[] = []
 
-        for (const file of journal.files) {
+        for (const file of payload.files) {
             const content = (await readSnapshot(file.path)).content
             states.push(content === file.expected ? "expected" : content === file.original ? "original" : "conflict")
         }
 
-        return { journal, states }
+        return { record, files: payload.files, states }
     }
 }

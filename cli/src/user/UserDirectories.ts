@@ -18,6 +18,8 @@ export class UserDirectories {
     get temporary(): string { return join(this.root, "tmp") }
     get runtime(): string { return join(this.root, "runtime") }
     get operations(): string { return join(this.root, "operations") }
+    get projects(): string { return join(this.root, "projects") }
+    get transactions(): string { return join(this.root, "transactions") }
 
     async ensure(directory: string): Promise<void> {
         await mkdir(this.root, { recursive: true })

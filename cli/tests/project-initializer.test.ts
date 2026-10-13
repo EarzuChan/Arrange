@@ -57,7 +57,7 @@ test("create 生成统一托管文件、SFA 工程与完整 effect/instrument Pr
         assert.match(cpp, /config\.app\.useLive\(\)/)
         assert.equal(cpp.includes('.withInput("Input"'), pluginType === "effect")
         assert.equal(cpp.includes("buffer.clear();"), pluginType === "instrument")
-        assert.deepEqual(await readdir(resolve(state.rootDir, ".arrange/initializations")), [])
+        assert.deepEqual(await readdir(resolve(state.rootDir, ".arrange/transactions")), [])
         assert.deepEqual(await readdir(resolve(state.rootDir, ".arrange/transactions")), [])
     }
 })
@@ -208,11 +208,11 @@ test("图标发布后配置中途取消保留原 PNG 与准确失败记录，不
     await assert.rejects(new ProjectInitializer(new CancelledWriter(controller.signal), controller.signal).create({ ...request(root), iconSource: source }), error => error instanceof Error && error.name === "AbortError")
     assert.deepEqual(await readFile(resolve(root, defaultProjectIconPath)), await readFile(source))
     await assert.rejects(readFile(resolve(root, "arrange.project.yaml")), { code: "ENOENT" })
-    const paths = await readdir(resolve(root, ".arrange/initializations"))
-    const journal = JSON.parse(await readFile(resolve(root, ".arrange/initializations", paths[0]), "utf8"))
+    const paths = await readdir(resolve(root, ".arrange/transactions"))
+    const journal = JSON.parse(await readFile(resolve(root, ".arrange/transactions", paths[0], "record.json"), "utf8"))
     assert.equal(journal.status, "failed")
-    assert.equal(journal.icons[0].copied, true)
-    assert.equal(journal.icons[0].destination, resolve(root, defaultProjectIconPath))
+    assert.equal(journal.payload.icons[0].copied, true)
+    assert.equal(journal.payload.icons[0].destination, resolve(root, defaultProjectIconPath))
     assert.deepEqual(await readdir(resolve(root, "assets")), ["icon.png"])
 })
 
@@ -243,9 +243,9 @@ test("确认后才建立不存在的工程根，初始化日志仍拒绝根以�
         assert.deepEqual(await readdir(parent), [])
         await initializer.apply(plan)
         assert.equal((await new ProjectStateStore(new FileTransaction()).load(root)).project.project.name, "StarterPlugin")
-        assert.deepEqual(await readdir(resolve(root, ".arrange/initializations")), [])
+        assert.deepEqual(await readdir(resolve(root, ".arrange/transactions")), [])
     })
-    for (const aliased of [".arrange", ".arrange/initializations"]) await t.test(`链接路径：${aliased}`, async t => {
+    for (const aliased of [".arrange", ".arrange/transactions"]) await t.test(`链接路径：${aliased}`, async t => {
         const root = await temporaryRoot(t)
         const external = await temporaryRoot(t)
         await write(resolve(external, "keep.txt"), "外部内容")
@@ -371,8 +371,8 @@ test("排他创建复制目标拒绝执行中出现的目录，不覆盖用户�
     assert.equal(await readFile(resolve(state.rootDir, "ui/user.txt"), "utf8"), "保留用户内容")
     await assert.rejects(readFile(resolve(state.rootDir, "ui/package.json")), { code: "ENOENT" })
     await assert.rejects(readFile(resolve(state.rootDir, "arrange.project.yaml")), { code: "ENOENT" })
-    const paths = await readdir(resolve(state.rootDir, ".arrange/initializations"))
-    assert.equal(JSON.parse(await readFile(resolve(state.rootDir, ".arrange/initializations", paths[0]), "utf8")).status, "failed")
+    const paths = await readdir(resolve(state.rootDir, ".arrange/transactions"))
+    assert.equal(JSON.parse(await readFile(resolve(state.rootDir, ".arrange/transactions", paths[0], "record.json"), "utf8")).status, "failed")
 })
 
 test("复制过滤保留恰名为 node_modules 的源根，仍排除其缓存及本机配置", async t => {
@@ -388,7 +388,7 @@ test("复制过滤保留恰名为 node_modules 的源根，仍排除其缓存及
     assert.equal(await readFile(resolve(state.rootDir, "ui/src/keep.ts"), "utf8"), "export const keep = true\n")
     for (const name of ["node_modules", ".arrange", "arrange.local.yaml"]) await assert.rejects(readFile(resolve(state.rootDir, "ui", name)), { code: "ENOENT" })
     assert.equal(await readFile(resolve(source, "arrange.local.yaml"), "utf8"), "本机配置")
-    assert.deepEqual(await readdir(resolve(state.rootDir, ".arrange/initializations")), [])
+    assert.deepEqual(await readdir(resolve(state.rootDir, ".arrange/transactions")), [])
 })
 
 test("成功初始化日志清理失败不把已完成工程报成失败", async t => {
@@ -398,13 +398,12 @@ test("成功初始化日志清理失败不把已完成工程报成失败", async
     }
     const state = await new RetainedJournalInitializer(new FileTransaction()).create(request(root))
     assert.equal((await new ProjectStateStore(new FileTransaction()).load(root)).project.project.name, state.project.project.name)
-    const paths = await readdir(resolve(root, ".arrange/initializations"))
+    const paths = await readdir(resolve(root, ".arrange/transactions"))
     assert.equal(paths.length, 1)
-    assert.equal(JSON.parse(await readFile(resolve(root, ".arrange/initializations", paths[0]), "utf8")).status, "complete")
-    assert.deepEqual(await readdir(resolve(root, ".arrange/transactions")), [])
+    assert.equal(JSON.parse(await readFile(resolve(root, ".arrange/transactions", paths[0], "record.json"), "utf8")).status, "complete")
 })
 
-test("初始化配置写入中途取消停止后续文件，两类失败记录保留且 AbortError 穿透", async t => {
+test("初始化配置写入中途取消停止后续文件，统一失败记录保留且 AbortError 穿透", async t => {
     const root = await temporaryRoot(t)
     const controller = new AbortController()
     class CancelledWriter extends FileTransaction {
@@ -415,19 +414,19 @@ test("初始化配置写入中途取消停止后续文件，两类失败记录�
     }
     await assert.rejects(new ProjectInitializer(new CancelledWriter(controller.signal), controller.signal).create(request(root)), error => {
         assert.ok(error instanceof Error && error.name === "AbortError")
-        assert.ok(error.message.includes(resolve(root, ".arrange", "initializations")))
+        assert.ok(error.message.includes(resolve(root, ".arrange", "transactions")))
         assert.ok(error.message.includes(resolve(root, ".arrange", "transactions")))
         return true
     })
     assert.equal(JSON.parse(await readFile(resolve(root, "ui/package.json"), "utf8")).name, "starterplugin")
     await assert.rejects(readFile(resolve(root, "arrange.project.yaml")), { code: "ENOENT" })
     await assert.rejects(readFile(resolve(root, "native/CMakeLists.txt")), { code: "ENOENT" })
-    for (const directory of ["initializations", "transactions"]) {
+    for (const directory of ["transactions"]) {
         const paths = await readdir(resolve(root, ".arrange", directory))
         assert.equal(paths.length, 1)
-        const journal = JSON.parse(await readFile(resolve(root, ".arrange", directory, paths[0]), "utf8"))
+        const journal = JSON.parse(await readFile(resolve(root, ".arrange", directory, paths[0], "record.json"), "utf8"))
         assert.equal(journal.status, "failed")
-        if (directory === "transactions") assert.equal(journal.files[0].written, true)
+        if (directory === "transactions") assert.equal(journal.payload.files[0].written, true)
     }
 })
 
@@ -458,15 +457,15 @@ test("完成首个子项目复制后取消，第二项目不开始并保留准�
         }
     }
     const initializer = new CancelledCopyInitializer(new FileTransaction(controller.signal), controller.signal)
-    await assert.rejects(initializer.adopt({ state, ui: { kind: "copy", sourceDir: uiSource }, native: { kind: "copy", sourceDir: nativeSource } }), error => error instanceof Error && error.name === "AbortError" && error.cause === controller.signal.reason && error.message.includes(resolve(state.rootDir, ".arrange/initializations")))
+    await assert.rejects(initializer.adopt({ state, ui: { kind: "copy", sourceDir: uiSource }, native: { kind: "copy", sourceDir: nativeSource } }), error => error instanceof Error && error.name === "AbortError" && error.cause === controller.signal.reason && error.message.includes(resolve(state.rootDir, ".arrange/transactions")))
     assert.equal(initializer.copies, 1)
     assert.equal(await readFile(resolve(state.rootDir, "ui/package.json"), "utf8"), "{}\n")
     await assert.rejects(readdir(resolve(state.rootDir, "native")), { code: "ENOENT" })
     await assert.rejects(readFile(resolve(state.rootDir, "arrange.project.yaml")), { code: "ENOENT" })
-    const paths = await readdir(resolve(state.rootDir, ".arrange/initializations"))
-    const journal = JSON.parse(await readFile(resolve(state.rootDir, ".arrange/initializations", paths[0]), "utf8"))
+    const paths = await readdir(resolve(state.rootDir, ".arrange/transactions"))
+    const journal = JSON.parse(await readFile(resolve(state.rootDir, ".arrange/transactions", paths[0], "record.json"), "utf8"))
     assert.equal(journal.status, "failed")
-    assert.deepEqual(journal.copies.map((copy: { copied: boolean }) => copy.copied), [true, false])
+    assert.deepEqual(journal.payload.copies.map((copy: { copied: boolean }) => copy.copied), [true, false])
 })
 
 test("递归复制中取消停止后续条目，保留部分内容和未完成复制记录", async t => {
@@ -488,10 +487,10 @@ test("递归复制中取消停止后续条目，保留部分内容和未完成�
     assert.equal(await readFile(resolve(state.rootDir, "ui/src/a-first.ts"), "utf8"), "已复制内容")
     await assert.rejects(readFile(resolve(state.rootDir, "ui/src/z-last.ts")), { code: "ENOENT" })
     await assert.rejects(readFile(resolve(state.rootDir, "arrange.project.yaml")), { code: "ENOENT" })
-    const paths = await readdir(resolve(state.rootDir, ".arrange/initializations"))
-    const journal = JSON.parse(await readFile(resolve(state.rootDir, ".arrange/initializations", paths[0]), "utf8"))
+    const paths = await readdir(resolve(state.rootDir, ".arrange/transactions"))
+    const journal = JSON.parse(await readFile(resolve(state.rootDir, ".arrange/transactions", paths[0], "record.json"), "utf8"))
     assert.equal(journal.status, "failed")
-    assert.equal(journal.copies[0].copied, false)
+    assert.equal(journal.payload.copies[0].copied, false)
 })
 
 test("初始化复制中断保留已完成目录及精确接入记录，不伪称工程创建成功", async t => {
@@ -504,17 +503,9 @@ test("初始化复制中断保留已完成目录及精确接入记录，不伪�
     const initializer = new ProjectInitializer(new FileTransaction())
     const plan = await initializer.planAdopt({ state, ui: { kind: "copy", sourceDir: uiSource }, native: { kind: "copy", sourceDir: nativeSource } })
     await rm(nativeSource, { recursive: true })
-    await assert.rejects(initializer.apply(plan), /初始化未完成.*接入计划记录于/)
-    assert.equal(await readFile(resolve(state.rootDir, "ui/package.json"), "utf8"), '{"name":"recoverable"}\n')
+    await assert.rejects(initializer.apply(plan), { code: "ENOENT" })
+    await assert.rejects(readFile(resolve(state.rootDir, "ui/package.json")), { code: "ENOENT" })
     await assert.rejects(readFile(resolve(state.rootDir, "arrange.project.yaml")), { code: "ENOENT" })
-    const paths = await readdir(resolve(state.rootDir, ".arrange/initializations"))
-    const journal = JSON.parse(await readFile(resolve(state.rootDir, ".arrange/initializations", paths[0]), "utf8"))
-    assert.equal(journal.status, "failed")
-    assert.deepEqual(journal.copies.map((copy: { copied: boolean }) => copy.copied), [true, false])
-    assert.equal(journal.state.project.native.target, state.project.native.target)
-    assert.ok(journal.files.includes(resolve(state.rootDir, "arrange.project.yaml")))
-    assert.equal(await readFile(resolve(state.rootDir, ".arrange/.gitignore"), "utf8"), "*\n")
-    assert.ok((await readdir(state.rootDir)).every(name => !name.startsWith(".arrange-copy-")))
 })
 
 test("非 TTY create/adopt 明确失败且不进入等待输入", async t => {

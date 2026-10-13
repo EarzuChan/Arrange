@@ -27,7 +27,9 @@ Arrange::framework -> native 唯一公开 target
 | `node-js/` | UI 包管理器、依赖准备与 UI 构建 |
 | `cmake/` | CMake 文件定义、工程独立构建目录、configure/build、File API 模型与准备检查 |
 | `packing/MacSignature` | macOS 自动重签的纯策略；系统签名检查与执行由 `MacBundleSigner` 负责 |
-| `user/` | Arrange 用户级目录解析与按需创建 |
+| `user/` | Arrange 用户级目录与工程登记；登记用于发现，不复制工程配置 |
+| `storage/` | 存储扫描、归属与引用判断、工程清理和用户级维护 |
+| `transaction/` | 持久记录、文件/初始化/替换/删除恢复处理器与恢复编排 |
 | `source/` | 原生依赖清单、共享源码缓存与 Git 获取 |
 | `operation/` | 命令资源计划、跨进程占用、内核锁与工具工作进程 |
 | `asset/` | 工程图标源校验、Node 侧缩放与 ICO/ICNS 转换、生成资源检查 |
@@ -35,7 +37,7 @@ Arrange::framework -> native 唯一公开 target
 | `packing/` | 真实产物定位、完整 bundle 整理、UI 资源、打包提交与 Mac 签名检查 |
 | `platform/` | 工具探测、平台环境、统一进程执行与开发进程监管 |
 | `wizard/` | 领域交互接口的终端实现与命令向导 |
-| `util/` | 独立的文件、事务、路径和数据辅助工具 |
+| `util/` | 独立文件、路径和数据辅助工具；FileTransaction 共用持久事务记录 |
 
 CLI 不使用全局服务容器。`Entry.ts` 检查正式运行环境，管理信号与退出；`CliApplication.ts` 通过显式参数装配本次调用的服务并注册命令，不自行启动。业务模块不得反向依赖入口或装配模块。
 
@@ -231,7 +233,7 @@ Windows x64 VST3 的二进制目录核验为 `Contents/x86_64-win`；Mac 产品�
 
 所有产物在同文件系统临时目录中整理、核验后再替换。UI 总是整体更新以去除旧资源；`--clean` 仅重建本次 flavor/version/platform/product 的所选产品目录，其它输出保留。不带 clean 时保留所选目录的额外文件，但仍替换当前产品和 UI。显示名改变时，依据上次产品清单识别并替换 CLI 原有入口；未被清单确认归属的其它产品或用户文件保留。提交采用备份和逆序回退；失败不得先删除旧交付物，回退失败保留并报告备份位置。路径重叠、包外/失效符号链接或交付目录中的符号链接别名须在提交前拒绝。
 
-产品和交付目录分别生成轻量 `arrange-package.json`，记录项目/Framework 版本、平台架构、相对路径、可用构建记录和入口/二进制摘要。
+产品和交付目录分别生成轻量 `arrange-package.json`，记录项目/Framework 版本、平台架构、相对路径、可用构建记录和入口/二进制摘要。产品清单的 `ownedEntries` 明确本次生成的顶层入口，clean 仅按有效清单移除本平台、本架构的受管入口，保留用户额外文件；旧清单缺少归属入口时拒绝猜测删除。打包从暂存开始保留持久事务，提交与回退共用[事务恢复](32-ArrangeCLI托管与同步模型.md#持久事务与独立恢复)。
 
 ### Mac 签名边界
 
@@ -245,3 +247,11 @@ Windows x64 VST3 的二进制目录核验为 `Contents/x86_64-win`；Mac 产品�
 - File/Cluster/Region、ManagedItem、CONFIG/SETUP 状态机与 `.arrange/`：[托管与同步模型](32-ArrangeCLI托管与同步模型.md)。
 - 本期实现状态与验收证据：[M2.2 第三期工作区](../proj/m2：初步完成，sub2待测试和收尾/2：初步完成，Win测中，待收尾/M2.2的最后工作中.md)。
 - 本轮工程能力与交付边界的决策原因：[ADR 016](../adr/016-M2.2%20CLI工程准备与交付整理.md)。
+
+## 工程与用户级维护命令
+
+`clean` 默认清当前工程 UI 输出与本平台当前架构 Debug/Release 构建树；`--ui-only`、`--native-only`、`--artifacts-only` 互斥，`--artifacts` 将受管交付物加入默认范围，`--flavor debug|release` 只限制 native。默认保留交付物、依赖、源码、日志和恢复材料。所有修改命令先展示计划确认，`--scan` 只查看，不能绕过路径核验或资源占用。
+
+`storage inspect` 查看登记与受管资源；`storage clean` 选择孤儿构建、无引用源码及无人使用的获取临时内容；`storage repair <条目ID>` 按确切 commit 修复；`recover [事务ID]` 与 `storage recover [事务ID]` 分别处理工程与用户级未完成事务。目录规则见[用户目录](35-Arrange用户目录与源码缓存.md)，恢复见[托管模型](32-ArrangeCLI托管与同步模型.md)，互斥见[资源协议](36-ArrangeCLI资源占用与进程生命周期.md)。
+
+维护参数：`clean [--ui-only|--native-only|--artifacts-only] [--artifacts] [--flavor debug|release] [--scan]`。单范围与 --artifacts 不混用，--flavor 不用于 UI/交付物单范围。storage clean/repair 与两个 recover 入口均接受 --scan；无事务 ID 时只列记录，有 ID 时展示目标、冲突和实际可用动作。没有 --force 或另一个 prune 别名。源码格式与旧记录边界见用户目录母文档。

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join, relative, resolve, sep } from "node:path"
 import type { TestContext } from "node:test"
 import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
 import { CmakeService } from "../src/cmake/CmakeService.ts"
@@ -36,7 +36,7 @@ export function nativeTools(): Promise<{ local: LocalDefinition, env: Record<str
     })()
 }
 
-export async function nativeState(t: TestContext): Promise<ProjectState> {
+export async function nativeState(t: Pick<TestContext, "after">): Promise<ProjectState> {
     const state = await fixture(t, false)
     const { local } = await nativeTools()
     state.local = structuredClone(local)
@@ -57,7 +57,7 @@ export async function configureNative(source: string, build: string, definitions
 }
 
 // 小型本机产物用于文件、打包和签名契约；JUCE 接入由独立真实工程验收
-export async function nativeProducts(t: TestContext) {
+export async function nativeProducts(t: Pick<TestContext, "after">) {
     const state = await nativeState(t)
     const source = join(state.rootDir, "native")
     await write(join(source, "main.cpp"), "int plugin(); int main() { return plugin(); }\n")
@@ -94,4 +94,44 @@ file(GENERATE OUTPUT "\${CMAKE_BINARY_DIR}/VST3/A Product.vst3/Contents/Resource
     let model
     try { model = await cmake.build(state, "release", ["standalone", "vst3"], task) } catch (error) { throw new Error(`${String(error)}\n${task.lines.join("\n")}`, { cause: error }) }
     return { state, cmake, model }
+}
+
+// 只复用真实编译的输入证据；副本不保留可执行构建缓存，不用于重新 configure/build
+export class NativeProductSeed {
+    private seed: ReturnType<typeof nativeProducts> | undefined
+    private readonly cleanup: (() => unknown)[] = []
+
+    async copy(t: TestContext) {
+        this.seed ??= (async () => {
+            const seed = await nativeProducts({
+                after: callback => {
+                    this.cleanup.push(() => callback?.(t, () => { }))
+                    return undefined
+                }
+            })
+            if (hostPlatform === "win32") {
+                const result = await cmakeRun(["--build", seed.model.buildDirectory, "--target", "Another"])
+                assert.equal(result.exitCode, 0, result.stdout + result.stderr)
+            }
+            return seed
+        })()
+        const seed = await this.seed
+        const state = await nativeState(t)
+        const build = resolve(state.local!.native!.buildRoot!, "products")
+        await mkdir(build, { recursive: true })
+        const relocate = (path: string): string => {
+            const part = relative(seed.model.buildDirectory, path)
+            if (part === "" || (!isAbsolute(part) && part !== ".." && !part.startsWith(`..${sep}`))) return resolve(build, part)
+            const sourcePart = relative(seed.state.rootDir, path)
+            if (isAbsolute(sourcePart) || sourcePart === ".." || sourcePart.startsWith(`..${sep}`)) throw new Error(`夹具模型路径超出已知根：${path}`)
+            return resolve(state.rootDir, sourcePart)
+        }
+        for (const name of ["Standalone", "VST3", ...(hostPlatform === "win32" ? ["library", "another"] : [])]) {
+            await cp(resolve(seed.model.buildDirectory, name), resolve(build, name), { recursive: true, verbatimSymlinks: true })
+        }
+        const model = { ...seed.model, sourceDirectory: relocate(seed.model.sourceDirectory), buildDirectory: build, targets: seed.model.targets.map(target => ({ ...target, artifacts: target.artifacts.map(relocate) })) }
+        return { state, model }
+    }
+
+    async close(): Promise<void> { for (const cleanup of this.cleanup.reverse()) await cleanup() }
 }

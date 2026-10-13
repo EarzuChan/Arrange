@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import { cp, lstat, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import { stringify } from "yaml"
@@ -9,11 +8,12 @@ import type { FileTransaction, FileChange } from "../util/FileTransaction.ts"
 import { assertSnapshots, readSnapshot, type FileSnapshot } from "../util/FileUtils.ts"
 import { errorMessage } from "../util/Utils.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
-import { writeJsonFile } from "../util/JsonFile.ts"
 import { createInitialProjectState, type CreateProjectRequest } from "./CreateProject.ts"
 import { projectStateSchema, type ProjectState } from "./ProjectState.ts"
 import { projectFileNames } from "./ProjectStateStore.ts"
 import { nativeStarterFiles, uiStarterFiles, type InitialFile } from "./StarterFiles.ts"
+import { TransactionStore, type TransactionRecord } from "../transaction/TransactionStore.ts"
+import { initializationItems, InitializationRecovery } from "../transaction/InitializationRecovery.ts"
 
 export type SubprojectInput = { readonly kind: "new" } | { readonly kind: "existing" } | { readonly kind: "copy", readonly sourceDir: string }
 
@@ -43,16 +43,6 @@ export interface InitializationPlan {
     readonly guards: readonly FileSnapshot[]
     readonly copies: readonly CopyPlan[]
     readonly icons: readonly IconPlan[]
-}
-
-interface InitializationJournal {
-    readonly id: string
-    readonly state: ProjectState
-    readonly files: readonly string[]
-    readonly copies: { source: string, destination: string, copied: boolean }[]
-    readonly icons: { kind: IconPlan["kind"], source: string, destination: string, fingerprint: string, copied: boolean }[]
-    status: "initializing" | "complete" | "failed"
-    error?: string
 }
 
 const excludedCopyNames = new Set([".git", localWorkDirectory, "node_modules", projectFileNames.local])
@@ -171,17 +161,19 @@ export class ProjectInitializer {
         this.defaultSignal?.throwIfAborted()
         await mkdir(plan.state.rootDir, { recursive: true })
         this.defaultSignal?.throwIfAborted()
-        const id = randomUUID()
-        const journalPath = resolve(plan.state.rootDir, localWorkDirectory, "initializations", `${id}.json`)
-        const journal: InitializationJournal = { id, state: plan.state, files: plan.files.map(file => file.before.path), copies: plan.copies.map(copy => ({ ...copy, copied: false })), icons: plan.icons.map(icon => ({ kind: icon.kind, source: icon.source, destination: icon.destination, fingerprint: icon.fingerprint, copied: false })), status: "initializing" }
-        await this.saveJournal(journalPath, journal)
+        const store = new TransactionStore(plan.state.rootDir)
+        const items = await initializationItems(plan.copies, plan.icons, excludedCopyNames)
+        const record = await store.create("initialize", { state: plan.state, items, files: plan.files.map(file => ({ path: file.before.path, original: file.before.content, expected: file.after, written: false })), copies: plan.copies.map(copy => ({ ...copy, copied: false })), icons: plan.icons.map(icon => ({ kind: icon.kind, source: icon.source, destination: icon.destination, fingerprint: icon.fingerprint, copied: false })) })
+        const journalPath = store.path(record.id)
+        const journal = record.payload as { copies: { source: string, destination: string, copied: boolean }[], icons: { copied: boolean }[] }
+        await this.saveJournal(journalPath, record)
         try {
             for (const copy of journal.copies) {
                 this.defaultSignal?.throwIfAborted()
                 await assertSnapshots(plan.guards)
                 await this.copyDirectory(copy)
                 copy.copied = true
-                await this.saveJournal(journalPath, journal)
+                await this.saveJournal(journalPath, record)
             }
             for (let i = 0; i < plan.icons.length; i++) {
                 this.defaultSignal?.throwIfAborted()
@@ -192,27 +184,30 @@ export class ProjectInitializer {
                     await this.copyIcon(plan.state.rootDir, icon)
                     journal.icons[i].copied = true
                 }
-                await this.saveJournal(journalPath, journal)
+                await this.saveJournal(journalPath, record)
             }
-            await this.writer.write(plan.state.rootDir, plan.files, plan.guards)
+            const conflicts = await new InitializationRecovery(store, this.defaultSignal ?? new AbortController().signal).conflicts(record)
+            if (conflicts.length) throw new Error(`初始化内容在复制期间变化：${conflicts.join("；")}`)
+            await this.writer.write(plan.state.rootDir, plan.files, plan.guards, record)
         } catch (error) {
-            journal.status = "failed"
-            journal.error = errorMessage(error)
+            record.status = "failed"
+            record.error = errorMessage(error)
             if ((this.defaultSignal?.aborted && error === this.defaultSignal.reason) || (error instanceof Error && error.name === "AbortError")) {
-                await this.saveJournal(journalPath, journal).catch(() => { })
-                const cancelled = new Error(`工程初始化已取消；已创建内容与接入计划记录于 ${journalPath}：${journal.error}`, { cause: error })
+                await this.saveJournal(journalPath, record).catch(() => { })
+                const cancelled = new Error(`工程初始化已取消；已创建内容与接入计划记录于 ${journalPath}：${record.error}`, { cause: error })
                 cancelled.name = "AbortError"
                 throw cancelled
             }
-            await this.saveJournal(journalPath, journal)
-            throw new Error(`工程初始化未完成；已写内容保留，接入计划记录于 ${journalPath}。有共享配置时可用 sync 继续；配置未写入时请按记录检查已创建文件：${journal.error}`, { cause: error })
+            await this.saveJournal(journalPath, record)
+            throw new Error(`工程初始化未完成；已写内容保留，接入计划记录于 ${journalPath}。请运行 arrange recover 检查并继续：${record.error}`, { cause: error })
         }
 
-        journal.status = "complete"
+        record.status = "complete"
+        await this.saveJournal(journalPath, record)
         try {
             await this.removeJournal(journalPath)
         } catch {
-            await this.saveJournal(journalPath, journal).catch(() => { })
+            await this.saveJournal(journalPath, record).catch(() => { })
         }
         return plan.state
     }
@@ -230,7 +225,7 @@ export class ProjectInitializer {
     }
 
     protected async removeJournal(path: string): Promise<void> {
-        await rm(path, { force: true })
+        await rm(dirname(path), { recursive: true })
     }
 
     private async copyIcon(root: string, icon: Extract<IconPlan, { kind: "copy" }>): Promise<void> {
@@ -242,15 +237,15 @@ export class ProjectInitializer {
         await writeFile(icon.destination, icon.bytes, { flag: "wx" })
     }
 
-    private async saveJournal(path: string, journal: InitializationJournal): Promise<void> {
-        await assertPlainDirectoryPath(journal.state.rootDir, dirname(path))
+    private async saveJournal(path: string, record: TransactionRecord): Promise<void> {
+        await assertPlainDirectoryPath(record.root, dirname(path))
         await mkdir(dirname(path), { recursive: true })
         try {
-            await writeFile(resolve(journal.state.rootDir, localWorkDirectory, ".gitignore"), "*\n", { flag: "wx" })
+            await writeFile(resolve(record.root, localWorkDirectory, ".gitignore"), "*\n", { flag: "wx" })
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
         }
-        await writeJsonFile(path, journal)
+        await new TransactionStore(record.root).save(record)
     }
 }
 

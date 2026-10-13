@@ -8,16 +8,20 @@ import type { Packer, PackOptions } from "../packing/Packer.ts"
 import type { Operations } from "./Operations.ts"
 import type { ProjectOperations, ProjectAccess } from "./ProjectOperations.ts"
 import type { Resource } from "./Resource.ts"
+import type { ProjectRegistry } from "../user/ProjectRegistry.ts"
 
 // 命令边界一次声明完整资源集合；领域服务内的并行任务继承占用，不各自追加锁
 export class ApplicationOperations {
-    constructor(private readonly operations: Operations, private readonly projects: ProjectOperations) { }
+    constructor(private readonly operations: Operations, private readonly projects: ProjectOperations, private readonly registry?: ProjectRegistry) { }
 
     initialize(initializer: ProjectInitializer, plan: InitializationPlan) {
         const resources: Resource[] = [{ kind: "initialization", path: plan.state.rootDir, mode: "write" }]
         for (const file of plan.files) resources.push({ kind: "directory", path: dirname(file.before.path), mode: "write" })
         for (const copy of plan.copies) resources.push({ kind: "directory", path: copy.source, mode: "read" }, { kind: "directory", path: copy.destination, mode: "write" })
-        return this.operations.run(resources, "创建或接入工程", () => initializer.apply(plan))
+        return this.operations.run(resources, "创建或接入工程", async () => {
+            await this.registry?.register(plan.state.rootDir)
+            return initializer.apply(plan)
+        })
     }
 
     sync(service: SyncService, options: SyncRunOptions, root: string) {

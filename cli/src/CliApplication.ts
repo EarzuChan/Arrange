@@ -50,6 +50,11 @@ import { Operations } from "./operation/Operations.ts"
 import { ProjectOperations } from "./operation/ProjectOperations.ts"
 import { ApplicationOperations } from "./operation/ApplicationOperations.ts"
 import { ApplicationCommand } from "./operation/ApplicationCommand.ts"
+import { ProjectRegistry } from "./user/ProjectRegistry.ts"
+import { StorageInventory } from "./storage/StorageInventory.ts"
+import { StorageMaintenance } from "./storage/StorageMaintenance.ts"
+import { ProjectCleaner } from "./storage/ProjectCleaner.ts"
+import { registerMaintenanceCommands } from "./command/Maintenance.ts"
 
 export interface CliInteractions {
     readonly project: ProjectInteraction
@@ -62,11 +67,12 @@ export interface CliApplicationOptions {
     readonly interactions: CliInteractions | "terminal"
     // 持久消息与实时任务的输出终端，由入口创建
     readonly terminal: CliTerminal
+    readonly userDirectories?: UserDirectories
 }
 
 export function createCliApplication(options: CliApplicationOptions): Command {
     const { terminal } = options
-    const directories = new UserDirectories()
+    const directories = options.userDirectories ?? new UserDirectories()
     const host = new OperationHost(directories)
     const signal = AbortSignal.any([options.signal, host.failureSignal])
     const operations = new Operations(host, signal, message => terminal.reporter.info(message))
@@ -87,7 +93,9 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const node = new NodeJsService(executor)
     const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), signal, operations))
     const cmake = new CmakeService(executor, platform, new IconAssetsService(signal), directories, sources, signal)
-    const projectOperations = new ProjectOperations(operations, store, cmake)
+    const projectRegistry = new ProjectRegistry(directories, signal)
+    const lifetime = { kind: "directory" as const, path: directories.sources, mode: "read" as const }
+    const projectOperations = new ProjectOperations(operations, store, cmake, projectRegistry, lifetime)
     const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, signal, new FrameworkSourceProbe(executor, undefined, sources), (state, scope) => projectOperations.assertSetup(state, scope))
     const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, signal, terminal.tasks)
     const initializer = new ProjectInitializer(fileWriter, signal)
@@ -97,7 +105,7 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     const ui = new UiBuildService(node)
     const builder = new BuildService(project, tools, ui, native, packer, terminal.tasks)
     const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, terminal.tasks)
-    const actions = new ApplicationOperations(operations, projectOperations)
+    const actions = new ApplicationOperations(operations, projectOperations, projectRegistry)
     const cli = new ApplicationCommand(host).name(cliName).description(cliDescription).version(cliVersion)
     const { reporter } = terminal
     const protectedInitializer = { planCreate: initializer.planCreate.bind(initializer), planAdopt: initializer.planAdopt.bind(initializer), apply: (plan: Parameters<ProjectInitializer["apply"]>[0]) => actions.initialize(initializer, plan) }
@@ -108,5 +116,8 @@ export function createCliApplication(options: CliApplicationOptions): Command {
     registerDevCommand(cli, { run: (root, options) => actions.dev(dev, root, options) }, signal, reporter)
     registerBuildCommand(cli, { build: (root, options) => actions.build(builder, root, options) }, reporter)
     registerPackCommand(cli, (root, options) => actions.pack(project, packer, root, options), terminal.tasks, reporter)
+    const storageGit = new GitSource(executor)
+    const inventory = new StorageInventory(directories, projectRegistry, storageGit, signal)
+    registerMaintenanceCommands(cli, { terminal, store, projects: projectOperations, operations, directories, registry: projectRegistry, inventory, cleaner: new ProjectCleaner(cmake, signal), maintenance: new StorageMaintenance(directories, inventory, storageGit, signal, projectRegistry), lifetime, signal, interactive: options.interactions === "terminal" })
     return cli
 }
