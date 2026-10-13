@@ -12,7 +12,7 @@ export interface AdoptCommandOptions {
 }
 
 export function registerAdoptCommand(program: Command, initializer: Pick<ProjectInitializer, "planAdopt" | "apply">, syncService: Pick<SyncService, "run">, interaction: ProjectInteraction, reporter: Reporter): void {
-    program.command("adopt").description("接入已有 UI/native 工程").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
+    program.command("adopt").description("接入已有 UI/native 工程").option("--registry <url>", "Framework npm 仓库地址").option("--fetch-content <url>", "Framework CMake FetchContent 的 Git 仓库地址")
         .action(async (options: AdoptCommandOptions) => {
             let initialized = false
             try {

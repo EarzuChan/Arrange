@@ -5,7 +5,7 @@ import { registerDevCommand } from "../src/command/Dev.ts"
 import type { DevService } from "../src/building/DevService.ts"
 import { quietTerminal } from "./fixture.ts"
 
-test("dev command preserves cleanup failures after Ctrl+C and accepts only actual cancellation", async () => {
+test("dev 在 Ctrl+C 后保留清理失败，只把真正取消识别为取消", async () => {
     const previousExitCode = process.exitCode
     try {
         const controller = new AbortController()

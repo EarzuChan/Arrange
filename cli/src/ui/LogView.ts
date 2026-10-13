@@ -1,6 +1,6 @@
 import { wrap } from "./Ansi.ts"
 
-// 任务日志的内存缓冲与框内视口。行号（seq）从 0 递增、永不复用；超过容量时丢弃最旧的行（完整内容在日志文件里）。
+// 任务日志的内存缓冲与框内视口。行号（seq）从 0 递增、永不复用；超过容量时丢弃最旧的行（完整内容在日志文件里）
 
 export class LogBuffer {
     private readonly lines: string[] = []

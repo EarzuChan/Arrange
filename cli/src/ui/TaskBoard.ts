@@ -4,8 +4,8 @@ import type { InputEvent } from "./Input.ts"
 import type { LiveView } from "./Screen.ts"
 import { formatDuration, spinnerFrames, spinnerIntervalMs, symbols, type Palette } from "./Theme.ts"
 
-// gradle 式任务面板：每个运行中的任务一行标题（转圈、进度、用时），下面一个固定高度、可滚动的日志框。
-// 任务完成后从面板移除，由调用方把 summary() 写进滚动历史；常驻窗格（dev）在会话结束前一直显示。
+// gradle 式任务面板：每个运行中的任务一行标题（转圈、进度、用时），下面一个固定高度、可滚动的日志框
+// 任务完成后从面板移除，由调用方把 summary() 写进滚动历史；常驻窗格（dev）在会话结束前一直显示
 
 export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled"
 export type Tone = "info" | "success" | "warn" | "error"

@@ -13,6 +13,7 @@ import { FileTransaction } from "../src/util/FileTransaction.ts"
 import { configRegistry } from "../src/config/ConfigRegistry.ts"
 import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
+import { stripAnsi } from "../src/ui/Ansi.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("./cli-runner.ts", import.meta.url))
@@ -21,10 +22,10 @@ const tsxLoader = import.meta.resolve("tsx")
 async function cli(root: string, args: string[]) {
     try {
         const result = await exec(process.execPath, ["--import", tsxLoader, sourceEntry, ...args], { cwd: root, env: { ...process.env, NODE_NO_WARNINGS: "1" }, timeout: 15000 })
-        return { ...result, code: 0 }
+        return { stdout: stripAnsi(result.stdout), stderr: stripAnsi(result.stderr), code: 0 }
     } catch (error) {
         const failure = error as Error & { code: number, stdout: string, stderr: string }
-        return { stdout: failure.stdout, stderr: failure.stderr, code: failure.code }
+        return { stdout: stripAnsi(failure.stdout), stderr: stripAnsi(failure.stderr), code: failure.code }
     }
 }
 

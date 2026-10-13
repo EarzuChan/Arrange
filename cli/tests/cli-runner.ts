@@ -4,7 +4,7 @@ import { SyncWizard } from "../src/wizard/Sync.ts"
 import { SetupWizard } from "../src/wizard/Setup.ts"
 import { createTerminal } from "../src/ui/Terminal.ts"
 
-// 程序化验收入口：输出走与正式入口相同的终端层（非 TTY 时为纯文本），任何需要询问的步骤直接失败
+// 程序化验收入口：输出走与正式入口相同的终端层，颜色遵循环境设置，任何需要询问的步骤直接失败
 const terminal = createTerminal()
 const config = new SyncWizard(terminal)
 const setup = new SetupWizard(terminal)

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 
 // 子进程输出解码：按字节切行（0x0A 在 UTF-8 与 GBK 等双字节编码里都不会作为尾字节出现），
 // 每行先按严格 UTF-8 解码，失败再用回退编码。Windows 上 cl 等原生工具经管道输出时使用控制台代码页
-// （简体中文系统默认 936/GBK），而 node、pnpm、cmake 输出 UTF-8，所以必须逐行判断。
+// （简体中文系统默认 936/GBK），而 node、pnpm、cmake 输出 UTF-8，所以必须逐行判断
 
 const maximumPendingBytes = 64 * 1024
 const utf8 = new TextDecoder("utf-8", { fatal: true })

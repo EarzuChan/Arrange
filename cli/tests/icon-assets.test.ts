@@ -278,7 +278,7 @@ test("移除 icon 清理三个旧派生文件，保留源图和未知额外文�
     assert.deepEqual(await input.service.inspect(input.state, input.output), { source: null, assets: null, ready: true })
 })
 
-test("root相对源路径不能逃逸或经过文件/父目录符号链接", async t => {
+test("工程根相对源路径不能越界或经过文件及父目录的符号链接", async t => {
     const input = await iconFixture(t)
     for (const value of ["../outside.png", input.source, "C:\\outside\\icon.png", "C:icon.png", ""]) {
         input.state.project.project.icon = value

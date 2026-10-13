@@ -204,7 +204,7 @@ SETUP 在需要配置原生构建树时，于安装 UI 依赖之前预检 Arrang
 
 项目版本保留完整 SemVer，包括 prerelease/build metadata；传入 JUCE 插件 `VERSION` 时使用其中的 `major.minor.patch` 数字部分，以满足 JUCE 的版本计算。交付目录和打包清单仍记录完整项目版本。
 
-支持 Windows/MSVC 与 macOS/Xcode clang 的 `x64`、`arm64` 工程。Node 至少 24，CMake 至少 3.24；包管理器使用工程所选 npm/pnpm。默认 native generator 为 Ninja；本机配置可选择可用生成器。Windows 调用已验证的 Visual Studio Developer 环境，并核对实际 MSVC 目标架构；Mac 使用选定 Developer Directory 的 Xcode clang。Linux 和跨平台交叉编译不属于当前契约。
+支持 Windows/MSVC 的 `x64` 工程，以及 macOS/Xcode clang 的 `x64`、`arm64` 工程。Windows arm64、Linux 和跨平台交叉编译不属于当前支持契约。Node 至少 24，CMake 至少 3.24；包管理器使用工程所选 npm/pnpm。默认 native generator 为 Ninja；本机配置可选择可用生成器。Windows 调用已验证的 Visual Studio Developer 环境，并核对实际 MSVC 目标架构；Mac 使用选定 Developer Directory 的 Xcode clang。
 
 原生构建尊重 `CMAKE_BUILD_PARALLEL_LEVEL`，由 CMake 解释其值；未设置时使用工具链默认并行构建。
 
@@ -227,7 +227,7 @@ build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`�
 | Mac Standalone | 完整 `.app` | `<app>/Contents/Resources/ui/` |
 | Windows/Mac VST3 | 完整 `.vst3`，保留 bundle 内既有资源与元信息 | `<plugin>/Contents/Resources/ui/` |
 
-Windows VST3 的二进制目录按架构核验为 `Contents/x86_64-win` 或 `Contents/arm64-win`；Mac 产品核验 `Contents/MacOS` 和 `Info.plist`。只复制 bundle 内现成的依赖，不尝试改写任意外部 Mac dylib 搜索路径。
+Windows x64 VST3 的二进制目录核验为 `Contents/x86_64-win`；Mac 产品核验 `Contents/MacOS` 和 `Info.plist`。只复制 bundle 内现成的依赖，不尝试改写任意外部 Mac dylib 搜索路径。
 
 所有产物在同文件系统临时目录中整理、核验后再替换。UI 总是整体更新以去除旧资源；`--clean` 仅重建本次 flavor/version/platform/product 的所选产品目录，其它输出保留。不带 clean 时保留所选目录的额外文件，但仍替换当前产品和 UI。显示名改变时，依据上次产品清单识别并替换 CLI 原有入口；未被清单确认归属的其它产品或用户文件保留。提交采用备份和逆序回退；失败不得先删除旧交付物，回退失败保留并报告备份位置。路径重叠、包外/失效符号链接或交付目录中的符号链接别名须在提交前拒绝。
 

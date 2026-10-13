@@ -40,5 +40,5 @@ export const configRegistry = createConfigRegistry([packageJsonFile, npmrcFile, 
     { id: "cmake.plugin-identity", label: "插件厂商与标识" },
     { id: "cmake.plugin-formats", label: "插件格式" },
     { id: "cmake.product-icon", label: "产品图标（CLI 生成的原生成品资源）" },
-    { id: "node.npmrc.arrange-registry", label: "Framework registry" },
+    { id: "node.npmrc.arrange-registry", label: "Framework npm 仓库" },
 ])

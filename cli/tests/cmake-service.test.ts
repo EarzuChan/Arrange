@@ -51,7 +51,7 @@ test("native build 尊重 CMake 并行环境变量，未设置时保留默认并
     })
 })
 
-test("CMake cancellation stays an AbortError even when a tool reports exit zero", async t => {
+test("CMake 工具退出码为零时，取消仍以 AbortError 传出", async t => {
     class CancelledExecutor extends Executor {
         override async run(): Promise<ProcessResult> {
             return { exitCode: 0, stdout: "", stderr: "", cancelled: true, timedOut: false }
@@ -116,8 +116,8 @@ target_link_libraries(TestPlugin_VST3 PRIVATE TestPlugin)
     assert.equal(await readFile(sentinel, "utf8"), "incremental tree")
 })
 
-test("CMake rejects aliased work directories before reading, resetting or running tools", async t => {
-    for (const level of ["builds", "project", "configuration"]) await t.test(level, async t => {
+test("CMake 在读取、重置或启动工具前拒绝工作目录的符号链接", async t => {
+    for (const level of ["builds", "project", "configuration"]) await t.test(`链接所在层级：${level}`, async t => {
         const state = await nativeState(t)
         const external = await mkdtemp(join(tmpdir(), "arrange-external-build-"))
         t.after(() => rm(external, { recursive: true, force: true }))
@@ -145,7 +145,7 @@ test("CMake rejects aliased work directories before reading, resetting or runnin
     })
 })
 
-test("plain working directory permits a project-root alias and rejects escapes or files", async t => {
+test("工作目录允许工程根别名，但拒绝越界路径和文件", async t => {
     const state = await fixture(t, false)
     const alias = `${state.rootDir}-alias`
     await symlink(state.rootDir, alias, process.platform === "win32" ? "junction" : "dir")
@@ -156,7 +156,7 @@ test("plain working directory permits a project-root alias and rejects escapes o
     await assert.rejects(assertPlainDirectoryPath(state.rootDir, join(state.rootDir, "user/builds/project")), /不是目录/)
 })
 
-test("real CMake query keeps target identity separate from product name and refreshes inputs", async t => {
+test("真实 CMake 查询区分目标身份与产品名称，并识别配置输入变化", async t => {
     const state = await nativeState(t)
     const native = join(state.rootDir, "native")
     const source = `cmake_minimum_required(VERSION 3.24)\nproject(Test LANGUAGES C CXX)\nset(CMAKE_POSITION_INDEPENDENT_CODE ON)\nadd_library(TestPlugin STATIC plugin.cpp)\nadd_executable(TestPlugin_Standalone main.cpp)\ntarget_link_libraries(TestPlugin_Standalone PRIVATE TestPlugin)\nset_target_properties(TestPlugin_Standalone PROPERTIES OUTPUT_NAME "Visible Product")\nadd_library(TestPlugin_VST3 MODULE module.cpp)\ntarget_link_libraries(TestPlugin_VST3 PRIVATE TestPlugin)\n`

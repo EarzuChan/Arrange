@@ -75,7 +75,7 @@ function hash(content: string | Buffer): string {
     return createHash("sha256").update(content).digest("hex")
 }
 
-// 根据项目打开方式的不同，CMake 可能会报告同一个 Win 路径，但其大小写或斜杠风格可能不同。Win 路径不区分大小写。
+// 根据项目打开方式的不同，CMake 可能会报告同一个 Win 路径，但其大小写或斜杠风格可能不同。Win 路径不区分大小写
 function normalizedPath(path: string, platform: PlatformService["name"]): string {
     return platform === "win32" ? win32.resolve(path).toLowerCase() : resolve(path)
 }

@@ -419,7 +419,7 @@ test("同一 ManagedItem 跨文本和 JSON，一支缺失不阻止另一支扫�
         protected override makeContent() { return {} }
     }()
     await write(jsonFile.path(state), '{"value":null,"other":7}')
-    const custom = new ConfigScanner(createConfigRegistry([textFile, jsonFile], [{ id: "both", label: "both" }]))
+    const custom = new ConfigScanner(createConfigRegistry([textFile, jsonFile], [{ id: "both", label: "两项共同托管" }]))
     const report = await custom.scan(state, "Global")
     assert.equal(report.resolvable.length, 1)
     assert.equal(report.applicable.length, 1)

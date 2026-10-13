@@ -96,7 +96,7 @@ test("macOS .app/.vst3 以完整 bundle 交付，并保留 Info.plist、Resource
     assert.ok(input.executor.calls.every(spec => spec.command.endsWith("/codesign")))
 })
 
-test("locator 拒绝过期准备、错误 configuration/architecture、缺失二进制及缺失完整 bundle", async t => {
+test("产物定位拒绝过期准备、配置或架构错误、缺失二进制及缺失完整 bundle", async t => {
     const input = await setup(t)
     input.cmake.ready = false
     await assert.rejects(input.locator.locateStandalone(input.state, "release"), /配置已过期/)
@@ -113,7 +113,7 @@ test("locator 拒绝过期准备、错误 configuration/architecture、缺失二
     await assert.rejects(new ArtifactLocator(new ModelCmakeService({ ...input.model, targets })).locate(input.state, { flavor: "release", products: ["vst3"] }), /完整 .vst3 bundle/)
 })
 
-test("package 复制完整 UI，移除旧 assets，--clean 只清所选产品", async t => {
+test("打包复制完整 UI，移除旧 assets，--clean 只清所选产品", async t => {
     const input = await setup(t)
     await oldOutput(input.output)
     await write(resolve(input.output, "standalone/ui/assets/stale.svg"), "stale")
@@ -183,7 +183,7 @@ test("Windows VST3 暂存后恢复真实图标 shell 属性，失败保留上次
     await writeFile(resolve(input.vstRoot, "Plugin.ico"), icon)
     await write(resolve(input.vstRoot, ".arrange-icon"), "")
     await write(resolve(input.vstRoot, "desktop.ini"), "[.ShellClassInfo]\nIconResource=Plugin.ico,0\n")
-    input.executor.handler = () => result(1, "", "attrib failed")
+    input.executor.handler = () => result(1, "", "模拟 attrib 失败")
     await assert.rejects(new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["vst3"] }), /图标属性/)
     assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
     input.executor.calls.length = 0

@@ -1,6 +1,6 @@
 {
   "name": "@arrange/cli",
-  "description": "The official CLI of Arrange",
+  "description": "Arrange 官方工程管理 CLI",
   "version": "1.0.0",
   "compatibility": 1,
   "private": false,

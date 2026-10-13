@@ -35,7 +35,7 @@ async function setup(t: TestContext) {
     return { state, registry, framework, project, installedPath }
 }
 
-test("operational load 优先已安装确切版本，registry 离线仍可加载；显式 remote 继续查询远程", async t => {
+test("工程执行优先加载已安装的确切版本，仓库离线仍可加载；显式 remote 继续查询远程", async t => {
     const input = await setup(t)
     await write(input.installedPath, JSON.stringify({ version: input.state.project.framework.version, arrange: { cliCompatibility } }))
     input.registry.offline = true

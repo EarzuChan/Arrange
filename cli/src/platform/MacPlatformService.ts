@@ -33,7 +33,7 @@ export class MacPlatformService extends PlatformService {
             if (candidate.native.generator === "Xcode") {
                 const xcode = await this.executor.run({ command: "/usr/bin/xcodebuild", args: ["-version"], env, timeoutMs: toolProbeTimeoutMs })
                 throwIfProcessCancelled(xcode)
-                if (xcode.exitCode !== 0 || !/^Xcode\s+\d/m.test(xcode.stdout)) issues.push({ key: "native", label: "Xcode generator", message: "Xcode 生成器需要完整 Xcode，当前 Developer Directory 不可用，请设置 native.developerDirectory 或选择 Ninja" })
+                if (xcode.exitCode !== 0 || !/^Xcode\s+\d/m.test(xcode.stdout)) issues.push({ key: "native", label: "Xcode 生成器", message: "Xcode 生成器需要完整 Xcode，当前 Developer Directory 不可用，请设置 native.developerDirectory 或选择 Ninja" })
             }
         } catch (error) {
             if (isAbortError(error)) throw error

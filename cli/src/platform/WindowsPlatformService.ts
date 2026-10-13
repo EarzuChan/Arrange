@@ -16,8 +16,8 @@ export function parseWindowsEnvironment(output: string): Record<string, string> 
     return result
 }
 
-// cl.exe 的横幅随系统语言本地化（如“用于 x64 的 … 编译器 19.50.35728 版”），不能依赖其中的词。
-// 横幅行同时含编译器版本号与目标架构记号，按这两种与语言无关的形态提取。
+// cl.exe 的横幅随系统语言本地化（如“用于 x64 的 … 编译器 19.50.35728 版”），不能依赖其中的词
+// 横幅行同时含编译器版本号与目标架构记号，按这两种与语言无关的形态提取
 // 无参数运行时用法行写在 stdout、横幅写在 stderr，拼接顺序不固定，所以逐行找第一个含版本号的行，并只从该行取架构记号
 export interface MsvcBanner {
     readonly version?: string

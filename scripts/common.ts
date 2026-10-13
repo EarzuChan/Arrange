@@ -16,7 +16,7 @@ export function run(command: string, args: readonly string[] = [], options: Spaw
         child.on("error", reject)
         child.on("exit", (code) => {
             if (code === 0) resolvePromise()
-            else reject(new Error(`${command} exited with ${code}`))
+            else reject(new Error(`${command} 执行失败，退出码 ${code}`))
         })
     })
 }

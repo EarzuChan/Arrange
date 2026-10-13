@@ -79,7 +79,7 @@ target_link_libraries(TestPlugin_Standalone PRIVATE TestPlugin)
     await write(join(native, "main.cpp"), "int plugin(); int main() { return plugin(); }\n")
     const automatic = join(state.rootDir, "automatic-juce")
     const explicit = join(state.rootDir, "explicit-juce")
-    for (const directory of [automatic, explicit]) await write(join(directory, "CMakeLists.txt"), "# test source\n")
+    for (const directory of [automatic, explicit]) await write(join(directory, "CMakeLists.txt"), "# 测试源码\n")
     const sources = { prepare: async (): Promise<CmakeDefinitionValues> => state.local!.native!.cmakeDefinitions?.JUCE_DIR === undefined ? { FETCHCONTENT_SOURCE_DIR_JUCE: automatic } : {} }
     const service = new CmakeService(executor, platform, new IconAssetsService(), new UserDirectories(userRoot), sources)
     const directory = service.buildDirectory(state, "debug")

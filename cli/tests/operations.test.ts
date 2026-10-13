@@ -128,10 +128,16 @@ test("正式工作进程托管输出、超时与取消，并在释放前结束�
     const immediate = host.start({ command: process.execPath, args: ["-e", "setInterval(()=>{},1000)"] })
     await immediate.stop()
     assert.equal((await immediate.completion).cancelled, true)
-    let descendant = 0
-    const orphan = host.start({ command: process.execPath, args: ["-e", "const {spawn}=require('node:child_process');const c=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(c.pid);c.unref()"], onOutput: bytes => { descendant = Number(bytes.toString().trim()) } })
-    assert.equal((await orphan.completion).exitCode, 0)
-    assert.ok(descendant)
+})
+
+test("父进程正常退出后结束后代，PID 从完整标准输出读取", async t => {
+    const input = await harness(t)
+    const host = input.host()
+    const result = await host.start({ command: process.execPath, args: ["-e", "const {spawn}=require('node:child_process');const c=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});process.stdout.write(String(c.pid)+'\\n');c.unref()"] }).completion
+    assert.equal(result.exitCode, 0, result.stderr)
+    assert.match(result.stdout, /^[1-9]\d*\n$/)
+    const descendant = Number(result.stdout)
+    assert.ok(Number.isSafeInteger(descendant) && descendant > 0)
     assert.throws(() => process.kill(descendant, 0), /ESRCH|no such process/i)
 })
 

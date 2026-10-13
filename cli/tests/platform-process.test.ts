@@ -24,7 +24,7 @@ async function freePort(): Promise<number> {
     return port
 }
 
-test("executor preserves exits, signals, timeout and cancellation", async () => {
+test("进程执行保留退出码、信号、超时与取消结果", async () => {
     const executor = new Executor()
     const failed = await executor.run({ command: process.execPath, args: ["-e", "process.stdout.write('out'); process.stderr.write('err'); process.exit(7)"] })
     assert.equal(failed.exitCode, 7)
@@ -42,7 +42,7 @@ test("executor preserves exits, signals, timeout and cancellation", async () => 
     assert.equal((await pending).exitCode, 130)
 })
 
-test("executor stops descendants even after their parent exits", async t => {
+test("父进程退出后仍停止其后代进程", async t => {
     const directory = await mkdtemp(join(tmpdir(), "arrange-process-tree-"))
     t.after(() => rm(directory, { recursive: true, force: true }))
     const marker = join(directory, "orphan.txt")
@@ -56,7 +56,7 @@ test("executor stops descendants even after their parent exits", async t => {
     await assert.rejects(readFile(marker), /ENOENT/)
 })
 
-test("executor cleans descendants that retain captured pipes after their parent exits", { timeout: 20000 }, async () => {
+test("父进程退出后清理仍持有捕获管道的后代进程", { timeout: 20000 }, async () => {
     const port = await freePort()
     const descendant = `require('node:http').createServer((q,s)=>s.end('alive')).listen(${port},'127.0.0.1',()=>process.send('ready'))`
     const source = `const child=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:['ignore','inherit','inherit','ipc']});child.on('message',()=>process.exit(7))`
@@ -67,7 +67,7 @@ test("executor cleans descendants that retain captured pipes after their parent 
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
-test("supervisor waits for UI readiness before native and cleans up on exit", async t => {
+test("开发监管等待 UI 就绪后启动原生进程，并在退出时清理", async t => {
     const directory = await mkdtemp(join(tmpdir(), "arrange-dev-readiness-"))
     t.after(() => rm(directory, { recursive: true, force: true }))
     const port = await freePort()
@@ -84,7 +84,7 @@ test("supervisor waits for UI readiness before native and cleans up on exit", as
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
-test("supervisor refuses occupied ports and propagates cancellation", async () => {
+test("开发监管拒绝已占用端口，并传递取消结果", async () => {
     const server = createHttpServer((request, response) => response.end("ok"))
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
     const port = (server.address() as { port: number }).port
@@ -98,7 +98,7 @@ test("supervisor refuses occupied ports and propagates cancellation", async () =
     assert.equal(await running, 0)
 })
 
-test("supervisor stops every process when an earlier ready child exits during later readiness", { timeout: 10000 }, async t => {
+test("等待后续进程就绪时，已就绪进程退出会停止全部进程", { timeout: 10000 }, async t => {
     const directory = await mkdtemp(join(tmpdir(), "arrange-dev-startup-failure-"))
     t.after(() => rm(directory, { recursive: true, force: true }))
     const uiPort = await freePort()
@@ -118,7 +118,7 @@ test("supervisor stops every process when an earlier ready child exits during la
     await assert.rejects(fetch(`http://127.0.0.1:${nativePort}`))
 })
 
-test("supervisor preserves cleanup failure after cancellation while stopping other children", async () => {
+test("开发监管在取消后保留清理失败，并继续停止其余进程", async () => {
     class CleanupFailureExecutor extends Executor {
         started = 0
         readonly stopped: number[] = []
@@ -145,7 +145,7 @@ test("supervisor preserves cleanup failure after cancellation while stopping oth
     assert.deepEqual(executor.stopped, [0, 1])
 })
 
-test("supervisor rejects HTTP 200 HTML fallback before starting native", async t => {
+test("开发监管在启动原生进程前拒绝 HTTP 200 的 HTML 回退页", async t => {
     const directory = await mkdtemp(join(tmpdir(), "arrange-dev-fallback-"))
     t.after(() => rm(directory, { recursive: true, force: true }))
     const port = await freePort()
@@ -166,7 +166,7 @@ test("supervisor rejects HTTP 200 HTML fallback before starting native", async t
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
-test("supervisor readiness timeout reports HTTP errors with a bounded first line", async () => {
+test("开发服务就绪超时报告 HTTP 错误，正文首行长度受限", async () => {
     const port = await freePort()
     const ui = `require('node:http').createServer((q,s)=>{s.statusCode=500;s.end('Failed to load module: '+ 'x'.repeat(10000)+'\\nignored second line')}).listen(${port},'127.0.0.1')`
     await assert.rejects(new DevSupervisor(new Executor()).run([
@@ -180,7 +180,7 @@ test("supervisor readiness timeout reports HTTP errors with a bounded first line
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
-test("Windows command and environment boundaries preserve paths and reject expansion", windowsOnly, () => {
+test("Windows 命令与环境保留路径，并拒绝命令扩展字符", windowsOnly, () => {
     assert.equal(quoteWindowsArgument("C:\\Program Files\\pnpm.cmd"), '"C:\\Program Files\\pnpm.cmd"')
     assert.throws(() => quoteWindowsArgument("%PATH%"))
     assert.throws(() => quoteWindowsArgument('x" & exit'))
@@ -220,7 +220,7 @@ test("Windows 真实 Developer Prompt 环境与 cl 架构一致", windowsOnly, a
     await assert.rejects(platform.nativeEnvironment(broken), /工具环境初始化失败/)
 })
 
-test("tool probes preserve cancellation rather than producing toolchain issues", async () => {
+test("工具探测保留取消结果，不误报工具链问题", async () => {
     class CancelledExecutor extends Executor {
         override async run(): Promise<ProcessResult> {
             return { exitCode: 0, stdout: "", stderr: "", cancelled: true, timedOut: false }

@@ -73,7 +73,7 @@ test("SETUP scan 与 --scan 仅报告动作，不保存 local、不安装或配�
 })
 
 test("SETUP 的 Framework/UI Fatal 阻止全范围所有 APPLY 和 Resolve", async t => {
-    for (const fatal of ["framework", "ui"] as const) await t.test(fatal, async t => {
+    for (const fatal of ["framework", "ui"] as const) await t.test(`阻塞来源：${fatal}`, async t => {
         const input = await setupHarness(t)
         input.tools.inspect = async () => ({ local: { ...local, node: { path: "/changed/node" } }, issues: [] })
         if (fatal === "framework") input.framework.assertCompatible = async () => { throw new Error("Framework 不兼容") }
@@ -195,8 +195,8 @@ function buildHarness(state: ProjectState) {
 
 test("Build 的 UI/native 范围独立，全量默认交付、--no-pack 禁止交付", async t => {
     const cases: { name: string, options: BuildOptions, scope: SetupScope, kinds: string[] }[] = [
-        { name: "UI only", options: { flavor: "release", ui: true, native: false, clean: true }, scope: "UI", kinds: ["ui"] },
-        { name: "native only", options: { flavor: "debug", ui: false, native: true, products: ["vst3", "vst3"] }, scope: "Native", kinds: ["native"] },
+        { name: "仅 UI", options: { flavor: "release", ui: true, native: false, clean: true }, scope: "UI", kinds: ["ui"] },
+        { name: "仅原生", options: { flavor: "debug", ui: false, native: true, products: ["vst3", "vst3"] }, scope: "Native", kinds: ["native"] },
         { name: "全量默认", options: { flavor: "release", ui: true, native: true, clean: true }, scope: "Global", kinds: ["ui", "native", "pack"] },
         { name: "不交付", options: { flavor: "release", ui: true, native: true, pack: false }, scope: "Global", kinds: ["ui", "native"] },
     ]
@@ -248,7 +248,7 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
     const state = await preparedState(t)
     state.local!.native = { generator: "Ninja", architecture: hostArchitecture }
     const model: CmakeModel = { sourceDirectory: resolve(state.rootDir, "native"), buildDirectory: resolve(state.rootDir, "user/builds/project"), configuration: "Release", platform: hostPlatform!, architecture: hostArchitecture, targets: [] }
-    for (const kind of ["ui", `native-${hostPlatform}-${hostArchitecture}-release`] as const) await t.test(kind, async () => {
+    for (const kind of ["ui", `native-${hostPlatform}-${hostArchitecture}-release`] as const) await t.test(`构建记录：${kind}`, async () => {
         const receiptPath = resolve(state.rootDir, ".arrange", `built-${kind}.json`)
         let fail = false
         const compile = async () => {
@@ -355,7 +355,7 @@ async function devHarness(t: TestContext) {
 }
 
 test("Release dev 先构建 UI 并交付 Standalone，运行交付二进制；native-only 使用已有 UI", async t => {
-    for (const entry of [{ flavor: "release", ui: true }, { flavor: "debug", ui: false }, { flavor: "release", ui: false }] as const) await t.test(`${entry.flavor} ui=${entry.ui}`, async t => {
+    for (const entry of [{ flavor: "release", ui: true }, { flavor: "debug", ui: false }, { flavor: "release", ui: false }] as const) await t.test(`配置 ${entry.flavor}，${entry.ui ? "包含 UI" : "仅原生"}`, async t => {
         const input = await devHarness(t)
         input.node.inspect = async () => { throw new Error("本模式不应启动 Vite") }
         const code = await input.service.run(input.state.rootDir, { ...entry, native: true })
@@ -413,7 +413,7 @@ test("Dev 已有同名 binary 仍增量构建 Standalone，使源码变更进入
 })
 
 test("Release dev 的 UI 构建或打包失败时不启动 native", async t => {
-    for (const stage of ["ui", "pack"] as const) await t.test(stage, async t => {
+    for (const stage of ["ui", "pack"] as const) await t.test(`失败阶段：${stage}`, async t => {
         const input = await devHarness(t)
         if (stage === "ui") input.ui.build = async () => { throw new Error("UI 构建失败") }
         else input.packer.pack = async () => { throw new Error("UI 资源交付失败") }
@@ -426,7 +426,7 @@ test("Release dev 的 UI 构建或打包失败时不启动 native", async t => {
 })
 
 test("Debug native 构建或定位失败时不启动 Live server/native", async t => {
-    for (const stage of ["build", "locate"] as const) await t.test(stage, async t => {
+    for (const stage of ["build", "locate"] as const) await t.test(`失败阶段：${stage}`, async t => {
         const input = await devHarness(t)
         if (stage === "build") input.native.build = async () => { throw new Error("native 构建失败") }
         else input.artifacts.locateStandalone = async () => { throw new Error("Standalone 产物缺失") }

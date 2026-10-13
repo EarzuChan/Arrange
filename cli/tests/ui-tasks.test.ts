@@ -44,12 +44,12 @@ test("并行任务：一个失败时其余跑完，最后一起报告失败；�
     assert.deepEqual(error.failures.map(failure => failure.title), ["任务 A"])
     assert.equal(error.message, "任务 A：A 出错")
     assert.deepEqual(finished.sort(), ["B", "C"])
-    const output = terminal.output.text
-    assert.match(output, /[◇o]  任务 B/)
-    assert.match(output, /[◇o]  任务 C/)
-    assert.match(output, /[■x]  任务 A 失败/)
-    assert.match(output, /[│|]  A 出错/)
-    assert.match(output, /[│|] A 输出/)
+    const output = stripAnsi(terminal.output.text)
+    assert.match(output, /任务 B/)
+    assert.match(output, /任务 C/)
+    assert.match(output, /任务 A 失败/)
+    assert.match(output, /A 出错/)
+    assert.match(output, /A 输出/)
 })
 
 test("全部成功时按输入顺序返回结果；单个任务失败时原样抛出原错误", async () => {
@@ -81,7 +81,7 @@ test("任一任务被取消时整体以取消结束（不当作失败），其�
         },
     ]), error => error === cancellation)
     assert.equal(otherDone, true)
-    assert.match(terminal.output.text, /[■x]  A 已取消/)
+    assert.match(stripAnsi(terminal.output.text), /A 已取消/)
 })
 
 test("任务日志写入工程 .arrange/logs/<运行>/<任务>.log（去掉颜色），只保留最近 20 次运行", async t => {

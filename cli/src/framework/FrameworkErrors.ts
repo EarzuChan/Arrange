@@ -1,5 +1,5 @@
 // registry 没有给出答案（连接失败、超时）与 registry 给出了否定答案（版本不存在、契约不兼容）是两回事：
-// 前者无法判定兼容性，可以在已安装的 Framework 上回退验证；后者是确定的结论。
+// 前者无法判定兼容性，可以在已安装的 Framework 上回退验证；后者是确定的结论
 export class RegistryUnreachableError extends Error {
     constructor(readonly registry: string, readonly reason: string, options?: { cause?: unknown }) {
         super(`无法连接 registry ${registry}：${reason}`, options)

@@ -1,7 +1,7 @@
 import type { ConsoleInput } from "./ConsoleInput.ts"
 
-// 原始模式下的终端输入：按键、SGR 鼠标（滚轮、左键按下）、光标位置应答（DSR）。
-// 一个转义序列可能被拆在两次 data 里，未完成的部分先缓存；单独的 ESC 等待片刻后才当作 Esc 键。
+// 原始模式下的终端输入：按键、SGR 鼠标（滚轮、左键按下）、光标位置应答（DSR）
+// 一个转义序列可能被拆在两次 data 里，未完成的部分先缓存；单独的 ESC 等待片刻后才当作 Esc 键
 
 export type KeyName = "up" | "down" | "left" | "right" | "pageup" | "pagedown" | "home" | "end" | "tab" | "backtab" | "enter" | "escape" | "interrupt" | "char"
 

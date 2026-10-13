@@ -34,9 +34,9 @@ export async function promptProjectDetails(terminal: CliTerminal, registry: Fram
         vendorName: () => requiredText(io, "厂商名称"),
         vendorCode: () => requiredText(io, "厂商四字符代码", { placeholder: "AbCd", validate: validateFourCharCode }),
         pluginCode: () => requiredText(io, "插件四字符代码", { placeholder: "EfGh", validate: validateFourCharCode }),
-        pluginType: () => select({ ...io, message: "插件类型", options: [{ label: "Effect", value: "effect" as const }, { label: "Instrument", value: "instrument" as const }] }),
+        pluginType: () => select({ ...io, message: "插件类型", options: [{ label: "效果器", value: "effect" as const }, { label: "乐器", value: "instrument" as const }] }),
         packageManager: () => select({ ...io, message: "UI 包管理器", initialValue: suggestions.packageManager ?? "pnpm", options: [{ label: "pnpm", value: "pnpm" as const }, { label: "npm", value: "npm" as const }] }),
-        products: () => multiselect<NativeProduct>({ ...io, message: "产品", required: true, options: [{ label: "Standalone", value: "standalone" }, { label: "VST3", value: "vst3" }], initialValues: ["standalone", "vst3"] }),
+        products: () => multiselect<NativeProduct>({ ...io, message: "产品", required: true, options: [{ label: "独立程序（Standalone）", value: "standalone" }, { label: "VST3", value: "vst3" }], initialValues: ["standalone", "vst3"] }),
     }, { onCancel: () => { throw new PromptCancelled() } })
     const displayName = await optionalText(terminal, "产品显示名称（留空使用项目名称）", { placeholder: answers.projectName, validate: validateDisplayName })
     const bundleId = await optionalText(terminal, "macOS Bundle ID（留空生成并保存）", { placeholder: generateDefaultBundleId(answers), validate: validateBundleId })

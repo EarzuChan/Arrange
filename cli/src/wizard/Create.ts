@@ -21,8 +21,8 @@ export async function runCreateWizard(terminal: CliTerminal, registry: Framework
         let directories: { uiDirectory: string, nativeDirectory: string, artifactsDirectory: string } = { uiDirectory: defaultProjectDirectories.ui, nativeDirectory: defaultProjectDirectories.native, artifactsDirectory: defaultProjectDirectories.artifacts }
         if (!await confirmPrompt(terminal, "使用默认 ui、native、artifacts 目录？")) directories = {
             uiDirectory: await requiredText(io, "UI 目录", { initialValue: defaultProjectDirectories.ui, validate: validateRelativeDirectory }),
-            nativeDirectory: await requiredText(io, "Native 目录", { initialValue: defaultProjectDirectories.native, validate: validateRelativeDirectory }),
-            artifactsDirectory: await requiredText(io, "Artifacts 目录", { initialValue: defaultProjectDirectories.artifacts, validate: validateRelativeDirectory }),
+            nativeDirectory: await requiredText(io, "原生源码目录", { initialValue: defaultProjectDirectories.native, validate: validateRelativeDirectory }),
+            artifactsDirectory: await requiredText(io, "交付产物目录", { initialValue: defaultProjectDirectories.artifacts, validate: validateRelativeDirectory }),
         }
         return { ...details, rootDir, ...directories, managedItems: await promptManagedItems(terminal, config.items) }
     } catch (error) {

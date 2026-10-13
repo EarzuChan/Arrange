@@ -18,8 +18,8 @@ function redactUrl(url: string): string {
     return url.replace(/(\/\/)[^/@\s]+@/, "$1***@")
 }
 
-// native 的 CMake 用 FetchContent 按 `v<Framework 版本>` 去 Arrange 仓库取原生源码。
-// 在花时间装 UI 依赖和配置构建树之前先确认：git 可用、仓库可达、对应 tag 存在。
+// native 的 CMake 用 FetchContent 按 `v<Framework 版本>` 去 Arrange 仓库取原生源码
+// 在花时间装 UI 依赖和配置构建树之前先确认：git 可用、仓库可达、对应 tag 存在
 export class FrameworkSourceProbe {
     constructor(private readonly executor: Executor, private readonly locate: typeof locateTool = locateTool, private readonly sources?: { hasFramework(state: ProjectState): Promise<boolean> }) { }
 

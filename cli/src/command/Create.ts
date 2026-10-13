@@ -12,7 +12,7 @@ export interface CreateCommandOptions {
 }
 
 export function registerCreateCommand(program: Command, initializer: Pick<ProjectInitializer, "planCreate" | "apply">, syncService: Pick<SyncService, "run">, interaction: ProjectInteraction, reporter: Reporter): void {
-    program.command("create").description("创建完整 Arrange 工程").option("--registry <url>", "Framework npm registry URL").option("--fetch-content <url>", "Framework CMake FetchContent Git URL")
+    program.command("create").description("创建完整 Arrange 工程").option("--registry <url>", "Framework npm 仓库地址").option("--fetch-content <url>", "Framework CMake FetchContent 的 Git 仓库地址")
         .action(async (options: CreateCommandOptions) => {
             let created = false
             try {

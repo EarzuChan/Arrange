@@ -3,9 +3,9 @@ import { StringDecoder } from "node:string_decoder"
 
 // 终端输入的唯一持有者。第一次需要输入时进入原始模式并一直保持到退出，期间不再切换模式：
 // Windows 上在读取过程中切回行模式会留下一个阻塞在 ReadConsole、等回车才返回的读取，
-// 之后的输入（按键、滚轮、光标位置应答）都会被它截住，进程退出时也会一直等它。
-// clack 提问读取 prompt 代理流（其 setRawMode 不触碰真实终端）；任务会话期间输入交给会话的解析器；
-// 两者都不在时丢弃输入，只把 Ctrl+C 转成中断。
+// 之后的输入（按键、滚轮、光标位置应答）都会被它截住，进程退出时也会一直等它
+// clack 提问读取 prompt 代理流（其 setRawMode 不触碰真实终端）；任务会话期间输入交给会话的解析器
+// 两者都不在时丢弃输入，只把 Ctrl+C 转成中断
 
 export interface InputStream extends NodeJS.ReadableStream {
     readonly isTTY?: boolean

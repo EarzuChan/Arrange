@@ -62,6 +62,6 @@ export function createInitialProjectState(request: CreateProjectRequest): Projec
             },
             "managed-items": Object.entries(request.managedItems).filter(([, managed]) => managed).map(([key]) => key),
         },
-        local: null, // TIPS：初次创建时尚未有Local配置，这个是被Sync阶段生成
+        local: null, // 初次创建没有本机配置，由 sync 阶段生成
     }
 }

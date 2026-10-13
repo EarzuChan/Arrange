@@ -2,7 +2,7 @@ import type { ProcessSpec } from "../platform/ProcessSpec.ts"
 import { errorMessage } from "../util/Utils.ts"
 import type { Tone } from "./TaskBoard.ts"
 
-// 服务层看到的任务接口：服务只负责产生日志行、阶段与进度，如何呈现由界面层决定。
+// 服务层看到的任务接口：服务只负责产生日志行、阶段与进度，如何呈现由界面层决定
 
 export interface TaskSpec {
     // ASCII 标识，用于日志文件名

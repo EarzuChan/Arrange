@@ -10,8 +10,8 @@ import { TaskLogRun, type TaskLogFile } from "./TaskLog.ts"
 import { colorEnvironment, TaskFailures, type OutputParser, type PaneOutcome, type PaneOutput, type PaneSession, type TaskEntry, type TaskOutput, type TaskRunner, type TaskSpec } from "./Tasks.ts"
 import { spinnerIntervalMs } from "./Theme.ts"
 
-// 实时会话：第一个任务开始时挂上面板，最后一个任务结束时卸下。
-// 只有存在可滚动的任务框时才接管按键与鼠标（只有临时状态行时终端滚轮仍用于翻看历史）。
+// 实时会话：第一个任务开始时挂上面板，最后一个任务结束时卸下
+// 只有存在可滚动的任务框时才接管按键与鼠标（只有临时状态行时终端滚轮仍用于翻看历史）
 class LiveSession {
     readonly board: TaskBoard
     private references = 0

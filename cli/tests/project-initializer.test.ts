@@ -245,7 +245,7 @@ test("确认后才建立不存在的工程根，初始化日志仍拒绝根以�
         assert.equal((await new ProjectStateStore(new FileTransaction()).load(root)).project.project.name, "StarterPlugin")
         assert.deepEqual(await readdir(resolve(root, ".arrange/initializations")), [])
     })
-    for (const aliased of [".arrange", ".arrange/initializations"]) await t.test(aliased, async t => {
+    for (const aliased of [".arrange", ".arrange/initializations"]) await t.test(`链接路径：${aliased}`, async t => {
         const root = await temporaryRoot(t)
         const external = await temporaryRoot(t)
         await write(resolve(external, "keep.txt"), "外部内容")

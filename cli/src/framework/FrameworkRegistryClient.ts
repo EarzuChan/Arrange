@@ -39,9 +39,8 @@ export class FrameworkRegistryClient {
         }
     }
 
-    // 对于一个特定版本。缺陷：无法获得版本发布时间
+    // 单版本接口不返回发布时间
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
-        // 原 fetchManifest 逻辑
         const registry = normalizeRegistryUrl(registryUrl)
         const response = await this.request(registry, `/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`)
 
@@ -49,7 +48,6 @@ export class FrameworkRegistryClient {
 
         const manifest = await response.json() as FrameworkManifest
 
-        // 后续处理逻辑
         const actualVersion = typeof manifest.version === "string" ? manifest.version : version
         const cliCompatibility = readCliCompatibility(manifest)
         if (cliCompatibility === null) throw new Error(`${frameworkPackageName}@${actualVersion} 未声明有效的 arrange.cliCompatibility`)
@@ -57,7 +55,7 @@ export class FrameworkRegistryClient {
         return { version: actualVersion, cliCompatibility, markedLatest: false, publishedAt: null }
     }
 
-    // 对于所有版本
+    // 从完整版本列表读取发布时间与最新版本标记
     async fetchCandidates(recentLimit = 5, registryUrl?: string): Promise<FrameworkVersionCandidate[]> {
         const registry = normalizeRegistryUrl(registryUrl)
         const response = await this.request(registry, `/${frameworkPackageName.replace("/", "%2f")}`)
