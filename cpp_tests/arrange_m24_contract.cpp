@@ -330,6 +330,54 @@ native.requestFrame(true)
     require(host.executeModule("m24-budget-recover.js", "globalThis.__ARRANGE_NATIVE__.installFrameDriver(() => {}, () => {}, () => {})").ok, "中断后重新加载未恢复");
 }
 
+void visualCompletionBudgets() {
+    arrange::quickjs::QuickJsScriptHost host({5, 1000, 1000});
+    const auto source = R"JS(
+const n = globalThis.__ARRANGE_NATIVE__
+const work = () => { const end = performance.measureNow() + 50; while (performance.measureNow() < end) {} }
+n.installFrameDriver(() => {
+    n.beginRearrange()
+    n.createNode(1, 'Root')
+    n.submitRearrange(work)
+}, () => work(), () => {})
+)JS";
+    require(host.executeModule("视觉完成预算.js", source).ok, "完成预算夹具加载失败");
+    require(host.prepareVisualFrame(16).ok, "完成预算夹具准备失败");
+    auto transaction = host.takePendingTransaction();
+    require(transaction && transaction->rearrange, "完成预算夹具未提交");
+    const auto receipt = host.completeRearrange(transaction->rearrange);
+    require(receipt.ok, receipt.error.c_str());
+    const auto completion = host.completeVisualFrame(true);
+    require(completion.ok, completion.error.c_str());
+
+    for (const bool receiptJob : {false, true}) {
+        const auto loaded = host.executeModule("完成后的微任务预算.js", receiptJob ? R"JS(
+const n = globalThis.__ARRANGE_NATIVE__
+n.installFrameDriver(() => {
+    n.beginRearrange()
+    n.createNode(1, 'Root')
+    n.submitRearrange(() => Promise.resolve().then(() => { while (true) {} }))
+}, () => {}, () => {})
+)JS"
+                                                                                   : R"JS(
+const n = globalThis.__ARRANGE_NATIVE__
+n.installFrameDriver(() => {}, () => Promise.resolve().then(() => { while (true) {} }), () => {})
+)JS");
+        require(loaded.ok && host.prepareVisualFrame(32).ok, "微任务预算夹具准备失败");
+        const auto submission = host.takePendingTransaction();
+        const auto result = receiptJob ? host.completeRearrange(submission->rearrange) : host.completeVisualFrame(true);
+        require(!result.ok && result.error.find("drainJobs") != std::string::npos && result.error.find("5ms") != std::string::npos, "视觉完成后的 PendingJob 必须使用独立语义预算");
+    }
+    require(host.executeModule("完成中断后重载.js", "globalThis.__ARRANGE_NATIVE__.installFrameDriver(() => {}, () => {}, () => {})").ok, "完成中断后不能重载");
+    require(host.prepareVisualFrame(48).ok && host.completeVisualFrame(true).ok, "完成中断后重载没有恢复帧驱动");
+
+    arrange::quickjs::QuickJsScriptHost bounded({5, 10, 1000});
+    require(bounded.executeModule("完成失控保护.js", "globalThis.__ARRANGE_NATIVE__.installFrameDriver(() => {}, () => { while (true) {} }, () => {})").ok, "完成失控夹具加载失败");
+    require(bounded.prepareVisualFrame(16).ok, "完成失控夹具准备失败");
+    const auto runaway = bounded.completeVisualFrame(true);
+    require(!runaway.ok && runaway.error.find("completeVisualFrame") != std::string::npos && runaway.error.find("10ms") != std::string::npos, "视觉完成仍必须受视觉耗时预算约束");
+}
+
 int main() {
     try {
         policiesAndStyleless();
@@ -340,6 +388,7 @@ int main() {
         rearrangeReceipts();
         cancelledReceipts();
         scriptExecutionBudgets();
+        visualCompletionBudgets();
         std::cout << "M2.4 原生布局、基础呈现与 Painter 契约通过\n";
         return 0;
     } catch (const std::exception& error) {

@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createApp, createLazyState, onMounted, onUnmounted, ref, nextTick } from '@arrange/framework'
-import { LazyColumn, Text } from '@arrange/framework/foundation'
+import { LazyColumn, LazyVerticalGrid, Text } from '@arrange/framework/foundation'
 import { defineArrangable } from '@arrange/framework/internal'
+import { GridItemSpan } from '../../packages/framework/src/primitives.ts'
 import type { Modifier } from '../../packages/framework/src/modifier.ts'
 import { recordingNative, type RecordedLayoutNode } from './recordingNative.ts'
 
@@ -187,5 +188,41 @@ test('Lazy 数据重排在测量前迁移活动 key，保留原生身份且失�
     native.materialize(id, [0, 1, 2, 3])
     assert.throws(() => native.finish('拒绝重排'), /拒绝重排/)
     assert.deepEqual(native.textNodes(), published)
+    app.unmount()
+})
+
+
+test('Lazy 元数据优化保留索引回调、深层依赖与回调替换，缺省类型和 span 完整覆盖集合', async () => {
+    const native = recordingNative(false)
+    const values = ref([{ id: 1, type: 10 }, { id: 2, type: 20 }])
+    const key = ref((item: { id: number }, index: number) => `${item.id}/${index}`)
+    const type = ref<((item: { type: number }, index: number) => number) | undefined>((item, index) => item.type + index)
+    const span = ref<((item: { id: number }, index: number) => ReturnType<typeof GridItemSpan>) | undefined>((_item, index) => GridItemSpan(index + 1))
+    const Item = defineArrangable({ setup(_props, { call }) { return () => call(0, Text, { text: () => '项' }) } })
+    const app = createApp(defineArrangable({
+        setup(_props, { call }) {
+            return () => call(0, LazyVerticalGrid, { items: () => values.value, itemKey: () => key.value, contentType: () => type.value, span: () => span.value, itemContent: () => Item })
+        }
+    }))
+    app.mount(native.target)
+    const metadata = () => {
+        native.frame()
+        const policy = lazyNode(native.candidateNodes!).inputs.get('measurePolicy') as { keys: string[], contentTypes: string[], spans: number[] }
+        const result = { keys: [...policy.keys], contentTypes: [...policy.contentTypes], spans: [...policy.spans] }
+        native.finish()
+        return result
+    }
+    assert.deepEqual(metadata(), { keys: ['s:1/0', 's:2/1'], contentTypes: ['n:10', 'n:21'], spans: [1, 2] })
+    values.value = [{ id: 0, type: 30 }, ...values.value]
+    await nextTick()
+    assert.deepEqual(metadata(), { keys: ['s:0/0', 's:1/1', 's:2/2'], contentTypes: ['n:30', 'n:11', 'n:22'], spans: [1, 2, 3] })
+    values.value[1].type = 40
+    await nextTick()
+    assert.deepEqual(metadata().contentTypes, ['n:30', 'n:41', 'n:22'])
+    key.value = item => item.id.toString()
+    type.value = undefined
+    span.value = undefined
+    await nextTick()
+    assert.deepEqual(metadata(), { keys: ['s:0', 's:1', 's:2'], contentTypes: ['', '', ''], spans: [1, 1, 1] })
     app.unmount()
 })

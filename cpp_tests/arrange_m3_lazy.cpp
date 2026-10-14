@@ -9,6 +9,7 @@
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -86,6 +87,7 @@ namespace {
         check(containsText(runtime.scene(), "项:0:1"), "Lazy 业务局部状态未更新");
         const auto command = [&](const char* value) {
             step = value;
+            if (std::getenv("ARRANGE_TRACE_SCRIPT_TASKS")) arrange::Log::d("Lazy测试", step);
             runtime.enqueueStringEvent(submit, value);
             settle();
         };

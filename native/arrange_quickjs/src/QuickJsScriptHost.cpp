@@ -124,7 +124,7 @@ namespace arrange::quickjs {
 
         void reset() {
             if (runtime.context != nullptr) {
-                TaskBudget budget(*this);
+                TaskBudget budget(*this, "disposeApp");
                 if (JS_IsFunction(runtime.context, runtime.disposeApp)) {
                     ScopedValue callback(runtime.context, JS_DupValue(runtime.context, runtime.disposeApp));
                     ScopedValue disposed(runtime.context, JS_Call(runtime.context, callback.get(), JS_UNDEFINED, 0, nullptr));
@@ -193,8 +193,10 @@ namespace arrange::quickjs {
             JS_SetInterruptHandler(
                 runtime.runtime,
                 [](JSRuntime*, void* opaque) {
-                    const auto& owner = *static_cast<Impl*>(opaque);
-                    return owner.taskDepth && std::chrono::steady_clock::now() >= owner.deadline ? 1 : 0;
+                    auto& owner = *static_cast<Impl*>(opaque);
+                    if (!owner.taskDepth || std::chrono::steady_clock::now() < owner.deadline) return 0;
+                    owner.interrupted = true;
+                    return 1;
                 },
                 this);
             JS_SetModuleLoaderFunc(runtime.runtime, &QuickJsModuleLoader::normalize, &QuickJsModuleLoader::load, &runtime.moduleLoader);
@@ -224,33 +226,51 @@ namespace arrange::quickjs {
         struct TaskBudget {
             Impl& owner;
 
-            explicit TaskBudget(Impl& value, int milliseconds = 0) : owner(value) {
+            explicit TaskBudget(Impl& value, const char* name, int milliseconds = 0) : owner(value) {
                 if (owner.ownerThread != std::this_thread::get_id()) throw std::runtime_error("QuickJS 只能由创建它的 UI Owner 线程执行");
                 if (owner.taskDepth++ == 0) {
-                    owner.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds ? milliseconds : owner.limits.semanticMillis);
+                    owner.taskName = name;
+                    owner.taskMillis = milliseconds ? milliseconds : owner.limits.semanticMillis;
+                    owner.started = std::chrono::steady_clock::now();
+                    owner.deadline = owner.started + std::chrono::milliseconds(owner.taskMillis);
+                    owner.interrupted = false;
+                    owner.initialAllocations = owner.memory.allocations;
                     owner.runtime.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
                 }
             }
 
             ~TaskBudget() {
-                --owner.taskDepth;
+                if (--owner.taskDepth == 0 && std::getenv("ARRANGE_TRACE_SCRIPT_TASKS")) arrange::Log::d("QuickJS任务", owner.taskName, "预算", owner.taskMillis, "耗时", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - owner.started).count(), "中断", owner.interrupted, "分配", owner.memory.allocations - owner.initialAllocations);
             }
         };
 
         const std::thread::id ownerThread = std::this_thread::get_id();
         unsigned taskDepth = 0;
         std::chrono::steady_clock::time_point deadline;
+        std::chrono::steady_clock::time_point started;
+        const char* taskName = "";
+        int taskMillis = 0;
+        bool interrupted = false;
+        std::uint64_t initialAllocations = 0;
+
+        std::string exceptionText(JSContext* context) const {
+            auto error = quickJsExceptionText(context);
+            if (interrupted) error += "\nQuickJS 任务 " + std::string(taskName) + " 超过 " + std::to_string(taskMillis) + "ms 预算（耗时 " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()) + "ms）";
+            return error;
+        }
 
         DrainJobsResult drainJobs() {
+            // 完成视觉回执后重新建立语义边界，嵌套派发仍继承当前任务预算
+            TaskBudget budget(*this, "drainJobs");
             JSContext* jobContext = nullptr;
             while (JS_IsJobPending(runtime.runtime)) {
                 if (runtime.remainingFrameJobs == 0) return {false, "JavaScript 语义任务超过检查点数量预算"};
                 --runtime.remainingFrameJobs;
-                if (JS_ExecutePendingJob(runtime.runtime, &jobContext) < 0) return {false, quickJsExceptionText(jobContext != nullptr ? jobContext : runtime.context)};
+                if (JS_ExecutePendingJob(runtime.runtime, &jobContext) < 0) return {false, exceptionText(jobContext != nullptr ? jobContext : runtime.context)};
             }
             if (!runtime.unhandledRejections.empty()) {
                 JS_Throw(runtime.context, JS_DupValue(runtime.context, runtime.unhandledRejections.front().second));
-                return {false, quickJsExceptionText(runtime.context)};
+                return {false, exceptionText(runtime.context)};
             }
             return {};
         }
@@ -285,22 +305,25 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {
-        Impl::TaskBudget budget(*impl_);
         if (!impl_) return {true, {}};
         auto& state = impl_->runtime;
         if (!submission || submission->cancelled || submission != state.rearrangeSubmission || JS_IsUndefined(state.rearrangeCompletion)) return {true, {}};
-        const auto callback = state.rearrangeCompletion;
-        state.rearrangeCompletion = JS_UNDEFINED;
-        if (error.empty())
-            state.commitRearrange();
-        else
-            state.abortRearrange();
+        {
+            // 回执包含结构退休与生命周期通知，属于当前视觉候选的完成阶段
+            Impl::TaskBudget budget(*impl_, __func__, impl_->limits.visualMillis);
+            const auto callback = state.rearrangeCompletion;
+            state.rearrangeCompletion = JS_UNDEFINED;
+            if (error.empty())
+                state.commitRearrange();
+            else
+                state.abortRearrange();
 
-        auto argument = error.empty() ? JS_UNDEFINED : JS_NewStringLen(state.context, error.data(), error.size());
-        ScopedValue result(state.context, JS_Call(state.context, callback, JS_UNDEFINED, 1, &argument));
-        JS_FreeValue(state.context, argument);
-        JS_FreeValue(state.context, callback);
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+            auto argument = error.empty() ? JS_UNDEFINED : JS_NewStringLen(state.context, error.data(), error.size());
+            ScopedValue result(state.context, JS_Call(state.context, callback, JS_UNDEFINED, 1, &argument));
+            JS_FreeValue(state.context, argument);
+            JS_FreeValue(state.context, callback);
+            if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
+        }
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
@@ -367,13 +390,13 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::semanticCheckpoint(double nowMillis) {
-        Impl::TaskBudget budget(*impl_);
+        Impl::TaskBudget budget(*impl_, __func__);
         auto& state = impl_->runtime;
         if (!state.context) return {true, {}};
         if (state.framePrepared) return {false, "语义检查点不能重入视觉提交"};
         setFrameTimeMillis(nowMillis);
         state.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
-        if (state.painters && !state.painters->pump()) return {false, quickJsExceptionText(state.context)};
+        if (state.painters && !state.painters->pump()) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
@@ -387,7 +410,7 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::prepareVisualFrame(double nowMillis) {
-        Impl::TaskBudget budget(*impl_, impl_->limits.visualMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.visualMillis);
         auto& state = impl_->runtime;
         if (!state.context) return {false, "QuickJS 运行时尚未初始化"};
         if (state.framePrepared) return {false, "视觉帧不能重入"};
@@ -400,7 +423,7 @@ namespace arrange::quickjs {
         JSValueConst argv[] = {timestamp.get()};
         ScopedValue result(state.context, JS_Call(state.context, state.prepareFrame, JS_UNDEFINED, 1, argv));
         if (JS_IsException(result.get())) {
-            const auto error = quickJsExceptionText(state.context);
+            const auto error = impl_->exceptionText(state.context);
             state.abortRearrange();
             (void)completeVisualFrame(false);
             return {false, error};
@@ -410,7 +433,7 @@ namespace arrange::quickjs {
 
     CallbackInvokeResult QuickJsScriptHost::prepareDrawModifiers(arrange::core::NativeScene& candidateScene) {
         if (!impl_ || !impl_->runtime.context) return {false, "QuickJS 运行时尚未初始化"};
-        Impl::TaskBudget budget(*impl_, impl_->limits.visualMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.visualMillis);
         auto& state = impl_->runtime;
         try {
             for (const auto id : candidateScene.tree().nodeIds()) {
@@ -429,7 +452,7 @@ namespace arrange::quickjs {
                     if (input->transactional) state.preparedDrawCallbacks.push_back({JS_DupValue(state.context, callback.get()), size.width, size.height});
                     JSValueConst arguments[]{width.get(), height.get(), phase.get()};
                     ScopedValue prepared(state.context, JS_Call(state.context, callback.get(), JS_UNDEFINED, input->transactional ? 3 : 2, arguments));
-                    if (JS_IsException(prepared.get())) throw std::runtime_error(quickJsExceptionText(state.context));
+                    if (JS_IsException(prepared.get())) throw std::runtime_error(impl_->exceptionText(state.context));
                     auto commands = QuickJsDrawReader(state.context).read(prepared.get());
                     if (!instance.preparedDraw || *instance.preparedDraw != commands) instance.preparedDraw = std::make_shared<const arrange::core::DrawCommands>(std::move(commands));
                     instance.preparedDrawSize = size;
@@ -439,13 +462,13 @@ namespace arrange::quickjs {
             }
             return {true, {}};
         } catch (const std::exception& error) {
-            if (JS_HasException(state.context)) return {false, std::string(error.what()) + "：" + quickJsExceptionText(state.context)};
+            if (JS_HasException(state.context)) return {false, std::string(error.what()) + "：" + impl_->exceptionText(state.context)};
             return {false, error.what()};
         }
     }
 
     CallbackInvokeResult QuickJsScriptHost::materializeLayout(arrange::core::NodeId id, const std::vector<int>& indices) {
-        Impl::TaskBudget budget(*impl_, impl_->limits.visualMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.visualMillis);
         auto& state = impl_->runtime;
         if (!state.framePrepared || state.materializingLayout || !JS_IsFunction(state.context, state.materializeLayout)) return {false, "Layout 材料化缺少当前视觉候选或驱动"};
         if (indices.size() > 4096) return {false, "单次 Layout 材料化超过 4096 项保护上限"};
@@ -456,36 +479,38 @@ namespace arrange::quickjs {
         ScopedValue result(state.context, JS_Call(state.context, state.materializeLayout, JS_UNDEFINED, 2, argv));
         state.materializingLayout = false;
         JS_FreeValue(state.context, argv[0]);
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
         return {true, {}};
     }
 
     CallbackInvokeResult QuickJsScriptHost::completeVisualFrame(bool success) {
-        Impl::TaskBudget budget(*impl_);
         auto& state = impl_->runtime;
         std::string drawError;
-        const auto drawings = std::move(state.preparedDrawCallbacks);
-        state.preparedDrawCallbacks.clear();
-        for (const auto& drawing : drawings) {
-            ScopedValue callback(state.context, drawing.callback);
-            ScopedValue width(state.context, JS_NewFloat64(state.context, drawing.width));
-            ScopedValue height(state.context, JS_NewFloat64(state.context, drawing.height));
-            ScopedValue phase(state.context, JS_NewString(state.context, success ? "commit" : "rollback"));
-            JSValueConst arguments[]{width.get(), height.get(), phase.get()};
-            ScopedValue finished(state.context, JS_Call(state.context, callback.get(), JS_UNDEFINED, 3, arguments));
-            if (JS_IsException(finished.get())) {
-                const auto error = quickJsExceptionText(state.context);
-                if (drawError.empty()) drawError = error;
+        {
+            Impl::TaskBudget budget(*impl_, __func__, impl_->limits.visualMillis);
+            const auto drawings = std::move(state.preparedDrawCallbacks);
+            state.preparedDrawCallbacks.clear();
+            for (const auto& drawing : drawings) {
+                ScopedValue callback(state.context, drawing.callback);
+                ScopedValue width(state.context, JS_NewFloat64(state.context, drawing.width));
+                ScopedValue height(state.context, JS_NewFloat64(state.context, drawing.height));
+                ScopedValue phase(state.context, JS_NewString(state.context, success ? "commit" : "rollback"));
+                JSValueConst arguments[]{width.get(), height.get(), phase.get()};
+                ScopedValue finished(state.context, JS_Call(state.context, callback.get(), JS_UNDEFINED, 3, arguments));
+                if (JS_IsException(finished.get())) {
+                    const auto error = impl_->exceptionText(state.context);
+                    if (drawError.empty()) drawError = error;
+                }
             }
-        }
-        if (!state.framePrepared) return {drawError.empty(), drawError};
-        state.framePrepared = false;
-        ScopedValue argument(state.context, JS_NewBool(state.context, success));
-        JSValueConst argv[] = {argument.get()};
-        ScopedValue result(state.context, JS_Call(state.context, state.completeFrame, JS_UNDEFINED, 1, argv));
-        if (JS_IsException(result.get())) {
-            const auto error = quickJsExceptionText(state.context);
-            return {false, drawError.empty() ? error : drawError + "\n" + error};
+            if (!state.framePrepared) return {drawError.empty(), drawError};
+            state.framePrepared = false;
+            ScopedValue argument(state.context, JS_NewBool(state.context, success));
+            JSValueConst argv[] = {argument.get()};
+            ScopedValue result(state.context, JS_Call(state.context, state.completeFrame, JS_UNDEFINED, 1, argv));
+            if (JS_IsException(result.get())) {
+                const auto error = impl_->exceptionText(state.context);
+                return {false, drawError.empty() ? error : drawError + "\n" + error};
+            }
         }
         const auto drained = impl_->drainJobs();
         if (!drawError.empty()) return {false, drawError};
@@ -496,9 +521,9 @@ namespace arrange::quickjs {
         pendingTransactions_.clear();
         const auto normalizedModulePath = std::filesystem::absolute(modulePath).lexically_normal();
         impl_->initialise(this, normalizedModulePath);
-        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
         ScopedValue result(impl_->runtime.context, JS_Eval(impl_->runtime.context, source.data(), source.size(), normalizedModulePath.generic_string().c_str(), JS_EVAL_TYPE_MODULE));
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(impl_->runtime.context)};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
         const auto& pending = pendingTransactions_.pending();
@@ -509,20 +534,20 @@ namespace arrange::quickjs {
     ScriptExecutionResult QuickJsScriptHost::executeLiveModules(const LiveModuleSnapshot& snapshot) {
         pendingTransactions_.clear();
         impl_->initialise(this, snapshot.entry);
-        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
         auto& state = impl_->runtime;
         state.moduleLoader.install(snapshot);
         installHotTransport(state.context);
         auto* module = QuickJsModuleLoader::load(state.context, snapshot.entry.c_str(), &state.moduleLoader);
-        if (!module) return {false, quickJsExceptionText(state.context)};
+        if (!module) return {false, impl_->exceptionText(state.context)};
         ScopedValue result(state.context, JS_EvalFunction(state.context, JS_DupValue(state.context, JS_MKPTR(JS_TAG_MODULE, module))));
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
 
     CallbackInvokeResult QuickJsScriptHost::applyHotUpdate(const LiveModuleSnapshot& snapshot, const HotMessage& message) {
-        Impl::TaskBudget budget(*impl_, impl_->limits.moduleMillis);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
         auto& state = impl_->runtime;
         if (!state.context) return {false, "HMR runtime 尚未初始化"};
         if (message.event == "arrange:import-ready") {
@@ -536,7 +561,7 @@ namespace arrange::quickjs {
         ScopedValue argument(state.context, hotMessageValue(state.context, message));
         JSValueConst argv[] = {argument.get()};
         ScopedValue result(state.context, JS_Call(state.context, receive.get(), JS_UNDEFINED, 1, argv));
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(state.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
@@ -554,7 +579,7 @@ namespace arrange::quickjs {
     }
 
     CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options) {
-        Impl::TaskBudget budget(*impl_);
+        Impl::TaskBudget budget(*impl_, __func__);
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         if (!slot.valid()) return {false, "Arrange event slot is invalid"};
         if (slot.kind == arrange::core::EventSlotKind::DrawPrepare) return {false, "绘制 callback 只允许候选准备阶段调用"};
@@ -579,14 +604,14 @@ namespace arrange::quickjs {
         }
         ScopedValue result(impl_->runtime.context, JS_Call(impl_->runtime.context, callback.get(), JS_UNDEFINED, argc, argv));
         if (options.hasStringArgument || options.hasFocusArgument) JS_FreeValue(impl_->runtime.context, argument);
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(impl_->runtime.context)};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
         return {true, {}};
     }
 
     CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll) {
-        Impl::TaskBudget budget(*impl_);
+        Impl::TaskBudget budget(*impl_, __func__);
         if (impl_->runtime.context == nullptr) return {false, "QuickJS runtime is not initialised"};
         if (!slot.valid()) return {false, "Arrange event slot is invalid"};
         if (slot.kind == arrange::core::EventSlotKind::DrawPrepare) return {false, "绘制 callback 只允许候选准备阶段调用"};
@@ -622,7 +647,7 @@ namespace arrange::quickjs {
         ScopedValue callback(impl_->runtime.context, JS_DupValue(impl_->runtime.context, callbackValue));
         JSValueConst argv[1] = {argument.get()};
         ScopedValue result(impl_->runtime.context, JS_Call(impl_->runtime.context, callback.get(), JS_UNDEFINED, 1, argv));
-        if (JS_IsException(result.get())) return {false, quickJsExceptionText(impl_->runtime.context)};
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(impl_->runtime.context)};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};
         return {true, {}};

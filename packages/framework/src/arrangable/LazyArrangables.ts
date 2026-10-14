@@ -132,18 +132,34 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
             const selectedKeys = shallowRef<readonly string[]>([])
             let version = 0
             const data = computed(() => {
-                if (!Array.isArray(props.items) || props.items.length > 1000000) throw new TypeError('Lazy items 必须是最多 1000000 项的数组')
-                const keys = props.items.map((item, index) => identity(props.itemKey?.(item, index) ?? index, 'Lazy key'))
-                const keyToIndex = new Map(keys.map((key, index) => [key, index]))
+                const items = props.items
+                if (!Array.isArray(items) || items.length > 1000000) throw new TypeError('Lazy items 必须是最多 1000000 项的数组')
+                const itemKey = props.itemKey
+                const contentType = props.contentType
+                const itemSpan = props.span
+                const keyToIndex = new Map<string, number>()
+                const keys = new Array<string>(items.length)
+                const contentTypes = new Array<string>(items.length)
+                const spans = new Array<number>(items.length)
+                // 三类元数据共享一次索引遍历；缺省回调仍生成完整默认数组，保持下游按索引读取。
+                for (let index = 0; index < items.length; index++) {
+                    // 与 Array.prototype.map 一致，稀疏位置不调用用户回调；最终的尺寸校验继续拒绝稀疏 Lazy 数据。
+                    if (!(index in items)) continue
+                    const item = items[index]
+                    const key = identity(itemKey?.(item, index) ?? index, 'Lazy key')
+                    if (keyToIndex.has(key)) throw new TypeError('Lazy key 不能重复')
+                    keyToIndex.set(key, index)
+                    keys[index] = key
+                    if (contentType) {
+                        const type = contentType(item, index)
+                        contentTypes[index] = type == null ? '' : identity(type, 'Lazy contentType')
+                    } else contentTypes[index] = ''
+                    if (itemSpan) {
+                        const span = itemSpan(item, index)
+                        spans[index] = !span ? 1 : span.type === 'GridItemSpan.MaxLineSpan' ? -1 : span.count
+                    } else spans[index] = 1
+                }
                 if (keyToIndex.size !== keys.length) throw new TypeError('Lazy key 不能重复')
-                const contentTypes = props.items.map((item, index) => {
-                    const type = props.contentType?.(item, index)
-                    return type == null ? '' : identity(type, 'Lazy contentType')
-                })
-                const spans = props.items.map((item, index) => {
-                    const span = props.span?.(item, index)
-                    return !span ? 1 : span.type === 'GridItemSpan.MaxLineSpan' ? -1 : span.count
-                })
                 return { keys, keyToIndex, contentTypes, spans, version: ++version }
             })
             // 数据重排先按稳定 key 迁移活动范围，避免测量前退挂仍被焦点或捕获持有的项

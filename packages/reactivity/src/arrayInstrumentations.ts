@@ -24,24 +24,24 @@ export function shallowReadArray<T>(arr: T[]): T[] {
     return arr
 }
 
-function toWrapped(target: unknown, item: unknown) {
-    if (isReadonly(target)) {
-        return isReactive(target) ? toReadonly(toReactive(item)) : toReadonly(item)
-    }
-    return toReactive(item)
+function arrayValueWrapper(target: unknown): (item: unknown) => unknown {
+    // 数组代理的深浅和只读模式在一次遍历中固定，不为每项重复查询代理标记
+    if (isReadonly(target)) return isReactive(target) ? item => toReadonly(toReactive(item)) : toReadonly
+    return toReactive
 }
 
 export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
     __proto__: null,
     [Symbol.iterator]() {
-        return iterator(this, Symbol.iterator, item => toWrapped(this, item))
+        return iterator(this, Symbol.iterator, arrayValueWrapper(this))
     },
     concat(...args: unknown[]) {
         return reactiveReadArray(this).concat(...args.map(x => (isArray(x) ? reactiveReadArray(x) : x)))
     },
     entries() {
+        const wrap = arrayValueWrapper(this)
         return iterator(this, 'entries', (value: [number, unknown]) => {
-            value[1] = toWrapped(this, value[1])
+            value[1] = wrap(value[1])
             return value
         })
     },
@@ -49,16 +49,17 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
         return apply(this, 'every', fn, thisArg, undefined, arguments)
     },
     filter(fn: (item: unknown, index: number, array: unknown[]) => unknown, thisArg?: unknown) {
-        return apply(this, 'filter', fn, thisArg, v => v.map((item: unknown) => toWrapped(this, item)), arguments)
+        const wrap = arrayValueWrapper(this)
+        return apply(this, 'filter', fn, thisArg, v => v.map(wrap), arguments)
     },
     find(fn: (item: unknown, index: number, array: unknown[]) => boolean, thisArg?: unknown) {
-        return apply(this, 'find', fn, thisArg, item => toWrapped(this, item), arguments)
+        return apply(this, 'find', fn, thisArg, arrayValueWrapper(this), arguments)
     },
     findIndex(fn: (item: unknown, index: number, array: unknown[]) => boolean, thisArg?: unknown) {
         return apply(this, 'findIndex', fn, thisArg, undefined, arguments)
     },
     findLast(fn: (item: unknown, index: number, array: unknown[]) => boolean, thisArg?: unknown) {
-        return apply(this, 'findLast', fn, thisArg, item => toWrapped(this, item), arguments)
+        return apply(this, 'findLast', fn, thisArg, arrayValueWrapper(this), arguments)
     },
     findLastIndex(fn: (item: unknown, index: number, array: unknown[]) => boolean, thisArg?: unknown) {
         return apply(this, 'findLastIndex', fn, thisArg, undefined, arguments)
@@ -118,7 +119,7 @@ export const arrayInstrumentations: Record<string | symbol, Function> = <any>{
         return noTracking(this, 'unshift', args)
     },
     values() {
-        return iterator(this, 'values', item => toWrapped(this, item))
+        return iterator(this, 'values', arrayValueWrapper(this))
     },
 }
 
@@ -154,11 +155,12 @@ function apply(self: unknown[], method: ArrayMethods, fn: (item: unknown, index:
         return needsWrap ? toReactive(result) : result
     }
 
+    const wrap = arrayValueWrapper(self)
     let wrappedFn = fn
     if (arr !== self) {
         if (needsWrap) {
             wrappedFn = function(this: unknown, item, index) {
-                return fn.call(this, toWrapped(self, item), index, self)
+                return fn.call(this, wrap(item), index, self)
             }
         } else if (fn.length > 2) {
             wrappedFn = function(this: unknown, item, index) {
@@ -173,6 +175,7 @@ function apply(self: unknown[], method: ArrayMethods, fn: (item: unknown, index:
 function reduce(self: unknown[], method: keyof Array<any>, fn: (acc: unknown, item: unknown, index: number, array: unknown[]) => unknown, args: unknown[]) {
     const arr = shallowReadArray(self)
     const needsWrap = arr !== self && !isShallow(self)
+    const wrap = arrayValueWrapper(self)
     let wrappedFn = fn
     let wrapInitialAccumulator = false
     if (arr !== self) {
@@ -181,9 +184,9 @@ function reduce(self: unknown[], method: keyof Array<any>, fn: (acc: unknown, it
             wrappedFn = function(this: unknown, acc, item, index) {
                 if (wrapInitialAccumulator) {
                     wrapInitialAccumulator = false
-                    acc = toWrapped(self, acc)
+                    acc = wrap(acc)
                 }
-                return fn.call(this, acc, toWrapped(self, item), index, self)
+                return fn.call(this, acc, wrap(item), index, self)
             }
         } else if (fn.length > 3) {
             wrappedFn = function(this: unknown, acc, item, index) {
@@ -192,7 +195,7 @@ function reduce(self: unknown[], method: keyof Array<any>, fn: (acc: unknown, it
         }
     }
     const result = (arr[method] as any)(wrappedFn, ...args)
-    return wrapInitialAccumulator ? toWrapped(self, result) : result
+    return wrapInitialAccumulator ? wrap(result) : result
 }
 
 function searchProxy(self: unknown[], method: keyof Array<any>, args: unknown[]) {

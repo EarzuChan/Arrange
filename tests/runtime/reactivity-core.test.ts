@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { EffectFlags, ReactiveEffect, batchUpdates, computed, effect, effectScope, getCurrentScope, onEffectCleanup, onScopeDispose, reactive, ref, stop, toRaw, watch } from '@arrange/reactivity'
+import { EffectFlags, ReactiveEffect, batchUpdates, computed, effect, effectScope, getCurrentScope, onEffectCleanup, onScopeDispose, reactive, readonly, shallowReactive, shallowReadonly, isReactive, isReadonly, ref, stop, toRaw, watch } from '@arrange/reactivity'
+import { arrayInstrumentations } from '../../packages/reactivity/src/arrayInstrumentations.ts'
 import type { Dep } from '../../packages/reactivity/src/dep.ts'
 
 test('computed 缓存按真实依赖更新，分支退出退订且相等结果不通知消费者', () => {
@@ -204,4 +205,43 @@ test('运行中的副作用停止后读取不重新订阅，旧追踪链接也�
     after.value = 3
     unused.value = 4
     assert.equal(triggers, 0)
+})
+
+
+test('数组遍历复用包装模式，保持深浅代理身份、回调参数和稀疏项语义', () => {
+    const raw = [{ id: 1 }, { id: 2 }]
+    for (const values of [reactive(raw), shallowReactive(raw), readonly(reactive(raw)), shallowReadonly(raw)]) {
+        const expected = values[0]
+        const receiver = { enabled: true }
+        const filtered = values.filter(function(this: { enabled: boolean }, item, index, array) {
+            assert.equal(this, receiver)
+            assert.equal(array, values)
+            assert.equal(item, values[index])
+            return this.enabled
+        }, receiver)
+        assert.equal(filtered[0], expected)
+        assert.equal(values.find(() => true), expected)
+        assert.equal(Reflect.apply(arrayInstrumentations.findLast, values, [() => true]), values[1])
+        assert.equal([...values][0], expected)
+        assert.equal([...values.values()][0], expected)
+        assert.equal([...values.entries()][0][1], expected)
+        assert.equal(values.reduce((acc, item, index, array) => {
+            assert.equal(acc, expected)
+            assert.equal(item, values[index])
+            assert.equal(array, values)
+            return acc
+        }), expected)
+        assert.equal(isReactive(filtered[0]), isReactive(expected))
+        assert.equal(isReadonly(filtered[0]), isReadonly(expected))
+    }
+    const sparse = reactive([{ id: 0 }, , { id: 2 }])
+    const visited: number[] = []
+    const mapped = sparse.map((item, index) => {
+        visited.push(index)
+        return item
+    })
+    assert.deepEqual(visited, [0, 2])
+    assert.equal(1 in mapped, false)
+    assert.equal(sparse.filter(() => true).length, 2)
+    assert.equal(reactive([raw[0]]).reduce(() => { throw new Error('单项无初值不调用回调') }), reactive(raw[0]))
 })
