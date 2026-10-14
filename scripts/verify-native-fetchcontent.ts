@@ -47,10 +47,18 @@ target_link_libraries(arrange_fetchcontent_consumer PRIVATE Arrange::framework)
 
     writeFileSync(resolve(consumerRoot, "main.cpp"), `
 #include <arrange/core/Version.h>
+#include <stdexcept>
+#include <string>
 
 int main() {
     static_assert(arrange::core::RuntimeVersion == ${contract.frameworkInternalProtocolCode}u);
-    return arrange::core::version()[0] == '\\0';
+    try {
+        const std::string version = arrange::core::version();
+        if (version.empty()) throw std::runtime_error("Arrange 版本不能为空");
+        return 0;
+    } catch (const std::exception&) {
+        return 1;
+    }
 }
 `.trimStart())
 

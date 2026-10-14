@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
-import { lstat, mkdir, readdir, rm } from "node:fs/promises"
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
+import { lstat, mkdir, readdir } from "node:fs/promises"
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path"
 import { z } from "zod"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
 import { writeAtomicText } from "../util/AtomicFile.ts"
@@ -21,6 +21,8 @@ export class NativeBuildTree {
         this.signal.throwIfAborted()
         source = await this.canonical(source)
         directory = resolve(directory)
+        // macOS 的外部父目录允许系统或用户别名；只解析父目录，保留受管树自身的链接检查
+        if (process.platform === "darwin" && directory !== dirname(directory)) directory = resolve((await canonicalResource({ kind: "directory", path: dirname(directory), mode: "write" })).path, basename(directory))
         const normalized = (await canonicalResource({ kind: "directory", path: directory, mode: "write" })).path
         const ancestorPart = relative(normalized, source)
         if (!ancestorPart || (!isAbsolute(ancestorPart) && ancestorPart !== ".." && !ancestorPart.startsWith(`..${sep}`))) throw new Error("验收构建目录不能覆盖源码根或其祖先")

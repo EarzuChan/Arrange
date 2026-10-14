@@ -50,7 +50,8 @@ export async function nativeCmake(args: readonly string[]): Promise<void> {
 
 export async function configureNativeBuild(source: string, build: string, flavor: "Debug" | "Release", definitions: readonly string[] = []): Promise<void> {
     const tools = await nativeToolchain()
-    const compiler = (await realpath(tools.local.nativeCompiler!.path)).replaceAll("\\", "/")
+    // clang++ 的调用名决定 C++ 链接行为，不能用其指向的 clang 替代；Windows 保留原有物理路径规则
+    const compiler = (tools.platform === "darwin" ? resolve(tools.local.nativeCompiler!.path) : await realpath(tools.local.nativeCompiler!.path)).replaceAll("\\", "/")
     await claimNativeVerification(build)
     const args = ["-S", resolve(source), "-B", resolve(build), "-G", "Ninja", `-DCMAKE_MAKE_PROGRAM=${tools.ninja}`, `-DCMAKE_BUILD_TYPE=${flavor}`, `-DCMAKE_CXX_COMPILER=${compiler}`, `-DCMAKE_C_COMPILER=${tools.platform === "darwin" ? join(dirname(compiler), "clang") : compiler}`]
     if (tools.platform === "darwin") args.push(`-DCMAKE_OSX_ARCHITECTURES=${tools.local.native!.architecture === "arm64" ? "arm64" : "x86_64"}`)

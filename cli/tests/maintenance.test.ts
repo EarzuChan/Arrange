@@ -19,8 +19,9 @@ import { RecoveryService } from "../src/transaction/RecoveryService.ts"
 import { FileTransaction } from "../src/util/FileTransaction.ts"
 import { readSnapshot } from "../src/util/FileUtils.ts"
 import { NativeBuildTree } from "../src/cmake/NativeBuildTree.ts"
+import { sourceReferencesFileName } from "../src/CliMetadata.ts"
 import { write } from "./fixture.ts"
-import { configureNative, cmakeRun } from "./native-fixture.ts"
+import { configureNative, cmakeRun, macOnly } from "./native-fixture.ts"
 import { BuildReferences } from "../src/source/BuildReferences.ts"
 import { StorageInventory } from "../src/storage/StorageInventory.ts"
 import { spawn } from "node:child_process"
@@ -98,7 +99,77 @@ test("真实 CMake 切换源码位置会重建嵌套缓存，相同身份保留�
     const unknown = join(input.root, "unknown")
     await write(join(unknown, "user"), "保留")
     await assert.rejects(tree.prepare(source, unknown, [], true), /缺少归属记录/)
+    assert.equal(await readFile(join(unknown, "user"), "utf8"), "保留")
     await assert.rejects(tree.prepare(source, source, [], true), /覆盖源码根/)
+})
+
+test("macOS 验收树允许外部父目录别名，物理路径共享增量、引用与删除恢复", macOnly, async t => {
+    const input = await harness(t)
+    const source = join(input.root, "source")
+    const external = join(input.root, "external")
+    const alias = join(input.root, "alias")
+    await mkdir(source)
+    await mkdir(external)
+    await symlink(external, alias, "dir")
+    const build = join(alias, "nested", "build")
+    const physical = join(await realpath(external), "nested", "build")
+    const tree = new NativeBuildTree(input.signal, input.user)
+    await (await tree.prepare(source, build, ["first"]))()
+    assert.equal((await canonicalResource({ kind: "directory", path: build, mode: "write" })).path, physical)
+    await write(join(physical, "tools", "sentinel"), "保留")
+    await (await tree.prepare(source, physical, ["first"]))()
+    assert.equal(await readFile(join(build, "tools", "sentinel"), "utf8"), "保留")
+    const references = await new BuildReferences(build).begin({ JUCE_DIR: source }, source)
+    await references()
+    assert.deepEqual(JSON.parse(await readFile(join(physical, sourceReferencesFileName), "utf8")).directories, [source])
+
+    const deletion = new DeleteTransaction(new TransactionStore(input.user.root, input.user.transactions), input.signal)
+    const record = await deletion.prepare([{ root: dirname(physical), path: physical }])
+    const quarantine = deletion.paths(record).find(entry => entry.path !== physical)!.path
+    await rename(physical, quarantine)
+    await (await tree.prepare(source, build, ["first"]))()
+    await assert.rejects(readFile(join(quarantine, "tools", "sentinel")), { code: "ENOENT" })
+    await assert.rejects(readFile(join(build, "tools", "sentinel")), { code: "ENOENT" })
+    await write(join(build, "tools", "sentinel"), "重建")
+    await (await tree.prepare(source, physical, ["second"]))()
+    await assert.rejects(readFile(join(build, "tools", "sentinel")), { code: "ENOENT" })
+    await write(join(build, "tools", "sentinel"), "清理")
+    await (await tree.prepare(source, build, ["second"], true))()
+    await assert.rejects(readFile(join(physical, "tools", "sentinel")), { code: "ENOENT" })
+})
+
+test("macOS 父目录别名不授权链接目标、未知树或其它源码的验收树清理", macOnly, async t => {
+    const input = await harness(t)
+    const source = join(input.root, "source")
+    const other = join(input.root, "other")
+    await mkdir(source)
+    await mkdir(other)
+    const tree = new NativeBuildTree(input.signal, input.user)
+    const owned = join(input.root, "owned")
+    await (await tree.prepare(source, owned, []))()
+    await write(join(owned, "keep"), "用户内容")
+    const redirect = join(input.root, "redirect")
+    await symlink(owned, redirect, "dir")
+    await assert.rejects(tree.prepare(source, redirect, [], true), /不能包含链接或文件/)
+    await assert.rejects(tree.prepare(other, owned, [], true), /属于其它源码/)
+    assert.equal(await readFile(join(owned, "keep"), "utf8"), "用户内容")
+
+    const alias = join(input.root, "alias")
+    await symlink(await realpath(input.root), alias, "dir")
+    await write(join(input.root, "unknown", "keep"), "未知内容")
+    await assert.rejects(tree.prepare(source, join(alias, "unknown"), [], true), /缺少归属记录/)
+    assert.equal(await readFile(join(input.root, "unknown", "keep"), "utf8"), "未知内容")
+    await assert.rejects(tree.prepare(source, alias, [], true), /覆盖源码根/)
+    await assert.rejects(tree.prepare(source, "/", [], true), /覆盖源码根/)
+    const file = join(input.root, "file")
+    await write(file, "文件内容")
+    await assert.rejects(tree.prepare(source, file, [], true), /不能包含链接或文件/)
+    await assert.rejects(tree.prepare(source, join(file, "build"), [], true))
+    assert.equal(await readFile(file, "utf8"), "文件内容")
+    await symlink(file, join(owned, "external-file"), "file")
+    await (await tree.prepare(source, join(alias, "owned"), [], true))()
+    assert.equal(await readFile(file, "utf8"), "文件内容")
+    await assert.rejects(readFile(join(owned, "external-file")), { code: "ENOENT" })
 })
 
 test("替换事务在移动后异常退出的事实可继续或回退，用户修改导致冲突", async t => {
