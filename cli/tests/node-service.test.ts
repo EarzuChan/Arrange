@@ -54,6 +54,49 @@ test("UI 从未安装与缺失准备记录可重新 SETUP，成功安装后才 r
     assert.equal((await input.node.inspect(input.state)).ready, true)
 })
 
+test("安装时只授权 npm 所需 esbuild 脚本并保留用户已有授权", async t => {
+    const input = await setup(t)
+    const manifest = JSON.parse(await readFile(resolve(input.uiRoot, "package.json"), "utf8"))
+    manifest.allowScripts = { koffi: true, esbuild: false }
+    await write(resolve(input.uiRoot, "package.json"), JSON.stringify(manifest))
+    await input.node.install(input.state, testTask())
+    const updated = JSON.parse(await readFile(resolve(input.uiRoot, "package.json"), "utf8"))
+    assert.deepEqual(updated.allowScripts, { koffi: true, esbuild: true })
+    assert.equal((await input.node.inspect(input.state)).ready, true)
+})
+
+test("pnpm 10/11 workspace 授权将占位拒绝项改为 esbuild true 并保留其他配置", async t => {
+    const input = await setup(t)
+    input.state.project.ui.packageManager = "pnpm"
+    input.state.local!.packageManager = { path: "/tools/pnpm", version: "11.15.0" }
+    await write(resolve(input.uiRoot, "pnpm-workspace.yaml"), "packages:\n  - .\nallowBuilds:\n  esbuild: set this to true or false\n  koffi: false\ncustomSetting: keep\n")
+    await input.node.install(input.state, testTask())
+    const updated = await readFile(resolve(input.uiRoot, "pnpm-workspace.yaml"), "utf8")
+    assert.match(updated, /esbuild: true/)
+    assert.match(updated, /koffi: false/)
+    assert.match(updated, /customSetting: keep/)
+    assert.equal((await input.node.inspect(input.state)).ready, true)
+})
+
+test("新 pnpm 工程缺少 workspace 配置时创建精确脚本授权", async t => {
+    const input = await setup(t)
+    input.state.project.ui.packageManager = "pnpm"
+    input.state.local!.packageManager = { path: "/tools/pnpm", version: "11.15.0" }
+    await input.node.install(input.state, testTask())
+    const updated = await readFile(resolve(input.uiRoot, "pnpm-workspace.yaml"), "utf8")
+    assert.match(updated, /allowBuilds:\n  esbuild: true/)
+    assert.equal((await input.node.inspect(input.state)).ready, true)
+})
+
+test("pnpm 授权输入变化使 UI 准备记录失效", async t => {
+    const input = await setup(t)
+    input.state.project.ui.packageManager = "pnpm"
+    input.state.local!.packageManager = { path: "/tools/pnpm", version: "10.34.5" }
+    await input.node.install(input.state, testTask())
+    await write(resolve(input.uiRoot, "pnpm-workspace.yaml"), "allowBuilds:\n  esbuild: false\n")
+    assert.equal((await input.node.inspect(input.state)).ready, false)
+})
+
 test("删除单个普通或 scoped 依赖后准备状态失效并可重新安装", async t => {
     const input = await setup(t)
     await input.node.install(input.state, testTask())

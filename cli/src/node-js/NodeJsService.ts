@@ -9,6 +9,8 @@ import { readJsonFile, writeJsonFile } from "../util/JsonFile.ts"
 import type { TaskOutput } from "../ui/Tasks.ts"
 import { hashText, isJsonObject } from "../util/Utils.ts"
 import { assertPlainDirectoryPath } from "../util/PlainDirectoryPath.ts"
+import { parseDocument, stringify } from "yaml"
+import { writeAtomicText } from "../util/AtomicFile.ts"
 
 export interface UiPreparation {
     readonly ready: boolean
@@ -58,6 +60,7 @@ export class NodeJsService {
         await safeUiOutputDirectory(state)
         await assertPlainDirectoryPath(state.rootDir, workDirectory(state))
         await rm(join(workDirectory(state), uiPreparationFileName), { force: true })
+        await this.authorizeInstallScripts(state)
         const result = await this.executor.run(task.process(this.packageManagerSpec(state, ["install"])))
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 依赖安装失败，退出码 ${result.exitCode}`)
@@ -79,7 +82,7 @@ export class NodeJsService {
     }
 
     private async installInputHash(state: ProjectState): Promise<string> {
-        const names = ["package.json", ".npmrc", state.project.ui.packageManager === "pnpm" ? "pnpm-lock.yaml" : "package-lock.json"]
+        const names = ["package.json", ".npmrc", ...(state.project.ui.packageManager === "pnpm" ? ["pnpm-lock.yaml", "pnpm-workspace.yaml"] : ["package-lock.json"])]
         const contents: string[] = []
         for (const name of names) {
             try { contents.push(name, await readFile(join(uiDirectory(state), name), "utf8")) } catch (error) {
@@ -88,5 +91,40 @@ export class NodeJsService {
             }
         }
         return hashText(JSON.stringify(contents))
+    }
+
+    private async authorizeInstallScripts(state: ProjectState): Promise<void> {
+        const uiRoot = uiDirectory(state)
+        if (state.project.ui.packageManager === "npm") {
+            const path = join(uiRoot, "package.json")
+            const manifest = await readJsonFile(path)
+            if (!isJsonObject(manifest)) throw new Error("UI package.json 必须是 JSON 对象，无法配置安装脚本授权")
+            if (manifest.allowScripts !== undefined && !isJsonObject(manifest.allowScripts)) throw new Error("UI package.json 的 allowScripts 必须是对象，请修复后重试")
+            const allowed = { ...(manifest.allowScripts as Record<string, unknown> | undefined), esbuild: true }
+            if ((manifest.allowScripts as Record<string, unknown> | undefined)?.esbuild !== true) {
+                manifest.allowScripts = allowed
+                await writeAtomicText(path, `${JSON.stringify(manifest, null, 2)}\n`)
+            }
+            return
+        }
+
+        const path = join(uiRoot, "pnpm-workspace.yaml")
+        let source = ""
+        try { source = await readFile(path, "utf8") } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        }
+        const document = parseDocument(source)
+        if (document.errors.length) throw new Error(`pnpm-workspace.yaml 无法解析，无法配置安装脚本授权：${document.errors.map(error => error.message).join("；")}`)
+        const root = document.toJS() as unknown
+        if (root !== null && root !== undefined && !isJsonObject(root)) throw new Error("pnpm-workspace.yaml 顶层必须是映射，无法配置安装脚本授权")
+        let builds: Record<string, unknown> = {}
+        if (isJsonObject(root) && root.allowBuilds !== undefined) {
+            if (isJsonObject(root.allowBuilds)) builds = { ...root.allowBuilds }
+            else if (root.allowBuilds === "esbuild: set this to true or false") builds = {}
+            else throw new Error("pnpm-workspace.yaml 的 allowBuilds 必须是映射，无法安全配置安装脚本授权")
+        }
+        if (builds.esbuild === true && source.length > 0) return
+        document.setIn(["allowBuilds"], { ...builds, esbuild: true })
+        await writeAtomicText(path, stringify(document))
     }
 }

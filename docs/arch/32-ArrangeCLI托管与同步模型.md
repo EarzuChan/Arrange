@@ -217,7 +217,7 @@ CONFIG 每轮执行：
 
 ## SETUP 扫描与准备
 
-SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原生 configure 结果。它不修改 CMakeLists、package.json 或 npmrc，安装使用已经确定的工程文件。本机工具写入 local YAML，依赖及 CMake 查询结果写入本机工作目录或包管理器正常使用的目录。
+SETUP 复用四类结果及 LSRA 顺序，扫描对象是工具、依赖和原生 configure 结果。它不修改 CMakeLists 或 npmrc；安装使用已经确定的工程依赖。为让标准 UI 工具链能够安装，SETUP 只为其必需的 `esbuild` 生命周期脚本写入精确授权：npm 使用 UI `package.json` 的 `allowScripts.esbuild`，pnpm 使用 UI `pnpm-workspace.yaml` 的 `allowBuilds.esbuild`。写入保留其他脚本授权与包管理器配置；无关脚本不会被授权。pnpm 10 和 11 均使用 `allowBuilds`。本机工具写入 local YAML，依赖及 CMake 查询结果写入本机工作目录或包管理器正常使用的目录。
 
 | 检查项 | 当前事实 | 分类与处理 |
 |---|---|---|
@@ -234,7 +234,7 @@ SETUP SCAN 可以执行只读的工具查询，例如 `--version`、Xcode 查找
 
 RESOLVE 先拒绝全报告中的 Fatal；无 Fatal 时一次处理一个 Resolvable，任何确认写入或用户修改后重新加载整个所选范围。APPLY 前核对 YAML 快照，并行执行 UI 安装与各 flavor 的 configure；任一失败时其余跑完后一起报告失败，保留已完成的本机准备。全部结束后再次核对快照，执行期间工程或本机配置被改动则不宣告完成。正常完成不追加扫描循环。正式入口的终端限制见 [CLI 入口](31-ArrangeCLI与工程模式.md#正式入口与自动化)；业务服务通过注入的交互接口处理确认与修正，不自行判断 TTY。
 
-UI 准备记录关联 package.json、npmrc 和所选包管理器的 lockfile，安装前使旧记录失效，成功验证后记录新输入。它只描述依赖准备，不证明源码已构建。原生准备记录关联 native 配置、原生工具、CMake 输入和查询模型；UI 工具的变化不使 native 准备失效。工程移动、生成器/编译器变更或 CMake 输入变更后需重新准备；互不兼容的缓存仅在 CLI 拥有的对应构建目录内重建。
+UI 准备记录关联 package.json、npmrc、所选包管理器的 lockfile，以及 pnpm 的 workspace 配置，安装前使旧记录失效，成功验证后记录新输入。它只描述依赖准备，不证明源码已构建。原生准备记录关联 native 配置、原生工具、CMake 输入和查询模型；UI 工具的变化不使 native 准备失效。工程移动、生成器/编译器变更或 CMake 输入变更后需重新准备；互不兼容的缓存仅在 CLI 拥有的对应构建目录内重建。
 
 ## CONFIG 的恢复与应用
 

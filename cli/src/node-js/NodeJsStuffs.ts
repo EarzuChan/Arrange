@@ -72,6 +72,7 @@ export const packageJsonFile: JsonFile = new class extends JsonFile {
         return {
             private: true,
             type: "module",
+            allowScripts: { esbuild: true },
             scripts: { dev: "vite --configLoader runner", typecheck: "tsx scripts/check-types.ts", build: "tsx scripts/check-types.ts && vite build --configLoader runner" },
             devDependencies: { vite: uiToolchainVersions.vite, tsx: uiToolchainVersions.tsx, typescript: uiToolchainVersions.typescript, "@types/node": uiToolchainVersions.nodeTypes },
         }
