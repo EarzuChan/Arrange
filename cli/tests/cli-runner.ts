@@ -1,13 +1,14 @@
 import { CommanderError } from "commander"
 import { createCliApplication, type CliInteractions } from "../src/CliApplication.ts"
-import { SyncWizard } from "../src/wizard/Sync.ts"
-import { SetupWizard } from "../src/wizard/Setup.ts"
-import { createTerminal } from "../src/ui/Terminal.ts"
-import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { SyncWizard } from "../src/business/wizard/Sync.ts"
+import { SetupWizard } from "../src/business/wizard/Setup.ts"
+import { quietTerminal, OutputSink } from "./fixture.ts"
+import { UserDirectories } from "../src/feature/user/UserDirectories.ts"
 import { resolve } from "node:path"
 
 // 程序化验收入口：输出走与正式入口相同的终端层，颜色遵循环境设置，任何需要询问的步骤直接失败
-const terminal = createTerminal()
+const output = new OutputSink()
+const terminal = quietTerminal(output)
 const config = new SyncWizard(terminal)
 const setup = new SetupWizard(terminal)
 const { reporter } = terminal
@@ -24,10 +25,14 @@ try {
     const cli = createCliApplication({ signal: new AbortController().signal, interactions, terminal, userDirectories: new UserDirectories(resolve(process.cwd(), "cli-test-user")) })
     cli.exitOverride()
     await cli.parseAsync(process.argv)
+    process.exitCode = cli.resultCode
 } catch (error) {
     if (error instanceof CommanderError) process.exitCode = error.exitCode
     else {
         reporter.fail(error instanceof Error ? error.message : String(error))
         process.exitCode = 1
     }
+} finally {
+    await terminal.close()
+    await new Promise<void>(resolve => { process.stdout.write(output.text, () => resolve()) })
 }

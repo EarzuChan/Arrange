@@ -1,10 +1,10 @@
 import { appendFile } from "node:fs/promises"
 import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
-import { OperationHost } from "../../src/operation/OperationHost.ts"
-import { Operations } from "../../src/operation/Operations.ts"
-import { SourceCache } from "../../src/source/SourceCache.ts"
-import { UserDirectories } from "../../src/user/UserDirectories.ts"
+import { OperationHost } from "../../src/feature/operation/OperationHost.ts"
+import { Operations } from "../../src/feature/operation/Operations.ts"
+import { SourceCache } from "../../src/feature/source/SourceCache.ts"
+import { UserDirectories } from "../../src/feature/user/UserDirectories.ts"
 import { testTask, write } from "../fixture.ts"
 
 const [root, counter] = process.argv.slice(2) as [string, string]

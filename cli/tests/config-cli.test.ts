@@ -8,12 +8,12 @@ import { fileURLToPath } from "node:url"
 import { join } from "node:path"
 import { readFile, readdir, rm } from "node:fs/promises"
 import { fixture, write } from "./fixture.ts"
-import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
-import { configRegistry } from "../src/config/ConfigRegistry.ts"
-import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
+import { ProjectStateStore } from "../src/feature/project/ProjectStateStore.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
+import { configRegistry } from "../src/feature/config/ConfigRegistry.ts"
+import { cmakeListsFile } from "../src/feature/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
-import { stripAnsi } from "../src/ui/Ansi.ts"
+import { stripAnsi } from "../src/util/TerminalText.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("./cli-runner.ts", import.meta.url))
@@ -78,7 +78,7 @@ test("程序化 CLI：只读扫描、Apply、Fatal 退出码与参数互斥", as
     assert.match(missing.stdout, /Resolvable .*CMakeLists.txt/)
     const nonInteractive = await cli(state.rootDir, ["sync", "--config", "--native"])
     assert.equal(nonInteractive.code, 1)
-    assert.match(nonInteractive.stderr, /需要交互/)
+    assert.match(nonInteractive.stdout, /需要交互/)
 
     await write(join(state.rootDir, "arrange.project.yaml"), "[")
     const fatal = await cli(state.rootDir, ["sync", "--config", "--scan"])

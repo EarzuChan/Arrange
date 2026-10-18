@@ -1,11 +1,11 @@
 import { join } from "node:path"
 import { rename } from "node:fs/promises"
-import { TransactionStore } from "../../src/transaction/TransactionStore.ts"
-import { ReplacementTransaction } from "../../src/transaction/ReplacementTransaction.ts"
-import { DeleteTransaction } from "../../src/transaction/DeleteTransaction.ts"
-import { OperationHost } from "../../src/operation/OperationHost.ts"
-import { Operations } from "../../src/operation/Operations.ts"
-import { UserDirectories } from "../../src/user/UserDirectories.ts"
+import { TransactionStore } from "../../src/feature/transaction/TransactionStore.ts"
+import { ReplacementTransaction } from "../../src/feature/transaction/ReplacementTransaction.ts"
+import { DeleteTransaction } from "../../src/feature/transaction/DeleteTransaction.ts"
+import { OperationHost } from "../../src/feature/operation/OperationHost.ts"
+import { Operations } from "../../src/feature/operation/Operations.ts"
+import { UserDirectories } from "../../src/feature/user/UserDirectories.ts"
 
 const [root, kind] = process.argv.slice(2) as [string, string]
 const host = new OperationHost(new UserDirectories(join(root, "user")))

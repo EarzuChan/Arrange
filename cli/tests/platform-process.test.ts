@@ -1,5 +1,5 @@
 import { windowsOnly, nativeTools, hostArchitecture } from "./native-fixture.ts"
-import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
+import { createPlatformService } from "../src/feature/platform/CreatePlatformService.ts"
 import assert from "node:assert/strict"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { createServer } from "node:net"
@@ -7,12 +7,12 @@ import { createServer as createHttpServer } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { Executor, quoteWindowsArgument } from "../src/platform/Executor.ts"
-import { DevSupervisor } from "../src/platform/DevSupervisor.ts"
-import { parseMsvcArchitecture, parseWindowsEnvironment, WindowsPlatformService } from "../src/platform/WindowsPlatformService.ts"
-import { satisfiesMinimumVersion, ToolchainService } from "../src/platform/ToolchainService.ts"
-import type { ProcessResult, ProcessSpec } from "../src/platform/ProcessSpec.ts"
-import { isAbortError, throwIfProcessCancelled } from "../src/platform/ProcessSpec.ts"
+import { Executor, quoteWindowsArgument } from "../src/feature/platform/Executor.ts"
+import { DevSupervisor } from "../src/feature/platform/DevSupervisor.ts"
+import { parseMsvcArchitecture, parseWindowsEnvironment, WindowsPlatformService } from "../src/feature/platform/WindowsPlatformService.ts"
+import { satisfiesMinimumVersion, ToolchainService } from "../src/feature/platform/ToolchainService.ts"
+import type { ProcessResult, ProcessSpec } from "../src/feature/platform/ProcessSpec.ts"
+import { isAbortError, throwIfProcessCancelled } from "../src/feature/platform/ProcessSpec.ts"
 import { stateFor } from "./fixture.ts"
 import { minimumNodeMajor } from "../src/CliMetadata.ts"
 
@@ -76,8 +76,8 @@ test("开发监管等待 UI 就绪后启动原生进程，并在退出时清理"
     const ui = `setTimeout(()=>{require('node:fs').writeFileSync(${JSON.stringify(ready)},'yes');require('node:http').createServer((q,s)=>{s.setHeader('x-arrange-dev','owned');s.end('ok')}).listen(${port},'127.0.0.1')},250)`
     const source = `if(!require('node:fs').existsSync(${JSON.stringify(ready)}))process.exit(9);require('node:fs').writeFileSync(${JSON.stringify(native)},'yes');setTimeout(()=>process.exit(6),100)`
     const code = await new DevSupervisor(new Executor()).run([
-        { name: "native", command: process.execPath, args: ["-e", source], dependsOn: ["ui"], stdio: "capture" },
-        { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${port}`, readyHeader: { name: "x-arrange-dev", value: "owned" }, stdio: "capture" },
+        { name: "native", command: process.execPath, args: ["-e", source], dependsOn: ["ui"] },
+        { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${port}`, readyHeader: { name: "x-arrange-dev", value: "owned" } },
     ])
     assert.equal(code, 6)
     assert.equal(await readFile(native, "utf8"), "yes")
@@ -93,7 +93,7 @@ test("开发监管拒绝已占用端口，并传递取消结果", async () => {
         await new Promise<void>(resolve => server.close(() => resolve()))
     }
     const signal = new AbortController()
-    const running = new DevSupervisor(new Executor()).run([{ name: "native", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"], stdio: "capture" }], { signal: signal.signal })
+    const running = new DevSupervisor(new Executor()).run([{ name: "native", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"] }], { signal: signal.signal })
     setTimeout(() => signal.abort(), 100)
     assert.equal(await running, 0)
 })
@@ -108,9 +108,9 @@ test("等待后续进程就绪时，已就绪进程退出会停止全部进程",
     const native = `require('node:http').createServer((q,s)=>{s.statusCode=503;s.end('preparing')}).listen(${nativePort},'127.0.0.1')`
     const startedAt = Date.now()
     await assert.rejects(new DevSupervisor(new Executor()).run([
-        { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${uiPort}`, stdio: "capture" },
-        { name: "native", command: process.execPath, args: ["-e", native], readyUrl: `http://127.0.0.1:${nativePort}`, dependsOn: ["ui"], stdio: "capture" },
-        { name: "third", command: process.execPath, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(thirdMarker)},'wrong')`], dependsOn: ["native"], stdio: "capture" },
+        { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${uiPort}` },
+        { name: "native", command: process.execPath, args: ["-e", native], readyUrl: `http://127.0.0.1:${nativePort}`, dependsOn: ["ui"] },
+        { name: "third", command: process.execPath, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(thirdMarker)},'wrong')`], dependsOn: ["native"] },
     ], { readinessTimeoutMs: 5000 }), /ui 在准备就绪前退出（7）/)
     assert.ok(Date.now() - startedAt < 3000)
     await assert.rejects(readFile(thirdMarker), /ENOENT/)
@@ -137,12 +137,39 @@ test("开发监管在取消后保留清理失败，并继续停止其余进程",
     const executor = new CleanupFailureExecutor()
     const signal = new AbortController()
     const running = new DevSupervisor(executor).run([
-        { name: "ui", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"], stdio: "capture" },
-        { name: "native", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"], stdio: "capture" },
+        { name: "ui", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"] },
+        { name: "native", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"] },
     ], { signal: signal.signal })
     setTimeout(() => signal.abort(), 100)
     await assert.rejects(running, /开发进程清理失败.*拒绝终止/)
     assert.deepEqual(executor.stopped, [0, 1])
+})
+
+test('开发就绪失败后清理再失败时同时保留两种原因，进程仍被停止', async () => {
+    const port = await freePort()
+    const cleanup = new Error('清理确认失败')
+    class FailureExecutor extends Executor {
+        override start(spec: ProcessSpec) {
+            const child = super.start(spec)
+            return {
+                ...child, stop: async () => {
+                    await child.stop()
+                    throw cleanup
+                }
+            }
+        }
+    }
+    const source = "require('node:http').createServer((q,s)=>{s.statusCode=503;s.end('preparing')}).listen(" + port + ",'127.0.0.1')"
+    await assert.rejects(new DevSupervisor(new FailureExecutor()).run([
+        { name: 'ui', command: process.execPath, args: ['-e', source], readyUrl: 'http://127.0.0.1:' + port }
+    ], { readinessTimeoutMs: 500 }), error => {
+        assert.ok(error instanceof AggregateError)
+        assert.match(error.message, /未在限定时间内就绪.*开发进程清理失败.*清理确认失败/)
+        assert.equal(error.errors.length, 2)
+        assert.strictEqual(error.errors[1].cause, cleanup)
+        return true
+    })
+    await assert.rejects(fetch('http://127.0.0.1:' + port))
 })
 
 test("开发监管在启动原生进程前拒绝 HTTP 200 的 HTML 回退页", async t => {
@@ -154,13 +181,13 @@ test("开发监管在启动原生进程前拒绝 HTTP 200 的 HTML 回退页", a
     const supervisor = new DevSupervisor(new Executor())
     await assert.rejects(supervisor.run([
         {
-            name: "ui", command: process.execPath, args: ["-e", ui], stdio: "capture", readyUrl: `http://127.0.0.1:${port}/@arrange/modules`, readyCheck: async response => {
+            name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${port}/@arrange/modules`, readyCheck: async response => {
                 if (!response.headers.get("content-type")?.includes("application/json")) return false
                 const body = await response.json() as { entry?: unknown, modules?: unknown[] }
                 return typeof body.entry === "string" && Array.isArray(body.modules) && body.modules.length > 0
             }
         },
-        { name: "native", command: process.execPath, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'wrong')`], dependsOn: ["ui"], stdio: "capture" },
+        { name: "native", command: process.execPath, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'wrong')`], dependsOn: ["ui"] },
     ], { readinessTimeoutMs: 400 }), /未在限定时间内就绪.*HTTP 200.*<html>fallback<\/html>/)
     await assert.rejects(readFile(marker), /ENOENT/)
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
@@ -170,7 +197,7 @@ test("开发服务就绪超时报告 HTTP 错误，正文首行长度受限", as
     const port = await freePort()
     const ui = `require('node:http').createServer((q,s)=>{s.statusCode=500;s.end('Failed to load module: '+ 'x'.repeat(10000)+'\\nignored second line')}).listen(${port},'127.0.0.1')`
     await assert.rejects(new DevSupervisor(new Executor()).run([
-        { name: "ui", command: process.execPath, args: ["-e", ui], stdio: "capture", readyUrl: `http://127.0.0.1:${port}/@arrange/modules` },
+        { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${port}/@arrange/modules` },
     ], { readinessTimeoutMs: 400 }), (error: Error) => {
         assert.match(error.message, /HTTP 500：Failed to load module:/)
         assert.equal(error.message.includes("ignored second line"), false)
@@ -196,7 +223,7 @@ test("本机真实工具发现：Node 与包管理器路径、版本及 Node 环
     const executor = new Executor()
     const state = stateFor(process.cwd())
     const node = process.execPath
-    const { locateTool } = await import("../src/platform/ToolLocator.ts")
+    const { locateTool } = await import("../src/feature/platform/ToolLocator.ts")
     const npm = await locateTool("npm")
     assert.ok(npm, "需要本机 npm")
     state.local = { node: { path: node }, packageManager: { path: npm } }

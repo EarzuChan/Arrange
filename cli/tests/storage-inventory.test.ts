@@ -3,27 +3,27 @@ import test, { type TestContext } from "node:test"
 import { mkdtemp, mkdir, readFile, readdir, rename, rm, writeFile, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { UserDirectories } from "../src/user/UserDirectories.ts"
-import { ProjectRegistry } from "../src/user/ProjectRegistry.ts"
-import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
-import { CmakeService } from "../src/cmake/CmakeService.ts"
-import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
-import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
-import { Executor } from "../src/platform/Executor.ts"
-import { GitSource } from "../src/source/GitSource.ts"
-import { SourceCache } from "../src/source/SourceCache.ts"
-import { StorageInventory } from "../src/storage/StorageInventory.ts"
-import { StorageMaintenance } from "../src/storage/StorageMaintenance.ts"
-import { buildPathKey } from "../src/storage/StoragePaths.ts"
-import { describeStorageItem, describeCleanupBlockers } from "../src/ui/StorageReport.ts"
-import { OperationHost } from "../src/operation/OperationHost.ts"
-import { Operations } from "../src/operation/Operations.ts"
+import { UserDirectories } from "../src/feature/user/UserDirectories.ts"
+import { ProjectRegistry } from "../src/feature/user/ProjectRegistry.ts"
+import { ProjectStateStore } from "../src/feature/project/ProjectStateStore.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
+import { CmakeService } from "../src/feature/cmake/CmakeService.ts"
+import { createPlatformService } from "../src/feature/platform/CreatePlatformService.ts"
+import { IconAssetsService } from "../src/feature/asset/IconAssetsService.ts"
+import { Executor } from "../src/feature/platform/Executor.ts"
+import { GitSource } from "../src/feature/source/GitSource.ts"
+import { SourceCache } from "../src/feature/source/SourceCache.ts"
+import { StorageInventory } from "../src/feature/storage/StorageInventory.ts"
+import { StorageMaintenance } from "../src/feature/storage/StorageMaintenance.ts"
+import { buildPathKey } from "../src/feature/storage/StoragePaths.ts"
+import { describeStorageItem, describeCleanupBlockers } from "../src/business/report/StorageReport.ts"
+import { OperationHost } from "../src/feature/operation/OperationHost.ts"
+import { Operations } from "../src/feature/operation/Operations.ts"
 import { projectRegistrySchema, sourceCacheSchema, sourceReferencesSchema } from "../src/CliMetadata.ts"
 import { stateFor, write, testTask, quietTerminal } from "./fixture.ts"
-import { canonicalResource } from "../src/operation/Resource.ts"
+import { canonicalResource } from "../src/feature/operation/Resource.ts"
 import { createCliApplication } from "../src/CliApplication.ts"
-import { TransactionStore } from "../src/transaction/TransactionStore.ts"
+import { TransactionStore } from "../src/feature/transaction/TransactionStore.ts"
 
 async function harness(t: TestContext) {
     const root = await mkdtemp(join(tmpdir(), "arrange-storage-facts-"))
@@ -230,8 +230,9 @@ test("真实工作进程占用使清理预览明确排除候选，释放后重�
         const terminal = quietTerminal()
         try {
             await createCliApplication({ signal: input.signal, interactions: "terminal", terminal, userDirectories: input.user }).exitOverride().parseAsync(["node", "arrange", "storage", "clean", "--scan"])
+            await terminal.close()
             return terminal.output.text
-        } finally { terminal.close() }
+        } finally { await terminal.close() }
     }
     try {
         const output = await run()

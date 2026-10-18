@@ -8,14 +8,14 @@ import { tmpdir } from "node:os"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { defaultProjectDirectories, defaultProjectIconPath, uiToolchainVersions } from "../src/CliMetadata.ts"
-import { createInitialProjectState, type CreateProjectRequest } from "../src/project/CreateProject.ts"
-import { ProjectInitializer, type CopyPlan } from "../src/project/ProjectInitializer.ts"
-import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { ConfigScanner } from "../src/sync/ConfigScanner.ts"
-import { configRegistry } from "../src/config/ConfigRegistry.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
+import { createInitialProjectState, type CreateProjectRequest } from "../src/feature/project/CreateProject.ts"
+import { ProjectInitializer, type CopyPlan } from "../src/feature/project/ProjectInitializer.ts"
+import { ProjectStateStore } from "../src/feature/project/ProjectStateStore.ts"
+import { ConfigScanner } from "../src/feature/sync/ConfigScanner.ts"
+import { configRegistry } from "../src/feature/config/ConfigRegistry.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
 import type { FileSnapshot } from "../src/util/FileUtils.ts"
-import { readUiSuggestions } from "../src/wizard/Adopt.ts"
+import { readUiSuggestions } from "../src/business/wizard/Adopt.ts"
 import { quietTerminal } from "./fixture.ts"
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url))
@@ -511,9 +511,9 @@ test("初始化复制中断保留已完成目录及精确接入记录，不伪�
 test("非 TTY create/adopt 明确失败且不进入等待输入", async t => {
     const root = await temporaryRoot(t)
     for (const command of ["create", "adopt"]) await assert.rejects(promisify(execFile)(process.execPath, ["--import", import.meta.resolve("tsx"), resolve(repoRoot, "cli/src/Entry.ts"), command], { cwd: root, timeout: 5000 }), error => {
-        const result = error as Error & { code: number, stderr: string }
+        const result = error as Error & { code: number, stdout: string }
         assert.equal(result.code, 1)
-        assert.match(result.stderr, /需要交互/)
+        assert.match(result.stdout, /需要交互/)
         return true
     })
     assert.deepEqual(await readdir(root), [])

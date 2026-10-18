@@ -17,10 +17,13 @@ export class EmulatedTty extends EventEmitter {
 
     hasColors(): boolean { return true }
 
-    write(chunk: string | Uint8Array): boolean {
+    write(chunk: string | Uint8Array, callback?: (error?: Error) => void): boolean {
         const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8")
         this.written.push(text)
-        this.pending = this.pending.then(() => new Promise<void>(resolve => this.terminal.write(text, () => resolve())))
+        this.pending = this.pending.then(() => new Promise<void>(resolve => this.terminal.write(text, () => {
+            callback?.()
+            resolve()
+        })))
         return true
     }
 

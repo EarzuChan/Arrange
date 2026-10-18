@@ -1,12 +1,12 @@
-import { OperationHost } from "../cli/src/operation/OperationHost.ts"
-import { Operations } from "../cli/src/operation/Operations.ts"
-import { UserDirectories } from "../cli/src/user/UserDirectories.ts"
-import { ProjectRegistry } from "../cli/src/user/ProjectRegistry.ts"
+import { OperationHost } from "../cli/src/feature/operation/OperationHost.ts"
+import { Operations } from "../cli/src/feature/operation/Operations.ts"
+import { UserDirectories } from "../cli/src/feature/user/UserDirectories.ts"
+import { ProjectRegistry } from "../cli/src/feature/user/ProjectRegistry.ts"
 import { resolve } from "node:path"
 import { repoRoot } from "./common.ts"
-import { Executor } from "../cli/src/platform/Executor.ts"
-import { throwIfProcessCancelled } from "../cli/src/platform/ProcessSpec.ts"
-import type { ProcessSpec } from "../cli/src/platform/ProcessSpec.ts"
+import { Executor } from "../cli/src/feature/platform/Executor.ts"
+import { throwIfProcessCancelled } from "../cli/src/feature/platform/ProcessSpec.ts"
+import type { ProcessSpec } from "../cli/src/feature/platform/ProcessSpec.ts"
 
 let session: { host: OperationHost, operations: Operations, signal: AbortSignal, builds: Set<string> } | undefined
 export function currentNativeSession() {
@@ -52,7 +52,7 @@ export function nativeSessionStart(spec: ProcessSpec) {
 export async function nativeSessionRun(command: string, args: readonly string[] = [], env: NodeJS.ProcessEnv = process.env): Promise<void> {
     const session = currentNativeSession()
     const variables = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
-    const result = await new Executor(process.platform, session.signal, session.host).run({ command, args, cwd: repoRoot, env: variables, stdio: "inherit" })
+    const result = await new Executor(process.platform, session.signal, session.host).run({ command, args, cwd: repoRoot, env: variables, retainOutput: false, onOutput: (chunk, stream) => (stream === "stdout" ? process.stdout : process.stderr).write(chunk) })
     throwIfProcessCancelled(result)
     if (result.exitCode !== 0) throw new Error(`${command} 执行失败，退出码 ${result.exitCode}`)
 }

@@ -4,8 +4,8 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { parseMsvcArchitecture, parseMsvcBanner } from "../src/platform/WindowsPlatformService.ts"
-import { locateTool } from "../src/platform/ToolLocator.ts"
+import { parseMsvcArchitecture, parseMsvcBanner } from "../src/feature/platform/WindowsPlatformService.ts"
+import { locateTool } from "../src/feature/platform/ToolLocator.ts"
 
 // 以下样本只验证本地化文本解析；本机 cl.exe 另有真实执行测试，不据此宣称其它语言环境已验
 const banners = [

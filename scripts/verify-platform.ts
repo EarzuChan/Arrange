@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises"
 import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { run, repoRoot } from "./common.ts"
-import { assertSupportedPlatform } from "../cli/src/CliEnvironment.ts"
+import { assertSupportedPlatform } from "../cli/src/util/CliEnvironment.ts"
 
 assertSupportedPlatform(process.platform)
 const evidence = resolve(repoRoot, ".arrange/verification", `${process.platform}-${process.arch}`)

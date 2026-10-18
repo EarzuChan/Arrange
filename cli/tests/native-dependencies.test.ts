@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { mkdir, readFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import test from "node:test"
-import { Executor } from "../src/platform/Executor.ts"
+import { Executor } from "../src/feature/platform/Executor.ts"
 import { nativeTools } from "./native-fixture.ts"
 import { fixture, write } from "./fixture.ts"
 

@@ -2,20 +2,24 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, dirname } from "node:path"
 import type { TestContext } from "node:test"
-import type { ProjectState } from "../src/project/ProjectState.ts"
-import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
-import { configRegistry } from "../src/config/ConfigRegistry.ts"
-import type { ResolveChoice } from "../src/sync/ConfigResolver.ts"
-import type { ConfigInteraction } from "../src/sync/ConfigInteraction.ts"
-import type { ConfigScanReport, ResolvableIssue } from "../src/sync/ConfigScanReport.ts"
+import type { ProjectState } from "../src/feature/project/ProjectState.ts"
+import { ProjectStateStore } from "../src/feature/project/ProjectStateStore.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
+import { configRegistry } from "../src/feature/config/ConfigRegistry.ts"
+import type { ResolveChoice } from "../src/feature/sync/ConfigResolver.ts"
+import type { ConfigInteraction } from "../src/feature/sync/ConfigInteraction.ts"
+import type { ConfigScanReport, ResolvableIssue } from "../src/feature/sync/ConfigScanReport.ts"
 import { Writable } from "node:stream"
-import { createTerminal, type CliTerminal } from "../src/ui/Terminal.ts"
-import type { TaskOutput } from "../src/ui/Tasks.ts"
-import { LineDecoder } from "../src/ui/LineDecoder.ts"
+import { EventEmitter } from "node:events"
+import { TerminalSession } from "../src/terminal/TerminalSession.ts"
+import { WorkPresenter } from "../src/business/WorkPresenter.ts"
+import type { CommandInterface } from "../src/business/CommandInterface.ts"
+import type { TaskOutput } from "../src/feature/operation/Work.ts"
+import { LineDecoder } from "../src/util/LineDecoder.ts"
 
 // 非 TTY 的输出汇：测试里收集界面输出，不写到真实终端
 export class OutputSink extends Writable {
+    readonly isTTY = false
     text = ""
     override _write(chunk: Buffer | string, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
         this.text += chunk.toString()
@@ -23,9 +27,14 @@ export class OutputSink extends Writable {
     }
 }
 
-export function quietTerminal(): CliTerminal & { readonly output: OutputSink } {
-    const output = new OutputSink()
-    return { ...createTerminal({ out: output, err: output }), output }
+export function quietTerminal(output = new OutputSink()): CommandInterface & { readonly output: OutputSink, close(): Promise<void> } {
+    const driver = Object.assign(new EventEmitter(), {
+        columns: 100, rows: 24, host: new EventEmitter(), output,
+        enter() { }, writeFrame(_frame: string) { },
+        close(transcript = ''): Promise<void> { return new Promise<void>(resolve => { output.write(transcript, () => resolve()) }) }
+    })
+    const session = new TerminalSession(driver)
+    return Object.freeze({ ...session.ui, tasks: new WorkPresenter(session.ui.tasks), output, close: () => session.close() })
 }
 
 export interface RecordedTask extends TaskOutput {
@@ -51,7 +60,7 @@ export function testTask(title = "test"): RecordedTask {
             }
             const decoders = { stdout: new LineDecoder(sink), stderr: new LineDecoder(sink) }
             return {
-                ...spec, stdio: "capture", retainOutput: false, onOutput: (chunk, stream) => decoders[stream].push(chunk), onOutputEnd: () => {
+                ...spec, retainOutput: false, onOutput: (chunk, stream) => decoders[stream].push(chunk), onOutputEnd: () => {
                     decoders.stdout.flush()
                     decoders.stderr.flush()
                 }

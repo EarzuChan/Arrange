@@ -78,7 +78,7 @@ namespace arrange {
     ResolvedApp AppResolver::resolvePackage(const App& app) const {
         ResolvedApp result;
         if (!app.hasDist()) {
-            result.error = "你啥也没给我给你加载啥app（笑）Call config.app.useDist(...).";
+            result.error = "你啥也没给我给你加载啥app（笑），请调用`config.app.useDist(...)`喵";
             return result;
         }
 
@@ -86,7 +86,7 @@ namespace arrange {
         result.entryPath = result.packageDir / DefaultEntry;
 
         if (result.packageDir.empty()) {
-            result.error = "Arrange runtime resource root could not be discovered.";
+            result.error = "Arrange runtime resource root could not be discovered";
             return result;
         }
         if (!std::filesystem::exists(result.packageDir)) {

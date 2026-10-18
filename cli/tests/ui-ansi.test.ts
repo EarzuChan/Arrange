@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { fit, padEnd, sanitizeLine, stripAnsi, truncate, visibleWidth, wrap } from "../src/ui/Ansi.ts"
+import { fit, padEnd, sanitizeLine, stripAnsi, truncate, visibleWidth, wrap } from "../src/util/TerminalText.ts"
 
 const red = "\x1b[31m"
 const bold = "\x1b[1m"

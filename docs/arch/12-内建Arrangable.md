@@ -48,7 +48,7 @@ Painter 由资源获取层创建，提供固有尺寸、内容版本、状态、
 
 资源请求具有身份与代际，加载和解码在工作线程执行，Owner 接收不可变结果后更新 Painter 状态。paint Modifier 消费资源快照及版本，固有尺寸变化进入必要测量，内容变化进入绘制失效。绘制阶段不回调任意 JS。
 
-JUCE 的 SVG Drawable 也是 Component；工作线程解析它时须取得消息线程锁。Owner 通过完成通知消费结果，不能在消息线程同步等待该加载 future，否则会阻塞解析所需的消息派发。无 peer 的资源完成仍通过同一语义任务运行，不借此获得视觉帧授权。
+JUCE 的 SVG Drawable 也是 Component（CHECK：什么情况？难道还在使用JUCE的组件，而不是我们自己的好活？）；工作线程解析它时须取得消息线程锁。Owner 通过完成通知消费结果，不能在消息线程同步等待该加载 future，否则会阻塞解析所需的消息派发。无 peer 的资源完成仍通过同一语义任务运行，不借此获得视觉帧授权。
 
 Image 使用 contentScale、alignment 和 alpha；Icon 的显式 tint 转为 colorFilter。Fit、Crop、FillBounds、FillWidth、FillHeight、Inside、None 使用统一缩放与对齐语义，绘制限制在目标区域内。SVG 固有尺寸来自视口，保留 viewBox 中的透明留白，不使用可见图形边界冒充视口；未给绝对宽高时使用 viewBox 尺寸，无 viewBox 时使用 300 × 150 基础视口。显式 Modifier 尺寸与父约束共同决定布局，paint 可以使用 Painter 固有尺寸参与约束。
 

@@ -1,0 +1,13 @@
+{
+  "name": "arrange-tui-test",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "bin": { "arrange-tui-test": "./index.js" },
+  "scripts": { "start": "node ./index.js", "test": "node --test", "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "string-width": "7.2.0"
+  },
+  "engines": { "node": ">=24" },
+  "license": "MIT"
+}

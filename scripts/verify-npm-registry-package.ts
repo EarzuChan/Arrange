@@ -6,16 +6,16 @@ import { npmSubprocessEnv, repoRoot } from "./common.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
 import { ARRANGE_MACRO_PATTERN } from "../packages/vite-plugin/src/constraints.ts"
 import { defaultNodeRegistryUrl, defaultProjectDirectories } from "../cli/src/CliMetadata.ts"
-import { ProjectInitializer } from "../cli/src/project/ProjectInitializer.ts"
-import { ProjectStateStore } from "../cli/src/project/ProjectStateStore.ts"
-import { uiOutputDirectory } from "../cli/src/project/ProjectPaths.ts"
-import { FileTransaction } from "../cli/src/util/FileTransaction.ts"
-import { configRegistry } from "../cli/src/config/ConfigRegistry.ts"
-import { Executor } from "../cli/src/platform/Executor.ts"
-import { createPlatformService } from "../cli/src/platform/CreatePlatformService.ts"
-import { ToolchainService } from "../cli/src/platform/ToolchainService.ts"
-import { environmentValue } from "../cli/src/platform/ToolLocator.ts"
-import type { ProcessSpec } from "../cli/src/platform/ProcessSpec.ts"
+import { ProjectInitializer } from "../cli/src/feature/project/ProjectInitializer.ts"
+import { ProjectStateStore } from "../cli/src/feature/project/ProjectStateStore.ts"
+import { uiOutputDirectory } from "../cli/src/feature/project/ProjectPaths.ts"
+import { FileTransaction } from "../cli/src/feature/transaction/FileTransaction.ts"
+import { configRegistry } from "../cli/src/feature/config/ConfigRegistry.ts"
+import { Executor } from "../cli/src/feature/platform/Executor.ts"
+import { createPlatformService } from "../cli/src/feature/platform/CreatePlatformService.ts"
+import { ToolchainService } from "../cli/src/feature/platform/ToolchainService.ts"
+import { environmentValue } from "../cli/src/feature/platform/ToolLocator.ts"
+import type { ProcessSpec } from "../cli/src/feature/platform/ProcessSpec.ts"
 
 const contract = readArrangeVersionContract()
 const cliManifest = JSON.parse(await readFile(resolve(repoRoot, "cli/package.json"), "utf8")) as { version: string }
@@ -34,7 +34,7 @@ const platform = createPlatformService(executor)
 const tools = new ToolchainService(executor, platform)
 
 async function execute(spec: ProcessSpec): Promise<void> {
-    const result = await executor.run({ ...spec, stdio: "inherit" })
+    const result = await executor.run({ ...spec, retainOutput: false, onOutput: (chunk, stream) => (stream === "stdout" ? process.stdout : process.stderr).write(chunk) })
     if (result.exitCode !== 0) throw new Error(`安装包验收命令未成功（${result.exitCode}）：${spec.command} ${spec.args.join(" ")}`)
 }
 
@@ -73,7 +73,7 @@ try {
 
     const installedCli = join(launcherDir, "node_modules", "@arrange", "cli", "dist", "Entry.js")
     await access(installedCli)
-    const rejected = await executor.run({ command: inspection.local.node!.path, args: [installedCli, "--help"], cwd: consumerDir, env: { ...env, NODE_ENV: "test" }, stdio: "capture" })
+    const rejected = await executor.run({ command: inspection.local.node!.path, args: [installedCli, "--help"], cwd: consumerDir, env: { ...env, NODE_ENV: "test" } })
     if (rejected.exitCode !== 1 || !rejected.stderr.includes("TTY")) throw new Error(`正式 CLI 未拒绝非 TTY 调用：${rejected.stdout}${rejected.stderr}`)
 
     const applicationUrl = pathToFileURL(join(dirname(installedCli), "CliApplication.js")).href

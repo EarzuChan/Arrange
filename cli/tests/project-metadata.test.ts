@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { createInitialProjectState, type CreateProjectRequest } from "../src/project/CreateProject.ts"
-import { effectiveBundleId, effectiveDisplayName, generateDefaultBundleId } from "../src/project/ProjectMetadata.ts"
-import { projectMetadataSchema, projectStateSchema } from "../src/project/ProjectState.ts"
+import { createInitialProjectState, type CreateProjectRequest } from "../src/feature/project/CreateProject.ts"
+import { effectiveBundleId, effectiveDisplayName, generateDefaultBundleId } from "../src/feature/project/ProjectMetadata.ts"
+import { projectMetadataSchema, projectStateSchema } from "../src/feature/project/ProjectState.ts"
 
 function request(): CreateProjectRequest {
     return { rootDir: "/project", projectName: "My_Plugin2", projectVersion: "1.0.0", frameworkVersion: "0.0.0-m.3.0", vendorName: "Arrange 制造商 & Co.", vendorCode: "AbCd", pluginCode: "EfGh", pluginType: "effect", packageManager: "npm", products: ["standalone"], uiDirectory: "ui", nativeDirectory: "native", artifactsDirectory: "artifacts", managedItems: {} }

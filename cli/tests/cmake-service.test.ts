@@ -1,19 +1,19 @@
 import { nativeState, nativeTools, hostPlatform, hostArchitecture, windowsOnly } from "./native-fixture.ts"
-import { IconAssetsService } from "../src/asset/IconAssetsService.ts"
+import { IconAssetsService } from "../src/feature/asset/IconAssetsService.ts"
 import assert from "node:assert/strict"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import test from "node:test"
-import { Executor } from "../src/platform/Executor.ts"
-import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
-import { CmakeService, type CmakeModel } from "../src/cmake/CmakeService.ts"
+import { Executor } from "../src/feature/platform/Executor.ts"
+import { createPlatformService } from "../src/feature/platform/CreatePlatformService.ts"
+import { CmakeService, type CmakeModel } from "../src/feature/cmake/CmakeService.ts"
 import { fixture, testTask, write } from "./fixture.ts"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { assertPlainDirectoryPath } from "../src/util/PlainDirectoryPath.ts"
-import { isAbortError, type ProcessResult, type ProcessSpec } from "../src/platform/ProcessSpec.ts"
+import { isAbortError, type ProcessResult, type ProcessSpec } from "../src/feature/platform/ProcessSpec.ts"
 import { PNG } from "pngjs"
-import { UserDirectories } from "../src/user/UserDirectories.ts"
-import { BuildDirectories } from "../src/cmake/BuildDirectories.ts"
+import { UserDirectories } from "../src/feature/user/UserDirectories.ts"
+import { BuildDirectories } from "../src/feature/cmake/BuildDirectories.ts"
 import { cmakeDefinitionsFileName, nativeIconCmakeDefinitions, nativeIconDirectory } from "../src/CliMetadata.ts"
 
 test("native build 尊重 CMake 并行环境变量，未设置时保留默认并行参数", async t => {
@@ -43,8 +43,7 @@ test("native build 尊重 CMake 并行环境变量，未设置时保留默认并
         assert.equal(calls.length, 1)
         assert.equal(calls[0].command, state.local!.cmake!.path)
         assert.equal(calls[0].cwd, state.rootDir)
-        // 输出经任务捕获、逐行呈现，不直通终端
-        assert.equal(calls[0].stdio, "capture")
+        // 输出经任务回调捕获，不直通终端
         assert.equal(typeof calls[0].onOutput, "function")
         assert.deepEqual(calls[0].args, ["--build", model.buildDirectory, "--config", "Release", ...(limit === undefined ? ["--parallel"] : []), "--target", "TestPlugin_Standalone", "--clean-first"])
         assert.equal(process.env.CMAKE_BUILD_PARALLEL_LEVEL, limit)
@@ -110,7 +109,10 @@ target_link_libraries(TestPlugin_VST3 PRIVATE TestPlugin)
     assert.equal((await service.inspect(state, "debug")).ready, false)
     await rm(join(native, "pause"))
     state.rootDir = state.rootDir.toUpperCase()
-    const model = await service.configure(state, "debug", testTask())
+    const task = testTask()
+    const model = await service.configure(state, "debug", task)
+    assert.ok(!task.stages.includes('配置'))
+    assert.equal(task.stages.at(-1), undefined)
     assert.equal(model.configuration, "Debug")
     assert.equal((await service.inspect(state, "debug")).ready, true)
     assert.equal(await readFile(sentinel, "utf8"), "incremental tree")
@@ -167,7 +169,10 @@ test("真实 CMake 查询区分目标身份与产品名称，并识别配置输�
     const executor = new Executor()
     const service = new CmakeService(executor, createPlatformService(executor), new IconAssetsService(), new UserDirectories(join(state.rootDir, "user")))
     assert.equal((await service.inspect(state, "debug")).ready, false)
-    const model = await service.configure(state, "debug", testTask())
+    const task = testTask()
+    const model = await service.configure(state, "debug", task)
+    assert.ok(!task.stages.includes('配置'))
+    assert.equal(task.stages.at(-1), undefined)
     assert.equal((await service.inspect(state, "debug")).ready, true)
     for (const [key, value] of Object.entries({ displayName: "显示 产品", bundleId: "com.example.test", vendorName: "Other Vendor", vendorCode: "Vend", pluginCode: "Plug", version: "2.0.0" })) {
         const metadata = state.project.project as unknown as Record<string, string | undefined>

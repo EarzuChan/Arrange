@@ -29,10 +29,8 @@ export const processStopGraceMs = 2000
 export const toolProbeTimeoutMs = 15000
 export const frameworkSourceProbeTimeoutMs = 30000
 export const devReadinessTimeoutMs = 30000
-// Windows 的 cl、link、rc 不声明长路径支持（即使系统已启用 LongPathsEnabled），完整路径超过 259 字符就无法打开文件
-// 因此 Windows 构建树放在短的哈希目录下。尾部预算是构建树内最长的相对路径加余量，按 JUCE 源码布局区分：
-// FetchContent 把 JUCE 取到构建树内时，对象路径为 …\arrange_juce.dir\__\__\__\juce-src\modules\…，实测最长 173
-// 使用外部 JUCE 源码（JUCE_DIR、FETCHCONTENT_SOURCE_DIR_JUCE）时，CMake 把源码绝对路径内嵌进对象路径，实测最长 193
+// Windows 的 cl、link、rc 不声明长路径支持（即使系统已启用 LongPathsEnabled），完整路径超过 259 字符就无法打开文件，因此 Windows 构建树放在短的哈希目录下
+// 尾部预算是构建树内最长的相对路径加余量，按 JUCE 源码布局区分：FetchContent 把 JUCE 取到构建树内时，对象路径为 …\arrange_juce.dir\__\__\__\juce-src\modules\…，实测最长 173；使用外部 JUCE 源码（JUCE_DIR、FETCHCONTENT_SOURCE_DIR_JUCE）时，CMake 把源码绝对路径内嵌进对象路径，实测最长 193
 export const windowsMaxPathLength = 259
 export const windowsBuildPathTailBudget = 180
 export const windowsExternalSourceTailBudget = 200

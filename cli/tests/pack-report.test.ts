@@ -3,10 +3,10 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
-import { describePackResult } from "../src/packing/PackReport.ts"
-import type { PackResult } from "../src/packing/Packer.ts"
-import type { ProjectState } from "../src/project/ProjectState.ts"
-import { formatFileSize } from "../src/ui/FileSize.ts"
+import { describePackResult } from "../src/business/report/PackReport.ts"
+import type { PackResult } from "../src/feature/packing/Packer.ts"
+import type { ProjectState } from "../src/feature/project/ProjectState.ts"
+import { formatFileSize } from "../src/util/FileSize.ts"
 
 test("打包报告列出目录、各产品位置、二进制大小与清单，路径相对工程根", async t => {
     const root = await mkdtemp(resolve(tmpdir(), "arrange-pack-report-"))

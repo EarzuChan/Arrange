@@ -7,7 +7,7 @@
 | Wrapper 与 Marker | [托管模型：Wrapper 与 Marker](../../../arch/32-ArrangeCLI托管与同步模型.md#wrapper-与-marker) |
 | 结果类型 | [托管模型：CONFIG SCAN 的四类结果](../../../arch/32-ArrangeCLI托管与同步模型.md#config-scan-的四类结果) |
 | 目标目录分工 | [CLI 架构](../../../arch/31-ArrangeCLI与工程模式.md#简明架构说明) |
-| CMake 具体定义 | [CmakeStuffs.ts](../../../../cli/src/cmake/CmakeStuffs.ts) |
-| Node 具体定义 | [NodeJsStuffs.ts](../../../../cli/src/node-js/NodeJsStuffs.ts) |
+| CMake 具体定义 | [CmakeStuffs.ts](../../../../cli/src/feature/cmake/CmakeStuffs.ts) |
+| Node 具体定义 | [NodeJsStuffs.ts](../../../../cli/src/feature/nodejs/NodeJsStuffs.ts) |
 
 实现顺序见[第三期工作区](M2.2的最后工作中.md)，验收见[CONFIG 扫描验收用例](SCAN结果各项+对策.md)。

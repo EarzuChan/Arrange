@@ -1,13 +1,13 @@
 import { dirname, join, resolve } from "node:path"
 import { mkdir, realpath } from "node:fs/promises"
-import { Executor } from "../cli/src/platform/Executor.ts"
-import { createPlatformService } from "../cli/src/platform/CreatePlatformService.ts"
-import { locateTool } from "../cli/src/platform/ToolLocator.ts"
+import { Executor } from "../cli/src/feature/platform/Executor.ts"
+import { createPlatformService } from "../cli/src/feature/platform/CreatePlatformService.ts"
+import { locateTool } from "../cli/src/feature/platform/ToolLocator.ts"
 import { windowsObjectPathMax } from "../cli/src/CliMetadata.ts"
 import { repoRoot } from "./common.ts"
-import { NativeBuildTree } from "../cli/src/cmake/NativeBuildTree.ts"
+import { NativeBuildTree } from "../cli/src/feature/cmake/NativeBuildTree.ts"
 import { cachedNativeDefinitions } from "./native-source-cache.ts"
-import { BuildReferences } from "../cli/src/source/BuildReferences.ts"
+import { BuildReferences } from "../cli/src/feature/source/BuildReferences.ts"
 import { claimNativeVerification, nativeSessionRun, currentNativeSession } from "./native-session.ts"
 
 let discovery: ReturnType<typeof discover> | undefined

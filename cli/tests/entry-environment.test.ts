@@ -7,16 +7,16 @@ import { createServer } from "node:http"
 import { once } from "node:events"
 import { join } from "node:path"
 import { readFile, readdir } from "node:fs/promises"
-import { assertCliEnvironment } from "../src/CliEnvironment.ts"
+import { assertCliEnvironment } from "../src/util/CliEnvironment.ts"
 import { createCliApplication, type CliInteractions } from "../src/CliApplication.ts"
-import { createPlatformService } from "../src/platform/CreatePlatformService.ts"
-import { Executor } from "../src/platform/Executor.ts"
-import { ProjectStateStore } from "../src/project/ProjectStateStore.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
-import { cmakeListsFile } from "../src/cmake/CmakeStuffs.ts"
+import { createPlatformService } from "../src/feature/platform/CreatePlatformService.ts"
+import { Executor } from "../src/feature/platform/Executor.ts"
+import { ProjectStateStore } from "../src/feature/project/ProjectStateStore.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
+import { cmakeListsFile } from "../src/feature/cmake/CmakeStuffs.ts"
 import { cliCompatibility } from "../src/CliMetadata.ts"
 import { fixture, quietTerminal, TestSyncWizard } from "./fixture.ts"
-import { UserDirectories } from "../src/user/UserDirectories.ts"
+import { UserDirectories } from "../src/feature/user/UserDirectories.ts"
 
 const exec = promisify(execFile)
 const sourceEntry = fileURLToPath(new URL("../src/Entry.ts", import.meta.url))
@@ -60,9 +60,9 @@ test("正式入口包括 help/version 都拒绝非 TTY，且不读取工程或�
     const before = await readFile(cmakeListsFile.path(state), "utf8")
     for (const args of [["--help"], ["--version"], ["sync", "--config"], ["create"]]) {
         await assert.rejects(exec(process.execPath, ["--import", tsxLoader, sourceEntry, ...args], { cwd: state.rootDir, env: { ...process.env, NODE_ENV: "test", NODE_NO_WARNINGS: "1" }, timeout: 15000 }), error => {
-            const failure = error as Error & { code: number, stderr: string }
+            const failure = error as Error & { code: number, stdout: string }
             assert.equal(failure.code, 1)
-            assert.match(failure.stderr, /stdin 和 stdout.*TTY/)
+            assert.match(failure.stdout, /stdin 和 stdout.*TTY/)
             return true
         })
     }
@@ -80,6 +80,20 @@ test("程序化装配显式接受交互策略，不自启动或注册全局信�
     await assert.rejects(cli.parseAsync(["node", "arrange", "--version"]), error => (error as { code?: string }).code === "commander.version")
     assert.ok(output.trim())
     assert.deepEqual([process.listenerCount("SIGINT"), process.listenerCount("SIGTERM")], listeners)
+})
+
+test('子命令帮助和参数错误通过应用退出策略返回，完整历史由调用方拍扁', async () => {
+    const runner = fileURLToPath(new URL('./cli-runner.ts', import.meta.url))
+    const help = await exec(process.execPath, ['--import', tsxLoader, runner, 'help', 'sync'])
+    assert.match(help.stdout, /--setup/)
+    assert.match(help.stdout, /--native/)
+    assert.ok(help.stdout.startsWith('\n'))
+    await assert.rejects(exec(process.execPath, ['--import', tsxLoader, runner, 'sync', '--does-not-exist']), error => {
+        const failure = error as Error & { code: number, stdout: string }
+        assert.equal(failure.code, 1)
+        assert.match(failure.stdout, /unknown option/)
+        return true
+    })
 })
 
 test("registry 请求期间取消 CONFIG，不报告完成或发布文件", async t => {

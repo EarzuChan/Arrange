@@ -8,7 +8,7 @@ SFA（Single-File Arrangable）使用 `.sfa` 扩展名。推荐先写 `<template
 
 SFA 的顶层区块只有 template 与 script，每类至多一个。视觉表现通过 Arrangable 参数和 Modifier 表达。
 
-setup 按实例执行一次，该 Arrangable 不退场的重排**不会重新执行其初始化**。SFA 顶层初始化系同步（有没有必要做异步支持）；共享逻辑可放进独立 `.ts` 模块。`defineProps`、`withDefaults`、响应式状态、生命周期及 provide/inject 按正式 API 使用。
+setup 按实例执行一次，该 Arrangable 不退场的重排**不会重新执行其初始化**。SFA 顶层初始化系同步（CHECK：有没有必要做异步支持？可能没有：很麻烦？！）；共享逻辑可放进独立 `.ts` 模块。`defineProps`、`withDefaults`、响应式状态、生命周期及 provide/inject 按正式 API 使用。
 
 ## SFA 与纯 TypeScript 的编译边界
 

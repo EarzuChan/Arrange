@@ -3,9 +3,9 @@ import { createServer, type IncomingMessage } from "node:http"
 import { once } from "node:events"
 import { test, type TestContext } from "node:test"
 import { cliCompatibility } from "../src/CliMetadata.ts"
-import { FrameworkRegistryClient } from "../src/framework/FrameworkRegistryClient.ts"
-import { addIncompatibilityIfPresenceFor, assertFrameworkCompatible } from "../src/framework/FrameworkMamba.ts"
-import { validateSemver } from "../src/util/PromptUtils.ts"
+import { FrameworkRegistryClient } from "../src/feature/framework/FrameworkRegistryClient.ts"
+import { addIncompatibilityIfPresenceFor, assertFrameworkCompatible } from "../src/feature/framework/FrameworkMamba.ts"
+import { validateSemver } from "../src/business/PromptUtils.ts"
 
 async function registry(t: TestContext, handler: (request: IncomingMessage) => { status?: number, body: unknown }) {
     const requests: string[] = []

@@ -5,9 +5,9 @@ import { tmpdir } from "node:os"
 import { resolve } from "node:path"
 import { test } from "node:test"
 import { stringify } from "yaml"
-import { ProjectStateStore, projectFileNames } from "../src/project/ProjectStateStore.ts"
-import type { LocalDefinition } from "../src/project/ProjectState.ts"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
+import { ProjectStateStore, projectFileNames } from "../src/feature/project/ProjectStateStore.ts"
+import type { LocalDefinition } from "../src/feature/project/ProjectState.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
 import { readSnapshot } from "../src/util/FileUtils.ts"
 
 test("saveLocal 准备好临时内容后取消不提交本机配置，保留失败记录并传递 AbortError", async t => {

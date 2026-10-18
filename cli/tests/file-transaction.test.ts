@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os"
 import { resolve } from "node:path"
 import { test, type TestContext } from "node:test"
-import { FileTransaction } from "../src/util/FileTransaction.ts"
+import { FileTransaction } from "../src/feature/transaction/FileTransaction.ts"
 import { readSnapshot, type FileSnapshot } from "../src/util/FileUtils.ts"
 import { readJsonFile, writeJsonFile } from "../src/util/JsonFile.ts"
 

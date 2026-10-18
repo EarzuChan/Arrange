@@ -5,7 +5,7 @@ import { createServer } from 'vite'
 import arrange from '../packages/vite-plugin/src/plugin.ts'
 import { configureSmokeBuild, nativeCmake, nativeExecutable, nativeTestDirectory } from './native-toolchain.ts'
 import { withNativeSession, nativeSessionStart } from "./native-session.ts"
-import type { RunningProcess, ProcessResult } from "../cli/src/platform/ProcessSpec.ts"
+import type { RunningProcess, ProcessResult } from "../cli/src/feature/platform/ProcessSpec.ts"
 
 await withNativeSession(async () => {
 

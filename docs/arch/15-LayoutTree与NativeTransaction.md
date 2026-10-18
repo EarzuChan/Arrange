@@ -122,7 +122,7 @@ JSON 不允许作为 JS 到 C++ 的生产提交事实源，也不允许作为 Mo
 - `LayoutTree`：统一生产树，服务 layout、paint、hit-test、input 与 accessibility，不拆成多套生产树。
 - `LayoutNode`：统一主节点，派生 layout / paint / hit-test cache。
 
-第三期起，历史 `RenderTree` 命名必须重命名并收口为 `LayoutTree`；`ArrangeNode` 必须重命名或收口为 `LayoutNode`。后续文档和新增代码不得继续引入新的 `RenderTree` 概念。
+CHECK、ENSURE：历史 `RenderTree` 命名已重命名并收口为 `LayoutTree`；`ArrangeNode`（历史命名，与如今的RearrangeNode无关）已重命名或收口为 `LayoutNode`。后续文档和新增代码不继续引入新的 `RenderTree` 概念。
 
 ```cpp
 struct LayoutNode {
@@ -169,7 +169,7 @@ TS stable Modifier object shape
 
 `ModifierCompiler` 必须保留 Modifier 的可执行顺序语义。Layout、Paint、HitTest、Input 与 Invalidation 不能各自解析 Modifier payload。相同 Modifier 描述应可用 hash / intern 复用，避免反复编译相同链条。
 
-生产代码不得依赖 debug JSON 字符串搜索、`__arrangeModifier.N.*` 展开字段或 `__arrangeClickableEnabled`、`__arrangeVerticalScrollValue`、`__arrangeZIndex`、`__arrangeLayer*` 等 JS 层派生 prop 来解析 Modifier 语义。`modifierDebugJson` 只能用于日志、错误屏诊断和人工排查，不得参与生产语义。
+（很早期的。现应已不复存在：）生产代码不得依赖 debug JSON 字符串搜索、`__arrangeModifier.N.*` 展开字段或 `__arrangeClickableEnabled`、`__arrangeVerticalScrollValue`、`__arrangeZIndex`、`__arrangeLayer*` 等 JS 层派生 prop 来解析 Modifier 语义。`modifierDebugJson` 只能用于日志、错误屏诊断和人工排查，不得参与生产语义。
 
 以下信息必须进入 typed native structure：
 
@@ -298,6 +298,3 @@ insert / remove / delete subtree 时必须同步维护 parent index 与 order in
 # Transform 与命中
 
 `graphicsLayer` 等 transform 的绘制与命中规则见 [Modifier](11-Modifier.md)。
-
-
-

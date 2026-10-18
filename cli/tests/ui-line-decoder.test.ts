@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { codePageDecoder, decodeLineBytes, LineDecoder, overwriteCarriageReturns, parseCodePage } from "../src/ui/LineDecoder.ts"
+import { codePageDecoder, decodeLineBytes, LineDecoder, TerminalTextDecoder, overwriteCarriageReturns, parseCodePage } from "../src/util/LineDecoder.ts"
 
 // “找不到标识符” 的 GBK 编码（MSVC 在 936 代码页控制台下经管道输出的就是这种字节）
 const gbkMessage = Buffer.from("a1b0d5d2b2bbb5bdb1eacab6b7fba1b1", "hex")
@@ -56,4 +56,30 @@ test("代码页解析与映射：chcp 的本地化输出、常见代码页与未
     assert.equal(codePageDecoder(65001).encoding, "utf-8")
     assert.equal(codePageDecoder(437).encoding, "windows-1252")
     assert.equal(codePageDecoder(undefined).encoding, "windows-1252")
+})
+
+test('终端解码立即发布无换行的文本及控制序列，UTF-8 任意分包不损坏字符', () => {
+    const bytes = Buffer.from('正在处理中😀\r\x1b[2K下一步')
+    for (let index = 0; index <= bytes.length; index++) {
+        const decoder = new TerminalTextDecoder(gbk)
+        const first = decoder.push(bytes.subarray(0, index))
+        const second = decoder.push(bytes.subarray(index))
+        assert.equal(first + second + decoder.flush(), bytes.toString('utf8'))
+    }
+    const decoder = new TerminalTextDecoder(gbk)
+    assert.equal(decoder.push(Buffer.from('没有换行')), '没有换行')
+    assert.equal(decoder.push(Buffer.from('\x1b[2K')), '\x1b[2K')
+})
+
+test('已识别的原生代码页流保留跨块双字节字符', () => {
+    const decoder = new TerminalTextDecoder(gbk)
+    let result = ''
+    for (const byte of gbkMessage) result += decoder.push(Uint8Array.of(byte))
+    assert.equal(result + decoder.flush(), '“找不到标识符”')
+})
+
+test('终端字节流可在原生代码页与 UTF-8 行之间切换，控制字符不丢失', () => {
+    const decoder = new TerminalTextDecoder(gbk)
+    const result = decoder.push(Buffer.concat([gbkMessage, Buffer.from('\r\n中文😀\r\n')]))
+    assert.equal(result + decoder.flush(), '“找不到标识符”\r\n中文😀\r\n')
 })
