@@ -11,7 +11,7 @@
 </template>
 
 <script>
-import { ref, createLazyState } from '@arrange/framework'
+import { ref, createLazyState, toRaw } from '@arrange/framework'
 import { M, GridCells, GridItemSpan } from '@arrange/framework/ui'
 import Item from './LazyItem.sfa'
 import RowItem from './RowItem.sfa'
@@ -29,7 +29,7 @@ function command(value: string) {
     else if (value === 'start') list.scrollToItem(0)
     else if (value === 'insert') items.value = [{ id: -1, height: 50 }, ...items.value]
     else if (value === 'prepend') items.value = [{ id: -2, height: 75 }, ...items.value]
-    else if (value === 'unprepend') items.value = items.value.filter(item => item.id !== -2)
+    else if (value === 'unprepend') items.value = toRaw(items.value).filter(item => item.id !== -2)
     else if (value === 'reverse') items.value = [...items.value].reverse()
     else if (value === 'animate') list.animateScrollToItem(100)
     else if (value === 'bad') items.value = [{ id: 0, height: 20 }, { id: 0, height: 30 }]
