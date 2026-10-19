@@ -110,6 +110,10 @@ namespace arrange::juce {
         void updateWindowTitle();
         void updateFrameClockState();
         void requestFrameClockResyncAsync();
+        void scheduleDevReadyCheck();
+        void reportDevReady();
+        bool devReadyReported_ = false;
+        bool devReadyCheckScheduled_ = false;
 
         EditorConfig config_;
         std::unique_ptr<EditorSceneHost> sceneHost_;

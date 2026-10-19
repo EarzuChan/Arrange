@@ -124,6 +124,10 @@ namespace arrange::juce {
             return framePump_.pumpFrame(runtime_, session_, diagnostics_, interaction_, paint_, rootNodeId, config_.app.distPath(), lastPaintBounds_, config_.diagnostics.errorScreen, chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_), nowMillis);
         }
 
+        bool ready() const {
+            return session_.interactive(diagnostics_) && runtime_.publishedFrame().revision > 0;
+        }
+
         std::string windowTitle(std::string_view baseTitle) const {
             return chrome_.windowTitle(baseTitle, packageSource_, diagnostics_);
         }
@@ -299,6 +303,10 @@ namespace arrange::juce {
 
     bool EditorSceneHost::wantsVBlank() const {
         return impl_->wantsVBlank();
+    }
+
+    bool EditorSceneHost::ready() const {
+        return impl_->ready();
     }
 
     bool EditorSceneHost::pumpFrame(double nowMillis) {

@@ -36,6 +36,7 @@ namespace arrange::juce {
         void repaintDirty(::juce::Component& owner);
         [[nodiscard]] bool wantsVBlank() const;
         [[nodiscard]] bool pumpFrame(double nowMillis);
+        [[nodiscard]] bool ready() const;
         [[nodiscard]] std::string windowTitle(std::string_view baseTitle) const;
 
         void resized(int width, int height);

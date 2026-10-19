@@ -9,6 +9,10 @@
 #endif
 
 #include <utility>
+#include <cstdlib>
+#include <string_view>
+#include <fstream>
+#include <filesystem>
 
 namespace arrange::juce {
 
@@ -60,6 +64,7 @@ namespace arrange::juce {
         editor.updateWindowTitle();
         editor.updateFrameClockState();
         if (frameChanged) editor.sceneHost_->repaintDirty(editor);
+        editor.reportDevReady();
     }
 
     ArrangeEditor::ArrangeEditor(::juce::AudioProcessor& processor) : ArrangeEditor(processor, EditorConfig{}) {}
@@ -110,6 +115,44 @@ namespace arrange::juce {
 
     void ArrangeEditor::paint(::juce::Graphics& g) {
         sceneHost_->paint(g, getLocalBounds());
+        scheduleDevReadyCheck();
+    }
+
+    void ArrangeEditor::scheduleDevReadyCheck() {
+        if (devReadyReported_ || devReadyCheckScheduled_ || !isShowing()) return;
+        devReadyCheckScheduled_ = true;
+        ::juce::Component::SafePointer<ArrangeEditor> safe(this);
+        ::juce::MessageManager::callAsync([safe] {
+            if (safe == nullptr) return;
+            safe->devReadyCheckScheduled_ = false;
+            safe->reportDevReady();
+        });
+    }
+
+    // 窗口显示且首帧包含已加载应用时确认本次启动
+    void ArrangeEditor::reportDevReady() {
+        if (devReadyReported_ || !isShowing() || !sceneHost_->ready()) return;
+#if JUCE_WINDOWS
+        const auto* path = _wgetenv(L"ARRANGE_DEV_READY_FILE");
+#else
+        const auto* path = std::getenv("ARRANGE_DEV_READY_FILE");
+#endif
+        const auto* token = std::getenv("ARRANGE_DEV_READY_TOKEN");
+        if (!path || !token) {
+            devReadyReported_ = true;
+            return;
+        }
+        const std::string_view value(token);
+        const std::filesystem::path target(path);
+        auto temporary = target;
+        temporary += ".tmp";
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        output.write(value.data(), static_cast<std::streamsize>(value.size()));
+        output.close();
+        if (!output) return;
+        std::error_code error;
+        std::filesystem::rename(temporary, target, error);
+        if (!error) devReadyReported_ = true;
     }
 
     void ArrangeEditor::parentHierarchyChanged() {
