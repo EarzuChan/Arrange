@@ -43,6 +43,11 @@ export class TaskController implements TaskView {
                 task.state = 'running'
                 this.changed()
             },
+            waiting: (text?: string) => {
+                active()
+                task.waiting = text
+                this.changed()
+            },
             stage: (text?: string) => {
                 active()
                 task.stage = text
@@ -81,6 +86,7 @@ export class TaskController implements TaskView {
                     try { await parser?.finish() }
                     finally {
                         parser = undefined
+                        task.waiting = undefined
                         task.state = state
                         if (state === 'done') task.progress = 1
                         if (state === 'failed') task.failure = detail

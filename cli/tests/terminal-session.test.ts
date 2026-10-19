@@ -75,6 +75,22 @@ test('正式会话顺序提问、默认值与验证、任意选项值、多选�
     assert.equal(host.eventNames().length, 0)
     output.terminal.dispose()
 })
+
+test('空输入采用生成默认值时答案显示默认值，业务仍收到空值', async () => {
+    const { session, send, output } = fixture()
+    let answer: unknown
+    const running = session.run(async ui => {
+        answer = await text({ ...ui.prompt, message: '产品名称', placeholder: 'MyProject', emptyAnswer: 'MyProject' })
+    })
+    await until(() => output.written.some(frame => frame.includes('产品名称')))
+    send('\r')
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    assert.equal(answer, '')
+    send('\r')
+    assert.equal(await running, 0)
+    assert.match((await output.lines()).join('\n'), /◇  产品名称\n│  MyProject/)
+    output.terminal.dispose()
+})
 function driverClosed(output: EmulatedTty): number { return output.written.filter(frame => frame === protocol.leave).length }
 
 test('替换包含问题的区块撤销旧输入目标，旧代写入拒绝，新问题与拍扁保持一致', async () => {

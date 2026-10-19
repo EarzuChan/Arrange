@@ -46,7 +46,7 @@ test('任务业务失败与呈现收尾同时失败时不覆盖业务原始错�
     const view: TaskView = {
         group: () => ({
             task: () => ({
-                start() { }, stage() { }, progress() { }, note() { }, console() { }, log() { },
+                start() { }, waiting() { }, stage() { }, progress() { }, note() { }, console() { }, log() { },
                 finish: async () => { throw cleanup }
             }),
             complete() { }

@@ -7,5 +7,5 @@ export function projectLocationHint(rootDir: string): string {
     if (directory.startsWith('-')) directory = '.' + sep + directory
     const quoted = process.platform === 'win32' ? "'" + directory.replaceAll("'", "''") + "'" : "'" + directory.replaceAll("'", "'\\''") + "'"
     const command = process.platform === 'win32' && /[*?\[\]]/.test(directory) ? 'cd -LiteralPath ' : 'cd '
-    return '；先运行 ' + command + quoted + ' 进入工程目录'
+    return '；请先运行 ' + command + quoted + ' 进入您工程的目录'
 }

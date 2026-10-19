@@ -1,7 +1,7 @@
 export type TaskState = 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | 'stopped'
 export type Tone = 'info' | 'step' | 'success' | 'warn' | 'error'
 export interface ConsoleContent { lines: string[], started: boolean }
-export interface TaskContent { id: string, title: string, state: TaskState, detail?: string, stage?: string, note?: string, progress?: number, failure?: string, logPath?: string, console?: ConsoleContent }
+export interface TaskContent { id: string, title: string, state: TaskState, detail?: string, waiting?: string, stage?: string, note?: string, progress?: number, failure?: string, logPath?: string, console?: ConsoleContent }
 export interface BatchContent { type: 'batch', title: string, state: TaskState, tasks: TaskContent[], transient?: boolean, messages?: { text: string, tone?: Tone }[] }
 export interface RegionContent { type: 'region', id: string, entries: Entry[] }
 export interface AnswerContent { type: 'answer', question: string, answer: string }

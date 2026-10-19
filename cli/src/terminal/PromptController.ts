@@ -13,6 +13,7 @@ export interface PromptRequest {
     readonly kind: "text" | "select" | "multiselect"
     readonly options?: readonly PromptOption<unknown>[]
     readonly initial?: unknown
+    readonly emptyAnswer?: string
     readonly required?: boolean
     readonly placeholder?: string
     readonly validate?: (value: string) => string | Error | undefined
@@ -48,7 +49,7 @@ export class PromptController {
         if (!pending) return
         this.pending = undefined
         const { request } = pending
-        const label = value === cancelled ? "已取消" : request.kind === "text" ? String(value) : request.options?.filter(option => Array.isArray(value) ? value.includes(option.value) : value === option.value).map(option => option.label).join("、") ?? String(value)
+        const label = value === cancelled ? "已取消" : request.kind === "text" ? String(value) || request.emptyAnswer || "" : request.options?.filter(option => Array.isArray(value) ? value.includes(option.value) : value === option.value).map(option => option.label).join("、") ?? String(value)
         pending.document.answer(request.message, sanitizeLine(label))
         pending.resolve(value)
         this.changed()

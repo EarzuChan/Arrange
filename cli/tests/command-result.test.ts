@@ -135,8 +135,8 @@ test('创建和接入在子目录时给出相对 cd 指令，当前目录不多�
         await terminal.close()
         assert.equal(calls, (name === 'adopt' ? 1 : 0) + (outcome === 'declined' ? 0 : 1))
         assert.equal(command.resultCode, outcome === 'failed' ? 1 : 0)
-        if (subdirectory) assert.match(terminal.output.text, /先运行 cd '我的 Plugin' 进入工程目录/)
-        else assert.doesNotMatch(terminal.output.text, /先运行 cd/)
+        if (subdirectory) assert.match(terminal.output.text, /请先运行 cd '我的 Plugin' 进入您工程的目录/)
+        else assert.doesNotMatch(terminal.output.text, /请先运行 cd/)
         assert.doesNotMatch(terminal.output.text, /您的工程根位于|工程已创建：/)
     }
 })

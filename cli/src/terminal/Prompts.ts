@@ -2,8 +2,8 @@ import { cancelled, type PromptRequest, type PromptOption, type PromptResult } f
 export interface PromptContext { readonly controller: { ask<T>(request: PromptRequest): Promise<PromptResult<T>> } }
 interface Base extends PromptContext { readonly message: string }
 export function isCancel(value: unknown): value is typeof cancelled { return value === cancelled }
-export function text(options: Base & { readonly initialValue?: string, readonly placeholder?: string, readonly validate?: (value: string | undefined) => string | Error | undefined }): Promise<PromptResult<string>> {
-    return options.controller.ask({ kind: "text", message: options.message, initial: options.initialValue, placeholder: options.placeholder, validate: options.validate })
+export function text(options: Base & { readonly initialValue?: string, readonly placeholder?: string, readonly emptyAnswer?: string, readonly validate?: (value: string | undefined) => string | Error | undefined }): Promise<PromptResult<string>> {
+    return options.controller.ask({ kind: "text", message: options.message, initial: options.initialValue, placeholder: options.placeholder, emptyAnswer: options.emptyAnswer, validate: options.validate })
 }
 export function select<T>(options: Base & { readonly options: readonly PromptOption<T>[], readonly initialValue?: T }): Promise<PromptResult<T>> {
     return options.controller.ask({ kind: "select", message: options.message, initial: options.initialValue, options: options.options })

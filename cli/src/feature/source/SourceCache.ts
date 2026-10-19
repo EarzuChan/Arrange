@@ -145,7 +145,7 @@ export class SourceCache {
                         await writeFile(join(temporary, "complete.json"), `${JSON.stringify(record, null, 4)}\n`)
                         await rename(temporary, join(this.entries, record.key))
                     }
-                })
+                }, text => task.waiting(text))
                 signal.throwIfAborted()
                 const request = join(this.requests, `${identity}.json`)
                 await writeAtomicText(request, `${JSON.stringify(record, null, 4)}\n`, signal)
@@ -154,6 +154,6 @@ export class SourceCache {
                 await assertPlainDirectoryPath(this.directories.root, temporary)
                 await rm(temporary, { recursive: true, force: true })
             }
-        })
+        }, text => task.waiting(text))
     }
 }

@@ -19,6 +19,8 @@ export type OutputParser = (line: string, task: TaskOutput) => void
 export interface TaskOutput {
     readonly title: string
     line(text: string): void
+    // 当前任务等待外部资源时显示临时状态，传入 undefined 清除
+    waiting(text?: string): void
     stage(text: string | undefined): void
     progress(done: number, total: number): void
     // 把子进程输出接到本任务：捕获 stdout/stderr、逐行解码、保留颜色

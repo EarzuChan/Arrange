@@ -36,14 +36,15 @@ export async function promptProjectDetails(terminal: CommandInterface, framework
         packageManager: () => select({ ...io, message: "UI 包管理器", initialValue: suggestions.packageManager ?? "pnpm", options: [{ label: "pnpm", value: "pnpm" as const }, { label: "npm", value: "npm" as const }] }),
         products: () => multiselect<NativeProduct>({ ...io, message: "产品", required: true, options: [{ label: "独立程序（Standalone）", value: "standalone" }, { label: "VST3", value: "vst3" }], initialValues: ["standalone", "vst3"] }),
     }, { onCancel: () => { throw new PromptCancelled() } })
-    const displayName = await optionalText(terminal, "产品显示名称（留空使用项目名称）", { placeholder: answers.projectName, validate: validateDisplayName })
-    const bundleId = await optionalText(terminal, "macOS Bundle ID（留空生成并保存）", { placeholder: generateDefaultBundleId(answers), validate: validateBundleId })
-    const iconSource = await optionalText(terminal, "PNG 图标源文件（留空使用系统默认或保留已有图标）", { placeholder: "正方形 PNG，边长至少 256 像素" })
+    const displayName = await optionalText(terminal, "产品显示名称（留空使用项目名称）", { placeholder: answers.projectName, emptyAnswer: answers.projectName, validate: validateDisplayName })
+    const defaultBundleId = generateDefaultBundleId(answers)
+    const bundleId = await optionalText(terminal, "macOS Bundle ID（留空生成并保存）", { placeholder: defaultBundleId, emptyAnswer: defaultBundleId, validate: validateBundleId })
+    const iconSource = await optionalText(terminal, "PNG 图标源文件（留空使用系统默认或保留已有图标）", { placeholder: "正方形 PNG，边长至少 256 像素", emptyAnswer: "（已留空）" })
     return { ...answers, displayName: displayName ?? answers.projectName, bundleId, iconSource: iconSource ? resolve(iconSource.trim()) : undefined, frameworkNodeRegistryUrl: input.nodeRegistryUrl, frameworkCmakeFetchContentUrl: input.cmakeFetchContentUrl }
 }
 
-async function optionalText(terminal: CommandInterface, message: string, options: { readonly placeholder?: string, readonly validate?: (value: string) => string | undefined }): Promise<string | undefined> {
-    const value = await text({ ...terminal.prompt, message, placeholder: options.placeholder, validate: input => input?.trim() ? options.validate?.(input) : undefined })
+async function optionalText(terminal: CommandInterface, message: string, options: { readonly placeholder?: string, readonly emptyAnswer?: string, readonly validate?: (value: string) => string | undefined }): Promise<string | undefined> {
+    const value = await text({ ...terminal.prompt, message, placeholder: options.placeholder, emptyAnswer: options.emptyAnswer, validate: input => input?.trim() ? options.validate?.(input) : undefined })
     if (isCancel(value)) throw new PromptCancelled()
     return value.trim() ? value : undefined
 }

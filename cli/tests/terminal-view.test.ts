@@ -38,18 +38,38 @@ function fixture() {
     return { document, batch, task }
 }
 
-test('线性历史统一主项留白、完整框线、固定六行和滚动方向标注', () => {
+test('线性历史统一主项留白、六行上限、完整框线和滚动方向标注', () => {
     const { document, task } = fixture()
     const tail = layoutDocument(document, 80)
     const text = tail.map(rowText)
     assert.equal(text[2], '│  ')
     const top = text.findIndex(line => line.includes('╭'))
-    assert.match(text[top]!, /╭─可往上滚·跟随中/)
+    assert.match(text[top]!, /╭─可往上滚[^╮]*╮/)
+    assert.ok(!text[top]!.includes('跟随中'))
     assert.match(text[top + 7]!, /╰─已完成/)
     assert.equal(visibleWidth(text[top]!), visibleWidth(text[top + 1]!))
     assert.equal(visibleWidth(text[top]!), visibleWidth(text[top + 7]!))
+    task.state = 'running'
     assert.match(layoutDocument(document, 80, { [task.id]: 0 }).map(rowText).join('\n'), /╭─可往下滚/)
     assert.match(layoutDocument(document, 80, { [task.id]: 4 }).map(rowText).join('\n'), /╭─可上下滚/)
+})
+
+test('子控制台按实际内容收缩至六行上限，结束后移除跟随标记', () => {
+    const { document, task } = fixture()
+    for (const count of [1, 5, 6, 9]) {
+        task.console!.lines = Array.from({ length: count }, (_, index) => '短输出 ' + index)
+        task.state = 'running'
+        const active = layoutDocument(document, 80)
+        const activeBox = viewport(active, 80, 40, 0).hitboxes[0]!
+        assert.equal(activeBox.height, Math.min(count, 6) + 2)
+        assert.ok(active.some(row => row.spans.some(part => part.text.includes('跟随中'))))
+
+        task.state = 'done'
+        const completed = layoutDocument(document, 80)
+        const completedBox = viewport(completed, 80, 40, 0).hitboxes[0]!
+        assert.equal(completedBox.height, Math.min(count, 6) + 2)
+        assert.ok(!completed.some(row => row.spans.some(part => part.text.includes('跟随中'))))
+    }
 })
 
 test('任务不额外显示阶段与状态附文，运行及拍扁均保留错误和已保存日志提示', () => {
@@ -71,6 +91,22 @@ test('任务不额外显示阶段与状态附文，运行及拍扁均保留错�
     const text = layoutDocument(document, 80).map(rowText).join('\n')
     assert.match(text, /实际错误原因/)
     assert.match(text, /已记录到 failed.log/)
+})
+
+test('资源等待作为所属任务的蓝色进展显示，并在等待结束后清除', () => {
+    const document = new SessionDocument()
+    const tasks = new TaskController(document, () => { })
+    const batch = tasks.group('SETUP')
+    const task = batch.task('配置 native · debug · cmake')
+    task.start()
+    task.waiting('等待其他 Arrange CLI 释放源码缓存')
+    let rows = layoutDocument(document, 100).map(rowText)
+    const taskRow = rows.findIndex(line => line.includes('配置 native · debug · cmake'))
+    assert.match(rows[taskRow + 1]!, /等待其他 Arrange CLI 释放源码缓存/)
+
+    task.waiting(undefined)
+    rows = layoutDocument(document, 100).map(rowText)
+    assert.ok(!rows.some(line => line.includes('等待其他 Arrange CLI')))
 })
 
 test('子控制台命中仅含边框矩形，外侧引导线和留白自然归历史', () => {
@@ -141,10 +177,12 @@ test('普通任务不创建控制台，完成后荧幕仍可滚动且新增输�
     const box = viewport(layoutDocument(document, 80), 80, 40, 0).hitboxes[0]!
     controller.wheel(box.x, box.y, -1)
     controller.render(0)
-    assert.ok(frames.at(-1)!.includes('可上下滚'))
+    assert.ok(frames.at(-1)!.includes('line 11'))
+    assert.ok(!frames.at(-1)!.includes('跟随中'))
     controller.wheel(box.x, box.y, 100)
     controller.render(0)
-    assert.ok(frames.at(-1)!.includes('可往上滚·跟随中'))
+    assert.ok(frames.at(-1)!.includes('line 19'))
+    assert.ok(!frames.at(-1)!.includes('跟随中'))
     assert.ok(frames.at(-1)!.includes('╰─已完成'))
 })
 

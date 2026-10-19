@@ -3,6 +3,8 @@ import type { TaskState, Tone } from './SessionDocument.ts'
 // 业务侧只提交呈现事实，不取得坐标、输入事件、文档或终端流
 export interface TaskPresentation {
     start(): void
+    // 提交或清除当前任务的临时等待状态
+    waiting(text?: string): void
     stage(text?: string): void
     progress(value: number): void
     note(text: string, tone?: Tone): void

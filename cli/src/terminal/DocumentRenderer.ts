@@ -25,19 +25,20 @@ export function consoleRows(task: TaskContent, width: number, offset: number | u
     const bottom = status(task)
     if (flatten) width = lines.reduce((width, line) => Math.max(width, visibleWidth(line) + 4), Math.max(4, visibleWidth(bottom) + 3))
     const inner = Math.max(0, width - 2), content = Math.max(0, inner - 2)
-    const max = Math.max(0, lines.length - consoleHeight)
+    const height = flatten ? lines.length : Math.min(consoleHeight, lines.length)
+    const max = Math.max(0, lines.length - height)
     const start = Math.max(0, Math.min(offset ?? max, max))
     const direction = start > 0 ? start < max ? '可上下滚' : '可往上滚' : max > 0 ? '可往下滚' : ''
-    const top = flatten ? '' : direction + (offset === undefined ? direction ? '·跟随中' : '跟随中' : '')
+    const following = task.state === 'running' && offset === undefined
+    const top = flatten ? '' : direction + (following ? direction ? '·跟随中' : '跟随中' : '')
     const prefix = span('│  ', guideColor)
     const border = (left: string, right: string, label: string): Row => {
         const text = truncate(label ? '─' + label : '', inner, '')
         return { spans: [prefix, span(left + text + '─'.repeat(inner - visibleWidth(text)) + right, accent)] }
     }
     const rows = [border('╭', '╮', top)]
-    if (!flatten) rows[0]!.hitbox = { id: task.id, x: 3, width, height: consoleHeight + 2 }
-    const shown = flatten ? lines : lines.slice(start, start + consoleHeight)
-    const height = flatten ? lines.length : consoleHeight
+    if (!flatten) rows[0]!.hitbox = { id: task.id, x: 3, width, height: height + 2 }
+    const shown = flatten ? lines : lines.slice(start, start + height)
     const padding = Math.max(0, height - shown.length)
     for (let index = 0; index < height; index++) {
         const text = truncate(index < padding ? '' : shown[index - padding] ?? '', content, '')
@@ -69,6 +70,7 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
             for (const message of entry.messages ?? []) body(message.text, message.tone ? toneColor[message.tone] : undefined, color)
             for (const task of entry.tasks) {
                 if (!single) body(taskLabel(task, frame), task.state === 'failed' ? 31 : task.state === 'pending' ? gray : task.state === 'done' ? 32 : accent, color)
+                if (task.waiting) body(task.waiting, accent, color)
                 if (task.failure) body(task.failure, 31, color)
                 if (task.console?.started) for (const row of consoleRows(task, Math.max(2, width - 3), offsets[task.id], color, flatten)) rows.push(row)
                 if (task.logPath) body('已记录到 ' + task.logPath, gray, color)

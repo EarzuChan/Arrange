@@ -28,6 +28,8 @@ class WorkOutput implements ProcessProgress {
         this.log?.write(text)
     }
 
+    waiting(text?: string): void { this.presentation.waiting(text) }
+
     stage(text?: string): void { this.presentation.stage(text) }
 
     progress(done: number, total: number): void { if (total > 0) this.presentation.progress(done / total) }

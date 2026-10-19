@@ -67,6 +67,7 @@ export function testTask(title = "test"): RecordedTask {
         stages: [],
         progresses: [],
         line(text) { task.lines.push(text) },
+        waiting() { },
         stage(text) { task.stages.push(text) },
         progress(done, total) { task.progresses.push([done, total]) },
         process(spec, parser) {

@@ -59,7 +59,7 @@ export class FrameworkService {
                 await assertFrameworkSource(source.directory, version)
             })
             return Object.freeze({ version, cliCompatibility: candidate.cliCompatibility, registryUrl, repositoryUrl, commit: source.commit })
-        })
+        }, false, message => task.waiting(message))
     }
 
     private async remoteVersion(version: string, registryUrl?: string) {
