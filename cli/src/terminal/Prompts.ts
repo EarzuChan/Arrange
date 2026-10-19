@@ -1,5 +1,5 @@
-import { cancelled, type PromptController, type PromptOption, type PromptResult } from "./PromptController.ts"
-export interface PromptContext { readonly controller: Pick<PromptController, 'ask'> }
+import { cancelled, type PromptRequest, type PromptOption, type PromptResult } from "./PromptController.ts"
+export interface PromptContext { readonly controller: { ask<T>(request: PromptRequest): Promise<PromptResult<T>> } }
 interface Base extends PromptContext { readonly message: string }
 export function isCancel(value: unknown): value is typeof cancelled { return value === cancelled }
 export function text(options: Base & { readonly initialValue?: string, readonly placeholder?: string, readonly validate?: (value: string | undefined) => string | Error | undefined }): Promise<PromptResult<string>> {

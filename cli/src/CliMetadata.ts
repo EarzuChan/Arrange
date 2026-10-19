@@ -6,10 +6,12 @@ export const cliCompatibility = pkg.compatibility
 export const cliDescription = pkg.description
 export const supportedCliPlatforms = ["darwin", "win32"] as const
 export const frameworkRegistryTimeoutMs = 15000
+export const frameworkVerificationConcurrency = 2
 
 export const defaultFetchUrl = "https://github.com/EarzuChan/Arrange.git"
 export const defaultNodeRegistryUrl = "https://registry.npmjs.org"
 export const frameworkPackageName = "@arrange/framework"
+export const frameworkVersionFileName = "arrange.version.json"
 export const minimumNodeMajor = 24
 export const minimumCmakeVersion = "3.24.0"
 export const defaultDevServerUrl = "http://127.0.0.1:9178"

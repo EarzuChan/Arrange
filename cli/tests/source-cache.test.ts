@@ -18,7 +18,7 @@ import { NativeSourceService } from "../src/feature/source/NativeSourceService.t
 import { OperationHost } from "../src/feature/operation/OperationHost.ts"
 import { Operations } from "../src/feature/operation/Operations.ts"
 import { FrameworkSourceProbe } from "../src/feature/framework/FrameworkSourceProbe.ts"
-import { sourceLocalTimeoutMs } from "../src/CliMetadata.ts"
+import { sourceLocalTimeoutMs, cliCompatibility } from "../src/CliMetadata.ts"
 
 const commit = "a".repeat(40)
 const spec: SourceSpec = { repository: "https://example.invalid/source.git", ref: "v1", commit }
@@ -128,7 +128,10 @@ test("依赖按 Arrange 清单准备，尊重源码与版本覆盖；缓存预�
     input.git.checkout = async (...args) => {
         if (args[0].ref === "custom") args[0] = { ...args[0], commit: "b".repeat(40) }
         const hash = await checkout(...args)
-        if (args[0].repository.includes("Arrange")) await write(join(args[1], "cmake", "NativeDependencies.json"), JSON.stringify(manifest))
+        if (args[0].repository.includes("Arrange")) {
+            await write(join(args[1], "cmake", "NativeDependencies.json"), JSON.stringify(manifest))
+            await write(join(args[1], 'arrange.version.json'), JSON.stringify({ frameworkVersion: state.project.framework.version, cliCompatibility, frameworkInternalProtocolCode: 1 }))
+        }
         return hash
     }
     const service = new NativeSourceService(input.cache)

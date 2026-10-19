@@ -1,22 +1,20 @@
 import { confirm, group, isCancel, multiselect, select, text } from "../../terminal/Prompts.ts"
 import { resolve } from "node:path"
 import type { ManagedItem } from "../../feature/managed/ManageItems.ts"
-import type { FrameworkRegistryClient } from "../../feature/framework/FrameworkRegistryClient.ts"
-import { assertFrameworkCompatible } from "../../feature/framework/FrameworkMamba.ts"
+import type { FrameworkService, VerifiedFrameworkVersion } from "../../feature/framework/FrameworkService.ts"
 import type { CreateProjectRequest } from "../../feature/project/CreateProject.ts"
 import type { InitializationPlan } from "../../feature/project/ProjectInitializer.ts"
 import type { NativeProduct } from "../../feature/project/ProjectState.ts"
 import { PromptCancelled, requiredText, validateFourCharCode, validateSemver } from "../PromptUtils.ts"
-import { errorMessage } from "../../util/Utils.ts"
 import { selectFrameworkVersion } from "./FrameworkVersion.ts"
 import type { ProjectInteractionInput } from "../../feature/project/ProjectInteraction.ts"
-import { isAbortError } from "../../feature/platform/ProcessSpec.ts"
 import { effectiveBundleId, effectiveDisplayName, generateDefaultBundleId, validateBundleId, validateDisplayName } from "../../feature/project/ProjectMetadata.ts"
 import type { CommandInterface } from "../CommandInterface.ts"
+import { interactionStep } from '../InteractionStep.ts'
 
 export type ProjectWizardInput = ProjectInteractionInput
 
-export type ProjectDetails = Omit<CreateProjectRequest, "rootDir" | "uiDirectory" | "nativeDirectory" | "artifactsDirectory" | "managedItems">
+export type ProjectDetails = Omit<CreateProjectRequest, "rootDir" | "uiDirectory" | "nativeDirectory" | "artifactsDirectory" | "managedItems" | "frameworkVersion"> & { readonly framework: VerifiedFrameworkVersion }
 
 export interface UiSuggestions {
     readonly name?: string
@@ -25,12 +23,12 @@ export interface UiSuggestions {
     readonly packageManager?: "npm" | "pnpm"
 }
 
-export async function promptProjectDetails(terminal: CommandInterface, registry: FrameworkRegistryClient, input: ProjectWizardInput, suggestions: UiSuggestions = {}): Promise<ProjectDetails> {
+export async function promptProjectDetails(terminal: CommandInterface, framework: FrameworkService, input: ProjectWizardInput, suggestions: UiSuggestions = {}): Promise<ProjectDetails> {
     const io = terminal.prompt
     const answers = await group({
         projectName: () => requiredText(io, "项目名称", { initialValue: suggestions.name && /^[A-Za-z][A-Za-z0-9_]*$/.test(suggestions.name) ? suggestions.name : undefined, validate: value => /^[A-Za-z][A-Za-z0-9_]*$/.test(value) ? undefined : "须以字母开头，仅使用字母、数字、下划线" }),
         projectVersion: () => requiredText(io, "项目版本", { initialValue: suggestions.version && !validateSemver(suggestions.version) ? suggestions.version : "1.0.0", validate: validateSemver }),
-        frameworkVersion: () => promptFrameworkVersion(terminal, registry, input, suggestions.frameworkVersion),
+        framework: () => selectFrameworkVersion(terminal, framework, { registryUrl: input.nodeRegistryUrl, repositoryUrl: input.cmakeFetchContentUrl, suggestion: suggestions.frameworkVersion }),
         vendorName: () => requiredText(io, "厂商名称"),
         vendorCode: () => requiredText(io, "厂商四字符代码", { placeholder: "AbCd", validate: validateFourCharCode }),
         pluginCode: () => requiredText(io, "插件四字符代码", { placeholder: "EfGh", validate: validateFourCharCode }),
@@ -50,26 +48,13 @@ async function optionalText(terminal: CommandInterface, message: string, options
     return value.trim() ? value : undefined
 }
 
-async function promptFrameworkVersion(terminal: CommandInterface, registry: FrameworkRegistryClient, input: ProjectWizardInput, suggestion?: string): Promise<string> {
-    if (suggestion && !validateSemver(suggestion) && await confirmPrompt(terminal, `使用 package.json 中的 Framework ${suggestion}？`)) {
-        try {
-            const candidate = await terminal.tasks.status(`正在验证 Framework ${suggestion}`, () => registry.fetchCandidateByVersion(suggestion, input.nodeRegistryUrl))
-            assertFrameworkCompatible(candidate)
-            if (candidate.version !== suggestion) throw new Error("registry 返回的版本与候选不符")
-            return suggestion
-        } catch (error) {
-            if (isAbortError(error)) throw error
-            terminal.reporter.warn(`已有 Framework 版本未通过验证：${errorMessage(error)}；请重新选择`)
-        }
-    }
-    return selectFrameworkVersion(terminal, registry, { registryUrl: input.nodeRegistryUrl })
-}
-
 export async function promptManagedItems(terminal: CommandInterface, items: readonly ManagedItem[]): Promise<Record<string, boolean>> {
-    if (await confirmPrompt(terminal, "持续托管全部支持的配置项？")) return Object.fromEntries(items.map(item => [item.id, true]))
-    const choices: Record<string, boolean> = {}
-    for (const item of items) choices[item.id] = await confirmPrompt(terminal, `持续托管${item.label}？`)
-    return choices
+    return interactionStep(terminal, async region => {
+        const all = await confirmPrompt(region.current, "持续托管全部支持的配置项？")
+        const choices: Record<string, boolean> = {}
+        for (const item of items) choices[item.id] = all || await confirmPrompt(region.replace(), `持续托管${item.label}？`)
+        return choices
+    }, choices => ({ question: '持续托管配置项', answer: items.filter(item => choices[item.id]).map(item => item.label).join('、') || '无' }))
 }
 
 export async function confirmPrompt(terminal: CommandInterface, message: string, initialValue = true): Promise<boolean> {

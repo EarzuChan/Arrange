@@ -5,7 +5,7 @@ import { Reporter } from './Reporter.ts'
 import { PromptController } from './PromptController.ts'
 import type { PromptContext } from './Prompts.ts'
 import { TaskController } from './TaskController.ts'
-import type { TaskView } from './Presentation.ts'
+import type { TaskView, PresentationRegion } from './Presentation.ts'
 import { ViewportController } from './ViewportController.ts'
 import { TranscriptRenderer } from './TranscriptRenderer.ts'
 import type { InputEvent } from './InputDecoder.ts'
@@ -23,6 +23,7 @@ export interface SessionUi {
     readonly reporter: Reporter
     readonly prompt: PromptContext
     readonly tasks: TaskView
+    region(): PresentationRegion<SessionUi>
 }
 
 // 会话拥有唯一驱动与文档，业务只取得语义接口和取消信号
@@ -41,6 +42,7 @@ export class TerminalSession {
     private failure?: unknown
     private resolveExit?: () => void
     private interrupted = false
+    private shutdownRequested = false
     readonly ui: SessionUi
 
     constructor(private readonly driver: TerminalPort = new TerminalDriver()) {
@@ -48,15 +50,45 @@ export class TerminalSession {
         this.prompts = new PromptController(this.document, changed, () => {
             this.abort.signal.throwIfAborted()
             if (this.state !== 'active') throw new Error('当前会话不能提问')
-            if (this.document.entries.some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('任务批次完成后才能提问')
+            if ([...this.document.contents()].some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('任务批次完成后才能提问')
         })
         this.tasks = new TaskController(this.document, changed, () => {
             this.abort.signal.throwIfAborted()
             if (this.state !== 'active' && this.state !== 'new') throw new Error('会话已停止接受任务')
-            if (this.prompts.active || this.document.entries.some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('当前活跃交互完成后才能开始下一批任务')
+            if (this.prompts.active || [...this.document.contents()].some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('当前活跃交互完成后才能开始下一批任务')
         })
         this.viewport = new ViewportController(this.document, driver)
-        this.ui = Object.freeze({ reporter: new Reporter(entry => this.append(entry)), prompt: Object.freeze({ controller: Object.freeze({ ask: this.prompts.ask.bind(this.prompts) }) }), tasks: Object.freeze({ group: this.tasks.group.bind(this.tasks) }) })
+        this.ui = this.makeUi(this.document)
+    }
+
+    private makeUi(document: SessionDocument): SessionUi {
+        return Object.freeze({
+            reporter: new Reporter(entry => this.append(entry, document)),
+            prompt: Object.freeze({ controller: Object.freeze({ ask: <T>(request: Parameters<PromptController['ask']>[0]) => this.prompts.ask<T>(request, document) }) }),
+            tasks: Object.freeze({ group: (title: string, options?: { readonly transient?: boolean }) => this.tasks.group(title, options, document) }),
+            region: () => {
+                this.abort.signal.throwIfAborted()
+                if (this.state !== 'new' && this.state !== 'active') throw new Error('会话已停止接受流程区块')
+                if (this.prompts.active || [...this.document.contents()].some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('当前活跃交互完成后才能建立流程区块')
+                const region = document.region()
+                let current = this.makeUi(region.document)
+                this.invalidate()
+                return Object.freeze({
+                    get current() { return current },
+                    replace: () => {
+                        this.prompts.cancelWithin(region.document)
+                        current = this.makeUi(region.replace())
+                        this.invalidate()
+                        return current
+                    },
+                    complete: (answer?: { readonly question: string, readonly answer: string }) => {
+                        this.prompts.cancelWithin(region.document)
+                        region.complete(answer)
+                        this.invalidate()
+                    }
+                })
+            }
+        })
     }
 
     get signal(): AbortSignal { return this.abort.signal }
@@ -73,12 +105,12 @@ export class TerminalSession {
 
                 if (this.failure) throw this.failure
 
-                if (this.interrupted) {
+                const result = [...this.document.contents()].filter(entry => entry.type === 'result').at(-1)
+                if (this.interrupted && (!code || code === 130 || result?.type === 'result' && result.tone === 'warn')) {
                     this.document.phase = 'cancelled'
-                    this.ui.reporter.cancelled('操作已取消')
                     code = 130
                 } else {
-                    if (this.document.entries.some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('命令结束时仍有未完成任务')
+                    if ([...this.document.contents()].some(entry => entry.type === 'batch' && entry.state === 'running')) throw new Error('命令结束时仍有未完成任务')
                     this.document.phase = code ? 'failed' : 'done'
                 }
             } catch (error) {
@@ -93,8 +125,12 @@ export class TerminalSession {
                 code = this.reportFailure(error)
             }
 
-            if (!this.failure && !this.interrupted) await this.waitForExit()
-            if (this.interrupted) code = this.failure ? 1 : 130
+            if (this.document.phase === 'cancelled') {
+                const result = [...this.document.contents()].filter(entry => entry.type === 'result').at(-1)
+                if (result?.type !== 'result' || result.tone !== 'warn') this.ui.reporter.cancelled('已取消操作')
+            }
+            this.document.sealChildren()
+            if (!this.failure && !this.shutdownRequested) await this.waitForExit()
         } catch (error) {
             code = this.reportFailure(error)
         } finally {
@@ -111,7 +147,6 @@ export class TerminalSession {
         const reason = this.failure ?? error
         if (!this.failure && this.signal.aborted && (reason === this.signal.reason || reason instanceof Error && reason.name === 'AbortError')) {
             this.document.phase = 'cancelled'
-            this.ui.reporter.cancelled('操作已取消')
             return 130
         }
         this.document.phase = 'failed'
@@ -119,14 +154,16 @@ export class TerminalSession {
         return 1
     }
 
-    private append(entry: Entry): void {
+    private append(entry: Entry, document = this.document): void {
         if (this.state === 'closing' || this.state === 'closed') throw new Error('会话已结束')
 
         if (this.prompts.active && entry.type !== 'result') throw new Error('当前问题回答后才能追加下一项')
 
-        const batch = this.document.entries.find(entry => entry.type === 'batch' && entry.state === 'running')
+        document.assertActive()
+        document = document.activeDocument()
+        const batch = [...document.contents()].find(entry => entry.type === 'batch' && entry.state === 'running')
         if (entry.type === 'message' && batch?.type === 'batch') (batch.messages ??= []).push({ text: entry.text, tone: entry.tone })
-        else this.document.entries.push(entry)
+        else document.append(entry)
 
         this.invalidate()
     }
@@ -141,14 +178,14 @@ export class TerminalSession {
         }
         listen(this.driver, 'input', (event: InputEvent) => this.input(event))
         listen(this.driver, 'resize', () => this.invalidate())
-        listen(this.driver, 'signal', () => this.cancel())
+        listen(this.driver, 'signal', () => this.cancel(false))
         listen(this.driver, 'failure', error => this.stop(error))
         listen(this.driver.host, 'uncaughtException', error => this.stop(error))
         listen(this.driver.host, 'unhandledRejection', error => this.stop(error))
         try {
             this.driver.enter()
             this.timer = setInterval(() => {
-                if (this.document.entries.some(entry => entry.type === 'batch' && entry.state === 'running')) {
+                if ([...this.document.contents()].some(entry => entry.type === 'batch' && entry.state === 'running')) {
                     this.frame++
                     this.invalidate()
                 }
@@ -162,16 +199,18 @@ export class TerminalSession {
 
     private stop(error: unknown): void {
         this.failure ??= error
-        this.cancel()
+        this.cancel(false)
     }
 
-    private cancel(): void {
+    private cancel(waitForEnter = true): void {
         if (this.state === 'closed' || this.state === 'closing') return
+        if (waitForEnter && this.state === 'waiting') return
 
+        if (!waitForEnter) this.shutdownRequested = true
         this.interrupted = true
-        this.prompts.cancel()
         this.abort.abort(new DOMException('操作已取消', 'AbortError'))
-        this.resolveExit?.()
+        this.prompts.cancel()
+        if (!waitForEnter) this.resolveExit?.()
     }
 
     private invalidate(): void {
@@ -187,7 +226,7 @@ export class TerminalSession {
 
     private input(event: InputEvent): void {
         if (event.kind === 'wheel') this.viewport.wheel(event.x, event.y, event.delta)
-        else if (event.kind === 'key' && event.key === 'interrupt') return this.cancel()
+        else if (event.kind === 'key' && (event.key === 'interrupt' || event.key === 'escape')) return this.cancel()
         else if (this.state === 'waiting' && event.kind === 'key' && event.key === 'enter') this.resolveExit?.()
         else if (event.kind === 'key' && ['pageup', 'pagedown'].includes(event.key)) this.viewport.key(event.key)
         else if (this.prompts.active) this.prompts.handle(event)
@@ -199,7 +238,7 @@ export class TerminalSession {
     private async waitForExit(): Promise<void> {
         if (this.failure) throw this.failure
 
-        if (this.interrupted) return
+        if (this.shutdownRequested) return
 
         this.state = 'waiting'
         this.viewport.followTail()
@@ -229,6 +268,7 @@ export class TerminalSession {
         }
 
         try {
+            this.document.seal()
             transcript = new TranscriptRenderer().render(this.document)
         } catch (error) {
             errors.push(error)

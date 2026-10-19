@@ -5,6 +5,7 @@ import type { SetupInteraction } from "../../feature/sync/SetupInteraction.ts"
 import { padEnd, visibleWidth } from "../../util/TerminalText.ts"
 import type { CommandInterface } from "../CommandInterface.ts"
 import { renderSetupReport, type ScanReportOptions } from "./ScanReports.ts"
+import { ScanPresentation } from '../ScanPresentation.ts'
 
 // 本机工具清单：名称、版本、路径各一列
 export function describeLocalTools(local: LocalDefinition, packageManager?: string): string[] {
@@ -26,25 +27,27 @@ export function describeLocalTools(local: LocalDefinition, packageManager?: stri
 }
 
 export class SetupWizard implements SetupInteraction {
-    constructor(private readonly output: CommandInterface) { }
+    constructor(output: CommandInterface, private readonly presentation = new ScanPresentation(output)) { }
 
     report(report: SetupScanReport, options?: ScanReportOptions): void {
         const rendered = renderSetupReport(report, options)
-        this.output.reporter.toned(rendered.tone, rendered.lines)
+        this.presentation.report(rendered.tone, rendered.lines, !!options?.listIdle || report.fatal.length > 0)
     }
 
     async acceptTools(local: LocalDefinition, packageManager?: string): Promise<boolean> {
-        this.output.reporter.info(["检测到以下本机工具：", ...describeLocalTools(local, packageManager)])
-        const accepted = await confirm({ ...this.output.prompt, message: "保存并使用这些工具？", initialValue: true })
+        this.presentation.current.reporter.info(["检测到以下本机工具：", ...describeLocalTools(local, packageManager)])
+        const accepted = await confirm({ ...this.presentation.current.prompt, message: "保存并使用这些工具？", initialValue: true })
+        if (isCancel(accepted) || !accepted) this.presentation.complete()
         return !isCancel(accepted) && accepted
     }
 
     async editTools(message: string): Promise<boolean> {
-        this.output.reporter.warn([message, "可安装缺失工具，或编辑 arrange.local.yaml 指定可执行文件路径"])
-        const accepted = await confirm({ ...this.output.prompt, message: "已修正工具，重新检测？", initialValue: true })
+        this.presentation.current.reporter.warn([message, "可安装缺失工具，或编辑 arrange.local.yaml 指定可执行文件路径"])
+        const accepted = await confirm({ ...this.presentation.current.prompt, message: "已修正工具，重新检测？", initialValue: true })
+        if (isCancel(accepted) || !accepted) this.presentation.complete()
         return !isCancel(accepted) && accepted
     }
 
-    message(message: string): void { this.output.reporter.step(message) }
-    failure(message: string): void { this.output.reporter.error(message) }
+    message(message: string, outcome?: 'completed'): void { this.presentation.message(message, outcome === 'completed') }
+    failure(message: string): void { this.presentation.failure(message) }
 }

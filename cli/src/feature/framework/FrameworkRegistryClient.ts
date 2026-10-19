@@ -1,9 +1,11 @@
 import { defaultNodeRegistryUrl, frameworkPackageName, frameworkRegistryTimeoutMs } from "../../CliMetadata.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
 import { RegistryUnreachableError, describeFetchFailure } from "./FrameworkErrors.ts"
-import type { FrameworkVersionCandidate } from "./FrameworkMamba.ts"
+import { readCliCompatibility, type FrameworkVersionCandidate } from "./FrameworkMamba.ts"
+import { isJsonObject } from "../../util/Utils.ts"
+import { isConcreteVersion } from "../../util/Semver.ts"
 
-export function normalizeRegistryUrl(registryUrl?: string): string { // 是否带派
+export function normalizeRegistryUrl(registryUrl?: string): string {
     const raw = registryUrl?.trim() || defaultNodeRegistryUrl
     return raw.replace(/\/+$/, "")
 }
@@ -32,27 +34,31 @@ export class FrameworkRegistryClient {
     // 连接失败与超时归为 RegistryUnreachableError，带上 registry 地址和真实原因；用户取消照常以 AbortError 传出
     private async request(registry: string, path: string): Promise<Response> {
         try {
-            return await fetch(`${registry}${path}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
+            const response = await fetch(`${registry}${path}`, { headers: { Accept: "application/json" }, signal: this.requestSignal() })
+            if ([408, 425, 429].includes(response.status) || response.status >= 500) throw new RegistryUnreachableError(registry, `HTTP ${response.status}`)
+            return response
         } catch (error) {
             if (isAbortError(error)) throw error
+            if (error instanceof RegistryUnreachableError) throw error
             throw new RegistryUnreachableError(registry, describeFetchFailure(error), { cause: error })
         }
     }
 
     // 单版本接口不返回发布时间
     async fetchCandidateByVersion(version: string, registryUrl?: string): Promise<FrameworkVersionCandidate> {
+        if (!isConcreteVersion(version)) throw new Error('Framework 必须使用具体的 SemVer 版本号')
         const registry = normalizeRegistryUrl(registryUrl)
         const response = await this.request(registry, `/${frameworkPackageName.replace("/", "%2f")}/${encodeURIComponent(version)}`)
 
         if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName}@${version}：HTTP ${response.status}`)
 
-        const manifest = await response.json() as FrameworkManifest
+        const manifest: unknown = await response.json()
+        if (!isJsonObject(manifest) || !isConcreteVersion(manifest.version)) throw new Error(`${frameworkPackageName}@${version} 的 registry metadata 缺少有效 version`)
+        if (manifest.version !== version) throw new Error(`registry 返回的 Framework 版本与请求不符：请求 ${version}，实际 ${manifest.version}`)
+        const compatibility = readCliCompatibility(isJsonObject(manifest.arrange) ? manifest.arrange.cliCompatibility : undefined)
+        if (compatibility === null) throw new Error(`${frameworkPackageName}@${version} 未声明有效的 arrange.cliCompatibility`)
 
-        const actualVersion = typeof manifest.version === "string" ? manifest.version : version
-        const cliCompatibility = readCliCompatibility(manifest)
-        if (cliCompatibility === null) throw new Error(`${frameworkPackageName}@${actualVersion} 未声明有效的 arrange.cliCompatibility`)
-
-        return { version: actualVersion, cliCompatibility, markedLatest: false, publishedAt: null }
+        return { version, cliCompatibility: compatibility, markedLatest: false, publishedAt: null }
     }
 
     // 从完整版本列表读取发布时间与最新版本标记
@@ -62,16 +68,18 @@ export class FrameworkRegistryClient {
 
         if (!response.ok) throw new Error(`无法从 ${registry} 读取 ${frameworkPackageName} 版本列表：HTTP ${response.status}`)
 
-        const packument = await response.json() as FrameworkPackument
+        const raw: unknown = await response.json()
+        if (!isJsonObject(raw) || !isJsonObject(raw.versions)) throw new Error(`${frameworkPackageName} 的 registry 版本列表无效`)
+        const packument = raw as FrameworkPackument
 
         const latestVersion = packument["dist-tags"]?.latest
         const times = packument.time ?? {}
 
-        const allCandidates = Object.values(packument.versions ?? {})
-            .filter((manifest): manifest is FrameworkManifest & { readonly version: string } => typeof manifest.version === "string")
-            .map((manifest): FrameworkVersionCandidate => ({
+        const allCandidates = Object.entries(packument.versions ?? {})
+            .filter((entry): entry is [string, FrameworkManifest & { readonly version: string }] => isJsonObject(entry[1]) && isConcreteVersion(entry[0]) && entry[1].version === entry[0])
+            .map(([, manifest]): FrameworkVersionCandidate => ({
                 version: manifest.version,
-                cliCompatibility: readCliCompatibility(manifest),
+                cliCompatibility: readCliCompatibility(isJsonObject(manifest.arrange) ? manifest.arrange.cliCompatibility : undefined),
                 markedLatest: false,
                 publishedAt: times[manifest.version] ?? null,
             }))
@@ -89,11 +97,6 @@ export class FrameworkRegistryClient {
         }
         return result
     }
-}
-
-function readCliCompatibility(manifest: FrameworkManifest): number | null {
-    const value = manifest.arrange?.cliCompatibility
-    return typeof value === "number" && Number.isInteger(value) ? value : null
 }
 
 function comparePublishedTimeDesc(a: FrameworkVersionCandidate, b: FrameworkVersionCandidate): number {

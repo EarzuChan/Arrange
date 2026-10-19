@@ -3,6 +3,7 @@ import { cliDescription, cliName, cliVersion } from "./CliMetadata.ts"
 import type { CommandInterface } from "./business/CommandInterface.ts"
 import { ApplicationCommand } from "./business/ApplicationCommand.ts"
 import { ApplicationOperations } from "./business/ApplicationOperations.ts"
+import { ScanPresentation } from './business/ScanPresentation.ts'
 import { registerAdoptCommand } from "./business/command/Adopt.ts"
 import { registerBuildCommand } from "./business/command/Build.ts"
 import { registerCreateCommand } from "./business/command/Create.ts"
@@ -84,27 +85,30 @@ export function createCliApplication(options: CliApplicationOptions): Applicatio
     const fileWriter = new FileTransaction(signal)
     const store = new ProjectStateStore(fileWriter)
     const registry = new FrameworkRegistryClient(signal)
+    const sourceGit = new GitSource(executor)
+    const sourceCache = new SourceCache(directories, sourceGit, signal, operations)
+    const sources = new NativeSourceService(sourceCache)
+    const framework = new FrameworkService(registry, { git: sourceGit, cache: sourceCache, operations, directory: directories.dependencySources })
 
-    const interactions = options.interactions === "terminal" ? { project: new TerminalProjectInteraction(registry, configRegistry, terminal), config: new SyncWizard(terminal), setup: new SetupWizard(terminal) } : options.interactions
+    const scans = { config: new ScanPresentation(terminal), setup: new ScanPresentation(terminal) }
+    const interactions = options.interactions === "terminal" ? { project: new TerminalProjectInteraction(framework, configRegistry, terminal), config: new SyncWizard(terminal, scans.config), setup: new SetupWizard(terminal, scans.setup) } : options.interactions
 
     const scanner = new ConfigScanner(configRegistry)
     const writer = new ConfigWriter(signal)
     const resolver = new ConfigResolver(writer, interactions.config, signal)
     const applier = new ConfigApplier(writer)
     const tools = new ToolchainService(executor, platform)
-    const framework = new FrameworkService(registry)
     const configuration = new ConfigurationReadiness(scanner, interactions.config)
     const project = new ProjectService(store, framework, configuration)
 
     const node = new NodeJsService(executor)
-    const sources = new NativeSourceService(new SourceCache(directories, new GitSource(executor), signal, operations))
     const cmake = new CmakeService(executor, platform, new IconAssetsService(signal), directories, sources, signal)
     const projectRegistry = new ProjectRegistry(directories, signal)
     const lifetime = { kind: "directory" as const, path: directories.dependencySources, mode: "read" as const }
     const projectOperations = new ProjectOperations(operations, store, cmake, projectRegistry, lifetime)
 
-    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, terminal.tasks, signal, new FrameworkSourceProbe(executor, undefined, sources), (state, scope) => projectOperations.assertSetup(state, scope))
-    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, signal, terminal.tasks)
+    const setup = new SetupService(store, tools, node, cmake, framework, interactions.setup, options.interactions === 'terminal' ? scans.setup : terminal.tasks, signal, new FrameworkSourceProbe(executor, undefined, sources), (state, scope) => projectOperations.assertSetup(state, scope))
+    const sync = new SyncService(store, framework, scanner, resolver, applier, setup, interactions.config, signal, options.interactions === 'terminal' ? scans.config : terminal.tasks)
 
     const initializer = new ProjectInitializer(fileWriter, signal)
     const native = new NativeBuildService(cmake)

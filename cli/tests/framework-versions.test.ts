@@ -69,7 +69,7 @@ test("无 latest 或发布时间时版本仍可选；缺契约和不兼容候选
     assert.deepEqual(choices.map(candidate => candidate.version), ["1.0.10", "1.0.3", "1.0.2"])
     assert.ok(choices.every(candidate => !candidate.markedLatest && candidate.publishedAt === null))
     assert.match(choices[0].incompatibility!, /不兼容.*cliCompatibility/)
-    assert.match(choices[1].incompatibility!, /未声明 arrange\.cliCompatibility/)
+    assert.match(choices[1].incompatibility!, /未声明有效的 arrange\.cliCompatibility/)
     assert.equal(choices[2].incompatibility, null)
     assert.throws(() => assertFrameworkCompatible(choices[0]), /CLI 兼容契约不一致/)
     assert.doesNotThrow(() => assertFrameworkCompatible(choices[2]))
@@ -93,4 +93,40 @@ test("自定义版本接受具体 SemVer 并读取真实契约；HTTP 和缺契�
     assert.ok(input.requests[0].endsWith("1.2.3-preview.1%2Bbuild.7"))
     await assert.rejects(input.client.fetchCandidateByVersion("1.0.0", input.url), /未声明有效的 arrange\.cliCompatibility/)
     await assert.rejects(input.client.fetchCandidateByVersion("9.9.9", input.url), /无法从.*HTTP 404/)
+})
+
+test('单版本响应必须包含请求的确切版本及有效正整数契约', async t => {
+    const inputs: unknown[] = [null, [], {}, { arrange: { cliCompatibility } }, { version: '1.0.1', arrange: { cliCompatibility } }, ...[null, '1', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1].map(value => ({ version: '1.0.0', arrange: { cliCompatibility: value } }))]
+    for (const body of inputs) {
+        const input = await registry(t, () => ({ body }))
+        await assert.rejects(input.client.fetchCandidateByVersion('1.0.0', input.url), /version|版本与请求不符|cliCompatibility/)
+    }
+    for (const version of ['latest', '^1.0.0', '1.0.0-01', '1.0.0-a..b', '1.0.0+']) {
+        assert.ok(validateSemver(version), version)
+        await assert.rejects(new FrameworkRegistryClient().fetchCandidateByVersion(version), /具体的 SemVer/)
+    }
+})
+
+test('版本目录忽略键值不一致和非具体版本，不把损坏 metadata 作为候选', async t => {
+    const input = await registry(t, () => ({ body: { 'dist-tags': { latest: '1.0.0' }, versions: { '1.0.0': { version: '9.9.9', arrange: { cliCompatibility } }, '1.0.1': null, latest: { version: 'latest' }, '1.0.2': { version: '1.0.2', arrange: { cliCompatibility: 0 } }, '1.0.3': { version: '1.0.3', arrange: { cliCompatibility } } } } }))
+    const candidates = addIncompatibilityIfPresenceFor(await input.client.fetchCandidates(5, input.url))
+    assert.deepEqual(candidates.map(candidate => candidate.version), ['1.0.3', '1.0.2'])
+    assert.equal(candidates[1].cliCompatibility, null)
+    assert.ok(candidates[1].incompatibility)
+})
+
+test('registry 限流和服务暂不可用归为可重试错误，404 仍是确定否定', async t => {
+    let status = 503
+    const input = await registry(t, () => ({ status, body: {} }))
+    const { RegistryUnreachableError } = await import('../src/feature/framework/FrameworkErrors.ts')
+    for (status of [408, 425, 429, 500, 503]) {
+        await assert.rejects(input.client.fetchCandidates(5, input.url), RegistryUnreachableError)
+        await assert.rejects(input.client.fetchCandidateByVersion('1.0.0', input.url), RegistryUnreachableError)
+    }
+    status = 404
+    await assert.rejects(input.client.fetchCandidateByVersion('1.0.0', input.url), error => {
+        assert.ok(!(error instanceof RegistryUnreachableError))
+        assert.match((error as Error).message, /HTTP 404/)
+        return true
+    })
 })

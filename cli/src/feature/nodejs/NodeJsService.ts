@@ -1,6 +1,6 @@
 import { readFile, rm, stat } from "node:fs/promises"
 import { delimiter, dirname, join } from "node:path"
-import { frameworkPackageName, cliCompatibility, uiPreparationFileName } from "../../CliMetadata.ts"
+import { frameworkPackageName, uiPreparationFileName } from "../../CliMetadata.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
 import { uiDirectory, safeUiOutputDirectory, workDirectory } from "../project/ProjectPaths.ts"
 import { Executor } from "../platform/Executor.ts"
@@ -11,6 +11,7 @@ import { hashText, isJsonObject } from "../../util/Utils.ts"
 import { assertPlainDirectoryPath } from "../../util/PlainDirectoryPath.ts"
 import { parseDocument, stringify } from "yaml"
 import { writeAtomicText } from "../../util/AtomicFile.ts"
+import { assertFrameworkCompatible, frameworkIncompatibility, readCliCompatibility } from '../framework/FrameworkMamba.ts'
 
 export interface UiPreparation {
     readonly ready: boolean
@@ -39,7 +40,7 @@ export class NodeJsService {
             if (!isJsonObject(manifest.dependencies) || manifest.dependencies[frameworkPackageName] !== state.project.framework.version) return { ready: false, fatal: true, reason: "UI Framework 依赖与工程配置不同，请先完成 CONFIG" }
             await safeUiOutputDirectory(state)
             const installed = await readJsonFile(join(uiDirectory(state), "node_modules", frameworkPackageName, "package.json"))
-            if (!isJsonObject(installed) || installed.version !== state.project.framework.version || !isJsonObject(installed.arrange) || installed.arrange.cliCompatibility !== cliCompatibility) return { ready: false, reason: "UI Framework 依赖缺失、版本不同或不兼容" }
+            if (!isJsonObject(installed) || installed.version !== state.project.framework.version || frameworkIncompatibility({ cliCompatibility: readCliCompatibility(isJsonObject(installed.arrange) ? installed.arrange.cliCompatibility : null) })) return { ready: false, reason: "UI Framework 依赖缺失、版本不同或不兼容" }
             const receipt = await readJsonFile(join(workDirectory(state), uiPreparationFileName))
             if (!isJsonObject(receipt) || receipt.inputHash !== await this.installInputHash(state)) return { ready: false, reason: "UI 依赖准备记录缺失或安装输入已改变" }
             for (const section of [manifest.dependencies, manifest.devDependencies]) if (isJsonObject(section)) {
@@ -65,7 +66,8 @@ export class NodeJsService {
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 依赖安装失败，退出码 ${result.exitCode}`)
         const installed = await readJsonFile(join(uiDirectory(state), "node_modules", frameworkPackageName, "package.json"))
-        if (!isJsonObject(installed) || installed.version !== state.project.framework.version || !isJsonObject(installed.arrange) || installed.arrange.cliCompatibility !== cliCompatibility) throw new Error("安装得到的 Framework 版本或兼容契约不符合工程配置")
+        if (!isJsonObject(installed) || installed.version !== state.project.framework.version) throw new Error("安装得到的 Framework 版本不符合工程配置")
+        assertFrameworkCompatible({ version: installed.version, cliCompatibility: readCliCompatibility(isJsonObject(installed.arrange) ? installed.arrange.cliCompatibility : null) })
         await writeJsonFile(join(workDirectory(state), uiPreparationFileName), { inputHash: await this.installInputHash(state), frameworkVersion: installed.version, packageManager: state.project.ui.packageManager })
     }
 

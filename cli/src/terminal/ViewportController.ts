@@ -11,6 +11,8 @@ export class ViewportController {
     private readonly renderer = new ScreenRenderer()
     constructor(private readonly document: SessionDocument, private readonly terminal: { columns: number, rows: number, writeFrame(frame: string): void }) { }
     render(frame: number, prompt?: PromptContent): void {
+        const ids = new Set([...this.document.contents()].flatMap(entry => entry.type === 'batch' ? entry.tasks.map(task => task.id) : []))
+        for (const id of Object.keys(this.offsets)) if (!ids.has(id)) delete this.offsets[id]
         const following = !this.view || this.historyOffset === this.view.maxOffset
         const rows = layoutDocument(this.document, this.terminal.columns, this.offsets, frame, prompt, false, this.terminal.rows)
         if (following) this.historyOffset = Math.max(0, rows.length - this.terminal.rows)
@@ -22,7 +24,7 @@ export class ViewportController {
     wheel(x: number, y: number, delta: number): void {
         if (!this.view) return
         const id = hitTest(this.view, x, y)
-        const task = id ? this.document.entries.flatMap(entry => entry.type === 'batch' ? entry.tasks : []).find(task => task.id === id) : undefined
+        const task = id ? [...this.document.contents()].flatMap(entry => entry.type === 'batch' ? entry.tasks : []).find(task => task.id === id) : undefined
         if (task?.console) {
             const max = Math.max(0, task.console.lines.length - consoleHeight)
             const offset = Math.max(0, Math.min(max, (this.offsets[task.id] ?? max) + delta * 3))

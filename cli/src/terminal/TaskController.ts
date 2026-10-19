@@ -6,20 +6,22 @@ export class TaskController implements TaskView {
     private readonly pending = new Set<Promise<void>>()
     private readonly openTasks = new Set<TaskPresentation>()
     constructor(private readonly document: SessionDocument, private readonly changed: () => void, private readonly assertCanOpen: () => void = () => { }) { }
-    group(title: string): TaskGroup {
+    group(title: string, options?: { readonly transient?: boolean }, document = this.document): TaskGroup {
         this.assertCanOpen()
-        const batch = this.document.batch(title)
+        document.assertActive()
+        const batch = document.batch(title, options?.transient)
         let closed = false
         this.changed()
         return Object.freeze({
             task: (title: string, detail?: string) => {
                 if (closed) throw new Error('任务批次已结束')
-                const handle = this.handle(this.document.task(batch, title, detail))
+                const handle = this.handle(document.task(batch, title, detail), document)
                 this.changed()
                 return handle
             },
             complete: () => {
                 if (closed) return
+                document.assertActive()
                 if (batch.tasks.some(task => task.state === 'running' || task.state === 'pending')) throw new Error('任务尚未全部结束')
                 closed = true
                 batch.state = batch.tasks.some(task => task.state === 'failed') ? 'failed' : batch.tasks.some(task => task.state === 'cancelled') ? 'cancelled' : 'done'
@@ -27,10 +29,13 @@ export class TaskController implements TaskView {
             }
         })
     }
-    private handle(task: TaskContent): TaskPresentation {
+    private handle(task: TaskContent, document: SessionDocument): TaskPresentation {
         let parser: ConsoleBuffer | undefined
         let finished: Promise<void> | undefined
-        const active = () => { if (finished) throw new Error('任务呈现已结束') }
+        const active = () => {
+            document.assertActive()
+            if (finished) throw new Error('任务呈现已结束')
+        }
         const handle: TaskPresentation = Object.freeze({
             start: () => {
                 active()
@@ -65,6 +70,7 @@ export class TaskController implements TaskView {
                 this.changed()
             },
             log: (path: string) => {
+                document.assertActive()
                 if (task.state === 'running' || task.state === 'pending') throw new Error('子控制台结束后才能报告已保存的日志')
                 task.logPath = path
                 this.changed()
@@ -97,7 +103,7 @@ export class TaskController implements TaskView {
     async flush(): Promise<void> { await Promise.all(this.pending) }
     async close(state: 'failed' | 'cancelled'): Promise<void> {
         const results = await Promise.allSettled([...this.openTasks].map(task => task.finish(state)))
-        for (const entry of this.document.entries) if (entry.type === 'batch' && entry.state === 'running') {
+        for (const entry of this.document.contents()) if (entry.type === 'batch' && entry.state === 'running') {
             entry.state = entry.tasks.some(task => task.state === 'failed') ? 'failed' : 'cancelled'
         }
         const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')

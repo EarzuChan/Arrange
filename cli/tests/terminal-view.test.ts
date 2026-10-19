@@ -10,6 +10,23 @@ import { ViewportController } from '../src/terminal/ViewportController.ts'
 import { stripAnsi, visibleWidth } from '../src/util/TerminalText.ts'
 
 const rowText = (row: Row) => stripAnsi(row.spans.map(part => part.text).join(''))
+
+test('单任务提升为主行时符号后留两格，任务组内子项仍按层级排列', () => {
+    const document = new SessionDocument()
+    const batch = document.batch('检查候选')
+    const task = document.task(batch, '检查候选')
+    for (const state of ['pending', 'running', 'done', 'failed', 'cancelled', 'stopped'] as const) {
+        task.state = state
+        batch.state = state === 'pending' ? 'running' : state
+        for (const flatten of [false, true]) assert.match(layoutDocument(document, 80, {}, 0, undefined, flatten).map(rowText)[0]!, /^[○◒◐◓◑✓■] {2}检查候选/)
+    }
+    const other = document.task(batch, '其它任务')
+    other.state = 'done'
+    batch.state = 'done'
+    const rows = layoutDocument(document, 80).map(rowText)
+    assert.equal(rows[0], '◇  检查候选 完成')
+    assert.ok(rows.includes('│  ✓ 其它任务 · 已完成'))
+})
 function fixture() {
     const document = new SessionDocument()
     document.entries.push({ type: 'heading', text: '标题' }, { type: 'message', text: '说明' })

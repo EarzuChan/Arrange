@@ -1,0 +1,127 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { SessionDocument } from '../src/terminal/SessionDocument.ts'
+import { TaskController } from '../src/terminal/TaskController.ts'
+import { WorkPresenter } from '../src/business/WorkPresenter.ts'
+import { TranscriptRenderer } from '../src/terminal/TranscriptRenderer.ts'
+import { layoutDocument } from '../src/terminal/DocumentRenderer.ts'
+import { ViewportController } from '../src/terminal/ViewportController.ts'
+import { stripAnsi } from '../src/util/TerminalText.ts'
+
+const transcript = (document: SessionDocument) => new TranscriptRenderer().render(document)
+
+test('嵌套步骤原位替换并收束为答案，旧代与旧子区块不能再写入', () => {
+    const document = new SessionDocument()
+    document.answer('项目名', 'MyApp')
+    const region = document.region()
+    const identity = document.entries.at(-1)
+    const previous = region.document
+    previous.append({ type: 'message', text: '加载中' })
+    assert.throws(() => document.answer('下一项', '越过'), /当前流程区块/)
+    const failed = region.replace()
+    failed.append({ type: 'message', text: '读取失败', tone: 'error' })
+    assert.doesNotMatch(transcript(document), /加载中/)
+    assert.throws(() => previous.answer('迟到', '结果'), /替换或结束/)
+    const nested = failed.region()
+    nested.document.answer('重试', '是')
+    region.replace().answer('版本选择', '1.2.3')
+    assert.throws(() => nested.document.append({ type: 'message', text: '旧异步返回' }), /替换或结束/)
+    assert.equal(document.entries.at(-1), identity)
+    region.complete({ question: 'Framework 版本', answer: '1.2.3' })
+    document.answer('厂商', 'Acme')
+    const text = transcript(document)
+    assert.match(text, /项目名[\s\S]*MyApp[\s\S]*Framework 版本[\s\S]*1.2.3[\s\S]*厂商/)
+    assert.doesNotMatch(text, /读取失败|加载中|重试|版本选择/)
+    assert.throws(() => region.replace(), /替换或结束/)
+})
+
+test('成功状态由下一项接替，失败原因只渲染一次，任务标题不套重复标题', async () => {
+    const document = new SessionDocument()
+    const tasks = new WorkPresenter(new TaskController(document, () => { }))
+    await tasks.status('读取列表', async () => 1)
+    assert.equal((transcript(document).match(/读取列表/g) ?? []).length, 1)
+    document.advance()
+    assert.doesNotMatch(transcript(document), /读取列表/)
+    await assert.rejects(tasks.status('读取列表', async () => { throw new Error('连接被拒绝') }), /连接被拒绝/)
+    const text = transcript(document)
+    assert.equal((text.match(/连接被拒绝/g) ?? []).length, 1)
+    assert.equal((text.match(/读取列表/g) ?? []).length, 1)
+    assert.match(text, /读取列表 · 失败/)
+    document.answer('重试', '取消')
+    assert.match(transcript(document), /连接被拒绝/)
+})
+
+test('区块替换等待任务收尾并撤下完整预检内容，拍扁不复现已撤下荧幕', async () => {
+    const document = new SessionDocument()
+    const parent = document.region()
+    const child = parent.document.region()
+    const tasks = new TaskController(document, () => { })
+    const group = tasks.group('源码预检', undefined, child.document)
+    const task = group.task('获取源码')
+    task.start()
+    task.console(Array.from({ length: 20 }, (_, index) => `预检输出 ${index}`).join('\r\n'))
+    assert.throws(() => parent.replace(), /任务收尾/)
+    await task.finish('done')
+    group.complete()
+    assert.match(transcript(document), /预检输出 19/)
+    child.replace().answer('重试', '完成')
+    assert.equal(layoutDocument(document, 100).filter(row => row.hitbox).length, 0)
+    child.replace().answer('版本确认', '是')
+    parent.complete({ question: 'Framework 版本', answer: '1.2.3' })
+    assert.equal([...document.contents()].filter(entry => entry.type === 'batch').length, 0)
+    assert.throws(() => task.console('迟到输出'), /替换或结束|呈现已结束/)
+    const text = transcript(document)
+    assert.match(text, /Framework 版本[\s\S]*1.2.3/)
+    assert.doesNotMatch(text, /预检输出|源码预检|版本确认|重试|╭|╰/)
+    await tasks.close('cancelled')
+})
+
+test('保留式完成留下可独立滚动的任务荧幕，不被后续决策区块替换影响', async () => {
+    const document = new SessionDocument()
+    const parent = document.region()
+    const child = parent.document.region()
+    const tasks = new TaskController(document, () => { })
+    const group = tasks.group('执行任务', undefined, child.document)
+    const task = group.task('安装依赖')
+    task.start()
+    task.console(Array.from({ length: 20 }, (_, index) => `执行输出 ${index}`).join('\r\n'))
+    await task.finish('done')
+    group.complete()
+    const id = [...document.contents()].flatMap(entry => entry.type === 'batch' ? entry.tasks : [])[0]!.id
+    child.complete()
+    parent.complete()
+    const decision = document.region()
+    decision.document.answer('是否继续', '否')
+    decision.replace().answer('是否继续', '是')
+    decision.complete({ question: '后续操作', answer: '继续' })
+    const batches = [...document.contents()].filter(entry => entry.type === 'batch')
+    assert.equal(batches.length, 1)
+    assert.equal(batches[0]!.tasks[0]!.id, id)
+    const frames: string[] = []
+    const controller = new ViewportController(document, { columns: 100, rows: 40, writeFrame: frame => frames.push(stripAnsi(frame)) })
+    controller.render(0)
+    const rows = layoutDocument(document, 100)
+    const top = rows.findIndex(row => row.hitbox) + 40 - rows.length
+    controller.wheel(4, top + 1, -1)
+    controller.render(0)
+    assert.match(frames.at(-1)!, /可上下滚/)
+    const text = transcript(document)
+    assert.equal((text.match(/执行输出 0\b/g) ?? []).length, 1)
+    assert.match(text, /执行输出 19/)
+    assert.match(text, /╰─已完成/)
+    assert.doesNotMatch(text, /是否继续|跟随中/)
+    await tasks.close('cancelled')
+})
+
+test('保留式完成保留错误现场，完成后的子区块及写入端全部失效', () => {
+    const document = new SessionDocument()
+    const outer = document.region()
+    const inner = outer.document.region()
+    inner.document.append({ type: 'message', text: '网络错误', tone: 'error' })
+    inner.document.answer('如何处理', '取消')
+    outer.complete()
+    document.append({ type: 'result', text: '已取消创建', tone: 'warn' })
+    assert.match(transcript(document), /网络错误[\s\S]*已取消创建/)
+    assert.throws(() => inner.replace(), /替换或结束/)
+    assert.throws(() => inner.document.batch('迟到任务'), /替换或结束/)
+})

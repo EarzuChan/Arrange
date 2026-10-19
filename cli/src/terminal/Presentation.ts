@@ -15,4 +15,9 @@ export interface TaskGroup {
     task(title: string, detail?: string): TaskPresentation
     complete(): void
 }
-export interface TaskView { group(title: string): TaskGroup }
+export interface TaskView { group(title: string, options?: { readonly transient?: boolean }): TaskGroup }
+export interface PresentationRegion<T> {
+    readonly current: T
+    replace(): T
+    complete(answer?: { readonly question: string, readonly answer: string }): void
+}

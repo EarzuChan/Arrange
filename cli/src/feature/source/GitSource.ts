@@ -2,13 +2,33 @@ import { Executor } from "../platform/Executor.ts"
 import { locateTool } from "../platform/ToolLocator.ts"
 import { throwIfProcessCancelled, type ProcessSpec } from "../platform/ProcessSpec.ts"
 import type { TaskOutput } from "../operation/Work.ts"
-import { sourceLocalTimeoutMs } from "../../CliMetadata.ts"
+import { sourceLocalTimeoutMs, frameworkSourceProbeTimeoutMs } from "../../CliMetadata.ts"
 import { redactSourceUrl, type SourceSpec } from "./SourceSpec.ts"
 import { LineDecoder } from "../../util/LineDecoder.ts"
 import { InspectionError } from "../../util/RecordInspection.ts"
 
 export class GitSource {
     constructor(private readonly executor: Executor) { }
+
+    async resolveTag(repository: string, tag: string, locate: typeof locateTool = locateTool): Promise<string> {
+        const git = await locate('git')
+        if (!git) throw new SourceUnavailableError('未找到 git，请先安装 git 并确认它在 PATH 中')
+        const ref = `refs/tags/${tag}`
+        const result = await this.executor.run({ command: git, args: ['ls-remote', '--tags', '--', repository, ref, `${ref}^{}`], env: { GIT_TERMINAL_PROMPT: '0' }, timeoutMs: frameworkSourceProbeTimeoutMs })
+        throwIfProcessCancelled(result)
+        if (result.timedOut) throw new SourceUnavailableError(`访问源码仓库 ${redactSourceUrl(repository)} 超时`)
+        if (result.exitCode !== 0) throw new SourceUnavailableError(`无法访问源码仓库 ${redactSourceUrl(repository)}：${redactSourceUrl(result.stderr || result.stdout).trim() || `git 退出码 ${result.exitCode}`}`)
+        const refs = new Map<string, string>()
+        for (const line of result.stdout.trim().split(/\r?\n/).filter(Boolean)) {
+            const match = /^([a-f0-9]{40}(?:[a-f0-9]{24})?)\s+(\S+)$/i.exec(line)
+            if (!match) throw new Error(`源码仓库 ${redactSourceUrl(repository)} 返回了无效的 tag 引用`)
+            refs.set(match[2]!, match[1]!)
+        }
+        const commit = refs.get(`${ref}^{}`) ?? refs.get(ref)
+        if (!refs.has(ref) || !commit) throw new SourceTagMissingError(repository, tag)
+        if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/i.test(commit)) throw new Error(`源码仓库 ${redactSourceUrl(repository)} 返回了无效的 tag ${tag}`)
+        return commit.toLowerCase()
+    }
 
     async verify(directory: string, signal: AbortSignal): Promise<void> {
         signal.throwIfAborted()
@@ -38,7 +58,10 @@ export class GitSource {
             } : process)
             signal.throwIfAborted()
             throwIfProcessCancelled(result)
-            if (result.exitCode !== 0) throw new Error(`获取 ${redactSourceUrl(spec.repository)} · ${spec.ref} 失败：${redactSourceUrl(result.stderr || result.stdout).trim() || `git 退出码 ${result.exitCode}`}`)
+            if (result.exitCode !== 0) {
+                const message = `获取 ${redactSourceUrl(spec.repository)} · ${spec.ref} 失败：${redactSourceUrl(result.stderr || result.stdout).trim() || `git 退出码 ${result.exitCode}`}`
+                throw network ? new SourceUnavailableError(message) : new Error(message)
+            }
             return result.stdout.trim()
         }
 
@@ -60,5 +83,16 @@ export class GitSource {
         await run(["remote", "remove", "origin"])
 
         return commit
+    }
+}
+
+export class SourceTagMissingError extends Error {
+    constructor(repository: string, tag: string) { super(`源码仓库 ${redactSourceUrl(repository)} 没有 tag ${tag}`) }
+}
+
+export class SourceUnavailableError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'SourceUnavailableError'
     }
 }

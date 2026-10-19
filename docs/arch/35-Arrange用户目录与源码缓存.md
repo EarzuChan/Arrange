@@ -45,6 +45,8 @@ Windows 长路径限制与 configure 预检见 [CLI 工具链](31-ArrangeCLI与�
 
 同一请求首次解析成功后记录实际 commit，日常命中使用这个快照，不联网追踪 tag 移动。已经知道固定 commit 时直接查内容缓存，不因 ref 变化重复下载。缓存命中检查发布记录、源码入口和 detached HEAD，准备时另以本地 Git diff 检查 tracked 源码是否被改动；不会静默覆盖受损缓存。开发源码修改应使用显式本地目录覆盖。
 
+创建或接入时的[版本准入](31-ArrangeCLI与工程模式.md#版本与工具链)须重新确认远端 tag；缓存快照或本次获取的 commit 与远端解析结果不同则拒绝，不移动既有快照。源码获取与清理共用目录使用期占用；发布前在内容锁内执行调用方校验，失败不发布条目或请求索引，复用条目也须通过同一校验。Arrange 源码准备与显式本地 Arrange 覆盖均复用版本声明与依赖清单校验，不以目录存在代替可用。
+
 CLI 仅缓存可确认来源的工程：Arrange 仓库与版本均由 CLI 托管时获取 Arrange；已显式提供本地 Arrange 时从该目录读取依赖清单。自定义未托管 CMake 的来源不由 CLI 猜测。`JUCE_DIR`、`ARRANGE_QUICKJS_NG_SOURCE_DIR`、各 `FETCHCONTENT_SOURCE_DIR_*` 显式覆盖优先，不接管、移动或删除用户目录。
 
 ## 获取、并发与恢复

@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { validateBundleId, validateDisplayName, validateIconPath } from "./ProjectMetadata.ts"
+import { isConcreteVersion } from '../../util/Semver.ts'
 
 export const arrangeSubprojectSchema = z.enum(["ui", "native"])
 export type ArrangeSubproject = z.infer<typeof arrangeSubprojectSchema>
@@ -14,7 +15,7 @@ export const packageManagerNameSchema = z.enum(["pnpm", "npm"])
 export type PackageManagerName = z.infer<typeof packageManagerNameSchema>
 
 export const frameworkDefinitionSchema = z.object({
-    version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, "需要具体版本号"),
+    version: z.string().refine(isConcreteVersion, "需要具体版本号"),
     nodeRegistryUrl: z.string().refine(value => !/[\r\n]/.test(value), "registry 不得包含换行").nullish(),
     cmakeFetchContentUrl: z.string().min(1).refine(value => !/[\r\n]/.test(value), "FetchContent URL 不得包含换行").nullish(),
 })
@@ -45,7 +46,7 @@ export const projectMetadataSchema = z.object({
     displayName: validatedText(validateDisplayName).optional(),
     bundleId: validatedText(validateBundleId).optional(),
     icon: validatedText(validateIconPath).optional(),
-    version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/, "需要具体版本号"),
+    version: z.string().refine(isConcreteVersion, "需要具体版本号"),
     vendorName: z.string().min(1).refine(value => !/[\r\n]/.test(value), "厂商名称不得包含换行"),
     vendorCode: z.string().regex(/^[A-Za-z0-9]{4}$/),
     pluginCode: z.string().regex(/^[A-Za-z0-9]{4}$/),

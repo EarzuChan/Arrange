@@ -12,8 +12,9 @@ import type { ConfigScanReport, ResolvableIssue } from "../src/feature/sync/Conf
 import { Writable } from "node:stream"
 import { EventEmitter } from "node:events"
 import { TerminalSession } from "../src/terminal/TerminalSession.ts"
-import { WorkPresenter } from "../src/business/WorkPresenter.ts"
+import { commandInterface } from "../src/business/CommandInterface.ts"
 import type { CommandInterface } from "../src/business/CommandInterface.ts"
+import type { PromptRequest, PromptResult } from '../src/terminal/PromptController.ts'
 import type { TaskOutput } from "../src/feature/operation/Work.ts"
 import { LineDecoder } from "../src/util/LineDecoder.ts"
 
@@ -34,7 +35,22 @@ export function quietTerminal(output = new OutputSink()): CommandInterface & { r
         close(transcript = ''): Promise<void> { return new Promise<void>(resolve => { output.write(transcript, () => resolve()) }) }
     })
     const session = new TerminalSession(driver)
-    return Object.freeze({ ...session.ui, tasks: new WorkPresenter(session.ui.tasks), output, close: () => session.close() })
+    return Object.freeze({ ...commandInterface(session.ui), output, close: () => session.close() })
+}
+
+export function observePrompts(terminal: CommandInterface, ask: <T>(request: PromptRequest, next: () => Promise<PromptResult<T>>) => Promise<PromptResult<T>>): CommandInterface {
+    return {
+        ...terminal, prompt: { controller: { ask: <T>(request: PromptRequest) => ask<T>(request, () => terminal.prompt.controller.ask<T>(request)) } },
+        region: () => {
+            const region = terminal.region()
+            let current = observePrompts(region.current, ask)
+            return {
+                get current() { return current },
+                replace: () => current = observePrompts(region.replace(), ask),
+                complete: region.complete
+            }
+        }
+    }
 }
 
 export interface RecordedTask extends TaskOutput {

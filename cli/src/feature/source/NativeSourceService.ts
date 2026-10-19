@@ -5,6 +5,7 @@ import { SourceCache } from "./SourceCache.ts"
 import { readNativeDependencies } from "./NativeDependencies.ts"
 import type { SourceSpec } from "./SourceSpec.ts"
 import { resolve } from "node:path"
+import { assertFrameworkSource } from '../framework/FrameworkSourceMetadata.ts'
 
 export class NativeSourceService {
     constructor(private readonly cache: SourceCache) { }
@@ -23,8 +24,9 @@ export class NativeSourceService {
     async prepare(state: ProjectState, task: TaskOutput): Promise<Readonly<Record<string, string>>> {
         const definitions = state.local?.native?.cmakeDefinitions ?? {}
         const framework = this.frameworkSpec(state)
-        const root = framework ? (await this.cache.ensure(framework, "Arrange", task)).directory : definitions.FETCHCONTENT_SOURCE_DIR_ARRANGE
+        const root = framework ? (await this.cache.ensure(framework, "Arrange", task, source => assertFrameworkSource(source.directory, state.project.framework.version))).directory : definitions.FETCHCONTENT_SOURCE_DIR_ARRANGE
         if (!root) return {}
+        if (!framework) await assertFrameworkSource(resolve(state.rootDir, root), state.project.framework.version)
         const dependencies = await readNativeDependencies(resolve(state.rootDir, root))
         const result: Record<string, string> = framework ? { FETCHCONTENT_SOURCE_DIR_ARRANGE: root } : {}
         for (const [name, label, overrides] of [["juce", "JUCE", ["JUCE_DIR", "FETCHCONTENT_SOURCE_DIR_JUCE"]], ["quickjs_ng", "QuickJS-NG", ["ARRANGE_QUICKJS_NG_SOURCE_DIR", "FETCHCONTENT_SOURCE_DIR_QUICKJS_NG"]]] as const) {

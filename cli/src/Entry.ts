@@ -2,7 +2,7 @@
 import { CommanderError } from 'commander'
 import { assertCliEnvironment } from './util/CliEnvironment.ts'
 import { TerminalSession } from './terminal/TerminalSession.ts'
-import { WorkPresenter } from './business/WorkPresenter.ts'
+import { commandInterface } from './business/CommandInterface.ts'
 
 const session = new TerminalSession()
 
@@ -13,7 +13,7 @@ try {
         // 环境闸门通过后再加载完整服务装配图
         const { createCliApplication } = await import('./CliApplication.ts')
 
-        const terminal = Object.freeze({ ...ui, tasks: new WorkPresenter(ui.tasks, signal) })
+        const terminal = commandInterface(ui, signal)
 
         const cli = createCliApplication({ signal, interactions: 'terminal', terminal })
 

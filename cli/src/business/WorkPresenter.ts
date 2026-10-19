@@ -115,8 +115,12 @@ export class WorkPresenter implements TaskRunner {
     }
 
     async all(entries: readonly TaskEntry[]): Promise<unknown[]> {
+        return this.present(entries)
+    }
+
+    private async present(entries: readonly TaskEntry[], transient = false): Promise<unknown[]> {
         if (!entries.length) return []
-        const group = this.view.group(entries.length === 1 ? entries[0]!.spec.title : '任务')
+        const group = this.view.group(entries.length === 1 ? entries[0]!.spec.title : '任务', { transient })
         const handles = entries.map(entry => group.task(entry.spec.title, entry.spec.detail))
         const results = await Promise.allSettled(entries.map((entry, index) => this.runOne(entry, handles[index]!)))
         group.complete()
@@ -149,7 +153,7 @@ export class WorkPresenter implements TaskRunner {
         }
     }
 
-    status<T>(title: string, body: () => Promise<T>): Promise<T> { return this.run({ id: 'status', title }, body) }
+    async status<T>(title: string, body: () => Promise<T>): Promise<T> { return (await this.present([{ spec: { id: 'status', title }, run: body }], true))[0] as T }
 
     processes(): ProcessProgressGroup {
         let group: TaskGroup | undefined

@@ -101,7 +101,7 @@ export class SyncService {
 
                 // 完成
 
-                this.interaction.message("CONFIG 完成")
+                this.interaction.message("CONFIG 完成", 'completed')
                 return { status: "completed", report }
             }
         } catch (error) {

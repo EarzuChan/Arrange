@@ -94,7 +94,7 @@ export class SetupService {
                 await this.tasks.all(report.applicable.map(task => this.entry(report.state!, task)))
                 // 执行期间工程或本机配置被改动时，本次准备基于的是旧配置，不能宣告完成
                 await assertSnapshots(report.snapshots)
-                this.interaction.message("SETUP 完成")
+                this.interaction.message("SETUP 完成", 'completed')
                 return { status: "completed", report }
             }
         } catch (error) {

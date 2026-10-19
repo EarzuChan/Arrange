@@ -100,11 +100,12 @@ export class SourceCache {
         this.signal.throwIfAborted()
     }
 
-    async ensure(spec: SourceSpec, label: string, task: TaskOutput): Promise<CachedSource> {
+    async ensure(spec: SourceSpec, label: string, task: TaskOutput, validate?: (source: CachedSource) => Promise<void>): Promise<CachedSource> {
         this.signal.throwIfAborted()
         const present = await this.find(spec)
         if (present) {
             await this.verify(present)
+            await validate?.(present)
             task.line(`复用 ${label} 源码 · ${spec.ref} · ${present.commit.slice(0, 12)}`)
             return present
         }
@@ -115,6 +116,7 @@ export class SourceCache {
             const ready = await this.find(spec)
             if (ready) {
                 await this.verify(ready)
+                await validate?.(ready)
                 task.line(`复用 ${label} 源码 · ${spec.ref} · ${ready.commit.slice(0, 12)}`)
                 return ready
             }
@@ -134,10 +136,13 @@ export class SourceCache {
                 const repository = sourceRepositoryIdentity(spec.repository)
                 const contentIdentity = sourceHash([repository, commit])
                 const record = recordSchema.parse({ schema: sourceCacheSchema, identity, key: contentIdentity.slice(0, 16), contentIdentity, commit, source: { repository, ref: spec.ref, commit } })
-                await writeFile(join(temporary, "complete.json"), `${JSON.stringify(record, null, 4)}\n`)
                 await this.operations.source(join(this.locks, record.key), `发布 ${label} 源码`, async publishSignal => {
-                    if (!await this.entry(record)) {
-                        publishSignal.throwIfAborted()
+                    const existing = await this.entry(record)
+                    if (existing) await this.verify(existing)
+                    await validate?.(existing ?? { directory: join(temporary, 'source'), commit, key: record.key })
+                    publishSignal.throwIfAborted()
+                    if (!existing) {
+                        await writeFile(join(temporary, "complete.json"), `${JSON.stringify(record, null, 4)}\n`)
                         await rename(temporary, join(this.entries, record.key))
                     }
                 })

@@ -9,14 +9,14 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 const toneColor = { info: 36, step: 32, success: 32, warn: 33, error: 31 }
 const status = (task: TaskContent): string => ({ done: '已完成', failed: '失败', cancelled: '已取消', stopped: '已停止', running: '', pending: '' })[task.state]
 
-export function taskLabel(task: TaskContent, frame: number): string {
+export function taskLabel(task: TaskContent, frame: number, primary = false): string {
     const symbol = task.state === 'done' ? '✓' : task.state === 'running' ? spinner[frame % spinner.length] : task.state === 'pending' ? '○' : '■'
     const progress = task.state === 'running' && task.progress !== undefined ? ' · [' + '━'.repeat(Math.round(task.progress * 10)) + '─'.repeat(10 - Math.round(task.progress * 10)) + '] ' + Math.floor(task.progress * 100) + '%' : ''
-    return symbol + ' ' + task.title + (task.detail ? ' · ' + task.detail : '') + progress + (status(task) ? ' · ' + status(task) : '')
+    return symbol + (primary ? '  ' : ' ') + task.title + (task.detail ? ' · ' + task.detail : '') + progress + (status(task) ? ' · ' + status(task) : '')
 }
 
 function batchLabel(batch: BatchContent, frame: number): string {
-    return batch.state === 'running' ? spinner[frame % spinner.length] + ' 正在 ' + batch.title : (batch.state === 'done' ? '◇ ' : '■ ') + batch.title + (batch.state === 'done' ? ' 完成' : batch.state === 'failed' ? ' 失败' : ' 已取消')
+    return batch.state === 'running' ? spinner[frame % spinner.length] + '  正在 ' + batch.title : (batch.state === 'done' ? '◇  ' : '■  ') + batch.title + (batch.state === 'done' ? ' 完成' : batch.state === 'failed' ? ' 失败' : ' 已取消')
 }
 
 // 框线和内文分别组成行，边框着色不覆盖子终端自身的颜色
@@ -54,7 +54,7 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
     const body = (text: string, color?: number, guideColor = gray) => {
         for (const logical of text.split(/\r?\n/)) for (const line of flatten ? [logical] : wrap(sanitizeLine(logical), Math.max(1, width - 3))) add(guide(guideColor), span(line, color))
     }
-    for (const entry of document.entries) {
+    for (const entry of document.contents()) {
         if (rows.length && ['answer', 'batch'].includes(entry.type)) add(guide())
         if (entry.type === 'heading') add(span('┌  ', gray), span(entry.text, undefined, true))
         else if (entry.type === 'message') body(entry.text, entry.tone ? toneColor[entry.tone] : undefined)
@@ -64,10 +64,11 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
             body(entry.answer, gray)
         } else if (entry.type === 'batch') {
             const color = entry.state === 'running' ? accent : gray
-            add(span(batchLabel(entry, frame), entry.state === 'running' ? accent : entry.state === 'failed' ? 31 : 32, true))
+            const single = entry.tasks.length === 1 && entry.tasks[0]!.title === entry.title
+            add(span(single ? taskLabel(entry.tasks[0]!, frame, true) : batchLabel(entry, frame), entry.state === 'running' ? accent : entry.state === 'failed' ? 31 : 32, true))
             for (const message of entry.messages ?? []) body(message.text, message.tone ? toneColor[message.tone] : undefined, color)
             for (const task of entry.tasks) {
-                body(taskLabel(task, frame), task.state === 'failed' ? 31 : task.state === 'pending' ? gray : task.state === 'done' ? 32 : accent, color)
+                if (!single) body(taskLabel(task, frame), task.state === 'failed' ? 31 : task.state === 'pending' ? gray : task.state === 'done' ? 32 : accent, color)
                 if (task.failure) body(task.failure, 31, color)
                 if (task.console?.started) for (const row of consoleRows(task, Math.max(2, width - 3), offsets[task.id], color, flatten)) rows.push(row)
                 if (task.logPath) body('已记录到 ' + task.logPath, gray, color)
@@ -89,7 +90,8 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
             for (const [relative, option] of prompt.options.slice(start, start + count).entries()) {
                 const index = start + relative
                 const selected = prompt.kind === 'multiselect' ? prompt.selected.includes(index) ? '● ' : '○ ' : ''
-                body((prompt.index === index ? '› ' : '  ') + selected + option, prompt.index === index ? accent : gray, accent)
+                const disabled = prompt.disabled?.includes(index)
+                body((disabled ? '× ' : prompt.index === index ? '› ' : '  ') + selected + option, !disabled && prompt.index === index ? accent : gray, accent)
             }
         }
         if (prompt.error) body(prompt.error, 31, accent)

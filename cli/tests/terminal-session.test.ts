@@ -9,6 +9,8 @@ import { TerminalDriver } from '../src/terminal/TerminalDriver.ts'
 import { protocol } from '../src/terminal/Protocol.ts'
 import { isCancel, text, select, multiselect } from '../src/terminal/Prompts.ts'
 import { WorkPresenter } from '../src/business/WorkPresenter.ts'
+import { commandInterface } from '../src/business/CommandInterface.ts'
+import { cancelled } from '../src/terminal/PromptController.ts'
 import { Executor } from '../src/feature/platform/Executor.ts'
 import { EmulatedTty } from './terminal-emulator.ts'
 
@@ -75,6 +77,35 @@ test('正式会话顺序提问、默认值与验证、任意选项值、多选�
 })
 function driverClosed(output: EmulatedTty): number { return output.written.filter(frame => frame === protocol.leave).length }
 
+test('替换包含问题的区块撤销旧输入目标，旧代写入拒绝，新问题与拍扁保持一致', async () => {
+    const { session, send, output } = fixture()
+    const running = session.run(async ui => {
+        ui.reporter.intro('替换流程')
+        const region = ui.region()
+        const old = region.current
+        const question = text({ ...old.prompt, message: '旧问题' })
+        const current = region.replace()
+        assert.equal(await question, cancelled)
+        assert.throws(() => old.reporter.info('旧异步消息'), /替换或结束/)
+        const answer = await text({ ...current.prompt, message: '新问题' })
+        region.complete({ question: '最终答案', answer: String(answer) })
+        ui.reporter.outro('流程完成')
+    })
+    await until(() => output.written.some(frame => frame.includes('新问题')))
+    send('最终值\r')
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    await output.resize(28, 12)
+    send('\x1b[5~\x1b[6~')
+    await delay(30)
+    assert.doesNotMatch((await output.screen()).join('\n'), /旧问题|新问题|旧异步消息/)
+    send('\r')
+    assert.equal(await running, 0)
+    const transcript = (await output.lines()).join('\n')
+    assert.match(transcript, /最终答案[\s\S]*最终值/)
+    assert.doesNotMatch(transcript, /旧问题|新问题|旧异步消息/)
+    output.terminal.dispose()
+})
+
 test('非零业务结果也统一停屏，按 Enter 后才恢复终端并保留原退出码', async () => {
     const { session, send, output, input } = fixture()
     let finished = false
@@ -109,10 +140,10 @@ test('裸命令、命令组、各级帮助、版本与参数错误全部经过�
         { args: ['storage', 'repair'], code: 1, text: /missing required argument/ }
     ]
     for (const entry of cases) await t.test(entry.args.join(' ') || 'arrange', { timeout: 5000 }, async t => {
-        const { session, send, output, input } = fixture()
+        const { session, send, output, input, host } = fixture()
         let finished = false, released = false
         const running = session.run(async (ui, signal) => {
-            const cli = createCliApplication({ signal, interactions: 'terminal', terminal: { ...ui, tasks: new WorkPresenter(ui.tasks, signal) } })
+            const cli = createCliApplication({ signal, interactions: 'terminal', terminal: commandInterface(ui, signal) })
             try { await cli.parseAsync(['node', 'arrange', ...entry.args]) }
             catch (error) {
                 if (error instanceof CommanderError) return error.exitCode
@@ -124,7 +155,7 @@ test('裸命令、命令组、各级帮助、版本与参数错误全部经过�
             return code
         })
         t.after(async () => {
-            send('\x03')
+            host.emit('SIGTERM')
             await running
             output.terminal.dispose()
         })
@@ -159,7 +190,7 @@ test('业务异常先完成控制台收尾再停屏，失败快照可滚动且�
         finally { released = true }
     })
     t.after(async () => {
-        send('\x03')
+        send('\r')
         await running
         output.terminal.dispose()
     })
@@ -206,25 +237,39 @@ test('鼠标回看和点击不夺取问题输入，PageUp 滚历史、Home End �
     output.terminal.dispose()
 })
 
-test('取消真实子进程先等待执行与输出收尾，再归还终端且仅拍扁一次', async () => {
+for (const key of ['\x03', '\x1b']) test(`${key === '\x03' ? 'Ctrl+C' : 'Esc'} 取消真实子进程后停屏，完成清理并按 Enter 才拍扁`, async () => {
     const { session, send, input, output } = fixture()
     let cleaned = false
+    let finished = false
     const run = session.run(async (ui, signal) => {
-        const work = new WorkPresenter(ui.tasks)
+        const work = new WorkPresenter(ui.tasks, signal)
         await work.run({ id: 'long', title: '真实进程' }, async task => {
             try {
                 await new Executor(process.platform, signal).run(task.process({ command: process.execPath, args: ['-e', 'process.stdout.write("开始运行\\n");setInterval(()=>{},50)'] }))
             } finally { cleaned = true }
         })
+    }).then(code => {
+        finished = true
+        return code
     })
     await until(() => output.written.some(frame => frame.includes('开始运行')))
-    send('\x03')
+    send(key)
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
     assert.equal(input.isRaw, true)
-    assert.equal(await run, 130)
     assert.equal(cleaned, true)
+    assert.equal(finished, false)
+    assert.equal(driverClosed(output), 0)
+    assert.match((await output.screen()).join('\n'), /已取消操作/)
+    send('\x03')
+    await delay(60)
+    send('\x1b')
+    await delay(60)
+    assert.equal(finished, false)
+    send('\r')
+    assert.equal(await run, 130)
     assert.equal(input.isRaw, false)
     assert.equal(driverClosed(output), 1)
-    assert.match((await output.lines()).join('\n'), /操作已取消/)
+    assert.match((await output.lines()).join('\n'), /已取消操作/)
     output.terminal.dispose()
 })
 
@@ -238,7 +283,7 @@ test('全局异常保留原始失败而非取消，并清理提问、帧调度�
     assert.equal(driverClosed(output), 1)
     const transcript = (await output.lines()).join('\n')
     assert.match(transcript, /原始异常/)
-    assert.ok(!transcript.includes('└  操作已取消'))
+    assert.ok(!transcript.includes('└  已取消操作'))
     assert.deepEqual(host.eventNames(), [])
     output.terminal.dispose()
 })
@@ -268,5 +313,117 @@ test('当前问题和任务批次不能被后续活跃交互越过，完成框�
     assert.match((await output.lines()).join('\n'), /完整内容/)
     const transcript = (await output.lines()).join('\n')
     assert.ok(transcript.indexOf('等待共享资源') < transcript.indexOf('✓ 工具'), '等待消息保留在同一批次内，不追加到活跃任务之后')
+    output.terminal.dispose()
+})
+
+for (const key of ['\x03', '\x1b']) test(`${key === '\x03' ? 'Ctrl+C' : 'Esc'} 取消创建问题保留业务收尾，只在回车后退出`, async () => {
+    const { session, send, input, output, host } = fixture()
+    let finished = false
+    const running = session.run(async (ui, signal) => {
+        const cli = createCliApplication({ signal, interactions: 'terminal', terminal: commandInterface(ui, signal) })
+        await cli.parseAsync(['create'], { from: 'user' })
+        return cli.resultCode
+    }).then(code => {
+        finished = true
+        return code
+    })
+    await until(() => output.written.some(frame => frame.includes('项目名称')))
+    send(key)
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    assert.equal(session.signal.aborted, true)
+    assert.equal(finished, false)
+    assert.equal(input.isRaw, true)
+    assert.equal(driverClosed(output), 0)
+    const screen = (await output.screen()).join('\n')
+    assert.match(screen, /已取消创建；未写工程文件/)
+    assert.ok(!screen.includes('已取消操作'))
+    send('x\x03')
+    send('\x1b')
+    output.emit('resize')
+    await delay(70)
+    assert.equal(finished, false)
+    send('\r')
+    assert.equal(await running, 130)
+    assert.equal(driverClosed(output), 1)
+    assert.equal(input.isRaw, false)
+    const transcript = (await output.lines()).join('\n')
+    assert.equal(transcript.match(/已取消创建；未写工程文件/g)?.length, 1)
+    assert.ok(!transcript.includes('按 Enter'))
+    assert.deepEqual(host.eventNames(), [])
+    output.terminal.dispose()
+})
+
+test('已完成的停屏不被 Ctrl+C 或 Esc 改写，原结果仍由 Enter 确认', async () => {
+    const { session, send, output, input } = fixture()
+    let finished = false
+    const running = session.run(async ui => {
+        ui.reporter.fail('原始业务结果')
+        return 7
+    }).then(code => {
+        finished = true
+        return code
+    })
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    send('\x03')
+    send('\x1b')
+    await delay(70)
+    assert.equal(finished, false)
+    assert.equal(input.isRaw, true)
+    assert.equal(session.signal.aborted, false)
+    send('\r')
+    assert.equal(await running, 7)
+    const transcript = (await output.lines()).join('\n')
+    assert.match(transcript, /原始业务结果/)
+    assert.ok(!transcript.includes('已取消操作'))
+    output.terminal.dispose()
+})
+
+test('取消清理期间的 Enter 不越过收尾，清理失败保留原始原因并停屏', async () => {
+    const { session, send, output, input } = fixture()
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const running = session.run(async (_ui, signal) => {
+        await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+        await gate
+        throw new AggregateError([signal.reason, new Error('资源清理失败')], '取消时资源清理失败')
+    })
+    send('\x03\r')
+    await delay(30)
+    assert.equal(input.isRaw, true)
+    assert.equal(driverClosed(output), 0)
+    assert.ok(!output.written.some(frame => frame.includes('按 Enter')))
+    release()
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    assert.match((await output.screen()).join('\n'), /取消时资源清理失败/)
+    send('\r')
+    assert.equal(await running, 1)
+    assert.equal(driverClosed(output), 1)
+    output.terminal.dispose()
+})
+
+test('外部终止信号在停屏中仍可靠恢复，不要求无法到达的用户输入', async () => {
+    const { session, output, input, host } = fixture()
+    const running = session.run(async ui => { ui.reporter.outro('已完成') })
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    host.emit('SIGTERM')
+    await running
+    assert.equal(input.isRaw, false)
+    assert.equal(driverClosed(output), 1)
+    assert.deepEqual(host.eventNames(), [])
+    output.terminal.dispose()
+})
+
+test('开发进程返回取消码时仍以已取消收尾，等待回车且不误判失败', async () => {
+    const { session, send, output } = fixture()
+    const running = session.run(async (_ui, signal) => {
+        await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+        return 130
+    })
+    send('\x03')
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    assert.match((await output.screen()).join('\n'), /已取消操作/)
+    assert.equal(driverClosed(output), 0)
+    send('\r')
+    assert.equal(await running, 130)
     output.terminal.dispose()
 })
