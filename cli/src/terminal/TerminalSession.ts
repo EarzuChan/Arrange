@@ -9,6 +9,8 @@ import type { TaskView, PresentationRegion } from './Presentation.ts'
 import { ViewportController } from './ViewportController.ts'
 import { TranscriptRenderer } from './TranscriptRenderer.ts'
 import type { InputEvent } from './InputDecoder.ts'
+import { StopController } from './StopController.ts'
+import type { StopControl } from '../util/StopControl.ts'
 
 export interface TerminalPort extends EventEmitter {
     readonly columns: number
@@ -23,6 +25,7 @@ export interface SessionUi {
     readonly reporter: Reporter
     readonly prompt: PromptContext
     readonly tasks: TaskView
+    stoppable<T>(hint: string, body: (control: StopControl) => Promise<T>): Promise<T>
     region(): PresentationRegion<SessionUi>
 }
 
@@ -33,6 +36,7 @@ export class TerminalSession {
     private readonly prompts: PromptController
     private readonly tasks: TaskController
     private readonly viewport: ViewportController
+    private readonly stops: StopController
     private readonly hooks: (() => void)[] = []
     private state: 'new' | 'active' | 'waiting' | 'closing' | 'closed' = 'new'
     private timer?: ReturnType<typeof setInterval>
@@ -42,11 +46,14 @@ export class TerminalSession {
     private failure?: unknown
     private resolveExit?: () => void
     private interrupted = false
+    private lastMessage?: Entry
+    private messageAtCancel?: Entry
     private shutdownRequested = false
     readonly ui: SessionUi
 
     constructor(private readonly driver: TerminalPort = new TerminalDriver()) {
         const changed = () => this.invalidate()
+        this.stops = new StopController(changed)
         this.prompts = new PromptController(this.document, changed, () => {
             this.abort.signal.throwIfAborted()
             if (this.state !== 'active') throw new Error('当前会话不能提问')
@@ -66,6 +73,11 @@ export class TerminalSession {
             reporter: new Reporter(entry => this.append(entry, document)),
             prompt: Object.freeze({ controller: Object.freeze({ ask: <T>(request: Parameters<PromptController['ask']>[0]) => this.prompts.ask<T>(request, document) }) }),
             tasks: Object.freeze({ group: (title: string, options?: { readonly transient?: boolean }) => this.tasks.group(title, options, document) }),
+            stoppable: <T>(hint: string, body: (control: StopControl) => Promise<T>) => {
+                this.abort.signal.throwIfAborted()
+                if (this.state !== 'active' || this.prompts.active) throw new Error('当前会话不能开放正常结束')
+                return this.stops.run(document, hint, body)
+            },
             region: () => {
                 this.abort.signal.throwIfAborted()
                 if (this.state !== 'new' && this.state !== 'active') throw new Error('会话已停止接受流程区块')
@@ -105,8 +117,7 @@ export class TerminalSession {
 
                 if (this.failure) throw this.failure
 
-                const result = [...this.document.contents()].filter(entry => entry.type === 'result').at(-1)
-                if (this.interrupted && (!code || code === 130 || result?.type === 'result' && result.tone === 'warn')) {
+                if (this.interrupted && (!code || code === 130)) {
                     this.document.phase = 'cancelled'
                     code = 130
                 } else {
@@ -126,8 +137,9 @@ export class TerminalSession {
             }
 
             if (this.document.phase === 'cancelled') {
-                const result = [...this.document.contents()].filter(entry => entry.type === 'result').at(-1)
-                if (result?.type !== 'result' || result.tone !== 'warn') this.ui.reporter.cancelled('已取消操作')
+                const last = [...this.document.contents()].at(-1)
+                if (!this.lastMessage || this.lastMessage === this.messageAtCancel || last !== this.lastMessage) this.ui.reporter.warn('已取消操作')
+                code = 130
             }
             this.document.sealChildren()
             if (!this.failure && !this.shutdownRequested) await this.waitForExit()
@@ -150,20 +162,23 @@ export class TerminalSession {
             return 130
         }
         this.document.phase = 'failed'
-        this.ui.reporter.fail(reason instanceof Error ? reason.message : String(reason))
+        this.prompts.cancel()
+        this.ui.reporter.error(reason instanceof Error ? reason.message : String(reason))
         return 1
     }
 
     private append(entry: Entry, document = this.document): void {
         if (this.state === 'closing' || this.state === 'closed') throw new Error('会话已结束')
 
-        if (this.prompts.active && entry.type !== 'result') throw new Error('当前问题回答后才能追加下一项')
+        if (this.prompts.active) throw new Error('当前问题回答后才能追加下一项')
 
         document.assertActive()
         document = document.activeDocument()
         const batch = [...document.contents()].find(entry => entry.type === 'batch' && entry.state === 'running')
         if (entry.type === 'message' && batch?.type === 'batch') (batch.messages ??= []).push({ text: entry.text, tone: entry.tone })
         else document.append(entry)
+
+        if (entry.type === 'message') this.lastMessage = entry
 
         this.invalidate()
     }
@@ -207,6 +222,7 @@ export class TerminalSession {
         if (waitForEnter && this.state === 'waiting') return
 
         if (!waitForEnter) this.shutdownRequested = true
+        if (!this.interrupted) this.messageAtCancel = this.lastMessage
         this.interrupted = true
         this.abort.abort(new DOMException('操作已取消', 'AbortError'))
         this.prompts.cancel()
@@ -226,7 +242,10 @@ export class TerminalSession {
 
     private input(event: InputEvent): void {
         if (event.kind === 'wheel') this.viewport.wheel(event.x, event.y, event.delta)
-        else if (event.kind === 'key' && (event.key === 'interrupt' || event.key === 'escape')) return this.cancel()
+        else if (event.kind === 'key' && (event.key === 'interrupt' || event.key === 'escape')) {
+            if (this.state !== 'waiting' && this.stops.request()) return
+            return this.cancel()
+        }
         else if (this.state === 'waiting' && event.kind === 'key' && event.key === 'enter') this.resolveExit?.()
         else if (event.kind === 'key' && ['pageup', 'pagedown'].includes(event.key)) this.viewport.key(event.key)
         else if (this.prompts.active) this.prompts.handle(event)
@@ -268,6 +287,7 @@ export class TerminalSession {
         }
 
         try {
+            if (this.document.phase === 'active') this.document.phase = 'done'
             this.document.seal()
             transcript = new TranscriptRenderer().render(this.document)
         } catch (error) {

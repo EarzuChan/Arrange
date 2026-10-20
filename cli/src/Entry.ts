@@ -28,7 +28,7 @@ try {
         return cli.resultCode
     })
 } catch (error) {
-    session.ui.reporter.fail(error instanceof Error ? error.message : String(error))
+    session.ui.reporter.error(error instanceof Error ? error.message : String(error))
 
     process.exitCode = 1
 

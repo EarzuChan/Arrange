@@ -11,6 +11,59 @@ import { stripAnsi, visibleWidth } from '../src/util/TerminalText.ts'
 
 const rowText = (row: Row) => stripAnsi(row.spans.map(part => part.text).join(''))
 
+test('空会话、单行消息和仅问题均由渲染器补齐边界且不改写内容', () => {
+    const document = new SessionDocument()
+    document.phase = 'done'
+    assert.deepEqual(layoutDocument(document, 80, {}, 0, undefined, true).map(rowText), ['┌', '└'])
+    document.append({ type: 'message', text: '唯一消息', tone: 'info' })
+    assert.deepEqual(layoutDocument(document, 80, {}, 0, undefined, true).map(rowText), ['┌', '└  唯一消息'])
+    assert.deepEqual(document.entries, [{ type: 'message', text: '唯一消息', tone: 'info' }])
+    const prompt = { kind: 'text' as const, question: '名字', options: [], index: 0, selected: [], value: '', cursor: 0, placeholder: '' }
+    const active = layoutDocument(new SessionDocument(), 80, {}, 0, prompt).map(rowText)
+    assert.equal(active[0], '┌')
+    assert.ok(active.includes('◆  名字'))
+    assert.ok(!active.some(line => line.startsWith('└')))
+})
+
+test('渲染器按整份线性文档确定首尾，嵌套标题与中间结果不终止引导线', () => {
+    const document = new SessionDocument()
+    document.append({ type: 'message', text: '工程创建' })
+    document.append({ type: 'message', text: '工程已创建', tone: 'success' })
+    const region = document.region()
+    region.document.append({ type: 'message', text: '同步阶段' })
+    region.document.append({ type: 'message', text: '同步完成', tone: 'success' })
+    region.complete()
+    const prompt = { kind: 'text' as const, question: '下一步', options: [], index: 0, selected: [], value: '', cursor: 0, placeholder: '' }
+    const active = layoutDocument(document, 80, {}, 0, prompt).map(rowText)
+    assert.equal(active.filter(line => line.startsWith('┌')).length, 1)
+    assert.equal(active.filter(line => line.startsWith('└')).length, 0)
+    assert.ok(active.includes('│  同步阶段'))
+    assert.ok(active.includes('│  工程已创建'))
+
+    document.phase = 'failed'
+    document.append({ type: 'message', text: '后续失败\n详细原因', tone: 'error' })
+    for (const flatten of [false, true]) {
+        const lines = layoutDocument(document, 80, {}, 0, undefined, flatten).map(rowText)
+        assert.equal(lines.filter(line => line.startsWith('┌')).length, 1)
+        assert.equal(lines.filter(line => line.startsWith('└')).length, 1)
+        assert.ok(lines.includes('│  同步完成'))
+        assert.ok(lines.includes('└  详细原因'))
+    }
+    const transcript = new TranscriptRenderer().render(document)
+    assert.equal(transcript.split('\n').filter(line => line.startsWith('└')).length, 1)
+})
+
+test('消息色调不决定会话状态，渲染器仅对末尾内容收线', () => {
+    for (const phase of ['done', 'failed', 'cancelled'] as const) {
+        const document = new SessionDocument()
+        document.append({ type: 'message', text: '先前取消', tone: 'warn' })
+        document.append({ type: 'message', text: '后续操作' })
+        document.phase = phase
+        assert.equal(document.entries.length, 2)
+        assert.equal(layoutDocument(document, 80).map(rowText).filter(line => line.startsWith('└')).length, 1)
+    }
+})
+
 test('单任务提升为主行时符号后留两格，任务组内子项仍按层级排列', () => {
     const document = new SessionDocument()
     const batch = document.batch('检查候选')
@@ -18,18 +71,18 @@ test('单任务提升为主行时符号后留两格，任务组内子项仍按�
     for (const state of ['pending', 'running', 'done', 'failed', 'cancelled', 'stopped'] as const) {
         task.state = state
         batch.state = state === 'pending' ? 'running' : state
-        for (const flatten of [false, true]) assert.match(layoutDocument(document, 80, {}, 0, undefined, flatten).map(rowText)[0]!, /^[○◒◐◓◑✓■] {2}检查候选/)
+        for (const flatten of [false, true]) assert.ok(layoutDocument(document, 80, {}, 0, undefined, flatten).map(rowText).some(line => /^[○◒◐◓◑✓■] {2}检查候选/.test(line)))
     }
     const other = document.task(batch, '其它任务')
     other.state = 'done'
     batch.state = 'done'
     const rows = layoutDocument(document, 80).map(rowText)
-    assert.equal(rows[0], '◇  检查候选 完成')
+    assert.ok(rows.includes('◇  检查候选 完成'))
     assert.ok(rows.includes('│  ✓ 其它任务 · 已完成'))
 })
 function fixture() {
     const document = new SessionDocument()
-    document.entries.push({ type: 'heading', text: '标题' }, { type: 'message', text: '说明' })
+    document.entries.push({ type: 'message', text: '标题' }, { type: 'message', text: '说明' })
     const batch = document.batch('SETUP')
     const task = document.task(batch, 'CMake')
     task.state = 'done'

@@ -5,7 +5,7 @@ import { SourceCache } from "./SourceCache.ts"
 import { readNativeDependencies } from "./NativeDependencies.ts"
 import type { SourceSpec } from "./SourceSpec.ts"
 import { resolve } from "node:path"
-import { assertFrameworkSource } from '../framework/FrameworkSourceMetadata.ts'
+import { assertFrameworkDevReadiness, assertFrameworkSource } from '../framework/FrameworkSourceMetadata.ts'
 
 export class NativeSourceService {
     constructor(private readonly cache: SourceCache) { }
@@ -21,10 +21,23 @@ export class NativeSourceService {
         return spec !== undefined && await this.cache.find(spec) !== undefined
     }
 
+    async assertDevReadiness(state: ProjectState, task: TaskOutput): Promise<void> {
+        const definitions = state.local?.native?.cmakeDefinitions ?? {}
+        const framework = this.frameworkSpec(state)
+        if (framework) {
+            const source = await this.cache.ensure(framework, "Arrange", task, async item => { await assertFrameworkSource(item.directory, state.project.framework.version) })
+            await assertFrameworkDevReadiness(source.directory, state.project.framework.version)
+            return
+        }
+        const override = definitions.FETCHCONTENT_SOURCE_DIR_ARRANGE
+        if (!override) throw new Error("无法核验 Native 开发就绪协议：请托管 Framework 仓库与版本，或设置 FETCHCONTENT_SOURCE_DIR_ARRANGE")
+        await assertFrameworkDevReadiness(resolve(state.rootDir, override), state.project.framework.version)
+    }
+
     async prepare(state: ProjectState, task: TaskOutput): Promise<Readonly<Record<string, string>>> {
         const definitions = state.local?.native?.cmakeDefinitions ?? {}
         const framework = this.frameworkSpec(state)
-        const root = framework ? (await this.cache.ensure(framework, "Arrange", task, source => assertFrameworkSource(source.directory, state.project.framework.version))).directory : definitions.FETCHCONTENT_SOURCE_DIR_ARRANGE
+        const root = framework ? (await this.cache.ensure(framework, "Arrange", task, async source => { await assertFrameworkSource(source.directory, state.project.framework.version) })).directory : definitions.FETCHCONTENT_SOURCE_DIR_ARRANGE
         if (!root) return {}
         if (!framework) await assertFrameworkSource(resolve(state.rootDir, root), state.project.framework.version)
         const dependencies = await readNativeDependencies(resolve(state.rootDir, root))

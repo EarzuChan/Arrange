@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto"
 // CLI 开发时可临时开启，独立于用户应用的 debug/release 构建配置
 export const recordAllTaskLogs = false
 
-// 子控制台非成功完成时才落盘，运行期间不创建日志目录或文件
+// 实际失败才落盘，正常停止与用户取消只保留会话历史
 const keptRuns = 20
 const logDirectoryName = "logs"
 
@@ -68,11 +68,11 @@ export class TaskLogFile {
         this.lines.push(stripAnsi(line) + "\n")
     }
 
-    close(success: boolean): Promise<string | undefined> { return this.closing ??= this.finish(success) }
+    close(failed: boolean): Promise<string | undefined> { return this.closing ??= this.finish(failed) }
 
-    private async finish(success: boolean): Promise<string | undefined> {
+    private async finish(failed: boolean): Promise<string | undefined> {
         try {
-            if (success && !recordAllTaskLogs) return undefined
+            if (!failed && !recordAllTaskLogs) return undefined
             return await this.save(this.lines.join(''))
         } finally { this.lines.length = 0 }
     }

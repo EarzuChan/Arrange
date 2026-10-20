@@ -29,7 +29,7 @@ try {
 } catch (error) {
     if (error instanceof CommanderError) process.exitCode = error.exitCode
     else {
-        reporter.fail(error instanceof Error ? error.message : String(error))
+        reporter.error(error instanceof Error ? error.message : String(error))
         process.exitCode = 1
     }
 } finally {

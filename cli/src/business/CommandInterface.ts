@@ -4,18 +4,20 @@ import type { TaskRunner } from '../feature/operation/Work.ts'
 import type { PresentationRegion } from '../terminal/Presentation.ts'
 import type { SessionUi } from '../terminal/TerminalSession.ts'
 import { WorkPresenter } from './WorkPresenter.ts'
+import type { StopControl } from '../util/StopControl.ts'
 
 export interface CommandInterface {
     readonly reporter: Reporter
     readonly prompt: PromptContext
     readonly tasks: TaskRunner
+    stoppable<T>(hint: string, body: (control: StopControl) => Promise<T>): Promise<T>
     region(): PresentationRegion<CommandInterface>
 }
 
 // 同一适配规则递归应用于子区块，服务只取得功能进展执行器
 export function commandInterface(ui: SessionUi, signal?: AbortSignal): CommandInterface {
     return Object.freeze({
-        reporter: ui.reporter, prompt: ui.prompt, tasks: new WorkPresenter(ui.tasks, signal),
+        reporter: ui.reporter, prompt: ui.prompt, tasks: new WorkPresenter(ui.tasks, signal), stoppable: ui.stoppable,
         region: () => {
             const region = ui.region()
             let current = commandInterface(region.current, signal)

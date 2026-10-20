@@ -92,7 +92,7 @@ test('非成功子控制台结束后才保存全部 stdout、stderr、尾行与�
     assert.ok(!saved.includes(String.fromCharCode(27)))
 })
 
-test('开发进程正常退出不保存，失败、停止和取消在各自结束后保存且重复结束不重复写入', async t => {
+test('开发进程仅实际失败保存日志，正常停止和取消不保存且收尾幂等', async t => {
     const root = await mkdtemp(join(tmpdir(), 'arrange-process-logs-'))
     t.after(() => rm(root, { recursive: true, force: true }))
     const abort = new AbortController()
@@ -107,14 +107,14 @@ test('开发进程正常退出不保存，失败、停止和取消在各自结�
     await success.finish({ kind: 'exited', message: '已退出' })
     await assert.rejects(readdir(join(root, '.arrange', 'logs')), { code: 'ENOENT' })
     await failed.finish({ kind: 'failed', message: '退出码 3' })
-    await stopped.finish({ kind: 'stopped' })
+    await stopped.finish({ kind: 'stopped', reason: 'companion' })
     abort.abort()
-    await processes.close()
+    await processes.close({ kind: 'cancelled' })
     await failed.finish({ kind: 'failed', message: '不得重复' })
     const dirs = await readdir(join(root, '.arrange', 'logs'))
     assert.equal(dirs.length, 1)
     const directory = join(root, '.arrange', 'logs', dirs[0]!)
-    assert.deepEqual((await readdir(directory)).sort(), ['cancelled.log', 'failed.log', 'stopped.log'])
+    assert.deepEqual((await readdir(directory)).sort(), ['failed.log'])
     const text = await readFile(join(directory, 'failed.log'), 'utf8')
     assert.equal(text.match(/失败输出/g)?.length, 1)
     assert.doesNotMatch(text, /不得重复/)
@@ -122,7 +122,8 @@ test('开发进程正常退出不保存，失败、停止和取消在各自结�
     if (batch.type !== 'batch') return assert.fail('缺少任务批次')
     assert.equal(batch.tasks[0]!.logPath, undefined)
     assert.deepEqual(batch.tasks.map(task => task.state), ['done', 'failed', 'stopped', 'cancelled'])
-    assert.ok(batch.tasks.slice(1).every(task => task.logPath))
+    assert.ok(batch.tasks[1]!.logPath)
+    assert.ok(batch.tasks.slice(2).every(task => !task.logPath))
 })
 
 test('普通任务没有子控制台时即使失败也不生成空日志，保存失败不谎报路径或覆盖原始错误', async t => {
@@ -156,23 +157,23 @@ test('常记录代码开关默认关闭，日志收尾幂等并释放成功任�
         return 'success.log'
     })
     success.write('无需保存')
-    assert.equal(await success.close(true), undefined)
-    assert.equal(saved, '')
     assert.equal(await success.close(false), undefined)
+    assert.equal(saved, '')
+    assert.equal(await success.close(true), undefined)
     assert.throws(() => success.write('迟到输出'), /日志已结束/)
     const failure = new TaskLogFile(async text => {
         saved = text
         return 'failed.log'
     })
     failure.write('完整失败输出')
-    assert.equal(await failure.close(false), 'failed.log')
+    assert.equal(await failure.close(true), 'failed.log')
     assert.equal(saved, '完整失败输出\n')
-    assert.equal(await failure.close(false), 'failed.log')
+    assert.equal(await failure.close(true), 'failed.log')
 })
 
 test("一次命令拍平 Reporter 和任务历史，只在关闭后回写系统终端", async () => {
     const terminal = quietTerminal()
-    terminal.reporter.intro("命令标题")
+    terminal.reporter.info("命令标题")
     assert.equal(terminal.output.text, "")
     terminal.reporter.success("完成")
     await terminal.close()
@@ -191,7 +192,7 @@ test('开发进程独立完成并释放解析资源，批次未结束仍保留�
     assert.throws(() => first.line('不得继续写入'), /结束/)
     second.line('继续运行')
     await second.finish({ kind: 'failed', message: '退出码 7' })
-    await processes.close()
+    await processes.close({ kind: 'stopped', reason: 'companion' })
     await terminal.close()
     assert.match(terminal.output.text, /第一份输出/)
     assert.match(terminal.output.text, /继续运行/)

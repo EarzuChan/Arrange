@@ -2,10 +2,7 @@ import type { Entry, Tone } from './SessionDocument.ts'
 
 export class Reporter {
     constructor(private readonly append: (entry: Entry) => void) { }
-    intro(text: string): void { this.append({ type: 'heading', text }) }
-    outro(text: string): void { this.append({ type: 'result', text, tone: 'success' }) }
-    fail(text: string): void { this.append({ type: 'result', text, tone: 'error' }) }
-    cancelled(text: string): void { this.append({ type: 'result', text, tone: 'warn' }) }
+    // 消息仅携带文字和色调，首尾结构完全由渲染器决定
     step(text: string | readonly string[]): void { this.toned('step', text) }
     info(text: string | readonly string[]): void { this.toned('info', text) }
     success(text: string | readonly string[]): void { this.toned('success', text) }

@@ -8,12 +8,12 @@ export interface SyncCommandOptions { scan?: boolean, config?: boolean, setup?: 
 export function registerSyncCommand(program: ApplicationCommand, syncService: Pick<SyncService, "run">, reporter: Reporter): void {
     program.command("sync").description("同步工程文件与开发准备状态").option("--scan", "只扫描；有 Fatal 或 Resolvable 时返回非零状态").addOption(new Option("--config", "只同步工程配置文件").conflicts("setup")).addOption(new Option("--setup", "只准备开发环境").conflicts("config")).addOption(new Option("--ui", "仅 UI 范围").conflicts("native")).addOption(new Option("--native", "仅 native 范围").conflicts("ui"))
         .action(async (options: SyncCommandOptions) => {
-            reporter.intro(`arrange sync${options.scan ? " --scan" : ""}`)
+            reporter.info(`arrange sync${options.scan ? " --scan" : ""}`)
             const result = await syncService.run({ scanOnly: options.scan, configOnly: options.config, setupOnly: options.setup, uiOnly: options.ui, nativeOnly: options.native }, process.cwd())
-            if (result.status === "completed") reporter.outro(options.scan ? "扫描完成，无需处理" : "同步完成")
+            if (result.status === "completed") reporter.success(options.scan ? "扫描完成，无需处理" : "同步完成")
             else {
-                if (result.status === "aborted") reporter.cancelled("已放弃同步")
-                else reporter.fail(options.scan ? "扫描发现需要处理的项" : result.status === "failed" ? "同步失败" : "同步未完成")
+                if (result.status === "aborted") reporter.warn("已放弃同步")
+                else reporter.error(options.scan ? "扫描发现需要处理的项" : result.status === "failed" ? "同步失败" : "同步未完成")
                 return 1
             }
         })

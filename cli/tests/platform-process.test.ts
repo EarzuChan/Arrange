@@ -12,6 +12,7 @@ import { DevSupervisor } from "../src/feature/platform/DevSupervisor.ts"
 import { parseMsvcArchitecture, parseWindowsEnvironment, WindowsPlatformService } from "../src/feature/platform/WindowsPlatformService.ts"
 import { satisfiesMinimumVersion, ToolchainService } from "../src/feature/platform/ToolchainService.ts"
 import type { ProcessResult, ProcessSpec } from "../src/feature/platform/ProcessSpec.ts"
+import type { ProcessOutcome, ProcessProgress, ProcessProgressGroup, TaskSpec } from "../src/feature/operation/Work.ts"
 import { isAbortError, throwIfProcessCancelled } from "../src/feature/platform/ProcessSpec.ts"
 import { stateFor } from "./fixture.ts"
 import { minimumNodeMajor } from "../src/CliMetadata.ts"
@@ -79,7 +80,7 @@ test("开发监管等待 UI 就绪后启动原生进程，并在退出时清理"
         { name: "native", command: process.execPath, args: ["-e", source], dependsOn: ["ui"] },
         { name: "ui", command: process.execPath, args: ["-e", ui], readyUrl: `http://127.0.0.1:${port}`, readyHeader: { name: "x-arrange-dev", value: "owned" } },
     ])
-    assert.equal(code, 6)
+    assert.deepEqual(code, { kind: 'failed', exitCode: 6, message: 'native 意外退出（退出码 6）' })
     assert.equal(await readFile(native, "utf8"), "yes")
     await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
@@ -95,7 +96,63 @@ test("开发监管拒绝已占用端口，并传递取消结果", async () => {
     const signal = new AbortController()
     const running = new DevSupervisor(new Executor()).run([{ name: "native", command: process.execPath, args: ["-e", "setInterval(()=>{},100)"] }], { signal: signal.signal })
     setTimeout(() => signal.abort(), 100)
-    assert.equal(await running, 0)
+    assert.deepEqual(await running, { kind: 'cancelled' })
+})
+
+test('用户在全部服务就绪后请求结束是正常结束，UI 和 Native 作为关联进程停止且不失败', async () => {
+    class Progress implements ProcessProgressGroup {
+        readonly outcomes = new Map<string, ProcessOutcome>()
+        async open(spec: TaskSpec): Promise<ProcessProgress> {
+            const owner = this
+            return {
+                title: spec.title,
+                line() { }, waiting() { }, stage() { }, progress() { }, process: value => value,
+                status() { },
+                async finish(outcome) { owner.outcomes.set(spec.id, outcome) }
+            }
+        }
+        async close() { }
+        private readonly thisOwner = this
+    }
+    const port = await freePort()
+    const source = `require('node:http').createServer((q,s)=>{s.setHeader('content-type','application/json');s.end('{"entry":"/src/App.sfa","modules":[{"url":"/src/App.sfa","source":"export default {}"}]}')}).listen(${port},'127.0.0.1');setInterval(()=>{},100)`
+    const stop = new AbortController()
+    const progress = new Progress()
+    const running = new DevSupervisor(new Executor()).run([
+        { name: 'ui', exitPolicy: 'service', command: process.execPath, args: ['-e', source], readyUrl: 'http://127.0.0.1:' + port, readyCheck: async response => (await response.json() as { modules?: unknown[] }).modules?.length === 1 },
+        { name: 'native', command: process.execPath, args: ['-e', 'setInterval(()=>{},100)'], dependsOn: ['ui'] }
+    ], { stopSignal: stop.signal, progress, onRunning: () => setTimeout(() => stop.abort(), 100) })
+    assert.deepEqual(await running, { kind: 'ended', reason: 'user' })
+    assert.deepEqual([...progress.outcomes.values()].map(outcome => outcome.kind).sort(), ['stopped', 'stopped'])
+    assert.deepEqual([...progress.outcomes.values()].map(outcome => outcome.kind === 'stopped' ? outcome.reason : '').sort(), ['user', 'user'])
+})
+
+test('Standalone 正常关闭自然结束开发会话，UI 作为关联进程停止', { timeout: 10000 }, async () => {
+    const port = await freePort()
+    const ui = `require('node:http').createServer((q,s)=>s.end('ok')).listen(${port},'127.0.0.1');setInterval(()=>{},100)`
+    const native = 'setTimeout(()=>process.exit(0),150)'
+    const progress: ProcessProgressGroup & { outcomes: ProcessOutcome[] } = {
+        outcomes: [], async open() {
+            const owner = this
+            return { title: '', line() { }, waiting() { }, stage() { }, progress() { }, process: (spec: ProcessSpec) => spec, status() { }, async finish(outcome: ProcessOutcome) { owner.outcomes.push(outcome) } }
+        }, async close() { }
+    }
+    assert.deepEqual(await new DevSupervisor(new Executor()).run([
+        { name: 'ui', exitPolicy: 'service', command: process.execPath, args: ['-e', ui], readyUrl: 'http://127.0.0.1:' + port },
+        { name: 'native', command: process.execPath, args: ['-e', native], dependsOn: ['ui'] }
+    ], { progress }), { kind: 'ended', reason: 'process' })
+    assert.equal(progress.outcomes.find(outcome => outcome.kind === 'stopped')?.kind, 'stopped')
+    assert.equal(progress.outcomes.find(outcome => outcome.kind === 'exited')?.kind, 'exited')
+})
+
+test('全部就绪后 UI 服务即使以零退出码结束仍属于意外故障', { timeout: 10000 }, async () => {
+    const port = await freePort()
+    const ui = `require('node:http').createServer((q,s)=>{s.setHeader('content-type','application/json');s.end('{"entry":"/src/App.sfa","modules":[{"url":"/src/App.sfa","source":"export default {}"}]}')}).listen(${port},'127.0.0.1');setTimeout(()=>process.exit(0),300)`
+    const outcome = await new DevSupervisor(new Executor()).run([
+        { name: 'ui', exitPolicy: 'service', command: process.execPath, args: ['-e', ui], readyUrl: `http://127.0.0.1:${port}`, readyCheck: async response => (await response.json() as { modules?: unknown[] }).modules?.length === 1 },
+        { name: 'native', command: process.execPath, args: ['-e', 'setInterval(()=>{},100)'], dependsOn: ['ui'] }
+    ])
+    assert.deepEqual(outcome, { kind: 'failed', exitCode: 1, message: 'ui 意外退出（退出码 0）' })
 })
 
 test("等待后续进程就绪时，已就绪进程退出会停止全部进程", { timeout: 10000 }, async t => {

@@ -33,14 +33,15 @@ export interface ProcessProgress extends TaskOutput {
 }
 
 export type ProcessOutcome =
-    | { readonly kind: "stopped" }
+    | { readonly kind: "stopped", readonly reason: 'user' | 'companion' }
+    | { readonly kind: "cancelled" }
     | { readonly kind: "exited", readonly message: string }
     | { readonly kind: "failed", readonly message: string }
 
 export interface ProcessProgressGroup {
     open(spec: TaskSpec): Promise<ProcessProgress>
     // 等待所有进程的进展输出收尾
-    close(): Promise<void>
+    close(outcome: ProcessOutcome): Promise<void>
 }
 
 export interface TaskEntry<T = unknown> {

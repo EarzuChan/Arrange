@@ -37,6 +37,8 @@ build 的占用从重新检查状态一直覆盖 configure、compile/link、产�
 
 dev 在启动前构建或打包，继续持有 UI 工作区、native 构建树或交付目录的原占用，直至全部受管进程停止。Windows 运行中的 EXE 不会被另一个 CLI 尝试重新链接。端点占用配合实际就绪与端口绑定检查，不能替代 Vite strictPort 或系统 bind 的真实结果。
 
+dev 仅在全部请求进程就绪后开放正常结束。Vite 以 Arrange modules HTTP 响应验证；Standalone 每次启动接收独立令牌和临时就绪文件，只在窗口显示、RuntimeSession 已可交互且首帧成功发布后原子写入令牌。CLI 必须读到本次令牌才开放结束提示；启动失败、HTML 回退页、窗口未显示或首帧失败不能被解释为就绪。Native 构建前核验实际 Framework 源码声明的 `nativeDevReadinessProtocolCode`，旧版缓存缺少协议时明确失败，不等待不存在的回执。就绪后的用户停止与 Standalone 正常退出返回正常会话结束，关联 Vite 标为已停止；作为必需服务的 Vite 意外退出（包括退出码为零）、Native 非零或异常信号退出仍失败。正常停止、关联停止和命令取消不写失败日志，实际失败才保存对应任务的控制台。协议元数据见[内部包构建与分发契约](29-内部包构建与分发契约.md)；按键作用域及并发结束判定见 [CLI 与工程模式](31-ArrangeCLI与工程模式.md#终端输出与交互)。
+
 native receipt 文件名包含平台、架构与 flavor，成功/失败记录原子写入，独立构建树不会覆盖同一份状态。UI receipt 仍属于单一 UI 工作区。没有旧文件名回退。并发命令的任务日志目录身份独立，自动清理跳过仍存活 CLI 的目录。
 
 ## 内核锁与工具工作进程

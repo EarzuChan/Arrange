@@ -120,7 +120,7 @@ test('保留式完成保留错误现场，完成后的子区块及写入端全�
     inner.document.append({ type: 'message', text: '网络错误', tone: 'error' })
     inner.document.answer('如何处理', '取消')
     outer.complete()
-    document.append({ type: 'result', text: '已取消创建', tone: 'warn' })
+    document.append({ type: 'message', text: '已取消创建', tone: 'warn' })
     assert.match(transcript(document), /网络错误[\s\S]*已取消创建/)
     assert.throws(() => inner.replace(), /替换或结束/)
     assert.throws(() => inner.document.batch('迟到任务'), /替换或结束/)

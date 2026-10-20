@@ -15,7 +15,7 @@ export async function runCreateWizard(terminal: CommandInterface, framework: Fra
     const io = terminal.prompt
 
     try {
-        terminal.reporter.intro("创建 Arrange 工程")
+        terminal.reporter.info("创建 Arrange 工程")
         const details = await promptProjectDetails(terminal, framework, input)
         const location = await select({ ...io, message: "创建位置", options: [{ label: `./${details.projectName}`, value: "subdir" }, { label: "当前目录", value: "current" }] })
         if (isCancel(location)) throw new PromptCancelled()

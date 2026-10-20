@@ -16,9 +16,9 @@ export function registerPackCommand(program: ApplicationCommand, pack: (root: st
     program.command("pack").description("整理已经构建的 UI/native 交付物").addOption(new Option("--flavor <flavor>", "产物配置").choices(["debug", "release"]).default("release")).addOption(new Option("--product <product...>", "选择产品").choices(["standalone", "vst3"])).option("--clean", "清理本次所选交付范围")
         .action(async (options: PackCommandOptions) => {
             const flavor = buildFlavorSchema.parse(options.flavor)
-            reporter.intro(`arrange pack · ${flavor}`)
+            reporter.info(`arrange pack · ${flavor}`)
             const { state, result } = await tasks.run({ id: "pack", title: "整理交付物", detail: flavor, rootDir: process.cwd() }, () => pack(process.cwd(), { flavor, products: options.product?.map(product => nativeProductSchema.parse(product)), clean: options.clean }))
             reporter.success(await describePackResult(state, flavor, result))
-            reporter.outro("打包完成")
+            reporter.success("打包完成")
         })
 }

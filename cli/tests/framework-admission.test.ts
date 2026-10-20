@@ -24,6 +24,7 @@ import { write, testTask, observePrompts } from './fixture.ts'
 import type { PromptRequest } from '../src/terminal/PromptController.ts'
 import type { CommandInterface } from '../src/business/CommandInterface.ts'
 import { stripAnsi } from '../src/util/TerminalText.ts'
+import { assertFrameworkDevReadiness } from '../src/feature/framework/FrameworkSourceMetadata.ts'
 
 const version = '1.2.3'
 const dependency = { repository: 'https://example.invalid/dependency.git', ref: 'v1', commit: 'a'.repeat(40) }
@@ -124,6 +125,15 @@ test('registry 确切版本与 Git 注解 tag 同时验证，复用源码缓存�
     assert.deepEqual(await input.service.selectVersion(version, input.input, testTask()), selected)
     assert.deepEqual(input.requests, [`/@arrange/framework/${version}`, `/@arrange/framework/${version}`])
     await assert.rejects(readdir(join(input.root, 'node_modules')), { code: 'ENOENT' })
+})
+
+test('Native dev 只接受声明当前就绪回执协议的 Framework 源码', async t => {
+    const input = await fixture(t)
+    await write(join(input.repository, 'arrange.version.json'), JSON.stringify({ frameworkVersion: version, cliCompatibility, frameworkInternalProtocolCode: 6, nativeDevReadinessProtocolCode: 1 }))
+    await write(join(input.repository, 'cmake', 'NativeDependencies.json'), JSON.stringify(dependencies))
+    await assertFrameworkDevReadiness(input.repository, version)
+    await write(join(input.repository, 'arrange.version.json'), JSON.stringify({ frameworkVersion: version, cliCompatibility, frameworkInternalProtocolCode: 6 }))
+    await assert.rejects(assertFrameworkDevReadiness(input.repository, version), /不支持 Native 开发就绪握手/)
 })
 
 test('不存在、不兼容或无法验证的 registry 版本在接触源码前拒绝', async t => {

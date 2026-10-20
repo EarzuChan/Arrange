@@ -19,24 +19,24 @@ export function registerCreateCommand(program: ApplicationCommand, initializer: 
             let location = ''
             try {
                 const request = await interaction.create({ nodeRegistryUrl: options.registry, cmakeFetchContentUrl: options.fetchContent })
-                if (!request) return reporter.cancelled("已取消创建；未写工程文件")
+                if (!request) return reporter.warn("已取消创建；未写工程文件")
                 const plan = await initializer.planCreate(request)
-                if (!await interaction.confirmInitialization(plan, "创建工程文件")) return reporter.cancelled("已取消创建；未写工程文件")
+                if (!await interaction.confirmInitialization(plan, "创建工程文件")) return reporter.warn("已取消创建；未写工程文件")
                 const state = await initializer.apply(plan)
                 created = true
                 location = projectLocationHint(state.rootDir)
                 interaction.message("工程已创建")
-                if (!await interaction.confirm("立即运行完整 sync，准备开发环境？")) return reporter.outro(`工程已创建${location}，运行 arrange sync 准备开发环境`)
+                if (!await interaction.confirm("立即运行完整 sync，准备开发环境？")) return reporter.success(`工程已创建${location}，运行 arrange sync 准备开发环境`)
                 const result = await syncService.run({}, state.rootDir)
                 if (result.status !== "completed") {
-                    reporter.fail(`工程已创建；同步未完成${location}，运行 arrange sync 继续`)
+                    reporter.error(`工程已创建；同步未完成${location}，运行 arrange sync 继续`)
                     return 1
                 }
-                reporter.outro(`工程已创建，开发环境已就绪${location}`)
+                reporter.success(`工程已创建，开发环境已就绪${location}`)
             } catch (error) {
                 if (isAbortError(error)) throw error
-                if (error instanceof ProjectInteractionCancelled) return reporter.cancelled(created ? "工程已创建；已取消后续同步" + location : "已取消创建；未写工程文件")
-                reporter.fail(errorMessage(error) + location)
+                if (error instanceof ProjectInteractionCancelled) return reporter.warn(created ? "工程已创建；已取消后续同步" + location : "已取消创建；未写工程文件")
+                reporter.error(errorMessage(error) + location)
                 return 1
             }
         })

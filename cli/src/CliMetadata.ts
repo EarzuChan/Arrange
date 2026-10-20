@@ -49,6 +49,7 @@ export const sourceReferencesFileName = "source-references.json"
 export const sourceReferencesSchema = 1
 export const nativeVerificationFileName = "arrange-native-verification.json"
 export const nativeVerificationSchema = 1
+export const nativeDevReadinessProtocolCode = 1
 export const sourceCacheSchema = 2
 export const sourceLocalTimeoutMs = 600000
 export const nativeDependencyManifest = "cmake/NativeDependencies.json"

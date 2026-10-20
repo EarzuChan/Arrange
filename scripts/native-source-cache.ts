@@ -15,7 +15,7 @@ export async function cachedNativeDefinitions(definitions: Readonly<Record<strin
     const cache = new SourceCache(user, new GitSource(executor), signal, operations)
     const log = (line: string) => console.log("[ArrangeNativeSource]", line)
     const task: TaskOutput = {
-        title: "验收依赖源码", line: log, stage: text => { if (text) log(text) }, progress: () => { }, process: spec => {
+        title: "验收依赖源码", line: log, waiting: text => { if (text) log(text) }, stage: text => { if (text) log(text) }, progress: () => { }, process: spec => {
             const decoders = { stdout: new LineDecoder(log), stderr: new LineDecoder(log) }
             return {
                 ...spec, onOutput: (bytes, stream) => decoders[stream].push(bytes), onOutputEnd: () => {

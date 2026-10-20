@@ -19,10 +19,10 @@ export function registerAdoptCommand(program: ApplicationCommand, initializer: P
             let location = ''
             try {
                 const request = await interaction.adopt({ nodeRegistryUrl: options.registry, cmakeFetchContentUrl: options.fetchContent })
-                if (!request) return reporter.cancelled("已取消接入；未写工程文件")
+                if (!request) return reporter.warn("已取消接入；未写工程文件")
 
                 const plan = await initializer.planAdopt(request)
-                if (!await interaction.confirmInitialization(plan, "保存配置并接入托管")) return reporter.cancelled("已取消接入；未写工程文件")
+                if (!await interaction.confirmInitialization(plan, "保存配置并接入托管")) return reporter.warn("已取消接入；未写工程文件")
 
                 const state = await initializer.apply(plan)
 
@@ -31,26 +31,26 @@ export function registerAdoptCommand(program: ApplicationCommand, initializer: P
 
                 const config = await syncService.run({ configOnly: true }, state.rootDir)
                 if (config.status !== "completed") {
-                    reporter.fail("工程配置已保存；托管接入未完成，修改内容与事务记录已保留" + location + "，运行 arrange sync 继续")
+                    reporter.error("工程配置已保存；托管接入未完成，修改内容与事务记录已保留" + location + "，运行 arrange sync 继续")
                     return 1
                 }
 
                 interaction.message("工程托管已接入")
-                if (!await interaction.confirm("立即运行 SETUP，准备开发环境？")) return reporter.outro("工程托管已接入" + location + "，运行 arrange sync --setup 准备开发环境")
+                if (!await interaction.confirm("立即运行 SETUP，准备开发环境？")) return reporter.success("工程托管已接入" + location + "，运行 arrange sync --setup 准备开发环境")
 
                 const setup = await syncService.run({ setupOnly: true }, state.rootDir)
                 if (setup.status !== "completed") {
-                    reporter.fail("工程托管已接入；环境准备未完成" + location + "，运行 arrange sync --setup 继续")
+                    reporter.error("工程托管已接入；环境准备未完成" + location + "，运行 arrange sync --setup 继续")
                     return 1
                 }
 
-                reporter.outro("工程托管已接入，开发环境已就绪" + location)
+                reporter.success("工程托管已接入，开发环境已就绪" + location)
             } catch (error) {
                 if (isAbortError(error)) throw error
 
-                if (error instanceof ProjectInteractionCancelled) return reporter.cancelled(initialized ? "工程配置与已完成修改已保留；已取消后续准备" + location : "已取消接入；未写工程文件")
+                if (error instanceof ProjectInteractionCancelled) return reporter.warn(initialized ? "工程配置与已完成修改已保留；已取消后续准备" + location : "已取消接入；未写工程文件")
 
-                reporter.fail(errorMessage(error) + location)
+                reporter.error(errorMessage(error) + location)
                 return 1
             }
         })

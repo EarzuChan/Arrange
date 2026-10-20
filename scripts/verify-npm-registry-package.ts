@@ -74,15 +74,26 @@ try {
     const installedCli = join(launcherDir, "node_modules", "@arrange", "cli", "dist", "Entry.js")
     await access(installedCli)
     const rejected = await executor.run({ command: inspection.local.node!.path, args: [installedCli, "--help"], cwd: consumerDir, env: { ...env, NODE_ENV: "test" } })
-    if (rejected.exitCode !== 1 || !rejected.stderr.includes("TTY")) throw new Error(`正式 CLI 未拒绝非 TTY 调用：${rejected.stdout}${rejected.stderr}`)
+    if (rejected.exitCode !== 1 || !(rejected.stdout + rejected.stderr).includes("TTY")) throw new Error(`正式 CLI 未拒绝非 TTY 调用：${rejected.stdout}${rejected.stderr}`)
 
     const applicationUrl = pathToFileURL(join(dirname(installedCli), "CliApplication.js")).href
+    const sessionUrl = pathToFileURL(join(dirname(installedCli), "terminal/TerminalSession.js")).href
+    const commandInterfaceUrl = pathToFileURL(join(dirname(installedCli), "business/CommandInterface.js")).href
     const runner = join(launcherDir, "verify-cli.mjs")
     await writeFile(runner, `import { createCliApplication } from ${JSON.stringify(applicationUrl)}
+import { TerminalSession } from ${JSON.stringify(sessionUrl)}
+import { commandInterface } from ${JSON.stringify(commandInterfaceUrl)}
+import { EventEmitter } from 'node:events'
 const controller = new AbortController()
 const interrupt = () => controller.abort()
+const session = new TerminalSession(Object.assign(new EventEmitter(), {
+    columns: 100, rows: 24, host: new EventEmitter(), output: { isTTY: false },
+    enter() {}, writeFrame() {},
+    close: transcript => new Promise(resolve => process.stdout.write(transcript, resolve)),
+}))
+const terminal = commandInterface(session.ui, controller.signal)
 const refuse = async () => { throw new Error("安装包自动化验收遇到未安排的交互") }
-const message = value => console.log("[ArrangePackageVerify]", value)
+const message = value => terminal.reporter.step(value)
 const failure = value => { throw new Error(value) }
 const interactions = {
     project: { create: refuse, adopt: refuse, confirmInitialization: refuse, confirm: refuse, message, failure },
@@ -92,10 +103,13 @@ const interactions = {
 process.on("SIGINT", interrupt)
 process.on("SIGTERM", interrupt)
 try {
-    await createCliApplication({ signal: controller.signal, interactions }).exitOverride().parseAsync(process.argv)
+    const cli = createCliApplication({ signal: controller.signal, interactions, terminal }).exitOverride()
+    await cli.parseAsync(process.argv)
+    process.exitCode = cli.resultCode
 } finally {
     process.removeListener("SIGINT", interrupt)
     process.removeListener("SIGTERM", interrupt)
+    await session.close()
 }
 `, "utf8")
     const runCli = (args: string[]): Promise<void> => execute({ command: inspection.local.node!.path, args: [runner, ...args], cwd: consumerDir, env })

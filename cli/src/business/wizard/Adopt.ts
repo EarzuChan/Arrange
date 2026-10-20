@@ -22,7 +22,7 @@ interface SubprojectChoice {
 export async function runAdoptWizard(terminal: CommandInterface, framework: FrameworkService, config: ConfigRegistry, input: ProjectWizardInput = {}): Promise<false | AdoptProjectRequest> {
     const io = terminal.prompt
     try {
-        terminal.reporter.intro("接入已有 Arrange 工程")
+        terminal.reporter.info("接入已有 Arrange 工程")
         const rootDir = process.cwd()
         const native = await promptSubproject(terminal, "native", rootDir)
         const ui = await promptSubproject(terminal, "ui", rootDir)

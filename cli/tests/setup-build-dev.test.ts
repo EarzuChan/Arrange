@@ -334,7 +334,7 @@ async function devHarness(t: TestContext) {
         run: async (specs: readonly LongRunningProcessSpec[]) => {
             actions.push("launch")
             processes = specs
-            return 7
+            return { kind: 'failed', exitCode: 7, message: '模拟开发失败' }
         }
     } as unknown as DevSupervisor
     const ui = {
@@ -351,7 +351,8 @@ async function devHarness(t: TestContext) {
             return { products: [{ binaryPath: packedBinary }] }
         }
     } as unknown as Packer
-    return { state, node, cmake, native, artifacts, ui, packer, builds, packages, actions, scopes, nativeBinary, packedBinary, processes: () => processes, service: new DevService(project, tools, node, cmake, native, artifacts, supervisor, ui, packer, quietTerminal().tasks) }
+    const sources = { assertDevReadiness: async () => { actions.push("verify-dev-readiness") } }
+    return { state, node, cmake, native, artifacts, ui, packer, sources, builds, packages, actions, scopes, nativeBinary, packedBinary, processes: () => processes, service: new DevService(project, tools, node, cmake, native, artifacts, supervisor, ui, packer, sources, quietTerminal().tasks) }
 }
 
 test("Release dev 先构建 UI 并交付 Standalone，运行交付二进制；native-only 使用已有 UI", async t => {
@@ -359,7 +360,7 @@ test("Release dev 先构建 UI 并交付 Standalone，运行交付二进制；na
         const input = await devHarness(t)
         input.node.inspect = async () => { throw new Error("本模式不应启动 Vite") }
         const code = await input.service.run(input.state.rootDir, { ...entry, native: true })
-        assert.equal(code, 7)
+        assert.equal(code.kind, 'failed')
         assert.deepEqual([...input.builds].sort(), entry.ui ? ["native", "ui"] : ["native"])
         assert.deepEqual(input.packages, [{ flavor: entry.flavor, products: ["standalone"] }])
         assert.deepEqual(input.processes().map(process => process.name), ["native"])
@@ -374,10 +375,10 @@ test("Debug Live 无需 UI dist 或预编译，在真实模块协议就绪后运
     await rm(resolve(input.state.rootDir, "ui/dist"), { recursive: true, force: true })
     input.ui.build = async () => { throw new Error("Live UI 和资源由 Framework 当前 origin 提供，不应预编译 UI") }
     input.packer.pack = async () => { throw new Error("Debug Live 不应依赖 package") }
-    assert.equal(await input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: true }), 7)
+    assert.deepEqual(await input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: true }), { kind: 'failed', exitCode: 7, message: '模拟开发失败' })
     assert.deepEqual(input.builds, ["native"])
     assert.deepEqual(input.packages, [])
-    assert.deepEqual(input.actions, ["native-build", "locate", "launch"])
+    assert.deepEqual(input.actions, ["verify-dev-readiness", "native-build", "locate", "launch"])
     const ui = input.processes().find(process => process.name === "ui")!
     const native = input.processes().find(process => process.name === "native")!
     assert.deepEqual(native.dependsOn, ["ui"])
@@ -399,6 +400,15 @@ test("Dev 缺失 Standalone 时只编译所需产品；未准备 UI/native 阻�
     input.cmake.inspect = async () => ({ ready: false, reason: "native 过期" })
     await assert.rejects(input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: true }), /native 过期/)
     assert.deepEqual(input.builds, ["native"])
+})
+
+test("Framework 源码缺少 Native 就绪协议时在构建和启动前明确失败", async t => {
+    const input = await devHarness(t)
+    const error = new Error("Arrange Framework 0.0.0-m.3.0 的源码不支持 Native 开发就绪握手")
+    input.sources.assertDevReadiness = async () => { throw error }
+    await assert.rejects(input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: true }), error)
+    assert.deepEqual(input.builds, [])
+    assert.deepEqual(input.processes(), [])
 })
 
 test("Dev 已有同名 binary 仍增量构建 Standalone，使源码变更进入运行产物", async t => {
@@ -441,7 +451,7 @@ test("Debug native 构建或定位失败时不启动 Live server/native", async 
 test("UI-only dev 只启动模块协议服务器，不构建或准备 native bundle", async t => {
     const input = await devHarness(t)
     input.cmake.inspect = async () => { throw new Error("UI-only 不应检查 native") }
-    assert.equal(await input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: false }), 7)
+    assert.deepEqual(await input.service.run(input.state.rootDir, { flavor: "debug", ui: true, native: false }), { kind: 'failed', exitCode: 7, message: '模拟开发失败' })
     assert.deepEqual(input.scopes, ["UI"])
     assert.deepEqual(input.builds, [])
     assert.deepEqual(input.packages, [])

@@ -127,7 +127,10 @@ test("依赖源码锁不设等待期限，普通占用保留期限；等待取�
     const statuses: (string | undefined)[] = []
     const operations = new Operations(waiter, controller.signal, () => assert.fail('任务归属明确时不得发送全局等待消息'))
     let entered = false
-    const pending = operations.source(source.path, "等待依赖源码夹具", async () => { entered = true }, message => { statuses.push(message); if (message) onWaiting() })
+    const pending = operations.source(source.path, "等待依赖源码夹具", async () => { entered = true }, message => {
+        statuses.push(message)
+        if (message) onWaiting()
+    })
     await waiting
     assert.match(statuses[0]!, /等待 获取依赖源码夹具/)
     await assert.rejects(waiter.acquire([source], "有限等待夹具", controller.signal, () => { }), /等待资源超过/)
@@ -139,7 +142,10 @@ test("依赖源码锁不设等待期限，普通占用保留期限；等待取�
 
     const releaseAgain = await holder.acquire([source], "再次持有依赖源码夹具", controller.signal, () => { })
     const waitingAgain = new Promise<void>(resolve => { onWaiting = resolve })
-    const cancelled = assert.rejects(operations.source(source.path, "取消源码等待夹具", async () => assert.fail("取消等待后不得执行"), message => { statuses.push(message); if (message) onWaiting() }), isAbortError)
+    const cancelled = assert.rejects(operations.source(source.path, "取消源码等待夹具", async () => assert.fail("取消等待后不得执行"), message => {
+        statuses.push(message)
+        if (message) onWaiting()
+    }), isAbortError)
     await waitingAgain
     controller.abort()
     await cancelled

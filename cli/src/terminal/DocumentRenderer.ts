@@ -55,11 +55,10 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
     const body = (text: string, color?: number, guideColor = gray) => {
         for (const logical of text.split(/\r?\n/)) for (const line of flatten ? [logical] : wrap(sanitizeLine(logical), Math.max(1, width - 3))) add(guide(guideColor), span(line, color))
     }
-    for (const entry of document.contents()) {
+    const entries = [...document.contents()]
+    for (const entry of entries) {
         if (rows.length && ['answer', 'batch'].includes(entry.type)) add(guide())
-        if (entry.type === 'heading') add(span('┌  ', gray), span(entry.text, undefined, true))
-        else if (entry.type === 'message') body(entry.text, entry.tone ? toneColor[entry.tone] : undefined)
-        else if (entry.type === 'result') add(span('└  ', gray), span(entry.text, entry.tone ? toneColor[entry.tone] : 32, true))
+        if (entry.type === 'message') body(entry.text, entry.tone ? toneColor[entry.tone] : undefined)
         else if (entry.type === 'answer') {
             add(span('◇  ', gray), span(entry.question))
             body(entry.answer, gray)
@@ -77,6 +76,16 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
             }
         }
     }
+    // 连接线属于整份文档的边界，不由消息类型或业务调用指定
+    const ended = !prompt && (flatten || document.phase !== 'active')
+    if (rows.length && entries[0]?.type === 'message' && (rows.length > 1 || !ended)) rows[0]!.spans[0] = span('┌  ', gray)
+    else rows.unshift({ spans: [span('┌', gray)] })
+    if (ended) {
+        const last = rows.at(-1)
+        if (last && entries.at(-1)?.type === 'message') last.spans[0] = span('└  ', gray)
+        else add(span('└', gray))
+    }
+    if (!flatten && document.phase === 'active' && document.stopHint) body(document.stopHint, accent)
     if (prompt) {
         if (rows.length) add(guide())
         add(span('◆  ', accent), span(prompt.question, undefined, true))
@@ -98,7 +107,7 @@ export function layoutDocument(document: SessionDocument, columns: number, offse
         }
         if (prompt.error) body(prompt.error, 31, accent)
         body(prompt.kind === 'text' ? 'Enter 确认 · Esc 取消' : prompt.kind === 'select' ? '↑↓ 选择 · Enter 确认' : '↑↓ 移动 · Space 切换 · Enter 确认', gray, accent)
-        add(span('└', accent))
+        add(guide(accent))
     } else if (!flatten && document.phase !== 'active') {
         add()
         add(span('按 Enter 退出', gray))

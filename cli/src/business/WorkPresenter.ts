@@ -83,7 +83,7 @@ class WorkOutput implements ProcessProgress {
     }
 
     private async commit(error?: unknown): Promise<void> {
-        const state = error ? isAbortError(error) ? 'cancelled' : 'failed' : this.outcome?.kind === 'failed' ? 'failed' : this.signal?.aborted ? 'cancelled' : this.outcome?.kind === 'stopped' ? 'stopped' : 'done'
+        const state = error ? isAbortError(error) ? 'cancelled' : 'failed' : this.outcome ? this.outcome.kind === 'failed' ? 'failed' : this.outcome.kind === 'cancelled' ? 'cancelled' : this.outcome.kind === 'stopped' ? 'stopped' : 'done' : this.signal?.aborted ? 'cancelled' : 'done'
         let failure: unknown
         try {
             for (const decoder of this.decoders) {
@@ -92,12 +92,12 @@ class WorkOutput implements ProcessProgress {
             }
             for (const parser of this.parsers) parser.flush()
             if (error) this.log?.write(errorMessage(error))
-            else if (this.outcome && this.outcome.kind !== 'stopped') this.log?.write(this.outcome.message)
-            await this.presentation.finish(state, error ? errorMessage(error) : this.outcome && this.outcome.kind !== 'stopped' ? this.outcome.message : undefined)
+            else if (this.outcome && 'message' in this.outcome) this.log?.write(this.outcome.message)
+            await this.presentation.finish(state, error ? errorMessage(error) : this.outcome && 'message' in this.outcome ? this.outcome.message : undefined)
         } catch (cleanup) { failure = cleanup }
 
         try {
-            const path = await this.log?.close(state === 'done' && failure === undefined)
+            const path = await this.log?.close(state === 'failed' || failure !== undefined)
             if (path) this.presentation.log(path)
         } catch (cleanup) {
             if (failure !== undefined) throw new AggregateError([failure, cleanup], errorMessage(failure) + '；日志保存失败：' + errorMessage(cleanup))
@@ -169,10 +169,10 @@ export class WorkPresenter implements TaskRunner {
                 opened.push(output)
                 return output
             },
-            close: async () => {
+            close: async (outcome = { kind: 'stopped', reason: 'companion' } as const) => {
                 if (closed) return
                 closed = true
-                const results = await Promise.allSettled(opened.map(async pending => (await pending).finish({ kind: 'stopped' })))
+                const results = await Promise.allSettled(opened.map(async pending => (await pending).finish(outcome)))
                 const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
                 try { group?.complete() } catch (error) { errors.push(error) }
                 if (errors.length) throw new AggregateError(errors, '开发进展收尾失败')

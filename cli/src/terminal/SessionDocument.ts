@@ -6,9 +6,9 @@ export interface BatchContent { type: 'batch', title: string, state: TaskState, 
 export interface RegionContent { type: 'region', id: string, entries: Entry[] }
 export interface AnswerContent { type: 'answer', question: string, answer: string }
 export interface PromptContent { kind: 'text' | 'select' | 'multiselect', question: string, options: string[], disabled?: readonly number[], index: number, selected: number[], value: string, cursor: number, placeholder: string, error?: string }
-export type Entry = { type: 'heading' | 'message' | 'result', text: string, tone?: Tone } | AnswerContent | BatchContent | RegionContent
+export type Entry = { type: 'message', text: string, tone?: Tone } | AnswerContent | BatchContent | RegionContent
 type Content = Exclude<Entry, RegionContent>
-interface DocumentState { phase: 'active' | 'done' | 'failed' | 'cancelled', sequence: number }
+interface DocumentState { phase: 'active' | 'done' | 'failed' | 'cancelled', sequence: number, stopHint?: string }
 interface Lifetime { closed: boolean, parent?: Lifetime, child?: Lifetime }
 
 // 仅保存呈现事实，完成的控制台内容与执行资源分别持有
@@ -17,6 +17,8 @@ export class SessionDocument {
     constructor(readonly entries: Entry[] = [], private readonly state: DocumentState = { phase: 'active', sequence: 0 }, private readonly lifetime: Lifetime = { closed: false }) { }
     get phase(): DocumentState['phase'] { return this.state.phase }
     set phase(value: DocumentState['phase']) { this.state.phase = value }
+    get stopHint(): string | undefined { return this.state.stopHint }
+    set stopHint(value: string | undefined) { this.state.stopHint = value }
     assertActive(): void {
         for (let scope: Lifetime | undefined = this.lifetime; scope; scope = scope.parent) if (scope.closed) throw new Error('流程区块已被替换或结束')
     }

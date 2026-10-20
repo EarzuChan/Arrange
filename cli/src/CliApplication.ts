@@ -116,7 +116,7 @@ export function createCliApplication(options: CliApplicationOptions): Applicatio
     const packer = new Packer(artifacts, executor, signal)
     const ui = new UiBuildService(node)
     const builder = new BuildService(project, tools, ui, native, packer, terminal.tasks)
-    const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, terminal.tasks)
+    const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, sources, terminal.tasks)
     const actions = new ApplicationOperations(operations, projectOperations, projectRegistry)
 
     const cli = new ApplicationCommand(host).exitOverride()/*这是AppCmd自己的Exit覆写*/.name(cliName).description(cliDescription).version(cliVersion)
@@ -129,7 +129,7 @@ export function createCliApplication(options: CliApplicationOptions): Applicatio
     registerCreateCommand(cli, protectedInitializer, protectedSync, interactions.project, reporter)
     registerAdoptCommand(cli, protectedInitializer, protectedSync, interactions.project, reporter)
     registerSyncCommand(cli, protectedSync, reporter)
-    registerDevCommand(cli, { run: (root, options) => actions.dev(dev, root, options) }, signal, reporter)
+    registerDevCommand(cli, { run: (root, options) => actions.dev(dev, root, options) }, signal, terminal)
     registerBuildCommand(cli, { build: (root, options) => actions.build(builder, root, options) }, reporter)
     registerPackCommand(cli, (root, options) => actions.pack(project, packer, root, options), terminal.tasks, reporter)
 
