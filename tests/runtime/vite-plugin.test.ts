@@ -10,6 +10,7 @@ import { createServer } from 'vite'
 import ts from 'typescript'
 import { ARRANGE_DEFINES, ARRANGE_DEFINE_KEYS, ARRANGE_VERSION } from '../../packages/vite-plugin/src/constraints.ts'
 import { ARRANGE_PACKAGE_VERSION } from '../../packages/framework/src/version.ts'
+import { prepareUiFixture } from '../helpers/ui-fixture.ts'
 
 test("vite plugin config freezes Arrange dev server and app.js output defaults", () => {
     const plugin = arrange()
@@ -38,9 +39,11 @@ test("vite plugin registers the live ESM snapshot endpoint", () => {
     assert.equal(typeof registrations[0].handler, "function")
 })
 
-test('Vite 保留 ESM 模块边界并提供原生 HMR', { timeout: 30000 }, async () => {
-    const root = resolve("demo/ui-src")
-    const server = await createServer({ root, configFile: false, plugins: [arrange()], server: { middlewareMode: true, hmr: false } })
+test('Vite 保留 ESM 模块边界并提供原生 HMR', { timeout: 30000 }, async t => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'arrange-gallery-live-')))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    await prepareUiFixture(root)
+    const server = await createServer({ root, configFile: false, plugins: [arrange()], server: { middlewareMode: true, hmr: false, fs: { allow: [root, resolve('.')] } } })
     try {
         const snapshot = await createModuleSnapshot(server, 'src/main.ts')
         assert.equal(snapshot.entry, '/@arrange/entry')

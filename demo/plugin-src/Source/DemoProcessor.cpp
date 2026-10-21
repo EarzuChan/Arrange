@@ -3,24 +3,6 @@
 #include <arrange/juce/ArrangeEditor.h>
 #include <utility>
 
-#if !defined(NDEBUG) && JUCE_STANDALONE_APPLICATION && defined(_WIN32)
-#include <cstdio>
-#include <windows.h>
-
-namespace {
-    void configureDebugConsole() {
-        FreeConsole();  // 放走老控制台
-
-        AllocConsole();  // 拉来一个船新控制台
-        SetConsoleTitleW(L"Arrange Demo - native log");
-
-        FILE* stream = nullptr;
-        freopen_s(&stream, "CONOUT$", "w", stdout);
-        freopen_s(&stream, "CONOUT$", "w", stderr);
-    }
-}
-#endif
-
 ArrangeDemoProcessor::ArrangeDemoProcessor() : juce::AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {}
 
 void ArrangeDemoProcessor::prepareToPlay(double, int) {}
@@ -35,10 +17,6 @@ void ArrangeDemoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 }
 
 juce::AudioProcessorEditor* ArrangeDemoProcessor::createEditor() {
-#if !defined(NDEBUG) && JUCE_STANDALONE_APPLICATION && defined(_WIN32)
-    configureDebugConsole();
-#endif
-
     arrange::juce::EditorConfig config;
 
     config.app.useDist();

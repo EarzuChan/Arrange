@@ -1,7 +1,6 @@
 packages:
   - "cli"
   - "packages/*"
-  - "demo/ui-src"
 
 linkWorkspacePackages: true
 

@@ -17,15 +17,53 @@ Demo 必须走真实消费路径：通过 Arrange CLI 编排工程，TS 侧通�
 
 ```txt
 demo/
+  arrange.project.yaml
+  arrange.local.yaml      # 本机，不提交
+  .arrange/               # CLI 本机记录，不提交
   plugin-src/
     ...
   ui-src/
     ...
+    package.json
+    package-lock.json
+    tsconfig.json
+    dist/                 # 构建产物，不提交
+  artifacts/              # CLI 交付物，不提交
 ```
 
-`ui-src/` 是 UI 源码项目；发布运行时的 `ui/` 是构建产物目录。
+`ui-src/` 是独立 npm UI 项目；发布运行时的 `ui/` 是 CLI 在产品旁或 bundle 内整理的构建产物目录。
 
-Demo 当前目录名可因仓库历史原因仍为 `xx-src/`，其消费方式对齐 Arrange CLI 标准工程，未来会让 Demo 改为由我们的 CLI 管理。Demo 是独立用户样板，不从根 CMake 作为内部子工程构建。根 CMake 不提供 `ARRANGE_BUILD_DEMO`。标准工程形态见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)。
+Demo 保留 `ui-src/`、`plugin-src/` 目录，通过共享配置声明实际路径。它是由 Arrange CLI 管理的普通工程；位于 Arrange Git 仓库内不改变工程主权。标准命令、配置职责与交付规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，运行步骤见 [Demo 说明](../../demo/README.md)。
+
+## 消费与版本
+
+UI 使用独立安装的 `@arrange/framework` npm 包和公开 exports，自带 manifest、npm 锁文件、Vite 配置与 SFA 类型检查入口，不继承根 TS paths 或 workspace 链接。UI 构建输出为自身 `dist/`，由 CLI 调用工程脚本及整理交付物。
+
+Native 使用 `FetchContent_Declare(arrange)`、`FetchContent_MakeAvailable(arrange)` 并链接 `Arrange::framework`。默认使用公开 Arrange Git 仓库和固定 Framework 版本 tag，仓库地址、tag 与 npm 依赖版本由 CLI CONFIG 管理。禁止从 Demo `add_subdirectory` Arrange 根或直接引用内部 TS/C++ 源文件构建产品。
+
+Demo 产品版本独立于框架版本。`arrange.project.yaml` 的 Framework 版本是 Demo 选择消费的版本；升级经 CLI 配置与同步完成。根版本同步、安装与内部包检查不写 Demo manifest，不要求 Demo 已安装或已构建。
+
+## 本机源码覆盖与独立移动
+
+需要验证当前未提交的 Arrange 源码时，在不提交的 `arrange.local.yaml` 中明确设置标准 CMake 覆盖：
+
+```yaml
+native:
+  cmakeDefinitions:
+    FETCHCONTENT_SOURCE_DIR_ARRANGE: E:/dev/Arrange
+```
+
+该路径必须是本机 Arrange 源码根的绝对路径，CLI 会校验版本、兼容码与依赖声明；仍经标准 FetchContent 接入。它只覆盖 Native，UI 仍消费实际安装的 npm 包。不会因工程恰好在仓库内就自动选择父目录源码；来源身份必须明确。
+
+共享配置不使用相对 Git 仓库地址。CLI 的来源预检、缓存获取和 CMake configure 有不同工作目录，相对地址不能保证各阶段含义一致；不能以本机一次 configure 成功证明可移植性。公开仓库与固定 tag 是默认事实，本机开发用上述显式覆盖。
+
+Demo 可以复制到 Arrange 仓库外；源码、素材、共享配置和 UI 锁文件随工程移动，依赖、本机配置、构建树与产物重新准备。清除本机覆盖后按共享声明消费公开来源，不能静默回退到仓库内部路径。版本是否已发布属于当期验收事实，记录在 M2 工作区，不以本机包验收冒充公网获取通过。
+
+## 框架仓库边界
+
+Demo 不属于根 Node workspace，也不是根 CMake 子工程。框架仓库不替 Demo 安装、构建、启动、复制 UI 或打包；这些工作只走正式 `arrange` 命令。不保留 Demo 私有启动脚本、根构建任务或 UI copy hook。Native 不释放或重建控制台，由 CLI 独占终端、子进程输出和交互生命周期。
+
+框架测试只读取或借用 Demo 的 SFA、TS、PNG、SVG 等源码与素材，复制到测试自己的隔离目录后，用测试依赖编译运行。夹具输出置于对应 native 测试构建树或临时测试目录，不读取 Demo 的 `node_modules/`、`dist/`、`.arrange/`、`artifacts/`。借用主画廊行为的测试保持源码复用，不另维护同语义页面。
 
 # 插件形态
 

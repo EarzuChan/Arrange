@@ -99,7 +99,8 @@ int runSmoke() {
     }
 
     const auto parameters = ::juce::JUCEApplication::getCommandLineParameterArray();
-    const auto packagePath = parameters.isEmpty() ? std::string("build/demo-ui-dist/app.js") : parameters[0].toStdString();
+    if (parameters.isEmpty()) return 1;
+    const auto packagePath = parameters[0].toStdString();
     const auto entry = std::filesystem::absolute(std::filesystem::path(std::u8string(packagePath.begin(), packagePath.end())));
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();

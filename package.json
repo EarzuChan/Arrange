@@ -4,8 +4,7 @@
   "type": "module",
   "workspaces": [
     "cli",
-    "packages/*",
-    "demo/ui-src"
+    "packages/*"
   ],
   "scripts": {
     "format": "node --import tsx scripts/format-code.ts --write",
@@ -19,9 +18,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:sfa": "node --import tsx scripts/typecheck-sfa.ts",
     "build:packages": "node --import tsx scripts/build-internal-packages.ts",
-    "build:demo-ui": "node --import tsx scripts/build-demo-ui.ts",
-    "build:demo": "node --import tsx scripts/build-demo.ts",
-    "verify:demo-dev": "node --import tsx scripts/verify-demo-dev-endpoint.ts",
     "sync:version": "node --import tsx scripts/sync-version.ts",
     "verify:version": "node --import tsx scripts/verify-version.ts",
     "verify:native-fetchcontent": "node --import tsx scripts/verify-native-fetchcontent.ts",

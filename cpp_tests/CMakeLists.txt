@@ -1,3 +1,22 @@
+find_program(ARRANGE_NODE_EXECUTABLE node REQUIRED)
+set(ARRANGE_FIXTURE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/../fixtures")
+file(GLOB_RECURSE ARRANGE_RUNTIME_FIXTURE_INPUTS CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/packages/*/src/*.ts"
+    "${CMAKE_SOURCE_DIR}/tests/fixtures/*"
+    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/*"
+    "${CMAKE_SOURCE_DIR}/demo/ui-src/public/*")
+set(ARRANGE_RUNTIME_FIXTURE_OUTPUTS)
+foreach(fixture IN ITEMS gallery rearrange-runtime viewport-runtime m3-layout m3-lazy m3-draw)
+    list(APPEND ARRANGE_RUNTIME_FIXTURE_OUTPUTS "${ARRANGE_FIXTURE_ROOT}/${fixture}/app.js")
+endforeach()
+add_custom_command(
+    OUTPUT ${ARRANGE_RUNTIME_FIXTURE_OUTPUTS}
+    COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/build-runtime-fixtures.ts "${ARRANGE_FIXTURE_ROOT}"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    DEPENDS ${ARRANGE_RUNTIME_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-runtime-fixtures.ts" "${CMAKE_SOURCE_DIR}/tests/helpers/ui-fixture.ts"
+    COMMENT "编译隔离的 Arrange SFA 原生运行夹具")
+add_custom_target(arrange_runtime_fixture DEPENDS ${ARRANGE_RUNTIME_FIXTURE_OUTPUTS})
+
 add_executable(arrange_core_smoke arrange_core_smoke.cpp)
 target_link_libraries(arrange_core_smoke PRIVATE Arrange::framework)
 add_test(NAME arrange_core_smoke COMMAND arrange_core_smoke)
@@ -15,8 +34,9 @@ if(TARGET qjs)
   target_link_libraries(arrange_live_modules PRIVATE Arrange::quickjs)
   add_test(NAME arrange_live_modules COMMAND arrange_live_modules)
   add_executable(arrange_quickjs_app_smoke arrange_quickjs_app_smoke.cpp)
+  add_dependencies(arrange_quickjs_app_smoke arrange_runtime_fixture)
   target_link_libraries(arrange_quickjs_app_smoke PRIVATE Arrange::framework)
-  add_test(NAME arrange_quickjs_app_smoke COMMAND arrange_quickjs_app_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js")
+  add_test(NAME arrange_quickjs_app_smoke COMMAND arrange_quickjs_app_smoke "${ARRANGE_FIXTURE_ROOT}/gallery/app.js")
 endif()
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
@@ -40,10 +60,11 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   target_link_libraries(arrange_live_server PRIVATE Arrange::framework)
   add_executable(arrange_juce_runtime_smoke arrange_juce_runtime_smoke.cpp)
   target_compile_definitions(arrange_juce_runtime_smoke PRIVATE _CONSOLE=1)
+  add_dependencies(arrange_juce_runtime_smoke arrange_runtime_fixture)
   target_link_libraries(arrange_juce_runtime_smoke PRIVATE Arrange::framework)
   add_test(
     NAME arrange_juce_runtime_smoke
-    COMMAND arrange_juce_runtime_smoke "${CMAKE_SOURCE_DIR}/build/demo-ui-dist/app.js"
+    COMMAND arrange_juce_runtime_smoke "${ARRANGE_FIXTURE_ROOT}/gallery/app.js"
   )
   set_tests_properties(arrange_juce_runtime_smoke PROPERTIES TIMEOUT 30)
 endif()
@@ -66,30 +87,14 @@ target_link_libraries(arrange_frame_submission PRIVATE Arrange::framework)
 add_test(NAME arrange_frame_submission COMMAND arrange_frame_submission)
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
-  find_program(ARRANGE_NODE_EXECUTABLE node REQUIRED)
-  file(GLOB_RECURSE ARRANGE_RUNTIME_FIXTURE_INPUTS CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/packages/*/src/*.ts"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/rearrange-runtime/*"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/viewport-runtime/*"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/m3-layout/*"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/m3-lazy/*"
-    "${CMAKE_SOURCE_DIR}/tests/fixtures/m3-draw/*"
-    "${CMAKE_SOURCE_DIR}/demo/ui-src/src/view/*.sfa")
-  add_custom_command(
-    OUTPUT "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-layout-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-lazy-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-draw-fixture/app.js"
-    COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/build-runtime-fixtures.ts
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    DEPENDS ${ARRANGE_RUNTIME_FIXTURE_INPUTS} "${CMAKE_SOURCE_DIR}/scripts/build-runtime-fixtures.ts"
-    COMMENT "编译 Arrange SFA 原生运行夹具")
-  add_custom_target(arrange_runtime_fixture DEPENDS "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-layout-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-lazy-fixture/app.js" "${CMAKE_SOURCE_DIR}/build/m3-draw-fixture/app.js")
   add_executable(arrange_rearrange_runtime arrange_rearrange_runtime.cpp AllocationProbe.cpp)
   target_link_libraries(arrange_rearrange_runtime PRIVATE Arrange::framework)
   add_dependencies(arrange_rearrange_runtime arrange_runtime_fixture)
-  add_test(NAME arrange_rearrange_runtime COMMAND arrange_rearrange_runtime "${CMAKE_SOURCE_DIR}/build/rearrange-runtime-fixture/app.js")
+  add_test(NAME arrange_rearrange_runtime COMMAND arrange_rearrange_runtime "${ARRANGE_FIXTURE_ROOT}/rearrange-runtime/app.js")
   add_executable(arrange_viewport_runtime arrange_viewport_runtime.cpp)
   target_link_libraries(arrange_viewport_runtime PRIVATE Arrange::framework)
   add_dependencies(arrange_viewport_runtime arrange_runtime_fixture)
-  add_test(NAME arrange_viewport_runtime COMMAND arrange_viewport_runtime "${CMAKE_SOURCE_DIR}/build/viewport-runtime-fixture/app.js")
+  add_test(NAME arrange_viewport_runtime COMMAND arrange_viewport_runtime "${ARRANGE_FIXTURE_ROOT}/viewport-runtime/app.js")
 endif()
 
 if(TARGET juce::juce_audio_processors)
@@ -108,7 +113,7 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   add_executable(arrange_m3_draw arrange_m3_draw.cpp)
   target_link_libraries(arrange_m3_draw PRIVATE Arrange::framework)
   add_dependencies(arrange_m3_draw arrange_runtime_fixture)
-  add_test(NAME arrange_m3_draw COMMAND arrange_m3_draw "${CMAKE_SOURCE_DIR}/build/m3-draw-fixture/app.js")
+  add_test(NAME arrange_m3_draw COMMAND arrange_m3_draw "${ARRANGE_FIXTURE_ROOT}/m3-draw/app.js")
   add_executable(arrange_focus_input arrange_focus_input.cpp)
   target_compile_definitions(arrange_focus_input PRIVATE _CONSOLE=1)
   target_link_libraries(arrange_focus_input PRIVATE Arrange::framework)
@@ -116,12 +121,12 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   add_executable(arrange_m3_layout_boundary arrange_m3_layout_boundary.cpp)
   target_link_libraries(arrange_m3_layout_boundary PRIVATE Arrange::framework)
   add_dependencies(arrange_m3_layout_boundary arrange_runtime_fixture)
-  add_test(NAME arrange_m3_layout_boundary COMMAND arrange_m3_layout_boundary "${CMAKE_SOURCE_DIR}/build/m3-layout-fixture/app.js")
+  add_test(NAME arrange_m3_layout_boundary COMMAND arrange_m3_layout_boundary "${ARRANGE_FIXTURE_ROOT}/m3-layout/app.js")
 endif()
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
   add_executable(arrange_m3_lazy arrange_m3_lazy.cpp)
   target_link_libraries(arrange_m3_lazy PRIVATE Arrange::framework)
   add_dependencies(arrange_m3_lazy arrange_runtime_fixture)
-  add_test(NAME arrange_m3_lazy COMMAND arrange_m3_lazy "${CMAKE_SOURCE_DIR}/build/m3-lazy-fixture/app.js")
+  add_test(NAME arrange_m3_lazy COMMAND arrange_m3_lazy "${ARRANGE_FIXTURE_ROOT}/m3-lazy/app.js")
 endif()

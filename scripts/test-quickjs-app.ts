@@ -1,5 +1,4 @@
 import { resolve } from 'node:path'
-import { buildDemoUi } from './demo-build.ts'
 import { configureSmokeBuild, nativeCmake, nativeExecutable, nativeTestDirectory } from './native-toolchain.ts'
 import { withNativeSession, nativeSessionRun as run } from "./native-session.ts"
 
@@ -8,9 +7,8 @@ await withNativeSession(async () => {
 
     const buildDir = nativeTestDirectory()
     const smokeExe = nativeExecutable(resolve(buildDir, 'cpp_tests'), 'arrange_quickjs_app_smoke')
-    const appBundle = resolve('build/demo-ui-dist/app.js')
+    const appBundle = resolve(buildDir, 'fixtures/gallery/app.js')
 
-    await buildDemoUi()
     await configureSmokeBuild(buildDir)
     await nativeCmake(["--build", buildDir, "--target", "arrange_quickjs_app_smoke", "arrange_juce_runtime_smoke", "--parallel", "4"])
 

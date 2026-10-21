@@ -8,7 +8,7 @@ type Edit = { start: number, end: number, text: string }
 const root = resolve(import.meta.dirname, '..')
 const write = process.argv.includes('--write')
 const requested = process.argv.slice(2).filter(argument => argument !== '--write')
-const files = requested.length ? requested : execFileSync('rg', ['--files', 'packages', 'cli', 'scripts', 'tests', 'demo', 'types', '-g', '*.ts', '-g', '*.mts', '-g', '*.cts', '-g', '*.js', '-g', '*.sfa'], { cwd: root, encoding: 'utf8' }).trim().split(/\r?\n/)
+const files = requested.length ? requested : execFileSync('rg', ['--files', 'packages', 'cli', 'scripts', 'tests', 'types', '-g', '*.ts', '-g', '*.mts', '-g', '*.cts', '-g', '*.js', '-g', '*.sfa'], { cwd: root, encoding: 'utf8' }).trim().split(/\r?\n/)
 
 function parse(source: string, filename: string) {
     return ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, filename.endsWith('.js') ? ts.ScriptKind.JS : ts.ScriptKind.TS)

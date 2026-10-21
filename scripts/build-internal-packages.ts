@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs
 import { resolve } from "node:path"
 import { repoRoot } from "./common.ts"
 import { assertArrangeVersionContract, readArrangeVersionContract } from "./version-contract.ts"
-import { ARRANGE_MACRO_PATTERN } from '../packages/vite-plugin/src/constraints.ts'
 
 type PackageManifest = {
     name?: unknown
@@ -180,22 +179,6 @@ function walkFiles(dir: string, visit: (path: string) => void): void {
     }
 }
 
-function assertNoMacrosInBundle(path: string): void {
-    const source = readFileSync(path, "utf8")
-    const match = source.match(ARRANGE_MACRO_PATTERN)
-    if (match) fail(`unresolved Arrange macro in app bundle ${path}: ${match[0]}`)
-}
-
-function assertNoMacrosInBuiltDemoBundle(): void {
-    const candidates = [
-        resolve(repoRoot, "build", "demo-ui-dist", "app.js"),
-        resolve(repoRoot, "demo", "plugin-src", "ui", "app.js"),
-    ]
-    const bundle = candidates.find((path) => existsSync(path))
-    if (!bundle) fail(`missing Arrange app bundle; run build:demo-ui before package boundary verification`)
-    assertNoMacrosInBundle(bundle)
-}
-
 const packageDirs = readdirSync(packagesRoot).map((name) => resolve(packagesRoot, name)).filter((path) => statSync(path).isDirectory() && existsSync(resolve(path, "package.json")))
 
 const contract = readArrangeVersionContract()
@@ -216,7 +199,7 @@ for (const pkgDir of packageDirs) {
     assertNoDistDirectory(pkgDir, pkgName)
 }
 
-for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
+for (const root of ["packages", "scripts", "tests"]) {
     walkFiles(resolve(repoRoot, root), (path) => {
         if (!/\.(?:ts|tsx|js|jsx|sfa|json)$/.test(path)) return
         if (path.endsWith("package.json")) return
@@ -224,6 +207,5 @@ for (const root of ["packages", "demo/ui-src", "scripts", "tests"]) {
     })
 }
 
-assertNoMacrosInBuiltDemoBundle()
 assertCliPackageContract()
 console.log('[ArrangePackageBuild]', "verified TS-first package and publish boundary contract")

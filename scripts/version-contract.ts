@@ -41,7 +41,6 @@ function packageJsonPaths(): string[] {
     const packagesRoot = resolve(repoRoot, "packages")
     return [
         resolve(repoRoot, "package.json"),
-        resolve(repoRoot, "demo/ui-src/package.json"),
         ...readdirSync(packagesRoot).map((name) => resolve(packagesRoot, name, "package.json")).filter((path) => existsSync(path)),
     ]
 }
