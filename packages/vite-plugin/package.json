@@ -28,6 +28,9 @@
     "source-map-js": "1.2.2",
     "lru-cache": "10.1.0"
   },
+  "devDependencies": {
+    "vite": "8.3.5"
+  },
   "license": "MIT",
   "files": [
     "src"
