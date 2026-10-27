@@ -42,6 +42,14 @@ M.if(condition: boolean, ifModifier: Modifier, elseModifier?: Modifier)
 
 `M.if` 是 Earzu Chan 大人原创的语法糖，作用等同条件分支拼接 Modifier。
 
+组合修饰：
+
+- `Modifier` 上的方法只对应原语，即单个原生 Modifier 元素。由多个原语组合而成的能力写成返回 `Modifier` 的普通函数，以 `then()` 拼入链中，如 `M.size(48.dp, 48.dp).then(adjustable(knob))`。官方与第三方组合使用同一写法。
+- 组合函数在每次重排时都会被调用，内部不创建、不记住状态。需要状态时由调用方在 setup 中以 `createXxxState()` 创建后传入。
+- 组合函数交给原语的回调须身份稳定，通常挂在传入的状态上。回调身份变化会让原生更换事件槽并重算命中与焦点。随声明变化的输入由状态记住最近一次值，回调内读取。
+
+取舍原因见 [ADR 018](../adr/018-无扩展函数与接收者时的Compose对齐约定.md)。
+
 # 阶段
 
 Modifier 可作用于：
@@ -127,7 +135,7 @@ M.zIndex(10)
 ```
 
 - `offset` 不改变测量尺寸，只影响放置位置。
-- `align`、`weight`、`matchParentSize` 是父布局数据。
+- `align`、`weight`、`matchParentSize` 是父布局数据，只能用于对应布局的直接子项：`matchParentSize` 对应 Box，`weight` 对应 Row、Column、Flow，`align` 须与父布局的对齐轴匹配。模板中可静态判定的误用在 SFA 编译期报错（见 [SFA 与模板写法](33-SFA与模板写法.md#父布局数据检查)），其余由原生布局校验报错。
 - `zIndex` 同时影响绘制顺序和默认命中顺序。同一链条中多个 `zIndex` 累加；同值保留父布局的放置顺序，命中从绘制的最后一项向前搜索。
 
 # 背景、边框、裁剪

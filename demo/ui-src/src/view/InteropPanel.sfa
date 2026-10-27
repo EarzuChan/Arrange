@@ -8,7 +8,7 @@
             <Box :modifier="M.size(56.dp, 56.dp).then(adjustable(knob, { pointerLock: true, valueText: gain.text, interactionState: knobInteraction })).pointerIcon('resizeVertical').onContextClick(showGainMenu).then(knobDrawing)" />
             <Column :vertical-arrangement="Arrangement.spacedBy(4.dp)">
                 <Text :text="`增益 ${gain.text}`" :style="bodyStyle" />
-                <Text text="拖动调节，Shift 精调，双击复位，滚轮与方向键步进，右键宿主菜单" :style="hintStyle" />
+                <Text text="拖动调节，Shift 精调，双击复位，方向键步进，右键宿主菜单" :style="hintStyle" />
             </Column>
         </Row>
 
@@ -58,7 +58,7 @@ const hostLine = computed(() => `${host.name ?? '独立运行'} · ${host.format
 const transportLine = computed(() => transport.playing ? `播放中 · ${transport.bpm?.toFixed(1) ?? '—'} BPM · 第 ${(transport.positionPpq ?? 0).toFixed(2)} 拍` : '走带停止')
 
 // 旋钮：一次拖动只对应一对参数 gesture，宿主记录为一次编辑；外观只读 fraction 与交互状态
-const knob = createValueDragState({ value: gain.editable(), wheel: { fraction: 0.02 } })
+const knob = createValueDragState({ value: gain.editable() })
 const knobInteraction = createInteractionState()
 
 function showGainMenu() {

@@ -152,3 +152,13 @@ test('adjustable 只组合公开原语并校验状态来源', () => {
     assert.throws(() => adjustable({} as never), TypeError)
     assert.throws(() => createValueDragState({ value: editableRef(ref(0)), fullRangeDp: 0 }), RangeError)
 })
+
+test('adjustable 重复调用时交给原语的回调身份不变，禁用后按键不再处理', () => {
+    const knob = createValueDragState({ value: editableRef(ref(0)), defaultValue: 0 })
+    const callbacks = (modifier: ReturnType<typeof adjustable>) => modifier.elements.flatMap(item => Object.values(item.value).filter(value => typeof value === 'function'))
+    const first = adjustable(knob)
+    assert.deepEqual(callbacks(adjustable(knob, { valueText: '变化' })), callbacks(first))
+    const disabled = adjustable(knob, { enabled: false })
+    assert.equal(key(disabled, 'ArrowUp'), false)
+    assert.equal(knob.value, 0)
+})

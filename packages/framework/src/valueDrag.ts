@@ -64,6 +64,14 @@ interface ValueDragInternal {
     stopped(): void
     wheel(event: WheelEvent): void
     key(event: KeyEvent): boolean
+    // 交给原语的回调随状态创建一次，组合函数重复调用时身份不变，原生事件槽因此不随重排更换
+    readonly click: () => void
+    readonly reset: () => void
+    readonly onKey: (event: KeyEvent) => boolean
+    readonly increment: () => void
+    readonly decrement: () => void
+    // 最近一次 adjustable 声明的启用状态
+    enabled: boolean
 }
 
 const internals = new WeakMap<object, ValueDragInternal>()
@@ -188,6 +196,12 @@ export function createValueDragState(options: ValueDragOptions): ValueDragState 
             wheelTarget = clampUnit(wheelTarget + amount)
             writeFraction(wheelTarget)
         },
+        click: () => { },
+        reset: () => state.reset(),
+        onKey: event => internal.enabled && internal.key(event),
+        increment: () => state.stepBy(1),
+        decrement: () => state.stepBy(-1),
+        enabled: true,
         key: event => {
             if (event.type !== 'down') return false
             const keys: Record<string, () => void> = {
@@ -268,12 +282,12 @@ export type AdjustableOptions = { pointerLock?: boolean; startImmediately?: bool
 // 只组合公开原语：拖动、双击复位、焦点与按键、滚轮和语义
 export function adjustable(state: ValueDragState, args: AdjustableOptions = {}): Modifier {
     const internal = valueDragInternal(state)
-    const enabled = args.enabled ?? true
+    const enabled = internal.enabled = args.enabled ?? true
     const { interactionState } = args
     const drag = { enabled, pointerLock: args.pointerLock, startImmediately: args.startImmediately, interactionState, onDragStarted: internal.started, onDragStopped: internal.stopped }
     let modifier = state.mapping === 'both' || state.mapping === 'angle' ? M.draggable2D(internal.drag2D, drag) : M.draggable(internal.drag, { ...drag, orientation: state.mapping === 'horizontal' ? 'horizontal' : 'vertical' })
-    if (state.defaultValue !== undefined || state.editable.defaultValue !== undefined) modifier = modifier.clickable({ onClick: () => { }, onDoubleClick: () => state.reset(), enabled, focusable: false })
-    modifier = modifier.focusable({ enabled, interactionState }).onKeyEvent(event => enabled && internal.key(event))
+    if (state.defaultValue !== undefined || state.editable.defaultValue !== undefined) modifier = modifier.clickable({ onClick: internal.click, onDoubleClick: internal.reset, enabled, focusable: false })
+    modifier = modifier.focusable({ enabled, interactionState }).onKeyEvent(internal.onKey)
     if (state.wheel) modifier = modifier.onWheel(internal.wheel, { enabled })
-    return modifier.semantics({ role: 'slider', valueText: args.valueText, enabled, increment: () => state.stepBy(1), decrement: () => state.stepBy(-1) })
+    return modifier.semantics({ role: 'slider', valueText: args.valueText, enabled, increment: internal.increment, decrement: internal.decrement })
 }
