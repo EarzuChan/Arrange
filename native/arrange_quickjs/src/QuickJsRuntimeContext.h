@@ -5,6 +5,7 @@
 #include "QuickJsEventRegistry.h"
 #include "QuickJsModuleLoader.h"
 #include "QuickJsPainterResources.h"
+#include "QuickJsInterop.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <arrange/core/Mutation.h>
 #include <arrange/core/MutationTransaction.h>
@@ -63,6 +64,8 @@ namespace arrange::quickjs {
         QuickJsModuleLoader moduleLoader;
         arrange::core::PainterLoader painterLoader;
         std::unique_ptr<QuickJsPainterResources> painters;
+        arrange::core::InteropHost* interopHost = nullptr;
+        std::unique_ptr<QuickJsInterop> interop;
         std::unordered_map<arrange::core::NodeId, arrange::core::MeasurePolicy> measurePolicies;
         std::unordered_map<arrange::core::NodeId, arrange::core::NodeType> nodeTypes;
         std::unordered_map<arrange::core::NodeId, std::uint64_t> nodeGenerations;

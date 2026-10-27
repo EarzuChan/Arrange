@@ -16,6 +16,7 @@
       "@arrange/framework/foundation": ["packages/framework/src/foundation.ts"],
       "@arrange/framework/ui": ["packages/framework/src/ui.ts"],
       "@arrange/framework/animation": ["packages/framework/src/animation/index.ts"],
+      "@arrange/framework/interop": ["packages/framework/src/interop.ts"],
       "@arrange/framework/internal": ["packages/framework/src/internal.ts"],
       "@arrange/framework/vite": ["packages/framework/src/vite.ts"],
       "@arrange/compiler": ["packages/compiler/src/sfa/index.ts"],

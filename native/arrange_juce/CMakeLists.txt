@@ -21,6 +21,7 @@ endif()
 
 target_sources(arrange_juce PRIVATE
   src/ArrangeEditor.cpp
+  src/Interop.cpp
   src/ArrangeRuntime.cpp
   src/EditorChromeModel.cpp
   src/RearrangeHost.cpp

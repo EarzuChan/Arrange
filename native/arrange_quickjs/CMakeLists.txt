@@ -20,6 +20,7 @@ target_sources(arrange_quickjs PRIVATE
   src/QuickJsNativeApi.cpp
   src/Log.cpp
   src/QuickJsPainterResources.cpp
+  src/QuickJsInterop.cpp
   src/QuickJsRuntimeContext.cpp
   src/QuickJsScriptHost.cpp
   src/QuickJsValueReader.cpp

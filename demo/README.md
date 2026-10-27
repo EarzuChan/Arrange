@@ -15,6 +15,6 @@ arrange pack --flavor release --product standalone vst3
 
 ---
 
-Demo 不直接依赖本仓裸代码，而是通过包关系（NPM package 和 CMake FetchContent Git repo；不管是 Local 还是 Remote）使用“发行了的依赖”。目前 Demo 在使用 0.0.0-m.3.0。
+Demo 不直接依赖本仓裸代码，而是通过包关系（NPM package 和 CMake FetchContent Git repo；不管是 Local 还是 Remote）使用“发行了的依赖”。M4 施工期间 Demo 经本机来源消费 dev 版本（见[本机发包](../docs/proj/5：具体开发的额外约束.md#本机发包)），共享配置记录当前 dev 版本号。
 
 长期工程边界与可选本机 FetchContent 源码覆盖见仓库内的 [Demo 母文档](../docs/arch/23-Demo.md)；本轮证据与实机待办见 [M2 工作区记录](../docs/proj/m2：已完成/2：初步完成，Win测中，待收尾/M2.2的最后工作中.md)。

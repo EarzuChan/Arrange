@@ -26,6 +26,7 @@ add_library(arrange_core STATIC
   src/Scroll.cpp
   src/InputEditing.cpp
   src/Paint.cpp
+  src/Interop.cpp
 )
 add_library(Arrange::core ALIAS arrange_core)
 target_include_directories(arrange_core PUBLIC

@@ -53,6 +53,64 @@ export type NativeBindingHandle = Readonly<{ identity: bigint; generation: bigin
 
 export type NativeModifierHandle = NativeBindingHandle & Readonly<{ key: string; kind: string }>
 
+export type NativeInteropValue = null | boolean | number | string | readonly NativeInteropValue[] | { readonly [key: string]: NativeInteropValue }
+
+export type NativeParameterDescriptor = Readonly<{
+    index: number
+    id: string
+    name: string
+    label: string
+    defaultNormalized: number
+    steps: number
+    discrete: boolean
+    boolean: boolean
+    minimum: number
+    maximum: number
+    value: number
+}>
+
+export type NativeHostFormat = 'standalone' | 'vst3' | 'au' | 'aax' | 'lv2' | 'unknown'
+
+export type NativeHostInfo = Readonly<{ name: string | null; format: NativeHostFormat; sampleRate: number | null; blockSize: number | null }>
+
+export type NativeTransport = Readonly<{
+    playing: boolean
+    recording: boolean
+    looping: boolean
+    bpm: number | null
+    timeSignature: Readonly<{ numerator: number; denominator: number }> | null
+    positionPpq: number | null
+    positionSeconds: number | null
+}>
+
+export interface NativeInteropDriver {
+    parameters(indices: readonly number[], values: readonly number[]): void
+    host(info: NativeHostInfo): void
+    transport(state: NativeTransport): void
+    meter(name: string, level: number): void
+    waveform(name: string, samples: Float32Array): void
+    spectrum(name: string, values: Float32Array): void
+    message(name: string, value: NativeInteropValue): void
+    reply(id: number, ok: boolean, value: NativeInteropValue, error: string): void
+}
+
+export type NativeInterop = {
+    install: (driver: NativeInteropDriver) => void
+    parameters: () => readonly NativeParameterDescriptor[]
+    parameterValue: (index: number) => number
+    toPlain: (index: number, normalized: number) => number
+    toNormalized: (index: number, value: number) => number
+    text: (index: number, normalized: number) => string
+    parse: (index: number, text: string) => number | null
+    gesture: (index: number, phase: 'begin' | 'end') => void
+    set: (index: number, normalized: number, complete: boolean) => void
+    host: () => NativeHostInfo
+    transport: () => NativeTransport
+    subscribe: (kind: 'meter' | 'waveform' | 'spectrum' | 'transport', name: string, size?: number) => number
+    unsubscribe: (id: number) => void
+    invoke: (name: string, args: NativeInteropValue) => number
+}
+
 export type NativeTransactionTarget = {
     focusCommand?: (operation: 'request' | 'clear' | 'move' | 'cancel', requester: number, direction?: import('./focus.ts').FocusDirection) => boolean
     installFrameDriver: (prepare: (time: number) => void, complete: (success: boolean) => void, dispose: () => void) => void
@@ -81,6 +139,7 @@ export type NativeTransactionTarget = {
     diagnosticsRequestReload?: (payload?: NativeReloadPayload) => void
     diagnosticsTriggerFakeError?: (payload?: { message?: string }) => void
     diagnosticsSetToastsEnabled?: (enabled: boolean) => void
+    interop?: NativeInterop
 }
 
 export type NativeMutation = (target: NativeTransactionTarget) => void

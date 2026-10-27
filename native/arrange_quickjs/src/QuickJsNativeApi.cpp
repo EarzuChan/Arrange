@@ -532,6 +532,7 @@ namespace arrange::quickjs {
         ScopedValue native(context, JS_NewObject(context));
         JS_SetPropertyFunctionList(context, native.get(), nativeApiFunctions, static_cast<int>(std::size(nativeApiFunctions)));
         runtime.painters->install(native.get());
+        if (runtime.interop) runtime.interop->install(native.get());
         JS_SetPropertyStr(context, native.get(), "runtimeVersion", JS_NewUint32(context, arrange::core::RuntimeVersion));
         JS_SetPropertyStr(context, global.get(), "__ARRANGE_NATIVE__", native.release());
 

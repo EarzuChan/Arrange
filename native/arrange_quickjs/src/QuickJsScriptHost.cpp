@@ -139,6 +139,8 @@ namespace arrange::quickjs {
                 runtime.materializeLayout = JS_UNDEFINED;
                 runtime.prepareFrame = runtime.completeFrame = runtime.disposeApp = JS_UNDEFINED;
                 runtime.painters.reset();
+                if (runtime.interop) runtime.interop->close();
+                runtime.interop.reset();
                 JS_FreeValue(runtime.context, runtime.rearrangeCompletion);
                 runtime.rearrangeCompletion = JS_UNDEFINED;
                 if (runtime.rearrangeSubmission) runtime.rearrangeSubmission->cancelled = true;
@@ -220,6 +222,7 @@ namespace arrange::quickjs {
             runtime.events.reset(runtime.context);
             JS_SetContextOpaque(runtime.context, &runtime);
             runtime.painters = std::make_unique<QuickJsPainterResources>(runtime.context, runtime.painterLoader);
+            if (runtime.interopHost) runtime.interop = std::make_unique<QuickJsInterop>(runtime.context, *runtime.interopHost, runtime.wakeOwner);
             QuickJsNativeApi::install(runtime.context, runtime);
         }
 
@@ -282,6 +285,11 @@ namespace arrange::quickjs {
 
     void QuickJsScriptHost::setPainterLoader(arrange::core::PainterLoader loader) {
         impl_->runtime.painterLoader = std::move(loader);
+    }
+
+    void QuickJsScriptHost::setInteropHost(arrange::core::InteropHost* host) {
+        if (impl_->runtime.context) throw std::logic_error("互操作宿主须在加载脚本前设置");
+        impl_->runtime.interopHost = host;
     }
 
     std::size_t QuickJsScriptHost::eventSlotCount() const noexcept {
@@ -387,6 +395,7 @@ namespace arrange::quickjs {
 
     void QuickJsScriptHost::setOwnerWake(std::function<void()> wake) {
         impl_->runtime.wakeOwner = std::move(wake);
+        if (impl_->runtime.interop) impl_->runtime.interop->setWakeOwner(impl_->runtime.wakeOwner);
     }
 
     CallbackInvokeResult QuickJsScriptHost::semanticCheckpoint(double nowMillis) {
@@ -397,16 +406,18 @@ namespace arrange::quickjs {
         setFrameTimeMillis(nowMillis);
         state.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
         if (state.painters && !state.painters->pump()) return {false, impl_->exceptionText(state.context)};
+        if (state.interop && !state.interop->pump()) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
 
     bool QuickJsScriptHost::hasPendingSemanticWork() const noexcept {
-        return impl_ && impl_->runtime.context && (JS_IsJobPending(impl_->runtime.runtime) || (impl_->runtime.painters && impl_->runtime.painters->hasPending()));
+        return impl_ && impl_->runtime.context && (JS_IsJobPending(impl_->runtime.runtime) || (impl_->runtime.painters && impl_->runtime.painters->hasPending()) || (impl_->runtime.interop && impl_->runtime.interop->hasPending()));
     }
 
     bool QuickJsScriptHost::hasPendingVisualWork() const noexcept {
-        return impl_ && impl_->runtime.frameRequested;
+        // 播放中的走带与观测订阅按帧拉取，由 VBlank 驱动语义检查点交付
+        return impl_ && (impl_->runtime.frameRequested || (impl_->runtime.interop && impl_->runtime.interop->wantsFrames()));
     }
 
     CallbackInvokeResult QuickJsScriptHost::prepareVisualFrame(double nowMillis) {

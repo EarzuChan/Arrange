@@ -46,6 +46,7 @@ namespace arrange::juce {
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         try {
             scriptHost->setPainterLoader(livePainterLoader(resolved.devServerUrl));
+            scriptHost->setInteropHost(config.interop);
         } catch (const std::exception& failure) {
             result.error = makeErrorScreenModel(ErrorSource::AppPackage, failure.what(), {}, bundleUrl);
             setToast(result, LogLevel::Error, "Live 资源来源无效", failure.what());
@@ -83,6 +84,7 @@ namespace arrange::juce {
 #if ARRANGE_WITH_QUICKJS_NG
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
+        scriptHost->setInteropHost(config.interop);
         arrange::quickjs::AppScriptLoader loader(*scriptHost);
         const auto loaded = loader.loadEntry(resolved.entryPath);
         if (!loaded.ok) {

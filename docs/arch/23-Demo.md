@@ -45,7 +45,7 @@ Demo 产品版本独立于框架版本。`arrange.project.yaml` 的 Framework �
 
 ## 本机来源与独立移动
 
-验证尚未公开发布的 Framework 时，先按[本机发包流程](../proj/5：具体开发的额外约束.md#本机发包)把包发到本机 Verdaccio、在本仓库打 dev tag，再在不提交的 `arrange.local.yaml` 中覆盖获取来源：
+验证尚未公开发布的 Framework 时，先按[本机发包流程](../proj/5：具体开发的额外约束.md#本机发包)把包发到本机 Verdaccio、在本仓库打本地 tag，再在不提交的 `arrange.local.yaml` 中覆盖获取来源：
 
 ```yaml
 framework:
@@ -53,7 +53,7 @@ framework:
   cmakeFetchContentUrl: ..
 ```
 
-共享配置的 `framework.version` 改为对应的 dev 版本后 sync。UI 与 Native 都经正式包消费路径获取同一版本，覆盖规则见[配置分工](31-ArrangeCLI与工程模式.md#配置分工)。
+共享配置的 `framework.version` 改为对应版本后 sync。UI 与 Native 都经正式包消费路径获取同一版本，覆盖规则见[配置分工](31-ArrangeCLI与工程模式.md#配置分工)。
 
 只需临时验证未提交的 Native 源码时，也可改用标准 CMake 覆盖 `native.cmakeDefinitions.FETCHCONTENT_SOURCE_DIR_ARRANGE`（本机 Arrange 源码根绝对路径）。它只覆盖 Native，UI 仍消费实际安装的 npm 包，且不能与本机仓库覆盖并用。
 
@@ -76,7 +76,7 @@ Demo 插件目标：
 
 选择 Effect 而非 Instrument，是为了减少 MIDI 处理干扰，更适合快速真实宿主测试。
 
-不实际处理音频：参数仅用于 Demo 测试，不会对实际声效产生影响。
+Demo 用 APVTS 声明增益、削波模式与旁通参数，并真实处理音频，供参数联动、自动化、走带与电平 / 波形 / 频谱观测的互操作验收；处理只为验收服务，不追求音质。
 
 # 具体实现
 

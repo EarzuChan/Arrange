@@ -2,12 +2,13 @@ import * as core from '@arrange/framework'
 import * as foundation from '@arrange/framework/foundation'
 import * as ui from '@arrange/framework/ui'
 import * as animation from '@arrange/framework/animation'
+import * as interop from '@arrange/framework/interop'
 import * as internal from '@arrange/framework/internal'
 import assert from 'node:assert/strict'
 import ts from 'typescript'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 
-const modules: Record<string, unknown> = { '@arrange/framework': core, '@arrange/framework/foundation': foundation, '@arrange/framework/ui': ui, '@arrange/framework/animation': animation, '@arrange/framework/internal': internal }
+const modules: Record<string, unknown> = { '@arrange/framework': core, '@arrange/framework/foundation': foundation, '@arrange/framework/ui': ui, '@arrange/framework/animation': animation, '@arrange/framework/interop': interop, '@arrange/framework/internal': internal }
 
 export function requireSfaModule(name: string): unknown {
     if (!Object.hasOwn(modules, name)) throw new Error(`测试未提供 SFA 依赖：${name}`)

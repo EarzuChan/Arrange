@@ -8,6 +8,8 @@
             <Image :painter="logoPainter" :modifier="M.size(96.dp, 40.dp)"/>
         </Row>
 
+        <InteropPanel a-if="interopReady"/>
+
         <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :modifier="M.fillMaxWidth().height(44.dp)">
             <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFF3A7AFE))"/>
 
@@ -65,8 +67,13 @@ import ShowcaseGallery from './view/ShowcaseGallery.sfa'
 import PropBoundary from './view/PropBoundary.sfa'
 import RefRelay from './view/RefRelay.sfa'
 import M3Gallery from './view/M3Gallery.sfa'
+import InteropPanel from './view/InteropPanel.sfa'
+import { hasInterop } from '@arrange/framework/interop'
 
 const TAG = "App"
+
+// 插件宿主才连接 Interop；无宿主的预览与测试夹具不显示互操作面板
+const interopReady = hasInterop()
 
 const clicks = ref(0)
 const firstRef = ref(11)

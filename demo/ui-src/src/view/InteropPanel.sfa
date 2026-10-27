@@ -1,0 +1,149 @@
+<template>
+    <Column :modifier="M.width(460.dp).padding(16.dp).background(Color(0xff172331))" :vertical-arrangement="Arrangement.spacedBy(10.dp)">
+        <Text text="宿主互操作" :style="{ fontSize: 21.sp, color: Color(0xffedf4fa) }" />
+        <Text :text="hostLine" :style="hintStyle" />
+        <Text :text="transportLine" :style="hintStyle" />
+
+        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
+            <Text :text="`增益 ${gain.text}`" :style="bodyStyle" :modifier="M.width(104.dp).padding({ vertical: 7.dp })" />
+            <GalleryButton text="-1 dB" :on-click="() => { stopSweep(); gain.value = gain.value - 1 }" />
+            <GalleryButton text="+1 dB" :on-click="() => { stopSweep(); gain.value = gain.value + 1 }" />
+            <GalleryButton text="复位" :on-click="() => { stopSweep(); gain.reset() }" />
+            <GalleryButton text="扫一遍" :active="sweeping" :on-click="sweep" />
+        </Row>
+
+        <Box :modifier="M.fillMaxWidth().height(8.dp).then(gainBar)" />
+
+        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
+            <GalleryButton a-for="name in modeNames" :key="name" :text="name" :active="mode.value === modeNames.indexOf(name)" :on-click="() => mode.value = modeNames.indexOf(name)" />
+            <GalleryButton text="旁通" :active="bypass.value > 0.5" :on-click="() => bypass.value = bypass.value > 0.5 ? 0 : 1" />
+        </Row>
+
+        <Box :modifier="M.fillMaxWidth().height(12.dp).then(meterBar)" />
+        <Box :modifier="M.fillMaxWidth().height(72.dp).then(scopeDrawing)" />
+        <Box :modifier="M.fillMaxWidth().height(72.dp).then(spectrumDrawing)" />
+
+        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
+            <GalleryButton a-for="name in presets" :key="name" :text="name" :on-click="() => loadPreset(name)" />
+            <GalleryButton text="存为新预设" :on-click="savePreset" />
+        </Row>
+
+        <Text :text="status" :style="hintStyle" />
+    </Column>
+</template>
+
+<script>
+import { computed, ref, watch, onMounted } from '@arrange/framework'
+import { useParameter, useHost, useTransport, useMeter, useWaveform, useSpectrum, onNativeEvent, invokeNative } from '@arrange/framework/interop'
+import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
+import { Arrangement, Color, M } from '@arrange/framework/ui'
+import GalleryButton from './GalleryButton.sfa'
+
+const hintStyle = { fontSize: 12.sp, color: Color(0xff91a6b8) }
+const bodyStyle = { fontSize: 13.sp, color: Color(0xffdae6f0) }
+const modeNames = ['Clean', 'Soft Clip', 'Hard Clip']
+
+const gain = useParameter('gain')
+const mode = useParameter('mode')
+const bypass = useParameter('bypass')
+const host = useHost()
+const transport = useTransport()
+const level = useMeter('output')
+const samples = useWaveform('output', { size: 256 })
+const bins = useSpectrum('output')
+
+const presets = ref<string[]>([])
+const status = ref('电平、波形与频谱随音频实时刷新；宿主自动化会同步到这里')
+
+const hostLine = computed(() => `${host.name ?? '独立运行'} · ${host.format} · ${host.sampleRate ? `${host.sampleRate} Hz / ${host.blockSize} 样本` : '音频未就绪'}`)
+const transportLine = computed(() => transport.playing ? `播放中 · ${transport.bpm?.toFixed(1) ?? '—'} BPM · 第 ${(transport.positionPpq ?? 0).toFixed(2)} 拍` : '走带停止')
+
+// gesture 演示：一次连续编辑只对应一对 begin / end，宿主记录为一次拖动
+// gesture 在 setup 中创建并反复使用，面板卸载时随 scope 自动结束
+const sweepTarget = ref(gain.normalized)
+const sweepValue = animatedNumberAsRef(() => sweepTarget.value, { animationSpec: tween({ durationMillis: 1200, easing: linearEasing }) })
+const sweeping = ref(false)
+const drag = gain.gesture()
+
+function sweep() {
+    if (sweeping.value) return
+    drag.begin()
+    sweeping.value = true
+    sweepTarget.value = gain.normalized > 0.5 ? 0 : 1
+}
+
+function stopSweep() {
+    if (!sweeping.value) return
+    sweeping.value = false
+    drag.end()
+}
+
+watch(sweepValue, value => {
+    if (!sweeping.value) return
+    drag.setNormalized(value)
+    if (value === sweepTarget.value) stopSweep()
+})
+
+watch(() => gain.normalized, value => { if (!sweeping.value) sweepTarget.value = value })
+
+const gainBar = M.drawBehind(scope => {
+    scope.drawRect({ color: Color(0xff223647) })
+    scope.drawRect({ width: (scope.size.width * gain.normalized).px, color: Color(0xff61d6bb) })
+})
+
+const meterBar = M.drawBehind(scope => {
+    const decibels = 20 * Math.log10(Math.max(level.value, 1e-4))
+    const fill = Math.min(1, Math.max(0, (decibels + 60) / 60))
+    scope.drawRect({ color: Color(0xff223647) })
+    scope.drawRect({ width: (scope.size.width * fill).px, color: decibels > -3 ? Color(0xffef9a74) : Color(0xff79a8ea) })
+})
+
+const scopeDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const data = samples.value
+    scope.drawRect({ color: Color(0xff101b26) })
+    scope.drawLine({ startX: 0.px, startY: (height / 2).px, endX: width.px, endY: (height / 2).px, color: Color(0xff29394a), strokeWidth: 1.px })
+    for (let i = 1; i < data.length; i++) {
+        const x0 = (i - 1) / (data.length - 1) * width
+        const x1 = i / (data.length - 1) * width
+        scope.drawLine({ startX: x0.px, startY: (height / 2 * (1 - data[i - 1])).px, endX: x1.px, endY: (height / 2 * (1 - data[i])).px, color: Color(0xff61d6bb), strokeWidth: 1.5.px })
+    }
+})
+
+const spectrumDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const data = bins.value
+    scope.drawRect({ color: Color(0xff101b26) })
+    if (!data.length) return
+    const step = width / data.length
+    for (let i = 0; i < data.length; i++) {
+        const barHeight = Math.max(1, data[i] * height)
+        scope.drawRect({ x: (i * step + 1).px, y: (height - barHeight).px, width: Math.max(1, step - 2).px, height: barHeight.px, color: Color.hsl(200 - data[i] * 160, 0.7, 0.55) })
+    }
+})
+
+async function refreshPresets() {
+    presets.value = [...await invokeNative<string[]>('presets')]
+}
+
+async function loadPreset(name: string) {
+    try {
+        await invokeNative('loadPreset', name)
+    } catch (error) {
+        status.value = `载入失败：${(error as Error).message}`
+    }
+}
+
+async function savePreset() {
+    try {
+        const saved = await invokeNative<string>('savePreset', `User ${presets.value.filter(name => name.startsWith('User ')).length + 1}`)
+        status.value = `已保存 ${saved}`
+        await refreshPresets()
+    } catch (error) {
+        status.value = `保存失败：${(error as Error).message}`
+    }
+}
+
+onNativeEvent<{ name: string }>('presetLoaded', value => { status.value = `已载入预设 ${value.name}` })
+onMounted(refreshPresets)
+</script>

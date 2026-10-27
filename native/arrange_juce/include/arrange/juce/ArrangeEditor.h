@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <arrange/Log.h>
+#include <arrange/core/Interop.h>
 #include "App.h"
 #include "EditorFrameClock.h"
 
@@ -47,6 +48,8 @@ namespace arrange::juce {
         int height = 300;
         WindowConfig window;
         DiagnosticsConfig diagnostics;
+        // 非拥有：通常指向 processor 持有的 arrange::juce::Interop，寿命须长于 Editor
+        arrange::core::InteropHost* interop = nullptr;
     };
 
 #if ARRANGE_JUCE_WITH_JUCE

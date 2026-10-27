@@ -12,6 +12,7 @@
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Painter.h>
 #include <arrange/core/FocusTypes.h>
+#include <arrange/core/Interop.h>
 #include <arrange/Log.h>
 #include "ScriptHost.h"
 #include "LiveModule.h"
@@ -60,6 +61,8 @@ namespace arrange::quickjs {
         explicit QuickJsScriptHost(ScriptExecutionLimits limits = {});
         ~QuickJsScriptHost() override;
         void setPainterLoader(arrange::core::PainterLoader loader);
+        // 宿主寿命须长于本脚本宿主；须在加载脚本前设置
+        void setInteropHost(arrange::core::InteropHost* host);
 
         ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override;
         ScriptExecutionResult executeLiveModules(const LiveModuleSnapshot& snapshot);
