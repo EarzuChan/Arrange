@@ -109,7 +109,7 @@ namespace arrange::core {
         bool operator==(const ClipModifier&) const = default;
     };
 
-    enum class InputModifierKind { Clickable, Hoverable, Focusable, ContextClick, PointerIcon, KeyEvent, Wheel, Draggable };
+    enum class InputModifierKind { Clickable, Hoverable, Focusable, ContextClick, PointerIcon, KeyEvent, Wheel, Draggable, PointerInput };
 
     enum class PointerIcon : std::uint8_t { Default, Hand, Text, Crosshair, ResizeHorizontal, ResizeVertical, Grab, Grabbing, None };
 

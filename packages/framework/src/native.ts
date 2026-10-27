@@ -104,6 +104,7 @@ export type NativeInterop = {
     parse: (index: number, text: string) => number | null
     gesture: (index: number, phase: 'begin' | 'end') => void
     set: (index: number, normalized: number, complete: boolean) => void
+    hostMenu: (index: number) => boolean
     host: () => NativeHostInfo
     transport: () => NativeTransport
     subscribe: (kind: 'meter' | 'waveform' | 'spectrum' | 'transport', name: string, size?: number) => number

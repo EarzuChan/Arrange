@@ -202,6 +202,12 @@ namespace arrange::juce {
                 pending->deltaY += delta->deltaY;
                 return;
             }
+        // 连续指针移动只保留最新位置；按下、抬起、取消与进出不合并
+        if (const auto* move = std::get_if<arrange::core::PointerInputPayload>(&payload); move && move->type == arrange::core::PointerInputType::Move && !events_.empty() && events_.back().kind == QueuedEventKind::InvokeInput && events_.back().slot == slot && events_.back().ownerGeneration == ownerGeneration_)
+            if (auto* pending = std::get_if<arrange::core::PointerInputPayload>(&events_.back().input); pending && pending->type == arrange::core::PointerInputType::Move && pending->modifiers == move->modifiers) {
+                *pending = *move;
+                return;
+            }
         QueuedEvent event;
         event.kind = QueuedEventKind::InvokeInput;
         event.slot = slot;

@@ -107,13 +107,14 @@ export class UnitResolver {
     }
 
     // 原生指针事件为受体本地 PX；按回调缓存包装，避免每次重排都换掉事件槽
-    private readonly pointerCallbacks = new WeakMap<object, (event: { x: number; y: number; modifiers: unknown }) => unknown>()
+    private readonly pointerCallbacks = new WeakMap<object, (event: { type?: string; x: number; y: number; modifiers: unknown }) => unknown>()
 
     private pointerCallback(callback: unknown): unknown {
         if (typeof callback !== 'function') return callback
         let wrapped = this.pointerCallbacks.get(callback)
         if (!wrapped) {
-            wrapped = event => callback(Object.freeze({ xDp: this.density.pxToDp(event.x), yDp: this.density.pxToDp(event.y), modifiers: Object.freeze(event.modifiers) }))
+            // pointerInput 事件另带 type
+            wrapped = event => callback(Object.freeze({ ...'type' in event ? { type: event.type } : {}, xDp: this.density.pxToDp(event.x), yDp: this.density.pxToDp(event.y), modifiers: Object.freeze(event.modifiers) }))
             this.pointerCallbacks.set(callback, wrapped)
         }
         return wrapped
@@ -206,6 +207,7 @@ export class UnitResolver {
         else if (type === 'onContextClick') value = { ...value, callback: this.pointerCallback(value.callback) }
         else if (type === 'draggable') value = this.resolveDraggable(value)
         else if (type === 'onWheel') value = { ...value, callback: this.wheelCallback(value.callback) }
+        else if (type === 'pointerInput') value = { ...value, callback: this.pointerCallback(value.callback) }
 
         if (value.shape && typeof value.shape === 'object') value = { ...value, shape: resolveShape(value.shape as Readonly<Record<string, unknown>>, this) }
         value = this.resolveFixedFields(type, value)

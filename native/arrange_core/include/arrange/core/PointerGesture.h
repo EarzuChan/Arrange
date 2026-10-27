@@ -82,6 +82,7 @@ namespace arrange::core {
             int clicks = 1;
             std::optional<HitTestResult> clickable;
             std::optional<HitTestResult> draggable;
+            std::optional<HitTestResult> pointer;
             bool moved = false;
             bool dragging = false;
             bool locked = false;
@@ -92,10 +93,14 @@ namespace arrange::core {
         // 按节点汇总悬停、按下与拖动中，变化时交付给该节点全部 interaction 槽
         void syncInteractions(const LayoutTree& tree, PointerGestureOutput& out);
         void stopDrag(const LayoutTree& tree, bool cancelled, PointerGestureOutput& out);
+        // pointerInput 受体的进入、移动与离开；按下期间只交付给按下的受体
+        void updateStreams(const LayoutTree& tree, const std::vector<HitTestResult>& chain, const PointerSample& sample, PointerGestureOutput& out);
+        void emitPressed(const LayoutTree& tree, PointerInputType type, const PointerSample& sample, PointerGestureOutput& out);
 
         std::optional<Press> press_;
         std::vector<HitTestResult> hovered_;
         std::vector<HitTestResult> chain_;
+        std::vector<HitTestResult> streams_;
         std::vector<std::pair<NodeHandle, InteractionPayload>> interactions_;
         PointerIcon icon_ = PointerIcon::Default;
         float touchSlop_ = 4.0f;

@@ -152,7 +152,7 @@ namespace arrange::quickjs {
 
     void QuickJsInterop::install(JSValueConst native) {
         static const JSCFunctionListEntry functions[] = {
-            JS_CFUNC_DEF("install", 1, jsInstall), JS_CFUNC_DEF("parameters", 0, jsParameters), JS_CFUNC_DEF("parameterValue", 1, jsParameterValue), JS_CFUNC_DEF("toPlain", 2, jsToPlain), JS_CFUNC_DEF("toNormalized", 2, jsToNormalized), JS_CFUNC_DEF("text", 2, jsText), JS_CFUNC_DEF("parse", 2, jsParse), JS_CFUNC_DEF("gesture", 2, jsGesture), JS_CFUNC_DEF("set", 3, jsSet), JS_CFUNC_DEF("host", 0, jsHost), JS_CFUNC_DEF("transport", 0, jsTransport), JS_CFUNC_DEF("subscribe", 3, jsSubscribe), JS_CFUNC_DEF("unsubscribe", 1, jsUnsubscribe), JS_CFUNC_DEF("invoke", 2, jsInvoke),
+            JS_CFUNC_DEF("install", 1, jsInstall), JS_CFUNC_DEF("parameters", 0, jsParameters), JS_CFUNC_DEF("parameterValue", 1, jsParameterValue), JS_CFUNC_DEF("toPlain", 2, jsToPlain), JS_CFUNC_DEF("toNormalized", 2, jsToNormalized), JS_CFUNC_DEF("text", 2, jsText), JS_CFUNC_DEF("parse", 2, jsParse), JS_CFUNC_DEF("gesture", 2, jsGesture), JS_CFUNC_DEF("set", 3, jsSet), JS_CFUNC_DEF("hostMenu", 1, jsHostMenu), JS_CFUNC_DEF("host", 0, jsHost), JS_CFUNC_DEF("transport", 0, jsTransport), JS_CFUNC_DEF("subscribe", 3, jsSubscribe), JS_CFUNC_DEF("unsubscribe", 1, jsUnsubscribe), JS_CFUNC_DEF("invoke", 2, jsInvoke),
         };
         ScopedValue interop(context_, JS_NewObject(context_));
         JS_SetPropertyFunctionList(context_, interop.get(), functions, static_cast<int>(std::size(functions)));
@@ -439,6 +439,13 @@ namespace arrange::quickjs {
             bridge.host_->setParameter(index, value);
         }
         return JS_UNDEFINED;
+    }
+
+    JSValue QuickJsInterop::jsHostMenu(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        auto& bridge = self(context);
+        std::size_t index = 0;
+        if (argc < 1 || !bridge.parameterIndex(argv[0], index)) return JS_EXCEPTION;
+        return JS_NewBool(context, bridge.host_->showParameterMenu(index));
     }
 
     JSValue QuickJsInterop::jsHost(JSContext* context, JSValueConst, int, JSValueConst*) {

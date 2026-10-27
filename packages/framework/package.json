@@ -1,6 +1,6 @@
 {
   "name": "@arrange/framework",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "private": false,
   "type": "module",
   "exports": {
@@ -42,10 +42,10 @@
     "vite": "8.3.5",
     "lru-cache": "10.1.0",
     "typescript": "^5.9.0",
-    "@arrange/reactivity": "0.4.2",
-    "@arrange/shared": "0.4.2",
-    "@arrange/compiler": "0.4.2",
-    "@arrange/vite-plugin": "0.4.2"
+    "@arrange/reactivity": "0.5.0",
+    "@arrange/shared": "0.5.0",
+    "@arrange/compiler": "0.5.0",
+    "@arrange/vite-plugin": "0.5.0"
   },
   "license": "MIT",
   "sideEffects": false,

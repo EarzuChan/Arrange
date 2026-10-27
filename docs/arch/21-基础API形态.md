@@ -116,7 +116,7 @@ interface Modifier {
     onWheel(callback: (event: WheelEvent) => void, args?: { axis?: 'vertical' | 'horizontal' | 'both'; enabled?: boolean }): Modifier
     draggable(state: DraggableState, args?: DraggableOptions & { orientation?: 'horizontal' | 'vertical' }): Modifier
     draggable2D(state: Draggable2DState, args?: DraggableOptions): Modifier
-    pointerInput(handler: (event: PointerEvent) => void, args?: EnabledOptions): Modifier
+    pointerInput(handler: (event: PointerInputEvent) => void, args?: EnabledOptions): Modifier
     semantics(args: SemanticsOptions): Modifier
     drawBehind(draw: (scope: DrawScope) => void): Modifier
     drawWithContent(draw: (scope: DrawScope, drawContent: () => void) => void): Modifier
@@ -142,7 +142,7 @@ type DraggableOptions = { enabled?: boolean; startImmediately?: boolean; pointer
 type SemanticsOptions = { role?: 'button' | 'slider' | 'switch' | 'checkbox' | 'textField' | 'image' | 'group'; label?: string; description?: string; valueText?: string; enabled?: boolean; increment?: () => void; decrement?: () => void }
 ```
 
-`KeyEvent`、`KeyModifiers`、`PointerEvent` 的字段与各输入行为见 [事件与输入](17-事件与输入.md)；拖动与数值控件语义见 [拖动与数值控件](37-拖动与数值控件.md)。基础绘制类型从 UI 入口导出，焦点类型从根入口导出，具体字段以包内正式 TypeScript 声明为准。
+`KeyEvent`、`KeyModifiers`、`PointerInputEvent` 的字段与各输入行为见 [事件与输入](17-事件与输入.md)；拖动与数值控件语义见 [拖动与数值控件](37-拖动与数值控件.md)。基础绘制类型从 UI 入口导出，焦点类型从根入口导出，具体字段以包内正式 TypeScript 声明为准。
 
 Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 
@@ -389,7 +389,7 @@ createDraggable2DState(onDelta: (delta: { xDp: number; yDp: number }, modifiers:
 interface DraggableState { readonly isDragging: boolean }
 interface Draggable2DState { readonly isDragging: boolean }
 
-interface EditableValue { readonly value: number; begin?(): void; set(value: number): void; end?(): void }
+interface EditableValue { readonly value: number; readonly defaultValue?: number; readonly step?: number; begin?(): void; set(value: number): void; end?(): void }
 editableRef(ref: Ref<number>): EditableValue
 createValueDragState(args: ValueDragOptions): ValueDragState
 type ValueDragOptions = {
@@ -404,7 +404,11 @@ type ValueDragOptions = {
     wheel?: false | { fraction: number }
     keyboard?: { small: number; large: number }
 }
-interface ValueDragState extends ValueDragOptions {
+// 配置字段可读写；可编辑值以 editable 读写，value 是当前数值
+interface ValueDragState extends Required<Omit<ValueDragOptions, 'value' | 'step' | 'defaultValue'>> {
+    editable: EditableValue
+    step: number | undefined
+    defaultValue: number | undefined
     readonly value: number
     readonly fraction: number
     readonly isDragging: boolean

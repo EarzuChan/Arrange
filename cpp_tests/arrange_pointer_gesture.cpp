@@ -175,6 +175,52 @@ namespace {
         check(interactions(out) == std::vector{InteractionPayload{}}, "抬起到受体外未清空交互状态");
     }
 
+    std::vector<PointerInputPayload> streams(const PointerGestureOutput& out) {
+        std::vector<PointerInputPayload> result;
+        for (const auto& event : out.events)
+            if (const auto* item = std::get_if<PointerInputPayload>(&event.payload)) result.push_back(*item);
+        return result;
+    }
+
+    bool stream(const PointerInputPayload& event, PointerInputType type, float x, float y) {
+        return event.type == type && (type == PointerInputType::Exit || type == PointerInputType::Cancel || event.x == x && event.y == y);
+    }
+
+    void verifyPointerInput() {
+        LayoutTree tree;
+        create(tree, 1, {{size(400, 200)}});
+        OffsetModifier offset;
+        offset.x = 50;
+        offset.y = 20;
+        create(tree, 2, {{offset}, {size(100, 50)}, {input(InputModifierKind::PointerInput, 2, EventSlotKind::PointerInput)}});
+        tree.apply({InsertChildMutation{1, 2, 0}});
+        LayoutEngine{}.layout(tree, 1, {0, 400, 0, 200});
+        const auto snapshot = buildHitTestSnapshot(tree, 1);
+        PointerGestureSession session;
+        PointerGestureOutput out;
+        session.move(tree, snapshot, {{60, 30}}, out);
+        session.move(tree, snapshot, {{70, 30}}, out);
+        auto events = streams(out);
+        check(events.size() == 2 && stream(events[0], PointerInputType::Enter, 10, 10) && stream(events[1], PointerInputType::Move, 20, 10), "悬停期间未交付进入与本地坐标移动");
+        out = {};
+        session.primaryDown(tree, snapshot, {{70, 30}}, 1, out);
+        check(out.consumed && session.capturedNode(tree) == 2 && stream(streams(out).back(), PointerInputType::Down, 20, 10), "pointerInput 受体未捕获按下");
+        out = {};
+        session.drag(tree, {{71, 30}}, out);
+        session.drag(tree, {{500, 30}}, out);
+        events = streams(out);
+        check(events.size() == 2 && stream(events[0], PointerInputType::Move, 21, 10) && stream(events[1], PointerInputType::Move, 450, 10), "捕获期间移动未越过阈值交付或未按按下点外推");
+        out = {};
+        session.primaryUp(tree, snapshot, {{500, 30}}, out);
+        events = streams(out);
+        check(events.size() == 2 && stream(events[0], PointerInputType::Up, 450, 10) && stream(events[1], PointerInputType::Exit, 0, 0), "抬起未交付或移出后未离开");
+        out = {};
+        session.primaryDown(tree, snapshot, {{70, 30}}, 1, out);
+        out = {};
+        session.cancel(tree, out);
+        check(streams(out).size() == 1 && stream(streams(out)[0], PointerInputType::Cancel, 0, 0) && !session.pressed(), "取消未交付给捕获的受体");
+    }
+
     void verifyContextClick() {
         Fixture fixture;
         PointerGestureOutput out;
@@ -220,6 +266,7 @@ int main() {
         verifyContextClick();
         verifyPointerLockAndImmediate();
         verifyInteractionState();
+        verifyPointerInput();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << "\n";

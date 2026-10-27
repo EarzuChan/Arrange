@@ -4,12 +4,12 @@
         <Text :text="hostLine" :style="hintStyle" />
         <Text :text="transportLine" :style="hintStyle" />
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
-            <Text :text="`增益 ${gain.text}`" :style="bodyStyle" :modifier="M.width(104.dp).padding({ vertical: 7.dp })" />
-            <GalleryButton text="-1 dB" :on-click="() => { stopSweep(); gain.value = gain.value - 1 }" />
-            <GalleryButton text="+1 dB" :on-click="() => { stopSweep(); gain.value = gain.value + 1 }" />
-            <GalleryButton text="复位" :on-click="() => { stopSweep(); gain.reset() }" />
-            <GalleryButton text="扫一遍" :active="sweeping" :on-click="sweep" />
+        <Row :horizontal-arrangement="Arrangement.spacedBy(10.dp)">
+            <Box :modifier="M.size(56.dp, 56.dp).then(adjustable(knob, { pointerLock: true, valueText: gain.text, interactionState: knobInteraction })).pointerIcon('resizeVertical').onContextClick(showGainMenu).then(knobDrawing)" />
+            <Column :vertical-arrangement="Arrangement.spacedBy(4.dp)">
+                <Text :text="`增益 ${gain.text}`" :style="bodyStyle" />
+                <Text text="拖动调节，Shift 精调，双击复位，滚轮与方向键步进，右键宿主菜单" :style="hintStyle" />
+            </Column>
         </Row>
 
         <Box :modifier="M.fillMaxWidth().height(8.dp).then(gainBar)" />
@@ -33,9 +33,8 @@
 </template>
 
 <script>
-import { computed, ref, watch, onMounted } from '@arrange/framework'
+import { computed, ref, onMounted, createValueDragState, createInteractionState, adjustable } from '@arrange/framework'
 import { useParameter, useHost, useTransport, useMeter, useWaveform, useSpectrum, onNativeEvent, invokeNative } from '@arrange/framework/interop'
-import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
 import { Arrangement, Color, M } from '@arrange/framework/ui'
 import GalleryButton from './GalleryButton.sfa'
 
@@ -58,33 +57,24 @@ const status = ref('电平、波形与频谱随音频实时刷新；宿主自动
 const hostLine = computed(() => `${host.name ?? '独立运行'} · ${host.format} · ${host.sampleRate ? `${host.sampleRate} Hz / ${host.blockSize} 样本` : '音频未就绪'}`)
 const transportLine = computed(() => transport.playing ? `播放中 · ${transport.bpm?.toFixed(1) ?? '—'} BPM · 第 ${(transport.positionPpq ?? 0).toFixed(2)} 拍` : '走带停止')
 
-// gesture 演示：一次连续编辑只对应一对 begin / end，宿主记录为一次拖动
-// gesture 在 setup 中创建并反复使用，面板卸载时随 scope 自动结束
-const sweepTarget = ref(gain.normalized)
-const sweepValue = animatedNumberAsRef(() => sweepTarget.value, { animationSpec: tween({ durationMillis: 1200, easing: linearEasing }) })
-const sweeping = ref(false)
-const drag = gain.gesture()
+// 旋钮：一次拖动只对应一对参数 gesture，宿主记录为一次编辑；外观只读 fraction 与交互状态
+const knob = createValueDragState({ value: gain.editable(), wheel: { fraction: 0.02 } })
+const knobInteraction = createInteractionState()
 
-function sweep() {
-    if (sweeping.value) return
-    drag.begin()
-    sweeping.value = true
-    sweepTarget.value = gain.normalized > 0.5 ? 0 : 1
+function showGainMenu() {
+    if (!gain.showHostMenu()) status.value = '宿主未提供参数菜单'
 }
 
-function stopSweep() {
-    if (!sweeping.value) return
-    sweeping.value = false
-    drag.end()
-}
-
-watch(sweepValue, value => {
-    if (!sweeping.value) return
-    drag.setNormalized(value)
-    if (value === sweepTarget.value) stopSweep()
+const knobDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const radius = Math.min(width, height) / 2
+    const active = knob.isDragging || knobInteraction.hovered || knobInteraction.focused
+    scope.drawCircle({ color: active ? Color(0xff2b4458) : Color(0xff223647) })
+    // 指针在正上方两侧各 135° 内扫动
+    const angle = (knob.fraction * 270 - 135) * Math.PI / 180
+    const length = radius * 0.78
+    scope.drawLine({ startX: (width / 2).px, startY: (height / 2).px, endX: (width / 2 + Math.sin(angle) * length).px, endY: (height / 2 - Math.cos(angle) * length).px, color: Color(0xff61d6bb), strokeWidth: 3.px })
 })
-
-watch(() => gain.normalized, value => { if (!sweeping.value) sweepTarget.value = value })
 
 const gainBar = M.drawBehind(scope => {
     scope.drawRect({ color: Color(0xff223647) })

@@ -101,6 +101,7 @@ namespace arrange::juce {
         void beginGesture(std::size_t index) override;
         void setParameter(std::size_t index, float normalized) override;
         void endGesture(std::size_t index) override;
+        bool showParameterMenu(std::size_t index) override;
         arrange::core::InteropHostInfo hostInfo() const override;
         arrange::core::InteropTransport transport() const override;
         bool hasMeter(std::string_view name) const override;

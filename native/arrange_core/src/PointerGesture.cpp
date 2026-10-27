@@ -49,6 +49,27 @@ namespace arrange::core {
         icon_ = input ? input->icon : PointerIcon::Default;
     }
 
+    void PointerGestureSession::updateStreams(const LayoutTree& tree, const std::vector<HitTestResult>& chain, const PointerSample& sample, PointerGestureOutput& out) {
+        std::vector<HitTestResult> next;
+        for (const auto& item : chain)
+            if (item.input == InputModifierKind::PointerInput) next.push_back(item);
+        for (const auto& old : streams_) {
+            if (std::any_of(next.begin(), next.end(), [&](const auto& item) { return sameTarget(item, old); })) continue;
+            if (const auto* input = liveInputModifier(tree, old)) emit(out, input->eventSlot, PointerInputPayload{PointerInputType::Exit, 0, 0, sample.modifiers});
+        }
+        for (const auto& item : next) {
+            const auto entered = std::none_of(streams_.begin(), streams_.end(), [&](const auto& old) { return sameTarget(item, old); });
+            if (const auto* input = liveInputModifier(tree, item)) emit(out, input->eventSlot, PointerInputPayload{entered ? PointerInputType::Enter : PointerInputType::Move, item.local.x, item.local.y, sample.modifiers});
+        }
+        streams_ = std::move(next);
+    }
+
+    void PointerGestureSession::emitPressed(const LayoutTree& tree, PointerInputType type, const PointerSample& sample, PointerGestureOutput& out) {
+        if (!press_ || !press_->pointer) return;
+        const auto& target = *press_->pointer;
+        if (const auto* input = liveInputModifier(tree, target)) emit(out, input->eventSlot, PointerInputPayload{type, target.local.x + sample.point.x - press_->start.x, target.local.y + sample.point.y - press_->start.y, sample.modifiers});
+    }
+
     void PointerGestureSession::syncInteractions(const LayoutTree& tree, PointerGestureOutput& out) {
         std::vector<NodeHandle> nodes;
         const auto add = [&](NodeHandle node) {
@@ -57,7 +78,7 @@ namespace arrange::core {
         for (const auto& [node, state] : interactions_) add(node);
         for (const auto& item : chain_) add({item.node, item.generation});
         if (press_)
-            for (const auto* target : {press_->clickable ? &*press_->clickable : nullptr, press_->draggable ? &*press_->draggable : nullptr})
+            for (const auto* target : {press_->clickable ? &*press_->clickable : nullptr, press_->draggable ? &*press_->draggable : nullptr, press_->pointer ? &*press_->pointer : nullptr})
                 if (target) add({target->node, target->generation});
         std::vector<std::pair<NodeHandle, InteractionPayload>> next;
         for (const auto node : nodes) {
@@ -67,7 +88,7 @@ namespace arrange::core {
             };
             InteractionPayload state;
             state.hovered = std::any_of(chain_.begin(), chain_.end(), [&](const auto& item) { return item.node == node.id && item.generation == node.generation; });
-            state.pressed = press_ && (is(press_->clickable) || is(press_->draggable));
+            state.pressed = press_ && (is(press_->clickable) || is(press_->draggable) || is(press_->pointer));
             state.dragged = press_ && press_->dragging && is(press_->draggable);
             const auto previous = std::find_if(interactions_.begin(), interactions_.end(), [&](const auto& item) { return item.first == node; });
             const auto before = previous == interactions_.end() ? InteractionPayload{} : previous->second;
@@ -82,13 +103,16 @@ namespace arrange::core {
     void PointerGestureSession::move(const LayoutTree& tree, const HitTestSnapshot& snapshot, const PointerSample& sample, PointerGestureOutput& out) {
         // 按下期间悬停与光标冻结
         if (press_) return;
-        updateHover(tree, hitTester_.hitChain(snapshot, sample.point), out);
+        const auto chain = hitTester_.hitChain(snapshot, sample.point);
+        updateHover(tree, chain, out);
+        updateStreams(tree, chain, sample, out);
         syncInteractions(tree, out);
     }
 
     void PointerGestureSession::exit(const LayoutTree& tree, PointerGestureOutput& out) {
         if (press_) return;
         updateHover(tree, {}, out);
+        updateStreams(tree, {}, {}, out);
         syncInteractions(tree, out);
     }
 
@@ -96,18 +120,21 @@ namespace arrange::core {
         cancel(tree, out);
         const auto chain = hitTester_.hitChain(snapshot, sample.point);
         updateHover(tree, chain, out);
+        updateStreams(tree, chain, sample, out);
         Press press;
         press.start = press.last = sample.point;
         press.lastTime = sample.timeMillis;
         press.clicks = clicks;
         if (auto clickable = first(chain, InputModifierKind::Clickable); clickable && liveInputModifier(tree, *clickable)) press.clickable = clickable;
         if (auto draggable = first(chain, InputModifierKind::Draggable); draggable && liveInputModifier(tree, *draggable)) press.draggable = draggable;
-        if (!press.clickable && !press.draggable) {
+        if (auto pointer = first(chain, InputModifierKind::PointerInput); pointer && liveInputModifier(tree, *pointer)) press.pointer = pointer;
+        if (!press.clickable && !press.draggable && !press.pointer) {
             syncInteractions(tree, out);
             return;
         }
         press_ = press;
         out.consumed = true;
+        emitPressed(tree, PointerInputType::Down, sample, out);
         if (const auto* input = press_->draggable ? liveInputModifier(tree, *press_->draggable) : nullptr; input && input->startImmediately) {
             press_->dragging = true;
             press_->locked = input->pointerLock;
@@ -120,6 +147,8 @@ namespace arrange::core {
     void PointerGestureSession::drag(const LayoutTree& tree, const PointerSample& sample, PointerGestureOutput& out) {
         if (!press_) return;
         out.consumed = true;
+        // 低级指针流不受拖动阈值限制
+        emitPressed(tree, PointerInputType::Move, sample, out);
         auto& press = *press_;
         const auto* input = press.draggable ? liveInputModifier(tree, *press.draggable) : nullptr;
         if (press.draggable && !input) {
@@ -183,6 +212,7 @@ namespace arrange::core {
         out.consumed = true;
         const auto press = *press_;
         stopDrag(tree, false, out);
+        emitPressed(tree, PointerInputType::Up, sample, out);
         press_.reset();
         const auto chain = hitTester_.hitChain(snapshot, sample.point);
         // 拖动越过阈值后不再识别为点击
@@ -192,7 +222,10 @@ namespace arrange::core {
                 if (const auto* input = liveInputModifier(tree, *released)) emit(out, press.clicks >= 2 && input->doubleClick.valid() ? input->doubleClick : input->eventSlot, std::monostate{});
         }
         // 锁定指针时抬起点并非真实光标位置，悬停留待下一次移动
-        if (!press.locked) updateHover(tree, chain, out);
+        if (!press.locked) {
+            updateHover(tree, chain, out);
+            updateStreams(tree, chain, sample, out);
+        }
         syncInteractions(tree, out);
     }
 
@@ -208,6 +241,8 @@ namespace arrange::core {
     void PointerGestureSession::cancel(const LayoutTree& tree, PointerGestureOutput& out) {
         if (!press_) return;
         stopDrag(tree, true, out);
+        if (press_->pointer)
+            if (const auto* input = liveInputModifier(tree, *press_->pointer)) emit(out, input->eventSlot, PointerInputPayload{PointerInputType::Cancel, 0, 0, {}});
         press_.reset();
         syncInteractions(tree, out);
     }
@@ -215,13 +250,15 @@ namespace arrange::core {
     void PointerGestureSession::revalidate(const LayoutTree& tree, PointerGestureOutput& out) {
         std::erase_if(hovered_, [&](const auto& item) { return !liveInputModifier(tree, item); });
         std::erase_if(chain_, [&](const auto& item) { return !liveInputModifier(tree, item); });
+        std::erase_if(streams_, [&](const auto& item) { return !liveInputModifier(tree, item); });
         if (!press_) return;
         if (press_->draggable && !liveInputModifier(tree, *press_->draggable)) {
             cancel(tree, out);
             return;
         }
         if (press_->clickable && !liveInputModifier(tree, *press_->clickable)) press_->clickable.reset();
-        if (!press_->clickable && !press_->draggable) press_.reset();
+        if (press_->pointer && !liveInputModifier(tree, *press_->pointer)) press_->pointer.reset();
+        if (!press_->clickable && !press_->draggable && !press_->pointer) press_.reset();
         syncInteractions(tree, out);
     }
 
@@ -229,13 +266,14 @@ namespace arrange::core {
         press_.reset();
         hovered_.clear();
         chain_.clear();
+        streams_.clear();
         interactions_.clear();
         icon_ = PointerIcon::Default;
     }
 
     std::optional<NodeId> PointerGestureSession::capturedNode(const LayoutTree& tree) const {
         if (!press_) return {};
-        for (const auto* target : {press_->draggable ? &*press_->draggable : nullptr, press_->clickable ? &*press_->clickable : nullptr})
+        for (const auto* target : {press_->draggable ? &*press_->draggable : nullptr, press_->clickable ? &*press_->clickable : nullptr, press_->pointer ? &*press_->pointer : nullptr})
             if (target && liveInputModifier(tree, *target)) return target->node;
         return {};
     }

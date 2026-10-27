@@ -146,6 +146,8 @@ namespace arrange::core {
         virtual void beginGesture(std::size_t index) = 0;
         virtual void setParameter(std::size_t index, float normalized) = 0;
         virtual void endGesture(std::size_t index) = 0;
+        // 在当前指针位置弹出宿主为该参数提供的菜单；宿主不提供时返回 false
+        virtual bool showParameterMenu(std::size_t) { return false; }
 
         [[nodiscard]] virtual InteropHostInfo hostInfo() const = 0;
         [[nodiscard]] virtual InteropTransport transport() const = 0;

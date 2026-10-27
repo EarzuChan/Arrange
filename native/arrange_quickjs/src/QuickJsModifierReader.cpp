@@ -66,6 +66,7 @@ namespace arrange::quickjs {
             if (type == "onContextClick") return check({"enabled", "callback"});
             if (type == "onWheel") return check({"enabled", "axis", "callback"});
             if (type == "onKeyEvent") return check({"callback"});
+            if (type == "pointerInput") return check({"enabled", "callback"});
             if (type == "pointerIcon") return check({"icon"});
             if (type == "draggable") return check({"enabled", "axis", "startImmediately", "pointerLock", "onDelta", "onStart", "onStop", "interaction"});
             if (type == "focusRequester") return check({"requester"});
@@ -583,7 +584,7 @@ namespace arrange::quickjs {
                     callbacks.push_back({result.size(), arrange::core::EventSlotKind::FocusChanged, std::move(callback)});
                 }
                 result.push_back({item, key});
-            } else if (type == "clickable" || type == "hoverable" || type == "focusable" || type == "onContextClick" || type == "pointerIcon" || type == "onKeyEvent" || type == "onWheel" || type == "draggable") {
+            } else if (type == "clickable" || type == "hoverable" || type == "focusable" || type == "onContextClick" || type == "pointerIcon" || type == "onKeyEvent" || type == "onWheel" || type == "draggable" || type == "pointerInput") {
                 using Kind = arrange::core::EventSlotKind;
                 using InputKind = arrange::core::InputModifierKind;
                 arrange::core::InputModifierSemantics item;
@@ -629,6 +630,9 @@ namespace arrange::quickjs {
                 } else if (type == "onKeyEvent") {
                     item.kind = InputKind::KeyEvent;
                     ok = callback("callback", Kind::Key, true);
+                } else if (type == "pointerInput") {
+                    item.kind = InputKind::PointerInput;
+                    ok = callback("callback", Kind::PointerInput, true);
                 } else if (type == "onWheel") {
                     item.kind = InputKind::Wheel;
                     ok = readAxis() && callback("callback", Kind::Wheel, true);

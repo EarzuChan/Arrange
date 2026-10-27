@@ -33,6 +33,7 @@ export type PointerIcon = 'default' | 'hand' | 'text' | 'crosshair' | 'resizeHor
 export type KeyModifiers = Readonly<{ shift: boolean; alt: boolean; ctrl: boolean; meta: boolean; command: boolean }>
 export type ContextClickEvent = Readonly<{ xDp: number; yDp: number; modifiers: KeyModifiers }>
 export type WheelEvent = Readonly<{ deltaXDp: number; deltaYDp: number; modifiers: KeyModifiers }>
+export type PointerInputEvent = Readonly<{ type: 'down' | 'move' | 'up' | 'cancel' | 'enter' | 'exit'; xDp: number; yDp: number; modifiers: KeyModifiers }>
 export type KeyEvent = Readonly<{ type: 'down' | 'up'; key: string; text: string; repeat: boolean; modifiers: KeyModifiers }>
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
 export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
@@ -258,6 +259,12 @@ export class Modifier {
         return this.#add('semantics', { ...args })
     }
 
+    // 低级指针流：悬停时进入、移动、离开；主键按下后捕获，交付按下、移动、抬起或取消
+    pointerInput(handler: (event: PointerInputEvent) => void, args: EnabledOptions = {}): Modifier {
+        if (typeof handler !== 'function') throw new TypeError('pointerInput 需要函数')
+        return this.#add('pointerInput', { callback: handler, enabled: true, ...args })
+    }
+
     pointerIcon(icon: PointerIcon): Modifier {
         return this.#add('pointerIcon', { icon })
     }
@@ -293,8 +300,9 @@ export class Modifier {
         const { interactionState: _, ...rest } = value
         if (!state) return this.#add(type, rest)
         const internal = interactionStateInternal(state)
-        const modifier = this.#add(type, { ...rest, interaction: internal.pointer })
-        return focus ? modifier.#add('onFocusChanged', { callback: internal.focus }) : modifier
+        // 焦点观察须在受体之前声明
+        const observed = focus ? this.#add('onFocusChanged', { callback: internal.focus }) : this
+        return observed.#add(type, { ...rest, interaction: internal.pointer })
     }
 
     #add(type: string, value: Record<string, unknown>): Modifier {

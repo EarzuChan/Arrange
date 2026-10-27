@@ -57,7 +57,7 @@ namespace arrange::core {
                     return names[static_cast<std::size_t>(input.kind)];
                 }
                 if constexpr (std::is_same_v<T, InputModifierSemantics>) {
-                    constexpr std::string_view names[]{"clickable", "hoverable", "focusable", "onContextClick", "pointerIcon", "onKeyEvent", "onWheel", "draggable"};
+                    constexpr std::string_view names[]{"clickable", "hoverable", "focusable", "onContextClick", "pointerIcon", "onKeyEvent", "onWheel", "draggable", "pointerInput"};
                     return names[static_cast<std::size_t>(input.kind)];
                 }
                 if constexpr (std::is_same_v<T, FocusModifier>) {

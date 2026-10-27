@@ -1,5 +1,6 @@
 import { batchUpdates, computed, getCurrentScope, onScopeDispose, shallowRef, type ComputedRef, type ShallowRef } from '@arrange/reactivity'
 import { currentInstance } from './runtime/arrangable.ts'
+import type { EditableValue } from './valueDrag.ts'
 import type { NativeHostFormat, NativeHostInfo, NativeInterop, NativeInteropDriver, NativeInteropValue, NativeParameterDescriptor, NativeTransactionTarget, NativeTransport } from './native.ts'
 
 export type InteropValue = NativeInteropValue
@@ -25,6 +26,10 @@ export interface Parameter {
     reset(): void
     textFor(normalized: number): string
     parseText(text: string): number | null
+    // 读写标准化值的可编辑值，begin / set / end 对应本参数 gesture；默认值与离散步长取自参数描述
+    editable(): EditableValue
+    // 在当前指针位置弹出宿主的参数菜单；宿主不提供时返回 false
+    showHostMenu(): boolean
 }
 
 export type HostInfo = NativeHostInfo
@@ -125,6 +130,26 @@ class InteropClient {
             reset: () => write(state.descriptor.defaultNormalized),
             textFor: (normalized: number) => api.text(index, clampUnit(finite(normalized, '标准化值'))),
             parseText: (text: string) => api.parse(index, text),
+            editable: () => this.createEditable(state),
+            showHostMenu: () => api.hostMenu(index),
+        })
+    }
+
+    private createEditable(state: ParameterState): EditableValue {
+        const { descriptor } = state
+        // 在 setup 中取得时随作用域销毁结束未完成的 gesture
+        const gesture = this.createGesture(state)
+        const handle = this.parameter(descriptor.id)
+        return Object.freeze({
+            get value() { return state.normalized.value },
+            defaultValue: descriptor.defaultNormalized,
+            step: descriptor.discrete && descriptor.steps > 1 ? 1 / (descriptor.steps - 1) : undefined,
+            begin: () => gesture.begin(),
+            set: (value: number) => {
+                if (gesture.active) gesture.setNormalized(value)
+                else handle.normalized = value
+            },
+            end: () => gesture.end(),
         })
     }
 

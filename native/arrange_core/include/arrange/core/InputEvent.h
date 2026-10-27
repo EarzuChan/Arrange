@@ -62,5 +62,15 @@ namespace arrange::core {
         bool operator==(const InteractionPayload&) const = default;
     };
 
-    using InputEventPayload = std::variant<std::monostate, PointerEventPayload, KeyEventPayload, WheelEventPayload, DragStartPayload, DragDeltaPayload, DragStopPayload, InteractionPayload>;
+    enum class PointerInputType { Down, Move, Up, Cancel, Enter, Exit };
+
+    // 低级指针流；坐标为受体本地 PX，按下期间相对按下点外推，不受悬停冻结影响
+    struct PointerInputPayload {
+        PointerInputType type = PointerInputType::Move;
+        float x = 0.0f;
+        float y = 0.0f;
+        KeyModifierState modifiers;
+    };
+
+    using InputEventPayload = std::variant<std::monostate, PointerEventPayload, KeyEventPayload, WheelEventPayload, DragStartPayload, DragDeltaPayload, DragStopPayload, InteractionPayload, PointerInputPayload>;
 }

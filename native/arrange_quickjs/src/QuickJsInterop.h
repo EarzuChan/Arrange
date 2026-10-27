@@ -74,6 +74,7 @@ namespace arrange::quickjs {
         static JSValue jsParse(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
         static JSValue jsGesture(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
         static JSValue jsSet(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
+        static JSValue jsHostMenu(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
         static JSValue jsHost(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
         static JSValue jsTransport(JSContext* context, JSValueConst, int argc, JSValueConst* argv);
         static JSValue jsSubscribe(JSContext* context, JSValueConst, int argc, JSValueConst* argv);

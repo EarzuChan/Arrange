@@ -403,6 +403,7 @@ int main() {
                 {type: 'onContextClick', value: {enabled: true, callback: event => n.setProp(1, 'contentDescription', 'context ' + event.x)}},
                 {type: 'onKeyEvent', value: {callback: event => event.key === 'Enter' && event.type === 'down'}},
                 {type: 'draggable', value: {enabled: true, axis: 'horizontal', startImmediately: false, pointerLock: true, onDelta: event => n.setProp(1, 'contentDescription', 'delta ' + event.deltaX + ' ' + event.modifiers.shift), onStart: () => {}}},
+                {type: 'pointerInput', value: {enabled: true, callback: event => n.setProp(1, 'contentDescription', event.type + ' ' + event.x + ' ' + event.modifiers.alt)}},
                 {type: 'semantics', value: {role: 'slider', label: '增益', valueText: '-6 dB', increment: () => n.setProp(1, 'contentDescription', 'increment')}}
             ]})
         )JS");
@@ -419,7 +420,7 @@ int main() {
                 if (input->kind == InputModifierKind::ContextClick) context = input;
             }
         check(drag && keys && context && drag->axis == DragAxis::Horizontal && drag->pointerLock && drag->dragStart.valid() && !drag->dragStop.valid(), "draggable 字段或可选回调槽位读取错误");
-        check(HitTester().hitChain(buildHitTestSnapshot(scene.tree(), 1), {10, 10}).size() == 4, "命中链未包含悬停、光标、上下文点击与拖动受体");
+        check(HitTester().hitChain(buildHitTestSnapshot(scene.tree(), 1), {10, 10}).size() == 5, "命中链未包含悬停、光标、上下文点击、拖动与指针流受体");
         DragDeltaPayload delta{12, 3, {}};
         delta.modifiers.shift = true;
         const auto dragSlot = drag->eventSlot;
@@ -434,6 +435,14 @@ int main() {
         check(host.invokeEventSlot(contextSlot, InputEventPayload{PointerEventPayload{7, 8, {}}}).ok, "上下文点击回调执行失败");
         frame(host, scene, pipeline, published);
         check(scene.node(1).props.at("contentDescription").stringOr() == "context 7", "上下文点击坐标未交付");
+        const InputModifierSemantics* stream = nullptr;
+        for (const auto& instance : scene.tree().node(1).modifier.elements())
+            if (const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value); input && input->kind == InputModifierKind::PointerInput) stream = input;
+        PointerInputPayload down{PointerInputType::Down, 3, 4, {}};
+        down.modifiers.alt = true;
+        check(stream && host.invokeEventSlot(stream->eventSlot, InputEventPayload{down}).ok, "pointerInput 回调执行失败");
+        frame(host, scene, pipeline, published);
+        check(scene.node(1).props.at("contentDescription").stringOr() == "down 3 true", "pointerInput 载荷未按对象交付");
         const SemanticsModifier* semantics = nullptr;
         for (const auto& instance : scene.tree().node(1).modifier.elements())
             if (const auto* item = std::get_if<SemanticsModifier>(&instance.descriptor.value)) semantics = item;

@@ -292,6 +292,15 @@ namespace arrange::juce {
         parameter(index).endChangeGesture();
     }
 
+    bool Interop::showParameterMenu(std::size_t index) {
+        auto* editor = processor_.getActiveEditor();
+        auto* context = editor ? editor->getHostContext() : nullptr;
+        auto menu = context ? context->getContextMenuForParameter(&parameter(index)) : nullptr;
+        if (!menu) return false;
+        menu->showNativeMenu(editor->getMouseXYRelative());
+        return true;
+    }
+
     arrange::core::InteropHostInfo Interop::hostInfo() const {
         arrange::core::InteropHostInfo info;
         // 宿主在运行期不变；PluginHostType 每次都要探测宿主路径，检查点逐帧调用时只探测一次

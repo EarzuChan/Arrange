@@ -660,6 +660,12 @@ namespace arrange::quickjs {
                 } else if constexpr (std::is_same_v<T, arrange::core::DragStopPayload>) {
                     number("velocity", event.velocity);
                     flag("cancelled", event.cancelled);
+                } else if constexpr (std::is_same_v<T, arrange::core::PointerInputPayload>) {
+                    constexpr const char* types[]{"down", "move", "up", "cancel", "enter", "exit"};
+                    JS_SetPropertyStr(context, argument.get(), "type", JS_NewString(context, types[static_cast<std::size_t>(event.type)]));
+                    number("x", event.x);
+                    number("y", event.y);
+                    modifiers(event.modifiers);
                 } else if constexpr (std::is_same_v<T, arrange::core::InteractionPayload>) {
                     flag("hovered", event.hovered);
                     flag("pressed", event.pressed);

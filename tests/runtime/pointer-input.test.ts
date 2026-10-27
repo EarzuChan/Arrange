@@ -65,11 +65,11 @@ test('draggable2D 交付二维 dp 位移，单轴与二维状态不能混用', (
 test('interactionState 接入原生 interaction 槽，可聚焦原语附带焦点观察', () => {
     const interaction = createInteractionState()
     const modifier = M.clickable({ onClick: () => { }, interactionState: interaction }).hoverable({ interactionState: interaction })
-    assert.deepEqual(modifier.elements.map(element => element.type), ['clickable', 'onFocusChanged', 'hoverable'])
-    assert.equal('interactionState' in modifier.elements[0].value, false)
-    assert.equal(modifier.elements[0].value.interaction, modifier.elements[2].value.interaction)
-    fire(modifier.elements[0].value.interaction, { hovered: true, pressed: true, focused: false, dragged: false })
-    fire(modifier.elements[1].value.callback, { isFocused: true, hasFocus: true })
+    assert.deepEqual(modifier.elements.map(element => element.type), ['onFocusChanged', 'clickable', 'hoverable'])
+    assert.equal('interactionState' in modifier.elements[1].value, false)
+    assert.equal(modifier.elements[1].value.interaction, modifier.elements[2].value.interaction)
+    fire(modifier.elements[1].value.interaction, { hovered: true, pressed: true, focused: false, dragged: false })
+    fire(modifier.elements[0].value.callback, { isFocused: true, hasFocus: true })
     assert.deepEqual({ ...interaction }, { hovered: true, pressed: true, focused: true, dragged: false })
     assert.throws(() => M.hoverable({ interactionState: {} as never }), TypeError)
 })
@@ -79,4 +79,16 @@ test('semantics 原样声明角色、文本与增减动作', () => {
     const [element] = M.semantics({ role: 'slider', label: '增益', valueText: '-6 dB', increment }).elements
     assert.equal(element.type, 'semantics')
     assert.deepEqual(element.value, { role: 'slider', label: '增益', valueText: '-6 dB', increment })
+})
+
+test('pointerInput 把原生 PX 坐标换算为 dp 并保留事件类型', () => {
+    const units = new UnitResolver(createDensity(2))
+    const events: unknown[] = []
+    const callback = (event: unknown) => { events.push(event) }
+    const [element] = units.modifier(M.pointerInput(callback)).elements
+    assert.equal(element.value.enabled, true)
+    fire(element.value.callback, { type: 'move', x: 30, y: 8, modifiers: { shift: true } })
+    assert.deepEqual(events, [{ type: 'move', xDp: 15, yDp: 4, modifiers: { shift: true } }])
+    assert.equal(units.modifier(M.pointerInput(callback)).elements[0].value.callback, element.value.callback)
+    assert.throws(() => M.pointerInput(undefined as never), TypeError)
 })

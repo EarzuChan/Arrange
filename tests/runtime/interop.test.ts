@@ -29,6 +29,10 @@ function fakeInterop() {
             values[index] = normalized
             calls.push(`set ${index} ${normalized} ${complete}`)
         },
+        hostMenu: index => {
+            calls.push(`menu ${index}`)
+            return index === 0
+        },
         host: () => ({ name: 'Fake DAW', format: 'vst3', sampleRate: 48000, blockSize: 256 }),
         transport: () => stopped,
         subscribe: (kind, name, size) => {
@@ -159,4 +163,21 @@ test('宿主未连接 Interop 时明确报错', () => {
     globalThis.__ARRANGE_NATIVE__ = {} as NativeTransactionTarget
     assert.equal(hasInterop(), false)
     assert.throws(() => useParameter('gain'), /未连接 Interop/)
+})
+
+test('editable() 以参数 gesture 承载连续编辑并提供默认值与离散步长；showHostMenu 交给宿主', () => {
+    const host = fakeInterop()
+    const gain = useParameter('gain').editable()
+    const mode = useParameter('mode').editable()
+    assert.equal(gain.defaultValue, 0.5)
+    assert.equal(gain.step, undefined)
+    assert.equal(mode.step, 0.5)
+    gain.set(0.75)
+    gain.begin!()
+    gain.set(0.5)
+    gain.end!()
+    assert.deepEqual(host.calls, ['set 0 0.75 true', 'begin 0', 'set 0 0.5 false', 'end 0'])
+    assert.equal(useParameter('gain').showHostMenu(), true)
+    assert.equal(useParameter('mode').showHostMenu(), false)
+    assert.deepEqual(host.calls.slice(4), ['menu 0', 'menu 1'])
 })
