@@ -331,9 +331,11 @@ int main(int argc, char** argv) {
         }
         const auto memoryAfter = hostView->memoryStats();
         const auto workAfter = runtime.frameCounters();
+        // 脚本堆按尺寸档复用：稳态帧的短命对象不应逐个进出系统堆
+        check((memoryAfter.systemAllocations - memoryBefore.systemAllocations) * 50 < memoryAfter.allocations - memoryBefore.allocations, "脚本稳态帧仍大量向系统堆申请内存");
         command("perf-report");
         std::sort(durations.begin(), durations.end());
-        std::cout << "M23_PERF {\"frames\":" << durations.size() << ",\"mean_ms\":" << std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size() << ",\"p95_ms\":" << durations[durations.size() * 95 / 100] << ",\"max_ms\":" << durations.back() << ",\"cpp_new_count\":" << nativeAllocations.count << ",\"cpp_new_bytes\":" << nativeAllocations.bytes << ",\"js_allocations\":" << memoryAfter.allocations - memoryBefore.allocations << ",\"js_allocated_bytes\":" << memoryAfter.allocatedBytes - memoryBefore.allocatedBytes << ",\"js_live_bytes\":" << memoryAfter.liveBytes << ",\"measure\":" << workAfter.measures - workBefore.measures << ",\"place\":" << workAfter.placements - workBefore.placements << ",\"paint\":" << workAfter.paintBuilds - workBefore.paintBuilds << ",\"hit\":" << workAfter.hitBuilds - workBefore.hitBuilds << ",\"copied_nodes\":" << workAfter.candidateNodesCopied - workBefore.candidateNodesCopied << "}\n";
+        std::cout << "M23_PERF {\"frames\":" << durations.size() << ",\"mean_ms\":" << std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size() << ",\"p95_ms\":" << durations[durations.size() * 95 / 100] << ",\"max_ms\":" << durations.back() << ",\"cpp_new_count\":" << nativeAllocations.count << ",\"cpp_new_bytes\":" << nativeAllocations.bytes << ",\"js_allocations\":" << memoryAfter.allocations - memoryBefore.allocations << ",\"js_allocated_bytes\":" << memoryAfter.allocatedBytes - memoryBefore.allocatedBytes << ",\"js_system_allocations\":" << memoryAfter.systemAllocations - memoryBefore.systemAllocations << ",\"js_live_bytes\":" << memoryAfter.liveBytes << ",\"measure\":" << workAfter.measures - workBefore.measures << ",\"place\":" << workAfter.placements - workBefore.placements << ",\"paint\":" << workAfter.paintBuilds - workBefore.paintBuilds << ",\"hit\":" << workAfter.hitBuilds - workBefore.hitBuilds << ",\"copied_nodes\":" << workAfter.candidateNodesCopied - workBefore.candidateNodesCopied << "}\n";
 
         const auto replayAfter = performancePaint.replayCounters();
         const auto textAfter = textService.counters();

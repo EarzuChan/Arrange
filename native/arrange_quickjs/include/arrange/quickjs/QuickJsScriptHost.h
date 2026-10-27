@@ -47,6 +47,8 @@ namespace arrange::quickjs {
         std::uint64_t allocatedBytes = 0;
         std::size_t liveBytes = 0;
         std::size_t peakBytes = 0;
+        // 实际向系统堆申请的次数（新大块与池外大对象）
+        std::uint64_t systemAllocations = 0;
     };
 
     // 超时是终止整个脚本任务的保护边界，不是帧率目标或可恢复时间片

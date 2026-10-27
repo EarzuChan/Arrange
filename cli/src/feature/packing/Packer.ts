@@ -12,7 +12,7 @@ import { nativePresentationSignature } from "../project/NativePresentation.ts"
 import { WindowsBundleIcon } from "./WindowsBundleIcon.ts"
 import { nativeBuildRecordName } from "../building/BuildReceipt.ts"
 import { TransactionStore } from "../transaction/TransactionStore.ts"
-import { ReplacementTransaction } from "../transaction/ReplacementTransaction.ts"
+import { isBusyPathError, ReplacementTransaction } from "../transaction/ReplacementTransaction.ts"
 
 export interface PackOptions {
     readonly flavor: BuildFlavor
@@ -31,7 +31,11 @@ export interface PackResult {
     readonly directory: string
     readonly products: readonly PackedProduct[]
     readonly manifestPath: string
+    // 新交付已生效，但旧版本备份或暂存仍被占用未能删除；下次打包自动清理
+    readonly leftovers: readonly string[]
 }
+
+const stagingPrefix = ".arrange-package-"
 
 interface Replacement {
     readonly staged: string
@@ -173,6 +177,25 @@ export class Packer {
         await rename(source, destination)
     }
 
+    protected async remove(path: string): Promise<void> {
+        await rm(path, { recursive: true, force: true })
+    }
+
+    // 清理此前因占用而遗留的暂存；仍被未完成事务引用的暂存保留给 arrange 恢复流程
+    private async removeStaleStaging(directory: string, store: TransactionStore): Promise<void> {
+        const stale = (await readdir(directory).catch(() => [] as string[])).filter(name => name.startsWith(stagingPrefix))
+        if (!stale.length) return
+        const records = await store.list()
+        if (records.some(entry => entry.error)) return
+        const transaction = new ReplacementTransaction(store)
+        const referenced = new Set(records.flatMap(entry => entry.record?.kind === "replace" ? transaction.paths(entry.record).map(path => resolve(path.path)) : []))
+        for (const name of stale) {
+            const path = resolve(directory, name)
+            if (referenced.has(path)) continue
+            await this.remove(path).catch(error => { if (!isBusyPathError(error)) throw error })
+        }
+    }
+
     private async checkOutput(state: ProjectState, outputRoot: string, uiDirectory: string): Promise<void> {
         const root = await canonical(resolve(state.rootDir))
         const output = await canonical(outputRoot)
@@ -211,14 +234,16 @@ export class Packer {
         if (contains(canonicalDirectory, await canonical(uiDist)) || contains(await canonical(uiDist), canonicalDirectory)) throw new Error("交付目录与 UI dist 重叠")
 
         await mkdir(directory, { recursive: true })
-        const staging = await mkdtemp(resolve(directory, ".arrange-package-"))
         const transactionStore = new TransactionStore(state.rootDir)
-        const transaction = new ReplacementTransaction(transactionStore, this.signal, this.move.bind(this))
+        await this.removeStaleStaging(directory, transactionStore)
+        const staging = await mkdtemp(resolve(directory, stagingPrefix))
+        const transaction = new ReplacementTransaction(transactionStore, this.signal, this.move.bind(this), this.remove.bind(this))
         const cleanup = [{ root: outputRoot, path: staging }]
         const record = await transaction.begin(cleanup)
         const replacements: Replacement[] = []
         const products: PackedProduct[] = []
         let preserveStaging = false
+        let leftovers: readonly string[] = []
         try {
             for (const artifact of artifacts) {
                 this.signal?.throwIfAborted()
@@ -268,18 +293,22 @@ export class Packer {
             try {
                 this.signal?.throwIfAborted()
                 await transaction.prepare(replacements.map(replacement => ({ ...replacement, root: outputRoot })), cleanup, record)
-                await transaction.apply(record)
+                leftovers = (await transaction.apply(record)).leftovers
             } catch (error) {
-                try { await new ReplacementTransaction(transactionStore, undefined, this.move.bind(this)).apply(record, true) } catch (rollback) {
+                try { await new ReplacementTransaction(transactionStore, undefined, this.move.bind(this), this.remove.bind(this)).apply(record, true) } catch (rollback) {
                     preserveStaging = true
                     throw new Error(`打包提交失败：${String(error)}；回退未完成：${String(rollback)}；事务 ${record.id}，备份目录：${staging}`, { cause: error })
                 }
+                if (isBusyPathError(error)) throw new Error(`交付目录中的旧产物被占用，无法替换；旧交付保持不变。请关闭加载着该插件的宿主或打开着该目录的资源管理器后重试：${String(error)}`, { cause: error })
                 throw error
             }
-            return { directory, products, manifestPath }
+            return { directory, products, manifestPath, leftovers }
         } finally {
             if (!preserveStaging) {
-                await rm(staging, { recursive: true, force: true })
+                await this.remove(staging).catch(error => {
+                    if (!isBusyPathError(error)) throw error
+                    if (!leftovers.includes(staging)) leftovers = [...leftovers, staging]
+                })
                 await transactionStore.remove(record.id).catch(error => { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error })
             }
         }

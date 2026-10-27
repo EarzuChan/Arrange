@@ -20,5 +20,6 @@ export async function describePackResult(state: ProjectState, flavor: BuildFlavo
         lines.push(`${padEnd(product.product, width)}  ${displayPath(state.rootDir, product.path)}${size}`)
     }
     lines.push(`${padEnd(manifestLabel, width)}  ${displayPath(state.rootDir, result.manifestPath)}`)
+    for (const path of result.leftovers) lines.push(`旧版本备份仍被占用，暂未删除（宿主可能仍加载着旧插件），下次打包自动清理：${displayPath(state.rootDir, path)}`)
     return lines
 }

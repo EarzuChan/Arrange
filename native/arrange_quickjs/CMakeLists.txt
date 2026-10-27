@@ -22,6 +22,7 @@ target_sources(arrange_quickjs PRIVATE
   src/QuickJsPainterResources.cpp
   src/QuickJsInterop.cpp
   src/QuickJsRuntimeContext.cpp
+  src/QuickJsScriptHeap.cpp
   src/QuickJsScriptHost.cpp
   src/QuickJsValueReader.cpp
 )

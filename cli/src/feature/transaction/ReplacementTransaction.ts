@@ -1,4 +1,5 @@
 import { rename, rm } from "node:fs/promises"
+import { isAbsolute, relative, sep } from "node:path"
 import { z } from "zod"
 import { TransactionStore, type TransactionRecord } from "./TransactionStore.ts"
 import { assertOwnedPath, treeIdentity } from "./TreeState.ts"
@@ -7,9 +8,22 @@ const stepSchema = z.object({ root: z.string(), destination: z.string(), staged:
 const payloadSchema = z.object({ phase: z.enum(["staging", "ready"]), steps: z.array(stepSchema), cleanup: z.array(z.object({ root: z.string(), path: z.string() })) })
 export type ReplacementStep = z.infer<typeof stepSchema>
 
+// 文件仍被其它进程打开（宿主加载着旧插件、资源管理器开着目录等）
+export function isBusyPathError(error: unknown): boolean {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    return code === "EPERM" || code === "EBUSY" || code === "EACCES"
+}
+
+const removeTree = (path: string) => rm(path, { recursive: true, force: true })
+
+function isWithin(parent: string, child: string): boolean {
+    const path = relative(parent, child)
+    return path === "" || (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`))
+}
+
 // 每次移动前先保存意图；崩溃后的事实由内容身份判断，不能只相信进度标记
 export class ReplacementTransaction {
-    constructor(private readonly store: TransactionStore, private readonly signal?: AbortSignal, private readonly move: (source: string, destination: string) => Promise<void> = rename) { }
+    constructor(private readonly store: TransactionStore, private readonly signal?: AbortSignal, private readonly move: (source: string, destination: string) => Promise<void> = rename, private readonly remove: (path: string) => Promise<void> = removeTree) { }
 
     begin(cleanup: readonly { root: string, path: string }[]): Promise<TransactionRecord> { return this.store.create("replace", { phase: "staging", steps: [], cleanup }) }
 
@@ -44,7 +58,8 @@ export class ReplacementTransaction {
         return record
     }
 
-    async apply(record: TransactionRecord, rollback = false): Promise<void> {
+    // 全部替换落位即为提交点；之后清除备份与暂存失败只作为遗留返回，不能再回退已生效的新内容
+    async apply(record: TransactionRecord, rollback = false): Promise<{ leftovers: readonly string[] }> {
         const payload = payloadSchema.parse(record.payload)
         if (!rollback && payload.phase !== "ready") throw new Error("暂存未完成，只能回退清除暂存内容")
         record.payload = payload
@@ -85,21 +100,32 @@ export class ReplacementTransaction {
                 }
                 await this.store.save(record)
             }
+            const leftovers: string[] = []
+            const tidy = async (path: string) => {
+                try {
+                    await this.remove(path)
+                } catch (error) {
+                    if (!isBusyPathError(error)) throw error
+                    leftovers.push(path)
+                }
+            }
             for (const entry of payload.cleanup) {
                 await assertOwnedPath(entry.root, entry.path)
-                await rm(entry.path, { recursive: true, force: true })
+                await tidy(entry.path)
             }
             // 默认备份位于 cleanup 内；独立调用仍需清除已经确认的备份和暂存
             for (const step of payload.steps) {
                 for (const path of [step.backup, step.staged]) {
+                    if (leftovers.some(leftover => isWithin(leftover, path))) continue
                     const identity = await treeIdentity(path)
                     if (identity !== null) {
                         if (identity !== (path === step.backup ? step.original : step.expected)) throw new Error(`收尾内容冲突：${path}`)
-                        await rm(path, { recursive: true })
+                        await tidy(path)
                     }
                 }
             }
             await this.store.finish(record)
+            return { leftovers }
         } catch (error) {
             record.status = "failed"
             record.error = String(error)

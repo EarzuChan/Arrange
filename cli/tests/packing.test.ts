@@ -348,6 +348,47 @@ test("提交第二个产品失败回退已经替换的首个产品和第二个�
     assert.ok((await readdir(input.output)).every(name => !name.startsWith(".arrange-package-")))
 })
 
+function busy(path: string): NodeJS.ErrnoException {
+    return Object.assign(new Error(`EPERM: operation not permitted, unlink '${path}'`), { code: "EPERM" })
+}
+
+test("提交后旧备份仍被占用：新交付生效并报告遗留，下次打包清理遗留暂存", async t => {
+    const input = await setup(t)
+    await oldOutput(input.output)
+    class LockedBackupPacker extends Packer {
+        protected override async remove(path: string): Promise<void> {
+            if (basename(path).startsWith(".arrange-package-")) throw busy(resolve(path, "backup-vst3"))
+            return super.remove(path)
+        }
+    }
+    const packed = await new LockedBackupPacker(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone", "vst3"], clean: true })
+    assert.notEqual(await readFile(resolve(input.output, "arrange-package.json"), "utf8"), "old-manifest")
+    await assert.rejects(lstat(resolve(input.output, "vst3/old.txt")))
+    assert.equal(packed.leftovers.length, 1)
+    assert.ok(basename(packed.leftovers[0]).startsWith(".arrange-package-"))
+    assert.equal(await readFile(resolve(packed.leftovers[0], "backup-vst3/old.txt"), "utf8"), "old-vst3")
+
+    const repacked = await new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone", "vst3"], clean: true })
+    assert.deepEqual(repacked.leftovers, [])
+    assert.ok((await readdir(input.output)).every(name => !name.startsWith(".arrange-package-")))
+})
+
+test("替换时旧产物被占用：提示关闭占用者，旧交付不变", async t => {
+    const input = await setup(t)
+    await oldOutput(input.output)
+    class LockedProductPacker extends Packer {
+        protected override async move(source: string, destination: string) {
+            if (source === resolve(input.output, "vst3")) throw busy(resolve(source, "old.txt"))
+            return super.move(source, destination)
+        }
+    }
+    await assert.rejects(new LockedProductPacker(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone", "vst3"], clean: true }), /旧产物被占用.*旧交付保持不变/)
+    assert.equal(await readFile(resolve(input.output, "standalone/old.txt"), "utf8"), "old-standalone")
+    assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
+    assert.equal(await readFile(resolve(input.output, "arrange-package.json"), "utf8"), "old-manifest")
+    assert.ok((await readdir(input.output)).every(name => !name.startsWith(".arrange-package-")))
+})
+
 test("拒绝工程根、UI、native、.arrange 重叠输出与符号链接绕过", async t => {
     const input = await setup(t)
     const packer = new Packer(input.locator, input.executor)

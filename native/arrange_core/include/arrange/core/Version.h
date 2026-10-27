@@ -3,6 +3,6 @@
 namespace arrange::core {
     inline constexpr unsigned RuntimeVersion = 7u;
     inline constexpr unsigned ProtocolVersion = RuntimeVersion;
-    inline constexpr const char* PackageVersion = "0.4.1";
+    inline constexpr const char* PackageVersion = "0.4.2";
     const char* version() noexcept;
 }

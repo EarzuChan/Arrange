@@ -8,7 +8,7 @@
     "build": "tsx scripts/check-types.ts && vite build --configLoader runner"
   },
   "dependencies": {
-    "@arrange/framework": "0.4.1"
+    "@arrange/framework": "0.4.2"
   },
   "devDependencies": {
     "vite": "8.0.16",

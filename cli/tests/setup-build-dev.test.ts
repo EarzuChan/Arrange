@@ -187,7 +187,7 @@ function buildHarness(state: ProjectState) {
         pack: async (state: ProjectState, options: PackOptions) => {
             calls.push({ kind: "pack", products: options.products, clean: options.clean })
             const directory = resolve(state.rootDir, "artifacts", options.flavor)
-            return { directory, products: [], manifestPath: resolve(directory, "arrange-package.json") }
+            return { directory, products: [], manifestPath: resolve(directory, "arrange-package.json"), leftovers: [] }
         }
     } as unknown as Packer
     return { service: new BuildService(project, tools, ui, native, packer, quietTerminal().tasks), project, tools, ui, native, packer, scopes, calls }
