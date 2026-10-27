@@ -105,6 +105,19 @@ export class UnitResolver {
         return this.policy = value
     }
 
+    // 原生指针事件为受体本地 PX；按回调缓存包装，避免每次重排都换掉事件槽
+    private readonly pointerCallbacks = new WeakMap<object, (event: { x: number; y: number; modifiers: unknown }) => unknown>()
+
+    private pointerCallback(callback: unknown): unknown {
+        if (typeof callback !== 'function') return callback
+        let wrapped = this.pointerCallbacks.get(callback)
+        if (!wrapped) {
+            wrapped = event => callback(Object.freeze({ xDp: this.density.pxToDp(event.x), yDp: this.density.pxToDp(event.y), modifiers: Object.freeze(event.modifiers) }))
+            this.pointerCallbacks.set(callback, wrapped)
+        }
+        return wrapped
+    }
+
     private resolveModifierValue(type: string, input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
         let value = input
 
@@ -140,6 +153,7 @@ export class UnitResolver {
             ['y', 'yDp', 'yPx'],
         ], this.density)
         else if (type === 'border') value = replaceLength(value, 'width', this.resolveLength(value.widthDp, value.widthPx))
+        else if (type === 'onContextClick') value = { ...value, callback: this.pointerCallback(value.callback) }
 
         if (value.shape && typeof value.shape === 'object') value = { ...value, shape: resolveShape(value.shape as Readonly<Record<string, unknown>>, this) }
         value = this.resolveFixedFields(type, value)

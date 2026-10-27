@@ -2,6 +2,10 @@
 
 #include "Geometry.h"
 #include "LayoutTree.h"
+#include "Modifier.h"
+
+#include <optional>
+#include <vector>
 
 namespace arrange::core {
     struct HitTestResult {
@@ -11,6 +15,11 @@ namespace arrange::core {
         EventSlotId eventSlot;
         ModifierHandle modifier;
         std::uint64_t generation = 0;
+        // 输入受体类型；空表示仅为节点或文本框命中
+        std::optional<InputModifierKind> input;
+        // 受体本地坐标，只在命中链结果中填写
+        Point local;
+        Rect bounds;
     };
 
     struct HitConstraint {
@@ -61,5 +70,7 @@ namespace arrange::core {
         HitTestResult hitTestClickable(const HitTestSnapshot& snapshot, Point point) const;
         HitTestResult hitTest(const LayoutTree& tree, NodeId root, Point point) const;
         HitTestResult hitTestClickable(const LayoutTree& tree, NodeId root, Point point) const;
+        // 指针下的全部输入受体，由内向外；遇到含受体的子树后不再查看其下层兄弟
+        std::vector<HitTestResult> hitChain(const HitTestSnapshot& snapshot, Point point) const;
     };
 }

@@ -604,6 +604,79 @@ namespace arrange::quickjs {
         if (!drained.ok) return {false, drained.error};
         return {true, {}};
     }
+
+    CallbackInvokeResult QuickJsScriptHost::invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::InputEventPayload& payload) {
+        Impl::TaskBudget budget(*impl_, __func__);
+        auto* context = impl_->runtime.context;
+        if (context == nullptr) return {false, "QuickJS runtime is not initialised"};
+        if (!slot.valid()) return {false, "Arrange event slot is invalid"};
+        if (slot.kind == arrange::core::EventSlotKind::DrawPrepare) return {false, "绘制 callback 只允许候选准备阶段调用"};
+        const auto callbackValue = impl_->runtime.events.callback(slot);
+        if (JS_IsUndefined(callbackValue)) return {false, "Arrange event slot is not registered in QuickJS"};
+
+        ScopedValue argument(context, JS_NewObject(context));
+        const auto number = [&](const char* name, double value) {
+            JS_SetPropertyStr(context, argument.get(), name, JS_NewFloat64(context, value));
+        };
+        const auto flag = [&](const char* name, bool value) {
+            JS_SetPropertyStr(context, argument.get(), name, JS_NewBool(context, value));
+        };
+        const auto modifiers = [&](const arrange::core::KeyModifierState& state) {
+            JSValue object = JS_NewObject(context);
+            JS_SetPropertyStr(context, object, "shift", JS_NewBool(context, state.shift));
+            JS_SetPropertyStr(context, object, "alt", JS_NewBool(context, state.alt));
+            JS_SetPropertyStr(context, object, "ctrl", JS_NewBool(context, state.ctrl));
+            JS_SetPropertyStr(context, object, "meta", JS_NewBool(context, state.meta));
+            JS_SetPropertyStr(context, object, "command", JS_NewBool(context, state.command));
+            JS_SetPropertyStr(context, argument.get(), "modifiers", object);
+        };
+        std::visit(
+            [&](const auto& event) {
+                using T = std::decay_t<decltype(event)>;
+                if constexpr (std::is_same_v<T, arrange::core::PointerEventPayload>) {
+                    number("x", event.x);
+                    number("y", event.y);
+                    modifiers(event.modifiers);
+                } else if constexpr (std::is_same_v<T, arrange::core::KeyEventPayload>) {
+                    JS_SetPropertyStr(context, argument.get(), "type", JS_NewString(context, event.up ? "up" : "down"));
+                    JS_SetPropertyStr(context, argument.get(), "key", JS_NewStringLen(context, event.key.data(), event.key.size()));
+                    JS_SetPropertyStr(context, argument.get(), "text", JS_NewStringLen(context, event.text.data(), event.text.size()));
+                    flag("repeat", event.repeat);
+                    modifiers(event.modifiers);
+                } else if constexpr (std::is_same_v<T, arrange::core::WheelEventPayload>) {
+                    number("deltaX", event.deltaX);
+                    number("deltaY", event.deltaY);
+                    modifiers(event.modifiers);
+                } else if constexpr (std::is_same_v<T, arrange::core::DragStartPayload>) {
+                    number("x", event.x);
+                    number("y", event.y);
+                    number("width", event.width);
+                    number("height", event.height);
+                    modifiers(event.modifiers);
+                } else if constexpr (std::is_same_v<T, arrange::core::DragDeltaPayload>) {
+                    number("deltaX", event.deltaX);
+                    number("deltaY", event.deltaY);
+                    modifiers(event.modifiers);
+                } else if constexpr (std::is_same_v<T, arrange::core::DragStopPayload>) {
+                    number("velocity", event.velocity);
+                    flag("cancelled", event.cancelled);
+                } else if constexpr (std::is_same_v<T, arrange::core::InteractionPayload>) {
+                    flag("hovered", event.hovered);
+                    flag("pressed", event.pressed);
+                    flag("focused", event.focused);
+                    flag("dragged", event.dragged);
+                }
+            },
+            payload);
+        ScopedValue callback(context, JS_DupValue(context, callbackValue));
+        JSValueConst argv[1] = {argument.get()};
+        ScopedValue result(context, JS_Call(context, callback.get(), JS_UNDEFINED, 1, argv));
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(context)};
+        const auto consumed = JS_ToBool(context, result.get()) > 0;
+        const auto drained = impl_->drainJobs();
+        if (!drained.ok) return {false, drained.error};
+        return {true, {}, consumed};
+    }
 }
 
 #endif

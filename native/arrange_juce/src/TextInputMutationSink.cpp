@@ -30,6 +30,9 @@ namespace arrange::juce {
         result.invokeScrollEvent = [&runtime](const auto& slot, const auto& scroll) {
             if (slot.valid()) runtime.enqueueScrollSnapshotEvent(slot, scroll);
         };
+        result.dispatchKeyEvent = [&runtime](const arrange::core::EventSlotId& slot, const arrange::core::KeyEventPayload& payload) {
+            return runtime.dispatchInputEventNow(slot, payload, ::juce::Time::getMillisecondCounterHiRes());
+        };
         result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag, std::string reason) {
             arrange::core::MutationTransaction transaction;
             transaction.operations.emplace_back(arrange::core::NativeInvalidationMutation{

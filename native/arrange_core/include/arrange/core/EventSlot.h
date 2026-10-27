@@ -20,6 +20,17 @@ namespace arrange::core {
         InputBlur = 7,
         DrawPrepare = 9,
         FocusChanged = 8,
+        DoubleClick = 10,
+        ContextClick = 11,
+        HoverEnter = 12,
+        HoverExit = 13,
+        Key = 14,
+        Wheel = 15,
+        DragStart = 16,
+        DragDelta = 17,
+        DragStop = 18,
+        Interaction = 19,
+        PointerInput = 20,
         Custom = 100,
     };
 

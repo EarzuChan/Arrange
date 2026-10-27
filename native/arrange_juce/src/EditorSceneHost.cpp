@@ -148,6 +148,18 @@ namespace arrange::juce {
             paint_.paint(g, runtime_.publishedFrame());
         }
 
+        void pointerMove(const ::juce::MouseEvent& event) {
+            pointerEvents_.pointerMove(runtime_, session_, diagnostics_, interaction_, event);
+        }
+
+        void pointerExit() {
+            pointerEvents_.pointerExit(runtime_, interaction_);
+        }
+
+        void cancelPointer() {
+            pointerEvents_.cancelPointer(runtime_, interaction_);
+        }
+
         void pointerDown(const ::juce::MouseEvent& event) {
             pointerEvents_.pointerDown(runtime_, session_, diagnostics_, interaction_, rootNodeId, event, inputCallbacks());
         }
@@ -176,6 +188,18 @@ namespace arrange::juce {
 
         void cancelWheel() {
             interaction_.cancelWheel();
+        }
+
+        arrange::core::PointerIcon pointerIcon() const {
+            return interaction_.pointerIcon();
+        }
+
+        PointerPlatformEffects takePointerEffects() {
+            return interaction_.takePointerEffects();
+        }
+
+        bool pointerDragging() const {
+            return interaction_.pointerDragging();
         }
 
         bool isTextInputActive() const {
@@ -220,6 +244,20 @@ namespace arrange::juce {
 
         ::juce::RectangleList<int> textBounds(::juce::Range<int> range) const {
             return textInput_.textBounds(runtime_.scene().tree(), session_, diagnostics_, interaction_, range);
+        }
+
+        bool keyStateChanged(const std::function<bool(int)>& isDown) {
+            if (diagnostics_.hasError()) return false;
+            return interaction_.keyStateChanged(runtime_.scene().tree(), session_.loaded(), isDown, inputCallbacks());
+        }
+
+        void modifierKeysChanged(const ::juce::ModifierKeys& modifiers) {
+            if (diagnostics_.hasError()) return;
+            interaction_.modifierKeysChanged(runtime_.scene().tree(), session_.loaded(), keyModifierState(modifiers), inputCallbacks());
+        }
+
+        bool hasKeyboardFocusTarget() const {
+            return interaction_.focusedNode().has_value();
         }
 
         bool keyPressed(const ::juce::KeyPress& key) {
@@ -325,6 +363,30 @@ namespace arrange::juce {
         impl_->paint(g, bounds);
     }
 
+    void EditorSceneHost::pointerMove(const ::juce::MouseEvent& event) {
+        impl_->pointerMove(event);
+    }
+
+    void EditorSceneHost::pointerExit() {
+        impl_->pointerExit();
+    }
+
+    void EditorSceneHost::cancelPointer() {
+        impl_->cancelPointer();
+    }
+
+    arrange::core::PointerIcon EditorSceneHost::pointerIcon() const {
+        return impl_->pointerIcon();
+    }
+
+    PointerPlatformEffects EditorSceneHost::takePointerEffects() {
+        return impl_->takePointerEffects();
+    }
+
+    bool EditorSceneHost::pointerDragging() const {
+        return impl_->pointerDragging();
+    }
+
     void EditorSceneHost::pointerDown(const ::juce::MouseEvent& event) {
         impl_->pointerDown(event);
     }
@@ -391,6 +453,18 @@ namespace arrange::juce {
 
     ::juce::RectangleList<int> EditorSceneHost::textBounds(::juce::Range<int> range) const {
         return impl_->textBounds(range);
+    }
+
+    bool EditorSceneHost::keyStateChanged(const std::function<bool(int)>& isDown) {
+        return impl_->keyStateChanged(isDown);
+    }
+
+    void EditorSceneHost::modifierKeysChanged(const ::juce::ModifierKeys& modifiers) {
+        impl_->modifierKeysChanged(modifiers);
+    }
+
+    bool EditorSceneHost::hasKeyboardFocusTarget() const {
+        return impl_->hasKeyboardFocusTarget();
     }
 
     bool EditorSceneHost::keyPressed(const ::juce::KeyPress& key) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/InputEvent.h>
 #include <arrange/core/LayoutNode.h>
 #include <arrange/core/Scroll.h>
 
@@ -18,6 +19,7 @@ namespace arrange::juce {
         bool invoked = false;
         bool ok = true;
         std::string error;
+        bool consumed = false;
     };
 
     class ScriptEventDispatcher final {
@@ -27,6 +29,7 @@ namespace arrange::juce {
         ScriptEventInvokeResult invoke(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::quickjs::CallbackInvokeOptions& options) const;
         ScriptEventInvokeResult invokeString(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value) const;
         ScriptEventInvokeResult invokeScroll(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result) const;
+        ScriptEventInvokeResult invokeInput(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::InputEventPayload& payload) const;
 #endif
     };
 

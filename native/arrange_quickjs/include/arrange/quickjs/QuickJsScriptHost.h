@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/InputEvent.h>
 #include <arrange/core/NativeScene.h>
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
@@ -74,6 +75,7 @@ namespace arrange::quickjs {
         bool hasPendingFocusCommands() const noexcept;
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const CallbackInvokeOptions& options = {});
         CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::ScrollResult& scroll);
+        CallbackInvokeResult invokeEventSlot(const arrange::core::EventSlotId& slot, const arrange::core::InputEventPayload& payload);
 
         bool hasPendingTransactions() const noexcept {
             return pendingTransactions_.hasPending();

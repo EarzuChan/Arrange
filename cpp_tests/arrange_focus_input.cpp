@@ -110,7 +110,27 @@ namespace {
         interaction.dispatchCommittedFocus(tree, callbacks);
         check(changes == std::vector<bool>{true}, "成功提交没有发送焦点回调");
         check(parentChanges == std::vector<std::pair<bool, bool>>{{false, true}}, "父Layout没有收到后代hasFocus");
-        check(interaction.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::spaceKey), callbacks) && clicks == 1, "clickable焦点无法键盘触发");
+        check(interaction.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::spaceKey), callbacks) && clicks == 0, "Space 按下就激活了 clickable");
+        check(interaction.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::spaceKey), callbacks) && clicks == 0, "Space 重复连发了激活");
+        check(interaction.keyStateChanged(tree, true, [](int) { return false; }, callbacks) && clicks == 1, "clickable焦点无法键盘触发");
+        check(interaction.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::spaceKey), callbacks) && interaction.keyStateChanged(tree, true, {}, callbacks) && clicks == 1, "失焦补发的抬起激活了 clickable");
+        InputModifierSemantics keys;
+        keys.kind = InputModifierKind::KeyEvent;
+        keys.eventSlot = makeEventSlotId(1, EventSlotKind::Key);
+        tree.apply({SetModifierMutation{1, {{size(400, 200)}, {parentObserver}, {keys}}}});
+        std::vector<KeyEventPayload> seen;
+        auto consume = true;
+        callbacks.dispatchKeyEvent = [&](const auto& slot, const auto& payload) {
+            seen.push_back(payload);
+            return slot.node == 1 && consume;
+        };
+        check(interaction.keyPressed(tree, true, ::juce::KeyPress('a', ::juce::ModifierKeys::shiftModifier, 'A'), callbacks) && seen.size() == 1 && seen[0].key == "A" && seen[0].text == "A" && !seen[0].up && seen[0].modifiers.shift, "onKeyEvent 未从焦点受体冒泡到祖先");
+        check(interaction.keyStateChanged(tree, true, [](int) { return false; }, callbacks) && seen.size() == 2 && seen[1].up && seen[1].key == "A", "key up 未交付给已交付 key down 的键");
+        consume = false;
+        check(!interaction.keyPressed(tree, true, ::juce::KeyPress('b'), callbacks) && seen.size() == 3, "未消费的普通按键没有交还宿主");
+        (void)interaction.keyStateChanged(tree, true, {}, callbacks);
+        callbacks.dispatchKeyEvent = {};
+        tree.apply({SetModifierMutation{1, {{size(400, 200)}, {parentObserver}}}});
         check(interaction.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::tabKey), callbacks) && interaction.focusedNode() == 3, "Tab没有转移通用焦点");
         check(changes == std::vector<bool>({true, false}), "原焦点没有blur回调");
         check(parentChanges.size() == 1, "同一父Layout内转焦点触发了假blur");

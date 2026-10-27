@@ -4,9 +4,11 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #endif
 
+#include <functional>
 #include <memory>
 #include <arrange/juce/WheelInput.h>
 #include <arrange/core/Geometry.h>
+#include <arrange/core/PointerGesture.h>
 #include <string>
 #include <string_view>
 
@@ -14,6 +16,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     struct EditorConfig;
+    using PointerPlatformEffects = arrange::core::PointerPlatformEffects;
 
     class EditorSceneHost final {
        public:
@@ -42,6 +45,12 @@ namespace arrange::juce {
         void resized(int width, int height);
         void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds);
 
+        void pointerMove(const ::juce::MouseEvent& event);
+        void pointerExit();
+        void cancelPointer();
+        [[nodiscard]] arrange::core::PointerIcon pointerIcon() const;
+        [[nodiscard]] PointerPlatformEffects takePointerEffects();
+        [[nodiscard]] bool pointerDragging() const;
         void pointerDown(const ::juce::MouseEvent& event);
         [[nodiscard]] bool pointerDrag(const ::juce::MouseEvent& event);
         void pointerUp(const ::juce::MouseEvent& event);
@@ -61,6 +70,9 @@ namespace arrange::juce {
         [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(int characterIndex) const;
         [[nodiscard]] ::juce::RectangleList<int> textBounds(::juce::Range<int> range) const;
         [[nodiscard]] bool keyPressed(const ::juce::KeyPress& key);
+        [[nodiscard]] bool keyStateChanged(const std::function<bool(int)>& isDown);
+        void modifierKeysChanged(const ::juce::ModifierKeys& modifiers);
+        [[nodiscard]] bool hasKeyboardFocusTarget() const;
 
        private:
         static constexpr std::string_view TAG = "EditorSceneHost";

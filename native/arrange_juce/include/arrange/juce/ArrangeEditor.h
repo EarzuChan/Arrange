@@ -90,11 +90,16 @@ namespace arrange::juce {
         void focusLost(FocusChangeType cause) override;
         void focusGained(FocusChangeType cause) override;
         void visibilityChanged() override;
+        void mouseMove(const ::juce::MouseEvent& event) override;
+        void mouseEnter(const ::juce::MouseEvent& event) override;
+        void mouseExit(const ::juce::MouseEvent& event) override;
         void mouseDown(const ::juce::MouseEvent& event) override;
         void mouseDrag(const ::juce::MouseEvent& event) override;
         void mouseUp(const ::juce::MouseEvent& event) override;
         void mouseWheelMove(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) override;
         bool keyPressed(const ::juce::KeyPress& key) override;
+        bool keyStateChanged(bool isKeyDown) override;
+        void modifierKeysChanged(const ::juce::ModifierKeys& modifiers) override;
         bool isTextInputActive() const override;
         ::juce::Range<int> getHighlightedRegion() const override;
         void setHighlightedRegion(const ::juce::Range<int>& newRange) override;
@@ -115,6 +120,10 @@ namespace arrange::juce {
         void requestFrameClockResyncAsync();
         void scheduleDevReadyCheck();
         void reportDevReady();
+        // 执行指针会话要求的无界移动，并同步光标
+        void applyPointerEffects(const ::juce::MouseEvent* event);
+        void cancelPointer();
+        bool pointerLocked_ = false;
         bool devReadyReported_ = false;
         bool devReadyCheckScheduled_ = false;
 

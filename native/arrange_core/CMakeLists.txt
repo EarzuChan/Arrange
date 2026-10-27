@@ -23,6 +23,7 @@ add_library(arrange_core STATIC
   src/MeasurePolicy.cpp
   src/HitTest.cpp
   src/PointerInputProcessor.cpp
+  src/PointerGesture.cpp
   src/Scroll.cpp
   src/InputEditing.cpp
   src/Paint.cpp

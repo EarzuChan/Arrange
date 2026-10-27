@@ -50,6 +50,27 @@ namespace arrange::juce {
         return result;
     }
 
+    bool ArrangeRuntime::dispatchInputEventNow(const arrange::core::EventSlotId& slot, const arrange::core::InputEventPayload& payload, double nowMillis) {
+        if (!slot.valid()) return false;
+        // 帧内或脚本已出错时不能同步调用，退回排队且视为未消费
+        if (inFrame_ || inSemantic_ || semanticError_) {
+            enqueueInputEvent(slot, payload);
+            return false;
+        }
+        if (!semanticCheckpoint(nowMillis).ok || !pipelineState_.scene().hasEventSlot(slot)) return false;
+        const ::juce::ScopedValueSetter<bool> guard(inSemantic_, true);
+        const auto invoked = rearrangeHost_.invokeInput(slot, nowMillis, payload);
+        if (!invoked.ok) {
+            semanticError_ = invoked.error;
+            return false;
+        }
+        if (invoked.invoked) (void)captureRearrangeTransactions();
+        const auto completed = rearrangeHost_.semanticCheckpoint(nowMillis, false);
+        if (!completed.ok) semanticError_ = completed.error;
+        if (workAvailable_) workAvailable_();
+        return invoked.consumed;
+    }
+
     void ArrangeRuntime::postEvent(QueuedEvent event) {
         if (events_.size() >= 4096) {
             semanticError_ = "Owner 输入邮箱超过 4096 项，已停止接收并要求重新加载";
@@ -173,6 +194,21 @@ namespace arrange::juce {
         postEvent(std::move(event));
     }
 
+    void ArrangeRuntime::enqueueInputEvent(const arrange::core::EventSlotId& slot, arrange::core::InputEventPayload payload) {
+        if (!slot.valid()) return;
+        if (const auto* delta = std::get_if<arrange::core::DragDeltaPayload>(&payload); delta && !events_.empty() && events_.back().kind == QueuedEventKind::InvokeInput && events_.back().slot == slot && events_.back().ownerGeneration == ownerGeneration_)
+            if (auto* pending = std::get_if<arrange::core::DragDeltaPayload>(&events_.back().input); pending && pending->modifiers == delta->modifiers) {
+                pending->deltaX += delta->deltaX;
+                pending->deltaY += delta->deltaY;
+                return;
+            }
+        QueuedEvent event;
+        event.kind = QueuedEventKind::InvokeInput;
+        event.slot = slot;
+        event.input = std::move(payload);
+        postEvent(std::move(event));
+    }
+
     void ArrangeRuntime::enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused) {
         enqueueFocusEvent(slot, focused, focused);
     }
@@ -273,6 +309,9 @@ namespace arrange::juce {
                     break;
                 case QueuedEventKind::InvokeScrollSnapshot:
                     invoked = rearrangeHost_.invokeScrollSnapshot(event.slot, nowMillis, event.scroll);
+                    break;
+                case QueuedEventKind::InvokeInput:
+                    invoked = rearrangeHost_.invokeInput(event.slot, nowMillis, event.input);
                     break;
             }
 

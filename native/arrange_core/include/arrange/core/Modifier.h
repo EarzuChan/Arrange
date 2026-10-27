@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <utility>
 #include <string>
 #include <variant>
 #include <vector>
@@ -108,15 +109,54 @@ namespace arrange::core {
         bool operator==(const ClipModifier&) const = default;
     };
 
-    enum class InputModifierKind { Clickable, Hoverable, Focusable };
+    enum class InputModifierKind { Clickable, Hoverable, Focusable, ContextClick, PointerIcon, KeyEvent, Wheel, Draggable };
+
+    enum class PointerIcon : std::uint8_t { Default, Hand, Text, Crosshair, ResizeHorizontal, ResizeVertical, Grab, Grabbing, None };
+
+    enum class DragAxis : std::uint8_t { Horizontal, Vertical, Both };
 
     struct InputModifierSemantics {
         InputModifierKind kind = InputModifierKind::Clickable;
         bool enabled = true;
         bool focusable = true;
+        // 主槽：click、contextClick、key、wheel 或拖动位移
         EventSlotId eventSlot;
+        EventSlotId doubleClick;
+        EventSlotId enter;
+        EventSlotId exit;
+        EventSlotId dragStart;
+        EventSlotId dragStop;
+        EventSlotId interaction;
+        PointerIcon icon = PointerIcon::Default;
+        DragAxis axis = DragAxis::Both;
+        bool startImmediately = false;
+        bool pointerLock = false;
         bool operator==(const InputModifierSemantics&) const = default;
     };
+
+    // 按槽类型取输入 Modifier 的对应槽位
+    inline const EventSlotId& inputEventSlot(const InputModifierSemantics& input, EventSlotKind kind) {
+        switch (kind) {
+            case EventSlotKind::DoubleClick:
+                return input.doubleClick;
+            case EventSlotKind::HoverEnter:
+                return input.enter;
+            case EventSlotKind::HoverExit:
+                return input.exit;
+            case EventSlotKind::DragStart:
+                return input.dragStart;
+            case EventSlotKind::DragStop:
+                return input.dragStop;
+            case EventSlotKind::Interaction:
+                return input.interaction;
+            default:
+                return input.eventSlot;
+        }
+    }
+
+    inline EventSlotId& inputEventSlot(InputModifierSemantics& input, EventSlotKind kind) {
+        return const_cast<EventSlotId&>(inputEventSlot(std::as_const(input), kind));
+    }
 
     struct TransformModifierSemantics {
         float translationX = 0.0f;
@@ -298,7 +338,7 @@ namespace arrange::core {
             return {};
         }
         EventSlotId slot;
-        if (const auto* input = std::get_if<InputModifierSemantics>(&value)) slot = input->eventSlot;
+        if (const auto* input = std::get_if<InputModifierSemantics>(&value)) slot = inputEventSlot(*input, kind);
         if (const auto* focus = std::get_if<FocusModifier>(&value)) slot = focus->eventSlot;
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value)) slot = layout->eventSlot;
         if (const auto* draw = std::get_if<DrawModifier>(&value)) slot = draw->prepare;

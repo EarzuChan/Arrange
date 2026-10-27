@@ -21,6 +21,28 @@ namespace arrange::core {
                 return "drawPrepare";
             case EventSlotKind::FocusChanged:
                 return "focusChanged";
+            case EventSlotKind::DoubleClick:
+                return "doubleClick";
+            case EventSlotKind::ContextClick:
+                return "contextClick";
+            case EventSlotKind::HoverEnter:
+                return "hoverEnter";
+            case EventSlotKind::HoverExit:
+                return "hoverExit";
+            case EventSlotKind::Key:
+                return "key";
+            case EventSlotKind::Wheel:
+                return "wheel";
+            case EventSlotKind::DragStart:
+                return "dragStart";
+            case EventSlotKind::DragDelta:
+                return "dragDelta";
+            case EventSlotKind::DragStop:
+                return "dragStop";
+            case EventSlotKind::Interaction:
+                return "interaction";
+            case EventSlotKind::PointerInput:
+                return "pointerInput";
             case EventSlotKind::Custom:
                 return "custom";
             case EventSlotKind::None:
@@ -39,6 +61,17 @@ namespace arrange::core {
         if (name == "inputBlur") return EventSlotKind::InputBlur;
         if (name == "drawPrepare") return EventSlotKind::DrawPrepare;
         if (name == "focusChanged") return EventSlotKind::FocusChanged;
+        if (name == "doubleClick") return EventSlotKind::DoubleClick;
+        if (name == "contextClick") return EventSlotKind::ContextClick;
+        if (name == "hoverEnter") return EventSlotKind::HoverEnter;
+        if (name == "hoverExit") return EventSlotKind::HoverExit;
+        if (name == "key") return EventSlotKind::Key;
+        if (name == "wheel") return EventSlotKind::Wheel;
+        if (name == "dragStart") return EventSlotKind::DragStart;
+        if (name == "dragDelta") return EventSlotKind::DragDelta;
+        if (name == "dragStop") return EventSlotKind::DragStop;
+        if (name == "interaction") return EventSlotKind::Interaction;
+        if (name == "pointerInput") return EventSlotKind::PointerInput;
         if (name == "custom") return EventSlotKind::Custom;
         return EventSlotKind::None;
     }

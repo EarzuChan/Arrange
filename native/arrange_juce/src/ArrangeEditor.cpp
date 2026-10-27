@@ -94,6 +94,8 @@ namespace arrange::juce {
         setResizeLimits(config_.window.minWidth, config_.window.minHeight, config_.window.maxWidth, config_.window.maxHeight);
         setResizable(config_.window.resizable, config_.window.useCornerResizer);
         setWantsKeyboardFocus(true);
+        // 键盘焦点只在命中焦点受体时获取，见 mouseDown
+        setMouseClickGrabsKeyboardFocus(false);
         sceneHost_->configure(config_);
         sceneHost_->resized(getWidth(), getHeight());
         shell_.afterConfigure(*this);
@@ -164,7 +166,35 @@ namespace arrange::juce {
         updateFrameClockState();
     }
 
+    void ArrangeEditor::cancelPointer() {
+        sceneHost_->cancelPointer();
+        applyPointerEffects(nullptr);
+        shell_.afterFrameRelevantChange(*this);
+    }
+
+    void ArrangeEditor::applyPointerEffects(const ::juce::MouseEvent* event) {
+        const auto effects = sceneHost_->takePointerEffects();
+        auto source = event ? event->source : ::juce::Desktop::getInstance().getMainMouseSource();
+        if (effects.lockPointer && event && !pointerLocked_) {
+            source.enableUnboundedMouseMovement(true, false);
+            pointerLocked_ = true;
+        }
+        // 会话结束或被取消后一律解除，光标回到按下点
+        if (pointerLocked_ && (effects.unlockPointer || !sceneHost_->pointerDragging())) {
+            source.enableUnboundedMouseMovement(false);
+            if (effects.unlockPointer) source.setScreenPosition(localPointToGlobal(::juce::Point<float>(effects.restorePoint.x, effects.restorePoint.y)));
+            pointerLocked_ = false;
+        }
+        using Icon = arrange::core::PointerIcon;
+        const auto icon = sceneHost_->pointerIcon();
+        const auto cursor = icon == Icon::Hand ? ::juce::MouseCursor::PointingHandCursor : icon == Icon::Text ? ::juce::MouseCursor::IBeamCursor : icon == Icon::Crosshair ? ::juce::MouseCursor::CrosshairCursor : icon == Icon::ResizeHorizontal ? ::juce::MouseCursor::LeftRightResizeCursor : icon == Icon::ResizeVertical ? ::juce::MouseCursor::UpDownResizeCursor : icon == Icon::Grab ? ::juce::MouseCursor::DraggingHandCursor : icon == Icon::Grabbing ? ::juce::MouseCursor::DraggingHandCursor : icon == Icon::None ? ::juce::MouseCursor::NoCursor : ::juce::MouseCursor::NormalCursor;
+        if (getMouseCursor() != ::juce::MouseCursor(cursor)) setMouseCursor(cursor);
+    }
+
     void ArrangeEditor::focusLost(FocusChangeType) {
+        // 为仍按下的键补发 key up
+        (void)sceneHost_->keyStateChanged({});
+        cancelPointer();
         sceneHost_->cancelWheel();
 #if JUCE_WINDOWS
         // 未测试！
@@ -180,26 +210,54 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::visibilityChanged() {
-        if (!isShowing()) sceneHost_->cancelWheel();
+        if (!isShowing()) {
+            cancelPointer();
+            sceneHost_->cancelWheel();
+        }
 #if JUCE_WINDOWS
         // 未测试！
         if (precisionWheelSource_) precisionWheelSource_->sync(*this);
 #endif
     }
 
+    void ArrangeEditor::mouseMove(const ::juce::MouseEvent& event) {
+        sceneHost_->pointerMove(event);
+        applyPointerEffects(&event);
+        shell_.afterFrameRelevantChange(*this);
+    }
+
+    void ArrangeEditor::mouseEnter(const ::juce::MouseEvent& event) {
+        mouseMove(event);
+    }
+
+    void ArrangeEditor::mouseExit(const ::juce::MouseEvent& event) {
+        // 无界拖动中指针可能越出编辑器，会话仍归本编辑器
+        if (sceneHost_->pointerDragging()) return;
+        sceneHost_->pointerExit();
+        applyPointerEffects(&event);
+        shell_.afterFrameRelevantChange(*this);
+    }
+
     void ArrangeEditor::mouseDown(const ::juce::MouseEvent& event) {
-        grabKeyboardFocus();
         sceneHost_->pointerDown(event);
+        // 点击非焦点受体时交还键盘，宿主快捷键不被空白区域吞掉
+        if (sceneHost_->hasKeyboardFocusTarget())
+            grabKeyboardFocus();
+        else if (hasKeyboardFocus(true))
+            giveAwayKeyboardFocus();
+        applyPointerEffects(&event);
         shell_.afterPointerDown(*this);
     }
 
     void ArrangeEditor::mouseDrag(const ::juce::MouseEvent& event) {
         (void)sceneHost_->pointerDrag(event);
+        applyPointerEffects(&event);
         shell_.afterFrameRelevantChange(*this);
     }
 
     void ArrangeEditor::mouseUp(const ::juce::MouseEvent& event) {
         sceneHost_->pointerUp(event);
+        applyPointerEffects(&event);
         shell_.afterFrameRelevantChange(*this);
     }
 
@@ -220,6 +278,7 @@ namespace arrange::juce {
             return true;
         }
 #endif
+#if !defined(NDEBUG)
         if (key.isKeyCode(::juce::KeyPress::F5Key)) {
             sceneHost_->manualReload(key.getModifiers().isCommandDown());
             shell_.afterTitleAndFrameRelevantChange(*this);
@@ -237,6 +296,7 @@ namespace arrange::juce {
             }
             return true;
         }
+#endif
         if (key.getModifiers().isCommandDown() && (key.getTextCharacter() == 'c' || key.getTextCharacter() == 'C')) {
             if (sceneHost_->copyDiagnosticsToClipboard()) {
                 shell_.afterFrameRelevantChange(*this);
@@ -247,6 +307,18 @@ namespace arrange::juce {
         // 事件是否消费和是否产生待提交工作是两个不同结果
         shell_.afterFrameRelevantChange(*this);
         return consumed;
+    }
+
+    bool ArrangeEditor::keyStateChanged(bool isKeyDown) {
+        if (isKeyDown) return false;
+        const auto consumed = sceneHost_->keyStateChanged([](int code) { return ::juce::KeyPress::isKeyCurrentlyDown(code); });
+        shell_.afterFrameRelevantChange(*this);
+        return consumed;
+    }
+
+    void ArrangeEditor::modifierKeysChanged(const ::juce::ModifierKeys& modifiers) {
+        sceneHost_->modifierKeysChanged(modifiers);
+        shell_.afterFrameRelevantChange(*this);
     }
 
     bool ArrangeEditor::isTextInputActive() const {

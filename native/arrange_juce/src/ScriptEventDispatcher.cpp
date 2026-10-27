@@ -35,6 +35,14 @@ namespace arrange::juce {
         if (!invoked.ok) return {true, false, invoked.error};
         return {true, true, {}};
     }
+
+    ScriptEventInvokeResult ScriptEventDispatcher::invokeInput(arrange::quickjs::QuickJsScriptHost* host, const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::InputEventPayload& payload) const {
+        if (host == nullptr || !slot.valid()) return {};
+        host->setFrameTimeMillis(nowMillis);
+        const auto invoked = host->invokeEventSlot(slot, payload);
+        if (!invoked.ok) return {true, false, invoked.error};
+        return {true, true, {}, invoked.consumed};
+    }
 #endif
 }
 

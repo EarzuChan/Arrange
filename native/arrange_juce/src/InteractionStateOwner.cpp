@@ -3,6 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/core/ModifierGeometry.h>
+#include <arrange/juce/JucePointerInputAdapter.h>
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
@@ -57,24 +58,89 @@ namespace arrange::juce {
         return input_.viewportX();
     }
 
-    void InteractionStateOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options) {
+    namespace {
+        // 逻辑键名沿用 Web KeyboardEvent.key 的写法
+        std::string keyName(const ::juce::KeyPress& key) {
+            using K = ::juce::KeyPress;
+            const auto code = key.getKeyCode();
+            const std::pair<int, const char*> named[]{{K::returnKey, "Enter"}, {K::escapeKey, "Escape"}, {K::tabKey, "Tab"}, {K::backspaceKey, "Backspace"}, {K::deleteKey, "Delete"}, {K::insertKey, "Insert"}, {K::spaceKey, " "}, {K::upKey, "ArrowUp"}, {K::downKey, "ArrowDown"}, {K::leftKey, "ArrowLeft"}, {K::rightKey, "ArrowRight"}, {K::pageUpKey, "PageUp"}, {K::pageDownKey, "PageDown"}, {K::homeKey, "Home"}, {K::endKey, "End"}};
+            for (const auto& [value, name] : named)
+                if (code == value) return name;
+            for (int index = 0; index < 12; ++index)
+                if (code == K::F1Key + index) return "F" + std::to_string(index + 1);
+            if (const auto character = key.getTextCharacter(); character >= 32 && character != 127) return ::juce::String::charToString(character).toStdString();
+            return ::juce::String::charToString(static_cast<::juce::juce_wchar>(code)).toLowerCase().toStdString();
+        }
+
+        std::string keyText(const ::juce::KeyPress& key) {
+            const auto character = key.getTextCharacter();
+            return character >= 32 && character != 127 ? ::juce::String::charToString(character).toStdString() : std::string{};
+        }
+
+        arrange::core::PointerSample sampleAt(float x, float y, arrange::core::KeyModifierState modifiers) {
+            return {{x, y}, modifiers, ::juce::Time::getMillisecondCounterHiRes()};
+        }
+    }
+
+    arrange::core::PointerGestureOutput InteractionStateOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options, arrange::core::KeyModifierState modifiers) {
         pendingLazyFocus_.reset();
         const auto point = arrange::core::Point{x, y};
-        const auto pointerResult = pointer_.pointerDown(snapshot, point, 0);
+        arrange::core::PointerGestureOutput gesture;
+        const auto pointerResult = pointer_.pointerDown(tree, snapshot, sampleAt(x, y, modifiers), options.clickCount, gesture);
         focus_.synchronize(tree, true);
         (void)focus_.set(arrange::core::pointerFocusTarget(tree, focus_.snapshot(), pointerResult.hit.node, point));
         input_.pointerDown(tree, pointerResult.hit, x, y, callbacks, options);
         dispatchCommittedFocus(tree, callbacks);
+        return gesture;
     }
 
-    bool InteractionStateOwner::pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks) {
+    bool InteractionStateOwner::pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks, arrange::core::PointerGestureOutput* gesture, arrange::core::KeyModifierState modifiers) {
+        arrange::core::PointerGestureOutput local;
+        pointer_.pointerDrag(tree, sampleAt(x, y, modifiers), gesture ? *gesture : local);
+        // 拖动会话独占指针，不再交给文本拖选
+        if (pointer_.gesture().dragging()) {
+            input_.cancelDrag();
+            return true;
+        }
         return input_.pointerDrag(tree, runtimeReady, x, y, callbacks);
     }
 
-    InteractionPointerUpResult InteractionStateOwner::pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y) {
+    InteractionPointerUpResult InteractionStateOwner::pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers) {
         input_.cancelDrag();
-        const auto result = pointer_.pointerUp(snapshot, {x, y}, 0);
-        return {result.clickTriggered, result.eventSlot};
+        InteractionPointerUpResult result;
+        pointer_.pointerUp(tree, snapshot, sampleAt(x, y, modifiers), result.gesture);
+        for (const auto& event : result.gesture.events)
+            if (std::holds_alternative<std::monostate>(event.payload)) {
+                result.clickTriggered = true;
+                result.eventSlot = event.slot;
+            }
+        return result;
+    }
+
+    arrange::core::PointerGestureOutput InteractionStateOwner::pointerMove(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y) {
+        arrange::core::PointerGestureOutput gesture;
+        pointer_.gesture().move(tree, snapshot, sampleAt(x, y, {}), gesture);
+        return gesture;
+    }
+
+    arrange::core::PointerGestureOutput InteractionStateOwner::pointerExit(const arrange::core::LayoutTree& tree) {
+        arrange::core::PointerGestureOutput gesture;
+        pointer_.gesture().exit(tree, gesture);
+        return gesture;
+    }
+
+    arrange::core::PointerGestureOutput InteractionStateOwner::contextClick(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers) {
+        arrange::core::PointerGestureOutput gesture;
+        pointer_.gesture().contextClick(tree, snapshot, sampleAt(x, y, modifiers), gesture);
+        return gesture;
+    }
+
+    arrange::core::PointerGestureOutput InteractionStateOwner::cancelPointer(const arrange::core::LayoutTree& tree) {
+        arrange::core::PointerGestureOutput gesture;
+        input_.cancelDrag();
+        pointer_.cancelWheel();
+        pointer_.gesture().cancel(tree, gesture);
+        return gesture;
     }
 
     InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision, float pixelsPerWheelUnit) {
@@ -130,14 +196,38 @@ namespace arrange::juce {
         return input_.textBounds(tree, runtimeReady, range);
     }
 
+    bool InteractionStateOwner::bubbleKey(const arrange::core::LayoutTree& tree, const arrange::core::KeyEventPayload& payload, const TextInputCallbacks& callbacks) const {
+        if (!focusedNode() || !tree.contains(*focusedNode()) || !callbacks.dispatchKeyEvent) return false;
+        // 先收集槽位再调用：焦点受体在前，同节点内层 Modifier 在前
+        std::vector<arrange::core::EventSlotId> slots;
+        const auto path = arrange::core::nodePath(tree, *focusedNode());
+        for (auto node = path.rbegin(); node != path.rend(); ++node) {
+            const auto& elements = tree.node(*node).modifier.elements();
+            for (auto element = elements.rbegin(); element != elements.rend(); ++element)
+                if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&element->descriptor.value); input && input->kind == arrange::core::InputModifierKind::KeyEvent && input->enabled && input->eventSlot.valid()) slots.push_back(input->eventSlot);
+        }
+        for (const auto& slot : slots)
+            if (callbacks.dispatchKeyEvent(slot, payload)) return true;
+        return false;
+    }
+
     bool InteractionStateOwner::keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks) {
         if (!runtimeReady) return false;
         focus_.synchronize(tree, runtimeReady);
-        if (key.isKeyCode(::juce::KeyPress::tabKey)) return moveFocus(tree, key.getModifiers().isShiftDown() ? arrange::core::FocusDirection::Previous : arrange::core::FocusDirection::Next, callbacks);
-        if (input_.keyPressed(tree, runtimeReady, key, callbacks)) return true;
+        const auto code = key.getKeyCode();
+        auto pressed = std::find_if(pressedKeys_.begin(), pressedKeys_.end(), [&](const auto& item) { return item.keyCode == code; });
+        const auto repeat = pressed != pressedKeys_.end();
+        if (!repeat) pressed = pressedKeys_.insert(pressedKeys_.end(), {code, keyName(key), keyText(key), false});
+        const auto tab = key.isKeyCode(::juce::KeyPress::tabKey);
+        // Input 先消费编辑按键；Tab 不交给 Input
+        if (!tab && input_.keyPressed(tree, runtimeReady, key, callbacks)) return true;
         if (callbacks.enqueueKeyIntent) callbacks.enqueueKeyIntent(focusedNode().value_or(0), "通用焦点键盘输入");
+        pressed->delivered = true;
+        if (bubbleKey(tree, {false, pressed->key, pressed->text, repeat, keyModifierState(key.getModifiers())}, callbacks)) return true;
+        if (tab) return moveFocus(tree, key.getModifiers().isShiftDown() ? arrange::core::FocusDirection::Previous : arrange::core::FocusDirection::Next, callbacks);
+        // Enter / Space 按下只进入激活待定，抬起才激活；重复不连发
         if (focus_.target() && (key.isKeyCode(::juce::KeyPress::returnKey) || key.isKeyCode(::juce::KeyPress::spaceKey)) && focus_.target()->click.valid()) {
-            if (callbacks.invokeEvent) callbacks.invokeEvent(focus_.target()->click);
+            if (!repeat) activation_ = KeyActivation{code, focus_.target()->node.id};
             return true;
         }
         if (key.isKeyCode(::juce::KeyPress::upKey)) return moveFocus(tree, arrange::core::FocusDirection::Up, callbacks);
@@ -153,6 +243,33 @@ namespace arrange::juce {
                 }
         }
         return false;
+    }
+
+    bool InteractionStateOwner::keyStateChanged(arrange::core::LayoutTree& tree, bool runtimeReady, const std::function<bool(int)>& isDown, const TextInputCallbacks& callbacks) {
+        auto consumed = false;
+        for (auto index = pressedKeys_.size(); index-- > 0;) {
+            const auto key = pressedKeys_[index];
+            if (isDown && isDown(key.keyCode)) continue;
+            pressedKeys_.erase(pressedKeys_.begin() + static_cast<std::ptrdiff_t>(index));
+            if (!runtimeReady) continue;
+            if (key.delivered) consumed = bubbleKey(tree, {true, key.key, key.text, false, modifiers_}, callbacks) || consumed;
+            if (activation_ && activation_->keyCode == key.keyCode) {
+                const auto activation = *std::exchange(activation_, std::nullopt);
+                focus_.synchronize(tree, runtimeReady);
+                // 失焦补发的抬起不激活
+                if (isDown && focus_.target() && focus_.target()->node.id == activation.node && focus_.target()->click.valid() && callbacks.invokeEvent) callbacks.invokeEvent(focus_.target()->click);
+                consumed = true;
+            }
+        }
+        return consumed;
+    }
+
+    void InteractionStateOwner::modifierKeysChanged(arrange::core::LayoutTree& tree, bool runtimeReady, arrange::core::KeyModifierState modifiers, const TextInputCallbacks& callbacks) {
+        const auto previous = std::exchange(modifiers_, modifiers);
+        if (!runtimeReady) return;
+        const std::tuple<bool, bool, const char*> changes[]{{previous.shift, modifiers.shift, "Shift"}, {previous.ctrl, modifiers.ctrl, "Control"}, {previous.alt, modifiers.alt, "Alt"}, {previous.meta, modifiers.meta, "Meta"}};
+        for (const auto& [before, after, name] : changes)
+            if (before != after) (void)bubbleKey(tree, {!after, name, {}, false, modifiers}, callbacks);
     }
 
     void InteractionStateOwner::synchronizePublishedFocus(const arrange::core::LayoutTree& tree, bool runtimeReady, const std::vector<arrange::core::FocusCommand>& commands) {

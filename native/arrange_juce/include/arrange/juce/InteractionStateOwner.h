@@ -20,9 +20,12 @@ namespace arrange::juce {
     struct InteractionPointerUpResult {
         bool clickTriggered = false;
         arrange::core::EventSlotId eventSlot;
+        arrange::core::PointerGestureOutput gesture;
     };
 
     using InteractionWheelResult = WheelDispatchResult;
+
+    using PointerPlatformEffects = arrange::core::PointerPlatformEffects;
 
     class InteractionStateOwner final {
        public:
@@ -82,9 +85,43 @@ namespace arrange::juce {
             return input_.focusedModifier();
         }
 
-        void pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options = {});
-        [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks);
-        [[nodiscard]] InteractionPointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y);
+        arrange::core::PointerGestureOutput pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options = {}, arrange::core::KeyModifierState modifiers = {});
+        [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks, arrange::core::PointerGestureOutput* gesture = nullptr, arrange::core::KeyModifierState modifiers = {});
+        [[nodiscard]] InteractionPointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers = {});
+        arrange::core::PointerGestureOutput pointerMove(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y);
+        arrange::core::PointerGestureOutput pointerExit(const arrange::core::LayoutTree& tree);
+        arrange::core::PointerGestureOutput contextClick(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers);
+        // 统一取消：按下、文本拖选、拖动与滚轮会话
+        arrange::core::PointerGestureOutput cancelPointer(const arrange::core::LayoutTree& tree);
+
+        [[nodiscard]] arrange::core::PointerIcon pointerIcon() const noexcept {
+            return pointer_.gesture().icon();
+        }
+
+        [[nodiscard]] bool pointerDragging() const noexcept {
+            return pointer_.gesture().dragging();
+        }
+
+        void notePointerEffects(const arrange::core::PointerGestureOutput& output) noexcept {
+            if (output.lockPointer) {
+                effects_.lockPointer = true;
+                effects_.unlockPointer = false;
+            }
+            if (output.unlockPointer) {
+                effects_.unlockPointer = true;
+                effects_.lockPointer = false;
+                effects_.restorePoint = output.restorePoint;
+            }
+        }
+
+        PointerPlatformEffects takePointerEffects() noexcept {
+            return std::exchange(effects_, {});
+        }
+
+        void setTouchSlop(float px) noexcept {
+            pointer_.gesture().setTouchSlop(px);
+        }
+
         [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
         [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision = 0);
@@ -105,9 +142,17 @@ namespace arrange::juce {
         [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(const arrange::core::LayoutTree& tree, bool runtimeReady, int characterIndex) const;
         [[nodiscard]] ::juce::RectangleList<int> textBounds(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Range<int> range) const;
         [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks);
+        // 为已不在按下状态的键交付 key up；isDown 为空时视为全部抬起（失焦补发）
+        [[nodiscard]] bool keyStateChanged(arrange::core::LayoutTree& tree, bool runtimeReady, const std::function<bool(int)>& isDown, const TextInputCallbacks& callbacks);
+        void modifierKeysChanged(arrange::core::LayoutTree& tree, bool runtimeReady, arrange::core::KeyModifierState modifiers, const TextInputCallbacks& callbacks);
 
         void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
             pointer_.synchronizePublishedWheel(tree, runtimeReady);
+            arrange::core::PointerGestureOutput ignored;
+            if (runtimeReady)
+                pointer_.gesture().revalidate(tree, ignored);
+            else
+                pointer_.gesture().cancel(tree, ignored);
             input_.synchronizePublishedInput(tree, runtimeReady);
             focus_.synchronize(tree, runtimeReady);
         }
@@ -117,6 +162,25 @@ namespace arrange::juce {
 
        private:
         PointerInputState pointer_;
+        PointerPlatformEffects effects_;
+
+        struct PressedKey {
+            int keyCode = 0;
+            std::string key;
+            std::string text;
+            // 只有交付过 key down 的键才交付 key up
+            bool delivered = false;
+        };
+
+        struct KeyActivation {
+            int keyCode = 0;
+            arrange::core::NodeId node = 0;
+        };
+
+        std::vector<PressedKey> pressedKeys_;
+        std::optional<KeyActivation> activation_;
+        arrange::core::KeyModifierState modifiers_;
+        bool bubbleKey(const arrange::core::LayoutTree& tree, const arrange::core::KeyEventPayload& payload, const TextInputCallbacks& callbacks) const;
         TextInputOwner input_;
         FocusOwner focus_;
         std::vector<std::pair<arrange::core::EventSlotId, std::string>> preparedInputEvents_;

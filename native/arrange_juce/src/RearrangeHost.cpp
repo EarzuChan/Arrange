@@ -5,7 +5,7 @@
 namespace arrange::juce {
     namespace {
         RearrangeInvokeResult fromScriptEventResult(ScriptEventInvokeResult result) {
-            return {result.invoked, result.ok, std::move(result.error)};
+            return {result.invoked, result.ok, std::move(result.error), result.consumed};
         }
     }
 
@@ -162,6 +162,10 @@ namespace arrange::juce {
 
     RearrangeInvokeResult RearrangeHost::invokeScrollSnapshot(const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result) {
         return fromScriptEventResult(eventDispatcher_.invokeScroll(scriptHost_.get(), slot, nowMillis, result));
+    }
+
+    RearrangeInvokeResult RearrangeHost::invokeInput(const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::InputEventPayload& payload) {
+        return fromScriptEventResult(eventDispatcher_.invokeInput(scriptHost_.get(), slot, nowMillis, payload));
     }
 
     RearrangeInvokeResult RearrangeHost::completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error) {

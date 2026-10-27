@@ -21,8 +21,13 @@ export type ModifierElement = Readonly<{ type: string, key?: string, value: Modi
 export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
 export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
 export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
-export type ClickableOptions = { onClick: () => void; enabled?: boolean; focusable?: boolean }
+export type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean }
 export type EnabledOptions = { enabled?: boolean }
+export type HoverableOptions = { enabled?: boolean; onEnter?: () => void; onExit?: () => void }
+export type PointerIcon = 'default' | 'hand' | 'text' | 'crosshair' | 'resizeHorizontal' | 'resizeVertical' | 'grab' | 'grabbing' | 'none'
+export type KeyModifiers = Readonly<{ shift: boolean; alt: boolean; ctrl: boolean; meta: boolean; command: boolean }>
+export type ContextClickEvent = Readonly<{ xDp: number; yDp: number; modifiers: KeyModifiers }>
+export type KeyEvent = Readonly<{ type: 'down' | 'up'; key: string; text: string; repeat: boolean; modifiers: KeyModifiers }>
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
 export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
 export type TextFieldOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; placeholder?: string; enabled?: boolean; selectAllOnFocus?: boolean; onValueChange?: (value: string) => void; onSubmit?: (value: string) => void; onChange?: (value: string) => void; onBlur?: (value: string) => void }>
@@ -209,8 +214,22 @@ export class Modifier {
         return this.#add("clickable", typeof arg === "function" ? { onClick: arg, enabled: true, focusable: true } : { enabled: true, focusable: true, ...arg })
     }
 
-    hoverable(args: EnabledOptions = {}): Modifier {
+    // 上下文点击：右键，macOS 上 Ctrl+点击；clickable 只响应主键
+    onContextClick(callback: (event: ContextClickEvent) => void, args: EnabledOptions = {}): Modifier {
+        return this.#add('onContextClick', { callback, enabled: true, ...args })
+    }
+
+    hoverable(args: HoverableOptions = {}): Modifier {
         return this.#add("hoverable", { enabled: true, ...args })
+    }
+
+    // 从焦点受体向祖先冒泡，返回 true 表示已消费；未消费才走默认行为并交还宿主
+    onKeyEvent(callback: (event: KeyEvent) => boolean): Modifier {
+        return this.#add('onKeyEvent', { callback })
+    }
+
+    pointerIcon(icon: PointerIcon): Modifier {
+        return this.#add('pointerIcon', { icon })
     }
 
     focusable(arg: boolean | EnabledOptions = true): Modifier {

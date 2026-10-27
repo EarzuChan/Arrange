@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/InputEvent.h>
 #include <arrange/core/Geometry.h>
 #include <arrange/core/InputIntent.h>
 #include <arrange/core/MutationTransaction.h>
@@ -101,6 +102,9 @@ namespace arrange::juce {
         void enqueueFocusEvent(const arrange::core::EventSlotId& slot, bool focused, bool hasFocus);
         std::vector<arrange::core::FocusCommand> takeFocusCommands();
         void enqueueStringEvent(const arrange::core::EventSlotId& slot, std::string value);
+        void enqueueInputEvent(const arrange::core::EventSlotId& slot, arrange::core::InputEventPayload payload);
+        // 先清空排队事件保持顺序，再同步调用并返回回调是否消费
+        [[nodiscard]] bool dispatchInputEventNow(const arrange::core::EventSlotId& slot, const arrange::core::InputEventPayload& payload, double nowMillis);
 
         [[nodiscard]] bool hasPendingEvents() const noexcept;
 
@@ -139,6 +143,7 @@ namespace arrange::juce {
             InvokeString,
             InvokeFocus,
             InvokeScrollSnapshot,
+            InvokeInput,
         };
 
         struct QueuedEvent {
@@ -153,6 +158,7 @@ namespace arrange::juce {
             bool focused = false;
             bool hasFocus = false;
             arrange::core::ScrollResult scroll;
+            arrange::core::InputEventPayload input;
         };
 
         [[nodiscard]] FrameWorkState frameWorkState() const noexcept;

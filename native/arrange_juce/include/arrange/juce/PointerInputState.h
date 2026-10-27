@@ -3,7 +3,7 @@
 #include <arrange/core/Geometry.h>
 #include <arrange/core/HitTest.h>
 #include <arrange/core/LayoutNode.h>
-#include <arrange/core/PointerInputProcessor.h>
+#include <arrange/core/PointerGesture.h>
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/juce/WheelInput.h>
@@ -27,9 +27,17 @@ namespace arrange::juce {
        public:
         void reset();
         void resetForSceneChange();
-        [[nodiscard]] PointerDownResult pointerDown(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId = 0);
+        [[nodiscard]] PointerDownResult pointerDown(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, int clicks, arrange::core::PointerGestureOutput& out);
+        void pointerDrag(const arrange::core::LayoutTree& tree, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out);
+        void pointerUp(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out);
 
-        [[nodiscard]] arrange::core::PointerDispatchResult pointerUp(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId = 0);
+        arrange::core::PointerGestureSession& gesture() noexcept {
+            return gesture_;
+        }
+
+        const arrange::core::PointerGestureSession& gesture() const noexcept {
+            return gesture_;
+        }
 
         [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
@@ -38,7 +46,7 @@ namespace arrange::juce {
         void synchronizePublishedWheel(const arrange::core::LayoutTree& tree, bool interactive);
 
         std::optional<arrange::core::NodeId> capturedNode(const arrange::core::LayoutTree& tree) const {
-            return pointer_.capturedNode(tree);
+            return gesture_.capturedNode(tree);
         }
 
        private:
@@ -56,7 +64,7 @@ namespace arrange::juce {
         WheelSession wheelSession_;
         std::uint64_t nextWheelSessionId_ = 0;
         arrange::core::HitTester hitTester_;
-        arrange::core::PointerInputProcessor pointer_;
+        arrange::core::PointerGestureSession gesture_;
         arrange::core::ScrollDispatcher scroll_;
         arrange::core::PendingScrollValues pendingScrollValues_;
         std::uint64_t scrollRevision_ = 0;

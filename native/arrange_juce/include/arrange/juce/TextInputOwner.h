@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/InputEvent.h>
 #include <arrange/core/HitTest.h>
 #include <arrange/core/InputEditing.h>
 #include <arrange/core/Paint.h>
@@ -33,6 +34,8 @@ namespace arrange::juce {
         std::function<void(const arrange::core::EventSlotId&, bool, bool)> invokeFocusEvent;
         std::function<void(const arrange::core::EventSlotId&)> invokeEvent;
         std::function<void(const arrange::core::EventSlotId&, const arrange::core::ScrollResult&)> invokeScrollEvent;
+        // 同步调用 onKeyEvent，返回是否消费
+        std::function<bool(const arrange::core::EventSlotId&, const arrange::core::KeyEventPayload&)> dispatchKeyEvent;
         std::function<std::string()> readClipboard;
         std::function<void(const std::string&)> writeClipboard;
     };

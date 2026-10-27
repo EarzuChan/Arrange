@@ -14,6 +14,8 @@ namespace arrange::quickjs {
     struct CallbackInvokeResult {
         bool ok = false;
         std::string error;
+        // 回调返回真值，表示事件已被消费
+        bool consumed = false;
     };
 
     struct CallbackInvokeOptions {

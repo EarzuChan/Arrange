@@ -60,8 +60,13 @@ namespace arrange::quickjs {
             if (type == "background") return check({"color", "brush", "shape"});
             if (type == "border") return check({"width", "color", "brush", "shape"});
             if (type == "clip") return check({"shape"});
-            if (type == "clickable") return check({"enabled", "focusable", "onClick"});
-            if (type == "hoverable" || type == "focusable") return check({"enabled"});
+            if (type == "clickable") return check({"enabled", "focusable", "onClick", "onDoubleClick", "interaction"});
+            if (type == "hoverable") return check({"enabled", "onEnter", "onExit", "interaction"});
+            if (type == "focusable") return check({"enabled", "interaction"});
+            if (type == "onContextClick" || type == "onWheel") return check({"enabled", "callback"});
+            if (type == "onKeyEvent") return check({"callback"});
+            if (type == "pointerIcon") return check({"icon"});
+            if (type == "draggable") return check({"enabled", "axis", "startImmediately", "pointerLock", "onDelta", "onStart", "onStop", "interaction"});
             if (type == "focusRequester") return check({"requester"});
             if (type == "focusGroup") return check({});
             if (type == "onFocusChanged") return check({"callback"});
@@ -551,19 +556,72 @@ namespace arrange::quickjs {
                     callbacks.push_back({result.size(), arrange::core::EventSlotKind::FocusChanged, std::move(callback)});
                 }
                 result.push_back({item, key});
-            } else if (type == "clickable" || type == "hoverable" || type == "focusable") {
+            } else if (type == "clickable" || type == "hoverable" || type == "focusable" || type == "onContextClick" || type == "pointerIcon" || type == "onKeyEvent" || type == "onWheel" || type == "draggable") {
+                using Kind = arrange::core::EventSlotKind;
+                using InputKind = arrange::core::InputModifierKind;
                 arrange::core::InputModifierSemantics item;
                 item.enabled = boolField(payload, "enabled", true);
                 item.focusable = boolField(payload, "focusable", true);
-                if (type == "clickable") {
-                    ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "onClick"));
-                    if (!JS_IsFunction(context_, callback.get())) {
-                        (void)throwTypeError("clickable.onClick 需要函数");
+                // 必填回调缺失时报错；可选回调为 undefined 时不登记槽位
+                const auto callback = [&](const char* name, Kind kind, bool required) {
+                    ScopedValue value(context_, JS_GetPropertyStr(context_, payload, name));
+                    const auto present = !JS_IsUndefined(value.get()) && !JS_IsNull(value.get());
+                    if ((required || present) && !JS_IsFunction(context_, value.get())) {
+                        JS_ThrowTypeError(context_, "%.*s.%s 需要函数", static_cast<int>(type.size()), type.data(), name);
+                        return false;
+                    }
+                    if (present) callbacks.push_back({result.size(), kind, std::move(value)});
+                    return true;
+                };
+                auto ok = true;
+                if (type == "clickable")
+                    ok = callback("onClick", Kind::Click, true) && callback("onDoubleClick", Kind::DoubleClick, false) && callback("interaction", Kind::Interaction, false);
+                else if (type == "hoverable") {
+                    item.kind = InputKind::Hoverable;
+                    ok = callback("onEnter", Kind::HoverEnter, false) && callback("onExit", Kind::HoverExit, false) && callback("interaction", Kind::Interaction, false);
+                } else if (type == "focusable") {
+                    item.kind = InputKind::Focusable;
+                    ok = callback("interaction", Kind::Interaction, false);
+                } else if (type == "onContextClick") {
+                    item.kind = InputKind::ContextClick;
+                    ok = callback("callback", Kind::ContextClick, true);
+                } else if (type == "onKeyEvent") {
+                    item.kind = InputKind::KeyEvent;
+                    ok = callback("callback", Kind::Key, true);
+                } else if (type == "onWheel") {
+                    item.kind = InputKind::Wheel;
+                    ok = callback("callback", Kind::Wheel, true);
+                } else if (type == "pointerIcon") {
+                    item.kind = InputKind::PointerIcon;
+                    const auto icon = reader_.stringField(payload, "icon");
+                    constexpr std::string_view icons[]{"default", "hand", "text", "crosshair", "resizeHorizontal", "resizeVertical", "grab", "grabbing", "none"};
+                    const auto found = std::find(std::begin(icons), std::end(icons), icon);
+                    if (found == std::end(icons)) {
+                        (void)throwTypeError("pointerIcon 光标名称无效");
                         return {};
                     }
-                    callbacks.push_back({result.size(), arrange::core::EventSlotKind::Click, std::move(callback)});
-                } else
-                    item.kind = type == "hoverable" ? arrange::core::InputModifierKind::Hoverable : arrange::core::InputModifierKind::Focusable;
+                    item.icon = static_cast<arrange::core::PointerIcon>(found - std::begin(icons));
+                } else {
+                    item.kind = InputKind::Draggable;
+                    const auto axis = reader_.stringField(payload, "axis");
+                    if (axis == "horizontal")
+                        item.axis = arrange::core::DragAxis::Horizontal;
+                    else if (axis == "vertical")
+                        item.axis = arrange::core::DragAxis::Vertical;
+                    else if (axis.empty() || axis == "both")
+                        item.axis = arrange::core::DragAxis::Both;
+                    else {
+                        (void)throwTypeError("draggable.axis 需要 horizontal、vertical 或 both");
+                        return {};
+                    }
+                    item.startImmediately = boolField(payload, "startImmediately", false);
+                    item.pointerLock = boolField(payload, "pointerLock", false);
+                    ok = callback("onDelta", Kind::DragDelta, true) && callback("onStart", Kind::DragStart, false) && callback("onStop", Kind::DragStop, false) && callback("interaction", Kind::Interaction, false);
+                }
+                if (!ok) {
+                    failed_ = true;
+                    return {};
+                }
                 result.push_back({item, key});
             } else {
                 (void)throwUnknownModifier(type);
@@ -611,7 +669,7 @@ namespace arrange::quickjs {
             } else if (auto* focus = std::get_if<arrange::core::FocusModifier>(&input))
                 focus->eventSlot = slot;
             else
-                std::get<arrange::core::InputModifierSemantics>(input).eventSlot = slot;
+                arrange::core::inputEventSlot(std::get<arrange::core::InputModifierSemantics>(input), pending.kind) = slot;
             if (slot.valid()) retained.push_back(slot);
         }
         if (!instanceInput) events_.releaseModifierCallbacksExcept(id, retained, transaction_);

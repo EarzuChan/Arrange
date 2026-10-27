@@ -23,6 +23,7 @@ namespace arrange::juce {
         bool invoked = false;
         bool ok = true;
         std::string error;
+        bool consumed = false;
     };
 
     class RearrangeHost final {
@@ -52,6 +53,7 @@ namespace arrange::juce {
         [[nodiscard]] RearrangeInvokeResult invokeString(const arrange::core::EventSlotId& slot, double nowMillis, const std::string& value);
 
         [[nodiscard]] RearrangeInvokeResult invokeScrollSnapshot(const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::ScrollResult& result);
+        [[nodiscard]] RearrangeInvokeResult invokeInput(const arrange::core::EventSlotId& slot, double nowMillis, const arrange::core::InputEventPayload& payload);
 
         void publishScene(const arrange::core::NativeScene& scene);
         RearrangeInvokeResult completeRearrange(const std::shared_ptr<arrange::core::RearrangeSubmission>& submission, const std::string& error = {});

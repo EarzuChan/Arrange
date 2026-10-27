@@ -6,7 +6,7 @@
 
 namespace arrange::juce {
     void PointerInputState::reset() {
-        pointer_ = {};
+        gesture_.reset();
         wheelSession_ = {};
         nextWheelSessionId_ = 0;
         pendingScrollValues_.clear();
@@ -14,22 +14,28 @@ namespace arrange::juce {
     }
 
     void PointerInputState::resetForSceneChange() {
-        pointer_ = {};
+        gesture_.reset();
         pendingScrollValues_.clear();
         scrollRevision_ = 0;
         // reload 清场景状态，但旧手势的剩余输入仍应留在取消会话中
         cancelWheel();
     }
 
-    PointerDownResult PointerInputState::pointerDown(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId) {
+    PointerDownResult PointerInputState::pointerDown(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, int clicks, arrange::core::PointerGestureOutput& out) {
         PointerDownResult result;
-        result.hit = hitTester_.hitTest(snapshot, point);
-        (void)pointer_.pointerDown(snapshot, point, pointerId);
+        result.hit = hitTester_.hitTest(snapshot, sample.point);
+        // 新的按下打断尚未结束的滚轮会话
+        cancelWheel();
+        gesture_.primaryDown(tree, snapshot, sample, clicks, out);
         return result;
     }
 
-    arrange::core::PointerDispatchResult PointerInputState::pointerUp(const arrange::core::HitTestSnapshot& snapshot, arrange::core::Point point, std::uint32_t pointerId) {
-        return pointer_.pointerUp(snapshot, point, pointerId);
+    void PointerInputState::pointerDrag(const arrange::core::LayoutTree& tree, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out) {
+        gesture_.drag(tree, sample, out);
+    }
+
+    void PointerInputState::pointerUp(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out) {
+        gesture_.primaryUp(tree, snapshot, sample, out);
     }
 
     void PointerInputState::cancelWheel() {
@@ -51,6 +57,11 @@ namespace arrange::juce {
     }
 
     WheelDispatchResult PointerInputState::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input, std::uint64_t publishedRevision) {
+        // 拖动会话独占指针，滚轮直接丢弃且不开启会话
+        if (gesture_.dragging()) {
+            cancelWheel();
+            return {};
+        }
         if (scrollRevision_ != publishedRevision) {
             if (ScrollProbe::active()) {
                 for (const auto& [identity, value] : pendingScrollValues_) {

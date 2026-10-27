@@ -6,6 +6,14 @@
 
 namespace arrange::core {
     namespace {
+        // 文本框之外的输入受体区域；clickable 之外的类型不参与旧的单点命中
+        void pushInputRegion(std::vector<HitRegion>& regions, const ModifierInstance& instance, const ModifierValue& value, NodeId id, std::uint64_t generation, std::size_t constraint) {
+            const auto* input = std::get_if<InputModifierSemantics>(&value);
+            if (!input || !input->enabled || input->kind == InputModifierKind::Focusable || input->kind == InputModifierKind::KeyEvent) return;
+            const auto clickable = input->kind == InputModifierKind::Clickable;
+            regions.push_back({instance.bounds, {true, id, clickable, input->eventSlot, instance.handle, generation, input->kind}, constraint});
+        }
+
         void collect(const LayoutTree& tree, NodeId id, std::size_t constraint, HitGeometry& snapshot) {
             if (!nodeInteractionEnabled(tree, id)) return;
             const auto& node = tree.node(id);
@@ -20,9 +28,7 @@ namespace arrange::core {
                     constraint = snapshot.constraints.size();
                 }
                 if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) snapshot.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle, node.generation}, constraint});
-                if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) {
-                    snapshot.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle, node.generation}, constraint});
-                }
+                pushInputRegion(snapshot.regions, instance, value, id, node.generation, constraint);
             }
             snapshot.regions[generic].constraint = constraint;
             auto children = node.children;
@@ -49,11 +55,36 @@ namespace arrange::core {
                 }
             }
             for (auto region = geometry.regions.rbegin(); region != geometry.regions.rend(); ++region) {
-                if (clickableOnly && !region->target.clickable) continue;
+                if (clickableOnly && !region->target.clickable || region->target.input && !region->target.clickable) continue;
                 auto local = point;
                 if (enter(geometry, region->constraint, local) && containsRect(region->bounds, local)) return region->target;
             }
             return {};
+        }
+
+        bool chain(const HitFragment& fragment, Point point, std::vector<HitTestResult>& out) {
+            if (!fragment.enabled || !fragment.local) return false;
+            const auto& geometry = *fragment.local;
+            auto any = false;
+            auto contentPoint = point;
+            if (enter(geometry, fragment.contentConstraint, contentPoint)) {
+                for (auto child = fragment.children.rbegin(); child != fragment.children.rend(); ++child)
+                    if (chain(**child, contentPoint, out)) {
+                        any = true;
+                        break;
+                    }
+            }
+            for (auto region = geometry.regions.rbegin(); region != geometry.regions.rend(); ++region) {
+                if (!region->target.input) continue;
+                auto local = point;
+                if (!enter(geometry, region->constraint, local) || !containsRect(region->bounds, local)) continue;
+                auto result = region->target;
+                result.local = {local.x - region->bounds.x, local.y - region->bounds.y};
+                result.bounds = region->bounds;
+                out.push_back(result);
+                any = true;
+            }
+            return any;
         }
     }
 
@@ -94,7 +125,7 @@ namespace arrange::core {
                             constraint = local.constraints.size();
                         }
                         if (const auto* field = std::get_if<TextFieldModifier>(&value); field && field->enabled) local.regions.push_back({instance.bounds, {true, id, false, {}, instance.handle, node.generation}, constraint});
-                        if (const auto* input = std::get_if<InputModifierSemantics>(&value); input && input->kind == InputModifierKind::Clickable && input->enabled) local.regions.push_back({instance.bounds, {true, id, true, input->eventSlot, instance.handle, node.generation}, constraint});
+                        pushInputRegion(local.regions, instance, value, id, node.generation, constraint);
                     }
                     local.regions[0].constraint = fragment->contentConstraint = constraint;
                     counters.emittedRegions += local.regions.size();
@@ -146,6 +177,12 @@ namespace arrange::core {
 
     HitTestResult HitTester::hitTestClickable(const HitTestSnapshot& snapshot, Point point) const {
         return snapshot.root ? hit(*snapshot.root, point, true) : HitTestResult{};
+    }
+
+    std::vector<HitTestResult> HitTester::hitChain(const HitTestSnapshot& snapshot, Point point) const {
+        std::vector<HitTestResult> result;
+        if (snapshot.root) (void)chain(*snapshot.root, point, result);
+        return result;
     }
 
     HitTestResult HitTester::hitTest(const LayoutTree& tree, NodeId root, Point point) const {

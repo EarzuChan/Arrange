@@ -1,6 +1,8 @@
 #pragma once
 
+#include <arrange/core/InputEvent.h>
 #include <arrange/core/LayoutNode.h>
+#include <arrange/core/PointerGesture.h>
 #include <arrange/juce/TextInputOwner.h>
 #include <arrange/juce/WheelInput.h>
 
@@ -16,8 +18,13 @@ namespace arrange::juce {
     class InteractionStateOwner;
     class RuntimeSessionState;
 
+    arrange::core::KeyModifierState keyModifierState(const ::juce::ModifierKeys& modifiers) noexcept;
+
     class JucePointerInputAdapter final {
        public:
+        void pointerMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event) const;
+        void pointerExit(ArrangeRuntime& runtime, InteractionStateOwner& interaction) const;
+        void cancelPointer(ArrangeRuntime& runtime, InteractionStateOwner& interaction) const;
         void pointerDown(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const;
 
         [[nodiscard]] bool pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const;
