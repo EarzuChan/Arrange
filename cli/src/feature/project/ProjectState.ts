@@ -70,7 +70,14 @@ export const toolPathDefinitionSchema = z.object({
 })
 export type ToolPathDefinition = z.infer<typeof toolPathDefinitionSchema>
 
+export const localFrameworkDefinitionSchema = z.object({
+    nodeRegistryUrl: z.string().min(1).refine(value => !/[\r\n]/.test(value), "registry 不得包含换行").optional(),
+    cmakeFetchContentUrl: z.string().min(1).refine(value => !/[\r\n]/.test(value), "Framework 仓库地址不得包含换行").optional(),
+})
+export type LocalFrameworkDefinition = z.infer<typeof localFrameworkDefinitionSchema>
+
 export const localDefinitionSchema = z.object({
+    framework: localFrameworkDefinitionSchema.optional(),
     node: toolPathDefinitionSchema.optional(),
     packageManager: toolPathDefinitionSchema.optional(),
     cmake: toolPathDefinitionSchema.optional(),

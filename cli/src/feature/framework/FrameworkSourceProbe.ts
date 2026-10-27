@@ -1,4 +1,4 @@
-import { defaultFetchUrl } from "../../CliMetadata.ts"
+import { frameworkRepositoryUrl } from "./FrameworkOrigin.ts"
 import type { Executor } from "../platform/Executor.ts"
 import { isAbortError } from "../platform/ProcessSpec.ts"
 import { locateTool } from "../platform/ToolLocator.ts"
@@ -29,7 +29,7 @@ export class FrameworkSourceProbe {
     async check(state: ProjectState): Promise<FrameworkSourceCheck> {
         if (!this.applies(state)) return { kind: "skipped" }
         if (await this.sources?.hasFramework(state)) return { kind: "ok" }
-        const url = state.project.framework.cmakeFetchContentUrl ?? defaultFetchUrl
+        const url = frameworkRepositoryUrl(state)
         const version = state.project.framework.version
         const tag = `v${version}`
         const git = await this.locate("git")
@@ -47,7 +47,7 @@ export class FrameworkSourceProbe {
 
 // 预检不通过时的说明；通过或不适用返回 undefined
 export function frameworkSourceProblem(check: FrameworkSourceCheck): string | undefined {
-    const remedy = `也可以在 arrange.local.yaml 的 native.cmakeDefinitions 里设置 ${sourceOverrideDefinition} 指向本地 Arrange 源码`
+    const remedy = `也可以在 arrange.local.yaml 的 framework.cmakeFetchContentUrl 指定本机仓库，或在 native.cmakeDefinitions 里设置 ${sourceOverrideDefinition} 指向本地 Arrange 源码`
     if (check.kind === "git-missing") return "未找到 git。native 构建要用 CMake FetchContent 克隆 Arrange 源码，请先安装 git 并确认它在 PATH 中"
     if (check.kind === "tag-missing") return `Arrange 源码仓库 ${check.url} 上没有 tag ${check.tag}，CMake FetchContent 取不到与 Framework ${check.version} 对应的原生源码。请确认该版本的 tag 已发布；${remedy}`
     if (check.kind === "unreachable") return `无法访问 Arrange 源码仓库 ${check.url}（git ls-remote 失败：${check.reason}）。请检查网络、代理或仓库地址；${remedy}`

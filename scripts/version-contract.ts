@@ -11,7 +11,8 @@ export type ArrangeVersionContract = {
 
 type JsonObject = Record<string, unknown>
 
-const milestoneVersionPattern = /^0\.0\.0-m\.(\d+)\.(\d+)$/
+const milestoneVersionPattern = /^0\.0\.0-m\.(\d+)\.(\d+)(?:-dev\.(\d+))?$/
+const devVersionPattern = /-dev\.\d+$/
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 
 export const versionFile = resolve(repoRoot, "arrange.version.json")
@@ -19,7 +20,7 @@ export const versionFile = resolve(repoRoot, "arrange.version.json")
 export function readArrangeVersionContract(): ArrangeVersionContract {
     const parsed = JSON.parse(readFileSync(versionFile, "utf8").replace(/^\uFEFF/, "")) as Partial<ArrangeVersionContract>
     const frameworkVersion = parsed.frameworkVersion
-    if (typeof frameworkVersion !== "string" || !milestoneVersionPattern.test(frameworkVersion)) throw new Error(`Arrange frameworkVersion must use 0.0.0-m.<N>.<sub>, got ${String(frameworkVersion)}`)
+    if (typeof frameworkVersion !== "string" || !milestoneVersionPattern.test(frameworkVersion)) throw new Error(`Arrange frameworkVersion must use 0.0.0-m.<N>.<sub>[-dev.<K>], got ${String(frameworkVersion)}`)
     const frameworkInternalProtocolCode = parsed.frameworkInternalProtocolCode
     if (typeof frameworkInternalProtocolCode !== "number" || !Number.isInteger(frameworkInternalProtocolCode) || frameworkInternalProtocolCode <= 0) throw new Error(`Arrange frameworkInternalProtocolCode must be a positive integer, got ${String(frameworkInternalProtocolCode)}`)
     const cliVersion = parsed.cliVersion
@@ -27,6 +28,11 @@ export function readArrangeVersionContract(): ArrangeVersionContract {
     const cliCompatibility = parsed.cliCompatibility
     if (typeof cliCompatibility !== "number" || !Number.isInteger(cliCompatibility) || cliCompatibility <= 0) throw new Error(`Arrange cliCompatibility must be a positive integer, got ${String(cliCompatibility)}`)
     return { frameworkVersion, frameworkInternalProtocolCode, cliVersion, cliCompatibility }
+}
+
+// dev 版本只用于本机发包验证，不发布到公共 registry
+export function isDevFrameworkVersion(version: string): boolean {
+    return devVersionPattern.test(version)
 }
 
 function readJson(path: string): JsonObject {

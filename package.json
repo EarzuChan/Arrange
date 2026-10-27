@@ -22,6 +22,7 @@
     "verify:version": "node --import tsx scripts/verify-version.ts",
     "verify:native-fetchcontent": "node --import tsx scripts/verify-native-fetchcontent.ts",
     "pack:package": "node --import tsx scripts/pack-npm-package.ts",
+    "publish:local": "node --import tsx scripts/publish-local.ts",
     "verify:npm-package": "node --import tsx scripts/verify-npm-package.ts",
     "verify:npm-registry-package": "node --import tsx scripts/verify-npm-registry-package.ts",
     "verify:platform": "node --import tsx scripts/verify-platform.ts"

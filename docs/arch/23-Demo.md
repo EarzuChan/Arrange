@@ -43,21 +43,23 @@ Native 使用 `FetchContent_Declare(arrange)`、`FetchContent_MakeAvailable(arra
 
 Demo 产品版本独立于框架版本。`arrange.project.yaml` 的 Framework 版本是 Demo 选择消费的版本；升级经 CLI 配置与同步完成。根版本同步、安装与内部包检查不写 Demo manifest，不要求 Demo 已安装或已构建。
 
-## 本机源码覆盖与独立移动
+## 本机来源与独立移动
 
-需要验证当前未提交的 Arrange 源码时，在不提交的 `arrange.local.yaml` 中明确设置标准 CMake 覆盖：
+验证尚未公开发布的 Framework 时，先按[本机发包流程](../proj/5：具体开发的额外约束.md#本机发包)把包发到本机 Verdaccio、在本仓库打 dev tag，再在不提交的 `arrange.local.yaml` 中覆盖获取来源：
 
 ```yaml
-native:
-  cmakeDefinitions:
-    FETCHCONTENT_SOURCE_DIR_ARRANGE: E:/dev/Arrange
+framework:
+  nodeRegistryUrl: http://localhost:4873
+  cmakeFetchContentUrl: ..
 ```
 
-该路径必须是本机 Arrange 源码根的绝对路径，CLI 会校验版本、兼容码与依赖声明；仍经标准 FetchContent 接入。它只覆盖 Native，UI 仍消费实际安装的 npm 包。不会因工程恰好在仓库内就自动选择父目录源码；来源身份必须明确。
+共享配置的 `framework.version` 改为对应的 dev 版本后 sync。UI 与 Native 都经正式包消费路径获取同一版本，覆盖规则见[配置分工](31-ArrangeCLI与工程模式.md#配置分工)。
 
-共享配置不使用相对 Git 仓库地址。CLI 的来源预检、缓存获取和 CMake configure 有不同工作目录，相对地址不能保证各阶段含义一致；不能以本机一次 configure 成功证明可移植性。公开仓库与固定 tag 是默认事实，本机开发用上述显式覆盖。
+只需临时验证未提交的 Native 源码时，也可改用标准 CMake 覆盖 `native.cmakeDefinitions.FETCHCONTENT_SOURCE_DIR_ARRANGE`（本机 Arrange 源码根绝对路径）。它只覆盖 Native，UI 仍消费实际安装的 npm 包，且不能与本机仓库覆盖并用。
 
-Demo 可以复制到 Arrange 仓库外；源码、素材、共享配置和 UI 锁文件随工程移动，依赖、本机配置、构建树与产物重新准备。清除本机覆盖后按共享声明消费公开来源，不能静默回退到仓库内部路径。版本是否已发布属于当期验收事实，记录在 M2 工作区，不以本机包验收冒充公网获取通过。
+共享配置不使用相对 Git 仓库地址：CLI 的来源预检、缓存获取和 CMake configure 有不同工作目录，共享的相对地址不能保证各阶段含义一致。相对路径只允许出现在本机覆盖中，由 CLI 按工程根解析。不会因工程恰好在仓库内就自动选择父目录源码；来源身份必须明确。
+
+Demo 可以复制到 Arrange 仓库外；源码、素材、共享配置和 UI 锁文件随工程移动，依赖、本机配置、构建树与产物重新准备。清除本机覆盖并 sync 后按共享声明消费公开来源，不能静默回退到仓库内部路径。版本是否已发布属于当期验收事实，记录在 M2 工作区，不以本机包验收冒充公网获取通过。
 
 ## 框架仓库边界
 

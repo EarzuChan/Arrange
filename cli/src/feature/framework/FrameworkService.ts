@@ -11,6 +11,7 @@ import type { SourceCache } from '../source/SourceCache.ts'
 import type { GitSource } from '../source/GitSource.ts'
 import type { TaskOutput } from '../operation/Work.ts'
 import { assertFrameworkSource } from './FrameworkSourceMetadata.ts'
+import { frameworkRegistryUrl } from './FrameworkOrigin.ts'
 import { isConcreteVersion } from '../../util/Semver.ts'
 import type { Operations } from '../operation/Operations.ts'
 
@@ -73,7 +74,7 @@ export class FrameworkService {
     async assertCompatible(state: ProjectState, mode: FrameworkCompatibilityMode): Promise<void> {
         if (mode === "installed-first" && await this.assertInstalledCompatible(state)) return
         try {
-            await this.remoteVersion(state.project.framework.version, state.project.framework.nodeRegistryUrl ?? undefined)
+            await this.remoteVersion(state.project.framework.version, frameworkRegistryUrl(state) ?? undefined)
         } catch (error) {
             // 联网也不行时说明为什么没能用本机已装的版本判定，让用户知道还差一步安装或联网
             if (mode === "installed-first" && error instanceof RegistryUnreachableError) throw error.withNote(`本机 UI 目录里没有可用于离线验证的 ${frameworkPackageName}@${state.project.framework.version}`)

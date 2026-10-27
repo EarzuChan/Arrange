@@ -1,4 +1,4 @@
-import { defaultFetchUrl } from "../../CliMetadata.ts"
+import { frameworkRepositoryUrl } from "../framework/FrameworkOrigin.ts"
 import { isManagedItem, type ProjectState } from "../project/ProjectState.ts"
 import type { TaskOutput } from "../operation/Work.ts"
 import { SourceCache } from "./SourceCache.ts"
@@ -13,7 +13,7 @@ export class NativeSourceService {
     frameworkSpec(state: ProjectState): SourceSpec | undefined {
         if (!isManagedItem(state, "cmake.fetch-content-repository") || !isManagedItem(state, "framework.version")) return undefined
         if (state.local?.native?.cmakeDefinitions?.FETCHCONTENT_SOURCE_DIR_ARRANGE !== undefined) return undefined
-        return { repository: state.project.framework.cmakeFetchContentUrl ?? defaultFetchUrl, ref: `v${state.project.framework.version}` }
+        return { repository: frameworkRepositoryUrl(state), ref: `v${state.project.framework.version}` }
     }
 
     async hasFramework(state: ProjectState): Promise<boolean> {

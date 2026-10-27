@@ -4,6 +4,7 @@ import { NodeJsService } from "../nodejs/NodeJsService.ts"
 import { CmakeService } from "../cmake/CmakeService.ts"
 import { FrameworkService } from "../framework/FrameworkService.ts"
 import { frameworkSourceProblem, type FrameworkSourceProbe } from "../framework/FrameworkSourceProbe.ts"
+import { localFrameworkOriginProblem } from "../framework/FrameworkOrigin.ts"
 import type { SetupInteraction } from "./SetupInteraction.ts"
 import { assertSnapshots } from "../../util/FileUtils.ts"
 import { errorMessage } from "../../util/Utils.ts"
@@ -29,6 +30,8 @@ export class SetupService {
             if (isAbortError(error)) throw error
             fatal.push({ key: "framework", message: errorMessage(error) })
         }
+        const originProblem = localFrameworkOriginProblem(state)
+        if (originProblem) fatal.push({ key: "framework-origin", message: originProblem })
         const inspected = await this.tools.inspect(state, scope)
         this.signal.throwIfAborted()
         const proposedLocal = inspected.local

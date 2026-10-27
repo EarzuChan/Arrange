@@ -18,6 +18,7 @@ import { writeAtomicText } from "../../util/AtomicFile.ts"
 import { CmakeDefinitions, mergeCmakeDefinitions, type CmakeDefinitionValues } from "./CmakeDefinitions.ts"
 import { preparationRecordSchema } from "./PreparationRecord.ts"
 import { readCurrentRecord, inspectionFailure, type InspectionFact } from "../../util/RecordInspection.ts"
+import { frameworkRepositoryUrl } from "../framework/FrameworkOrigin.ts"
 
 export interface CmakeTarget {
     readonly name: string
@@ -244,7 +245,7 @@ export class CmakeService {
     private iconDirectory(state: ProjectState, flavor: BuildFlavor): string { return join(this.buildDirectory(state, flavor), nativeIconDirectory) }
     private async signature(state: ProjectState, flavor: BuildFlavor): Promise<string> {
         const { vendorName, vendorCode, pluginCode, version, products } = state.project.project
-        return hash(JSON.stringify({ native: state.project.native, project: { vendorName, vendorCode, pluginCode, version, products }, presentation: await this.presentationSignature(state), framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl, sourceManaged: isManagedItem(state, "cmake.fetch-content-repository") && isManagedItem(state, "framework.version") }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor }))
+        return hash(JSON.stringify({ native: state.project.native, project: { vendorName, vendorCode, pluginCode, version, products }, presentation: await this.presentationSignature(state), framework: { version: state.project.framework.version, cmakeFetchContentUrl: state.project.framework.cmakeFetchContentUrl, repository: frameworkRepositoryUrl(state), sourceManaged: isManagedItem(state, "cmake.fetch-content-repository") && isManagedItem(state, "framework.version") }, local: { cmake: state.local?.cmake, nativeCompiler: state.local?.nativeCompiler, ninja: state.local?.ninja, native: state.local?.native }, platform: this.platform.name, flavor }))
     }
 
     private async readReply<T>(directory: string, kind: string): Promise<T> {

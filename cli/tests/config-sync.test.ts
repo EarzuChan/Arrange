@@ -579,3 +579,15 @@ test("Resolve 选择返回之前取消，不创建文件或继续 Apply", async 
     await assert.rejects(readFile(packageJsonFile.path(state)), { code: "ENOENT" })
     await noJournal(state.rootDir)
 })
+
+test("本机 registry 写入 .npmrc 而 CMakeLists 保持共享仓库地址，删除本机覆盖后回到共享来源", async t => {
+    const state = await fixture(t)
+    const cmakeBefore = await readFile(cmakeListsFile.path(state), "utf8")
+    await store.save({ ...state, local: { framework: { nodeRegistryUrl: "http://localhost:4873", cmakeFetchContentUrl: ".." } } })
+    assert.equal((await run(new TestSyncWizard()).run({ configOnly: true }, state.rootDir)).status, "completed")
+    assert.match(await readFile(npmrcFile.path(state), "utf8"), /@arrange:registry=http:\/\/localhost:4873\n/)
+    assert.equal(await readFile(cmakeListsFile.path(state), "utf8"), cmakeBefore)
+    await store.save({ ...state, local: {} })
+    assert.equal((await run(new TestSyncWizard()).run({ configOnly: true }, state.rootDir)).status, "completed")
+    assert.doesNotMatch(await readFile(npmrcFile.path(state), "utf8"), /@arrange:registry/)
+})

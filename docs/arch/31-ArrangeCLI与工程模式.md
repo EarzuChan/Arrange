@@ -67,6 +67,16 @@ project/
 
 共享配置中的 `native.target` 必须明确指定 JUCE 插件共享代码根 target；它不从产品显示名称或 CMake 正文反推。CLI 使用 JUCE 的 `<target>_Standalone` 与 `<target>_VST3` 格式 target，通过 CMake 模型核验类型、依赖和真实产物路径。`ui.outputDirectory` 可指定 UI 构建目录，默认 `dist`，必须是 UI 子项目内的独立产物目录。
 
+本机配置可用 `framework.nodeRegistryUrl`、`framework.cmakeFetchContentUrl` 覆盖共享配置中的 Framework 获取来源，用于本机 registry、本机仓库等开发场景：
+
+```yaml
+framework:
+  nodeRegistryUrl: http://localhost:4873
+  cmakeFetchContentUrl: ..
+```
+
+版本仍只由共享配置声明，本机只决定从哪里获取。生效来源依次取本机覆盖、共享配置、官方默认，由 CLI 统一解析（`framework/FrameworkOrigin.ts`）：sync 将生效 registry 写入托管的 UI `.npmrc`，版本核验、源码预检和源码缓存使用生效仓库；共享的 CMakeLists `GIT_REPOSITORY` 仍只写共享配置，本机仓库经源码缓存以 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 交给 CMake。本机仓库可写相对工程根的路径，CLI 先解析为绝对路径再用于各阶段。仓库地址或版本未托管、或同时设置了 `FETCHCONTENT_SOURCE_DIR_ARRANGE` 时，本机仓库覆盖无法确定生效，SETUP 报告 Fatal。UI `.npmrc` 因含本机来源而不提交，create 写入对应忽略规则。删除本机覆盖并 sync 即回到共享来源。
+
 本机配置记录 Node、包管理器、CMake、编译器和必要时的 Ninja 路径及版本。`native` 部分记录 `generator`、`architecture: x64|arm64`、Windows 的 `developerCommand`、Mac 的 `developerDirectory`，以及可选的 `cmakeDefinitions` 和构建树根目录 `buildRoot`（见同篇“版本与工具链”一节的构建树位置说明）。自定义 CMake definitions 不得覆盖 CLI 管理的配置、生成器、编译器或架构选项。
 
 CLI 的全部 `-D` 参数由当前配置、工具链与默认规则统一生成。每个构建树中的 `definitions.json` 仅保存 CLI 可能写入过的键，不保存配置值；自动源码覆盖也纳入这份记录。configure 前以精确 `-UKEY` 清除已删除的键，再以 `-DKEY=value` 写入当前值；仍有 CLI 默认值的键直接恢复该默认值。CMake 自身创建或用户手工写入的其它缓存键不属于 CLI 的日常清理范围。

@@ -270,6 +270,7 @@ test("已有 .gitignore 原文保留；工程根与各输出目录独立且不�
     assert.ok(ignore.startsWith("# 用户规则\r\nsecret/\r\n"))
     assert.match(ignore, /\/arrange\.local\.yaml/)
     assert.match(ignore, /\/ui\/dist\//)
+    assert.match(ignore, /\/ui\/\.npmrc/)
     await assert.rejects(new ProjectInitializer(new FileTransaction()).create(request(root)), /目标已经存在/)
     const other = await temporaryRoot(t)
     await assert.rejects(new ProjectInitializer(new FileTransaction()).create({ ...request(other), nativeDirectory: "ui/native" }), /相互独立/)

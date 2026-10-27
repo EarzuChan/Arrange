@@ -5,13 +5,14 @@ import { TextCluster } from "../managed/TextCluster.ts"
 import { TextRegion } from "../managed/TextRegion.ts"
 import { JsonRegion, type JsonValue } from "../managed/JsonRegion.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
+import { frameworkRegistryUrl } from "../framework/FrameworkOrigin.ts"
 
 export const registryRegion: TextRegion = new class extends TextRegion {
     readonly id = "node.registry"
     readonly managedItemId = "node.npmrc.arrange-registry"
 
     protected override makeInner(state: ProjectState): string {
-        const url = state.project.framework.nodeRegistryUrl
+        const url = frameworkRegistryUrl(state)
         return url == null ? "" : `@arrange:registry=${url}\n`
     }
 }()

@@ -131,7 +131,9 @@ export class ProjectInitializer {
         const gitignore = await readSnapshot(resolve(state.rootDir, ".gitignore"))
         const uiOutput = relative(state.rootDir, resolve(directories[0], state.project.ui.outputDirectory ?? defaultUiOutputDirectory))
         const artifacts = relative(state.rootDir, directories[2])
-        const patterns = [`/${localWorkDirectory}/`, `/${projectFileNames.local}`, "node_modules/", ...(!uiOutput.startsWith("..") && !isAbsolute(uiOutput) ? [`/${portablePath(uiOutput)}/`] : []), `/${portablePath(artifacts)}/`]
+        // .npmrc 由 CLI 按共享与本机配置生成，含本机来源，不提交
+        const npmrc = relative(state.rootDir, resolve(directories[0], ".npmrc"))
+        const patterns = [`/${localWorkDirectory}/`, `/${projectFileNames.local}`, "node_modules/", ...(!uiOutput.startsWith("..") && !isAbsolute(uiOutput) ? [`/${portablePath(uiOutput)}/`] : []), ...(!npmrc.startsWith("..") && !isAbsolute(npmrc) ? [`/${portablePath(npmrc)}`] : []), `/${portablePath(artifacts)}/`]
         const original = gitignore.content ?? ""
         const existingLines = new Set(original.split(/\r?\n/))
         const missingPatterns = patterns.filter(pattern => !existingLines.has(pattern))
