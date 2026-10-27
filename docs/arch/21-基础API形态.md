@@ -104,12 +104,20 @@ interface Modifier {
     alpha(value: number): Modifier
     graphicsLayer(args?: GraphicsLayerOptions): Modifier
     clickable(arg: (() => void) | ClickableOptions): Modifier
-    hoverable(args?: EnabledOptions): Modifier
+    onContextClick(callback: (event: ContextClickEvent) => void, args?: EnabledOptions): Modifier
+    hoverable(args?: HoverableOptions): Modifier
+    pointerIcon(icon: PointerIcon): Modifier
     focusable(arg?: boolean | EnabledOptions): Modifier
     focusRequester(requester: FocusRequester): Modifier
     focusProperties(properties: FocusProperties): Modifier
     focusGroup(): Modifier
     onFocusChanged(callback: (state: FocusState) => void): Modifier
+    onKeyEvent(callback: (event: KeyEvent) => boolean): Modifier
+    onWheel(callback: (event: WheelEvent) => void, args?: { axis?: 'vertical' | 'horizontal' | 'both'; enabled?: boolean }): Modifier
+    draggable(state: DraggableState, args?: DraggableOptions & { orientation?: 'horizontal' | 'vertical' }): Modifier
+    draggable2D(state: Draggable2DState, args?: DraggableOptions): Modifier
+    pointerInput(handler: (event: PointerEvent) => void, args?: EnabledOptions): Modifier
+    semantics(args: SemanticsOptions): Modifier
     drawBehind(draw: (scope: DrawScope) => void): Modifier
     drawWithContent(draw: (scope: DrawScope, drawContent: () => void) => void): Modifier
     drawWithCache(builder: (scope: Readonly<{ size: DrawSize }>) => DrawCacheResult): Modifier
@@ -119,7 +127,22 @@ interface Modifier {
 }
 ```
 
-参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，ClickableOptions 包含 onClick、enabled、focusable，EnabledOptions 只包含 enabled。完整类型见包声明。阴影、渐变与 pointerInput 为后续能力，目前不导出。基础绘制类型从 UI 入口导出，焦点类型从根入口导出，具体字段以包内正式 TypeScript 声明为准。
+参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，EnabledOptions 只包含 enabled。完整类型见包声明。阴影与渐变为后续能力，目前不导出。
+
+```ts
+type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean; interactionState?: InteractionState }
+type HoverableOptions = { enabled?: boolean; onEnter?: () => void; onExit?: () => void; interactionState?: InteractionState }
+type PointerIcon = 'default' | 'hand' | 'text' | 'crosshair' | 'resizeHorizontal' | 'resizeVertical' | 'grab' | 'grabbing' | 'none'
+type ContextClickEvent = { xDp: number; yDp: number; modifiers: KeyModifiers }
+type WheelEvent = { deltaXDp: number; deltaYDp: number; modifiers: KeyModifiers }
+type DragModifiers = KeyModifiers
+type DragStart = { xDp: number; yDp: number; widthDp: number; heightDp: number; modifiers: DragModifiers }
+type DragStop = { velocityDp: number; cancelled: boolean }
+type DraggableOptions = { enabled?: boolean; startImmediately?: boolean; pointerLock?: boolean; onDragStarted?: (start: DragStart) => void; onDragStopped?: (stop: DragStop) => void; interactionState?: InteractionState }
+type SemanticsOptions = { role?: 'button' | 'slider' | 'switch' | 'checkbox' | 'textField' | 'image' | 'group'; label?: string; description?: string; valueText?: string; enabled?: boolean; increment?: () => void; decrement?: () => void }
+```
+
+`KeyEvent`、`KeyModifiers`、`PointerEvent` 的字段与各输入行为见 [事件与输入](17-事件与输入.md)；拖动与数值控件语义见 [拖动与数值控件](37-拖动与数值控件.md)。基础绘制类型从 UI 入口导出，焦点类型从根入口导出，具体字段以包内正式 TypeScript 声明为准。
 
 Modifier 顺序与阶段语义见 [Modifier](11-Modifier.md)。
 
@@ -355,6 +378,42 @@ interface LazyState extends ScrollState {
     scrollToItem(index: number, scrollOffset?: number): void
     animateScrollToItem(index: number, scrollOffset?: number, animationSpec?: AnimationSpec): Promise<void>
 }
+```
+
+```ts
+createInteractionState(): InteractionState
+interface InteractionState { readonly hovered: boolean; readonly pressed: boolean; readonly focused: boolean; readonly dragged: boolean }
+
+createDraggableState(onDelta: (deltaDp: number, modifiers: DragModifiers) => void): DraggableState
+createDraggable2DState(onDelta: (delta: { xDp: number; yDp: number }, modifiers: DragModifiers) => void): Draggable2DState
+interface DraggableState { readonly isDragging: boolean }
+interface Draggable2DState { readonly isDragging: boolean }
+
+interface EditableValue { readonly value: number; begin?(): void; set(value: number): void; end?(): void }
+editableRef(ref: Ref<number>): EditableValue
+createValueDragState(args: ValueDragOptions): ValueDragState
+type ValueDragOptions = {
+    value: EditableValue
+    range?: { min: number; max: number }
+    step?: number
+    defaultValue?: number
+    fullRangeDp?: number
+    fine?: { factor: number; modifier: 'shift' | 'alt' | 'ctrl' | 'meta' }
+    mapping?: 'vertical' | 'horizontal' | 'both' | 'angle'
+    angleSweepDeg?: number
+    wheel?: false | { fraction: number }
+    keyboard?: { small: number; large: number }
+}
+interface ValueDragState extends ValueDragOptions {
+    readonly value: number
+    readonly fraction: number
+    readonly isDragging: boolean
+    readonly isEditing: boolean
+    reset(): void
+    stepBy(steps: number): void
+    setFraction(fraction: number): void
+}
+adjustable(state: ValueDragState, args?: { pointerLock?: boolean; startImmediately?: boolean; valueText?: string; enabled?: boolean; interactionState?: InteractionState }): Modifier
 ```
 
 在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。LazyState 的索引、可见项与缓存语义归属 [内建 Arrangable](12-内建Arrangable.md)。

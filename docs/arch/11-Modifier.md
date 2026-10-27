@@ -31,7 +31,7 @@ Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型�
 
 TS 方法使用明确的参数类型；原生 reader 校验字段集合、类型及取值，不忽略未知字段。新增能力必须同时实现 TS 参数、JSValue 解码、原生语义、失效、生命周期和真实链路测试。源码定位与 authoring 契约见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
-下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影、InteractionState、pointerInput 等尚属后续能力。
+下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影等尚属后续能力。
 
 # 便捷组合
 
@@ -254,22 +254,31 @@ M.clickable({
   focusable: true,
 })
 
-M.hoverable({ enabled: true })
+M.clickable({ onClick, onDoubleClick, interactionState })
+M.onContextClick((event) => {})
+M.hoverable({ enabled: true, onEnter, onExit, interactionState })
+M.pointerIcon('hand')
 M.focusable({ enabled: true })
 M.focusRequester(requester)
 M.onFocusChanged((state) => {})
 M.focusProperties({ canFocus, next, previous, up, down, left, right })
 M.focusGroup()
-
+M.onKeyEvent((event) => false)
+M.onWheel((event) => {}, { axis: 'vertical' })
+M.draggable(state, { orientation: 'vertical' })
+M.draggable2D(state)
+M.semantics({ role: 'slider', valueText })
+M.pointerInput(handler)
 ```
 
-完整 `InteractionState`、hover 的 onEnter/onExit、onDoubleClick/onLongClick、role 与低级 `pointerInput` 回调仍是后续设计，当前不接受这些参数或构造器。
+onLongClick 与 `anchoredDraggable` 为后续能力。
 
 语义：
 
 - `clickable` 默认可获得焦点，支持鼠标左键、Enter、Space 激活。
-- `clickable` 的 press / focus 由原生 Owner 维护；当前可用 `onFocusChanged` 观察 `{isFocused,hasFocus}`。完整 `InteractionState` 仍是后续设计。
+- `clickable` 的 press / focus 由原生 Owner 维护；可用 `onFocusChanged` 观察 `{isFocused,hasFocus}`，或传入 `InteractionState` 读取 hovered / pressed / focused / dragged。
 - `hoverable` 只处理进入 / 离开；连续 hover move 用 `pointerInput`。
+- 指针会话、拖动会话、键盘派发顺序、滚轮候选、光标与上下文点击的行为见 [事件与输入](17-事件与输入.md)；拖动原语与数值控件见 [拖动与数值控件](37-拖动与数值控件.md)。
 - `focusable` 加入焦点遍历；`focusRequester` 提供程序化请求焦点。
 - `focusGroup` 影响方向焦点搜索，不改变布局、绘制或命中。
 - 程序化焦点的成功发布、请求器生命周期、父级 hasFocus、遍历/几何与 Lazy 按需导航规则见 [事件与输入](17-事件与输入.md#focus)。
@@ -282,7 +291,6 @@ const state = createScrollState()
 
 M.verticalScroll(state)
 M.horizontalScroll(state)
-M.scrollable(state, Orientation.Vertical)
 ```
 
 `verticalScroll` / `horizontalScroll` 是布局型滚动：
@@ -302,7 +310,7 @@ scroll viewport clip 与普通 `M.clip(shape)` 同属于视觉裁剪，但来源
 
 滚动范围是布局输出：视口或内容尺寸变化后，实际偏移在本次放置中限制到合法范围，绘制和命中使用同一结果。只有成功发布的布局快照才回传 ScrollState；值、范围、视口尺寸、内容尺寸及可滚动方向按一组反应式状态交付。Modifier 的输入只订阅请求偏移和回传接口，不把范围等布局输出反向当作输入。反馈引出的后续视觉变化进入下一候选，不在发布调用栈里重跑流水线。
 
-`scrollable` 是手势型滚动：只接收滚动 delta，不自动移动内容；适合自定义控件、Canvas、旋钮轨道等。
+只需要接收位移而不移动内容的自定义控件，使用 `M.draggable` 与 `M.onWheel`。
 
 普通滚动会创建完整子树，适合设置页、短表单、小面板。大型集合使用 Lazy Arrangable。
 
