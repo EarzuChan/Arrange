@@ -68,10 +68,10 @@ namespace arrange::juce {
 #endif
     }
 
-    RearrangeInvokeResult RearrangeHost::semanticCheckpoint(double nowMillis) {
+    RearrangeInvokeResult RearrangeHost::semanticCheckpoint(double nowMillis, bool visualFrame) {
 #if ARRANGE_WITH_QUICKJS_NG
         if (scriptHost_) {
-            const auto result = scriptHost_->semanticCheckpoint(nowMillis);
+            const auto result = scriptHost_->semanticCheckpoint(nowMillis, visualFrame);
             return {true, result.ok, result.error};
         }
 #endif

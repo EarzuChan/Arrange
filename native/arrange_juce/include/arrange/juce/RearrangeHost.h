@@ -41,7 +41,7 @@ namespace arrange::juce {
         [[nodiscard]] std::optional<arrange::core::MutationTransaction> takePendingTransaction() noexcept;
 
         void setOwnerWake(std::function<void()> wake);
-        RearrangeInvokeResult semanticCheckpoint(double nowMillis);
+        RearrangeInvokeResult semanticCheckpoint(double nowMillis, bool visualFrame = false);
         [[nodiscard]] RearrangeInvokeResult prepareVisualFrame(double nowMillis);
         RearrangeInvokeResult completeVisualFrame(bool success);
         RearrangeInvokeResult prepareDrawModifiers(arrange::core::NativeScene& candidate);

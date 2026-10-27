@@ -184,7 +184,8 @@ namespace arrange::quickjs {
         for (const auto& [key, stream] : streams_) {
             if (stream.references == 0) continue;
             if (key.front() != 't') return true;
-            if (host_->transport().playing || deliveredTransport_.playing) return true;
+            const auto transport = host_->transport();
+            if (transport.playing || deliveredTransport_.playing || !stream.delivered || !(transport == deliveredTransport_)) return true;
         }
         return false;
     }
@@ -205,7 +206,7 @@ namespace arrange::quickjs {
         return !JS_IsException(result.get());
     }
 
-    bool QuickJsInterop::pump() {
+    bool QuickJsInterop::pump(bool visualFrame) {
         if (!host_ || JS_IsUndefined(driver_)) return true;
         wakeRequested_ = false;
 
@@ -230,8 +231,9 @@ namespace arrange::quickjs {
 
         // 回调可以增删订阅，先复制本轮要交付的流
         std::vector<std::pair<std::string, std::size_t>> streams;
-        for (const auto& [key, stream] : streams_)
-            if (stream.references > 0) streams.emplace_back(key, stream.size);
+        if (visualFrame)
+            for (const auto& [key, stream] : streams_)
+                if (stream.references > 0) streams.emplace_back(key, stream.size);
         for (const auto& [key, size] : streams) {
             const auto found = streams_.find(key);
             if (found == streams_.end()) continue;

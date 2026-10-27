@@ -141,8 +141,10 @@ namespace {
         host.waveformCount = 9;
         host.sink->message("hello", InteropValue::object({{"to", "world"}}));
         check(script.hasPendingSemanticWork(), "消息未形成待处理语义工作");
-        check(script.semanticCheckpoint(16).ok, "第一次交付失败");
-        check(script.semanticCheckpoint(32).ok, "第二次交付失败");
+        // 唤醒触发的检查点不交付观测流，交付频率不随唤醒频率增长
+        check(script.semanticCheckpoint(8).ok && !findReport(host, "meter") && !findReport(host, "waveform"), "非视觉帧检查点交付了观测流");
+        check(script.semanticCheckpoint(16, true).ok, "第一次交付失败");
+        check(script.semanticCheckpoint(32, true).ok, "第二次交付失败");
 
         const auto* parameters = findReport(host, "parameters");
         check(parameters && (*parameters)["ix"][0].asNumber(-1) == 0 && (*parameters)["v"][0].asNumber() == 0.75, "参数变化未交付");
@@ -157,7 +159,7 @@ namespace {
 
         // 数据未变化时不重复交付
         const auto count = host.reports.size();
-        check(script.semanticCheckpoint(48).ok && script.semanticCheckpoint(64).ok, "空交付失败");
+        check(script.semanticCheckpoint(48, true).ok && script.semanticCheckpoint(64, true).ok, "空交付失败");
         check(host.reports.size() == count, "未变化的观测数据被重复交付");
 
         // 换会话：旧会话未结束的 gesture 由原生补齐，新会话重新接入

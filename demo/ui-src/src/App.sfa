@@ -1,5 +1,5 @@
 <template>
-    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).verticalScroll(pageScroll).padding(18.dp)" :vertical-arrangement="Arrangement.spacedBy(12.dp)">
+    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).padding(18.dp)" :vertical-arrangement="Arrangement.spacedBy(12.dp)">
         <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
             <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(20.dp, 20.dp)"/>
 
@@ -8,40 +8,45 @@
             <Image :painter="logoPainter" :modifier="M.size(96.dp, 40.dp)"/>
         </Row>
 
-        <InteropPanel a-if="interopReady"/>
-
-        <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :modifier="M.fillMaxWidth().height(44.dp)">
-            <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFF3A7AFE))"/>
-
-            <Spacer :modifier="M.width(8.dp)"/>
-
-            <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFFFFB020))"/>
+        // 切页展示：一次只挂载一页，Debug 下也不至于整页卡顿
+        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
+            <GalleryButton a-for="tab in tabs" :key="tab.key" :text="tab.title" :active="page === tab.key" :on-click="() => page = tab.key"/>
         </Row>
 
-        // 模版内支持单行双斜杠注释，带派不带派！
-        <Spacer :modifier="M.height(4.dp)"/>
+        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :vertical-arrangement="Arrangement.spacedBy(12.dp)" a-if="page === 'basics'">
+            <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :modifier="M.fillMaxWidth().height(44.dp)">
+                <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFF3A7AFE))"/>
 
-        <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
+                <Spacer :modifier="M.width(8.dp)"/>
 
-        <PropBoundary secret="App 传给 PropBoundary 的恩情"/> // 这是一个“不透传”的测试
+                <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFFFFB020))"/>
+            </Row>
 
-        <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
+            // 模版内支持单行双斜杠注释，带派不带派！
+            <Spacer :modifier="M.height(4.dp)"/>
 
-        <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: 13.sp, color: Color(0xFFE8EAED) }" :modifier="M.size(240.dp, 28.dp).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))"/>
+            <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
 
-        <Text :text="inputStatus" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(16.dp)"/>
+            <PropBoundary secret="App 传给 PropBoundary 的恩情"/> // 这是一个“不透传”的测试
 
-        <Column :modifier="M.size(260.dp, 58.dp).verticalScroll(scrollState).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
-            <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: 12.sp, color: Color(0xFFE8EAED) }" :modifier="M.height(14.dp)"/>
+            <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
 
-            <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+            <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: 13.sp, color: Color(0xFFE8EAED) }" :modifier="M.size(240.dp, 28.dp).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))"/>
 
-            <Text text="滚轮也可以触发啊一个" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+            <Text :text="inputStatus" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(16.dp)"/>
 
-            <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+            <Column :modifier="M.size(260.dp, 58.dp).verticalScroll(scrollState).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
+                <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: 12.sp, color: Color(0xFFE8EAED) }" :modifier="M.height(14.dp)"/>
+
+                <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+
+                <Text text="滚轮也可以触发啊一个" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+
+                <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
+            </Column>
         </Column>
 
-        <Row :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
+        <Row :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :horizontal-arrangement="Arrangement.spacedBy(16.dp)" a-else-if="page === 'showcase'">
             <ShowcaseGallery/>
 
             <Text text="润" :style="{ color: Color(0xFFAAAA00) }"/>
@@ -49,9 +54,15 @@
             <AnimationGallery/>
         </Row>
 
-        <Text text="Arrangeの本格界面" :style="{fontSize: 12.sp, color: Color(0xff91a6b8)}"/>
+        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :vertical-arrangement="Arrangement.spacedBy(12.dp)" a-else-if="page === 'm3'">
+            <Text text="Arrangeの本格界面" :style="{fontSize: 12.sp, color: Color(0xff91a6b8)}"/>
 
-        <M3Gallery/>
+            <M3Gallery/>
+        </Column>
+
+        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" a-else>
+            <InteropPanel/>
+        </Column>
     </Column>
 </template>
 
@@ -68,12 +79,19 @@ import PropBoundary from './view/PropBoundary.sfa'
 import RefRelay from './view/RefRelay.sfa'
 import M3Gallery from './view/M3Gallery.sfa'
 import InteropPanel from './view/InteropPanel.sfa'
+import GalleryButton from './view/GalleryButton.sfa'
 import { hasInterop } from '@arrange/framework/interop'
 
 const TAG = "App"
 
-// 插件宿主才连接 Interop；无宿主的预览与测试夹具不显示互操作面板
-const interopReady = hasInterop()
+// 插件宿主才连接 Interop；无宿主的预览与测试夹具不显示互操作页
+const tabs = [
+    { key: 'basics', title: '基础' },
+    { key: 'showcase', title: '展示与动画' },
+    { key: 'm3', title: 'M3' },
+    ...hasInterop() ? [{ key: 'interop', title: '宿主互操作' }] : [],
+]
+const page = ref('basics')
 
 const clicks = ref(0)
 const firstRef = ref(11)

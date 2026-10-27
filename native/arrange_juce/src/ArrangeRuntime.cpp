@@ -33,7 +33,7 @@ namespace arrange::juce {
         if (workAvailable_) workAvailable_();
     }
 
-    RuntimeStepResult ArrangeRuntime::semanticCheckpoint(double nowMillis) {
+    RuntimeStepResult ArrangeRuntime::semanticCheckpoint(double nowMillis, bool visualFrame) {
         if (inFrame_ || inSemantic_) return {false, false, "Owner 任务不能重入"};
         if (semanticError_) return {false, false, *semanticError_};
         const ::juce::ScopedValueSetter<bool> guard(inSemantic_, true);
@@ -42,7 +42,7 @@ namespace arrange::juce {
             semanticError_ = result.error;
             return result;
         }
-        const auto completed = rearrangeHost_.semanticCheckpoint(nowMillis);
+        const auto completed = rearrangeHost_.semanticCheckpoint(nowMillis, visualFrame);
         if (!completed.ok) {
             semanticError_ = completed.error;
             return {true, false, completed.error};
@@ -356,7 +356,7 @@ namespace arrange::juce {
         RuntimeFramePumpResult result;
         if (suspended_) return result;
         if (inFrame_ || inSemantic_) return {false, false, false, RuntimeFrameErrorPhase::Event, "Owner 视觉帧不能重入"};
-        const auto semantic = semanticCheckpoint(nowMillis);
+        const auto semantic = semanticCheckpoint(nowMillis, true);
         if (!semantic.ok) return {true, false, false, RuntimeFrameErrorPhase::Event, semantic.error};
         const ::juce::ScopedValueSetter<bool> frameGuard(inFrame_, true);
         pipelineState_.setFrameTime(nowMillis);

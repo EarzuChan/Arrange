@@ -398,7 +398,7 @@ namespace arrange::quickjs {
         if (impl_->runtime.interop) impl_->runtime.interop->setWakeOwner(impl_->runtime.wakeOwner);
     }
 
-    CallbackInvokeResult QuickJsScriptHost::semanticCheckpoint(double nowMillis) {
+    CallbackInvokeResult QuickJsScriptHost::semanticCheckpoint(double nowMillis, bool visualFrame) {
         Impl::TaskBudget budget(*impl_, __func__);
         auto& state = impl_->runtime;
         if (!state.context) return {true, {}};
@@ -406,7 +406,7 @@ namespace arrange::quickjs {
         setFrameTimeMillis(nowMillis);
         state.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
         if (state.painters && !state.painters->pump()) return {false, impl_->exceptionText(state.context)};
-        if (state.interop && !state.interop->pump()) return {false, impl_->exceptionText(state.context)};
+        if (state.interop && !state.interop->pump(visualFrame)) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }

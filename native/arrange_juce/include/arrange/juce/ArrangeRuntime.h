@@ -60,7 +60,7 @@ namespace arrange::juce {
 
         ~ArrangeRuntime();
         void reset();
-        RuntimeStepResult semanticCheckpoint(double nowMillis);
+        RuntimeStepResult semanticCheckpoint(double nowMillis, bool visualFrame = false);
 
         void setWorkAvailable(std::function<void()> callback) {
             workAvailable_ = std::move(callback);

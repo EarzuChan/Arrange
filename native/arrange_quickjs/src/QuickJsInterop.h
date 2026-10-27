@@ -31,10 +31,11 @@ namespace arrange::quickjs {
         void install(JSValueConst native);
         void setWakeOwner(std::function<void()> wake);
         [[nodiscard]] bool hasPending() const noexcept;
-        // 本会话存在持续拉取需求（播放中的走带或观测订阅）
+        // 本会话存在持续拉取需求（观测订阅、播放中或尚未交付的走带）
         [[nodiscard]] bool wantsFrames() const;
+        // 参数、宿主信息、消息与回执随每个检查点交付；走带与观测流只在视觉帧交付，不随唤醒频率交付
         // 交付失败时返回 false，异常留在 context 上
-        bool pump();
+        bool pump(bool visualFrame);
         // 结束未完成 gesture 并释放 JS 值；context 释放前调用
         void close() noexcept;
 

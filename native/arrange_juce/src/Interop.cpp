@@ -81,6 +81,8 @@ namespace arrange::juce {
         }
 
         constexpr int maxTextLength = 128;
+        // 会话连接期间 message thread 按此频率检查唤醒标记；VBlank 帧期间检查点本身也会收取变化
+        constexpr int wakePollHz = 30;
     }
 
     Interop::Interop(::juce::AudioProcessor& processor) : processor_(processor) {
@@ -113,14 +115,14 @@ namespace arrange::juce {
     }
 
     Interop::~Interop() {
-        cancelPendingUpdate();
+        stopTimer();
         for (auto* parameter : parameters_) parameter->removeListener(this);
     }
 
     void Interop::prepare(double sampleRate, int blockSize) noexcept {
         sampleRate_.store(sampleRate, std::memory_order_relaxed);
         blockSize_.store(blockSize, std::memory_order_relaxed);
-        triggerAsyncUpdate();
+        wakePending_.store(true, std::memory_order_release);
     }
 
     void Interop::process(::juce::AudioPlayHead* playHead) noexcept {
@@ -156,11 +158,11 @@ namespace arrange::juce {
         cell.seconds.store(next.positionSeconds.value_or(0.0), std::memory_order_relaxed);
         cell.sequence.store(sequence + 2, std::memory_order_release);
 
-        // 只在状态边沿唤醒 UI；播放位置由 UI 在订阅期间逐帧拉取
+        // 只在状态边沿请求唤醒 UI；播放位置由 UI 在订阅期间逐帧拉取
         const auto& previous = audioTransport_;
         const auto edge = next.playing != previous.playing || next.recording != previous.recording || next.looping != previous.looping || next.bpm != previous.bpm || next.numerator != previous.numerator || next.denominator != previous.denominator;
         audioTransport_ = next;
-        if (edge) triggerAsyncUpdate();
+        if (edge) wakePending_.store(true, std::memory_order_release);
     }
 
     arrange::core::InteropTransport Interop::transport() const {
@@ -232,10 +234,13 @@ namespace arrange::juce {
         // 新会话按当前值整体对齐，历史变化标记不再有意义
         for (std::size_t i = 0; i < parameters_.size(); ++i) changed_[i].store(false, std::memory_order_relaxed);
         anyChanged_.store(false, std::memory_order_relaxed);
+        startTimerHz(wakePollHz);
     }
 
     void Interop::detach(arrange::core::InteropSessionSink& sink) noexcept {
-        if (sink_ == &sink) sink_ = nullptr;
+        if (sink_ != &sink) return;
+        sink_ = nullptr;
+        stopTimer();
     }
 
     const std::vector<arrange::core::InteropParameter>& Interop::parameters() const {
@@ -328,18 +333,19 @@ namespace arrange::juce {
     }
 
     void Interop::parameterValueChanged(int parameterIndex, float) {
-        // 可能来自音频线程或宿主任意线程：只写标记，唤醒请求由 AsyncUpdater 合并
+        // 可能来自音频线程或宿主任意线程：只写标记，由 message thread 轮询收取
         // 登记顺序即 processor 扁平参数表顺序，下标与 getParameterIndex 一致
         if (parameterIndex < 0 || static_cast<std::size_t>(parameterIndex) >= parameters_.size()) return;
         changed_[static_cast<std::size_t>(parameterIndex)].store(true, std::memory_order_release);
         anyChanged_.store(true, std::memory_order_release);
-        triggerAsyncUpdate();
+        wakePending_.store(true, std::memory_order_release);
     }
 
     void Interop::parameterGestureChanged(int, bool) {}
 
-    void Interop::handleAsyncUpdate() {
-        if (sink_) sink_->wake();
+    void Interop::timerCallback() {
+        // 音频线程不向 message 队列投递消息：投递会与音频块同频，在宿主中挤占输入事件
+        if (wakePending_.exchange(false, std::memory_order_acq_rel) && sink_) sink_->wake();
     }
 
 #endif

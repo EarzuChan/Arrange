@@ -66,7 +66,7 @@ namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
     // processor 持有的互操作端点；寿命长于任何 Editor 与脚本会话
-    class Interop final : public arrange::core::InteropHost, private ::juce::AudioProcessorParameter::Listener, private ::juce::AsyncUpdater {
+    class Interop final : public arrange::core::InteropHost, private ::juce::AudioProcessorParameter::Listener, private ::juce::Timer {
        public:
         using Handler = std::function<InteropValue(const InteropValue& args)>;
         using AsyncHandler = std::function<void(const InteropValue& args, InteropReply reply)>;
@@ -77,7 +77,7 @@ namespace arrange::juce {
         Interop(const Interop&) = delete;
         Interop& operator=(const Interop&) = delete;
 
-        // 以下两项在音频线程或 prepare 路径调用，实时安全
+        // 以下两项在音频线程或 prepare 路径调用：只写原子量，不分配、不加锁、不投递消息
         void prepare(double sampleRate, int blockSize) noexcept;
         void process(::juce::AudioPlayHead* playHead) noexcept;
 
@@ -129,7 +129,7 @@ namespace arrange::juce {
 
         void parameterValueChanged(int parameterIndex, float newValue) override;
         void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-        void handleAsyncUpdate() override;
+        void timerCallback() override;
         ::juce::AudioProcessorParameter& parameter(std::size_t index) const;
 
         ::juce::AudioProcessor& processor_;
@@ -138,6 +138,7 @@ namespace arrange::juce {
         std::vector<arrange::core::InteropParameter> descriptors_;
         std::unique_ptr<std::atomic<bool>[]> changed_;
         std::atomic<bool> anyChanged_{false};
+        std::atomic<bool> wakePending_{false};
         std::atomic<double> sampleRate_{0.0};
         std::atomic<int> blockSize_{0};
         TransportCell transport_;

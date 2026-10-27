@@ -85,7 +85,8 @@ namespace arrange::quickjs {
         void clearPendingTransactions() noexcept;
         void setFrameTimeMillis(double nowMillis) noexcept;
         void setOwnerWake(std::function<void()> wake);
-        CallbackInvokeResult semanticCheckpoint(double nowMillis);
+        // visualFrame 表示本检查点属于 VBlank 视觉帧；只在视觉帧交付按帧拉取的互操作数据
+        CallbackInvokeResult semanticCheckpoint(double nowMillis, bool visualFrame = false);
         bool hasPendingSemanticWork() const noexcept;
         bool hasPendingVisualWork() const noexcept;
         CallbackInvokeResult prepareVisualFrame(double nowMillis);
