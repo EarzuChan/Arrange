@@ -124,7 +124,7 @@ namespace arrange::juce {
 
         [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
-        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision = 0);
+        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision = 0, const arrange::core::HitTestSnapshot* snapshot = nullptr);
 
         void cancelWheel() {
             pointer_.cancelWheel();

@@ -39,6 +39,7 @@ namespace arrange::core {
             if (std::holds_alternative<DrawModifier>(value)) return kPaint | dirtyMask(DirtyFlag::EventSlot);
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             if (std::holds_alternative<FocusModifier>(value)) return dirtyMask(DirtyFlag::Focus) | dirtyMask(DirtyFlag::EventSlot);
+            if (std::holds_alternative<SemanticsModifier>(value)) return dirtyMask(DirtyFlag::Accessibility) | dirtyMask(DirtyFlag::EventSlot);
             return kPaint | kHit;
         }
     }
@@ -72,6 +73,7 @@ namespace arrange::core {
                 if constexpr (std::is_same_v<T, OffsetModifier>) return "offset";
                 if constexpr (std::is_same_v<T, ZIndexModifier>) return "zIndex";
                 if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) return "animateContentSize";
+                if constexpr (std::is_same_v<T, SemanticsModifier>) return "semantics";
                 if constexpr (std::is_same_v<T, DrawModifier>) {
                     constexpr std::string_view names[]{"drawBehind", "drawWithContent", "drawWithCache"};
                     return names[static_cast<std::size_t>(input.kind)];

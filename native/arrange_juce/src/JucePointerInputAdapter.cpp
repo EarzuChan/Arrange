@@ -139,7 +139,14 @@ namespace arrange::juce {
             interaction.cancelWheel();
             return false;
         }
-        const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision);
+        const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision, runtime.publishedFrame().content.hitTest.get());
+        if (wheelResult.wheelEvent) {
+            auto payload = std::get<arrange::core::WheelEventPayload>(wheelResult.wheelEvent->payload);
+            payload.modifiers = keyModifierState(::juce::ModifierKeys::getCurrentModifiers());
+            runtime.enqueueInputEvent(wheelResult.wheelEvent->slot, payload);
+            return true;
+        }
+        if (wheelResult.locked && !wheelResult.scroll.target) return true;
         const auto& result = wheelResult.scroll;
         if (ScrollProbe::active()) {
             const auto logicalDistance = [&](float delta, WheelUnit unit) {

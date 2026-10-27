@@ -66,6 +66,39 @@ namespace {
         LayoutEngine{}.place(tree, 1);
     }
 
+    void verifyWheelReceptor() {
+        const auto withReceptor = [](DragAxis axis) {
+            LayoutTree tree;
+            makeSingleScroll(tree, true);
+            InputModifierSemantics wheel;
+            wheel.kind = InputModifierKind::Wheel;
+            wheel.axis = axis;
+            wheel.eventSlot = makeEventSlotId(2, EventSlotKind::Wheel);
+            tree.apply({SetModifierMutation{2, {{fixedSize(100, 400), "content"}, {wheel}}}});
+            LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
+            return tree;
+        };
+        arrange::juce::WheelInput input;
+        input.deltaY = -32;
+        input.timeMillis = 1;
+
+        auto tree = withReceptor(DragAxis::Both);
+        auto snapshot = buildHitTestSnapshot(tree, 1);
+        arrange::juce::PointerInputState pointer;
+        auto result = pointer.wheel(tree, 1, {20, 20}, input, 1, &snapshot);
+        check(result.wheelEvent && result.wheelEvent->slot.node == 2 && near(std::get<WheelEventPayload>(result.wheelEvent->payload).deltaY, -32) && !result.scroll.consumed && result.locked, "内层 onWheel 未优先于滚动容器接管会话");
+        input.timeMillis = 20;
+        result = pointer.wheel(tree, 1, {20, 20}, input, 1, &snapshot);
+        check(result.wheelEvent && !result.scroll.consumed, "onWheel 会话锁定后又交还滚动容器");
+
+        tree = withReceptor(DragAxis::Horizontal);
+        snapshot = buildHitTestSnapshot(tree, 1);
+        arrange::juce::PointerInputState other;
+        input.timeMillis = 1;
+        result = other.wheel(tree, 1, {20, 20}, input, 1, &snapshot);
+        check(!result.wheelEvent && result.scroll.consumed, "只接受横向的 onWheel 截取了纵向滚动");
+    }
+
     void verifySingleAxisRouting() {
         LayoutTree vertical;
         makeSingleScroll(vertical, true);
@@ -561,6 +594,7 @@ n.insertChild(1, 2, 0)
 int runScrollInput() {
     try {
         ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
+        verifyWheelReceptor();
         verifySingleAxisRouting();
         verifyPrecisionAndPublication();
         verifyCrossAxisRoutingAndBoundaries();

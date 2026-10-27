@@ -148,8 +148,8 @@ namespace arrange::juce {
         return result;
     }
 
-    InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision) {
-        return pointer_.wheel(tree, root, {x, y}, input, publishedRevision);
+    InteractionWheelResult InteractionStateOwner::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision, const arrange::core::HitTestSnapshot* snapshot) {
+        return pointer_.wheel(tree, root, {x, y}, input, publishedRevision, snapshot);
     }
 
     bool InteractionStateOwner::isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const {

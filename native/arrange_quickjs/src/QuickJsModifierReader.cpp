@@ -63,11 +63,13 @@ namespace arrange::quickjs {
             if (type == "clickable") return check({"enabled", "focusable", "onClick", "onDoubleClick", "interaction"});
             if (type == "hoverable") return check({"enabled", "onEnter", "onExit", "interaction"});
             if (type == "focusable") return check({"enabled", "interaction"});
-            if (type == "onContextClick" || type == "onWheel") return check({"enabled", "callback"});
+            if (type == "onContextClick") return check({"enabled", "callback"});
+            if (type == "onWheel") return check({"enabled", "axis", "callback"});
             if (type == "onKeyEvent") return check({"callback"});
             if (type == "pointerIcon") return check({"icon"});
             if (type == "draggable") return check({"enabled", "axis", "startImmediately", "pointerLock", "onDelta", "onStart", "onStop", "interaction"});
             if (type == "focusRequester") return check({"requester"});
+            if (type == "semantics") return check({"role", "label", "description", "valueText", "enabled", "increment", "decrement"});
             if (type == "focusGroup") return check({});
             if (type == "onFocusChanged") return check({"callback"});
             if (type == "focusProperties") return check({"canFocus", "next", "previous", "up", "down", "left", "right"});
@@ -527,6 +529,31 @@ namespace arrange::quickjs {
                 result.push_back({paintStyle(payload, kind), key});
             } else if (type == "clip") {
                 result.push_back({arrange::core::ClipModifier{paintStyle(payload, arrange::core::PaintStyleKind::Background)}, key});
+            } else if (type == "semantics") {
+                arrange::core::SemanticsModifier item;
+                const auto role = reader_.stringField(payload, "role");
+                constexpr std::string_view roles[]{"", "button", "slider", "switch", "checkbox", "textField", "image", "group"};
+                const auto found = std::find(std::begin(roles), std::end(roles), role);
+                if (found == std::end(roles)) {
+                    (void)throwTypeError("semantics.role 角色名称无效");
+                    return {};
+                }
+                item.role = static_cast<arrange::core::SemanticsRole>(found - std::begin(roles));
+                item.label = reader_.stringField(payload, "label");
+                item.description = reader_.stringField(payload, "description");
+                item.valueText = reader_.stringField(payload, "valueText");
+                item.enabled = boolField(payload, "enabled", true);
+                for (const auto& [name, kind] : {std::pair{"increment", arrange::core::EventSlotKind::SemanticsIncrement}, std::pair{"decrement", arrange::core::EventSlotKind::SemanticsDecrement}}) {
+                    ScopedValue action(context_, JS_GetPropertyStr(context_, payload, name));
+                    if (JS_IsUndefined(action.get()) || JS_IsNull(action.get())) continue;
+                    if (!JS_IsFunction(context_, action.get())) {
+                        JS_ThrowTypeError(context_, "semantics.%s 需要函数", name);
+                        return {};
+                    }
+                    callbacks.push_back({result.size(), kind, std::move(action)});
+                }
+                if (JS_HasException(context_)) return {};
+                result.push_back({item, key});
             } else if (type == "focusRequester" || type == "focusProperties" || type == "focusGroup" || type == "onFocusChanged") {
                 arrange::core::FocusModifier item;
                 item.kind = type == "focusRequester" ? arrange::core::FocusModifierKind::Requester : type == "focusGroup" ? arrange::core::FocusModifierKind::Group : type == "onFocusChanged" ? arrange::core::FocusModifierKind::Observer : arrange::core::FocusModifierKind::Properties;
@@ -573,6 +600,20 @@ namespace arrange::quickjs {
                     if (present) callbacks.push_back({result.size(), kind, std::move(value)});
                     return true;
                 };
+                const auto readAxis = [&] {
+                    const auto axis = reader_.stringField(payload, "axis");
+                    if (axis == "horizontal")
+                        item.axis = arrange::core::DragAxis::Horizontal;
+                    else if (axis == "vertical")
+                        item.axis = arrange::core::DragAxis::Vertical;
+                    else if (axis.empty() || axis == "both")
+                        item.axis = arrange::core::DragAxis::Both;
+                    else {
+                        JS_ThrowTypeError(context_, "%.*s.axis 需要 horizontal、vertical 或 both", static_cast<int>(type.size()), type.data());
+                        return false;
+                    }
+                    return true;
+                };
                 auto ok = true;
                 if (type == "clickable")
                     ok = callback("onClick", Kind::Click, true) && callback("onDoubleClick", Kind::DoubleClick, false) && callback("interaction", Kind::Interaction, false);
@@ -590,7 +631,7 @@ namespace arrange::quickjs {
                     ok = callback("callback", Kind::Key, true);
                 } else if (type == "onWheel") {
                     item.kind = InputKind::Wheel;
-                    ok = callback("callback", Kind::Wheel, true);
+                    ok = readAxis() && callback("callback", Kind::Wheel, true);
                 } else if (type == "pointerIcon") {
                     item.kind = InputKind::PointerIcon;
                     const auto icon = reader_.stringField(payload, "icon");
@@ -603,15 +644,8 @@ namespace arrange::quickjs {
                     item.icon = static_cast<arrange::core::PointerIcon>(found - std::begin(icons));
                 } else {
                     item.kind = InputKind::Draggable;
-                    const auto axis = reader_.stringField(payload, "axis");
-                    if (axis == "horizontal")
-                        item.axis = arrange::core::DragAxis::Horizontal;
-                    else if (axis == "vertical")
-                        item.axis = arrange::core::DragAxis::Vertical;
-                    else if (axis.empty() || axis == "both")
-                        item.axis = arrange::core::DragAxis::Both;
-                    else {
-                        (void)throwTypeError("draggable.axis 需要 horizontal、vertical 或 both");
+                    if (!readAxis()) {
+                        failed_ = true;
                         return {};
                     }
                     item.startImmediately = boolField(payload, "startImmediately", false);
@@ -668,6 +702,8 @@ namespace arrange::quickjs {
                     field->onBlur = slot;
             } else if (auto* focus = std::get_if<arrange::core::FocusModifier>(&input))
                 focus->eventSlot = slot;
+            else if (auto* semantics = std::get_if<arrange::core::SemanticsModifier>(&input))
+                (pending.kind == arrange::core::EventSlotKind::SemanticsDecrement ? semantics->decrement : semantics->increment) = slot;
             else
                 arrange::core::inputEventSlot(std::get<arrange::core::InputModifierSemantics>(input), pending.kind) = slot;
             if (slot.valid()) retained.push_back(slot);

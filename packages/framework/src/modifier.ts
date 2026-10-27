@@ -11,6 +11,8 @@ import type { TextStyleProp } from './native.ts'
 import { focusRequesterIdentity } from './focus.ts'
 import type { FocusRequester, FocusProperties, FocusState } from './focus.ts'
 import type { DrawCallback, DrawContentCallback, DrawCacheBuilder } from './draw.ts'
+import { dragStateInternal, interactionStateInternal } from './gesture.ts'
+import type { DraggableOptions, DraggableState, Draggable2DState, InteractionState } from './gesture.ts'
 export type { DrawSize, DrawRect, DrawPaint, DrawTransform, DrawCallback, DrawContentCallback, DrawCacheResult, DrawCacheBuilder } from './draw.ts'
 export { DrawScope } from './draw.ts'
 
@@ -21,12 +23,16 @@ export type ModifierElement = Readonly<{ type: string, key?: string, value: Modi
 export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
 export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
 export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
-export type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean }
+export type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean; interactionState?: InteractionState }
 export type EnabledOptions = { enabled?: boolean }
-export type HoverableOptions = { enabled?: boolean; onEnter?: () => void; onExit?: () => void }
+export type FocusableOptions = { enabled?: boolean; interactionState?: InteractionState }
+export type HoverableOptions = { enabled?: boolean; onEnter?: () => void; onExit?: () => void; interactionState?: InteractionState }
+export type SemanticsRole = 'button' | 'slider' | 'switch' | 'checkbox' | 'textField' | 'image' | 'group'
+export type SemanticsOptions = { role?: SemanticsRole; label?: string; description?: string; valueText?: string; enabled?: boolean; increment?: () => void; decrement?: () => void }
 export type PointerIcon = 'default' | 'hand' | 'text' | 'crosshair' | 'resizeHorizontal' | 'resizeVertical' | 'grab' | 'grabbing' | 'none'
 export type KeyModifiers = Readonly<{ shift: boolean; alt: boolean; ctrl: boolean; meta: boolean; command: boolean }>
 export type ContextClickEvent = Readonly<{ xDp: number; yDp: number; modifiers: KeyModifiers }>
+export type WheelEvent = Readonly<{ deltaXDp: number; deltaYDp: number; modifiers: KeyModifiers }>
 export type KeyEvent = Readonly<{ type: 'down' | 'up'; key: string; text: string; repeat: boolean; modifiers: KeyModifiers }>
 export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
 export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
@@ -211,7 +217,8 @@ export class Modifier {
     }
 
     clickable(arg: (() => void) | ClickableOptions): Modifier {
-        return this.#add("clickable", typeof arg === "function" ? { onClick: arg, enabled: true, focusable: true } : { enabled: true, focusable: true, ...arg })
+        if (typeof arg === "function") return this.#add("clickable", { onClick: arg, enabled: true, focusable: true })
+        return this.#interaction(arg.interactionState, "clickable", { enabled: true, focusable: true, ...arg }, arg.focusable ?? true)
     }
 
     // 上下文点击：右键，macOS 上 Ctrl+点击；clickable 只响应主键
@@ -220,7 +227,7 @@ export class Modifier {
     }
 
     hoverable(args: HoverableOptions = {}): Modifier {
-        return this.#add("hoverable", { enabled: true, ...args })
+        return this.#interaction(args.interactionState, "hoverable", { enabled: true, ...args }, false)
     }
 
     // 从焦点受体向祖先冒泡，返回 true 表示已消费；未消费才走默认行为并交还宿主
@@ -228,12 +235,36 @@ export class Modifier {
         return this.#add('onKeyEvent', { callback })
     }
 
+    // 手势原语只交付位移；开始与停止回调随使用场景配置
+    draggable(state: DraggableState, args: DraggableOptions & { orientation?: 'horizontal' | 'vertical' } = {}): Modifier {
+        if (dragStateInternal(state).twoDimensional) throw new TypeError('draggable 需要 createDraggableState()，二维状态请用 draggable2D')
+        const orientation = args.orientation ?? 'vertical'
+        if (orientation !== 'horizontal' && orientation !== 'vertical') throw new TypeError("draggable.orientation 只能是 'horizontal' 或 'vertical'")
+        return this.#interaction(args.interactionState, 'draggable', { ...args, state, orientation }, false)
+    }
+
+    draggable2D(state: Draggable2DState, args: DraggableOptions = {}): Modifier {
+        if (!dragStateInternal(state).twoDimensional) throw new TypeError('draggable2D 需要 createDraggable2DState()')
+        return this.#interaction(args.interactionState, 'draggable', { ...args, state, orientation: 'both' }, false)
+    }
+
+    // 声明了 onWheel 的节点参与滚轮会话的起手候选；比同轴滚动容器更靠内时整个会话交给它
+    onWheel(callback: (event: WheelEvent) => void, args: { axis?: 'vertical' | 'horizontal' | 'both'; enabled?: boolean } = {}): Modifier {
+        return this.#add('onWheel', { callback, enabled: true, axis: 'both', ...args })
+    }
+
+    // 最小语义声明；增减动作供语义测试与后续无障碍桥接调用
+    semantics(args: SemanticsOptions): Modifier {
+        return this.#add('semantics', { ...args })
+    }
+
     pointerIcon(icon: PointerIcon): Modifier {
         return this.#add('pointerIcon', { icon })
     }
 
-    focusable(arg: boolean | EnabledOptions = true): Modifier {
-        return this.#add("focusable", typeof arg === "boolean" ? { enabled: arg } : { enabled: true, ...arg })
+    focusable(arg: boolean | FocusableOptions = true): Modifier {
+        if (typeof arg === "boolean") return this.#add("focusable", { enabled: arg })
+        return this.#interaction(arg.interactionState, "focusable", { enabled: true, ...arg }, true)
     }
 
     focusRequester(requester: FocusRequester): Modifier { return this.#add('focusRequester', { requester: focusRequesterIdentity(requester) }) }
@@ -255,6 +286,15 @@ export class Modifier {
 
     horizontalScroll(state: ScrollStateLike, args: EnabledOptions = {}): Modifier {
         return this.#add("horizontalScroll", { state: scrollStateSnapshot(state), enabled: true, ...args })
+    }
+
+    // 交互状态：指针部分由原生 interaction 槽回写，焦点部分附带同节点焦点观察
+    #interaction(state: InteractionState | undefined, type: string, value: Record<string, unknown>, focus: boolean): Modifier {
+        const { interactionState: _, ...rest } = value
+        if (!state) return this.#add(type, rest)
+        const internal = interactionStateInternal(state)
+        const modifier = this.#add(type, { ...rest, interaction: internal.pointer })
+        return focus ? modifier.#add('onFocusChanged', { callback: internal.focus }) : modifier
     }
 
     #add(type: string, value: Record<string, unknown>): Modifier {

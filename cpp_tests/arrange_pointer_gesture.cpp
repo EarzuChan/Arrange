@@ -36,7 +36,7 @@ namespace {
         HitTestSnapshot snapshot;
         PointerGestureSession session;
 
-        explicit Fixture(bool pointerLock = false, bool startImmediately = false) {
+        explicit Fixture(bool pointerLock = false, bool startImmediately = false, bool interaction = false) {
             create(tree, 1, {{size(400, 200)}});
             auto hover = input(InputModifierKind::Hoverable, 2, EventSlotKind::None);
             hover.eventSlot = {};
@@ -47,6 +47,7 @@ namespace {
             icon.icon = PointerIcon::Hand;
             auto click = input(InputModifierKind::Clickable, 2, EventSlotKind::Click);
             click.doubleClick = makeEventSlotId(2, EventSlotKind::DoubleClick);
+            if (interaction) click.interaction = makeEventSlotId(2, EventSlotKind::Interaction);
             auto drag = input(InputModifierKind::Draggable, 2, EventSlotKind::DragDelta);
             drag.axis = DragAxis::Horizontal;
             drag.dragStart = makeEventSlotId(2, EventSlotKind::DragStart);
@@ -149,6 +150,31 @@ namespace {
         check(!fixture.session.pressed() && out.events.empty(), "受体退休后拖动未取消");
     }
 
+    std::vector<InteractionPayload> interactions(const PointerGestureOutput& out) {
+        std::vector<InteractionPayload> result;
+        for (const auto& event : out.events)
+            if (const auto* state = std::get_if<InteractionPayload>(&event.payload)) result.push_back(*state);
+        return result;
+    }
+
+    void verifyInteractionState() {
+        Fixture fixture(false, false, true);
+        PointerGestureOutput out;
+        fixture.session.move(fixture.tree, fixture.snapshot, fixture.at(10, 10), out);
+        check(interactions(out) == std::vector{InteractionPayload{true, false, false, false}}, "悬停未回写交互状态");
+        out = {};
+        fixture.session.move(fixture.tree, fixture.snapshot, fixture.at(12, 10), out);
+        check(interactions(out).empty(), "移动时重复回写了未变化的交互状态");
+        fixture.session.primaryDown(fixture.tree, fixture.snapshot, fixture.at(12, 10), 1, out);
+        check(interactions(out) == std::vector{InteractionPayload{true, true, false, false}}, "按下未回写 pressed");
+        out = {};
+        fixture.session.drag(fixture.tree, fixture.at(40, 10), out);
+        check(interactions(out) == std::vector{InteractionPayload{true, true, false, true}}, "拖动开始未回写 dragged");
+        out = {};
+        fixture.session.primaryUp(fixture.tree, fixture.snapshot, fixture.at(350, 150), out);
+        check(interactions(out) == std::vector{InteractionPayload{}}, "抬起到受体外未清空交互状态");
+    }
+
     void verifyContextClick() {
         Fixture fixture;
         PointerGestureOutput out;
@@ -193,6 +219,7 @@ int main() {
         verifyCancelAndRevalidate();
         verifyContextClick();
         verifyPointerLockAndImmediate();
+        verifyInteractionState();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << "\n";

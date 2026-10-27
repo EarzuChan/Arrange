@@ -393,6 +393,54 @@ int main() {
             n.setModifier(1, {elements: [{type: 'clickable', value: {onClick: () => {}}}]})
         )JS");
         check(reloaded.ok && !host.invokeEventSlot(outerHit.eventSlot).ok, "context reset accepted old callback token");
+        const auto gestures = host.executeModule("gesture-modifier.js", R"JS(
+            const n = globalThis.__ARRANGE_NATIVE__
+            void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
+            n.setModifier(1, {elements: [
+                {type: 'size', value: {width: 100, height: 80}},
+                {type: 'hoverable', value: {enabled: true, onEnter: () => n.setProp(1, 'contentDescription', 'enter')}},
+                {type: 'pointerIcon', value: {icon: 'grab'}},
+                {type: 'onContextClick', value: {enabled: true, callback: event => n.setProp(1, 'contentDescription', 'context ' + event.x)}},
+                {type: 'onKeyEvent', value: {callback: event => event.key === 'Enter' && event.type === 'down'}},
+                {type: 'draggable', value: {enabled: true, axis: 'horizontal', startImmediately: false, pointerLock: true, onDelta: event => n.setProp(1, 'contentDescription', 'delta ' + event.deltaX + ' ' + event.modifiers.shift), onStart: () => {}}},
+                {type: 'semantics', value: {role: 'slider', label: '增益', valueText: '-6 dB', increment: () => n.setProp(1, 'contentDescription', 'increment')}}
+            ]})
+        )JS");
+        check(gestures.ok, "手势 Modifier 脚本执行失败");
+        scene.reset();
+        frame(host, scene, pipeline, published);
+        const InputModifierSemantics* drag = nullptr;
+        const InputModifierSemantics* keys = nullptr;
+        const InputModifierSemantics* context = nullptr;
+        for (const auto& instance : scene.tree().node(1).modifier.elements())
+            if (const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value)) {
+                if (input->kind == InputModifierKind::Draggable) drag = input;
+                if (input->kind == InputModifierKind::KeyEvent) keys = input;
+                if (input->kind == InputModifierKind::ContextClick) context = input;
+            }
+        check(drag && keys && context && drag->axis == DragAxis::Horizontal && drag->pointerLock && drag->dragStart.valid() && !drag->dragStop.valid(), "draggable 字段或可选回调槽位读取错误");
+        check(HitTester().hitChain(buildHitTestSnapshot(scene.tree(), 1), {10, 10}).size() == 4, "命中链未包含悬停、光标、上下文点击与拖动受体");
+        DragDeltaPayload delta{12, 3, {}};
+        delta.modifiers.shift = true;
+        const auto dragSlot = drag->eventSlot;
+        const auto keySlot = keys->eventSlot;
+        const auto contextSlot = context->eventSlot;
+        check(host.invokeEventSlot(dragSlot, InputEventPayload{delta}).ok, "拖动位移回调执行失败");
+        frame(host, scene, pipeline, published);
+        check(scene.node(1).props.at("contentDescription").stringOr() == "delta 12 true", "拖动位移载荷未按对象交付");
+        const auto consumed = host.invokeEventSlot(keySlot, InputEventPayload{KeyEventPayload{false, "Enter", "", false, {}}});
+        const auto ignored = host.invokeEventSlot(keySlot, InputEventPayload{KeyEventPayload{false, "a", "a", false, {}}});
+        check(consumed.ok && consumed.consumed && ignored.ok && !ignored.consumed, "onKeyEvent 返回值未作为消费结果");
+        check(host.invokeEventSlot(contextSlot, InputEventPayload{PointerEventPayload{7, 8, {}}}).ok, "上下文点击回调执行失败");
+        frame(host, scene, pipeline, published);
+        check(scene.node(1).props.at("contentDescription").stringOr() == "context 7", "上下文点击坐标未交付");
+        const SemanticsModifier* semantics = nullptr;
+        for (const auto& instance : scene.tree().node(1).modifier.elements())
+            if (const auto* item = std::get_if<SemanticsModifier>(&instance.descriptor.value)) semantics = item;
+        check(semantics && semantics->role == SemanticsRole::Slider && semantics->label == "增益" && semantics->valueText == "-6 dB" && semantics->increment.valid() && !semantics->decrement.valid(), "semantics 字段或动作槽位读取错误");
+        check(host.invokeEventSlot(semantics->increment).ok, "语义增加动作执行失败");
+        frame(host, scene, pipeline, published);
+        check(scene.node(1).props.at("contentDescription").stringOr() == "increment", "语义增加动作未调用");
         std::cout << "QuickJS Modifier: ordered geometry, independent callbacks, retirement and reset passed\n";
         return 0;
     } catch (const std::exception& error) {

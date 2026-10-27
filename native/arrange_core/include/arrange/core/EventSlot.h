@@ -31,6 +31,8 @@ namespace arrange::core {
         DragStop = 18,
         Interaction = 19,
         PointerInput = 20,
+        SemanticsIncrement = 21,
+        SemanticsDecrement = 22,
         Custom = 100,
     };
 

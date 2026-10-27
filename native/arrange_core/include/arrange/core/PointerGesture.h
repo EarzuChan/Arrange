@@ -6,6 +6,7 @@
 #include "InputEvent.h"
 #include "LayoutTree.h"
 #include "Modifier.h"
+#include "SlotUpdate.h"
 
 #include <optional>
 #include <vector>
@@ -88,10 +89,14 @@ namespace arrange::core {
         };
 
         void updateHover(const LayoutTree& tree, const std::vector<HitTestResult>& chain, PointerGestureOutput& out);
+        // 按节点汇总悬停、按下与拖动中，变化时交付给该节点全部 interaction 槽
+        void syncInteractions(const LayoutTree& tree, PointerGestureOutput& out);
         void stopDrag(const LayoutTree& tree, bool cancelled, PointerGestureOutput& out);
 
         std::optional<Press> press_;
         std::vector<HitTestResult> hovered_;
+        std::vector<HitTestResult> chain_;
+        std::vector<std::pair<NodeHandle, InteractionPayload>> interactions_;
         PointerIcon icon_ = PointerIcon::Default;
         float touchSlop_ = 4.0f;
         HitTester hitTester_;

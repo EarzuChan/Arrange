@@ -248,7 +248,21 @@ namespace arrange::core {
         bool operator==(const DrawModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier, FocusModifier, DrawModifier>;
+    enum class SemanticsRole { None, Button, Slider, Switch, Checkbox, TextField, Image, Group };
+
+    // 最小语义：角色、文本与增减动作，先服务键盘与语义测试，平台无障碍桥接在后续
+    struct SemanticsModifier {
+        SemanticsRole role = SemanticsRole::None;
+        std::string label;
+        std::string description;
+        std::string valueText;
+        bool enabled = true;
+        EventSlotId increment;
+        EventSlotId decrement;
+        bool operator==(const SemanticsModifier&) const = default;
+    };
+
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier, FocusModifier, DrawModifier, SemanticsModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;
@@ -342,6 +356,7 @@ namespace arrange::core {
         if (const auto* focus = std::get_if<FocusModifier>(&value)) slot = focus->eventSlot;
         if (const auto* layout = std::get_if<LayoutModifierSemantics>(&value)) slot = layout->eventSlot;
         if (const auto* draw = std::get_if<DrawModifier>(&value)) slot = draw->prepare;
+        if (const auto* semantics = std::get_if<SemanticsModifier>(&value)) slot = kind == EventSlotKind::SemanticsDecrement ? semantics->decrement : semantics->increment;
         return kind == EventSlotKind::None || slot.kind == kind ? slot : EventSlotId{};
     }
 

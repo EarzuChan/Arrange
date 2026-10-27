@@ -4,6 +4,7 @@ import type { Modifier, ModifierElement } from './modifier.ts'
 import type { MeasurePolicy } from './measurePolicy.ts'
 import type { ArrangementProp } from './native.ts'
 import { DrawInstance, type DrawDeclaration } from './draw.ts'
+import { dragStateInternal, type DragModifiers } from './gesture.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
 
 export interface PxModifier {
@@ -118,6 +119,55 @@ export class UnitResolver {
         return wrapped
     }
 
+    // 每个手势状态一组稳定的原生回调，回调内读取最新声明，事件槽因此不随重排更换
+    private readonly drags = new WeakMap<object, { input: Readonly<Record<string, unknown>>; native: Readonly<Record<string, (event: never) => void>> }>()
+
+    private resolveDraggable(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+        const state = input.state as object
+        let entry = this.drags.get(state)
+        if (!entry) {
+            const internal = dragStateInternal(state)
+            const dp = (value: number) => this.density.pxToDp(value)
+            const created: { input: Readonly<Record<string, unknown>>; native: Readonly<Record<string, (event: never) => void>> } = {
+                input,
+                native: Object.freeze({
+                    onDelta: (event: { deltaX: number; deltaY: number; modifiers: DragModifiers }) => {
+                        const orientation = created.input.orientation
+                        internal.delta(dp(orientation === 'vertical' ? event.deltaY : event.deltaX), orientation === 'both' ? dp(event.deltaY) : 0, Object.freeze(event.modifiers))
+                    },
+                    onStart: (event: { x: number; y: number; width: number; height: number; modifiers: DragModifiers }) => {
+                        internal.setDragging(true)
+                        const callback = created.input.onDragStarted as ((start: unknown) => void) | undefined
+                        callback?.(Object.freeze({ xDp: dp(event.x), yDp: dp(event.y), widthDp: dp(event.width), heightDp: dp(event.height), modifiers: Object.freeze(event.modifiers) }))
+                    },
+                    onStop: (event: { velocity: number; cancelled: boolean }) => {
+                        internal.setDragging(false)
+                        const callback = created.input.onDragStopped as ((stop: unknown) => void) | undefined
+                        callback?.(Object.freeze({ velocityDp: dp(event.velocity), cancelled: event.cancelled }))
+                    },
+                }),
+            }
+            entry = created
+            this.drags.set(state, entry)
+        }
+        entry.input = input
+        const resolved: Record<string, unknown> = { enabled: input.enabled ?? true, axis: input.orientation, startImmediately: input.startImmediately ?? false, pointerLock: input.pointerLock ?? false, ...entry.native }
+        if (input.interaction) resolved.interaction = input.interaction
+        return resolved
+    }
+
+    private readonly wheelCallbacks = new WeakMap<object, (event: { deltaX: number; deltaY: number; modifiers: unknown }) => unknown>()
+
+    private wheelCallback(callback: unknown): unknown {
+        if (typeof callback !== 'function') return callback
+        let wrapped = this.wheelCallbacks.get(callback)
+        if (!wrapped) {
+            wrapped = event => callback(Object.freeze({ deltaXDp: this.density.pxToDp(event.deltaX), deltaYDp: this.density.pxToDp(event.deltaY), modifiers: Object.freeze(event.modifiers) }))
+            this.wheelCallbacks.set(callback, wrapped)
+        }
+        return wrapped
+    }
+
     private resolveModifierValue(type: string, input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
         let value = input
 
@@ -154,6 +204,8 @@ export class UnitResolver {
         ], this.density)
         else if (type === 'border') value = replaceLength(value, 'width', this.resolveLength(value.widthDp, value.widthPx))
         else if (type === 'onContextClick') value = { ...value, callback: this.pointerCallback(value.callback) }
+        else if (type === 'draggable') value = this.resolveDraggable(value)
+        else if (type === 'onWheel') value = { ...value, callback: this.wheelCallback(value.callback) }
 
         if (value.shape && typeof value.shape === 'object') value = { ...value, shape: resolveShape(value.shape as Readonly<Record<string, unknown>>, this) }
         value = this.resolveFixedFields(type, value)

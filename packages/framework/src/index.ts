@@ -14,6 +14,8 @@ export type { PropType, ExtractPropTypes, ExtractPublicPropTypes } from './runti
 export { createApp } from './app.ts'
 export type { ArrangeApp } from './app.ts'
 export { createScrollState } from './state.ts'
+export { createDraggableState, createDraggable2DState, createInteractionState } from './gesture.ts'
+export type { DraggableState, Draggable2DState, DraggableOptions, DragStart, DragStop, DragModifiers, InteractionState } from './gesture.ts'
 export type { ScrollState } from './state.ts'
 export { createFocusRequester, FocusManagerKey } from './focus.ts'
 export type { FocusDirection, FocusRequester, FocusManager, FocusProperties, FocusState } from './focus.ts'

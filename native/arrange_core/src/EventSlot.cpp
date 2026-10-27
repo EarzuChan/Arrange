@@ -43,6 +43,10 @@ namespace arrange::core {
                 return "interaction";
             case EventSlotKind::PointerInput:
                 return "pointerInput";
+            case EventSlotKind::SemanticsIncrement:
+                return "semanticsIncrement";
+            case EventSlotKind::SemanticsDecrement:
+                return "semanticsDecrement";
             case EventSlotKind::Custom:
                 return "custom";
             case EventSlotKind::None:
@@ -72,6 +76,8 @@ namespace arrange::core {
         if (name == "dragStop") return EventSlotKind::DragStop;
         if (name == "interaction") return EventSlotKind::Interaction;
         if (name == "pointerInput") return EventSlotKind::PointerInput;
+        if (name == "semanticsIncrement") return EventSlotKind::SemanticsIncrement;
+        if (name == "semanticsDecrement") return EventSlotKind::SemanticsDecrement;
         if (name == "custom") return EventSlotKind::Custom;
         return EventSlotKind::None;
     }

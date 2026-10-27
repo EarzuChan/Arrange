@@ -21,6 +21,8 @@ namespace arrange::juce {
         bool locked = false;
         bool sessionStarted = false;
         bool sessionCancelled = false;
+        // 会话锁定到 onWheel 受体时的交付，单位为逻辑 PX，向上 / 向左滚为正
+        std::optional<arrange::core::PointerGestureEvent> wheelEvent;
     };
 
     class PointerInputState {
@@ -41,7 +43,7 @@ namespace arrange::juce {
 
         [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
 
-        [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input, std::uint64_t publishedRevision = 0);
+        [[nodiscard]] WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input, std::uint64_t publishedRevision = 0, const arrange::core::HitTestSnapshot* snapshot = nullptr);
         void cancelWheel();
         void synchronizePublishedWheel(const arrange::core::LayoutTree& tree, bool interactive);
 
@@ -59,6 +61,9 @@ namespace arrange::juce {
             double lastInputMillis = 0;
             arrange::core::ScrollHitPath initialPath;
             std::optional<arrange::core::ScrollTarget> target;
+            // 起手命中链上最近的 onWheel 受体，选定后整个会话交给它
+            std::optional<arrange::core::HitTestResult> candidate;
+            std::optional<arrange::core::HitTestResult> receptor;
         };
 
         WheelSession wheelSession_;
