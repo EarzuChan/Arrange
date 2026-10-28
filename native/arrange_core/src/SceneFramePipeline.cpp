@@ -45,6 +45,7 @@ namespace arrange::core {
         auto candidateFrame = publishedFrame;
         candidateFrame.changes = {};
         candidateFrame.error.reset();
+        candidateFrame.content.viewport = {constraints.maxWidth, constraints.maxHeight};
         if (transaction) ++counters_.submissions;
         result.rearrange = transaction ? transaction->rearrange : nullptr;
         layout_.setMaterializer(prepare.materialize ? LayoutMaterializer{[&](NodeId id, const std::vector<int>& indices) {
@@ -148,10 +149,22 @@ namespace arrange::core {
         const auto& after = candidate.content;
         candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps || before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
         candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
-        // 编辑内容继承场景变换，局部矩形无法安全界定重绘范围
+        // 叠加层变化即使场景未重建也要发布并重绘
         if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
             candidate.plan.publishFrame = true;
             candidate.plan.passivePaint = true;
+        }
+        if (candidate.plan.passivePaint) {
+            RepaintDamage damage;
+            // 首帧、显式整块回退、视口变化、错误屏与诊断叠加层变化都整块重绘
+            if (previous.revision == 0 || candidate.plan.fullFallback || before.viewport != after.viewport || candidate.changes.diagnosticsDrawOpsChanged) damage.markFull();
+            damage.compareScene(before.scenePaint, after.scenePaint);
+            // 编辑命令在 TextField 叶项原位重放，范围取新旧聚焦叶项
+            if (candidate.changes.overlayDrawOpsChanged) {
+                damage.addInputField(before.scenePaint, before.focusedInputModifier);
+                damage.addInputField(after.scenePaint, after.focusedInputModifier);
+            }
+            candidate.changes.repaint = damage.finish(after.viewport);
         }
         candidate.revision = previous.revision + (candidate.plan.publishFrame ? 1 : 0);
     }

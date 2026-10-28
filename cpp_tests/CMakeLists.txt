@@ -25,6 +25,10 @@ add_executable(arrange_local_work arrange_local_work.cpp AllocationProbe.cpp)
 target_link_libraries(arrange_local_work PRIVATE Arrange::core)
 add_test(NAME arrange_local_work COMMAND arrange_local_work)
 
+add_executable(arrange_repaint_region arrange_repaint_region.cpp)
+target_link_libraries(arrange_repaint_region PRIVATE Arrange::core)
+add_test(NAME arrange_repaint_region COMMAND arrange_repaint_region)
+
 add_executable(arrange_input_session arrange_input_session.cpp)
 target_link_libraries(arrange_input_session PRIVATE Arrange::core)
 add_test(NAME arrange_input_session COMMAND arrange_input_session)

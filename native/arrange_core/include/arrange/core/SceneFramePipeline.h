@@ -8,6 +8,7 @@
 #include "MutationTransaction.h"
 #include "NativeScene.h"
 #include "Paint.h"
+#include "Repaint.h"
 #include "LayoutTree.h"
 
 #include <optional>
@@ -63,11 +64,15 @@ namespace arrange::core {
         ModifierHandle focusedInputModifier;
         float focusedInputViewportX = 0.0f;
         std::optional<std::string> errorFrame;
+        // 本帧布局所用的视口尺寸，脏区按它裁剪与计算面积占比
+        Size viewport;
     };
 
     struct FrameChangeSet {
         bool diagnosticsDrawOpsChanged = false;
         bool overlayDrawOpsChanged = false;
+        // 相对上一发布帧的重绘范围，只在 passivePaint 时有意义
+        RepaintRegion repaint;
     };
 
     struct FrameExecutionCounters {

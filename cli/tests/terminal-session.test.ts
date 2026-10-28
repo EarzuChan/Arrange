@@ -15,6 +15,7 @@ import { Executor } from '../src/feature/platform/Executor.ts'
 import { EmulatedTty } from './terminal-emulator.ts'
 import { registerDevCommand } from '../src/business/command/Dev.ts'
 import { ApplicationCommand } from '../src/business/ApplicationCommand.ts'
+import { cliVersion } from '../src/CliMetadata.ts'
 
 class Input extends EventEmitter {
     isTTY = true
@@ -281,7 +282,7 @@ test('裸命令、命令组、各级帮助、版本与参数错误全部经过�
         { args: ['--help'], code: 0, text: /Usage: arrange/ },
         { args: ['help', 'sync'], code: 0, text: /Usage: arrange sync/ },
         { args: ['storage', '--help'], code: 0, text: /Usage: arrange storage/ },
-        { args: ['--version'], code: 0, text: /1\.0\.0/ },
+        { args: ['--version'], code: 0, text: new RegExp(cliVersion.replaceAll('.', '\\.')) },
         { args: ['unknown-command'], code: 1, text: /unknown command/ },
         { args: ['sync', '--unknown-option'], code: 1, text: /unknown option/ },
         { args: ['storage', 'repair'], code: 1, text: /missing required argument/ }

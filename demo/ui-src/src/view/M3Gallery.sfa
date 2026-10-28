@@ -29,7 +29,7 @@
             <Row :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
                 <Box :modifier="M.size(116.dp, 100.dp)">
                     <Text text="点我" :style="{ fontSize: 12.sp, color: Color(0xff142631) }" :modifier="M.size(76.dp, 58.dp).graphicsLayer({ rotationZ: rotation, scaleX: mirror ? -1 : 1 }).clip(CircleShape).background(Color(0xff61d6bb)).padding(18.dp).clickable(() => status = '命中了变换后的椭圆')" />
-                </Box> // 变幻后椭圆的HitBox或有点问题？需要确认
+                </Box> // FIXME：变幻后椭圆的HitBox或有点问题？需要确认
 
                 <Box :modifier="M.size(150.dp, 100.dp)">
                     <Box :modifier="M.size(86.dp, 64.dp).background(Color(0xffef9a74)).zIndex(front ? 2 : -1).clickable(() => status = '点中了橙色块')" />

@@ -252,7 +252,7 @@ dirty 影响范围：
 - dev / dist source 切换。
 - scroll / clip / transform 相关 dirty bounds 无法可靠证明正确时。
 
-dirty repaint 只用于普通 prop/text/paint 小变化。dirty 清理必须发生在 FramePlan 与 publish frame 语义明确之后，不能过早清掉导致漏画。
+脏区计算与回退阈值见[渲染设计](05-渲染设计.md#脏区重绘)。dirty repaint 只用于普通 prop/text/paint 小变化。dirty 清理必须发生在 FramePlan 与 publish frame 语义明确之后，不能过早清掉导致漏画。
 
 # LayoutTree 结构索引
 

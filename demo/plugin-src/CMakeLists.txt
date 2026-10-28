@@ -11,7 +11,7 @@ FetchContent_Declare(arrange
     GIT_REPOSITORY "https://github.com/EarzuChan/Arrange.git"
 # arrange:end region:cmake.fetch-content-repository
 # arrange:begin region:cmake.framework-version
-    GIT_TAG "v0.5.0"
+    GIT_TAG "v0.6.0"
 # arrange:end region:cmake.framework-version
 )
 FetchContent_MakeAvailable(arrange)

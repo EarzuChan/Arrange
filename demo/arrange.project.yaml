@@ -9,7 +9,7 @@ project:
     - standalone
     - vst3
 framework:
-  version: 0.5.0
+  version: 0.6.0
 ui:
   directory: ui-src
   packageManager: npm
