@@ -20,24 +20,49 @@ namespace arrange::core {
         using Object = std::vector<std::pair<std::string, InteropValue>>;
 
         InteropValue() = default;
+
         InteropValue(std::nullptr_t) {}
+
         InteropValue(bool value) : value_(value) {}
+
         InteropValue(int value) : value_(static_cast<double>(value)) {}
+
         InteropValue(double value) : value_(value) {}
+
         InteropValue(float value) : value_(static_cast<double>(value)) {}
+
         InteropValue(const char* value) : value_(std::string(value)) {}
+
         InteropValue(std::string value) : value_(std::move(value)) {}
+
         InteropValue(std::string_view value) : value_(std::string(value)) {}
 
         static InteropValue array(Array items);
         static InteropValue object(Object fields);
 
-        [[nodiscard]] bool isNull() const noexcept { return std::holds_alternative<std::monostate>(value_); }
-        [[nodiscard]] bool isBool() const noexcept { return std::holds_alternative<bool>(value_); }
-        [[nodiscard]] bool isNumber() const noexcept { return std::holds_alternative<double>(value_); }
-        [[nodiscard]] bool isString() const noexcept { return std::holds_alternative<std::string>(value_); }
-        [[nodiscard]] bool isArray() const noexcept { return std::holds_alternative<std::shared_ptr<const Array>>(value_); }
-        [[nodiscard]] bool isObject() const noexcept { return std::holds_alternative<std::shared_ptr<const Object>>(value_); }
+        [[nodiscard]] bool isNull() const noexcept {
+            return std::holds_alternative<std::monostate>(value_);
+        }
+
+        [[nodiscard]] bool isBool() const noexcept {
+            return std::holds_alternative<bool>(value_);
+        }
+
+        [[nodiscard]] bool isNumber() const noexcept {
+            return std::holds_alternative<double>(value_);
+        }
+
+        [[nodiscard]] bool isString() const noexcept {
+            return std::holds_alternative<std::string>(value_);
+        }
+
+        [[nodiscard]] bool isArray() const noexcept {
+            return std::holds_alternative<std::shared_ptr<const Array>>(value_);
+        }
+
+        [[nodiscard]] bool isObject() const noexcept {
+            return std::holds_alternative<std::shared_ptr<const Object>>(value_);
+        }
 
         // 类型不符时返回给定的回退值，取用方不必先判型
         [[nodiscard]] bool asBool(bool fallback = false) const noexcept;
@@ -146,8 +171,11 @@ namespace arrange::core {
         virtual void beginGesture(std::size_t index) = 0;
         virtual void setParameter(std::size_t index, float normalized) = 0;
         virtual void endGesture(std::size_t index) = 0;
+
         // 在当前指针位置弹出宿主为该参数提供的菜单；宿主不提供时返回 false
-        virtual bool showParameterMenu(std::size_t) { return false; }
+        virtual bool showParameterMenu(std::size_t) {
+            return false;
+        }
 
         [[nodiscard]] virtual InteropHostInfo hostInfo() const = 0;
         [[nodiscard]] virtual InteropTransport transport() const = 0;

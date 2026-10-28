@@ -407,7 +407,7 @@ namespace arrange::core {
         const auto placement = mainPlacement(state, policy);
         for (std::size_t position = 0; position < policy.indices.size(); ++position) {
             const auto index = policy.indices[position], line = state.itemLines[index];
-            auto& child = tree.node(node.children[position]);
+            const auto& child = tree.node(node.children[position]);
             const auto itemCross = itemCrossConstraint(state, index);
             const auto slot = std::max(0.0f, (state.crossSize - state.crossSpacing * (state.cells - 1)) / state.cells);
             const auto crossStart = policy.crossBeforePadding + (policy.grid ? (slot + policy.crossSpacing) * state.itemSlots[index] : alignmentOffset(itemCross, policy.horizontal ? child.bounds.height : child.bounds.width, policy.itemAlignment));

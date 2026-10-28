@@ -12,6 +12,17 @@
 
 namespace arrange::core {
     namespace {
+        // 结构变化必然重测与重建命中；放置与变换必然重绘与重建命中；资源变化必然重绘
+        std::uint32_t impliedDirty(DirtyFlag flag) noexcept {
+            auto dirty = dirtyMask(flag);
+            if (flag == DirtyFlag::Structure) dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
+            if (flag == DirtyFlag::Placement || flag == DirtyFlag::Transform) dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
+            if (flag == DirtyFlag::Resource) dirty |= dirtyMask(DirtyFlag::Paint);
+            return dirty;
+        }
+    }
+
+    namespace {
         bool hasArea(Rect rect) {
             return rect.width > 0.0f && rect.height > 0.0f;
         }
@@ -53,7 +64,9 @@ namespace arrange::core {
             if (op->type == NodeType::Root) node.measurePolicy = BoxMeasurePolicy{"TopStart", true};
             node.generation = op->generation ? op->generation : allocateRuntimeIdentity();
             markDirty(node, DirtyFlag::Structure);
-            recordDirtyAttribution(op->id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "node", "create node");
+            invalidation_.record(impliedDirty(DirtyFlag::Structure));
+            journalNode(op->id);
+            node.journalEpoch = journalEpoch_;
             nodes_[op->id] = std::move(node);
             clearParent(op->id);
             return;
@@ -67,33 +80,33 @@ namespace arrange::core {
         }
 
         if (const auto* op = getIf<InsertChildMutation>(mutation)) {
-            require(op->child);
+            (void)require(op->child);
             if (op->parent == op->child) throw std::runtime_error("Arrange layout tree cannot insert a node into itself");
             std::unordered_set<NodeId> visited;
             if (isDescendant(op->child, op->parent, visited)) {
                 throw std::runtime_error("Arrange layout tree cannot insert an ancestor as a child");
             }
-            auto& parent = require(op->parent);
+            auto& parent = mutableNode(op->parent);
             if (const auto oldParent = parentOf(op->child)) {
-                auto& oldParentNode = require(*oldParent);
+                auto& oldParentNode = mutableNode(*oldParent);
                 oldParentNode.children.erase(std::remove(oldParentNode.children.begin(), oldParentNode.children.end(), op->child), oldParentNode.children.end());
-                markDirtyAttributed(*oldParent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "移出子节点");
+                invalidateNode(*oldParent, DirtyFlag::Structure);
             }
             parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
             const auto insertAt = std::min<std::size_t>(op->index, parent.children.size());
             parent.children.insert(parent.children.begin() + static_cast<std::ptrdiff_t>(insertAt), op->child);
             setParent(op->child, op->parent);
-            markDirtyAttributed(op->parent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "更新子节点顺序");
+            invalidateNode(op->parent, DirtyFlag::Structure);
             return;
         }
 
         if (const auto* op = getIf<RemoveChildMutation>(mutation)) {
-            auto& parent = require(op->parent);
+            auto& parent = mutableNode(op->parent);
             const auto oldSize = parent.children.size();
             parent.children.erase(std::remove(parent.children.begin(), parent.children.end(), op->child), parent.children.end());
             if (parent.children.size() != oldSize) {
                 clearParent(op->child);
-                markDirtyAttributed(op->parent, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "更新子节点顺序");
+                invalidateNode(op->parent, DirtyFlag::Structure);
             }
             return;
         }
@@ -111,18 +124,18 @@ namespace arrange::core {
         }
 
         if (const auto* op = getIf<NativeInvalidationMutation>(mutation)) {
-            markDirtyAttributed(op->id, op->flag, InvalidationSource::NativeState, op->field, op->reason);
+            invalidateNode(op->id, op->flag);
         }
     }
 
     void LayoutTree::markInputDirty(NodeId id, std::uint32_t mask) {
         for (auto flag : {DirtyFlag::Layout, DirtyFlag::Placement, DirtyFlag::Paint, DirtyFlag::HitTest, DirtyFlag::Focus, DirtyFlag::EventSlot, DirtyFlag::Resource, DirtyFlag::Accessibility}) {
-            if ((mask & dirtyMask(flag)) != 0) markDirtyAttributed(id, flag, InvalidationSource::NativeMutation, "typed input", "consumer input changed");
+            if ((mask & dirtyMask(flag)) != 0) invalidateNode(id, flag);
         }
     }
 
     std::uint32_t LayoutTree::setHostInput(NodeId id, HostInput input, const PropValue& value) {
-        auto& node = require(id);
+        auto& node = mutableNode(id);
         const auto name = std::string(hostInputName(input));
         if (input == HostInput::MeasurePolicy) {
             const auto policy = readMeasurePolicy(value, &node.measurePolicy);
@@ -133,21 +146,17 @@ namespace arrange::core {
         }
         std::string error;
         if (!validateSetPropMutation(node.type, name, value, error)) throw std::invalid_argument(error);
-        const auto previous = node.props.find(name);
-        if (previous == node.props.end() && value.isNull()) return 0;
-        const auto mask = hostInputInvalidation(input, previous == node.props.end() ? nullptr : &previous->second, value);
-        if (mask != 0) {
-            if (value.isNull())
-                node.props.erase(name);
-            else
-                node.props[name] = value;
-            markInputDirty(id, mask);
-        }
+        // 空值回到默认的可用状态
+        const auto enabled = value.isNull() || value.boolean;
+        if (enabled == node.enabled) return 0;
+        node.enabled = enabled;
+        const auto mask = hostInputInvalidation(input);
+        markInputDirty(id, mask);
         return mask;
     }
 
     std::uint32_t LayoutTree::setModifierInput(NodeId id, ModifierHandle handle, const ModifierValue& value) {
-        auto& node = require(id);
+        auto& node = mutableNode(id);
         const auto previousScroll = scrollValues(node);
         auto mask = node.modifier.update(handle, value);
         if (previousScroll != scrollValues(node)) mask |= dirtyMask(DirtyFlag::Layout);
@@ -156,7 +165,7 @@ namespace arrange::core {
     }
 
     std::uint32_t LayoutTree::setModifierChain(NodeId id, const ModifierDescriptors& descriptors) {
-        auto& node = require(id);
+        auto& node = mutableNode(id);
         const auto previousScroll = scrollValues(node);
         auto result = node.modifier.reconcile(descriptors);
         if (previousScroll != scrollValues(node)) result.dirty |= dirtyMask(DirtyFlag::Layout);
@@ -168,8 +177,61 @@ namespace arrange::core {
         return require(id);
     }
 
-    LayoutNode& LayoutTree::node(NodeId id) {
-        return require(id);
+    LayoutNode& LayoutTree::mutableNode(NodeId id) {
+        ++nodeAccesses_;
+        const auto it = nodes_.find(id);
+        if (it == nodes_.end()) throw std::runtime_error("Arrange 布局节点不存在：" + std::to_string(id));
+        auto& node = it->second;
+        if (journal_ && node.journalEpoch != journalEpoch_) {
+            journal_->nodes.emplace_back(id, node);
+            node.journalEpoch = journalEpoch_;
+        }
+        return node;
+    }
+
+    void LayoutTree::beginJournal() {
+        if (journal_) throw std::logic_error("Arrange 写入日志不能嵌套");
+        journal_.emplace();
+        ++journalEpoch_;
+        journal_->invalidation = invalidation_;
+        journal_->frameTimeMillis = frameTimeMillis_;
+    }
+
+    void LayoutTree::commitJournal() noexcept {
+        journal_.reset();
+    }
+
+    void LayoutTree::rollbackJournal() {
+        if (!journal_) return;
+        auto journal = std::move(*journal_);
+        journal_.reset();
+        for (auto it = journal.nodes.rbegin(); it != journal.nodes.rend(); ++it)
+            if (it->second)
+                nodes_.insert_or_assign(it->first, std::move(*it->second));
+            else
+                nodes_.erase(it->first);
+        for (auto it = journal.parents.rbegin(); it != journal.parents.rend(); ++it)
+            if (it->second)
+                parentByNode_.insert_or_assign(it->first, *it->second);
+            else
+                parentByNode_.erase(it->first);
+        invalidation_ = journal.invalidation;
+        frameTimeMillis_ = journal.frameTimeMillis;
+    }
+
+    void LayoutTree::journalNode(NodeId id) {
+        if (!journal_) return;
+        const auto it = nodes_.find(id);
+        if (it == nodes_.end())
+            journal_->nodes.emplace_back(id, std::nullopt);
+        else if (it->second.journalEpoch != journalEpoch_) {
+            journal_->nodes.emplace_back(id, it->second);
+            it->second.journalEpoch = journalEpoch_;
+        }
+    }
+
+    void LayoutTree::journalParent(NodeId child) {
+        if (journal_) journal_->parents.emplace_back(child, parentOf(child));
     }
 
     std::vector<NodeId> LayoutTree::nodeIds() const {
@@ -208,25 +270,27 @@ namespace arrange::core {
 
     void LayoutTree::advanceAnimations(double timeMillis) {
         frameTimeMillis_ = timeMillis;
-        for (auto& [id, node] : nodes_) {
+        for (const auto& [id, node] : nodes_) {
             for (const auto& instance : node.modifier.elements()) {
                 if (std::holds_alternative<AnimateContentSizeModifier>(instance.descriptor.value) && instance.sizeAnimation.running) {
-                    markDirtyAttributed(id, DirtyFlag::Layout, InvalidationSource::NativeState, "animateContentSize", "VBlank size animation sample");
+                    invalidateNode(id, DirtyFlag::Layout);
                     break;
                 }
             }
         }
     }
 
-    void LayoutTree::clearDirty() noexcept {
-        for (auto& [_, node] : nodes_) {
+    void LayoutTree::clearDirty() {
+        for (auto& [id, node] : nodes_) {
+            if (node.dirty == 0 && node.subtreeDirty == 0) continue;
+            journalNode(id);
             node.dirty = 0;
             node.subtreeDirty = 0;
         }
     }
 
     void LayoutTree::markDirtyWithPropagation(NodeId id, DirtyFlag flag) {
-        auto& dirtyNode = require(id);
+        auto& dirtyNode = mutableNode(id);
         markDirty(dirtyNode, flag);
 
         switch (flag) {
@@ -262,6 +326,7 @@ namespace arrange::core {
             case DirtyFlag::Focus:
             case DirtyFlag::Accessibility:
             case DirtyFlag::EventSlot:
+            case DirtyFlag::Diagnostics:
                 break;
         }
     }
@@ -271,73 +336,35 @@ namespace arrange::core {
         std::unordered_set<NodeId> visited;
         while (const auto parentId = parentOf(current)) {
             if (!visited.insert(*parentId).second) break;
-            auto& parent = require(*parentId);
-            if (parent.subtreeDirty & dirtyMask(flag)) break;
+            if (require(*parentId).subtreeDirty & dirtyMask(flag)) break;
+            auto& parent = mutableNode(*parentId);
             parent.subtreeDirty |= dirtyMask(flag);
             if (flag == DirtyFlag::Placement || flag == DirtyFlag::Structure || flag == DirtyFlag::Layout) markDirty(parent, flag);
             current = *parentId;
         }
     }
 
-    void LayoutTree::markDirtyAttributed(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
+    void LayoutTree::invalidateNode(NodeId id, DirtyFlag flag) {
         markDirtyWithPropagation(id, flag);
-        recordDirtyAttribution(id, flag, source, std::move(field), std::move(reason));
+        invalidation_.record(impliedDirty(flag));
     }
 
-    void LayoutTree::recordDirtyAttribution(NodeId id, DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
-        std::uint32_t dirty = dirtyMask(flag);
-        switch (flag) {
-            case DirtyFlag::Structure:
-                dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
-                break;
-            case DirtyFlag::Placement:
-            case DirtyFlag::Transform:
-                dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
-                break;
-            case DirtyFlag::Resource:
-                dirty |= dirtyMask(DirtyFlag::Paint);
-                break;
-            case DirtyFlag::Layout:
-            case DirtyFlag::Paint:
-            case DirtyFlag::HitTest:
-            case DirtyFlag::Focus:
-            case DirtyFlag::Accessibility:
-            case DirtyFlag::EventSlot:
-                break;
+    void LayoutTree::invalidateScene(DirtyFlag flag) {
+        const auto dirty = impliedDirty(flag);
+        for (auto& [id, node] : nodes_) {
+            journalNode(id);
+            node.dirty |= dirty;
         }
-        invalidation_.record(source, id, dirty, std::move(field), std::move(reason));
+        invalidation_.record(dirty);
     }
 
-    void LayoutTree::recordSceneInvalidation(DirtyFlag flag, InvalidationSource source, std::string field, std::string reason) {
-        std::uint32_t dirty = dirtyMask(flag);
-        switch (flag) {
-            case DirtyFlag::Structure:
-                dirty |= dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::HitTest);
-                break;
-            case DirtyFlag::Placement:
-            case DirtyFlag::Transform:
-                dirty |= dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::HitTest);
-                break;
-            case DirtyFlag::Resource:
-                dirty |= dirtyMask(DirtyFlag::Paint);
-                break;
-            case DirtyFlag::Layout:
-            case DirtyFlag::Paint:
-            case DirtyFlag::HitTest:
-            case DirtyFlag::Focus:
-            case DirtyFlag::Accessibility:
-            case DirtyFlag::EventSlot:
-                break;
-        }
-        // 视口尺寸变化只改变根约束，后代自行检查实际传入的约束
-        if (source != InvalidationSource::Resize)
-            for (auto& [_, node] : nodes_) node.dirty |= dirty;
-        invalidation_.record(source, std::nullopt, dirty, std::move(field), std::move(reason));
+    void LayoutTree::invalidateViewport() noexcept {
+        invalidation_.record(impliedDirty(DirtyFlag::Layout));
     }
 
     void LayoutTree::detachFromParents(NodeId id) {
         if (const auto parentId = parentOf(id)) {
-            auto& node = require(*parentId);
+            auto& node = mutableNode(*parentId);
             const auto oldSize = node.children.size();
             node.children.erase(std::remove(node.children.begin(), node.children.end(), id), node.children.end());
             if (node.children.size() != oldSize) {
@@ -347,7 +374,7 @@ namespace arrange::core {
                 markAncestorsDirty(node.id, DirtyFlag::Structure);
                 markAncestorsDirty(node.id, DirtyFlag::Layout);
                 markAncestorsDirty(node.id, DirtyFlag::HitTest);
-                recordDirtyAttribution(node.id, DirtyFlag::Structure, InvalidationSource::NativeMutation, "children", "detach child");
+                invalidation_.record(impliedDirty(DirtyFlag::Structure));
             }
         }
         clearParent(id);
@@ -359,27 +386,23 @@ namespace arrange::core {
         const auto children = it->second.children;
         for (auto child : children) eraseSubtree(child);
         clearParent(id);
+        journalNode(id);
         nodes_.erase(id);
     }
 
     void LayoutTree::setParent(NodeId child, NodeId parent) {
+        journalParent(child);
         parentByNode_[child] = parent;
     }
 
     void LayoutTree::clearParent(NodeId child) {
+        journalParent(child);
         parentByNode_.erase(child);
     }
 
     std::optional<NodeId> LayoutTree::parentOf(NodeId id) const noexcept {
         const auto it = parentByNode_.find(id);
         if (it == parentByNode_.end()) return std::nullopt;
-        return it->second;
-    }
-
-    LayoutNode& LayoutTree::require(NodeId id) {
-        ++nodeAccesses_;
-        const auto it = nodes_.find(id);
-        if (it == nodes_.end()) throw std::runtime_error("Arrange 布局节点不存在：" + std::to_string(id));
         return it->second;
     }
 

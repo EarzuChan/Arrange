@@ -1,10 +1,10 @@
 ﻿# 动画与 Transition
 
-本文是 Arrange 动画与 transition 语义的母文档。公开 API 签名见 [基础API形态](21-基础API形态.md)，帧调度见 [调度线程与帧阶段](26-调度线程与帧阶段.md)，Reactive Slot Runtime 见 [运行时](04-运行时.md)。
+本文是 Arrange 动画与 transition 语义的母文档。公开 API 签名见 [基础API形态](21-基础API形态.md)，帧调度见 [调度线程与帧阶段](26-调度线程与帧阶段.md)，值绑定（ValueBinding） 见 [运行时](04-运行时.md)。
 
 # 目标
 
-动画是 UI value 随 `VBlankSource` 推进的阶段化变化。动画过程值进入 JS Value Phase 与 Reactive Slot Runtime，形成 typed slot update，再由 FramePlan 与 SceneFramePipeline 消费。
+动画是 UI value 随 `VBlankSource` 推进的阶段化变化。动画过程值进入 JS Value Phase 与值绑定（`ValueBinding`），形成 typed slot update，再由 FramePlan 与 SceneFramePipeline 消费。
 
 动画过程值变化不得默认触发结构重排。结构变化仍属于 Rearrange Phase；动画只改变已经绑定到 layout、draw、transform、hit-test、event 或 resource slot 的 UI value。
 
@@ -16,7 +16,7 @@
 VBlankTick
 -> JS Value Phase
 -> animated refs / transitions advance
--> SlotUpdateBatch
+-> SlotUpdate
 -> FramePlan
 -> SceneFramePipeline
 ```
@@ -40,7 +40,7 @@ animatedSizeAsRef(...)
 animatedRectAsRef(...)
 ```
 
-这些 API 返回 `Ref`。该 `Ref` 绑定到 UI slot 后，过程值更新进入 JS Value Phase 与 SlotUpdateBatch，不走结构重排链路。
+这些 API 返回 `Ref`。该 `Ref` 绑定到 UI slot 后，过程值更新进入 JS Value Phase 与 SlotUpdate，不走结构重排链路。
 
 值类型规则：
 
@@ -123,7 +123,7 @@ AnimatedVisibility
 
 KeepAlive 停用时保留最近采样值并冻结动画进度，不申请持续帧；恢复首个采样保持该值，之后按剩余进度继续。恢复时目标已经变化则从保留值重新定向。最终销毁取消目标订阅、完成回调及帧需求。
 
-退休后的动画不得继续产出 SlotUpdateBatch，不得调用旧 callback，不得持有旧 node id 或旧 JS function。
+退休后的动画不得继续产出 SlotUpdate，不得调用旧 callback，不得持有旧 node id 或旧 JS function。
 
 # 诊断与测试
 
@@ -132,7 +132,7 @@ KeepAlive 停用时保留最近采样值并冻结动画进度，不申请持续�
 - arrangable render count。
 - 重排作用域执行次数与节点结构操作次数。
 - JS Value Phase time。
-- SlotUpdateBatch size。
+- SlotUpdate size。
 - dirty role count。
 - layout / paint triggered count。
 

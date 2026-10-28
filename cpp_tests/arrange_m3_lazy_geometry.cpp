@@ -54,7 +54,7 @@ namespace {
                 }
                 active = std::move(selected);
                 policy.indices = indices;
-                tree.node(1).measurePolicy = policy;
+                tree.mutableNode(1).measurePolicy = policy;
             });
         }
 
@@ -83,9 +83,9 @@ namespace {
             for (const auto& [index, child] : active)
                 if (index < heights.size()) setHeight(index, child);
             ++policy.workVersion;
-            tree.node(1).measurePolicy = policy;
-            tree.node(1).measurementValid = false;
-            markDirty(tree.node(1), DirtyFlag::Layout);
+            tree.mutableNode(1).measurePolicy = policy;
+            tree.mutableNode(1).measurementValid = false;
+            markDirty(tree.mutableNode(1), DirtyFlag::Layout);
             layout.layout(tree, 1, {0, cross, 0, viewport});
             policy = std::get<LazyMeasurePolicy>(tree.node(1).measurePolicy);
             tree.clearDirty();
@@ -220,7 +220,7 @@ namespace {
             policy.keys = std::vector<std::string>{"guard"};
             policy.contentTypes = std::vector<std::string>{""};
             policy.spans = std::vector<int>{1};
-            scene.node(2).measurePolicy = policy;
+            scene.tree().mutableNode(2).measurePolicy = policy;
             const BindingHandle ancestorBinding{allocateRuntimeIdentity(), allocateRuntimeIdentity()};
             MutationTransaction registration;
             registration.operations.push_back(RegisterBinding{ancestorBinding, ModifierChainTarget{{1, scene.node(1).generation}}});

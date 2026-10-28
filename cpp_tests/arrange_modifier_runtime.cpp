@@ -3,14 +3,16 @@
 #include <arrange/core/Layout.h>
 #include <arrange/core/ModifierGeometry.h>
 #include <arrange/core/Paint.h>
-#include <arrange/core/PointerInputProcessor.h>
+#include <arrange/core/PointerGesture.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/core/Scroll.h>
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
+#include <string>
 
 using namespace arrange::core;
 
@@ -41,6 +43,15 @@ namespace {
         InputModifierSemantics value;
         value.eventSlot = makeEventSlotId(1, EventSlotKind::Click, path);
         return value;
+    }
+
+    // 抬起并返回触发的点击槽路径；未触发点击时为空
+    std::optional<std::string> clickedPath(PointerGestureSession& pointer, const LayoutTree& tree, const HitTestSnapshot& snapshot, Point point) {
+        PointerGestureOutput out;
+        pointer.primaryUp(tree, snapshot, {point}, out);
+        for (const auto& event : out.events)
+            if (event.slot.kind == EventSlotKind::Click) return event.slot.path;
+        return std::nullopt;
     }
 
     template <class F>
@@ -87,8 +98,8 @@ namespace {
 
                 auto full = scene.tree();
                 for (const auto id : full.nodeIds()) {
-                    full.node(id).measurementValid = false;
-                    full.node(id).placementValid = false;
+                    full.mutableNode(id).measurementValid = false;
+                    full.mutableNode(id).placementValid = false;
                     full.markInputDirty(id, dirtyMask(DirtyFlag::Structure));
                 }
                 LayoutEngine{}.layout(full, 1, {0, extent, 0, extent});
@@ -153,12 +164,13 @@ namespace {
         auto hit = HitTester().hitTestClickable(tree, 1, {65, 15});
         check(hit.eventSlot.path == "inner", "inner transformed clickable failed");
         check(HitTester().hitTestClickable(tree, 1, {5, 5}).eventSlot.path == "outer", "padding removed outer clickable area");
-        PointerInputProcessor pointer;
-        pointer.pointerDown(tree, 1, {65, 15});
+        PointerGestureSession pointer;
+        PointerGestureOutput out;
+        pointer.primaryDown(tree, buildHitTestSnapshot(tree, 1), {{65, 15}}, 1, out);
         chain.back() = {click("replacement"), "new"};
         tree.apply({SetModifierMutation{1, chain}});
         layout.layout(tree, 1, {0, 500, 0, 500});
-        check(!pointer.pointerUp(tree, 1, {65, 15}).clickTriggered, "pointer-up clicked replacement instance");
+        check(!clickedPath(pointer, tree, buildHitTestSnapshot(tree, 1), {65, 15}), "pointer-up clicked replacement instance");
     }
 
     void verifyPointerCallbackRefresh() {
@@ -172,29 +184,34 @@ namespace {
         const auto snapshot = [&] {
             return buildHitTestSnapshot(tree, 1);
         };
-        PointerInputProcessor pointer;
-        const auto first = snapshot();
-        pointer.pointerDown(first, {10, 10});
+        PointerGestureSession pointer;
+        const auto down = [&] {
+            PointerGestureOutput out;
+            pointer.primaryDown(tree, snapshot(), {{10, 10}}, 1, out);
+        };
+        const auto up = [&] {
+            return clickedPath(pointer, tree, snapshot(), {10, 10});
+        };
+        down();
         const auto receiver = tree.node(1).modifier.elements()[1].handle;
         tree.setModifierInput(1, receiver, click("refreshed"));
         check(tree.node(1).modifier.elements()[1].handle == receiver, "callback刷新夹具误换了受体");
-        const auto refreshed = pointer.pointerUp(snapshot(), {10, 10});
-        check(refreshed.clickTriggered && refreshed.eventSlot.path == "refreshed", "同受体 callback 更新吞掉了 pointer up 或调用旧资源");
-        pointer.pointerDown(snapshot(), {10, 10});
+        check(up() == "refreshed", "同受体 callback 更新吞掉了 pointer up 或调用旧资源");
+        down();
         auto disabled = click("disabled");
         disabled.enabled = false;
         tree.setModifierInput(1, receiver, disabled);
-        check(!pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "disabled receiver 仍触发点击");
+        check(!up(), "disabled receiver 仍触发点击");
         tree.setModifierInput(1, receiver, click("again"));
-        pointer.pointerDown(snapshot(), {10, 10});
+        down();
         const auto generation = tree.node(1).generation;
         tree.apply({DeleteNodeMutation{1}});
         create();
-        check(tree.node(1).generation != generation && !pointer.capturedNode(tree) && !pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "同 node id 新代际继承了旧 pointer capture");
-        pointer.pointerDown(snapshot(), {10, 10});
+        check(tree.node(1).generation != generation && !pointer.capturedNode(tree) && !up(), "同 node id 新代际继承了旧 pointer capture");
+        down();
         tree.setModifierChain(1, {{size(100, 40)}, {click("replacement"), "new button"}});
         layout.layout(tree, 1, {0, 200, 0, 100});
-        check(!pointer.pointerUp(snapshot(), {10, 10}).clickTriggered, "换受体后旧 pointer capture 触发了新 callback");
+        check(!up(), "换受体后旧 pointer capture 触发了新 callback");
     }
 
     void verifyClipRequiredAndOffset() {

@@ -64,7 +64,7 @@ Modifier 可作用于：
 
 每个 Modifier 必须由 native core 的 `ModifierCompiler` 声明自己影响哪些阶段。
 
-阶段声明必须能进入 dirty attribution：
+阶段声明必须能进入 dirty 标记：
 
 | Modifier 类型 | dirty 影响 |
 | --- | --- |
@@ -339,8 +339,8 @@ animatedColorAsRef(...)
 transition(...)
 ```
 
-动画语义由 JS Value Phase 推进，生产视觉帧源由 VBlankSource 提供。动画过程值变化进入 Reactive Slot Runtime，并产生 typed slot dirty；它不得默认触发结构重排。
+动画语义由 JS Value Phase 推进，生产视觉帧源由 VBlankSource 提供。动画过程值变化进入值绑定（`ValueBinding`），并产生 typed slot dirty；它不得默认触发结构重排。
 
-`M.animateContentSize()` 复用同一 VBlankSource、JS Value Phase、SlotUpdateBatch 与 FramePlan。Canvas `frame` invalidation、meter / waveform 等 UI-thread 高频显示也复用同一底座。
+`M.animateContentSize()` 复用同一 VBlankSource、JS Value Phase、SlotUpdate 与 FramePlan。Canvas `frame` invalidation、meter / waveform 等 UI-thread 高频显示也复用同一底座。
 
 详见 [动画与Transition](28-动画与Transition.md)、[运行时](04-运行时.md) 与 [调度线程与帧阶段](26-调度线程与帧阶段.md)。

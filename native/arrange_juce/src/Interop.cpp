@@ -7,7 +7,8 @@ namespace arrange::juce {
     void Meter::push(float level) noexcept {
         latest_.store(level, std::memory_order_relaxed);
         auto peak = peak_.load(std::memory_order_relaxed);
-        while (level > peak && !peak_.compare_exchange_weak(peak, level, std::memory_order_relaxed)) {}
+        while (level > peak && !peak_.compare_exchange_weak(peak, level, std::memory_order_relaxed)) {
+        }
     }
 
     float Meter::take() noexcept {
@@ -194,15 +195,19 @@ namespace arrange::juce {
 
     Waveform& Interop::waveform(const std::string& name, std::size_t capacity) {
         auto& slot = waveforms_[name];
-        if (!slot) slot = std::make_unique<Waveform>(capacity);
-        else if (slot->capacity() != capacity) throw std::invalid_argument("波形 " + name + " 已按其它容量登记");
+        if (!slot)
+            slot = std::make_unique<Waveform>(capacity);
+        else if (slot->capacity() != capacity)
+            throw std::invalid_argument("波形 " + name + " 已按其它容量登记");
         return *slot;
     }
 
     Spectrum& Interop::spectrum(const std::string& name, std::size_t size) {
         auto& slot = spectra_[name];
-        if (!slot) slot = std::make_unique<Spectrum>(size);
-        else if (slot->size() != size) throw std::invalid_argument("频谱 " + name + " 已按其它长度登记");
+        if (!slot)
+            slot = std::make_unique<Spectrum>(size);
+        else if (slot->size() != size)
+            throw std::invalid_argument("频谱 " + name + " 已按其它长度登记");
         return *slot;
     }
 

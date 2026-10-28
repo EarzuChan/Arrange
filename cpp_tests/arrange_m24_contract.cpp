@@ -199,7 +199,7 @@ native.submitRearrange(error => {
                 n.createNode(2, 'LayoutNode')
                 n.submitRearrange(() => { throw new Error('被取消回执不应执行') })
             }}}]})
-            n.setProp(1, 'contentDescription', '初始')
+            n.setProp(1, 'enabled', true)
             n.submitRearrange(error => { if (error) throw new Error(error) })
         )JS");
         require(loaded.ok, loaded.error.c_str());
@@ -219,7 +219,7 @@ native.submitRearrange(error => {
             n.createNode(1, 'Root')
             n.submitRearrange(error => {
                 if (error) throw new Error(error)
-                n.setProp(1, 'contentDescription', '新回执')
+                n.setProp(1, 'enabled', false)
             })
         )JS");
         require(fresh.ok && cancelled->rearrange->cancelled, "重载没有取消已转交 Owner 的候选");

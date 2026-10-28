@@ -73,7 +73,7 @@ namespace arrange::juce {
 
     arrange::core::LayoutNode* TextInputOwner::activeInputNode(arrange::core::LayoutTree& tree, bool runtimeReady) {
         const auto* node = std::as_const(*this).activeInputNode(tree, runtimeReady);
-        return node ? &tree.node(node->id) : nullptr;
+        return node ? &tree.mutableNode(node->id) : nullptr;
     }
 
     void TextInputOwner::pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestResult& hit, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options) {
@@ -109,7 +109,7 @@ namespace arrange::juce {
             session_.dragAnchor() = TextDragSelection{range, granularity};
         }
         updateFocusedInputViewport(tree, true);
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(hit.node, arrange::core::DirtyFlag::Paint, "文本输入焦点改变");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(hit.node, arrange::core::DirtyFlag::Paint);
     }
 
     bool TextInputOwner::pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks) {
@@ -127,7 +127,7 @@ namespace arrange::juce {
         else
             session_.state().selectRange(anchor.range.start, anchor.range.end);
         updateFocusedInputViewport(tree, runtimeReady);
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "文本输入选区或光标改变");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint);
         return true;
     }
 
@@ -151,9 +151,9 @@ namespace arrange::juce {
         const auto anchor = byteIndexForCharIndex(session_.state().text(), range.getStart());
         const auto active = byteIndexForCharIndex(session_.state().text(), range.getEnd());
         session_.state().selectRange(anchor, active);
-        if (callbacks.enqueueImeCompositionIntent) callbacks.enqueueImeCompositionIntent(node->id, "ime highlighted region changed");
+        if (callbacks.enqueueImeCompositionIntent) callbacks.enqueueImeCompositionIntent(node->id);
         updateFocusedInputViewport(tree, runtimeReady);
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint);
         return true;
     }
 
@@ -162,7 +162,7 @@ namespace arrange::juce {
         if (node == nullptr) return false;
 
         session_.temporaryUnderlines().clear();
-        if (callbacks.enqueueImeCompositionIntent) callbacks.enqueueImeCompositionIntent(node->id, "ime temporary underlining changed");
+        if (callbacks.enqueueImeCompositionIntent) callbacks.enqueueImeCompositionIntent(node->id);
         for (const auto& range : ranges) {
             if (!range.isEmpty()) session_.temporaryUnderlines().push_back(range);
         }
@@ -183,7 +183,7 @@ namespace arrange::juce {
             dispatchPendingTextEdits(tree, callbacks);
         }
         updateFocusedInputViewport(tree, runtimeReady);
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint);
         return true;
     }
 
@@ -199,7 +199,7 @@ namespace arrange::juce {
     bool TextInputOwner::insertTextAtCaret(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::String& textToInsert, const TextInputCallbacks& callbacks) {
         auto* node = activeInputNode(tree, runtimeReady);
         if (node == nullptr) return false;
-        if (callbacks.enqueueTextInputIntent) callbacks.enqueueTextInputIntent(node->id, "text inserted at caret");
+        if (callbacks.enqueueTextInputIntent) callbacks.enqueueTextInputIntent(node->id);
         session_.state().setEditTime(::juce::Time::getMillisecondCounterHiRes());
         session_.compositionCancelled() = session_.state().composing() && textToInsert.isEmpty();
         // JUCE/Windows 在 composition start 用空插入清理选区；先保存事务基线。
@@ -254,7 +254,7 @@ namespace arrange::juce {
         dispatchPendingTextEdits(tree, callbacks);
         session_.state().setEditTime(::juce::Time::getMillisecondCounterHiRes());
         if (!key.isKeyCode(::juce::KeyPress::upKey) && !key.isKeyCode(::juce::KeyPress::downKey) && !key.isKeyCode(::juce::KeyPress::pageUpKey) && !key.isKeyCode(::juce::KeyPress::pageDownKey)) session_.preferredX().reset();
-        if (callbacks.enqueueKeyIntent) callbacks.enqueueKeyIntent(node->id, "text input key pressed");
+        if (callbacks.enqueueKeyIntent) callbacks.enqueueKeyIntent(node->id);
 
         arrange::core::InputEditResult edit;
         const auto textCharacter = key.getTextCharacter();
@@ -279,7 +279,7 @@ namespace arrange::juce {
                 callbacks.writeClipboard(selected);
             else
                 ::juce::SystemClipboard::copyTextToClipboard(selected);
-            if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input selection/caret changed");
+            if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint);
             return true;
         } else if (commandDown && shortcut('x')) {
             const auto selected = session_.state().selectedText();
@@ -346,7 +346,7 @@ namespace arrange::juce {
                 callbacks.invokeStringEvent(arrange::core::modifierEventSlot(inputInstance(*node).descriptor.value, arrange::core::EventSlotKind::InputBlur), session_.state().text());
             }
             if (callbacks.invalidateNativeState) {
-                callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint, "input focus cleared");
+                callbacks.invalidateNativeState(node->id, arrange::core::DirtyFlag::Paint);
             }
         }
         session_.reset();
@@ -438,7 +438,7 @@ namespace arrange::juce {
         if (!session_.state().composing()) session_.temporaryUnderlines().clear();
         session_.viewportX() = text_.updatedViewportX(inputInstance(node), session_.state().text(), session_.state().cursorIndex(), session_.viewportX());
         session_.viewportY() = text_.updatedViewportY(inputInstance(node), session_.state().text(), session_.state().cursorIndex(), session_.viewportY());
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node.id, arrange::core::DirtyFlag::Paint, "input edit changed");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(node.id, arrange::core::DirtyFlag::Paint);
 
         if (edit.submitRequested) {
             if (callbacks.invokeStringEvent) {

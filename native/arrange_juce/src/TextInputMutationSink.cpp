@@ -6,16 +6,9 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/juce/ArrangeRuntime.h>
 
-#include <string>
 #include <utility>
 
 namespace arrange::juce {
-    namespace {
-        void enqueueMutation(ArrangeRuntime& runtime, arrange::core::MutationTransaction transaction, std::string reason) {
-            runtime.enqueueIntent(arrange::core::InputIntent::jsCommit(std::move(transaction), std::move(reason)));
-        }
-    }
-
     TextInputCallbacks TextInputMutationSink::callbacks(ArrangeRuntime& runtime) const {
         TextInputCallbacks result;
         result.invokeStringEvent = [&runtime](const arrange::core::EventSlotId& slot, const std::string& value) {
@@ -33,24 +26,19 @@ namespace arrange::juce {
         result.dispatchKeyEvent = [&runtime](const arrange::core::EventSlotId& slot, const arrange::core::KeyEventPayload& payload) {
             return runtime.dispatchInputEventNow(slot, payload, ::juce::Time::getMillisecondCounterHiRes());
         };
-        result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag, std::string reason) {
+        result.invalidateNativeState = [&runtime](arrange::core::NodeId nodeId, arrange::core::DirtyFlag flag) {
             arrange::core::MutationTransaction transaction;
-            transaction.operations.emplace_back(arrange::core::NativeInvalidationMutation{
-                nodeId,
-                flag,
-                flag == arrange::core::DirtyFlag::Paint ? "nativeInputPaint" : "nativeInputState",
-                std::move(reason),
-            });
-            enqueueMutation(runtime, std::move(transaction), flag == arrange::core::DirtyFlag::Paint ? "native input paint invalidation" : "native input state invalidation");
+            transaction.operations.emplace_back(arrange::core::NativeInvalidationMutation{nodeId, flag});
+            runtime.enqueueIntent(arrange::core::InputIntent::jsCommit(std::move(transaction)));
         };
-        result.enqueueKeyIntent = [&runtime](arrange::core::NodeId nodeId, std::string reason) {
-            runtime.enqueueIntent(arrange::core::InputIntent::key(std::move(reason), nodeId));
+        result.enqueueKeyIntent = [&runtime](arrange::core::NodeId) {
+            runtime.enqueueIntent(arrange::core::InputIntent::key());
         };
-        result.enqueueTextInputIntent = [&runtime](arrange::core::NodeId nodeId, std::string reason) {
-            runtime.enqueueIntent(arrange::core::InputIntent::textInput(std::move(reason), nodeId));
+        result.enqueueTextInputIntent = [&runtime](arrange::core::NodeId) {
+            runtime.enqueueIntent(arrange::core::InputIntent::textInput());
         };
-        result.enqueueImeCompositionIntent = [&runtime](arrange::core::NodeId nodeId, std::string reason) {
-            runtime.enqueueIntent(arrange::core::InputIntent::imeComposition(std::move(reason), nodeId));
+        result.enqueueImeCompositionIntent = [&runtime](arrange::core::NodeId) {
+            runtime.enqueueIntent(arrange::core::InputIntent::imeComposition());
         };
         return result;
     }

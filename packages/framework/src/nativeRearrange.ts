@@ -248,7 +248,7 @@ export class LayoutRearrangeNode implements RearrangeNode {
         this.update('modifier', modifier)
     }
 
-    updateInput(name: 'enabled' | 'contentDescription', value: boolean | string | undefined): void {
+    updateInput(name: 'enabled', value: boolean | undefined): void {
         this.update(name, value ?? null)
     }
 

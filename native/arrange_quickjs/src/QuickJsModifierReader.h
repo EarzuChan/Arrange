@@ -30,6 +30,21 @@ namespace arrange::quickjs {
         [[nodiscard]] bool boolField(JSValueConst object, const char* key, bool fallback) const;
         [[nodiscard]] float requiredNumberField(JSValueConst object, const char* key, std::string_view owner);
         [[nodiscard]] std::string requiredStringField(JSValueConst object, const char* key, std::string_view owner);
+
+        // 枚举字段在读取边界一次解析；缺省保留目标默认值
+        template <class T, class Parse>
+        [[nodiscard]] bool enumField(JSValueConst object, const char* key, Parse parse, T& target) {
+            const auto name = reader_.stringField(object, key);
+            if (name.empty()) return true;
+            if (const auto value = parse(name)) {
+                target = *value;
+                return true;
+            }
+            failed_ = true;
+            JS_ThrowTypeError(context_, "Arrange Modifier 字段 '%s' 的枚举值无效：%s", key, name.c_str());
+            return false;
+        }
+
         [[nodiscard]] arrange::core::ModifierPadding readPadding(JSValueConst value);
         [[nodiscard]] std::pair<float, float> transformOriginFrom(JSValueConst value) const;
         [[nodiscard]] arrange::core::PaintStyleSemantics paintStyle(JSValueConst value, arrange::core::PaintStyleKind kind) const;

@@ -16,25 +16,25 @@ namespace arrange::juce {
         arrange::core::InputIntent packageIntent(PackageLoadOutcome::IntentKind kind, arrange::core::MutationTransaction transaction) {
             switch (kind) {
                 case PackageLoadOutcome::IntentKind::Reload:
-                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "reload initial commit");
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction));
                 case PackageLoadOutcome::IntentKind::HmrReload:
-                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "hmr reload initial commit");
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction));
                 case PackageLoadOutcome::IntentKind::PackageLoad:
-                    return arrange::core::InputIntent::packageLoad(std::move(transaction), "package load initial commit");
+                    return arrange::core::InputIntent::packageLoad(std::move(transaction));
             }
-            return arrange::core::InputIntent::packageLoad(std::move(transaction), "package load initial commit");
+            return arrange::core::InputIntent::packageLoad(std::move(transaction));
         }
 
         arrange::core::InputIntent packageFailureIntent(PackageLoadOutcome::IntentKind kind) {
             switch (kind) {
                 case PackageLoadOutcome::IntentKind::Reload:
-                    return arrange::core::InputIntent::reload("reload failed");
+                    return arrange::core::InputIntent::reload();
                 case PackageLoadOutcome::IntentKind::HmrReload:
-                    return arrange::core::InputIntent::hmrReload("hmr reload failed");
+                    return arrange::core::InputIntent::hmrReload();
                 case PackageLoadOutcome::IntentKind::PackageLoad:
-                    return arrange::core::InputIntent::diagnostics("package load failed");
+                    return arrange::core::InputIntent::diagnostics();
             }
-            return arrange::core::InputIntent::diagnostics("package load failed");
+            return arrange::core::InputIntent::diagnostics();
         }
     }
 
@@ -69,7 +69,7 @@ namespace arrange::juce {
     }
 
     void RuntimePackageBinder::deliverToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, RuntimeLoadToast toast) {
-        if (DiagnosticsToast::show(diagnostics, toast.level, TAG, std::move(toast.title), std::move(toast.message), toast.coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("package toast"));
+        if (DiagnosticsToast::show(diagnostics, toast.level, TAG, std::move(toast.title), std::move(toast.message), toast.coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics());
     }
 }
 

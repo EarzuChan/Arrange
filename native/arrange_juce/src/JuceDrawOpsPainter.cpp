@@ -13,55 +13,32 @@
 
 namespace arrange::juce {
     namespace {
-        int imageAlignmentFlags(const std::string& alignment) {
-            int flags = 0;
-            if (alignment == "TopStart" || alignment == "CenterStart" || alignment == "BottomStart" || alignment == "Start") {
-                flags |= ::juce::RectanglePlacement::xLeft;
-            } else if (alignment == "TopEnd" || alignment == "CenterEnd" || alignment == "BottomEnd" || alignment == "End") {
-                flags |= ::juce::RectanglePlacement::xRight;
-            } else {
-                flags |= ::juce::RectanglePlacement::xMid;
-            }
-
-            if (alignment == "TopStart" || alignment == "TopCenter" || alignment == "TopEnd" || alignment == "Top") {
-                flags |= ::juce::RectanglePlacement::yTop;
-            } else if (alignment == "BottomStart" || alignment == "BottomCenter" || alignment == "BottomEnd" || alignment == "Bottom") {
-                flags |= ::juce::RectanglePlacement::yBottom;
-            } else {
-                flags |= ::juce::RectanglePlacement::yMid;
-            }
-            return flags;
+        int imageAlignmentFlags(arrange::core::ImageAlignment alignment) {
+            const auto horizontal = arrange::core::horizontalBias(alignment);
+            const auto vertical = arrange::core::verticalBias(alignment);
+            const auto x = horizontal == 0.0f ? ::juce::RectanglePlacement::xLeft : horizontal == 1.0f ? ::juce::RectanglePlacement::xRight : ::juce::RectanglePlacement::xMid;
+            const auto y = vertical == 0.0f ? ::juce::RectanglePlacement::yTop : vertical == 1.0f ? ::juce::RectanglePlacement::yBottom : ::juce::RectanglePlacement::yMid;
+            return x | y;
         }
 
-        int imagePlacementFlags(const std::string& contentScale, const std::string& alignment) {
+        int imagePlacementFlags(arrange::core::ContentScale contentScale, arrange::core::ImageAlignment alignment) {
+            using arrange::core::ContentScale;
             const auto align = imageAlignmentFlags(alignment);
-            if (contentScale == "FillBounds") return ::juce::RectanglePlacement::stretchToFit;
-            if (contentScale == "Crop") return align | ::juce::RectanglePlacement::fillDestination;
-            if (contentScale == "Inside") return align | ::juce::RectanglePlacement::onlyReduceInSize;
-            if (contentScale == "None") return align | ::juce::RectanglePlacement::doNotResize;
+            if (contentScale == ContentScale::FillBounds) return ::juce::RectanglePlacement::stretchToFit;
+            if (contentScale == ContentScale::Crop) return align | ::juce::RectanglePlacement::fillDestination;
+            if (contentScale == ContentScale::Inside) return align | ::juce::RectanglePlacement::onlyReduceInSize;
+            if (contentScale == ContentScale::Unscaled) return align | ::juce::RectanglePlacement::doNotResize;
             return align;
         }
 
-        float imageHorizontalAlignment(const std::string& alignment) {
-            if (alignment == "TopStart" || alignment == "CenterStart" || alignment == "BottomStart" || alignment == "Start") return 0.0f;
-            if (alignment == "TopEnd" || alignment == "CenterEnd" || alignment == "BottomEnd" || alignment == "End") return 1.0f;
-            return 0.5f;
-        }
-
-        float imageVerticalAlignment(const std::string& alignment) {
-            if (alignment == "TopStart" || alignment == "TopCenter" || alignment == "TopEnd" || alignment == "Top") return 0.0f;
-            if (alignment == "BottomStart" || alignment == "BottomCenter" || alignment == "BottomEnd" || alignment == "Bottom") return 1.0f;
-            return 0.5f;
-        }
-
-        ::juce::Rectangle<float> imageFillAxisTarget(float imageWidth, float imageHeight, ::juce::Rectangle<float> target, const std::string& contentScale, const std::string& alignment) {
+        ::juce::Rectangle<float> imageFillAxisTarget(float imageWidth, float imageHeight, ::juce::Rectangle<float> target, arrange::core::ContentScale contentScale, arrange::core::ImageAlignment alignment) {
             if (imageWidth <= 0.0f || imageHeight <= 0.0f || target.isEmpty()) return target;
 
-            const auto scale = contentScale == "FillHeight" ? target.getHeight() / imageHeight : target.getWidth() / imageWidth;
+            const auto scale = contentScale == arrange::core::ContentScale::FillHeight ? target.getHeight() / imageHeight : target.getWidth() / imageWidth;
             const auto width = imageWidth * scale;
             const auto height = imageHeight * scale;
-            const auto x = target.getX() + (target.getWidth() - width) * imageHorizontalAlignment(alignment);
-            const auto y = target.getY() + (target.getHeight() - height) * imageVerticalAlignment(alignment);
+            const auto x = target.getX() + (target.getWidth() - width) * arrange::core::horizontalBias(alignment);
+            const auto y = target.getY() + (target.getHeight() - height) * arrange::core::verticalBias(alignment);
             return {x, y, width, height};
         }
 
@@ -75,7 +52,7 @@ namespace arrange::juce {
                 g.setOpacity(static_cast<float>((op.color >> 24u) & 0xffu) / 255.0f * alpha);
             }
 
-            if (op.contentScale == "FillWidth" || op.contentScale == "FillHeight") {
+            if (op.contentScale == arrange::core::ContentScale::FillWidth || op.contentScale == arrange::core::ContentScale::FillHeight) {
                 g.saveState();
                 g.reduceClipRegion(rect.toNearestInt());
                 g.drawImage(image, imageFillAxisTarget(static_cast<float>(image.getWidth()), static_cast<float>(image.getHeight()), rect, op.contentScale, op.alignment), ::juce::RectanglePlacement::stretchToFit, fillAlphaWithTint);
@@ -93,7 +70,7 @@ namespace arrange::juce {
             graphics.reduceClipRegion(target.toNearestInt());
             const auto bounds = content.vectorViewport.isEmpty() ? content.vector->getDrawableBounds() : content.vectorViewport;
             auto placement = imagePlacementFlags(op.contentScale, op.alignment);
-            if (op.contentScale == "FillWidth" || op.contentScale == "FillHeight") {
+            if (op.contentScale == arrange::core::ContentScale::FillWidth || op.contentScale == arrange::core::ContentScale::FillHeight) {
                 target = imageFillAxisTarget(bounds.getWidth(), bounds.getHeight(), target, op.contentScale, op.alignment);
                 placement = ::juce::RectanglePlacement::stretchToFit;
             }
@@ -107,7 +84,7 @@ namespace arrange::juce {
         const auto* resource = dynamic_cast<const JuceTextResource*>(op.textLayout->resource.get());
         if (!resource) throw std::logic_error("发布的文字不是 JUCE 绘制资源");
         ::juce::Graphics::ScopedSaveState scope(g);
-        if (op.inputText || op.overflow == "clip" || op.overflow == "ellipsis") g.reduceClipRegion(::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height).getSmallestIntegerContainer());
+        if (op.inputText || op.overflow != arrange::core::TextOverflow::Visible) g.reduceClipRegion(::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height).getSmallestIntegerContainer());
         g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
         const auto started = std::chrono::steady_clock::now();
         resource->replay(g, *op.textLayout, op.rect, op.textAlign, horizontalViewportOffset);

@@ -1,3 +1,4 @@
+#include "ScriptProbe.h"
 #include "JuceTestApplication.h"
 #include "TextFixtures.h"
 #include <arrange/core/Focus.h>
@@ -424,18 +425,20 @@ namespace {
 
     void verifyQuickJsFocus() {
         arrange::quickjs::QuickJsScriptHost host;
+        test_support::ScriptProbe probe;
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame published;
         const auto loaded = host.executeModule("M3-focus.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             const rejects = f => { try { f() } catch { return }; throw new Error('无效焦点载荷未拒绝') }
             n.createNode(1, 'LayoutNode')
             n.setModifier(1, {elements: [
                 {type:'focusRequester', value:{requester:9}},
                 {type:'onFocusChanged', key:'observer', value:{callback: state => {
                     if (typeof state.isFocused !== 'boolean' || typeof state.hasFocus !== 'boolean') throw new Error('焦点不是typed object')
-                    n.setProp(1, 'contentDescription', `${state.isFocused}/${state.hasFocus}`)
+                    probe(`${state.isFocused}/${state.hasFocus}`)
                 }}},
                 {type:'focusProperties',value:{canFocus:true, next:9}},
                 {type:'focusGroup',value:{}},
@@ -468,8 +471,7 @@ namespace {
         check(target && target->observers.size() == 1 && target->directions[0] == 9, "QuickJS焦点Modifier未进入原生结构");
         const auto invoked = host.invokeEventSlot(target->observers[0].slot, {.hasFocusArgument = true, .focused = false, .hasFocus = true});
         check(invoked.ok, invoked.error.c_str());
-        apply();
-        check(scene.node(1).props.at("contentDescription").stringOr() == "false/true", "QuickJS丢失了祖先hasFocus字段");
+        check(probe.read(host) == "false/true", "QuickJS丢失了祖先hasFocus字段");
     }
 
     void verifyLazyFocus() {
@@ -492,7 +494,7 @@ namespace {
         policy.keys = std::move(keys);
         policy.contentTypes = std::move(types);
         policy.spans = std::move(spans);
-        tree.node(1).measurePolicy = policy;
+        tree.mutableNode(1).measurePolicy = policy;
         LayoutEngine engine(service);
         engine.setMaterializer([&](NodeId id, const std::vector<int>& selected) {
             auto next = std::get<LazyMeasurePolicy>(tree.node(id).measurePolicy);
@@ -513,13 +515,13 @@ namespace {
                 tree.apply({InsertChildMutation{id, child, static_cast<std::uint32_t>(position)}});
             }
             next.indices = selected;
-            tree.node(id).measurePolicy = std::move(next);
+            tree.mutableNode(id).measurePolicy = std::move(next);
             tree.markInputDirty(id, dirtyMask(DirtyFlag::Layout));
         });
         engine.layout(tree, 1, {0, 100, 0, 100});
         arrange::juce::InteractionStateOwner interaction(service);
         arrange::juce::TextInputCallbacks callbacks;
-        callbacks.invalidateNativeState = [&](NodeId id, DirtyFlag flag, const auto&) {
+        callbacks.invalidateNativeState = [&](NodeId id, DirtyFlag flag) {
             tree.markInputDirty(id, dirtyMask(flag));
         };
         check(interaction.requestFocus(tree, 100, callbacks), "Lazy首项无法获得通用焦点");

@@ -32,7 +32,7 @@ namespace {
     void intrinsicAndBounds() {
         LayoutTree tree;
         children(tree, 2);
-        tree.node(1).measurePolicy = RowMeasurePolicy{};
+        tree.mutableNode(1).measurePolicy = RowMeasurePolicy{};
         tree.setModifierChain(2, {size(20, 10)});
         tree.setModifierChain(3, {size(30, 40)});
         LayoutEngine layout;
@@ -79,8 +79,8 @@ namespace {
         required.kind = LayoutModifierKind::RequiredWidth;
         required.value = 50;
         tree.setModifierChain(2, {{required}, size(20, 10)});
-        tree.node(1).measurePolicy = RowMeasurePolicy{{"Start", 5}};
-        tree.node(1).measurementValid = false;
+        tree.mutableNode(1).measurePolicy = RowMeasurePolicy{{"Start", 5}};
+        tree.mutableNode(1).measurementValid = false;
         layout.layout(tree, 1, {0, 40, 0, 100});
         check(tree.node(1).bounds.width == 40 && tree.node(2).bounds.width == 35 && tree.node(3).bounds.width == 0 && tree.node(2).contentBounds.width == 50, "有界 Row 的 gap 或 required 强制尺寸处理错误");
     }
@@ -88,7 +88,7 @@ namespace {
     void matchingBox() {
         LayoutTree tree;
         children(tree, 2);
-        tree.node(1).measurePolicy = BoxMeasurePolicy{};
+        tree.mutableNode(1).measurePolicy = BoxMeasurePolicy{};
         tree.setModifierChain(2, {size(20, 10)});
         ParentDataModifierSemantics match;
         match.kind = ParentDataKind::MatchParentSize;
@@ -97,8 +97,8 @@ namespace {
         check(layout.maxIntrinsicWidth(tree, 1, 100) == 20 && layout.maxIntrinsicHeight(tree, 1, 100) == 10, "matchParentSize 参与了 Box 固有尺寸");
         layout.layout(tree, 1, {0, 300, 0, 200});
         check(tree.node(1).bounds == Rect{0, 0, 20, 10} && tree.node(3).bounds == Rect{0, 0, 20, 10} && layout.counters().measuredNodes == 3, "matchParentSize 未在 Box 尺寸确定后仅测量一次");
-        tree.node(1).measurePolicy = RowMeasurePolicy{};
-        tree.node(1).measurementValid = false;
+        tree.mutableNode(1).measurePolicy = RowMeasurePolicy{};
+        tree.mutableNode(1).measurementValid = false;
         bool rejected = false;
         try {
             layout.layout(tree, 1, {0, 300, 0, 200});
@@ -117,8 +117,8 @@ namespace {
             rejected = true;
         }
         check(rejected, "Row 水平 align 未给出方向诊断");
-        tree.node(1).measurePolicy = BoxMeasurePolicy{};
-        tree.node(1).measurementValid = false;
+        tree.mutableNode(1).measurePolicy = BoxMeasurePolicy{};
+        tree.mutableNode(1).measurementValid = false;
         ParentDataModifierSemantics weight;
         weight.weight = 1;
         tree.setModifierChain(3, {{weight}, size(20, 10)});
@@ -138,7 +138,7 @@ namespace {
         FlowMeasurePolicy policy;
         policy.mainArrangement.spacing = 5;
         policy.crossArrangement.spacing = 7;
-        tree.node(1).measurePolicy = policy;
+        tree.mutableNode(1).measurePolicy = policy;
         LayoutEngine layout;
         layout.layout(tree, 1, {0, 70, 0, 200});
         check(tree.node(1).flowLines.size() == 2 && tree.node(1).bounds.width == 65 && tree.node(1).bounds.height == 27, "FlowRow 换行/间距错误");
@@ -151,8 +151,8 @@ namespace {
         weight.weight = 2;
         tree.setModifierChain(3, {{weight}, size(20, 10)});
         policy.maxItems = 2;
-        tree.node(1).measurePolicy = policy;
-        tree.node(1).measurementValid = false;
+        tree.mutableNode(1).measurePolicy = policy;
+        tree.mutableNode(1).measurementValid = false;
         layout.layout(tree, 1, {0, 95, 0, 200});
         check(near(tree.node(2).bounds.width, 30) && near(tree.node(3).bounds.width, 60), "Flow weight 没有按行分配");
         weight.weightFill = false;
@@ -168,8 +168,8 @@ namespace {
         policy.mainArrangement = {"Top", 5};
         policy.crossArrangement = {"Start", 7};
         policy.itemAlignment = "Start";
-        tree.node(1).measurePolicy = policy;
-        tree.node(1).measurementValid = false;
+        tree.mutableNode(1).measurePolicy = policy;
+        tree.mutableNode(1).measurementValid = false;
         tree.setModifierChain(2, {size(30, 10)});
         tree.setModifierChain(3, {size(30, 10)});
         layout.layout(tree, 1, {0, 200, 0, 30});

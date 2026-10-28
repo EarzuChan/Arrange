@@ -47,7 +47,7 @@ namespace arrange::juce {
     }
 
     void EditorDebugActions::emitToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, LogLevel level, std::string title, std::string message, bool coalesce) {
-        if (DiagnosticsToast::show(diagnostics, level, TAG, std::move(title), std::move(message), coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("editor toast"));
+        if (DiagnosticsToast::show(diagnostics, level, TAG, std::move(title), std::move(message), coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics());
     }
 }
 

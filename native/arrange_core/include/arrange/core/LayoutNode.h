@@ -1,12 +1,9 @@
 #pragma once
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <unordered_map>
 #include <vector>
 #include "Geometry.h"
 #include "Modifier.h"
-#include "PropValue.h"
 #include "MeasurePolicy.h"
 
 namespace arrange::core {
@@ -22,7 +19,8 @@ namespace arrange::core {
         NodeId id = 0;
         NodeType type = NodeType::Unknown;
         MeasurePolicy measurePolicy = MinSizeMeasurePolicy{};
-        std::unordered_map<std::string, PropValue> props;
+        // 宿主输入 enabled；为 false 时整棵子树不参与命中与交互
+        bool enabled = true;
         ModifierChain modifier;
         Rect contentBounds;
         std::uint64_t generation = 0;
@@ -39,6 +37,8 @@ namespace arrange::core {
         std::shared_ptr<const PaintFragment> paintCache;
         std::shared_ptr<const PaintFragment> contentFragment;
         std::shared_ptr<const HitFragment> hitCache;
+        // 写入日志已保存原值的轮次，同一帧内重复写入不再查表
+        std::uint64_t journalEpoch = 0;
     };
 
     inline void markDirty(LayoutNode& node, DirtyFlag flag) noexcept {

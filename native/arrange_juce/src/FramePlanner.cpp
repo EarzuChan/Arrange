@@ -21,16 +21,6 @@ namespace arrange::juce {
         plan.applyMutations = state.hasPendingIntents || state.hasPendingTransactions;
         plan.runPipeline = framePipelineRunRequested_ || plan.applyMutations;
         plan.hasTickWork = plan.runEvents || plan.runAnimation || plan.runPipeline;
-        if (plan.runEvents)
-            plan.reason = "queued input events";
-        else if (plan.runAnimation)
-            plan.reason = "animation frame";
-        else if (state.hasPendingIntents)
-            plan.reason = "pending InputIntent";
-        else if (state.hasPendingTransactions)
-            plan.reason = "pending MutationTransaction";
-        else if (framePipelineRunRequested_)
-            plan.reason = "explicit frame pipeline request";
         return plan;
     }
 

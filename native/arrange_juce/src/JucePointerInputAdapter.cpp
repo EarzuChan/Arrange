@@ -32,7 +32,7 @@ namespace arrange::juce {
             interaction.notePointerEffects(output);
             for (const auto& event : output.events) {
                 if (std::holds_alternative<std::monostate>(event.payload)) {
-                    runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针点击", event.slot.node));
+                    runtime.enqueueIntent(arrange::core::InputIntent::pointer());
                     runtime.enqueueEvent(event.slot);
                 } else
                     runtime.enqueueInputEvent(event.slot, event.payload);
@@ -77,7 +77,7 @@ namespace arrange::juce {
             return;
         }
         if (!event.mods.isLeftButtonDown()) return;
-        runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针按下"));
+        runtime.enqueueIntent(arrange::core::InputIntent::pointer());
         dispatchGesture(runtime, interaction, interaction.pointerDown(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, event.position.x, event.position.y, inputCallbacks, {event.getNumberOfClicks(), event.mods.isShiftDown()}, modifiers));
     }
 
@@ -90,7 +90,7 @@ namespace arrange::juce {
         arrange::core::PointerGestureOutput gesture;
         const auto changed = interaction.pointerDrag(runtime.scene().tree(), session.loaded(), event.position.x, event.position.y, inputCallbacks, &gesture, keyModifierState(event.mods));
         dispatchGesture(runtime, interaction, gesture);
-        if (changed) runtime.enqueueIntent(arrange::core::InputIntent::pointer("原生指针拖动"));
+        if (changed) runtime.enqueueIntent(arrange::core::InputIntent::pointer());
         return changed;
     }
 
@@ -174,7 +174,7 @@ namespace arrange::juce {
             ScrollProbe::record(sample);
         }
         if (!result.consumed) return false;
-        runtime.enqueueIntent(arrange::core::InputIntent::wheel(wheelResult.horizontal ? "原生横向滚动" : "原生纵向滚动", result.target, result.eventSlot));
+        runtime.enqueueIntent(arrange::core::InputIntent::wheel());
         runtime.enqueueScrollSnapshotEvent(result.eventSlot, result);
         return true;
     }

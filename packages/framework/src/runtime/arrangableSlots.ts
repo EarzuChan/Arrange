@@ -1,1 +1,0 @@
-export type { Content as Slot, Contents as Slots } from './arrangable.ts'

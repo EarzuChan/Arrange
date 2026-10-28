@@ -9,14 +9,13 @@ import { Layout } from './Layout.ts'
 export type BoxProps = ArrangableProps<typeof Box>
 export const Box = defineArrangable({
     name: 'Box',
-    props: { modifier: { type: Modifier, default: M }, contentAlignment: String as PropType<BoxAlignment>, propagateMinConstraints: Boolean, enabled: Boolean, contentDescription: String },
+    props: { modifier: { type: Modifier, default: M }, contentAlignment: String as PropType<BoxAlignment>, propagateMinConstraints: Boolean, enabled: Boolean },
     slotNames: ['default'],
     setup: (props, { call, slot, source }) => () => call(0, Layout, {
         measurePolicy: () => BoxMeasurePolicy({ contentAlignment: props.contentAlignment, propagateMinConstraints: props.propagateMinConstraints }),
         modifier: () => props.modifier,
         enabled: () => props.enabled,
-        contentDescription: () => props.contentDescription,
-    }, { default: slot('default') }, { sources: { modifier: source('modifier'), measurePolicy: source('contentAlignment') ?? source('propagateMinConstraints'), enabled: source('enabled'), contentDescription: source('contentDescription') } }),
+    }, { default: slot('default') }, { sources: { modifier: source('modifier'), measurePolicy: source('contentAlignment') ?? source('propagateMinConstraints'), enabled: source('enabled') } }),
 })
 
 export type RowProps = ArrangableProps<typeof Row>

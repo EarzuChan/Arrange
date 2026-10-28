@@ -2,43 +2,16 @@
 
 #include "LayoutNode.h"
 
-#include <optional>
-#include <string>
+#include <cstdint>
 #include <utility>
-#include <vector>
 
 namespace arrange::core {
-    enum class InvalidationSource {
-        Unknown,
-        NativeMutation,
-        NativeState,
-        InputIntent,
-        Resize,
-        Resource,
-        Diagnostics,
-        Fallback,
-    };
-
-    struct DirtyAttribution {
-        InvalidationSource source = InvalidationSource::Unknown;
-        std::optional<NodeId> node;
-        std::uint32_t dirty = 0;
-        std::string field;
-        std::string reason;
-
-        [[nodiscard]] bool affects(DirtyFlag flag) const noexcept {
-            return (dirty & dirtyMask(flag)) != 0;
-        }
-    };
-
     struct InvalidationSnapshot {
-        std::vector<DirtyAttribution> attributions;
         std::uint32_t combinedDirty = 0;
         bool needsFullFallback = false;
-        std::string fallbackReason;
 
         [[nodiscard]] bool empty() const noexcept {
-            return attributions.empty() && combinedDirty == 0 && !needsFullFallback;
+            return combinedDirty == 0 && !needsFullFallback;
         }
 
         [[nodiscard]] bool affects(DirtyFlag flag) const noexcept {
@@ -46,20 +19,15 @@ namespace arrange::core {
         }
     };
 
+    // 帧内失效只汇总为位掩码，阶段计划按它决定
     class InvalidationGraph {
        public:
-        void record(DirtyAttribution attribution) {
-            snapshot_.combinedDirty |= attribution.dirty;
-            snapshot_.attributions.push_back(std::move(attribution));
+        void record(std::uint32_t dirty) noexcept {
+            snapshot_.combinedDirty |= dirty;
         }
 
-        void record(InvalidationSource source, std::optional<NodeId> node, std::uint32_t dirty, std::string field, std::string reason) {
-            record({source, node, dirty, std::move(field), std::move(reason)});
-        }
-
-        void requireFullFallback(std::string reason) {
+        void requireFullFallback() noexcept {
             snapshot_.needsFullFallback = true;
-            snapshot_.fallbackReason = std::move(reason);
         }
 
         [[nodiscard]] const InvalidationSnapshot& snapshot() const noexcept {
@@ -67,9 +35,7 @@ namespace arrange::core {
         }
 
         [[nodiscard]] InvalidationSnapshot take() noexcept {
-            auto snapshot = std::move(snapshot_);
-            snapshot_ = {};
-            return snapshot;
+            return std::exchange(snapshot_, {});
         }
 
         void clear() noexcept {

@@ -126,7 +126,7 @@ namespace arrange::juce {
         op.lineHeight = fontSize * 1.2f;
         op.maxLines = maxLines;
         op.text = std::move(value);
-        op.overflow = "clip";
+        op.overflow = arrange::core::TextOverflow::Clip;
         return op;
     }
 }

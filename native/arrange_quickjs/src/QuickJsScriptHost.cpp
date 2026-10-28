@@ -389,12 +389,13 @@ namespace arrange::quickjs {
         auto& state = impl_->runtime;
         try {
             for (const auto id : candidateScene.tree().nodeIds()) {
-                auto& node = candidateScene.node(id);
-                for (auto& instance : node.modifier.elements()) {
-                    const auto* input = std::get_if<arrange::core::DrawModifier>(&instance.descriptor.value);
+                const auto& node = candidateScene.node(id);
+                for (std::size_t index = 0; index < node.modifier.elements().size(); ++index) {
+                    const auto& current = node.modifier.elements()[index];
+                    const auto* input = std::get_if<arrange::core::DrawModifier>(&current.descriptor.value);
                     if (!input) continue;
-                    const arrange::core::Size size{instance.bounds.width, instance.bounds.height};
-                    if (instance.preparedDraw && instance.preparedDrawSize == size && instance.preparedDrawRevision == input->revision && instance.preparedDrawCallback == input->prepare) continue;
+                    const arrange::core::Size size{current.bounds.width, current.bounds.height};
+                    if (current.preparedDraw && current.preparedDrawSize == size && current.preparedDrawRevision == input->revision && current.preparedDrawCallback == input->prepare) continue;
                     if (!candidateScene.hasEventSlot(input->prepare)) throw std::runtime_error("绘制准备受体已经退休");
                     ScopedValue callback(state.context, JS_DupValue(state.context, state.events.candidateCallback(input->prepare)));
                     if (!JS_IsFunction(state.context, callback.get())) throw std::runtime_error("绘制准备函数已经退休");
@@ -406,6 +407,7 @@ namespace arrange::quickjs {
                     ScopedValue prepared(state.context, JS_Call(state.context, callback.get(), JS_UNDEFINED, input->transactional ? 3 : 2, arguments));
                     if (JS_IsException(prepared.get())) throw std::runtime_error(impl_->exceptionText(state.context));
                     auto commands = QuickJsDrawReader(state.context).read(prepared.get());
+                    auto& instance = candidateScene.tree().mutableNode(id).modifier.elements()[index];
                     if (!instance.preparedDraw || *instance.preparedDraw != commands) instance.preparedDraw = std::make_shared<const arrange::core::DrawCommands>(std::move(commands));
                     instance.preparedDrawSize = size;
                     instance.preparedDrawRevision = input->revision;

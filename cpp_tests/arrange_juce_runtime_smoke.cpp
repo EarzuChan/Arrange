@@ -1,6 +1,6 @@
 #include "TextFixtures.h"
 #include "JuceTestApplication.h"
-#include <arrange/core/PointerInputProcessor.h>
+#include <arrange/core/PointerGesture.h>
 #include <arrange/core/EventSlot.h>
 #include <arrange/core/LayoutTree.h>
 #include <arrange/core/Scroll.h>
@@ -138,16 +138,19 @@ int runSmoke() {
         return 6;
     }
 
-    arrange::core::PointerInputProcessor pointer;
+    arrange::core::PointerGestureSession pointer;
     for (int index = 0; index < 13; ++index) {
         const auto& snapshot = *runtime.publishedFrame().content.hitTest;
         auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) { return candidate.target.eventSlot == *clickSlot; });
         if (region == snapshot.regions.end()) return 20;
         const arrange::core::Point point{region->bounds.x + region->bounds.width / 2, region->bounds.y + region->bounds.height / 2};
-        pointer.pointerDown(snapshot, point);
-        const auto clicked = pointer.pointerUp(snapshot, point);
-        if (!clicked.clickTriggered || clicked.eventSlot != *clickSlot) return 21;
-        runtime.enqueueEvent(clicked.eventSlot);
+        arrange::core::PointerGestureOutput down;
+        arrange::core::PointerGestureOutput clicked;
+        pointer.primaryDown(runtime.scene().tree(), snapshot, {point}, 1, down);
+        pointer.primaryUp(runtime.scene().tree(), snapshot, {point}, clicked);
+        const auto click = std::find_if(clicked.events.begin(), clicked.events.end(), [&](const auto& event) { return event.slot == *clickSlot; });
+        if (click == clicked.events.end()) return 21;
+        runtime.enqueueEvent(click->slot);
         const auto frame = runtime.pumpFrame(1, constraints, 16.0 * static_cast<double>(index + 1));
         if (!frame.ok) {
             std::cerr << "事件帧失败，索引为 " << index << ": " << frame.error << "\n";
@@ -309,8 +312,8 @@ int runSmoke() {
                         ::juce::Image output(::juce::Image::ARGB, 16, 16, true, ::juce::SoftwareImageType{});
                         auto op = painterOp(std::move(content), tinted);
                         op.rect = {2, 2, extent, extent};
-                        op.contentScale = scale;
-                        op.alignment = alignment;
+                        op.contentScale = *arrange::core::parseContentScale(scale);
+                        op.alignment = *arrange::core::parseImageAlignment(alignment);
                         {
                             ::juce::Graphics target(output);
                             painter.paint(target, std::vector{op});

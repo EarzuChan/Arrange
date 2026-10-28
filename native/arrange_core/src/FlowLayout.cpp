@@ -84,7 +84,7 @@ namespace arrange::core {
             }
             float used = gaps, lineCross = 0;
             for (auto childId : line) {
-                auto& child = tree.node(childId);
+                const auto& child = tree.node(childId);
                 const auto data = child.modifier.parentData();
                 if (data.weight > 0) {
                     const auto share = std::isfinite(maxMain) ? std::max(0.0f, maxMain - fixed) * data.weight / totalWeight : Constraints::Infinity;

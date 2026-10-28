@@ -17,12 +17,10 @@ namespace arrange::core {
         const auto hasDirty = dirty.nodeCount > 0 || !invalidation.empty();
 
         plan.fullFallback = invalidation.needsFullFallback;
-        plan.fallbackReason = invalidation.fallbackReason;
 
         if (!hasScene && (hasTransaction || framePipelineRequested || hasDirty || plan.fullFallback)) {
             plan.publishFrame = true;
             plan.passivePaint = true;
-            plan.reasons.push_back("root unavailable; publish empty frame");
             return plan;
         }
 
@@ -31,19 +29,10 @@ namespace arrange::core {
         plan.layout = plan.measure || invalidation.affects(DirtyFlag::Placement);
         plan.buildPaint = plan.layout || invalidation.affects(DirtyFlag::Paint) || invalidation.affects(DirtyFlag::Transform) || invalidation.affects(DirtyFlag::Resource) || plan.fullFallback;
         plan.buildHitTest = plan.layout || invalidation.affects(DirtyFlag::HitTest) || invalidation.affects(DirtyFlag::Transform);
-        plan.buildDiagnostics = invalidation.affects(DirtyFlag::Accessibility);
+        plan.buildDiagnostics = invalidation.affects(DirtyFlag::Diagnostics);
         plan.publishFrame = plan.measure || plan.layout || plan.buildPaint || plan.buildHitTest || plan.buildDiagnostics || invalidation.affects(DirtyFlag::EventSlot) || invalidation.affects(DirtyFlag::Focus) || plan.fullFallback;
         plan.passivePaint = plan.buildPaint || plan.fullFallback;
 
-        if (hasTransaction) plan.reasons.push_back("mutation transaction pending");
-        if (framePipelineRequested) plan.reasons.push_back("frame pipeline requested");
-        if (invalidation.affects(DirtyFlag::Layout)) plan.reasons.push_back("layout dirty");
-        if (invalidation.affects(DirtyFlag::Paint)) plan.reasons.push_back("paint dirty");
-        if (invalidation.affects(DirtyFlag::HitTest)) plan.reasons.push_back("hit-test dirty");
-        if (invalidation.affects(DirtyFlag::Transform)) plan.reasons.push_back("transform dirty");
-        if (invalidation.affects(DirtyFlag::Resource)) plan.reasons.push_back("resource dirty");
-        if (invalidation.affects(DirtyFlag::EventSlot)) plan.reasons.push_back("event slot dirty");
-        if (plan.fullFallback && !plan.fallbackReason.empty()) plan.reasons.push_back(plan.fallbackReason);
         return plan;
     }
 
@@ -51,9 +40,8 @@ namespace arrange::core {
         SceneFramePipelineResult result;
         (void)layout_.takeScrollUpdates();
         result.ran = true;
-        // 所有构建写入候选状态。任一阶段失败都保留上次成功 scene/PublishedFrame
-        auto candidateScene = scene;
-        counters_.candidateNodesCopied += scene.tree().size();
+        // 所有构建原地写入 scene，写入日志保存首次写入前的原值；任一阶段失败都回滚到上次成功 scene/PublishedFrame
+        scene.beginJournal();
         auto candidateFrame = publishedFrame;
         candidateFrame.changes = {};
         candidateFrame.error.reset();
@@ -63,21 +51,21 @@ namespace arrange::core {
             auto continuation = prepare.materialize(id, indices);
             if (result.rearrange && continuation.rearrange != result.rearrange) throw std::runtime_error("Layout 子组合必须继续同一候选事务");
             if (!result.rearrange) result.rearrange = continuation.rearrange;
-            candidateScene.validateLayoutMaterialization(id, continuation);
-            candidateScene.applyUncommitted(continuation);
+            scene.validateLayoutMaterialization(id, continuation);
+            scene.applyUncommitted(continuation);
         }}
                                                     : LayoutMaterializer{});
         try {
-            if (transaction) candidateScene.applyUncommitted(*transaction);
-            recordPhase(result.phases, FramePhase::ApplyMutations, transaction != nullptr, transaction ? "applied structural and typed input submission" : "no submission");
-            auto& tree = candidateScene.tree();
+            if (transaction) scene.applyUncommitted(*transaction);
+            result.phases.record(FramePhase::ApplyMutations, transaction != nullptr);
+            auto& tree = scene.tree();
             if (prepare.interaction) prepare.interaction(tree);
             tree.advanceAnimations(timeMillis);
-            if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::Resize, "constraints", "root constraints changed");
-            result.plan = planFrame(candidateScene, root, transaction != nullptr, framePipelineRequested);
-            candidateFrame.dirty = candidateScene.dirtySnapshot();
-            result.invalidation = candidateScene.takeInvalidation();
-            if (result.plan.fullFallback) tree.recordSceneInvalidation(DirtyFlag::Layout, InvalidationSource::NativeState, "fallback", result.plan.fallbackReason);
+            if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints) tree.invalidateViewport();
+            result.plan = planFrame(scene, root, transaction != nullptr, framePipelineRequested);
+            candidateFrame.dirty = scene.dirtySnapshot();
+            result.invalidation = scene.takeInvalidation();
+            if (result.plan.fullFallback) tree.invalidateScene(DirtyFlag::Layout);
             if (!tree.contains(root)) {
                 candidateFrame.content.scenePaint = {};
                 candidateFrame.content.overlayDrawOps.clear();
@@ -94,12 +82,9 @@ namespace arrange::core {
                     counters_.nativeAnimationSamples += work.animationSamples;
                     counters_.layoutWork.measuredNodes += work.measuredNodes;
                     counters_.layoutWork.measureCacheHits += work.measureCacheHits;
-                    if (work.measureCacheHits == 0) {
-                        ++counters_.fullLayouts;
-                        counters_.lastFullLayoutReason = result.plan.fullFallback ? result.plan.fallbackReason : "all reachable measurement inputs invalid or uncached";
-                    }
+                    if (work.measureCacheHits == 0) ++counters_.fullLayouts;
                 }
-                recordPhase(result.phases, FramePhase::Measure, result.plan.measure, result.plan.measure ? "measured root subtree" : "retained measured sizes");
+                result.phases.record(FramePhase::Measure, result.plan.measure);
                 if (result.plan.layout) {
                     const auto started = std::chrono::steady_clock::now();
                     layout_.resetCounters();
@@ -109,43 +94,50 @@ namespace arrange::core {
                     counters_.layoutWork.placedNodes += layout_.counters().placedNodes;
                     counters_.layoutWork.placeCacheHits += layout_.counters().placeCacheHits;
                 }
-                recordPhase(result.phases, FramePhase::Layout, result.plan.layout, result.plan.layout ? "placed root subtree" : "retained placement");
+                result.phases.record(FramePhase::Layout, result.plan.layout);
                 if (result.plan.buildPaint) {
-                    if (prepare.draw) prepare.draw(candidateScene);
+                    if (prepare.draw) prepare.draw(scene);
                     const auto started = std::chrono::steady_clock::now();
                     candidateFrame.content.scenePaint = drawOpsBuilder_.build(tree, root, counters_.paintWork);
                     ++counters_.paintBuilds;
                     counters_.paintBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
                 }
-                recordPhase(result.phases, FramePhase::BuildPaint, result.plan.buildPaint, result.plan.buildPaint ? "构建共享绘制片段" : "复用已发布绘制片段");
+                result.phases.record(FramePhase::BuildPaint, result.plan.buildPaint);
             }
             if (result.plan.buildHitTest || !tree.contains(root)) {
                 const auto started = std::chrono::steady_clock::now();
                 candidateFrame.content.hitTest = std::make_shared<const HitTestSnapshot>(buildCachedHitTestSnapshot(tree, root, counters_.hitWork));
                 ++counters_.hitBuilds;
                 counters_.hitBuildMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-                recordPhase(result.phases, FramePhase::BuildHitTest, true, "built immutable hit regions and constraints");
+                result.phases.record(FramePhase::BuildHitTest, true);
             } else
-                recordPhase(result.phases, FramePhase::BuildHitTest, false, "retained hit snapshot");
-            if (finalize) finalize(candidateScene, candidateFrame);
+                result.phases.record(FramePhase::BuildHitTest, false);
+            if (finalize) finalize(scene, candidateFrame);
             candidateFrame.plan = result.plan;
             finishCandidate(publishedFrame, candidateFrame);
             result.plan = candidateFrame.plan;
-            recordPhase(result.phases, FramePhase::BuildDiagnostics, result.plan.buildDiagnostics, result.plan.buildDiagnostics ? "diagnostics invalidated" : "diagnostics unchanged");
-            recordPhase(result.phases, FramePhase::PublishFrame, result.plan.publishFrame, result.plan.publishFrame ? "published consistent scene and frame" : "no visual publication needed");
-            recordPhase(result.phases, FramePhase::PassivePaint, result.plan.passivePaint, "paint only consumes published content");
+            result.phases.record(FramePhase::BuildDiagnostics, result.plan.buildDiagnostics);
+            result.phases.record(FramePhase::PublishFrame, result.plan.publishFrame);
+            result.phases.record(FramePhase::PassivePaint, result.plan.passivePaint);
             candidateFrame.invalidation = result.invalidation;
             candidateFrame.plan = result.plan;
             candidateFrame.phases = result.phases;
             if (result.plan.publishFrame) ++counters_.publications;
-            candidateScene.clearDirty();
-            scene = std::move(candidateScene);
+            counters_.candidateNodesCopied += scene.tree().journaledNodes();
+            scene.commitJournal();
+            scene.clearDirty();
             publishedFrame = std::move(candidateFrame);
             result.scrollUpdates = layout_.takeScrollUpdates();
         } catch (const std::exception& exception) {
             ++counters_.failedSubmissions;
+            counters_.candidateNodesCopied += scene.tree().journaledNodes();
+            scene.rollbackJournal();
             result.error = exception.what();
             // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何
+        } catch (...) {
+            scene.rollbackJournal();
+            layout_.setMaterializer({});
+            throw;
         }
         layout_.setMaterializer({});
         return result;
@@ -168,20 +160,16 @@ namespace arrange::core {
         auto candidate = publishedFrame;
         candidate.changes = {};
         candidate.plan = {};
-        candidate.phases.clear();
+        candidate.phases = {};
         candidate.dirty = {};
         candidate.invalidation = {};
         finalize(scene, candidate);
         finishCandidate(publishedFrame, candidate);
         if (!candidate.plan.publishFrame) return false;
-        recordPhase(candidate.phases, FramePhase::BuildDiagnostics, true, "finalized retained scene content");
-        recordPhase(candidate.phases, FramePhase::PublishFrame, true, "published retained scene with finalized attachments");
+        candidate.phases.record(FramePhase::BuildDiagnostics, true);
+        candidate.phases.record(FramePhase::PublishFrame, true);
         publishedFrame = std::move(candidate);
         ++counters_.publications;
         return true;
-    }
-
-    void SceneFramePipeline::recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason) {
-        phases.push_back({phase, ran, std::move(reason)});
     }
 }

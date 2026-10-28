@@ -13,10 +13,8 @@ namespace arrange::core {
     }
 
     bool nodeInteractionEnabled(const LayoutTree& tree, NodeId node) {
-        for (const auto id : nodePath(tree, node)) {
-            const auto found = tree.node(id).props.find("enabled");
-            if (found != tree.node(id).props.end() && !found->second.boolOr(true)) return false;
-        }
+        for (const auto id : nodePath(tree, node))
+            if (!tree.node(id).enabled) return false;
         return tree.contains(node);
     }
 

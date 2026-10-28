@@ -5,6 +5,7 @@
 #include "Animation.h"
 #include "Geometry.h"
 #include "DrawCommands.h"
+#include "DrawEnums.h"
 #include "Painter.h"
 #include "TextLayoutService.h"
 
@@ -28,6 +29,8 @@ namespace arrange::core {
         Resource = 128,
         EventSlot = 256,
         Placement = 512,
+        // 诊断叠加层（错误屏、角标、toast）需要重建，不涉及用户场景
+        Diagnostics = 1024,
     };
 
     inline constexpr std::uint32_t dirtyMask(DirtyFlag flag) noexcept {
@@ -201,8 +204,8 @@ namespace arrange::core {
 
     struct PaintModifier {
         PainterSnapshot painter;
-        std::string contentScale = "Fit";
-        std::string alignment = "Center";
+        ContentScale contentScale = ContentScale::Fit;
+        ImageAlignment alignment = ImageAlignment::Center;
         float alpha = 1.0f;
         std::optional<std::uint32_t> tint;
         bool sizeToIntrinsics = true;
@@ -215,8 +218,8 @@ namespace arrange::core {
         bool singleLine = false;
         int minLines = 1;
         int maxLines = 0;
-        std::string textAlign = "Start";
-        std::string overflow = "clip";
+        TextAlign textAlign = TextAlign::Start;
+        TextOverflow overflow = TextOverflow::Clip;
         bool operator==(const TextPresentation&) const = default;
     };
 

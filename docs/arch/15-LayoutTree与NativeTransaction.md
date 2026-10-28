@@ -2,13 +2,13 @@
 
 在 `Arrange UI Pipeline` 中，Arrange Ts Runtime 负责 authoring、rearrange、phase-aware reactivity、host target lowering 与 typed UI slot scheduling；Arrange Framework Native Part 负责把 Arrange Ts Runtime 产生的 typed mutation、event slot update 与 slot update 直接接入 native boundary；C++ core 负责 scene state、LayoutTree、布局、绘制准备、命中测试与 dirty 归因。
 
-Arrange 的 QuickJS 与 C++ 是直接就在一起的，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON、二进制 buffer、字符串 value 编码或 command buffer 协议。Arrange Framework Native Part 必须直接读取 `JSValue`、primitive、callback function 与稳定 runtime object shape，并构造 native typed `MutationTransaction` 与 `SlotUpdateBatch`。
+Arrange 的 QuickJS 与 C++ 是直接就在一起的，不是传统“JS 前端向 C++ 后端传输协议”的关系。生产链路不建立 JSON、二进制 buffer、字符串 value 编码或 command buffer 协议。Arrange Framework Native Part 必须直接读取 `JSValue`、primitive、callback function 与稳定 runtime object shape，并构造 native typed `MutationTransaction` 与 `SlotUpdate`。
 
 # 性能原则
 
 - JS 到 C++ 只提交变化，不传整棵树快照。
 - Rearrange Phase 的离散界面变化进入 `MutationTransaction`。
-- JS Value Phase 的 UI value 变化进入 `SlotUpdateBatch`。
+- JS Value Phase 的 UI value 变化进入 `SlotUpdate`。
 - 批处理是 transaction / slot update 优化，不是序列化协议。
 - Canvas、动画、高频绘制不通过结构重排 传大对象。
 - QuickJS host 不做泛用 serializer；只按稳定 TS object shape / native API 参数读取字段。
@@ -61,7 +61,7 @@ TS 不 stringify、不编码二进制或 JSON command buffer；QuickJS 直接读
 
 `registerBinding` 连接宿主正式输入或 Modifier 整链，`registerModifierBinding` 连接已发布的明确 Modifier handle；`updateBinding` 交付值，`releaseBinding` 退休绑定。绑定包含独立身份及代际，并关联 LayoutNode 身份/代际；Modifier 参数绑定还包含实例 handle，不能拿数组下标作为长期更新身份。
 
-纯值更新可以不产生结构操作，但仍与结构及资源变更共享有序提交。所谓 SlotUpdateBatch 表示这批类型化值操作，不另建与 MutationTransaction 顺序隔离的第二套提交容器。getter 在 JS 值消费阶段执行，FFI 只接收通过校验的结果，不把任意 getter 传到绘制线程。
+纯值更新可以不产生结构操作，但仍与结构及资源变更共享有序提交。所谓 SlotUpdate 表示这批类型化值操作，不另建与 MutationTransaction 顺序隔离的第二套提交容器。getter 在 JS 值消费阶段执行，FFI 只接收通过校验的结果，不把任意 getter 传到绘制线程。
 
 # QuickJS native boundary
 
@@ -73,7 +73,7 @@ QuickJS native boundary 的职责：
 - 读取真实 JS callback function，并注册到 native event registry。
 - 按明确 slot schema 读取 UI slot value。
 - 构造 native typed `MutationTransaction`。
-- 构造 native typed `SlotUpdateBatch`。
+- 构造 native typed `SlotUpdate`。
 - 为 C++ -> JS callback 构造 JS primitive 或 JS object 参数。
 
 QuickJS native boundary 禁止：
@@ -99,7 +99,9 @@ struct MutationTransaction {
 
 不能先按类别拆分、再分别应用节点和事件，否则会打乱创建、绑定、更新、移除及退休的真实次序。`SlotUpdate` 通过 BindingHandle 指向既定受体，SlotValue 只容纳受支持的类型化输入；不存在任意字段路径写入或节点直属事件输入。事件资源只有被存续 Modifier 引用时才有调用资格。
 
-SceneFramePipeline 在候选场景消费事务，再执行失效所需的测量、放置、绘制与命中准备，成功后发布并完成对应回执。失败保留已发布场景，向运行时报告候选失败，不自动重放已撤销候选。取消事务即使已被 Owner 取走，也不能应用或完成新上下文的回执。
+SceneFramePipeline 在候选场景消费事务，再执行失效所需的测量、放置、绘制与命中准备，成功后发布并完成对应回执。失败保留已发布场景，向运行时报告候选失败，不自动重放已撤销候选。
+
+候选场景不复制整棵树：场景开启写入日志后原地应用，节点、父子关系、绑定与事件资源在首次写入前保存原值，失效汇总与计数在开启时保存。节点写入只经 `mutableNode`，缓存命中的读取不进入日志。成功即丢弃日志，失败按日志逐项恢复；单帧的复制量只与本帧实际写入的节点数成正比。取消事务即使已被 Owner 取走，也不能应用或完成新上下文的回执。
 
 类型化输入的失效必须准确：仅颜色变化不失效测量，尺寸变化进入必要布局，事件替换不无故失效绘制或布局，Painter 内容和固有尺寸分别影响实际消费者。节点删除、调用退休、停用、重载和错误恢复均须清理失效绑定。原生阶段的工作量优化另见对应布局及失效母文档。
 
@@ -118,7 +120,7 @@ JSON 不允许作为 JS 到 C++ 的生产提交事实源，也不允许作为 Mo
 
 长期概念上，C++ 侧生产状态分为：
 
-- `NativeScene` / `NativeSceneState`：scene state owner，持有 LayoutTree、event slots、dirty state 与资源状态，不做 frame planning 或 JUCE paint。
+- `NativeScene`：scene state owner，持有 LayoutTree、event slots、dirty state 与资源状态，不做 frame planning 或 JUCE paint。
 - `LayoutTree`：统一生产树，服务 layout、paint、hit-test、input 与 accessibility，不拆成多套生产树。
 - `LayoutNode`：统一主节点，派生 layout / paint / hit-test cache。
 
@@ -222,16 +224,7 @@ native state changed
 
 # Dirty 分类
 
-typed mutation、slot update 或 native-first state change 后必须产出 dirty attribution。dirty 不只是 bit flag，还必须能记录或推导：
-
-```txt
-source input / intent
-changed state / changed field
-affected node / scene
-affected phase
-reason
-fallback reason if full repaint
-```
+typed mutation、slot update 或 native-first state change 后必须产出 dirty 标记：节点上的阶段位（连同向祖先传播的子树位），以及 `InvalidationGraph` 汇总的本帧失效位掩码。生产路径只记录位，不记录来源、字段或原因字符串；诊断需要“哪个节点、哪个阶段”时，由节点 dirty 位与 `DirtySnapshot` 推导。
 
 dirty 影响范围：
 

@@ -30,27 +30,6 @@ namespace arrange::core {
             }
             return result;
         }
-
-        bool validateAccessibility(std::string_view key, const PropValue& value, std::string& error) {
-            if (key == "contentDescription" || key == "label" || key == "description" || key == "role") {
-                if (value.isString()) return true;
-                error = std::string(key) + " must be a string";
-                return false;
-            }
-            if (key == "enabled") {
-                if (value.isBoolean()) return true;
-                error = "enabled must be a boolean";
-                return false;
-            }
-            return false;
-        }
-
-        bool validateByKey(std::string_view key, const PropValue& value, std::string& error) {
-            if (validateAccessibility(key, value, error)) return true;
-            if (!error.empty()) return false;
-
-            return false;
-        }
     }
 
     bool validateSetPropMutation(NodeType nodeType, const std::string& rawKey, const PropValue& value, std::string& error) {
@@ -69,8 +48,8 @@ namespace arrange::core {
                 return false;
             }
         }
-        if (value.isNull()) return true;
-
-        return validateByKey(key, value, error);
+        if (value.isNull() || value.isBoolean()) return true;
+        error = "enabled must be a boolean";
+        return false;
     }
 }

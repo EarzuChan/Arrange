@@ -1,3 +1,4 @@
+#include "ScriptProbe.h"
 #include "TextFixtures.h"
 #include <arrange/core/HitTest.h>
 #include <arrange/core/SceneFramePipeline.h>
@@ -15,8 +16,9 @@ namespace {
     }
 
     void frame(QuickJsScriptHost& host, NativeScene& scene, SceneFramePipeline& pipeline, PublishedFrame& published) {
+        // 只经探针报告的回调不产生提交
         auto submission = host.takePendingTransaction();
-        check(submission.has_value(), "QuickJS did not submit changes");
+        if (!submission) return;
         const auto result = pipeline.run(scene, 1, {0, 400, 0, 300}, &*submission, true, published);
         if (result.error) throw std::runtime_error(*result.error);
         host.publishScene(scene);
@@ -67,16 +69,18 @@ namespace {
 
     void verifyModifierInstanceBindings() {
         QuickJsScriptHost host;
+        test_support::ScriptProbe probe;
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame published;
         const auto loaded = host.executeModule("instance-input.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             const reject = fn => { try { fn() } catch { return }; throw new Error('Expected rejection') }
             for (const id of [-1, 0, 1.5, NaN, Infinity, 4294967297, '1']) reject(() => void (n.createNode(id, 'LayoutNode'), n.updateBinding(n.registerBinding(id, 'measurePolicy'), {kind: 'Box'})))
             n.createNode(1, 'LayoutNode')
             const background = color => ({type: 'background', key: 'bg', value: {color}})
-            const click = (key, value) => ({type: 'clickable', key, value: {onClick: () => n.setProp(1, 'contentDescription', value)}})
+            const click = (key, value) => ({type: 'clickable', key, value: {onClick: () => probe(value)}})
             const chain = n.registerBinding(1, 'modifier')
             n.updateBinding(chain, {elements: [background(0xff000000), click('outer', 'outer'), click('inner', 'inner')]})
             let bg, inner, old
@@ -105,7 +109,7 @@ namespace {
                     let decoded = false
                     reject(() => n.updateBinding(bg, {get type() { decoded = true }}))
                     if (decoded) throw new Error('Retired instance payload decoded')
-                    n.setProp(1, 'contentDescription', 'retired')
+                    probe('retired')
                 }
             }}}]})
         )JS");
@@ -125,7 +129,7 @@ namespace {
         const auto inner = modifierEventSlot(scene.node(1).modifier.elements()[2].descriptor.value);
         check(host.invokeEventSlot(inner).ok, "new instance callback unavailable");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "changed again", "direct callback input retained obsolete closure");
+        check(probe.read(host) == "changed again", "direct callback input retained obsolete closure");
         send("reorder");
         check(scene.node(1).modifier.elements()[1].handle == original, "keyed reorder changed instance handle");
         send("write");
@@ -133,16 +137,18 @@ namespace {
         send("remove");
         check(host.modifierInstanceCount() == 1 && host.bindingCount() == scene.bindingCount() && host.eventSlotCount() == 1, "retired instance retained JS/native resources");
         send("late");
-        check(scene.node(1).props.at("contentDescription").stringOr() == "retired" && host.rejectedBindingUpdates() == 2, "late instance input accepted");
+        check(probe.read(host) == "retired" && host.rejectedBindingUpdates() == 2, "late instance input accepted");
     }
 
     void verifyCallbackReceiverIdentity() {
         QuickJsScriptHost host;
+        test_support::ScriptProbe probe;
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame published;
         const auto loaded = host.executeModule("回调受体身份.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             n.createNode(1, 'Root')
             n.createNode(2, 'LayoutNode')
             n.createNode(3, 'LayoutNode')
@@ -151,7 +157,7 @@ namespace {
             n.insertChild(2, 3, 0)
             n.insertChild(3, 4, 0)
             const chain = n.registerBinding(4, 'modifier')
-            const callback = () => n.setProp(1, 'contentDescription', '正式回调')
+            const callback = () => probe('正式回调')
             const field = key => ({type: 'textField', key, value: {value: '', onSubmit: callback}})
             n.updateBinding(chain, {elements: [field('旧受体')]})
             n.setModifier(1, {elements: [{type: 'textField', value: {value: '', onSubmit: command => {
@@ -187,7 +193,7 @@ namespace {
         check(test_support::editable(scene.node(4))->handle != oldHandle && nextSlot != oldSlot, "同一函数错误复用了已退休受体的回调资源");
         check(!host.invokeEventSlot(oldSlot).ok && host.invokeEventSlot(nextSlot).ok, "回调退休没有区分旧受体与新受体");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "正式回调", "新受体回调没有执行");
+        check(probe.read(host) == "正式回调", "新受体回调没有执行");
 
         send("重建");
         check(!host.invokeEventSlot(nextSlot).ok, "同事务删除再创建沿用了旧回调身份");
@@ -200,15 +206,17 @@ namespace {
 
     void verifyCallbackPublication() {
         QuickJsScriptHost host;
+        test_support::ScriptProbe probe;
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame published;
         const auto loaded = host.executeModule("回调发布.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             n.beginRearrange()
             n.createNode(1, 'LayoutNode')
             const chain = n.registerBinding(1, 'modifier')
-            const content = label => ({elements: [{type: 'textField', value: {value: label, onSubmit: () => n.setProp(1, 'contentDescription', label)}}]})
+            const content = label => ({elements: [{type: 'textField', value: {value: label, onSubmit: () => probe(label)}}]})
             n.updateBinding(chain, content('旧回调'))
             n.submitRearrange(error => {
                 if (error) throw new Error(error)
@@ -239,7 +247,7 @@ namespace {
         check(published.revision == revision && scene.hasEventSlot(original) && !scene.hasEventSlot(next), "失败候选污染已发布资源");
         check(host.invokeEventSlot(original).ok && !host.invokeEventSlot(next).ok, "失败后旧回调不能继续使用");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "旧回调" && host.eventSlotCount() == 1, "回滚没有保留旧回调或泄漏候选");
+        check(probe.read(host) == "旧回调" && host.eventSlotCount() == 1, "回滚没有保留旧回调或泄漏候选");
     }
 
 }
@@ -315,12 +323,12 @@ int main() {
                 if (slot.kind == EventSlotKind::InputSubmit) submit = slot;
             const auto invalid = host.invokeEventSlot(submit, {true, "middel"});
             if (invalid.ok || invalid.error.find("textAlign") == std::string::npos || invalid.error.find("middel") == std::string::npos || invalid.error.find("enum-schema.js") == std::string::npos) throw std::runtime_error("枚举错误必须包含字段、输入值和脚本来源：" + invalid.error);
-            check(std::get<TextModifier>(scene.node(2).modifier.elements()[0].descriptor.value).textAlign == "Start" && published.revision == revision, "非法枚举污染了已发布状态");
+            check(std::get<TextModifier>(scene.node(2).modifier.elements()[0].descriptor.value).textAlign == TextAlign::Start && published.revision == revision, "非法枚举污染了已发布状态");
 
             const auto recovered = host.invokeEventSlot(submit, {true, "Center"});
             if (!recovered.ok) throw std::runtime_error(recovered.error);
             frame(host, scene, pipeline, published);
-            check(std::get<TextModifier>(scene.node(2).modifier.elements()[0].descriptor.value).textAlign == "Center" && scene.bindingCount() == bindings, "枚举拒绝后有效值应正常恢复且复用绑定");
+            check(std::get<TextModifier>(scene.node(2).modifier.elements()[0].descriptor.value).textAlign == TextAlign::Center && scene.bindingCount() == bindings, "枚举拒绝后有效值应正常恢复且复用绑定");
         }
         {
             QuickJsScriptHost unstable;
@@ -332,16 +340,18 @@ int main() {
             check(!result.ok && result.error.find("超过检查点数量预算") != std::string::npos, "unbounded microtask loop escaped the frame work budget");
         }
         QuickJsScriptHost host;
+        test_support::ScriptProbe probe;
         NativeScene scene;
         SceneFramePipeline pipeline;
         PublishedFrame published;
         const auto loaded = host.executeModule("modifier-onion.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             const size = {type: 'size', value: {width: 100, height: 80}}
-            const outer = () => n.setProp(1, 'contentDescription', 'outer')
+            const outer = () => probe('outer')
             const inner = () => {
-                n.setProp(1, 'contentDescription', 'inner')
+                probe('inner')
                 n.setModifier(1, {elements: [size]})
             }
             n.setModifier(1, {elements: [
@@ -363,10 +373,10 @@ int main() {
         check(exportDrawOps(published.content.scenePaint).size() == 4 && exportDrawOps(published.content.scenePaint)[2].rect == Rect{10, 10, 80, 60}, "QuickJS path lost ordered paint geometry");
         check(host.invokeEventSlot(outerHit.eventSlot).ok, "outer callback could not execute");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "outer", "wrong outer callback ran");
+        check(probe.read(host) == "outer", "wrong outer callback ran");
         check(host.invokeEventSlot(innerHit.eventSlot).ok, "inner callback could not execute");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "inner" && host.eventSlotCount() == 0 && scene.eventSlotCount() == 0, "chain replacement leaked retired callbacks");
+        check(probe.read(host) == "inner" && host.eventSlotCount() == 0 && scene.eventSlotCount() == 0, "chain replacement leaked retired callbacks");
         check(!host.invokeEventSlot(innerHit.eventSlot).ok, "retired callback accepted");
         const auto removedInOneSubmission = host.executeModule("retire-before-publish.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
@@ -395,16 +405,17 @@ int main() {
         check(reloaded.ok && !host.invokeEventSlot(outerHit.eventSlot).ok, "context reset accepted old callback token");
         const auto gestures = host.executeModule("gesture-modifier.js", R"JS(
             const n = globalThis.__ARRANGE_NATIVE__
+            const probe = value => n.diagnosticsToast('i', 'probe', String(value), [], false)
             void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}))
             n.setModifier(1, {elements: [
                 {type: 'size', value: {width: 100, height: 80}},
-                {type: 'hoverable', value: {enabled: true, onEnter: () => n.setProp(1, 'contentDescription', 'enter')}},
+                {type: 'hoverable', value: {enabled: true, onEnter: () => probe('enter')}},
                 {type: 'pointerIcon', value: {icon: 'grab'}},
-                {type: 'onContextClick', value: {enabled: true, callback: event => n.setProp(1, 'contentDescription', 'context ' + event.x)}},
+                {type: 'onContextClick', value: {enabled: true, callback: event => probe('context ' + event.x)}},
                 {type: 'onKeyEvent', value: {callback: event => event.key === 'Enter' && event.type === 'down'}},
-                {type: 'draggable', value: {enabled: true, axis: 'horizontal', startImmediately: false, pointerLock: true, onDelta: event => n.setProp(1, 'contentDescription', 'delta ' + event.deltaX + ' ' + event.modifiers.shift), onStart: () => {}}},
-                {type: 'pointerInput', value: {enabled: true, callback: event => n.setProp(1, 'contentDescription', event.type + ' ' + event.x + ' ' + event.modifiers.alt)}},
-                {type: 'semantics', value: {role: 'slider', label: '增益', valueText: '-6 dB', increment: () => n.setProp(1, 'contentDescription', 'increment')}}
+                {type: 'draggable', value: {enabled: true, axis: 'horizontal', startImmediately: false, pointerLock: true, onDelta: event => probe('delta ' + event.deltaX + ' ' + event.modifiers.shift), onStart: () => {}}},
+                {type: 'pointerInput', value: {enabled: true, callback: event => probe(event.type + ' ' + event.x + ' ' + event.modifiers.alt)}},
+                {type: 'semantics', value: {role: 'slider', label: '增益', valueText: '-6 dB', increment: () => probe('increment')}}
             ]})
         )JS");
         check(gestures.ok, "手势 Modifier 脚本执行失败");
@@ -428,13 +439,13 @@ int main() {
         const auto contextSlot = context->eventSlot;
         check(host.invokeEventSlot(dragSlot, InputEventPayload{delta}).ok, "拖动位移回调执行失败");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "delta 12 true", "拖动位移载荷未按对象交付");
+        check(probe.read(host) == "delta 12 true", "拖动位移载荷未按对象交付");
         const auto consumed = host.invokeEventSlot(keySlot, InputEventPayload{KeyEventPayload{false, "Enter", "", false, {}}});
         const auto ignored = host.invokeEventSlot(keySlot, InputEventPayload{KeyEventPayload{false, "a", "a", false, {}}});
         check(consumed.ok && consumed.consumed && ignored.ok && !ignored.consumed, "onKeyEvent 返回值未作为消费结果");
         check(host.invokeEventSlot(contextSlot, InputEventPayload{PointerEventPayload{7, 8, {}}}).ok, "上下文点击回调执行失败");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "context 7", "上下文点击坐标未交付");
+        check(probe.read(host) == "context 7", "上下文点击坐标未交付");
         const InputModifierSemantics* stream = nullptr;
         for (const auto& instance : scene.tree().node(1).modifier.elements())
             if (const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value); input && input->kind == InputModifierKind::PointerInput) stream = input;
@@ -442,14 +453,14 @@ int main() {
         down.modifiers.alt = true;
         check(stream && host.invokeEventSlot(stream->eventSlot, InputEventPayload{down}).ok, "pointerInput 回调执行失败");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "down 3 true", "pointerInput 载荷未按对象交付");
+        check(probe.read(host) == "down 3 true", "pointerInput 载荷未按对象交付");
         const SemanticsModifier* semantics = nullptr;
         for (const auto& instance : scene.tree().node(1).modifier.elements())
             if (const auto* item = std::get_if<SemanticsModifier>(&instance.descriptor.value)) semantics = item;
         check(semantics && semantics->role == SemanticsRole::Slider && semantics->label == "增益" && semantics->valueText == "-6 dB" && semantics->increment.valid() && !semantics->decrement.valid(), "semantics 字段或动作槽位读取错误");
         check(host.invokeEventSlot(semantics->increment).ok, "语义增加动作执行失败");
         frame(host, scene, pipeline, published);
-        check(scene.node(1).props.at("contentDescription").stringOr() == "increment", "语义增加动作未调用");
+        check(probe.read(host) == "increment", "语义增加动作未调用");
         std::cout << "QuickJS Modifier: ordered geometry, independent callbacks, retirement and reset passed\n";
         return 0;
     } catch (const std::exception& error) {

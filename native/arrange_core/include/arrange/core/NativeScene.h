@@ -3,6 +3,7 @@
 #include "MutationTransaction.h"
 #include "LayoutTree.h"
 
+#include <optional>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -20,10 +21,6 @@ namespace arrange::core {
             return tree_.node(id);
         }
 
-        [[nodiscard]] LayoutNode& node(NodeId id) {
-            return tree_.node(id);
-        }
-
         [[nodiscard]] DirtySnapshot dirtySnapshot(std::uint32_t mask = 0xffffffffu) const noexcept {
             return tree_.dirtySnapshot(mask);
         }
@@ -36,7 +33,7 @@ namespace arrange::core {
             return tree_.takeInvalidation();
         }
 
-        void clearDirty() noexcept {
+        void clearDirty() {
             tree_.clearDirty();
         }
 
@@ -68,6 +65,21 @@ namespace arrange::core {
 
        private:
         friend class SceneFramePipeline;
+
+        struct Journal {
+            // 空值表示该绑定在日志开启前不存在；事件槽记录原先是否存在
+            std::unordered_map<std::uint64_t, std::optional<RegisterBinding>> bindings;
+            std::unordered_map<EventSlotId, bool, EventSlotIdHash> eventSlots;
+            SlotRuntimeCounters slotCounters;
+        };
+
+        void beginJournal();
+        void commitJournal() noexcept;
+        void rollbackJournal();
+        void journalBinding(std::uint64_t identity);
+        void journalEventSlot(const EventSlotId& slot);
+        template <class Predicate>
+        void retireEventSlotsIf(Predicate predicate);
         void applyUncommitted(const MutationTransaction& transaction);
         void validateLayoutMaterialization(NodeId layout, const MutationTransaction& transaction) const;
         bool targetIsLive(const BindingTarget& target) const;
@@ -77,5 +89,6 @@ namespace arrange::core {
         SlotRuntimeCounters slotCounters_;
         LayoutTree tree_;
         std::unordered_set<EventSlotId, EventSlotIdHash> activeEventSlots_;
+        std::optional<Journal> journal_;
     };
 }

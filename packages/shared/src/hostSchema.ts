@@ -21,7 +21,4 @@ export function normalizeParameterObject(value: unknown): Record<string, unknown
     return result
 }
 
-// 原生节点输入与 Arrangable 参数分别由自身边界解释
-export const layoutNodeInputs = new Set(['modifier', 'measurePolicy', 'enabled', 'contentDescription', 'label', 'description', 'role'])
-
 export const canonicalHostInput = arrangeParameterName

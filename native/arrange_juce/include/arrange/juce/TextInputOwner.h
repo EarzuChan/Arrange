@@ -27,10 +27,10 @@ namespace arrange::juce {
 
     struct TextInputCallbacks {
         std::function<void(const arrange::core::EventSlotId&, const std::string&)> invokeStringEvent;
-        std::function<void(arrange::core::NodeId, arrange::core::DirtyFlag, std::string)> invalidateNativeState;
-        std::function<void(arrange::core::NodeId, std::string)> enqueueKeyIntent;
-        std::function<void(arrange::core::NodeId, std::string)> enqueueTextInputIntent;
-        std::function<void(arrange::core::NodeId, std::string)> enqueueImeCompositionIntent;
+        std::function<void(arrange::core::NodeId, arrange::core::DirtyFlag)> invalidateNativeState;
+        std::function<void(arrange::core::NodeId)> enqueueKeyIntent;
+        std::function<void(arrange::core::NodeId)> enqueueTextInputIntent;
+        std::function<void(arrange::core::NodeId)> enqueueImeCompositionIntent;
         std::function<void(const arrange::core::EventSlotId&, bool, bool)> invokeFocusEvent;
         std::function<void(const arrange::core::EventSlotId&)> invokeEvent;
         std::function<void(const arrange::core::EventSlotId&, const arrange::core::ScrollResult&)> invokeScrollEvent;

@@ -43,11 +43,11 @@ namespace arrange::core {
         int maxLines = 0;
         std::string text;
         std::shared_ptr<const TextLayout> textLayout;
-        std::string textAlign;
-        std::string overflow;
+        TextAlign textAlign = TextAlign::Start;
+        TextOverflow overflow = TextOverflow::Visible;
         PainterSnapshot painter;
-        std::string contentScale;
-        std::string alignment;
+        ContentScale contentScale = ContentScale::Fit;
+        ImageAlignment alignment = ImageAlignment::Center;
         bool hasTint = false;
         bool inputText = false;
         ModifierHandle textField;

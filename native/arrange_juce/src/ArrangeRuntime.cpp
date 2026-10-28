@@ -264,7 +264,7 @@ namespace arrange::juce {
 
     RuntimeStepResult ArrangeRuntime::prepareVisualFrame(double nowMillis) {
         if (!rearrangeHost_.hasScriptHost()) return {};
-        enqueueIntent(arrange::core::InputIntent::animationFrame("统一视觉帧"));
+        enqueueIntent(arrange::core::InputIntent::animationFrame());
         const auto pumped = rearrangeHost_.prepareVisualFrame(nowMillis);
         if (!pumped.ok) return {true, false, pumped.error};
         return {captureRearrangeTransactions(), true, {}};

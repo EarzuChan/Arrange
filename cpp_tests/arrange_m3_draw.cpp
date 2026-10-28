@@ -241,7 +241,7 @@ namespace {
         std::shared_ptr<const DrawCommands> commands;
         FramePreparation preparation;
         preparation.draw = [&](NativeScene& candidate) {
-            for (auto& instance : candidate.node(1).modifier.elements())
+            for (auto& instance : candidate.tree().mutableNode(1).modifier.elements())
                 if (std::holds_alternative<DrawModifier>(instance.descriptor.value)) instance.preparedDraw = commands;
         };
         const auto finalize = [&](const NativeScene& candidate, PublishedFrame& frame) {

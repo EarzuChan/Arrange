@@ -15,7 +15,6 @@ namespace arrange::juce {
         bool applyMutations = false;
         bool runPipeline = false;
         bool hasTickWork = false;
-        const char* reason = "idle";
     };
 
     class FramePlanner {

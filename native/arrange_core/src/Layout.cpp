@@ -119,12 +119,13 @@ namespace arrange::core {
 
     Size LayoutEngine::measure(LayoutTree& tree, NodeId id, Constraints constraints) {
         constraints.validate();
-        auto& node = tree.node(id);
-        validateParentData(tree, node);
-        if (node.measurementValid && node.measuredConstraints == constraints && !((node.dirty | node.subtreeDirty) & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure)))) {
+        const auto& cached = tree.node(id);
+        validateParentData(tree, cached);
+        if (cached.measurementValid && cached.measuredConstraints == constraints && !((cached.dirty | cached.subtreeDirty) & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure)))) {
             ++counters_.measureCacheHits;
-            return {node.bounds.width, node.bounds.height};
+            return {cached.bounds.width, cached.bounds.height};
         }
+        auto& node = tree.mutableNode(id);
         ++counters_.measuredNodes;
         // 放置依赖完整测量结果，约束改变或子项重测都可能改变内部几何
         node.placementValid = false;
@@ -137,7 +138,7 @@ namespace arrange::core {
     }
 
     Size LayoutEngine::measureWithModifier(LayoutTree& tree, NodeId id, std::size_t index, Constraints constraints) {
-        auto& node = tree.node(id);
+        auto& node = tree.mutableNode(id);
         if (index == node.modifier.elements().size()) {
             const auto size = measureContent(tree, id, constraints);
             node.contentBounds.width = size.width;
@@ -230,7 +231,7 @@ namespace arrange::core {
         if (text) {
             const auto editable = std::holds_alternative<TextFieldModifier>(instance.descriptor.value);
             const auto width = editable && text->singleLine || !constraints.hasBoundedWidth() ? 0.0f : std::max(constraints.maxWidth, std::numeric_limits<float>::min());
-            instance.textLayout = textLayoutService_->layout(modifierText(instance.descriptor.value), text->style, {text->singleLine ? 1 : editable ? 0 : text->maxLines, width, text->singleLine, text->overflow == "ellipsis"}, instance.textLayout);
+            instance.textLayout = textLayoutService_->layout(modifierText(instance.descriptor.value), text->style, {text->singleLine ? 1 : editable ? 0 : text->maxLines, width, text->singleLine, text->overflow == TextOverflow::Ellipsis}, instance.textLayout);
             inner.minWidth = std::max(inner.minWidth, std::min(instance.textLayout->width, inner.maxWidth));
             auto textHeight = instance.textLayout->height;
             if (editable && text->maxLines > 0) textHeight = std::min(textHeight, instance.textLayout->lineHeight * text->maxLines);
@@ -268,7 +269,7 @@ namespace arrange::core {
     }
 
     Size LayoutEngine::measureContent(LayoutTree& tree, NodeId id, Constraints constraints) {
-        auto& node = tree.node(id);
+        auto& node = tree.mutableNode(id);
         node.baseline = -1.0f;
         Size content;
 
@@ -396,11 +397,12 @@ namespace arrange::core {
     }
 
     void LayoutEngine::place(LayoutTree& tree, NodeId id, float x, float y) {
-        auto& node = tree.node(id);
-        if (node.placementValid && node.bounds.x == x && node.bounds.y == y && !(node.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Placement)))) {
+        const auto& cached = tree.node(id);
+        if (cached.placementValid && cached.bounds.x == x && cached.bounds.y == y && !(cached.dirty & (dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Placement)))) {
             ++counters_.placeCacheHits;
             return;
         }
+        auto& node = tree.mutableNode(id);
         ++counters_.placedNodes;
         node.bounds.x = x;
         node.bounds.y = y;
@@ -412,7 +414,7 @@ namespace arrange::core {
     }
 
     void LayoutEngine::placeWithModifier(LayoutTree& tree, NodeId id, std::size_t index, float x, float y) {
-        auto& node = tree.node(id);
+        auto& node = tree.mutableNode(id);
         if (index == node.modifier.elements().size()) {
             node.contentBounds.x = x;
             node.contentBounds.y = y;
@@ -451,7 +453,7 @@ namespace arrange::core {
     }
 
     void LayoutEngine::placeContent(LayoutTree& tree, NodeId id, float x, float y, float width, float height) {
-        auto& node = tree.node(id);
+        auto& node = tree.mutableNode(id);
         if (const auto* policy = std::get_if<LazyMeasurePolicy>(&node.measurePolicy)) {
             placeLazy(tree, node, x, y, width, height, *policy);
             return;
@@ -471,7 +473,7 @@ namespace arrange::core {
             }
             float cursor = x + arrangement.offset;
             for (auto childId : node.children) {
-                auto& child = tree.node(childId);
+                const auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
                 const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
                 const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline : crossAxisOffset(height, child.bounds.height, alignment, false);
@@ -486,7 +488,7 @@ namespace arrange::core {
             const auto defaultAlign = policy->horizontalAlignment;
             float cursor = y + arrangement.offset;
             for (auto childId : node.children) {
-                auto& child = tree.node(childId);
+                const auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
                 const auto offset = crossAxisOffset(width, child.bounds.width, childAlign.empty() ? defaultAlign : childAlign, true);
                 place(tree, childId, x + offset, cursor);
@@ -498,7 +500,7 @@ namespace arrange::core {
         if (const auto* policy = std::get_if<BoxMeasurePolicy>(&node.measurePolicy)) {
             const auto defaultAlign = policy->contentAlignment;
             for (auto childId : node.children) {
-                auto& child = tree.node(childId);
+                const auto& child = tree.node(childId);
                 const auto childAlign = alignModifier(child);
                 const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
                 place(tree, childId, x + crossAxisOffset(width, child.bounds.width, alignment, true), y + crossAxisOffset(height, child.bounds.height, alignment, false));

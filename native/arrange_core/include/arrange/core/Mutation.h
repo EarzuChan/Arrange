@@ -46,8 +46,6 @@ namespace arrange::core {
     struct NativeInvalidationMutation {
         NodeId id = 0;
         DirtyFlag flag = DirtyFlag::EventSlot;
-        std::string field;
-        std::string reason;
     };
 
     using TreeMutation = std::variant<CreateNodeMutation, DeleteNodeMutation, InsertChildMutation, RemoveChildMutation, SetPropMutation, SetModifierMutation, NativeInvalidationMutation>;

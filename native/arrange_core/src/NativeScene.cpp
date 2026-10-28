@@ -13,10 +13,66 @@ namespace arrange::core {
 
     void NativeScene::apply(const MutationTransaction& transaction) {
         if (transaction.rearrange && transaction.rearrange->cancelled) return;
-        // 直接调用 apply 也具有失败原子性；帧流水线在自己的候选 scene 上调用同一实现
-        auto candidate = *this;
-        candidate.applyUncommitted(transaction);
-        *this = std::move(candidate);
+        // 直接调用 apply 也具有失败原子性；帧流水线在同一写入日志下调用同一实现
+        beginJournal();
+        try {
+            applyUncommitted(transaction);
+        } catch (...) {
+            rollbackJournal();
+            throw;
+        }
+        commitJournal();
+    }
+
+    void NativeScene::beginJournal() {
+        tree_.beginJournal();
+        journal_.emplace();
+        journal_->slotCounters = slotCounters_;
+    }
+
+    void NativeScene::commitJournal() noexcept {
+        tree_.commitJournal();
+        journal_.reset();
+    }
+
+    void NativeScene::rollbackJournal() {
+        tree_.rollbackJournal();
+        if (!journal_) return;
+        auto journal = std::move(*journal_);
+        journal_.reset();
+        for (auto& [identity, binding] : journal.bindings)
+            if (binding)
+                bindings_.insert_or_assign(identity, std::move(*binding));
+            else
+                bindings_.erase(identity);
+        for (const auto& [slot, active] : journal.eventSlots)
+            if (active)
+                activeEventSlots_.insert(slot);
+            else
+                activeEventSlots_.erase(slot);
+        slotCounters_ = journal.slotCounters;
+    }
+
+    void NativeScene::journalBinding(std::uint64_t identity) {
+        if (!journal_ || journal_->bindings.contains(identity)) return;
+        const auto found = bindings_.find(identity);
+        journal_->bindings.emplace(identity, found == bindings_.end() ? std::nullopt : std::optional<RegisterBinding>(found->second));
+    }
+
+    void NativeScene::journalEventSlot(const EventSlotId& slot) {
+        if (journal_ && !journal_->eventSlots.contains(slot)) journal_->eventSlots.emplace(slot, activeEventSlots_.contains(slot));
+    }
+
+    template <class Predicate>
+    void NativeScene::retireEventSlotsIf(Predicate predicate) {
+        for (auto it = activeEventSlots_.begin(); it != activeEventSlots_.end();) {
+            if (!predicate(*it)) {
+                ++it;
+                continue;
+            }
+            journalEventSlot(*it);
+            it = activeEventSlots_.erase(it);
+        }
     }
 
     bool NativeScene::targetIsLive(const BindingTarget& target) const {
@@ -32,6 +88,7 @@ namespace arrange::core {
     void NativeScene::retireInvalidBindings() {
         for (auto it = bindings_.begin(); it != bindings_.end();) {
             if (!targetIsLive(it->second.target)) {
+                journalBinding(it->first);
                 it = bindings_.erase(it);
                 ++slotCounters_.retirements;
             } else
@@ -65,7 +122,7 @@ namespace arrange::core {
             if (const auto* mutation = std::get_if<TreeMutation>(&operation)) {
                 tree_.applyMutation(*mutation);
                 retireInvalidBindings();
-                std::erase_if(activeEventSlots_, [&](const auto& slot) { return !tree_.contains(slot.node); });
+                retireEventSlotsIf([&](const auto& slot) { return !tree_.contains(slot.node); });
             } else if (const auto* registration = std::get_if<RegisterBinding>(&operation)) {
                 if (!registration->handle.valid()) throw std::invalid_argument("Arrange invalid binding handle");
                 if (!targetIsLive(registration->target)) {
@@ -74,6 +131,7 @@ namespace arrange::core {
                 }
                 if (bindings_.contains(registration->handle.identity)) throw std::invalid_argument("Arrange duplicate binding registration");
                 if (const auto* host = std::get_if<HostInputTarget>(&registration->target)) (void)hostInputName(host->input);
+                journalBinding(registration->handle.identity);
                 bindings_.emplace(registration->handle.identity, *registration);
                 ++slotCounters_.registrations;
             } else if (const auto* retirement = std::get_if<RetireBinding>(&operation)) {
@@ -83,6 +141,7 @@ namespace arrange::core {
                     ++slotCounters_.rejected;
                     continue;
                 }
+                journalBinding(handle.identity);
                 bindings_.erase(found);
                 ++slotCounters_.retirements;
             } else if (const auto* update = std::get_if<SlotUpdate>(&operation)) {
@@ -97,13 +156,16 @@ namespace arrange::core {
                 retireInvalidBindings();
             } else if (const auto* registration = std::get_if<RegisterEventSlot>(&operation)) {
                 if (!registration->slot.valid() || !tree_.contains(registration->slot.node)) throw std::invalid_argument("Arrange event resource target is not live");
+                journalEventSlot(registration->slot);
                 activeEventSlots_.insert(registration->slot);
             } else {
-                activeEventSlots_.erase(std::get<RetireEventSlot>(operation).slot);
+                const auto& slot = std::get<RetireEventSlot>(operation).slot;
+                journalEventSlot(slot);
+                activeEventSlots_.erase(slot);
             }
         }
         // 回调资源仅属于存续 Modifier 实例，精确参数更新也遵守同一退休规则
-        std::erase_if(activeEventSlots_, [&](const auto& slot) {
+        retireEventSlotsIf([&](const auto& slot) {
             if (!tree_.contains(slot.node)) return true;
             for (const auto& instance : tree_.node(slot.node).modifier.elements()) {
                 if (modifierEventSlot(instance.descriptor.value, slot.kind) == slot) return false;

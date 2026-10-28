@@ -135,7 +135,7 @@ namespace {
         check(withSpace->width > a->width && near(service.layout("A \nB", {18, 24})->lines[0].width, withSpace->width), "排除换行时错误丢弃了真实尾随空格");
 
         arrange::juce::JuceDrawOpsPainter painter;
-        for (const std::string alignment : {"center", "end"}) {
+        for (const auto alignment : {TextAlign::Center, TextAlign::End}) {
             DrawOp multiline;
             multiline.type = DrawOpType::DrawText;
             multiline.text = "A\nA";
@@ -389,7 +389,7 @@ namespace {
                                                   {OffsetModifier{-140, 20}, {}},
                                                   {[] {
                                                        auto value = test_support::text("VISIBLE 中文溢出 English", 0xffff0000, 30);
-                                                       value.overflow = "visible";
+                                                       value.overflow = TextOverflow::Visible;
                                                        value.maxLines = 1;
                                                        return value;
                                                    }(),
@@ -423,7 +423,7 @@ namespace {
         check(loaded.content != nullptr, "绘制验收图片加载失败");
         PaintModifier imagePaint;
         imagePaint.painter = {1, 1, 1, loaded.content};
-        imagePaint.contentScale = "Crop";
+        imagePaint.contentScale = ContentScale::Crop;
         create.operations.push_back(CreateNodeMutation{7, arrange::core::NodeType::Layout});
         create.operations.push_back(arrange::core::SetPropMutation{7, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
         create.operations.push_back(SetModifierMutation{7, {{size(20, 40), {}}, {OffsetModifier{330, 20}, {}}, {imagePaint, {}}}});

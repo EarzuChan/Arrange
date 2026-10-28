@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <arrange/core/DrawEnums.h>
 #include <arrange/core/TextLayoutService.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
@@ -30,7 +31,7 @@ namespace arrange::juce {
 
         std::vector<Run> runs;
         std::size_t estimatedBytes() const noexcept override;
-        void replay(::juce::Graphics& graphics, const arrange::core::TextLayout& layout, arrange::core::Rect area, const std::string& alignment, float viewportX) const;
+        void replay(::juce::Graphics& graphics, const arrange::core::TextLayout& layout, arrange::core::Rect area, arrange::core::TextAlign alignment, float viewportX) const;
     };
 
     class JuceTextMeasurer final : public arrange::core::TextMeasurer {

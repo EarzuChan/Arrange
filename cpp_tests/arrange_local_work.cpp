@@ -52,11 +52,11 @@ namespace {
     void verifyScene(const NativeScene& local, const PublishedFrame& frame) {
         auto full = local.tree();
         for (const auto id : full.nodeIds()) {
-            full.node(id).measurementValid = false;
-            full.node(id).placementValid = false;
+            full.mutableNode(id).measurementValid = false;
+            full.mutableNode(id).placementValid = false;
             full.markInputDirty(id, dirtyMask(DirtyFlag::Structure));
         }
-        full.recordSceneInvalidation(DirtyFlag::Structure, InvalidationSource::NativeState, "验收", "完整计算对照");
+        full.invalidateScene(DirtyFlag::Structure);
         LayoutEngine{}.layout(full, 1, {0, 1000, 0, 1000});
         check(exportDrawOps(frame.content.scenePaint) == DrawOpsBuilder{}.exportScene(full, 1), "局部绘制结果与完整计算不同");
 
@@ -77,7 +77,7 @@ namespace {
     void invalidateAll(NativeScene& scene) {
         auto& tree = scene.tree();
         for (const auto id : tree.nodeIds()) {
-            auto& node = tree.node(id);
+            auto& node = tree.mutableNode(id);
             node.measurementValid = false;
             node.placementValid = false;
             node.paintCache.reset();
@@ -86,7 +86,7 @@ namespace {
             for (auto& instance : node.modifier.elements()) instance.paintCache.reset();
             tree.markInputDirty(id, dirtyMask(DirtyFlag::Structure));
         }
-        tree.requestFullFallback("固定场景的完整计算对照");
+        tree.requestFullFallback();
     }
 
     WorkSample run(const char* label, int mode, bool full) {

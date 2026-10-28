@@ -6,7 +6,6 @@
 #include "LayoutNode.h"
 
 #include <optional>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -30,119 +29,94 @@ namespace arrange::core {
 
     struct InputIntent {
         InputIntentKind kind = InputIntentKind::JsCommit;
-        std::string reason;
-        std::optional<NodeId> target;
-        std::optional<EventSlotId> eventSlot;
         std::optional<MutationTransaction> transaction;
-        std::optional<Constraints> constraints;
         bool needsFullFallback = false;
 
-        static InputIntent jsCommit(MutationTransaction transaction, std::string reason = "js commit") {
+        static InputIntent jsCommit(MutationTransaction transaction) {
             InputIntent intent;
             intent.kind = InputIntentKind::JsCommit;
-            intent.reason = std::move(reason);
             intent.transaction = std::move(transaction);
             return intent;
         }
 
-        static InputIntent animationFrame(std::string reason = "animation frame") {
+        static InputIntent animationFrame() {
             InputIntent intent;
             intent.kind = InputIntentKind::AnimationFrame;
-            intent.reason = std::move(reason);
             return intent;
         }
 
-        static InputIntent pointer(std::string reason = "pointer input", std::optional<NodeId> target = std::nullopt) {
+        static InputIntent pointer() {
             InputIntent intent;
             intent.kind = InputIntentKind::Pointer;
-            intent.reason = std::move(reason);
-            intent.target = target;
             return intent;
         }
 
-        static InputIntent wheel(std::string reason = "wheel input", std::optional<NodeId> target = std::nullopt, std::optional<EventSlotId> eventSlot = std::nullopt) {
+        static InputIntent wheel() {
             InputIntent intent;
             intent.kind = InputIntentKind::Wheel;
-            intent.reason = std::move(reason);
-            intent.target = target;
-            intent.eventSlot = std::move(eventSlot);
             return intent;
         }
 
-        static InputIntent key(std::string reason = "key input", std::optional<NodeId> target = std::nullopt) {
+        static InputIntent key() {
             InputIntent intent;
             intent.kind = InputIntentKind::Key;
-            intent.reason = std::move(reason);
-            intent.target = target;
             return intent;
         }
 
-        static InputIntent textInput(std::string reason = "text input", std::optional<NodeId> target = std::nullopt) {
+        static InputIntent textInput() {
             InputIntent intent;
             intent.kind = InputIntentKind::TextInput;
-            intent.reason = std::move(reason);
-            intent.target = target;
             return intent;
         }
 
-        static InputIntent imeComposition(std::string reason = "输入法组合文本", std::optional<NodeId> target = std::nullopt) {
+        static InputIntent imeComposition() {
             InputIntent intent;
             intent.kind = InputIntentKind::ImeComposition;
-            intent.reason = std::move(reason);
-            intent.target = target;
             return intent;
         }
 
-        static InputIntent resize(Constraints constraints, std::string reason = "viewport resize") {
+        static InputIntent resize() {
             InputIntent intent;
             intent.kind = InputIntentKind::Resize;
-            intent.reason = std::move(reason);
-            intent.constraints = constraints;
             return intent;
         }
 
-        static InputIntent diagnostics(std::string reason) {
+        static InputIntent diagnostics() {
             InputIntent intent;
             intent.kind = InputIntentKind::DiagnosticsEvent;
-            intent.reason = std::move(reason);
             return intent;
         }
 
-        static InputIntent packageLoad(MutationTransaction transaction, std::string reason = "package load") {
+        static InputIntent packageLoad(MutationTransaction transaction) {
             InputIntent intent;
             intent.kind = InputIntentKind::PackageLoad;
-            intent.reason = std::move(reason);
             intent.transaction = std::move(transaction);
             return intent;
         }
 
-        static InputIntent reload(std::string reason = "reload") {
+        static InputIntent reload() {
             InputIntent intent;
             intent.kind = InputIntentKind::Reload;
-            intent.reason = std::move(reason);
             intent.needsFullFallback = true;
             return intent;
         }
 
-        static InputIntent hmrReload(std::string reason = "hmr reload") {
+        static InputIntent hmrReload() {
             InputIntent intent;
             intent.kind = InputIntentKind::HmrReload;
-            intent.reason = std::move(reason);
             intent.needsFullFallback = true;
             return intent;
         }
 
-        static InputIntent resourceReady(std::string reason = "resource ready") {
+        static InputIntent resourceReady() {
             InputIntent intent;
             intent.kind = InputIntentKind::ResourceReady;
-            intent.reason = std::move(reason);
             return intent;
         }
 
-        static InputIntent resourceFailed(std::string reason = "resource failed") {
+        static InputIntent resourceFailed() {
             InputIntent intent;
             intent.kind = InputIntentKind::ResourceFailed;
-            intent.reason = std::move(reason);
             return intent;
         }
     };

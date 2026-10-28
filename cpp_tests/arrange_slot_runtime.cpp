@@ -2,6 +2,8 @@
 #include <arrange/core/SceneFramePipeline.h>
 
 #include <iostream>
+#include <map>
+#include <optional>
 #include <stdexcept>
 
 using namespace arrange::core;
@@ -48,7 +50,7 @@ namespace {
         MutationTransaction registerInputs;
         registerInputs.operations.emplace_back(RegisterBinding{paint, ModifierInputTarget{node, paintHandle}});
         registerInputs.operations.emplace_back(RegisterBinding{offset, ModifierInputTarget{node, offsetHandle}});
-        registerInputs.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::ContentDescription}});
+        registerInputs.operations.emplace_back(RegisterBinding{style, HostInputTarget{node, HostInput::Enabled}});
         scene.apply(registerInputs);
         MutationTransaction paintUpdate;
         paintUpdate.operations.emplace_back(SlotUpdate{paint, ModifierValue{color(0xffabcdef)}});
@@ -94,6 +96,79 @@ namespace {
         scene.reset();
         scene.apply(stale);
         check(scene.bindingCount() == 0 && scene.slotCounters().rejected == 1, "reset accepted old binding");
+    }
+
+    struct NodeState {
+        Rect bounds;
+        std::vector<NodeId> children;
+        std::optional<NodeId> parent;
+        std::uint32_t dirty = 0;
+        std::uint32_t subtreeDirty = 0;
+        bool measured = false;
+        bool placed = false;
+        const void* paint = nullptr;
+        const void* hit = nullptr;
+        std::size_t modifiers = 0;
+        bool operator==(const NodeState&) const = default;
+    };
+
+    std::map<NodeId, NodeState> capture(const NativeScene& scene) {
+        std::map<NodeId, NodeState> result;
+        const auto& tree = scene.tree();
+        for (const auto id : tree.nodeIds()) {
+            const auto& node = tree.node(id);
+            result[id] = {node.bounds, node.children, tree.parentOf(id), node.dirty, node.subtreeDirty, node.measurementValid, node.placementValid, node.paintCache.get(), node.hitCache.get(), node.modifier.elements().size()};
+        }
+        return result;
+    }
+
+    // 写入日志：注入失败后场景逐字段回到上次成功状态；局部帧只记录被写节点
+    void verifyJournalRollback() {
+        NativeScene scene;
+        SceneFramePipeline pipeline;
+        PublishedFrame frame;
+        const auto column = PropValue::objectValue({{"kind", PropValue::stringValue("Column")}});
+        MutationTransaction mount;
+        mount.operations.emplace_back(CreateNodeMutation{1, arrange::core::NodeType::Layout, allocateRuntimeIdentity()});
+        mount.operations.emplace_back(SetPropMutation{1, "measurePolicy", column});
+        std::vector<NodeHandle> children;
+        for (NodeId id = 2; id < 12; ++id) {
+            children.push_back({id, allocateRuntimeIdentity()});
+            mount.operations.emplace_back(CreateNodeMutation{id, arrange::core::NodeType::Layout, children.back().generation});
+            mount.operations.emplace_back(InsertChildMutation{1, id, static_cast<std::uint32_t>(id - 2)});
+            mount.operations.emplace_back(SetModifierMutation{id, box(0xff000000u + id)});
+        }
+        const auto chain = binding();
+        mount.operations.emplace_back(RegisterBinding{chain, ModifierChainTarget{children[0]}});
+        check(!pipeline.run(scene, 1, {0, 500, 0, 2000}, &mount, true, frame).error, "挂载帧失败");
+
+        const auto before = capture(scene);
+        const auto bindings = scene.bindingCount();
+        const auto counters = scene.slotCounters();
+        const auto revision = frame.revision;
+        const auto invalidation = scene.invalidationSnapshot();
+        MutationTransaction change;
+        change.operations.emplace_back(CreateNodeMutation{50, arrange::core::NodeType::Layout, allocateRuntimeIdentity()});
+        change.operations.emplace_back(InsertChildMutation{1, 50, 0});
+        change.operations.emplace_back(SetModifierMutation{50, box(0xff123456)});
+        change.operations.emplace_back(DeleteNodeMutation{3});
+        change.operations.emplace_back(SlotUpdate{chain, box(0xff654321)});
+        change.operations.emplace_back(RegisterBinding{binding(), ModifierChainTarget{children[2]}});
+        change.operations.emplace_back(RetireBinding{chain});
+        const auto failed = pipeline.run(scene, 1, {0, 500, 0, 2000}, &change, true, frame, [](const NativeScene&, PublishedFrame&) { throw std::runtime_error("注入失败"); });
+        check(failed.error.has_value() && failed.plan.measure && failed.plan.buildPaint, "注入失败应发生在测量与绘制之后");
+        check(capture(scene) == before, "失败帧回滚后节点、父子关系、几何或缓存与上次成功状态不同");
+        check(scene.bindingCount() == bindings && scene.slotCounters().registrations == counters.registrations && scene.slotCounters().retirements == counters.retirements && scene.slotCounters().updates == counters.updates, "失败帧回滚后绑定或计数与上次成功状态不同");
+        check(scene.invalidationSnapshot().combinedDirty == invalidation.combinedDirty && frame.revision == revision, "失败帧改变了失效汇总或已发布帧");
+
+        const auto applied = pipeline.run(scene, 1, {0, 500, 0, 2000}, &change, true, frame);
+        check(!applied.error && scene.contains(50) && !scene.contains(3) && scene.bindingCount() == bindings, "回滚后同一事务应能完整提交");
+
+        MutationTransaction paint;
+        paint.operations.emplace_back(SetModifierMutation{5, box(0xffabcdef)});
+        const auto copied = pipeline.counters().candidateNodesCopied;
+        check(!pipeline.run(scene, 1, {0, 500, 0, 2000}, &paint, true, frame).error, "局部颜色帧失败");
+        check(pipeline.counters().candidateNodesCopied - copied <= 2, "局部颜色帧不应记录无关节点");
     }
 
     void verifyOrderedSubmissions() {
@@ -189,6 +264,7 @@ int main() {
         verifyOrderedSubmissions();
         verifyBindingsAndFailureBoundary();
         verifyTextModifierAndAtomicApply();
+        verifyJournalRollback();
         std::cout << "Typed slots: lifecycle, phases, equality and atomic failure checks passed\n";
         return 0;
     } catch (const std::exception& error) {

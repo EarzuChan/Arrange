@@ -221,7 +221,7 @@ namespace arrange::juce {
         const auto tab = key.isKeyCode(::juce::KeyPress::tabKey);
         // Input 先消费编辑按键；Tab 不交给 Input
         if (!tab && input_.keyPressed(tree, runtimeReady, key, callbacks)) return true;
-        if (callbacks.enqueueKeyIntent) callbacks.enqueueKeyIntent(focusedNode().value_or(0), "通用焦点键盘输入");
+        if (callbacks.enqueueKeyIntent) callbacks.enqueueKeyIntent(focusedNode().value_or(0));
         pressed->delivered = true;
         if (bubbleKey(tree, {false, pressed->key, pressed->text, repeat, keyModifierState(key.getModifiers())}, callbacks)) return true;
         if (tab) return moveFocus(tree, key.getModifiers().isShiftDown() ? arrange::core::FocusDirection::Previous : arrange::core::FocusDirection::Next, callbacks);
@@ -297,7 +297,7 @@ namespace arrange::juce {
         if (changed && callbacks.invalidateNativeState) {
             for (const auto id : tree.nodeIds()) {
                 const auto& node = tree.node(id);
-                if (node.lazy && (!node.lazy->pinnedKeys.empty() || !node.lazy->focusRequestKey.empty()) || focusedNode() && std::holds_alternative<arrange::core::LazyMeasurePolicy>(node.measurePolicy) && descendant(tree, *focusedNode(), id)) callbacks.invalidateNativeState(id, arrange::core::DirtyFlag::Layout, "Lazy 焦点 pin 更新");
+                if (node.lazy && (!node.lazy->pinnedKeys.empty() || !node.lazy->focusRequestKey.empty()) || focusedNode() && std::holds_alternative<arrange::core::LazyMeasurePolicy>(node.measurePolicy) && descendant(tree, *focusedNode(), id)) callbacks.invalidateNativeState(id, arrange::core::DirtyFlag::Layout);
             }
         }
         if (focus_.takeScrollRequest() && focus_.target()) {
@@ -318,7 +318,7 @@ namespace arrange::juce {
                     input_.focus(tree, node, target.modifier, callbacks);
                 else
                     input_.finishFocusedInput(tree, false, callbacks);
-                if (changed && callbacks.invalidateNativeState) callbacks.invalidateNativeState(node, arrange::core::DirtyFlag::Paint, "焦点改变");
+                if (changed && callbacks.invalidateNativeState) callbacks.invalidateNativeState(node, arrange::core::DirtyFlag::Paint);
                 dispatchCommittedFocus(tree, callbacks);
                 return true;
             }
@@ -342,7 +342,7 @@ namespace arrange::juce {
         const auto previous = focusedNode();
         (void)focus_.set({});
         input_.finishFocusedInput(tree, false, callbacks);
-        if (previous && callbacks.invalidateNativeState) callbacks.invalidateNativeState(*previous, arrange::core::DirtyFlag::Paint, "焦点清空");
+        if (previous && callbacks.invalidateNativeState) callbacks.invalidateNativeState(*previous, arrange::core::DirtyFlag::Paint);
         dispatchCommittedFocus(tree, callbacks);
         if (focusChangedHook_) focusChangedHook_({});
     }
@@ -388,7 +388,7 @@ namespace arrange::juce {
         }
         if (index < 0 || index >= static_cast<int>(policy.keys.size())) return false;
         pendingLazyFocus_ = LazyFocusRequest{{container.id, container.generation}, policy.keys[index], direction, ++lazyFocusVersion_};
-        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(container.id, arrange::core::DirtyFlag::Layout, "Lazy 方向焦点材料化");
+        if (callbacks.invalidateNativeState) callbacks.invalidateNativeState(container.id, arrange::core::DirtyFlag::Layout);
         return true;
     }
 
@@ -405,7 +405,7 @@ namespace arrange::juce {
             }
         }
         for (const auto id : tree.nodeIds()) {
-            auto& node = tree.node(id);
+            const auto& node = tree.node(id);
             if (!std::holds_alternative<arrange::core::LazyMeasurePolicy>(node.measurePolicy)) continue;
             auto selected = pins[id];
             std::sort(selected.begin(), selected.end());
@@ -415,10 +415,11 @@ namespace arrange::juce {
             const auto version = request ? pendingLazyFocus_->version : node.lazy ? node.lazy->focusRequestVersion : 0;
             if (node.lazy && node.lazy->pinnedKeys == selected && node.lazy->focusRequestKey == key && node.lazy->focusRequestVersion == version) continue;
             if (selected.empty() && !request && !node.lazy) continue;
-            node.lazy = node.lazy ? std::make_shared<arrange::core::LazyLayoutState>(*node.lazy) : std::make_shared<arrange::core::LazyLayoutState>();
-            node.lazy->pinnedKeys = std::move(selected);
-            node.lazy->focusRequestKey = key;
-            node.lazy->focusRequestVersion = version;
+            auto& target = tree.mutableNode(id);
+            target.lazy = node.lazy ? std::make_shared<arrange::core::LazyLayoutState>(*node.lazy) : std::make_shared<arrange::core::LazyLayoutState>();
+            target.lazy->pinnedKeys = std::move(selected);
+            target.lazy->focusRequestKey = key;
+            target.lazy->focusRequestVersion = version;
             tree.markInputDirty(id, static_cast<std::uint32_t>(arrange::core::DirtyFlag::Layout));
         }
     }

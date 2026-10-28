@@ -94,7 +94,7 @@ namespace arrange::juce {
                 interaction.dispatchCommittedFocus(runtime.scene().tree(), TextInputMutationSink{}.callbacks(runtime));
                 if (const auto container = interaction.pendingLazyContainer()) {
                     const auto callbacks = TextInputMutationSink{}.callbacks(runtime);
-                    callbacks.invalidateNativeState(*container, arrange::core::DirtyFlag::Layout, "继续 Lazy 方向焦点搜索");
+                    callbacks.invalidateNativeState(*container, arrange::core::DirtyFlag::Layout);
                 }
             }
         }
@@ -148,7 +148,7 @@ namespace arrange::juce {
 #endif
         changed = diagnostics.tick(nowMillis) || changed;
         if (!changed) return false;
-        runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("diagnostics toast tick"));
+        runtime.enqueueIntent(arrange::core::InputIntent::diagnostics());
         return true;
     }
 

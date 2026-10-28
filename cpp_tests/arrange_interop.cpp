@@ -34,42 +34,88 @@ namespace {
             sink = &value;
             ++attaches;
         }
+
         void detach(arrange::core::InteropSessionSink& value) noexcept override {
             if (sink == &value) sink = nullptr;
         }
-        const std::vector<arrange::core::InteropParameter>& parameters() const override { return parameters_; }
-        float parameterValue(std::size_t index) const override { return values.at(index); }
+
+        const std::vector<arrange::core::InteropParameter>& parameters() const override {
+            return parameters_;
+        }
+
+        float parameterValue(std::size_t index) const override {
+            return values.at(index);
+        }
+
         void takeParameterChanges(std::vector<std::size_t>& changed) override {
             changed.insert(changed.end(), pendingChanges.begin(), pendingChanges.end());
             pendingChanges.clear();
         }
+
         double toPlain(std::size_t index, float normalized) const override {
             const auto& p = parameters_.at(index);
             return p.minimum + (p.maximum - p.minimum) * normalized;
         }
+
         float toNormalized(std::size_t index, double plain) const override {
             const auto& p = parameters_.at(index);
             return static_cast<float>((plain - p.minimum) / (p.maximum - p.minimum));
         }
-        std::string text(std::size_t index, float normalized) const override { return std::to_string(static_cast<int>(toPlain(index, normalized))); }
-        std::optional<float> parse(std::size_t index, std::string_view text) const override { return toNormalized(index, std::stod(std::string(text))); }
-        void beginGesture(std::size_t index) override { operations.push_back("begin " + std::to_string(index)); }
+
+        std::string text(std::size_t index, float normalized) const override {
+            return std::to_string(static_cast<int>(toPlain(index, normalized)));
+        }
+
+        std::optional<float> parse(std::size_t index, std::string_view text) const override {
+            return toNormalized(index, std::stod(std::string(text)));
+        }
+
+        void beginGesture(std::size_t index) override {
+            operations.push_back("begin " + std::to_string(index));
+        }
+
         void setParameter(std::size_t index, float normalized) override {
             values.at(index) = normalized;
             operations.push_back("set " + std::to_string(index) + " " + std::to_string(normalized));
         }
-        void endGesture(std::size_t index) override { operations.push_back("end " + std::to_string(index)); }
-        arrange::core::InteropHostInfo hostInfo() const override { return {"Fake DAW", "vst3", 48000.0, 256}; }
-        arrange::core::InteropTransport transport() const override { return {}; }
-        bool hasMeter(std::string_view name) const override { return name == "out"; }
-        float takeMeter(std::string_view) override { return meterLevel; }
-        std::optional<std::size_t> waveformCapacity(std::string_view name) const override { return name == "scope" ? std::optional<std::size_t>(16) : std::nullopt; }
+
+        void endGesture(std::size_t index) override {
+            operations.push_back("end " + std::to_string(index));
+        }
+
+        arrange::core::InteropHostInfo hostInfo() const override {
+            return {"Fake DAW", "vst3", 48000.0, 256};
+        }
+
+        arrange::core::InteropTransport transport() const override {
+            return {};
+        }
+
+        bool hasMeter(std::string_view name) const override {
+            return name == "out";
+        }
+
+        float takeMeter(std::string_view) override {
+            return meterLevel;
+        }
+
+        std::optional<std::size_t> waveformCapacity(std::string_view name) const override {
+            return name == "scope" ? std::optional<std::size_t>(16) : std::nullopt;
+        }
+
         std::uint64_t readWaveform(std::string_view, std::span<float> out) const override {
             for (std::size_t i = 0; i < out.size(); ++i) out[i] = static_cast<float>(waveformCount - out.size() + i + 1);
             return waveformCount;
         }
-        std::optional<std::size_t> spectrumSize(std::string_view) const override { return std::nullopt; }
-        bool readSpectrum(std::string_view, std::span<float>) override { return false; }
+
+        std::optional<std::size_t> spectrumSize(std::string_view) const override {
+            return std::nullopt;
+        }
+
+        bool readSpectrum(std::string_view, std::span<float>) override {
+            return false;
+        }
+
         void invoke(std::string_view name, const InteropValue& args, arrange::core::InteropReply reply) override {
             if (name == "report") {
                 reports.push_back(args);
@@ -179,21 +225,54 @@ namespace {
         ::juce::AudioParameterFloat* gain;
         ::juce::AudioParameterBool* bypass;
 
-        const ::juce::String getName() const override { return "Test"; }
+        const ::juce::String getName() const override {
+            return "Test";
+        }
+
         void prepareToPlay(double, int) override {}
+
         void releaseResources() override {}
+
         void processBlock(::juce::AudioBuffer<float>&, ::juce::MidiBuffer&) override {}
-        double getTailLengthSeconds() const override { return 0; }
-        bool acceptsMidi() const override { return false; }
-        bool producesMidi() const override { return false; }
-        ::juce::AudioProcessorEditor* createEditor() override { return nullptr; }
-        bool hasEditor() const override { return false; }
-        int getNumPrograms() override { return 1; }
-        int getCurrentProgram() override { return 0; }
+
+        double getTailLengthSeconds() const override {
+            return 0;
+        }
+
+        bool acceptsMidi() const override {
+            return false;
+        }
+
+        bool producesMidi() const override {
+            return false;
+        }
+
+        ::juce::AudioProcessorEditor* createEditor() override {
+            return nullptr;
+        }
+
+        bool hasEditor() const override {
+            return false;
+        }
+
+        int getNumPrograms() override {
+            return 1;
+        }
+
+        int getCurrentProgram() override {
+            return 0;
+        }
+
         void setCurrentProgram(int) override {}
-        const ::juce::String getProgramName(int) override { return {}; }
+
+        const ::juce::String getProgramName(int) override {
+            return {};
+        }
+
         void changeProgramName(int, const ::juce::String&) override {}
+
         void getStateInformation(::juce::MemoryBlock&) override {}
+
         void setStateInformation(const void*, int) override {}
     };
 
@@ -201,14 +280,23 @@ namespace {
        public:
         int wakes = 0;
         std::vector<std::string> messages;
-        void wake() override { ++wakes; }
-        void message(std::string name, InteropValue) override { messages.push_back(std::move(name)); }
+
+        void wake() override {
+            ++wakes;
+        }
+
+        void message(std::string name, InteropValue) override {
+            messages.push_back(std::move(name));
+        }
     };
 
     class FixedPlayHead final : public ::juce::AudioPlayHead {
        public:
         PositionInfo info;
-        ::juce::Optional<PositionInfo> getPosition() const override { return info; }
+
+        ::juce::Optional<PositionInfo> getPosition() const override {
+            return info;
+        }
     };
 
     void testJuceInterop() {

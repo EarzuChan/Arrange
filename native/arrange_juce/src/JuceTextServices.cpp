@@ -47,15 +47,11 @@ namespace arrange::juce {
         return bytes;
     }
 
-    void JuceTextResource::replay(::juce::Graphics& graphics, const arrange::core::TextLayout& layout, arrange::core::Rect area, const std::string& alignment, float viewportX) const {
+    void JuceTextResource::replay(::juce::Graphics& graphics, const arrange::core::TextLayout& layout, arrange::core::Rect area, arrange::core::TextAlign alignment, float viewportX) const {
         auto& context = graphics.getInternalContext();
         for (const auto& run : runs) {
             const auto width = layout.lines[run.line].width;
-            auto x = area.x - viewportX;
-            if (alignment == "center" || alignment == "Center")
-                x += (area.width - width) * 0.5f;
-            else if (alignment == "right" || alignment == "end" || alignment == "End")
-                x += area.width - width;
+            const auto x = area.x - viewportX + arrange::core::textAlignShift(alignment, area.width, width);
             context.setFont(run.font);
             context.drawGlyphs({run.glyphs.data(), run.glyphs.size()}, {run.positions.data(), run.positions.size()}, ::juce::AffineTransform::translation(x, area.y));
         }

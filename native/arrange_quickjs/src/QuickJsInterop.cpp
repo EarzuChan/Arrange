@@ -106,8 +106,10 @@ namespace arrange::quickjs {
                 const char* key = JS_AtomToCString(context, names[i].atom);
                 ScopedValue field(context, JS_GetProperty(context, value, names[i].atom));
                 auto converted = key ? interopValueFromJs(context, field.get(), depth + 1) : std::nullopt;
-                if (converted) fields.emplace_back(key, std::move(*converted));
-                else ok = false;
+                if (converted)
+                    fields.emplace_back(key, std::move(*converted));
+                else
+                    ok = false;
                 if (key) JS_FreeCString(context, key);
             }
             JS_FreePropertyEnum(context, names, count);
@@ -119,7 +121,9 @@ namespace arrange::quickjs {
     }
 
     QuickJsInterop::QuickJsInterop(JSContext* context, arrange::core::InteropHost& host, std::function<void()> wakeOwner) : context_(context), host_(&host), wakeOwner_(std::move(wakeOwner)) {
-        replies_->wake = [this] { wake(); };
+        replies_->wake = [this] {
+            wake();
+        };
         deliveredHost_ = host_->hostInfo();
         host_->attach(*this);
     }

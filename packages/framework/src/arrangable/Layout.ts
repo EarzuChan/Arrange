@@ -1,7 +1,7 @@
 import { currentInstance, ValueBinding, invokeContent } from '../runtime/internal.ts'
 import { defineArrangable } from '../runtime/index.ts'
 import type { ArrangableProps, PropType } from '../runtime/index.ts'
-import { LayoutRearrangeNode, NativeRearrangeHost } from '../rearrangeNode.ts'
+import { LayoutRearrangeNode, NativeRearrangeHost } from '../nativeRearrange.ts'
 import { isMeasurePolicy } from '../measurePolicy.ts'
 import type { MeasurePolicy } from '../measurePolicy.ts'
 import { M, Modifier } from '../modifier.ts'
@@ -13,7 +13,7 @@ import type { LayoutContentProvider } from '../layoutContent.ts'
 export type LayoutProps = ArrangableProps<typeof Layout>
 export const Layout = defineArrangable({
     name: 'Layout',
-    props: { modifier: { type: Modifier, default: M }, measurePolicy: { type: Object as PropType<MeasurePolicy>, required: true, validator: isMeasurePolicy }, contentProvider: Object as PropType<LayoutContentProvider>, enabled: Boolean, contentDescription: String },
+    props: { modifier: { type: Modifier, default: M }, measurePolicy: { type: Object as PropType<MeasurePolicy>, required: true, validator: isMeasurePolicy }, contentProvider: Object as PropType<LayoutContentProvider>, enabled: Boolean },
     slotNames: ['default'],
     setup(props, { slot, source }) {
         const instance = currentInstance!
@@ -34,7 +34,6 @@ export const Layout = defineArrangable({
         new ValueBinding(() => units.measurePolicy(props.measurePolicy), instance, value => node.updateMeasurePolicy(value as MeasurePolicy), source('measurePolicy'))
         new ValueBinding(() => units.modifier(props.modifier), instance, value => node.updateModifier(value as import('../resolveUnits.ts').PxModifier), source('modifier'))
         new ValueBinding(() => props.enabled, instance, value => node.updateInput('enabled', value as boolean | undefined), source('enabled'))
-        new ValueBinding(() => props.contentDescription, instance, value => node.updateInput('contentDescription', value as string | undefined), source('contentDescription'))
 
         const content = slot()
         return () => props.contentProvider ? props.contentProvider.render() : invokeContent(0, content)

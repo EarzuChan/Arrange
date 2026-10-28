@@ -213,11 +213,11 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
     void verifyPointerMoveBarriers() {
         // 当前生产输入队列不合并 move，离散边界前后的每项均保序
         InputIntentQueue queue;
-        const std::vector<std::string> sequence{"move-before", "down", "move-1", "move-2", "up", "move-after", "down", "move-3", "up"};
-        for (const auto& reason : sequence) queue.push(InputIntent::pointer(reason));
+        const std::vector<InputIntentKind> sequence{InputIntentKind::Pointer, InputIntentKind::Key, InputIntentKind::Pointer, InputIntentKind::Wheel, InputIntentKind::TextInput, InputIntentKind::Pointer};
+        for (const auto kind : sequence) queue.push(kind == InputIntentKind::Key ? InputIntent::key() : kind == InputIntentKind::Wheel ? InputIntent::wheel() : kind == InputIntentKind::TextInput ? InputIntent::textInput() : InputIntent::pointer());
         const auto intents = queue.take();
-        check(intents.size() == sequence.size() && queue.empty(), "指针输入队列在离散边界上合并或丢弃了操作");
-        for (std::size_t index = 0; index < sequence.size(); ++index) check(intents[index].reason == sequence[index], "指针移动越过 down/up 改变了输入顺序");
+        check(intents.size() == sequence.size() && queue.empty(), "输入意图队列合并或丢弃了操作");
+        for (std::size_t index = 0; index < sequence.size(); ++index) check(intents[index].kind == sequence[index], "输入意图队列改变了顺序");
 
         ApproximateTextMeasurer measurer;
         TextLayoutService text(measurer);

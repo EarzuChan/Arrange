@@ -4,8 +4,6 @@ add_library(arrange_core STATIC
   src/PropValue.cpp
   src/PropSchema.cpp
   src/TextLayoutService.cpp
-  src/InputIntent.cpp
-  src/Invalidation.cpp
   src/Mutation.cpp
   src/MutationTransaction.cpp
   src/HostInput.cpp
@@ -22,7 +20,6 @@ add_library(arrange_core STATIC
   src/Layout.cpp
   src/MeasurePolicy.cpp
   src/HitTest.cpp
-  src/PointerInputProcessor.cpp
   src/PointerGesture.cpp
   src/Scroll.cpp
   src/InputEditing.cpp

@@ -25,8 +25,6 @@ namespace arrange::core {
             if (input.style.fontSize <= 0 || input.style.lineHeight < 0) throw std::invalid_argument("文本字号必须大于零，行高不能为负数");
             if (input.minLines < 1 || input.maxLines < 0 || input.maxLines > 0 && input.maxLines < input.minLines) throw std::invalid_argument("文本行数范围无效");
             if (input.singleLine && (input.minLines != 1 || input.maxLines > 1)) throw std::invalid_argument("单行文本不能要求多行范围");
-            if (input.textAlign != "Start" && input.textAlign != "Center" && input.textAlign != "End") throw std::invalid_argument("textAlign 文本对齐值无效：" + input.textAlign);
-            if (input.overflow != "clip" && input.overflow != "ellipsis" && input.overflow != "visible") throw std::invalid_argument("文本溢出模式无效");
         }
 
         std::uint32_t invalidationMask(const ModifierValue& value) {
@@ -116,8 +114,6 @@ namespace arrange::core {
                 } else if constexpr (std::is_same_v<T, PaintModifier>) {
                     finite(input.alpha);
                     if (input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("paint alpha 必须在 0..1 之间");
-                    if (!isImageAlignment(input.alignment)) throw std::invalid_argument("paint 对齐值无效");
-                    if (input.contentScale != "Fit" && input.contentScale != "Crop" && input.contentScale != "FillBounds" && input.contentScale != "Inside" && input.contentScale != "None" && input.contentScale != "FillWidth" && input.contentScale != "FillHeight") throw std::invalid_argument("paint 缩放模式无效");
                     if (input.painter.content && input.painter.content->intrinsicSize) {
                         const auto size = *input.painter.content->intrinsicSize;
                         finite(size.width);

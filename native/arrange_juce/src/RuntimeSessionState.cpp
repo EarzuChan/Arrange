@@ -36,7 +36,7 @@ namespace arrange::juce {
         }
 
         void emitToast(DiagnosticsState& diagnostics, ArrangeRuntime& runtime, std::string_view tag, LogLevel level, std::string title, std::string message = {}, bool coalesce = true) {
-            if (DiagnosticsToast::show(diagnostics, level, tag, std::move(title), std::move(message), coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics("runtime toast"));
+            if (DiagnosticsToast::show(diagnostics, level, tag, std::move(title), std::move(message), coalesce)) runtime.enqueueIntent(arrange::core::InputIntent::diagnostics());
         }
     }
 
@@ -51,7 +51,7 @@ namespace arrange::juce {
         if (width_ == width && height_ == height) return;
         width_ = width;
         height_ = height;
-        runtime.enqueueIntent(arrange::core::InputIntent::resize(constraints(), "宿主视口尺寸变化"));
+        runtime.enqueueIntent(arrange::core::InputIntent::resize());
     }
 
     arrange::core::Constraints RuntimeSessionState::constraints() const noexcept {

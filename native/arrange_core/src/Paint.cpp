@@ -42,7 +42,7 @@ namespace arrange::core {
     void DrawOpsBuilder::prepareText(DrawOp& op, const TextLayoutService& service) {
         if (op.type != DrawOpType::DrawText) return;
         const auto width = op.inputText && op.maxLines == 1 ? 0.0f : op.rect.width;
-        op.textLayout = service.layout(op.text, {op.fontSize, op.lineHeight}, {op.maxLines, width, op.maxLines == 1, op.overflow == "ellipsis"}, op.textLayout);
+        op.textLayout = service.layout(op.text, {op.fontSize, op.lineHeight}, {op.maxLines, width, op.maxLines == 1, op.overflow == TextOverflow::Ellipsis}, op.textLayout);
     }
 
     std::vector<DrawOp> DrawOpsBuilder::exportScene(const LayoutTree& tree, NodeId root) const {
@@ -172,16 +172,12 @@ namespace arrange::core {
         if (op.type == DrawOpType::PushClip || op.type == DrawOpType::PopClip || op.type == DrawOpType::PushTransform || op.type == DrawOpType::PopTransform || op.type == DrawOpType::ContentMarker) return {};
         auto rect = op.rect;
         if (op.type == DrawOpType::DrawText) {
-            if (op.inputText || op.overflow == "clip" || op.overflow == "ellipsis") return {rect, true, rect.width <= 0 || rect.height <= 0};
+            if (op.inputText || op.overflow != TextOverflow::Visible) return {rect, true, rect.width <= 0 || rect.height <= 0};
             if (!op.textLayout || !op.textLayout->boundsKnown) return {{}, false, false};
             rect = op.textLayout->inkBounds;
             float minShift = 0, maxShift = 0;
             for (const auto& line : op.textLayout->lines) {
-                float shift = 0;
-                if (op.textAlign == "center" || op.textAlign == "Center")
-                    shift = (op.rect.width - line.width) * 0.5f;
-                else if (op.textAlign == "right" || op.textAlign == "end" || op.textAlign == "End")
-                    shift = op.rect.width - line.width;
+                const auto shift = textAlignShift(op.textAlign, op.rect.width, line.width);
                 minShift = std::min(minShift, shift);
                 maxShift = std::max(maxShift, shift);
             }
@@ -189,7 +185,7 @@ namespace arrange::core {
             rect.y += op.rect.y;
             rect.width += maxShift - minShift;
         }
-        if (op.type == DrawOpType::DrawPainter && (op.contentScale == "None" || op.contentScale == "Inside" || op.contentScale == "Crop")) return {{}, false, false};
+        if (op.type == DrawOpType::DrawPainter && (op.contentScale == ContentScale::Unscaled || op.contentScale == ContentScale::Inside || op.contentScale == ContentScale::Crop)) return {{}, false, false};
         auto margin = 1.0f;
         if (op.type == DrawOpType::StrokeRect) margin += op.strokeWidth * 0.5f;
         if (op.type == DrawOpType::DrawLine) {
@@ -201,12 +197,13 @@ namespace arrange::core {
     }
 
     std::shared_ptr<const PaintFragment> DrawOpsBuilder::buildFragment(LayoutTree& tree, NodeId id, PaintWorkCounters& counters) const {
-        auto& node = tree.node(id);
+        const auto& cached = tree.node(id);
         constexpr auto paintMask = dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Placement) | dirtyMask(DirtyFlag::Paint) | dirtyMask(DirtyFlag::Transform) | dirtyMask(DirtyFlag::Resource);
-        if (node.paintCache && !((node.dirty | node.subtreeDirty) & paintMask)) {
+        if (cached.paintCache && !((cached.dirty | cached.subtreeDirty) & paintMask)) {
             ++counters.subtreeCacheHits;
-            return node.paintCache;
+            return cached.paintCache;
         }
+        auto& node = tree.mutableNode(id);
         PaintFragment content;
         for (auto childId : childrenInPaintOrder(tree, node)) {
             const auto& child = tree.node(childId);
@@ -537,8 +534,8 @@ namespace arrange::core {
         text.fontSize = input.style.fontSize;
         text.lineHeight = input.style.lineHeight;
         text.maxLines = input.singleLine ? 1 : 0;
-        text.overflow = "clip";
-        text.textAlign = "Start";
+        text.overflow = TextOverflow::Clip;
+        text.textAlign = TextAlign::Start;
         text.textLayout = state.text.empty() ? instance.textLayout : inputLayout.text;
         ops.push_back(std::move(text));
 

@@ -9,7 +9,7 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/NativeScene.h>
 #include <arrange/core/Paint.h>
-#include <arrange/core/PointerInputProcessor.h>
+#include <arrange/core/PointerGesture.h>
 #include <arrange/core/PropSchema.h>
 #include <arrange/core/PropValue.h>
 #include <arrange/core/SceneFramePipeline.h>
@@ -43,11 +43,8 @@ namespace {
         return (node.dirty & arrange::core::dirtyMask(flag)) != 0;
     }
 
-    bool phaseRan(const std::vector<arrange::core::PhaseExecution>& phases, arrange::core::FramePhase phase) {
-        for (const auto& execution : phases) {
-            if (execution.phase == phase) return execution.ran;
-        }
-        return false;
+    bool phaseRan(const arrange::core::PhaseSet& phases, arrange::core::FramePhase phase) {
+        return phases.ran(phase);
     }
 
     arrange::core::PropValue object(std::vector<arrange::core::PropObjectField> fields) {
@@ -282,7 +279,7 @@ namespace {
         if (phaseRan(published.phases, arrange::core::FramePhase::BuildPaint)) return 29;
 
         arrange::core::MutationTransaction nativeInvalidation;
-        nativeInvalidation.operations.emplace_back(arrange::core::NativeInvalidationMutation{6, arrange::core::DirtyFlag::Paint, "nativeInputPaint", "caret blink"});
+        nativeInvalidation.operations.emplace_back(arrange::core::NativeInvalidationMutation{6, arrange::core::DirtyFlag::Paint});
         result = pipeline.run(scene, 1, {0.0f, 320.0f, 0.0f, 240.0f}, &nativeInvalidation, false, published);
         if (result.error) return 30;
         if (phaseRan(published.phases, arrange::core::FramePhase::Measure)) return 31;
@@ -298,10 +295,13 @@ namespace {
         }
         arrange::core::LayoutEngine{}.layout(tree, 1, {0.0f, 320.0f, 0.0f, 240.0f});
 
-        arrange::core::PointerInputProcessor pointer;
-        const auto down = pointer.pointerDown(tree, 1, {10.0f, 48.0f}, 1);
-        const auto up = pointer.pointerUp(tree, 1, {10.0f, 48.0f}, 1);
-        if (!down.consumed || !up.clickTriggered || up.eventSlot.kind != arrange::core::EventSlotKind::Click) return 41;
+        arrange::core::PointerGestureSession pointer;
+        const auto snapshot = arrange::core::buildHitTestSnapshot(tree, 1);
+        arrange::core::PointerGestureOutput down;
+        arrange::core::PointerGestureOutput up;
+        pointer.primaryDown(tree, snapshot, {{10.0f, 48.0f}}, 1, down);
+        pointer.primaryUp(tree, snapshot, {{10.0f, 48.0f}}, up);
+        if (!down.consumed || up.events.empty() || up.events.front().slot.kind != arrange::core::EventSlotKind::Click) return 41;
 
         const auto scroll = arrange::core::ScrollDispatcher{}.verticalWheel(tree, 1, {10.0f, 100.0f}, -1.0f, 24.0f);
         if (!scroll.consumed || scroll.target != 4 || !near(scroll.value, 24.0f)) return 42;
@@ -409,7 +409,7 @@ namespace {
                                 [&] {
                                     auto chain = size(40, 12);
                                     auto text = test_support::text("overflow text");
-                                    text.overflow = "visible";
+                                    text.overflow = TextOverflow::Visible;
                                     chain.push_back({text, {}});
                                     return chain;
                                 }()},
@@ -431,7 +431,7 @@ namespace {
         const auto clipOps = DrawOpsBuilder{}.exportScene(tree, 1);
         sawClip = false;
         for (const auto& op : clipOps) {
-            if (op.type == DrawOpType::DrawText && op.overflow == "clip") sawClip = true;
+            if (op.type == DrawOpType::DrawText && op.overflow == TextOverflow::Clip) sawClip = true;
         }
         if (!sawClip) return 114;
 
@@ -531,19 +531,19 @@ namespace {
         if (result.error || !pipelineState.scene().contains(1)) return 91;
 
         const auto initialRevision = pipelineState.publishedFrame().revision;
-        pipelineState.enqueueIntent(arrange::core::InputIntent::textInput("native input paint", 6));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::textInput());
         result = pipelineState.run(1, {0.0f, 320.0f, 0.0f, 240.0f}, false);
         if (result.error) return 92;
         if (result.ran || pipelineState.publishedFrame().revision != initialRevision) return 93;
 
-        pipelineState.enqueueIntent(arrange::core::InputIntent::resize({0.0f, 640.0f, 0.0f, 480.0f}));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::resize());
         result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
         if (result.error) return 94;
         if (!pipelineState.publishedFrame().invalidation.affects(arrange::core::DirtyFlag::Layout)) return 95;
 
         const auto resizedRevision = pipelineState.publishedFrame().revision;
         const auto resizedHit = pipelineState.publishedFrame().content.hitTest;
-        pipelineState.enqueueIntent(arrange::core::InputIntent::pointer("pointer hit test", 3));
+        pipelineState.enqueueIntent(arrange::core::InputIntent::pointer());
         result = pipelineState.run(1, {0.0f, 640.0f, 0.0f, 480.0f}, false);
         if (result.error) return 97;
         if (result.ran || pipelineState.publishedFrame().revision != resizedRevision || pipelineState.publishedFrame().content.hitTest != resizedHit) return 98;

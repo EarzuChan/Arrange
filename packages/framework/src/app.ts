@@ -1,7 +1,7 @@
 import type { AppConfig, AppContext, ArrangableDefinition, Data } from './runtime/internal.ts'
 import { RearrangeSession } from './runtime/internal.ts'
 import { isArrangableDefinition } from './runtime/internal.ts'
-import { NativeRearrangeHost } from './rearrangeNode.ts'
+import { NativeRearrangeHost } from './nativeRearrange.ts'
 import { Layout } from './arrangable/Layout.ts'
 import { Box, Row, Column, Spacer, FlowRow, FlowColumn } from './arrangable/LayoutingArrangables.ts'
 import { LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid } from './arrangable/LazyArrangables.ts'

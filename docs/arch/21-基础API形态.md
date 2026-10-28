@@ -24,7 +24,7 @@ SFA 模板与脚本
 -> Arrange compiler / runtime
 -> Rearrange mutations + Reactive slot updates
 -> QuickJS native boundary
--> MutationTransaction / SlotUpdateBatch
+-> MutationTransaction（结构操作与 SlotUpdate）
 ```
 
 `@arrange/framework` 根入口提供核心状态、生命周期、上下文与 App 能力；Foundation、UI 和动画从对应子入口导入。旧 VNode 及其构造 helper 没有公开、内部或测试专用保留入口。
@@ -156,7 +156,6 @@ interface BoxProps {
     contentAlignment?: BoxAlignment
     propagateMinConstraints?: boolean
     enabled?: boolean
-    contentDescription?: string
 }
 ```
 
@@ -247,11 +246,13 @@ interface IconProps {
 }
 ```
 
+`contentDescription` 降解为 `M.semantics({ role: 'image', label })`，与其它无障碍信息走同一条 semantics 通道。
+
 Painter 获取 API 为 painter(resource: string | {path: string}): Painter。Painter 提供只读 intrinsicSize、contentVersion、status、error 及 dispose()。业务通过 painter 取得能力对象再传入 Image/Icon；生命周期与绘制语义见 [内建 Arrangable](12-内建Arrangable.md)，路径约束见 [工具链与 App 发布包](14-工具链与App发布包.md)。
 
 ## 后续能力的签名草案
 
-Canvas、InputState、独立交互状态及 Interop hooks 为后续设计。Flow、Lazy 和焦点 API 已有完整消费者，列在下面的正式公开 API 中。
+Canvas 与 InputState 为后续设计。Flow、Lazy 和焦点 API 已有完整消费者，列在下面的正式公开 API 中。
 
 ### Canvas
 
@@ -422,15 +423,21 @@ adjustable(state: ValueDragState, args?: { pointerLock?: boolean; startImmediate
 
 在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。LazyState 的索引、可见项与缓存语义归属 [内建 Arrangable](12-内建Arrangable.md)。
 
-# Interop hooks（后续设计）
+# Interop API
 
 ```ts
-useParameter(id: string): ParameterState
-useHost(): HostState
-useTransport(): TransportState
+hasInterop(): boolean
+useParameter(id: string): Parameter
+useHost(): HostInfo
+useTransport(): Transport
+useMeter(name: string): ComputedRef<number>
+useWaveform(name: string, options: { size: number }): ComputedRef<Float32Array>
+useSpectrum(name: string): ComputedRef<Float32Array>
+onNativeEvent<T extends InteropValue>(name: string, handler: (value: T) => void): () => void
+invokeNative<T extends InteropValue>(name: string, args?: InteropValue): Promise<T>
 ```
 
-互操作语义见 [互操作](16-互操作.md)。
+`Parameter` 的字段与 `editable()`、`showHostMenu()` 等方法，以及各数据流的语义见 [互操作](16-互操作.md)。
 
 # Diagnostics API
 

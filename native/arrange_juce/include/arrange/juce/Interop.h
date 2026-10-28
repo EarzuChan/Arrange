@@ -37,7 +37,11 @@ namespace arrange::juce {
        public:
         explicit Waveform(std::size_t capacity);
         void push(const float* samples, std::size_t count) noexcept;
-        [[nodiscard]] std::size_t capacity() const noexcept { return capacity_; }
+
+        [[nodiscard]] std::size_t capacity() const noexcept {
+            return capacity_;
+        }
+
         std::uint64_t read(std::span<float> out) const noexcept;
 
        private:
@@ -51,7 +55,11 @@ namespace arrange::juce {
        public:
         explicit Spectrum(std::size_t size);
         void publish(const float* values, std::size_t count) noexcept;
-        [[nodiscard]] std::size_t size() const noexcept { return size_; }
+
+        [[nodiscard]] std::size_t size() const noexcept {
+            return size_;
+        }
+
         bool read(std::span<float> out) noexcept;
 
        private:

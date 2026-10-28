@@ -405,10 +405,7 @@ namespace arrange::quickjs {
                 text.minLines = static_cast<int>(minLines);
                 text.maxLines = static_cast<int>(maxLines);
                 text.singleLine = boolField(payload, "singleLine", editable && text.minLines == 1 && text.maxLines <= 1);
-                const auto align = reader_.stringField(payload, "textAlign");
-                if (!align.empty()) text.textAlign = align == "left" || align == "start" ? "Start" : align == "right" || align == "end" ? "End" : align == "center" ? "Center" : align;
-                const auto overflow = reader_.stringField(payload, "overflow");
-                if (!overflow.empty()) text.overflow = overflow;
+                if (!enumField(payload, "textAlign", arrange::core::parseTextAlign, text.textAlign) || !enumField(payload, "overflow", arrange::core::parseTextOverflow, text.overflow)) return {};
 
                 const auto styleName = editable ? "textStyle" : "style";
                 ScopedValue style(context_, JS_GetPropertyStr(context_, payload, styleName));
@@ -453,10 +450,7 @@ namespace arrange::quickjs {
                 item.painter = *snapshot;
                 item.alpha = numberField(payload, "alpha", 1.0f);
                 item.sizeToIntrinsics = boolField(payload, "sizeToIntrinsics", true);
-                const auto scale = reader_.stringField(payload, "contentScale");
-                const auto alignment = reader_.stringField(payload, "alignment");
-                if (!scale.empty()) item.contentScale = scale;
-                if (!alignment.empty()) item.alignment = alignment;
+                if (!enumField(payload, "contentScale", arrange::core::parseContentScale, item.contentScale) || !enumField(payload, "alignment", arrange::core::parseImageAlignment, item.alignment)) return {};
                 ScopedValue filter(context_, JS_GetPropertyStr(context_, payload, "colorFilter"));
                 if (!JS_IsUndefined(filter.get())) {
                     if (!JS_IsObject(filter.get()) || !fieldsMatch(context_, filter.get(), {"tint"}, "colorFilter")) {

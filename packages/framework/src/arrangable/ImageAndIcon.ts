@@ -8,6 +8,11 @@ import type { ContentScaleValue, ImageAlignment } from '../primitives.ts'
 import { Layout } from './Layout.ts'
 import { Box } from './LayoutingArrangables.ts'
 
+// 内容描述降解为图片语义，与其它无障碍信息走同一条 semantics 通道
+function described(modifier: Modifier, label: string | undefined): Modifier {
+    return label === undefined ? modifier : modifier.semantics({ role: 'image', label })
+}
+
 export type ImageProps = ArrangableProps<typeof Image>
 export const Image = defineArrangable({
     name: 'Image',
@@ -15,9 +20,8 @@ export const Image = defineArrangable({
     slotNames: [],
     setup: (props, { call, source }) => () => call(0, Layout, {
         measurePolicy: () => MinSizeMeasurePolicy,
-        modifier: () => props.modifier.paint(props.painter, { contentScale: props.contentScale, alignment: props.alignment, alpha: props.alpha }),
-        contentDescription: () => props.contentDescription,
-    }, {}, { sources: { modifier: source('modifier'), contentDescription: source('contentDescription') } }),
+        modifier: () => described(props.modifier.paint(props.painter, { contentScale: props.contentScale, alignment: props.alignment, alpha: props.alpha }), props.contentDescription),
+    }, {}, { sources: { modifier: source('modifier') ?? source('contentDescription') } }),
 })
 
 export type IconProps = ArrangableProps<typeof Icon>
@@ -26,7 +30,6 @@ export const Icon = defineArrangable({
     props: { modifier: { type: Modifier, default: M }, painter: { type: Object as PropType<Painter>, required: true, validator: isPainter }, tint: Number, contentDescription: String },
     slotNames: [],
     setup: (props, { call, source }) => () => call(0, Box, {
-        modifier: () => props.modifier.paint(props.painter, { colorFilter: props.tint === undefined ? undefined : { tint: props.tint } }),
-        contentDescription: () => props.contentDescription,
-    }, {}, { sources: { modifier: source('modifier'), contentDescription: source('contentDescription') } }),
+        modifier: () => described(props.modifier.paint(props.painter, { colorFilter: props.tint === undefined ? undefined : { tint: props.tint } }), props.contentDescription),
+    }, {}, { sources: { modifier: source('modifier') ?? source('contentDescription') } }),
 })

@@ -36,14 +36,19 @@ namespace arrange::core {
         bool publishFrame = false;
         bool passivePaint = false;
         bool fullFallback = false;
-        std::string fallbackReason;
-        std::vector<std::string> reasons;
     };
 
-    struct PhaseExecution {
-        FramePhase phase = FramePhase::ApplyMutations;
-        bool ran = false;
-        std::string reason;
+    // 本帧执行过的阶段，按 FramePhase 序号置位
+    struct PhaseSet {
+        std::uint32_t bits = 0;
+
+        void record(FramePhase phase, bool ran) noexcept {
+            if (ran) bits |= 1u << static_cast<std::uint32_t>(phase);
+        }
+
+        [[nodiscard]] bool ran(FramePhase phase) const noexcept {
+            return (bits & (1u << static_cast<std::uint32_t>(phase))) != 0;
+        }
     };
 
     struct PublishedFrameContent {
@@ -77,13 +82,13 @@ namespace arrange::core {
         PaintWorkCounters paintWork;
         HitWorkCounters hitWork;
         std::uint64_t nativeAnimationSamples = 0;
+        // 写入日志保存原值的节点数
         std::uint64_t candidateNodesCopied = 0;
         double measureMillis = 0;
         double placeMillis = 0;
         double paintBuildMillis = 0;
         double hitBuildMillis = 0;
         std::uint64_t fullLayouts = 0;
-        std::string lastFullLayoutReason;
     };
 
     struct PublishedFrame {
@@ -93,7 +98,7 @@ namespace arrange::core {
         DirtySnapshot dirty;
         InvalidationSnapshot invalidation;
         FramePlan plan;
-        std::vector<PhaseExecution> phases;
+        PhaseSet phases;
         std::optional<std::string> error;
     };
 
@@ -104,7 +109,7 @@ namespace arrange::core {
         std::optional<std::string> error;
         FramePlan plan;
         InvalidationSnapshot invalidation;
-        std::vector<PhaseExecution> phases;
+        PhaseSet phases;
     };
 
     using FrameFinalizer = std::function<void(const NativeScene&, PublishedFrame&)>;
@@ -133,7 +138,6 @@ namespace arrange::core {
        private:
         FrameExecutionCounters counters_;
         void finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate);
-        static void recordPhase(std::vector<PhaseExecution>& phases, FramePhase phase, bool ran, std::string reason);
 
         LayoutEngine layout_;
         DrawOpsBuilder drawOpsBuilder_;

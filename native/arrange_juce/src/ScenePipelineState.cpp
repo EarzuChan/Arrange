@@ -37,19 +37,18 @@ namespace arrange::juce {
     arrange::core::SceneFramePipelineResult ScenePipelineState::run(arrange::core::NodeId root, arrange::core::Constraints constraints, bool framePipelineRequested, const arrange::core::FrameFinalizer& finalize, const arrange::core::FramePreparation& preparation) {
         for (auto& intent : pendingIntents_.take()) {
             if (intent.transaction && (!intent.transaction->rearrange || !intent.transaction->rearrange->cancelled)) pendingTransactions_.push(std::move(*intent.transaction));
-            if (intent.kind == arrange::core::InputIntentKind::DiagnosticsEvent) {
-                scene_.tree().recordSceneInvalidation(arrange::core::DirtyFlag::Accessibility, arrange::core::InvalidationSource::Diagnostics, "diagnostics", intent.reason.empty() ? "diagnostics event" : intent.reason);
-            } else if (intent.kind == arrange::core::InputIntentKind::Resize) {
-                scene_.tree().recordSceneInvalidation(arrange::core::DirtyFlag::Layout, arrange::core::InvalidationSource::Resize, "viewport", intent.reason.empty() ? "viewport resize" : intent.reason);
-            } else if (intent.kind == arrange::core::InputIntentKind::ResourceReady) {
-                scene_.tree().recordSceneInvalidation(arrange::core::DirtyFlag::Resource, arrange::core::InvalidationSource::Resource, "resource", intent.reason.empty() ? "resource ready" : intent.reason);
-            } else if (intent.kind == arrange::core::InputIntentKind::ResourceFailed) {
-                scene_.tree().recordSceneInvalidation(arrange::core::DirtyFlag::Resource, arrange::core::InvalidationSource::Resource, "resource", intent.reason.empty() ? "resource failed" : intent.reason);
-                scene_.tree().recordSceneInvalidation(arrange::core::DirtyFlag::Accessibility, arrange::core::InvalidationSource::Diagnostics, "diagnostics", intent.reason.empty() ? "resource failed" : intent.reason);
+            auto& tree = scene_.tree();
+            if (intent.kind == arrange::core::InputIntentKind::DiagnosticsEvent)
+                tree.invalidateScene(arrange::core::DirtyFlag::Diagnostics);
+            else if (intent.kind == arrange::core::InputIntentKind::Resize)
+                tree.invalidateViewport();
+            else if (intent.kind == arrange::core::InputIntentKind::ResourceReady)
+                tree.invalidateScene(arrange::core::DirtyFlag::Resource);
+            else if (intent.kind == arrange::core::InputIntentKind::ResourceFailed) {
+                tree.invalidateScene(arrange::core::DirtyFlag::Resource);
+                tree.invalidateScene(arrange::core::DirtyFlag::Diagnostics);
             }
-            if (intent.needsFullFallback) {
-                scene_.tree().requestFullFallback(intent.reason.empty() ? "input intent requested full fallback" : intent.reason);
-            }
+            if (intent.needsFullFallback) tree.requestFullFallback();
         }
 
         const auto hasPending = pendingTransactions_.hasPending();

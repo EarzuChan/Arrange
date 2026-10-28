@@ -92,14 +92,14 @@ namespace arrange::core {
         HitTestSnapshot result;
         if (!tree.contains(root)) return result;
         std::function<std::shared_ptr<const HitFragment>(NodeId)> build = [&](NodeId id) -> std::shared_ptr<const HitFragment> {
-            auto& node = tree.node(id);
-            const auto input = node.props.find("enabled");
-            const auto enabled = input == node.props.end() || input->second.boolOr(true);
+            const auto& cached = tree.node(id);
+            const auto enabled = cached.enabled;
             constexpr auto mask = dirtyMask(DirtyFlag::Structure) | dirtyMask(DirtyFlag::Layout) | dirtyMask(DirtyFlag::Placement) | dirtyMask(DirtyFlag::HitTest) | dirtyMask(DirtyFlag::Transform);
-            if (node.hitCache && node.hitCache->enabled == enabled && !((node.dirty | node.subtreeDirty) & mask)) {
+            if (cached.hitCache && cached.hitCache->enabled == enabled && !((cached.dirty | cached.subtreeDirty) & mask)) {
                 ++counters.subtreeCacheHits;
-                return node.hitCache;
+                return cached.hitCache;
             }
+            auto& node = tree.mutableNode(id);
             ++counters.nodesBuilt;
             auto fragment = std::make_shared<HitFragment>();
             fragment->enabled = enabled;
