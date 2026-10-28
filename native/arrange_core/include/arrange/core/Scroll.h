@@ -30,9 +30,9 @@ namespace arrange::core {
        public:
         static ScrollSnapshot snapshot(const ModifierInstance& instance);
         static ScrollHitPath hitPath(const LayoutTree& tree, NodeId root, Point point);
-        static ScrollResult targetWheel(const LayoutTree& tree, const ScrollTarget& target, float delta, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr);
-        ScrollResult verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
-        ScrollResult horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerWheelUnit = 48.0f, const PendingScrollValues* pending = nullptr) const;
+        static ScrollResult targetWheel(const LayoutTree& tree, const ScrollTarget& target, float delta, float pixelsPerUnit, const PendingScrollValues* pending = nullptr);
+        ScrollResult verticalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaY, float pixelsPerUnit, const PendingScrollValues* pending = nullptr) const;
+        ScrollResult horizontalWheel(const LayoutTree& tree, NodeId root, Point point, float wheelDeltaX, float pixelsPerUnit, const PendingScrollValues* pending = nullptr) const;
         static bool hasVerticalScroll(const LayoutNode& node);
         static bool hasHorizontalScroll(const LayoutNode& node);
         static float verticalScrollValue(const LayoutNode& node);

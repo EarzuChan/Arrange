@@ -1,12 +1,10 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/InputSession.h>
 #include <arrange/core/LayoutTree.h>
-#include <arrange/core/Scroll.h>
 #include <arrange/core/TextLayoutService.h>
 #include <arrange/juce/TextInputOwner.h>
-#include <arrange/juce/PointerInputState.h>
-#include <arrange/juce/FocusOwner.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -17,16 +15,10 @@
 namespace arrange::juce {
 #if ARRANGE_JUCE_WITH_JUCE
 
-    struct InteractionPointerUpResult {
-        bool clickTriggered = false;
-        arrange::core::EventSlotId eventSlot;
-        arrange::core::PointerGestureOutput gesture;
-    };
+    // JUCE 按键翻译为平台无关按键
+    arrange::core::KeyInput keyInput(const ::juce::KeyPress& key);
 
-    using InteractionWheelResult = WheelDispatchResult;
-
-    using PointerPlatformEffects = arrange::core::PointerPlatformEffects;
-
+    // 只做 JUCE 翻译：坐标、时间戳与按键换成 core 类型后交给 InputSession；文本编辑与 IME 由 TextInputOwner 承担
     class InteractionStateOwner final {
        public:
         explicit InteractionStateOwner(arrange::core::TextLayoutService& textLayoutService) noexcept;
@@ -34,16 +26,25 @@ namespace arrange::juce {
         void reset();
 
         void commitState(InteractionStateOwner&& candidate) noexcept {
-            pointer_ = std::move(candidate.pointer_);
-            focus_ = std::move(candidate.focus_);
-            preparedInputEvents_ = std::move(candidate.preparedInputEvents_);
-            pendingLazyFocus_ = std::move(candidate.pendingLazyFocus_);
-            lazyFocusVersion_ = candidate.lazyFocusVersion_;
+            session_.commitState(std::move(candidate.session_));
             input_.commitState(std::move(candidate.input_));
         }
 
-        [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept;
-        [[nodiscard]] float viewportX() const noexcept;
+        [[nodiscard]] arrange::core::InputSession& session() noexcept {
+            return session_;
+        }
+
+        [[nodiscard]] const arrange::core::InputSession& session() const noexcept {
+            return session_;
+        }
+
+        [[nodiscard]] const std::optional<arrange::core::NodeId>& focusedNode() const noexcept {
+            return session_.focusedNode();
+        }
+
+        [[nodiscard]] float viewportX() const noexcept {
+            return input_.viewportX();
+        }
 
         [[nodiscard]] float viewportY() const noexcept {
             return input_.viewportY();
@@ -53,151 +54,167 @@ namespace arrange::juce {
             return input_.focusedNode();
         }
 
-        void synchronizePublishedFocus(const arrange::core::LayoutTree& tree, bool runtimeReady, const std::vector<arrange::core::FocusCommand>& commands = {});
-        void dispatchCommittedFocus(arrange::core::LayoutTree& tree, const TextInputCallbacks& callbacks);
+        void synchronizePublishedFocus(const arrange::core::LayoutTree& tree, bool runtimeReady, const std::vector<arrange::core::FocusCommand>& commands = {}) {
+            session_.synchronizePublishedFocus(tree, runtimeReady, input_, commands);
+        }
 
-        void dispatchPendingTextEdits(const arrange::core::LayoutTree& tree, const TextInputCallbacks& callbacks) {
+        void dispatchCommittedFocus(arrange::core::LayoutTree& tree, const arrange::core::InputCallbacks& callbacks) {
+            session_.dispatchCommittedFocus(tree, input_, callbacks);
+        }
+
+        void dispatchPendingTextEdits(const arrange::core::LayoutTree& tree, const arrange::core::InputCallbacks& callbacks) {
             input_.dispatchPendingTextEdits(tree, callbacks);
         }
 
         void setFocusNavigationHook(std::function<bool(arrange::core::NodeId, arrange::core::FocusDirection)> hook) {
-            navigationHook_ = std::move(hook);
+            session_.setFocusNavigationHook(std::move(hook));
         }
 
         void setFocusChangedHook(std::function<void(std::optional<arrange::core::NodeId>)> hook) {
-            focusChangedHook_ = std::move(hook);
+            session_.setFocusChangedHook(std::move(hook));
         }
 
-        bool requestFocus(arrange::core::LayoutTree& tree, arrange::core::NodeId node, const TextInputCallbacks& callbacks);
-        bool moveFocus(arrange::core::LayoutTree& tree, arrange::core::FocusDirection direction, const TextInputCallbacks& callbacks);
-        void clearFocus(arrange::core::LayoutTree& tree, const TextInputCallbacks& callbacks);
-        void prepareLazyInteraction(arrange::core::LayoutTree& tree) const;
+        bool requestFocus(arrange::core::LayoutTree& tree, arrange::core::NodeId node, const arrange::core::InputCallbacks& callbacks) {
+            return session_.requestFocus(tree, node, input_, callbacks);
+        }
+
+        bool moveFocus(arrange::core::LayoutTree& tree, arrange::core::FocusDirection direction, const arrange::core::InputCallbacks& callbacks) {
+            return session_.moveFocus(tree, direction, input_, callbacks);
+        }
+
+        void clearFocus(arrange::core::LayoutTree& tree, const arrange::core::InputCallbacks& callbacks) {
+            session_.clearFocus(tree, input_, callbacks);
+        }
+
+        void prepareLazyInteraction(arrange::core::LayoutTree& tree) const {
+            session_.prepareLazyInteraction(tree);
+        }
 
         bool hasPendingLazyFocus() const noexcept {
-            return pendingLazyFocus_.has_value();
+            return session_.hasPendingLazyFocus();
         }
 
         std::optional<arrange::core::NodeId> pendingLazyContainer() const noexcept {
-            return pendingLazyFocus_ ? std::optional<arrange::core::NodeId>{pendingLazyFocus_->container.id} : std::nullopt;
+            return session_.pendingLazyContainer();
         }
 
         [[nodiscard]] arrange::core::ModifierHandle focusedModifier() const noexcept {
             return input_.focusedModifier();
         }
 
-        arrange::core::PointerGestureOutput pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const TextInputCallbacks& callbacks, TextPointerDownOptions options = {}, arrange::core::KeyModifierState modifiers = {});
-        [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const TextInputCallbacks& callbacks, arrange::core::PointerGestureOutput* gesture = nullptr, arrange::core::KeyModifierState modifiers = {});
-        [[nodiscard]] InteractionPointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers = {});
+        arrange::core::PointerGestureOutput pointerDown(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, const arrange::core::InputCallbacks& callbacks, arrange::core::PointerDownOptions options = {}, arrange::core::KeyModifierState modifiers = {});
+        [[nodiscard]] bool pointerDrag(arrange::core::LayoutTree& tree, bool runtimeReady, float x, float y, const arrange::core::InputCallbacks& callbacks, arrange::core::PointerGestureOutput* gesture = nullptr, arrange::core::KeyModifierState modifiers = {});
+        [[nodiscard]] arrange::core::PointerUpResult pointerUp(arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers = {});
         arrange::core::PointerGestureOutput pointerMove(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y);
-        arrange::core::PointerGestureOutput pointerExit(const arrange::core::LayoutTree& tree);
         arrange::core::PointerGestureOutput contextClick(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, float x, float y, arrange::core::KeyModifierState modifiers);
-        // 统一取消：按下、文本拖选、拖动与滚轮会话
-        arrange::core::PointerGestureOutput cancelPointer(const arrange::core::LayoutTree& tree);
+
+        arrange::core::PointerGestureOutput pointerExit(const arrange::core::LayoutTree& tree) {
+            return session_.pointerExit(tree);
+        }
+
+        arrange::core::PointerGestureOutput cancelPointer(const arrange::core::LayoutTree& tree) {
+            return session_.cancelPointer(tree, input_);
+        }
 
         [[nodiscard]] arrange::core::PointerIcon pointerIcon() const noexcept {
-            return pointer_.gesture().icon();
+            return session_.pointerIcon();
         }
 
         [[nodiscard]] bool pointerDragging() const noexcept {
-            return pointer_.gesture().dragging();
+            return session_.pointerDragging();
         }
 
         void notePointerEffects(const arrange::core::PointerGestureOutput& output) noexcept {
-            if (output.lockPointer) {
-                effects_.lockPointer = true;
-                effects_.unlockPointer = false;
-            }
-            if (output.unlockPointer) {
-                effects_.unlockPointer = true;
-                effects_.lockPointer = false;
-                effects_.restorePoint = output.restorePoint;
-            }
+            session_.notePointerEffects(output);
         }
 
-        PointerPlatformEffects takePointerEffects() noexcept {
-            return std::exchange(effects_, {});
+        arrange::core::PointerPlatformEffects takePointerEffects() noexcept {
+            return session_.takePointerEffects();
         }
 
         void setTouchSlop(float px) noexcept {
-            pointer_.gesture().setTouchSlop(px);
+            session_.setTouchSlop(px);
         }
 
-        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, float deltaX, float deltaY, std::uint64_t publishedRevision = 0, float pixelsPerWheelUnit = 48.0f);
-
-        [[nodiscard]] InteractionWheelResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const WheelInput& input, std::uint64_t publishedRevision = 0, const arrange::core::HitTestSnapshot* snapshot = nullptr);
+        [[nodiscard]] arrange::core::WheelDispatchResult wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, float x, float y, const arrange::core::WheelInput& input, std::uint64_t publishedRevision = 0, const arrange::core::HitTestSnapshot* snapshot = nullptr) {
+            return session_.wheel(tree, root, {x, y}, input, publishedRevision, snapshot);
+        }
 
         void cancelWheel() {
-            pointer_.cancelWheel();
+            session_.cancelWheel();
         }
 
-        [[nodiscard]] bool isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] ::juce::Range<int> highlightedRegion(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range, const TextInputCallbacks& callbacks);
-        [[nodiscard]] bool setTemporaryUnderlining(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Array<::juce::Range<int>>& ranges, const TextInputCallbacks& callbacks);
-        [[nodiscard]] ::juce::String textInRange(const arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range) const;
-        [[nodiscard]] bool insertTextAtCaret(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::String& textToInsert, const TextInputCallbacks& callbacks);
-        [[nodiscard]] int caretPosition(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] int totalNumChars(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
-        [[nodiscard]] int charIndexForPoint(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Point<int> point) const;
-        [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(const arrange::core::LayoutTree& tree, bool runtimeReady, int characterIndex) const;
-        [[nodiscard]] ::juce::RectangleList<int> textBounds(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Range<int> range) const;
-        [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks);
-        // 为已不在按下状态的键交付 key up；isDown 为空时视为全部抬起（失焦补发）
-        [[nodiscard]] bool keyStateChanged(arrange::core::LayoutTree& tree, bool runtimeReady, const std::function<bool(int)>& isDown, const TextInputCallbacks& callbacks);
-        void modifierKeysChanged(arrange::core::LayoutTree& tree, bool runtimeReady, arrange::core::KeyModifierState modifiers, const TextInputCallbacks& callbacks);
+        [[nodiscard]] bool isTextInputActive(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+            return input_.isTextInputActive(tree, runtimeReady);
+        }
+
+        [[nodiscard]] ::juce::Range<int> highlightedRegion(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+            return input_.highlightedRegion(tree, runtimeReady);
+        }
+
+        [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range, const arrange::core::InputCallbacks& callbacks) {
+            return input_.setHighlightedRegion(tree, runtimeReady, range, callbacks);
+        }
+
+        [[nodiscard]] bool setTemporaryUnderlining(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Array<::juce::Range<int>>& ranges, const arrange::core::InputCallbacks& callbacks) {
+            return input_.setTemporaryUnderlining(tree, runtimeReady, ranges, callbacks);
+        }
+
+        [[nodiscard]] ::juce::String textInRange(const arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::Range<int>& range) const {
+            return input_.textInRange(tree, runtimeReady, range);
+        }
+
+        [[nodiscard]] bool insertTextAtCaret(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::String& textToInsert, const arrange::core::InputCallbacks& callbacks) {
+            return input_.insertTextAtCaret(tree, runtimeReady, textToInsert, callbacks);
+        }
+
+        [[nodiscard]] int caretPosition(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+            return input_.caretPosition(tree, runtimeReady);
+        }
+
+        [[nodiscard]] int totalNumChars(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+            return input_.totalNumChars(tree, runtimeReady);
+        }
+
+        [[nodiscard]] int charIndexForPoint(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Point<int> point) const {
+            return input_.charIndexForPoint(tree, runtimeReady, point);
+        }
+
+        [[nodiscard]] ::juce::Rectangle<int> caretRectangleForCharIndex(const arrange::core::LayoutTree& tree, bool runtimeReady, int characterIndex) const {
+            return input_.caretRectangleForCharIndex(tree, runtimeReady, characterIndex);
+        }
+
+        [[nodiscard]] ::juce::RectangleList<int> textBounds(const arrange::core::LayoutTree& tree, bool runtimeReady, ::juce::Range<int> range) const {
+            return input_.textBounds(tree, runtimeReady, range);
+        }
+
+        [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, bool runtimeReady, const ::juce::KeyPress& key, const arrange::core::InputCallbacks& callbacks) {
+            return session_.keyDown(tree, runtimeReady, keyInput(key), input_, callbacks);
+        }
+
+        [[nodiscard]] bool keyStateChanged(arrange::core::LayoutTree& tree, bool runtimeReady, const std::function<bool(int)>& isDown, const arrange::core::InputCallbacks& callbacks) {
+            return session_.keyStateChanged(tree, runtimeReady, isDown, callbacks);
+        }
+
+        void modifierKeysChanged(arrange::core::LayoutTree& tree, bool runtimeReady, arrange::core::KeyModifierState modifiers, const arrange::core::InputCallbacks& callbacks) {
+            session_.modifierKeysChanged(tree, runtimeReady, modifiers, callbacks);
+        }
 
         void synchronizePublishedInput(const arrange::core::LayoutTree& tree, bool runtimeReady) {
-            pointer_.synchronizePublishedWheel(tree, runtimeReady);
-            arrange::core::PointerGestureOutput ignored;
-            if (runtimeReady)
-                pointer_.gesture().revalidate(tree, ignored);
-            else
-                pointer_.gesture().cancel(tree, ignored);
-            input_.synchronizePublishedInput(tree, runtimeReady);
-            focus_.synchronize(tree, runtimeReady);
+            session_.synchronizePublishedInput(tree, runtimeReady, input_);
         }
 
-        void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady);
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(const arrange::core::LayoutTree& tree, bool runtimeReady) const;
+        void updateFocusedInputViewport(const arrange::core::LayoutTree& tree, bool runtimeReady) {
+            input_.updateFocusedInputViewport(tree, runtimeReady);
+        }
+
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildFocusedInputOps(const arrange::core::LayoutTree& tree, bool runtimeReady) const {
+            return input_.buildFocusedInputOps(tree, runtimeReady);
+        }
 
        private:
-        PointerInputState pointer_;
-        PointerPlatformEffects effects_;
-
-        struct PressedKey {
-            int keyCode = 0;
-            std::string key;
-            std::string text;
-            // 只有交付过 key down 的键才交付 key up
-            bool delivered = false;
-        };
-
-        struct KeyActivation {
-            int keyCode = 0;
-            arrange::core::NodeId node = 0;
-        };
-
-        std::vector<PressedKey> pressedKeys_;
-        std::optional<KeyActivation> activation_;
-        arrange::core::KeyModifierState modifiers_;
-        bool bubbleKey(const arrange::core::LayoutTree& tree, const arrange::core::KeyEventPayload& payload, const TextInputCallbacks& callbacks) const;
+        arrange::core::InputSession session_;
         TextInputOwner input_;
-        FocusOwner focus_;
-        std::vector<std::pair<arrange::core::EventSlotId, std::string>> preparedInputEvents_;
-        std::function<bool(arrange::core::NodeId, arrange::core::FocusDirection)> navigationHook_;
-        std::function<void(std::optional<arrange::core::NodeId>)> focusChangedHook_;
-
-        struct LazyFocusRequest {
-            arrange::core::NodeHandle container;
-            std::string key;
-            arrange::core::FocusDirection direction = arrange::core::FocusDirection::Next;
-            std::uint64_t version = 0;
-        };
-
-        std::optional<LazyFocusRequest> pendingLazyFocus_;
-        std::uint64_t lazyFocusVersion_ = 0;
-        bool navigateLazy(arrange::core::LayoutTree& tree, arrange::core::FocusDirection direction, const TextInputCallbacks& callbacks);
-        void resolveLazyFocus(const arrange::core::LayoutTree& tree);
     };
 
 #endif

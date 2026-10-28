@@ -75,6 +75,12 @@ namespace arrange::core {
         }
 
        private:
+        struct InteractionReceptor {
+            NodeHandle node;
+            ModifierHandle modifier;
+            bool operator==(const InteractionReceptor&) const = default;
+        };
+
         struct Press {
             Point start;
             Point last;
@@ -90,7 +96,7 @@ namespace arrange::core {
         };
 
         void updateHover(const LayoutTree& tree, const std::vector<HitTestResult>& chain, PointerGestureOutput& out);
-        // 按节点汇总悬停、按下与拖动中，变化时交付给该节点全部 interaction 槽
+        // 逐受体汇总悬停、按下与拖动中，变化时交付给该受体的 interaction 槽
         void syncInteractions(const LayoutTree& tree, PointerGestureOutput& out);
         void stopDrag(const LayoutTree& tree, bool cancelled, PointerGestureOutput& out);
         // pointerInput 受体的进入、移动与离开；按下期间只交付给按下的受体
@@ -101,7 +107,7 @@ namespace arrange::core {
         std::vector<HitTestResult> hovered_;
         std::vector<HitTestResult> chain_;
         std::vector<HitTestResult> streams_;
-        std::vector<std::pair<NodeHandle, InteractionPayload>> interactions_;
+        std::vector<std::pair<InteractionReceptor, InteractionPayload>> interactions_;
         PointerIcon icon_ = PointerIcon::Default;
         float touchSlop_ = 4.0f;
         HitTester hitTester_;

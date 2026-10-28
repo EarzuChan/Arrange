@@ -9,13 +9,13 @@
 #include <functional>
 #include <memory>
 #include <arrange/core/Geometry.h>
-#include <arrange/juce/WheelInput.h>
+#include <arrange/core/WheelInput.h>
 
 namespace arrange::juce {
     // 未测试！
     class WindowsPrecisionWheelSource final {
        public:
-        using InputCallback = std::function<void(arrange::core::Point, const WheelInput&)>;
+        using InputCallback = std::function<void(arrange::core::Point, const arrange::core::WheelInput&)>;
         using WakeCallback = std::function<void()>;
 
         WindowsPrecisionWheelSource(InputCallback onInput, WakeCallback onWake);

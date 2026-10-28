@@ -22,11 +22,11 @@ namespace arrange::juce {
         return interaction.highlightedRegion(tree, inputReady(session, diagnostics));
     }
 
-    bool JuceTextInputAdapter::setHighlightedRegion(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Range<int>& range, const TextInputCallbacks& callbacks) const {
+    bool JuceTextInputAdapter::setHighlightedRegion(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Range<int>& range, const arrange::core::InputCallbacks& callbacks) const {
         return inputReady(session, diagnostics) && interaction.setHighlightedRegion(tree, session.loaded(), range, callbacks);
     }
 
-    bool JuceTextInputAdapter::setTemporaryUnderlining(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Array<::juce::Range<int>>& ranges, const TextInputCallbacks& callbacks) const {
+    bool JuceTextInputAdapter::setTemporaryUnderlining(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Array<::juce::Range<int>>& ranges, const arrange::core::InputCallbacks& callbacks) const {
         return inputReady(session, diagnostics) && interaction.setTemporaryUnderlining(tree, session.loaded(), ranges, callbacks);
     }
 
@@ -34,7 +34,7 @@ namespace arrange::juce {
         return interaction.textInRange(tree, inputReady(session, diagnostics), range);
     }
 
-    bool JuceTextInputAdapter::insertTextAtCaret(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::String& textToInsert, const TextInputCallbacks& callbacks) const {
+    bool JuceTextInputAdapter::insertTextAtCaret(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::String& textToInsert, const arrange::core::InputCallbacks& callbacks) const {
         return inputReady(session, diagnostics) && interaction.insertTextAtCaret(tree, session.loaded(), textToInsert, callbacks);
     }
 
@@ -58,7 +58,7 @@ namespace arrange::juce {
         return interaction.textBounds(tree, inputReady(session, diagnostics), range);
     }
 
-    bool JuceTextInputAdapter::keyPressed(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks) const {
+    bool JuceTextInputAdapter::keyPressed(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::KeyPress& key, const arrange::core::InputCallbacks& callbacks) const {
         if (diagnostics.hasError()) {
             return false;
         }

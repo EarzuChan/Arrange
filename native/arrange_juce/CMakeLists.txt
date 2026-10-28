@@ -34,7 +34,6 @@ target_sources(arrange_juce PRIVATE
   src/EditorSceneHost.cpp
   src/FramePumpDriver.cpp
   src/PainterResources.cpp
-  src/FocusOwner.cpp
   src/InteractionStateOwner.cpp
   src/TextInputOwner.cpp
   src/TextInputMutationSink.cpp
@@ -45,7 +44,6 @@ target_sources(arrange_juce PRIVATE
   src/PackageRuntimeSource.cpp
   src/PassivePaintRenderer.cpp
   src/JucePointerInputAdapter.cpp
-  src/PointerInputState.cpp
   src/ScrollProbe.cpp
   src/JuceRepaintAdapter.cpp
   src/RuntimePackageBinder.cpp

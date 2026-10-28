@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 using namespace arrange::core;
 
@@ -47,13 +48,17 @@ namespace {
             icon.icon = PointerIcon::Hand;
             auto click = input(InputModifierKind::Clickable, 2, EventSlotKind::Click);
             click.doubleClick = makeEventSlotId(2, EventSlotKind::DoubleClick);
-            if (interaction) click.interaction = makeEventSlotId(2, EventSlotKind::Interaction);
+            if (interaction) {
+                hover.interaction = makeEventSlotId(2, EventSlotKind::Interaction, "hover");
+                click.interaction = makeEventSlotId(2, EventSlotKind::Interaction, "click");
+            }
             auto drag = input(InputModifierKind::Draggable, 2, EventSlotKind::DragDelta);
             drag.axis = DragAxis::Horizontal;
             drag.dragStart = makeEventSlotId(2, EventSlotKind::DragStart);
             drag.dragStop = makeEventSlotId(2, EventSlotKind::DragStop);
             drag.pointerLock = pointerLock;
             drag.startImmediately = startImmediately;
+            if (interaction) drag.interaction = makeEventSlotId(2, EventSlotKind::Interaction, "drag");
             create(tree, 2, {{size(100, 50)}, {hover}, {icon}, {click}, {drag}});
             OffsetModifier offset;
             offset.x = 200;
@@ -150,10 +155,12 @@ namespace {
         check(!fixture.session.pressed() && out.events.empty(), "受体退休后拖动未取消");
     }
 
-    std::vector<InteractionPayload> interactions(const PointerGestureOutput& out) {
-        std::vector<InteractionPayload> result;
+    using Interactions = std::vector<std::pair<std::string, InteractionPayload>>;
+
+    Interactions interactions(const PointerGestureOutput& out) {
+        Interactions result;
         for (const auto& event : out.events)
-            if (const auto* state = std::get_if<InteractionPayload>(&event.payload)) result.push_back(*state);
+            if (const auto* state = std::get_if<InteractionPayload>(&event.payload)) result.emplace_back(event.slot.path, *state);
         return result;
     }
 
@@ -161,18 +168,20 @@ namespace {
         Fixture fixture(false, false, true);
         PointerGestureOutput out;
         fixture.session.move(fixture.tree, fixture.snapshot, fixture.at(10, 10), out);
-        check(interactions(out) == std::vector{InteractionPayload{true, false, false, false}}, "悬停未回写交互状态");
+        const InteractionPayload hovered{true, false, false, false};
+        check(interactions(out) == Interactions{{"hover", hovered}, {"click", hovered}, {"drag", hovered}}, "悬停未按节点回写给全部受体");
         out = {};
         fixture.session.move(fixture.tree, fixture.snapshot, fixture.at(12, 10), out);
         check(interactions(out).empty(), "移动时重复回写了未变化的交互状态");
         fixture.session.primaryDown(fixture.tree, fixture.snapshot, fixture.at(12, 10), 1, out);
-        check(interactions(out) == std::vector{InteractionPayload{true, true, false, false}}, "按下未回写 pressed");
+        const InteractionPayload pressed{true, true, false, false};
+        check(interactions(out) == Interactions{{"click", pressed}, {"drag", pressed}}, "pressed 未只归属被按下的受体");
         out = {};
         fixture.session.drag(fixture.tree, fixture.at(40, 10), out);
-        check(interactions(out) == std::vector{InteractionPayload{true, true, false, true}}, "拖动开始未回写 dragged");
+        check(interactions(out) == Interactions{{"drag", {true, true, false, true}}}, "dragged 未只归属拖动受体");
         out = {};
         fixture.session.primaryUp(fixture.tree, fixture.snapshot, fixture.at(350, 150), out);
-        check(interactions(out) == std::vector{InteractionPayload{}}, "抬起到受体外未清空交互状态");
+        check(interactions(out) == Interactions{{"hover", {}}, {"click", {}}, {"drag", {}}}, "抬起到受体外未清空交互状态");
     }
 
     std::vector<PointerInputPayload> streams(const PointerGestureOutput& out) {
@@ -221,6 +230,28 @@ namespace {
         check(streams(out).size() == 1 && stream(streams(out)[0], PointerInputType::Cancel, 0, 0) && !session.pressed(), "取消未交付给捕获的受体");
     }
 
+    void verifyPointerInputTransform() {
+        LayoutTree tree;
+        create(tree, 1, {{size(400, 200)}});
+        OffsetModifier offset;
+        offset.x = 50;
+        offset.y = 20;
+        TransformModifierSemantics layer;
+        layer.scaleX = layer.scaleY = 2;
+        layer.transformOriginX = layer.transformOriginY = 0;
+        create(tree, 2, {{offset}, {size(100, 50)}, {layer}, {input(InputModifierKind::PointerInput, 2, EventSlotKind::PointerInput)}});
+        tree.apply({InsertChildMutation{1, 2, 0}});
+        LayoutEngine{}.layout(tree, 1, {0, 400, 0, 200});
+        const auto snapshot = buildHitTestSnapshot(tree, 1);
+        PointerGestureSession session;
+        PointerGestureOutput out;
+        session.primaryDown(tree, snapshot, {{70, 30}}, 1, out);
+        check(stream(streams(out).back(), PointerInputType::Down, 10, 5), "放大层内按下坐标不是受体本地坐标");
+        out = {};
+        session.drag(tree, {{90, 40}}, out);
+        check(stream(streams(out).back(), PointerInputType::Move, 20, 10), "捕获期间外推没有按受体逆变换换算");
+    }
+
     void verifyContextClick() {
         Fixture fixture;
         PointerGestureOutput out;
@@ -267,6 +298,7 @@ int main() {
         verifyPointerLockAndImmediate();
         verifyInteractionState();
         verifyPointerInput();
+        verifyPointerInputTransform();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << "\n";

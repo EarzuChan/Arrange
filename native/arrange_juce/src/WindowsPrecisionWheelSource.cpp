@@ -22,7 +22,7 @@ namespace arrange::juce {
 
         struct PendingWheelInput {
             arrange::core::Point point;
-            WheelInput input;
+            arrange::core::WheelInput input;
         };
 
         // 未测试！
@@ -50,7 +50,7 @@ namespace arrange::juce {
                 }
             }
 
-            void append(WheelInput input) {
+            void append(arrange::core::WheelInput input) {
                 input.timeMillis = ::juce::Time::getMillisecondCounterHiRes();
                 input.precise = true;
                 input.nativePhases = true;
@@ -59,12 +59,12 @@ namespace arrange::juce {
 
             void finish(bool cancelled) {
                 if (!active) return;
-                WheelInput input;
+                arrange::core::WheelInput input;
                 if (inertial) {
                     input.inertial = true;
-                    input.momentumPhase = cancelled ? WheelPhase::Cancelled : WheelPhase::Ended;
+                    input.momentumPhase = cancelled ? arrange::core::WheelPhase::Cancelled : arrange::core::WheelPhase::Ended;
                 } else {
-                    input.phase = cancelled ? WheelPhase::Cancelled : WheelPhase::Ended;
+                    input.phase = cancelled ? arrange::core::WheelPhase::Cancelled : arrange::core::WheelPhase::Ended;
                 }
                 append(input);
                 active = false;
@@ -76,8 +76,8 @@ namespace arrange::juce {
                 finish(false);
                 active = true;
                 inertial = false;
-                WheelInput input;
-                input.phase = WheelPhase::Began;
+                arrange::core::WheelInput input;
+                input.phase = arrange::core::WheelPhase::Began;
                 append(input);
             }
         };
@@ -108,9 +108,9 @@ namespace arrange::juce {
                         state_->ticks.store(true);
                     } else if (current == DIRECTMANIPULATION_INERTIA && state_->active && !state_->inertial) {
                         state_->inertial = true;
-                        WheelInput input;
-                        input.phase = WheelPhase::Ended;
-                        input.momentumPhase = WheelPhase::Began;
+                        arrange::core::WheelInput input;
+                        input.phase = arrange::core::WheelPhase::Ended;
+                        input.momentumPhase = arrange::core::WheelPhase::Began;
                         input.inertial = true;
                         state_->append(input);
                     } else if (current == DIRECTMANIPULATION_READY) {
@@ -152,7 +152,7 @@ namespace arrange::juce {
                 {
                     std::lock_guard lock(state_->mutex);
                     if (state_->window.load() == nullptr || state_->resetting || !state_->active) return S_OK;
-                    WheelInput input;
+                    arrange::core::WheelInput input;
                     input.deltaX = (transform[4] - state_->lastX) / state_->scale;
                     input.deltaY = (transform[5] - state_->lastY) / state_->scale;
                     state_->lastX = transform[4];
@@ -160,9 +160,9 @@ namespace arrange::juce {
                     if (input.deltaX == 0.0f && input.deltaY == 0.0f) return S_OK;
                     input.inertial = state_->inertial;
                     if (state_->inertial)
-                        input.momentumPhase = WheelPhase::Changed;
+                        input.momentumPhase = arrange::core::WheelPhase::Changed;
                     else
-                        input.phase = WheelPhase::Changed;
+                        input.phase = arrange::core::WheelPhase::Changed;
                     state_->append(input);
                 }
                 state_->wake();
@@ -236,7 +236,7 @@ namespace arrange::juce {
                 pending.swap(state->pending);
             }
             for (const auto& sample : pending) {
-                if (sample.input.phase == WheelPhase::Began) {
+                if (sample.input.phase == arrange::core::WheelPhase::Began) {
                     // RUNNING 中的新接触可能由系统直接分配；每次真起手在 UI 线程重取初始点
                     dispatchedPoint = cursorPoint().value_or(sample.point);
                     hasDispatchedPoint = true;

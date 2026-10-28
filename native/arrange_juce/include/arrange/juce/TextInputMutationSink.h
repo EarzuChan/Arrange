@@ -9,7 +9,7 @@ namespace arrange::juce {
 
     class TextInputMutationSink final {
        public:
-        [[nodiscard]] TextInputCallbacks callbacks(ArrangeRuntime& runtime) const;
+        [[nodiscard]] arrange::core::InputCallbacks callbacks(ArrangeRuntime& runtime) const;
     };
 
 #endif

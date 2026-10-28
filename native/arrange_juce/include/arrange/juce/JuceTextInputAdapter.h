@@ -23,13 +23,13 @@ namespace arrange::juce {
 
         [[nodiscard]] ::juce::Range<int> highlightedRegion(const arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, const InteractionStateOwner& interaction) const;
 
-        [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Range<int>& range, const TextInputCallbacks& callbacks) const;
+        [[nodiscard]] bool setHighlightedRegion(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Range<int>& range, const arrange::core::InputCallbacks& callbacks) const;
 
-        [[nodiscard]] bool setTemporaryUnderlining(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Array<::juce::Range<int>>& ranges, const TextInputCallbacks& callbacks) const;
+        [[nodiscard]] bool setTemporaryUnderlining(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::Array<::juce::Range<int>>& ranges, const arrange::core::InputCallbacks& callbacks) const;
 
         [[nodiscard]] ::juce::String textInRange(const arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, const InteractionStateOwner& interaction, const ::juce::Range<int>& range) const;
 
-        [[nodiscard]] bool insertTextAtCaret(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::String& textToInsert, const TextInputCallbacks& callbacks) const;
+        [[nodiscard]] bool insertTextAtCaret(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::String& textToInsert, const arrange::core::InputCallbacks& callbacks) const;
 
         [[nodiscard]] int caretPosition(const arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, const InteractionStateOwner& interaction) const;
 
@@ -41,7 +41,7 @@ namespace arrange::juce {
 
         [[nodiscard]] ::juce::RectangleList<int> textBounds(const arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, const InteractionStateOwner& interaction, ::juce::Range<int> range) const;
 
-        [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::KeyPress& key, const TextInputCallbacks& callbacks) const;
+        [[nodiscard]] bool keyPressed(arrange::core::LayoutTree& tree, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::KeyPress& key, const arrange::core::InputCallbacks& callbacks) const;
     };
 
 #endif

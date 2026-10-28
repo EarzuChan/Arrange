@@ -1,12 +1,10 @@
-#include <arrange/juce/PointerInputState.h>
-#include "ScrollProbe.h"
+#include <arrange/core/PointerInputState.h>
+#include <arrange/core/ModifierGeometry.h>
 
 #include <algorithm>
-#include <arrange/core/ModifierGeometry.h>
 #include <cmath>
-#include <juce_core/juce_core.h>
 
-namespace arrange::juce {
+namespace arrange::core {
     void PointerInputState::reset() {
         gesture_.reset();
         wheelSession_ = {};
@@ -23,7 +21,7 @@ namespace arrange::juce {
         cancelWheel();
     }
 
-    PointerDownResult PointerInputState::pointerDown(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, int clicks, arrange::core::PointerGestureOutput& out) {
+    PointerDownResult PointerInputState::pointerDown(const LayoutTree& tree, const HitTestSnapshot& snapshot, const PointerSample& sample, int clicks, PointerGestureOutput& out) {
         PointerDownResult result;
         result.hit = hitTester_.hitTest(snapshot, sample.point);
         // 新的按下打断尚未结束的滚轮会话
@@ -32,11 +30,11 @@ namespace arrange::juce {
         return result;
     }
 
-    void PointerInputState::pointerDrag(const arrange::core::LayoutTree& tree, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out) {
+    void PointerInputState::pointerDrag(const LayoutTree& tree, const PointerSample& sample, PointerGestureOutput& out) {
         gesture_.drag(tree, sample, out);
     }
 
-    void PointerInputState::pointerUp(const arrange::core::LayoutTree& tree, const arrange::core::HitTestSnapshot& snapshot, const arrange::core::PointerSample& sample, arrange::core::PointerGestureOutput& out) {
+    void PointerInputState::pointerUp(const LayoutTree& tree, const HitTestSnapshot& snapshot, const PointerSample& sample, PointerGestureOutput& out) {
         gesture_.primaryUp(tree, snapshot, sample, out);
     }
 
@@ -46,42 +44,24 @@ namespace arrange::juce {
         wheelSession_.target.reset();
     }
 
-    void PointerInputState::synchronizePublishedWheel(const arrange::core::LayoutTree& tree, bool interactive) {
-        if (!interactive || (wheelSession_.target && !arrange::core::ScrollDispatcher::targetWheel(tree, *wheelSession_.target, 0, 1).target)) cancelWheel();
+    void PointerInputState::synchronizePublishedWheel(const LayoutTree& tree, bool interactive) {
+        if (!interactive || (wheelSession_.target && !ScrollDispatcher::targetWheel(tree, *wheelSession_.target, 0, 1).target)) cancelWheel();
     }
 
-    WheelDispatchResult PointerInputState::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, float deltaX, float deltaY, std::uint64_t publishedRevision, float pixelsPerWheelUnit) {
-        WheelInput input;
-        input.timeMillis = ::juce::Time::getMillisecondCounterHiRes();
-        input.deltaX = deltaX * pixelsPerWheelUnit;
-        input.deltaY = deltaY * pixelsPerWheelUnit;
-        return wheel(tree, root, point, input, publishedRevision);
-    }
-
-    WheelDispatchResult PointerInputState::wheel(arrange::core::LayoutTree& tree, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input, std::uint64_t publishedRevision, const arrange::core::HitTestSnapshot* snapshot) {
+    WheelDispatchResult PointerInputState::wheel(LayoutTree& tree, NodeId root, Point point, const WheelInput& input, std::uint64_t publishedRevision, const HitTestSnapshot* snapshot) {
         // 拖动会话独占指针，滚轮直接丢弃且不开启会话
         if (gesture_.dragging()) {
             cancelWheel();
             return {};
         }
+        WheelDispatchResult result;
         if (scrollRevision_ != publishedRevision) {
-            if (ScrollProbe::active()) {
-                for (const auto& [identity, value] : pendingScrollValues_) {
-                    ScrollProbe::Sample sample;
-                    sample.kind = ScrollProbe::Kind::PredictionReset;
-                    sample.previousRevision = scrollRevision_;
-                    sample.revision = publishedRevision;
-                    sample.modifierIdentity = identity;
-                    sample.value = value;
-                    sample.queueDepth = pendingScrollValues_.size();
-                    ScrollProbe::record(sample);
-                }
-            }
+            result.droppedFromRevision = scrollRevision_;
+            result.droppedPredictions.assign(pendingScrollValues_.begin(), pendingScrollValues_.end());
             pendingScrollValues_.clear();
             scrollRevision_ = publishedRevision;
         }
 
-        WheelDispatchResult result;
         const auto begin = [&] {
             wheelSession_ = {};
             wheelSession_.id = ++nextWheelSessionId_;
@@ -89,10 +69,10 @@ namespace arrange::juce {
             wheelSession_.nativePhases = input.nativePhases;
             wheelSession_.lastInputMillis = input.timeMillis;
             // 只在起手冻结命中链，零位移 began 也不能把初始落点拖到下一次输入
-            wheelSession_.initialPath = arrange::core::ScrollDispatcher::hitPath(tree, root, point);
+            wheelSession_.initialPath = ScrollDispatcher::hitPath(tree, root, point);
             if (snapshot)
                 for (const auto& item : hitTester_.hitChain(*snapshot, point))
-                    if (item.input == arrange::core::InputModifierKind::Wheel) {
+                    if (item.input == InputModifierKind::Wheel) {
                         wheelSession_.candidate = item;
                         break;
                     }
@@ -122,23 +102,23 @@ namespace arrange::juce {
         if (wheelSession_.active) wheelSession_.lastInputMillis = input.timeMillis;
         if (!wheelSession_.active || wheelSession_.cancelled) return result;
 
-        const auto dispatch = [&](const arrange::core::ScrollTarget& target) {
+        const auto dispatch = [&](const ScrollTarget& target) {
             const auto unit = target.horizontal ? input.unitX : input.unitY;
             const auto delta = target.horizontal ? input.deltaX : input.deltaY;
             auto scale = unit == WheelUnit::Lines ? scrollLineDistance : 1.0f;
-            if (unit == WheelUnit::Pages) scale = arrange::core::ScrollDispatcher::targetWheel(tree, target, 0, 1, &pendingScrollValues_).viewportSize;
-            return arrange::core::ScrollDispatcher::targetWheel(tree, target, std::isfinite(delta) ? delta : 0.0f, scale, &pendingScrollValues_);
+            if (unit == WheelUnit::Pages) scale = ScrollDispatcher::targetWheel(tree, target, 0, 1, &pendingScrollValues_).viewportSize;
+            return ScrollDispatcher::targetWheel(tree, target, std::isfinite(delta) ? delta : 0.0f, scale, &pendingScrollValues_);
         };
         const auto pixels = [&](float delta, WheelUnit unit) {
             return std::isfinite(delta) ? delta * (unit == WheelUnit::Lines ? scrollLineDistance : unit == WheelUnit::Pages ? scrollLineDistance * 8 : 1.0f) : 0.0f;
         };
         const auto& wheel = input;
-        const auto deliver = [&](const arrange::core::HitTestResult& receptor) {
-            const auto* modifier = arrange::core::liveInputModifier(tree, receptor);
+        const auto deliver = [&](const HitTestResult& receptor) {
+            const auto* modifier = liveInputModifier(tree, receptor);
             if (!modifier) return false;
-            const auto deltaX = modifier->axis == arrange::core::DragAxis::Vertical ? 0.0f : pixels(wheel.deltaX, wheel.unitX);
-            const auto deltaY = modifier->axis == arrange::core::DragAxis::Horizontal ? 0.0f : pixels(wheel.deltaY, wheel.unitY);
-            if (deltaX != 0 || deltaY != 0) result.wheelEvent = arrange::core::PointerGestureEvent{modifier->eventSlot, arrange::core::WheelEventPayload{deltaX, deltaY, {}}};
+            const auto deltaX = modifier->axis == DragAxis::Vertical ? 0.0f : pixels(wheel.deltaX, wheel.unitX);
+            const auto deltaY = modifier->axis == DragAxis::Horizontal ? 0.0f : pixels(wheel.deltaY, wheel.unitY);
+            if (deltaX != 0 || deltaY != 0) result.wheelEvent = PointerGestureEvent{modifier->eventSlot, WheelEventPayload{deltaX, deltaY, {}}};
             return true;
         };
         if (wheelSession_.receptor) {
@@ -164,14 +144,14 @@ namespace arrange::juce {
             result.horizontal = axisMagnitude(input.deltaX, input.unitX) > axisMagnitude(input.deltaY, input.unitY);
             const auto hasAxis = [&](bool horizontal) {
                 for (const auto& target : wheelSession_.initialPath)
-                    if (target.horizontal == horizontal && arrange::core::ScrollDispatcher::targetWheel(tree, target, 0, 1).target) return true;
+                    if (target.horizontal == horizontal && ScrollDispatcher::targetWheel(tree, target, 0, 1).target) return true;
                 return false;
             };
             // 主轴没有容器才允许改用次轴；边界不能让次轴噪声接管手势
             if (!hasAxis(result.horizontal) && (result.horizontal ? input.deltaY : input.deltaX) != 0) result.horizontal = !result.horizontal;
             // onWheel 受体接受该轴且比同轴滚动容器更靠内时，整个会话交给它
-            if (const auto* receptor = wheelSession_.candidate ? arrange::core::liveInputModifier(tree, *wheelSession_.candidate) : nullptr; receptor && receptor->axis != (result.horizontal ? arrange::core::DragAxis::Vertical : arrange::core::DragAxis::Horizontal)) {
-                const auto path = arrange::core::nodePath(tree, wheelSession_.candidate->node);
+            if (const auto* receptor = wheelSession_.candidate ? liveInputModifier(tree, *wheelSession_.candidate) : nullptr; receptor && receptor->axis != (result.horizontal ? DragAxis::Vertical : DragAxis::Horizontal)) {
+                const auto path = nodePath(tree, wheelSession_.candidate->node);
                 const auto inner = std::all_of(wheelSession_.initialPath.begin(), wheelSession_.initialPath.end(), [&](const auto& target) { return target.horizontal != result.horizontal || std::find(path.begin(), path.end(), target.node) != path.end(); });
                 if (inner) {
                     wheelSession_.receptor = wheelSession_.candidate;

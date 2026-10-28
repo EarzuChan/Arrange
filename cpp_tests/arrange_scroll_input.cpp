@@ -1,3 +1,4 @@
+#include <arrange/core/WheelInput.h>
 #include "JuceTestApplication.h"
 #include <arrange/core/Layout.h>
 #include <arrange/core/Scroll.h>
@@ -5,10 +6,10 @@
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/JucePointerInputAdapter.h>
-#include <arrange/juce/PointerInputState.h>
+#include <arrange/core/PointerInputState.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/VBlankSource.h>
-#include <arrange/juce/WheelInput.h>
+#include <arrange/core/WheelInput.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <algorithm>
@@ -28,6 +29,16 @@
 using namespace arrange::core;
 
 namespace {
+    // 按滚轮格数换算为逻辑 PX 输入；连续调用落在同一滚轮序列内
+    arrange::core::WheelInput notches(float deltaX, float deltaY, float pixelsPerNotch = 48.0f) {
+        static double time = 0;
+        arrange::core::WheelInput input;
+        input.timeMillis = time += 1;
+        input.deltaX = deltaX * pixelsPerNotch;
+        input.deltaY = deltaY * pixelsPerNotch;
+        return input;
+    }
+
     void check(bool condition, const char* message) {
         if (!condition) throw std::runtime_error(message);
     }
@@ -78,13 +89,13 @@ namespace {
             LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
             return tree;
         };
-        arrange::juce::WheelInput input;
+        arrange::core::WheelInput input;
         input.deltaY = -32;
         input.timeMillis = 1;
 
         auto tree = withReceptor(DragAxis::Both);
         auto snapshot = buildHitTestSnapshot(tree, 1);
-        arrange::juce::PointerInputState pointer;
+        arrange::core::PointerInputState pointer;
         auto result = pointer.wheel(tree, 1, {20, 20}, input, 1, &snapshot);
         check(result.wheelEvent && result.wheelEvent->slot.node == 2 && near(std::get<WheelEventPayload>(result.wheelEvent->payload).deltaY, -32) && !result.scroll.consumed && result.locked, "内层 onWheel 未优先于滚动容器接管会话");
         input.timeMillis = 20;
@@ -93,7 +104,7 @@ namespace {
 
         tree = withReceptor(DragAxis::Horizontal);
         snapshot = buildHitTestSnapshot(tree, 1);
-        arrange::juce::PointerInputState other;
+        arrange::core::PointerInputState other;
         input.timeMillis = 1;
         result = other.wheel(tree, 1, {20, 20}, input, 1, &snapshot);
         check(!result.wheelEvent && result.scroll.consumed, "只接受横向的 onWheel 截取了纵向滚动");
@@ -102,54 +113,54 @@ namespace {
     void verifySingleAxisRouting() {
         LayoutTree vertical;
         makeSingleScroll(vertical, true);
-        arrange::juce::PointerInputState pointer;
-        auto result = pointer.wheel(vertical, 1, {20, 20}, 1, -213, 1, 1);
+        arrange::core::PointerInputState pointer;
+        auto result = pointer.wheel(vertical, 1, {20, 20}, notches(1, -213, 1), 1);
         check(!result.horizontal && result.scroll.consumed && result.scroll.target == 1 && near(result.scroll.value, 213), "纵向精细滚动被微小横向噪声阻断");
         pointer.reset();
-        result = pointer.wheel(vertical, 1, {20, 20}, -100, -2, 1, 1);
+        result = pointer.wheel(vertical, 1, {20, 20}, notches(-100, -2, 1), 1);
         check(!result.horizontal && result.scroll.consumed && near(result.scroll.value, 2), "只支持纵向的命中链没有回退到有效纵向分量");
         pointer.reset();
-        result = pointer.wheel(vertical, 1, {20, 20}, -100, 0, 1, 1);
+        result = pointer.wheel(vertical, 1, {20, 20}, notches(-100, 0, 1), 1);
         check(!result.scroll.consumed, "纯横向输入被擅自转换为纵向位移");
         pointer.reset();
-        result = pointer.wheel(vertical, 1, {20, 20}, 0, 0, 1, 1);
+        result = pointer.wheel(vertical, 1, {20, 20}, notches(0, 0, 1), 1);
         check(!result.scroll.consumed, "零位移制造了滚动");
 
         LayoutTree horizontal;
         makeSingleScroll(horizontal, false);
         pointer.reset();
-        result = pointer.wheel(horizontal, 1, {20, 20}, -213, 1, 1, 1);
+        result = pointer.wheel(horizontal, 1, {20, 20}, notches(-213, 1, 1), 1);
         check(result.horizontal && result.scroll.consumed && result.scroll.target == 1 && near(result.scroll.value, 213), "横向精细滚动被微小纵向噪声阻断");
         pointer.reset();
-        result = pointer.wheel(horizontal, 1, {20, 20}, -2, -100, 1, 1);
+        result = pointer.wheel(horizontal, 1, {20, 20}, notches(-2, -100, 1), 1);
         check(result.horizontal && result.scroll.consumed && near(result.scroll.value, 2), "只支持横向的命中链没有回退到有效横向分量");
         pointer.reset();
-        result = pointer.wheel(horizontal, 1, {20, 20}, 0, -100, 1, 1);
+        result = pointer.wheel(horizontal, 1, {20, 20}, notches(0, -100, 1), 1);
         check(!result.scroll.consumed, "纯纵向输入被擅自转换为横向位移");
     }
 
     void verifyPrecisionAndPublication() {
         LayoutTree tree;
         makeSingleScroll(tree, true);
-        arrange::juce::PointerInputState pointer;
-        const auto first = pointer.wheel(tree, 1, {20, 20}, 0, -0.125f, 1, 1);
-        const auto second = pointer.wheel(tree, 1, {20, 20}, 0, -0.125f, 1, 1);
+        arrange::core::PointerInputState pointer;
+        const auto first = pointer.wheel(tree, 1, {20, 20}, notches(0, -0.125f, 1), 1);
+        const auto second = pointer.wheel(tree, 1, {20, 20}, notches(0, -0.125f, 1), 1);
         check(first.scroll.consumed && second.scroll.consumed && near(first.scroll.value, 0.125f) && near(second.scroll.value, 0.25f), "同帧亚像素输入被取整或丢失累计量");
         check(ScrollDispatcher::verticalScrollValue(tree.node(1)) == 0 && tree.node(2).bounds.y == 0, "输入预测提前修改了已发布的滚动几何");
         setSingleScrollValue(tree, true, second.scroll.value);
-        const auto next = pointer.wheel(tree, 1, {20, 20}, 0, -0.125f, 2, 1);
+        const auto next = pointer.wheel(tree, 1, {20, 20}, notches(0, -0.125f, 1), 2);
         check(near(next.scroll.value, 0.375f), "新发布没有从已提交滚动值继续累计");
         pointer.reset();
-        check(near(pointer.wheel(tree, 1, {20, 20}, 0, -0.125f, 2, 1).scroll.value, 0.375f), "重置后复用了旧滚动预测");
+        check(near(pointer.wheel(tree, 1, {20, 20}, notches(0, -0.125f, 1), 2).scroll.value, 0.375f), "重置后复用了旧滚动预测");
 
         LayoutTree mouse;
         makeSingleScroll(mouse, true);
         pointer.reset();
-        const auto mouseFirst = pointer.wheel(mouse, 1, {20, 20}, 0, -1, 1);
-        const auto mouseSecond = pointer.wheel(mouse, 1, {20, 20}, 0, -1, 1);
+        const auto mouseFirst = pointer.wheel(mouse, 1, {20, 20}, notches(0, -1), 1);
+        const auto mouseSecond = pointer.wheel(mouse, 1, {20, 20}, notches(0, -1), 1);
         check(mouseFirst.scroll.value == 48 && mouseSecond.scroll.value == 96, "离散鼠标滚轮的步长或同帧累计行为发生变化");
         setSingleScrollValue(mouse, true, mouseSecond.scroll.value);
-        check(pointer.wheel(mouse, 1, {20, 20}, 0, -1, 2).scroll.value == 144, "鼠标滚轮发布后没有从已提交值继续滚动");
+        check(pointer.wheel(mouse, 1, {20, 20}, notches(0, -1), 2).scroll.value == 144, "鼠标滚轮发布后没有从已提交值继续滚动");
     }
 
     void makeCrossAxisScroll(LayoutTree& tree, float horizontalValue = 0, float verticalValue = 0) {
@@ -160,25 +171,25 @@ namespace {
     void verifyCrossAxisRoutingAndBoundaries() {
         LayoutTree tree;
         makeCrossAxisScroll(tree);
-        arrange::juce::PointerInputState pointer;
-        auto result = pointer.wheel(tree, 1, {20, 20}, -1, -20, 1, 1);
+        arrange::core::PointerInputState pointer;
+        auto result = pointer.wheel(tree, 1, {20, 20}, notches(-1, -20, 1), 1);
         check(!result.horizontal && result.scroll.consumed && result.scroll.target == 2 && near(result.scroll.value, 20), "交叉轴嵌套没有把纵向主量交给纵向子容器");
         pointer.reset();
-        result = pointer.wheel(tree, 1, {20, 20}, -20, -1, 1, 1);
+        result = pointer.wheel(tree, 1, {20, 20}, notches(-20, -1, 1), 1);
         check(result.horizontal && result.scroll.consumed && result.scroll.target == 1 && near(result.scroll.value, 20), "交叉轴嵌套没有把横向主量交给横向父容器");
         pointer.reset();
-        result = pointer.wheel(tree, 1, {20, 20}, -10, -10, 1, 1);
+        result = pointer.wheel(tree, 1, {20, 20}, notches(-10, -10, 1), 1);
         check(!result.horizontal && result.scroll.target == 2 && near(result.scroll.value, 10), "相等的双轴输入没有保持纵向优先");
 
         LayoutTree verticalBoundary;
         makeCrossAxisScroll(verticalBoundary, 0, 300);
         pointer.reset();
-        result = pointer.wheel(verticalBoundary, 1, {20, 20}, -1, -20, 1, 1);
+        result = pointer.wheel(verticalBoundary, 1, {20, 20}, notches(-1, -20, 1), 1);
         check(!result.horizontal && !result.scroll.consumed && result.scroll.target == 2 && result.scroll.value == 300, "纵向子容器到边界后误将横向噪声交给父容器");
         LayoutTree horizontalBoundary;
         makeCrossAxisScroll(horizontalBoundary, 300, 0);
         pointer.reset();
-        result = pointer.wheel(horizontalBoundary, 1, {20, 20}, -20, -1, 1, 1);
+        result = pointer.wheel(horizontalBoundary, 1, {20, 20}, notches(-20, -1, 1), 1);
         check(result.horizontal && !result.scroll.consumed && result.scroll.target == 1 && result.scroll.value == 300, "横向父容器到边界后误将纵向噪声交给子容器");
     }
 
@@ -190,8 +201,8 @@ namespace {
         inner.eventSlot = makeEventSlotId(1, EventSlotKind::VerticalScroll, "inner");
         tree.apply({CreateNodeMutation{1, NodeType::Layout}, boxPolicy(1), SetModifierMutation{1, {{fixedSize(100, 100), "viewport"}, {outer, "outer"}, {fixedSize(100, 200), "inner-viewport"}, {inner, "inner"}, {fixedSize(100, 400), "content"}}}});
         LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
-        arrange::juce::PointerInputState pointer;
-        const auto result = pointer.wheel(tree, 1, {20, 20}, 1, -40, 1, 1);
+        arrange::core::PointerInputState pointer;
+        const auto result = pointer.wheel(tree, 1, {20, 20}, notches(1, -40, 1), 1);
         check(!result.horizontal && result.scroll.consumed && result.scroll.eventSlot.path == "outer" && near(result.scroll.value, 40), "同向子容器完全到边界后的父容器接续行为退化");
     }
 
@@ -211,15 +222,15 @@ namespace {
         LayoutEngine{}.place(tree, 1);
     }
 
-    arrange::juce::WheelInput sessionWheel(float deltaX, float deltaY, double timeMillis, arrange::juce::WheelPhase phase = arrange::juce::WheelPhase::None, arrange::juce::WheelPhase momentum = arrange::juce::WheelPhase::None, bool nativePhases = false) {
-        arrange::juce::WheelInput input;
+    arrange::core::WheelInput sessionWheel(float deltaX, float deltaY, double timeMillis, arrange::core::WheelPhase phase = arrange::core::WheelPhase::None, arrange::core::WheelPhase momentum = arrange::core::WheelPhase::None, bool nativePhases = false) {
+        arrange::core::WheelInput input;
         input.deltaX = deltaX;
         input.deltaY = deltaY;
         input.timeMillis = timeMillis;
         input.phase = phase;
         input.momentumPhase = momentum;
         input.precise = true;
-        input.inertial = momentum != arrange::juce::WheelPhase::None;
+        input.inertial = momentum != arrange::core::WheelPhase::None;
         input.nativePhases = nativePhases;
         return input;
     }
@@ -228,7 +239,7 @@ namespace {
         using namespace arrange::juce;
         LayoutTree tree;
         makeNestedScroll(tree);
-        PointerInputState pointer;
+        arrange::core::PointerInputState pointer;
         const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 0), 1);
         pointer.cancelWheel();
         for (double timestamp : {50, 100, 150, 200, 250, 310, 360}) {
@@ -243,12 +254,12 @@ namespace {
         using namespace arrange::juce;
         LayoutTree tree;
         makeSingleScroll(tree, true);
-        PointerInputState pointer;
-        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 0, WheelPhase::Began, WheelPhase::None, true), 1);
+        arrange::core::PointerInputState pointer;
+        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
         pointer.resetForSceneChange();
-        const auto remainder = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 100, WheelPhase::Changed, WheelPhase::None, true), 2);
+        const auto remainder = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 100, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 2);
         check(!remainder.locked && !remainder.scroll.consumed && remainder.sessionId == first.sessionId, "reload 后旧手势重新命中了新场景");
-        const auto next = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 200, WheelPhase::Began, WheelPhase::None, true), 2);
+        const auto next = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 200, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 2);
         check(next.sessionStarted && next.locked && next.scroll.value == 5, "reload 后新手势不能从新的已发布值开始");
     }
 
@@ -256,15 +267,15 @@ namespace {
         using namespace arrange::juce;
         LayoutTree tree;
         makeSingleScroll(tree, true);
-        PointerInputState pointer;
+        arrange::core::PointerInputState pointer;
         auto input = sessionWheel(0, -0.125f, 0);
-        input.unitY = WheelUnit::Lines;
+        input.unitY = arrange::core::WheelUnit::Lines;
         const auto line = pointer.wheel(tree, 1, {20, 20}, input, 1);
         input.timeMillis = 10;
         const auto nextLine = pointer.wheel(tree, 1, {20, 20}, input, 1);
         check(near(line.scroll.value, 2) && near(nextLine.scroll.value, 4), "小轮行增量没有保留分数并按框架行距累计");
         pointer.reset();
-        input.unitY = WheelUnit::Pages;
+        input.unitY = arrange::core::WheelUnit::Pages;
         input.deltaY = -0.5f;
         const auto page = pointer.wheel(tree, 1, {20, 20}, input, 1);
         check(near(page.scroll.value, 50), "整页滚动没有采用锁定目标的视口尺寸");
@@ -326,37 +337,37 @@ namespace {
     }
 
     void verifyLockedSessionBoundaries() {
-        using arrange::juce::WheelPhase;
+        using arrange::core::WheelPhase;
         LayoutTree tree;
         makeNestedScroll(tree, 0, 199);
         const auto path = ScrollDispatcher::hitPath(tree, 1, {20, 20});
         check(path.size() == 2 && path[0].modifier != path[1].modifier, "同节点的两个滚动实例没有独立目标身份");
-        arrange::juce::PointerInputState pointer;
-        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 0, WheelPhase::Began, WheelPhase::None, true), 1);
+        arrange::core::PointerInputState pointer;
+        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -5, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
         check(first.locked && first.sessionStarted && first.scroll.eventSlot.path == "inner" && first.scroll.value == 200, "手势没有锁定起始仍能移动的最内层实例");
-        const auto boundary = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 10, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto boundary = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(boundary.locked && boundary.sessionId == first.sessionId && !boundary.scroll.consumed && boundary.scroll.eventSlot.path == "inner", "手势中途到边界后串给了父容器");
-        const auto reverse = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 5, 20, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto reverse = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 5, 20, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(reverse.scroll.eventSlot.path == "inner" && reverse.scroll.value == 195, "同一手势反向没有继续移动原目标");
         setTargetValue(tree, path.back(), 200);
-        const auto newGesture = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 30, WheelPhase::Began, WheelPhase::None, true), 2);
+        const auto newGesture = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 30, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 2);
         check(newGesture.sessionStarted && newGesture.sessionId != first.sessionId && newGesture.scroll.eventSlot.path == "outer" && newGesture.scroll.value == 20, "起始已到边界没有重新选择能移动的同轴父容器");
-        const auto parentReverse = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 5, 40, WheelPhase::Changed, WheelPhase::None, true), 2);
+        const auto parentReverse = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 5, 40, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 2);
         check(parentReverse.scroll.eventSlot.path == "outer" && parentReverse.scroll.value == 15, "父容器手势反向时被重新能动的子容器抢走");
 
         LayoutTree allBlocked;
         makeNestedScroll(allBlocked, 100, 200);
         pointer.reset();
-        const auto blocked = pointer.wheel(allBlocked, 1, {20, 20}, sessionWheel(0, -5, 0, WheelPhase::Began, WheelPhase::None, true), 1);
+        const auto blocked = pointer.wheel(allBlocked, 1, {20, 20}, sessionWheel(0, -5, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
         check(blocked.locked && !blocked.scroll.consumed && blocked.scroll.eventSlot.path == "outer", "全部到边界时没有锁定同轴最外层目标");
-        const auto blockedReverse = pointer.wheel(allBlocked, 1, {20, 20}, sessionWheel(0, 5, 10, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto blockedReverse = pointer.wheel(allBlocked, 1, {20, 20}, sessionWheel(0, 5, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(blockedReverse.scroll.eventSlot.path == "outer" && blockedReverse.scroll.value == 95, "全部到边界起手的反向滚动偷回了子容器");
 
         LayoutTree crossed;
         makeCrossAxisScroll(crossed);
         pointer.reset();
-        const auto vertical = pointer.wheel(crossed, 1, {20, 20}, sessionWheel(-1, -20, 0, WheelPhase::Began, WheelPhase::None, true), 1);
-        const auto horizontalNoise = pointer.wheel(crossed, 1, {20, 20}, sessionWheel(-100, -1, 10, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto vertical = pointer.wheel(crossed, 1, {20, 20}, sessionWheel(-1, -20, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
+        const auto horizontalNoise = pointer.wheel(crossed, 1, {20, 20}, sessionWheel(-100, -1, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(vertical.locked && !vertical.horizontal && horizontalNoise.locked && !horizontalNoise.horizontal && horizontalNoise.scroll.target == 2 && horizontalNoise.scroll.value == 21, "同手势次轴变成主量后切换了锁定轴或目标");
     }
 
@@ -366,62 +377,62 @@ namespace {
     }
 
     void verifyFrozenInitialHitAndPublishedGeometry() {
-        using arrange::juce::WheelPhase;
+        using arrange::core::WheelPhase;
         LayoutTree tree;
         makeMovingScroll(tree);
         const auto initial = ScrollDispatcher::hitPath(tree, 1, {20, 20});
         check(initial.size() == 1 && initial.front().node == 1, "移动目标夹具的内层容器起始不应在指针下");
-        arrange::juce::PointerInputState pointer;
-        const auto began = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 0, WheelPhase::Began, WheelPhase::None, true), 1);
+        arrange::core::PointerInputState pointer;
+        const auto began = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
         check(began.sessionStarted && !began.locked && !began.scroll.consumed, "零位移 began 提前选择目标或产生滚动");
-        const auto first = pointer.wheel(tree, 1, {20, 250}, sessionWheel(0, -200, 10, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto first = pointer.wheel(tree, 1, {20, 250}, sessionWheel(0, -200, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(first.locked && first.scroll.target == 1 && first.scroll.value == 200, "方向确认时重用了移动后的指针位置而非起始命中链");
         setTargetValue(tree, initial.front(), 200);
         const auto moved = ScrollDispatcher::hitPath(tree, 1, {20, 20});
         check(moved.size() == 2 && moved.back().node == 3, "父滚动没有把内层容器带到指针下，夹具无效");
-        const auto afterPublish = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 20, WheelPhase::Changed, WheelPhase::None, true), 2);
+        const auto afterPublish = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 20, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 2);
         check(afterPublish.scroll.target == 1 && afterPublish.scroll.value == 201 && afterPublish.sessionId == first.sessionId, "新发布或子容器经过指针改变了手势锁定目标");
         setTargetValue(tree, initial.front(), afterPublish.scroll.value);
         tree.setModifierInput(1, tree.node(1).modifier.elements().front().handle, fixedSize(100, 80));
         LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
-        const auto resized = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 30, WheelPhase::Changed, WheelPhase::None, true), 3);
+        const auto resized = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 30, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 3);
         check(resized.scroll.target == 1 && resized.scroll.value == 202 && resized.sessionId == first.sessionId, "视口 resize 重置或重新命中了手势目标");
 
         pointer.reset();
-        const auto outside = pointer.wheel(tree, 1, {150, 20}, sessionWheel(0, 0, 40, WheelPhase::Began, WheelPhase::None, true), 3);
-        const auto entered = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 50, WheelPhase::Changed, WheelPhase::None, true), 3);
+        const auto outside = pointer.wheel(tree, 1, {150, 20}, sessionWheel(0, 0, 40, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 3);
+        const auto entered = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 50, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 3);
         check(outside.sessionStarted && !entered.scroll.target && !entered.scroll.consumed, "初始命中链为空的手势经过容器时突然被接管");
 
         LayoutTree vertical;
         makeSingleScroll(vertical, true);
         pointer.reset();
-        const auto noise = pointer.wheel(vertical, 1, {20, 20}, sessionWheel(1, 0, 0, WheelPhase::Began, WheelPhase::None, true), 1);
-        const auto directed = pointer.wheel(vertical, 1, {20, 20}, sessionWheel(1, -20, 10, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto noise = pointer.wheel(vertical, 1, {20, 20}, sessionWheel(1, 0, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
+        const auto directed = pointer.wheel(vertical, 1, {20, 20}, sessionWheel(1, -20, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(!noise.locked && !noise.scroll.target && directed.locked && !directed.horizontal && directed.scroll.value == 20 && directed.sessionId == noise.sessionId, "起始横向噪声把纵向手势锁成了无目标");
     }
 
     void verifyGestureAndMomentumLifecycle() {
-        using arrange::juce::WheelPhase;
+        using arrange::core::WheelPhase;
         LayoutTree tree;
         makeNestedScroll(tree);
-        arrange::juce::PointerInputState pointer;
-        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 0, WheelPhase::Began, WheelPhase::None, true), 1);
-        const auto paused = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 2000, WheelPhase::Changed, WheelPhase::None, true), 1);
+        arrange::core::PointerInputState pointer;
+        const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
+        const auto paused = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 2000, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(paused.sessionId == first.sessionId && paused.scroll.eventSlot.path == "inner" && paused.scroll.value == 40, "有真实 phase 的手势暂停超过 300ms 后被错误切组");
-        const auto ended = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 2010, WheelPhase::Ended, WheelPhase::None, true), 1);
+        const auto ended = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 2010, arrange::core::WheelPhase::Ended, arrange::core::WheelPhase::None, true), 1);
         check(ended.locked && !ended.scroll.consumed, "手指 ended 提前解除惯性将要使用的目标");
-        const auto inertia = pointer.wheel(tree, 1, {20, 250}, sessionWheel(0, -20, 2020, WheelPhase::None, WheelPhase::Began, true), 1);
+        const auto inertia = pointer.wheel(tree, 1, {20, 250}, sessionWheel(0, -20, 2020, arrange::core::WheelPhase::None, arrange::core::WheelPhase::Began, true), 1);
         check(inertia.sessionId == first.sessionId && inertia.scroll.eventSlot.path == "inner" && inertia.scroll.value == 60, "惯性没有延续原手势目标");
-        const auto nextBegin = pointer.wheel(tree, 1, {20, 20}, sessionWheel(-20, 0, 2030, WheelPhase::Began, WheelPhase::None, true), 1);
+        const auto nextBegin = pointer.wheel(tree, 1, {20, 20}, sessionWheel(-20, 0, 2030, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
         check(nextBegin.sessionStarted && nextBegin.sessionId != first.sessionId && !nextBegin.locked, "新 began 没有立即打断旧惯性");
-        const auto next = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 2040, WheelPhase::Changed, WheelPhase::None, true), 1);
+        const auto next = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -20, 2040, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 1);
         check(next.locked && next.scroll.eventSlot.path == "inner" && next.scroll.value == 80, "新手势没有从未发布的累计值继续移动");
-        const auto momentumEnd = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 2050, WheelPhase::None, WheelPhase::Ended, true), 1);
+        const auto momentumEnd = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 2050, arrange::core::WheelPhase::None, arrange::core::WheelPhase::Ended, true), 1);
         check(!momentumEnd.locked && !momentumEnd.scroll.consumed, "momentum ended 没有结束锁定或制造了额外惯性");
 
         pointer.reset();
-        const auto cancelledStart = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 3000, WheelPhase::Began, WheelPhase::None, true), 1);
-        const auto cancelled = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 3010, WheelPhase::Cancelled, WheelPhase::None, true), 1);
+        const auto cancelledStart = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 3000, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
+        const auto cancelled = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, 0, 3010, arrange::core::WheelPhase::Cancelled, arrange::core::WheelPhase::None, true), 1);
         check(cancelledStart.locked && cancelled.sessionCancelled && !cancelled.locked, "原生 cancel 没有取消手势锁定");
 
         LayoutTree mouse;
@@ -440,12 +451,12 @@ namespace {
     }
 
     void verifyLockedTargetInvalidation() {
-        using arrange::juce::WheelPhase;
+        using arrange::core::WheelPhase;
         for (int change = 0; change != 3; ++change) {
             LayoutTree tree;
             makeNestedScroll(tree);
-            arrange::juce::PointerInputState pointer;
-            const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 0, WheelPhase::Began, WheelPhase::None, true), 1);
+            arrange::core::PointerInputState pointer;
+            const auto first = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -1, 0, arrange::core::WheelPhase::Began, arrange::core::WheelPhase::None, true), 1);
             check(first.locked && first.scroll.eventSlot.path == "inner", "目标失效夹具没有先锁定内层容器");
             if (change == 0) {
                 auto disabled = std::get<LayoutModifierSemantics>(tree.node(1).modifier.find(first.scroll.modifier)->descriptor.value);
@@ -459,9 +470,9 @@ namespace {
             } else {
                 tree.apply({DeleteNodeMutation{1}});
             }
-            const auto invalid = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 10, WheelPhase::Changed, WheelPhase::None, true), 2);
+            const auto invalid = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 10, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 2);
             check(invalid.sessionCancelled && !invalid.locked && !invalid.scroll.target && !invalid.scroll.consumed, "删除、禁用或退休目标后没有取消，而是串给了父容器");
-            const auto remainder = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 20, WheelPhase::Changed, WheelPhase::None, true), 2);
+            const auto remainder = pointer.wheel(tree, 1, {20, 20}, sessionWheel(0, -10, 20, arrange::core::WheelPhase::Changed, arrange::core::WheelPhase::None, true), 2);
             check(!remainder.scroll.target && !remainder.scroll.consumed, "已取消手势的剩余输入重新命中了父容器");
         }
     }
@@ -558,7 +569,7 @@ n.insertChild(1, 2, 0)
         UINT wheelLines = 3;
         check(SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &wheelLines, 0) != FALSE, "未完成 Windows 滚轮验证：无法读取系统滚轮设置");
         check(wheelLines != 0 && wheelLines != WHEEL_PAGESCROLL, "未完成 Windows 滚轮验证：请在系统设置中启用按行滚动后重跑");
-        const float mouseDistance = arrange::juce::scrollLineDistance * static_cast<float>(wheelLines);
+        const float mouseDistance = arrange::core::scrollLineDistance * static_cast<float>(wheelLines);
         const float deltaPerPixel = static_cast<float>(WHEEL_DELTA) / (512.0f * mouseDistance);
         const float mouseStep = static_cast<float>(WHEEL_DELTA) / 512.0f;
 #endif

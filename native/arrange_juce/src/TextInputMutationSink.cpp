@@ -9,8 +9,8 @@
 #include <utility>
 
 namespace arrange::juce {
-    TextInputCallbacks TextInputMutationSink::callbacks(ArrangeRuntime& runtime) const {
-        TextInputCallbacks result;
+    arrange::core::InputCallbacks TextInputMutationSink::callbacks(ArrangeRuntime& runtime) const {
+        arrange::core::InputCallbacks result;
         result.invokeStringEvent = [&runtime](const arrange::core::EventSlotId& slot, const std::string& value) {
             if (slot.valid()) runtime.enqueueStringEvent(slot, value);
         };

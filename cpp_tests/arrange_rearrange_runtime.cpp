@@ -248,7 +248,7 @@ int main(int argc, char** argv) {
         const auto workBeforeScroll = runtime.frameCounters();
         const auto viewport = runtime.scene().node(scrollNode).bounds;
         for (const auto delta : {-12.0f, 12.0f}) {
-            const auto scroll = ScrollDispatcher{}.verticalWheel(runtime.scene().tree(), 1, {viewport.x + 5, viewport.y + 5}, delta);
+            const auto scroll = ScrollDispatcher{}.verticalWheel(runtime.scene().tree(), 1, {viewport.x + 5, viewport.y + 5}, delta, 48.0f);
             check(scroll.consumed && scroll.eventSlot.valid(), "真实列表没有消费滚动并关联回调");
             runtime.enqueueScrollSnapshotEvent(scroll.eventSlot, scroll);
             const auto moved = runtime.pumpFrame(1, constraints, timestamp += 16);

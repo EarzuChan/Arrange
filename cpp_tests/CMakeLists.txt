@@ -25,6 +25,10 @@ add_executable(arrange_local_work arrange_local_work.cpp AllocationProbe.cpp)
 target_link_libraries(arrange_local_work PRIVATE Arrange::core)
 add_test(NAME arrange_local_work COMMAND arrange_local_work)
 
+add_executable(arrange_input_session arrange_input_session.cpp)
+target_link_libraries(arrange_input_session PRIVATE Arrange::core)
+add_test(NAME arrange_input_session COMMAND arrange_input_session)
+
 add_executable(arrange_m24_contract arrange_m24_contract.cpp)
 target_link_libraries(arrange_m24_contract PRIVATE Arrange::framework)
 add_test(NAME arrange_m24_contract COMMAND arrange_m24_contract)

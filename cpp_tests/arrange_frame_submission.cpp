@@ -1,3 +1,4 @@
+#include <arrange/core/WheelInput.h>
 #include "TextFixtures.h"
 #include "JuceTestApplication.h"
 #include <arrange/juce/ScenePipelineState.h>
@@ -11,7 +12,7 @@
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/InteractionStateOwner.h>
-#include <arrange/juce/PointerInputState.h>
+#include <arrange/core/PointerInputState.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/JucePointerInputAdapter.h>
 #include <arrange/core/ModifierGeometry.h>
@@ -24,6 +25,16 @@
 using namespace arrange::core;
 
 namespace {
+    // 按滚轮格数换算为逻辑 PX 输入；连续调用落在同一滚轮序列内
+    arrange::core::WheelInput notches(float deltaX, float deltaY, float pixelsPerNotch = 48.0f) {
+        static double time = 0;
+        arrange::core::WheelInput input;
+        input.timeMillis = time += 1;
+        input.deltaX = deltaX * pixelsPerNotch;
+        input.deltaY = deltaY * pixelsPerNotch;
+        return input;
+    }
+
     void check(bool condition, const char* message) {
         if (!condition) throw std::runtime_error(message);
     }
@@ -148,7 +159,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto receiver = test_support::editable(tree.node(2))->handle;
 
         std::vector<std::pair<EventSlotId, std::string>> edits;
-        arrange::juce::TextInputCallbacks callbacks;
+        arrange::core::InputCallbacks callbacks;
         callbacks.invokeStringEvent = [&](const EventSlotId& slot, const std::string& value) {
             edits.emplace_back(slot, value);
         };
@@ -199,15 +210,15 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         scroll.enabled = true;
         tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, CreateNodeMutation{2, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{2, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, {{fixedSize(100, 100), {}}, {scroll, {}}}}, SetModifierMutation{2, {{fixedSize(100, 400), {}}}}, InsertChildMutation{1, 2, 0}});
         LayoutEngine{}.layout(tree, 1, {0, 500, 0, 500});
-        arrange::juce::PointerInputState pointer;
-        const auto first = pointer.wheel(tree, 1, {20, 20}, 0, -1, 1);
-        const auto second = pointer.wheel(tree, 1, {20, 20}, 0, -1, 1);
+        arrange::core::PointerInputState pointer;
+        const auto first = pointer.wheel(tree, 1, {20, 20}, notches(0, -1), 1);
+        const auto second = pointer.wheel(tree, 1, {20, 20}, notches(0, -1), 1);
         check(first.scroll.value == 48 && second.scroll.value == 96, "Same-frame wheel lost accumulated delta");
         check(ScrollDispatcher::verticalScrollValue(tree.node(1)) == 0, "Wheel mutated published geometry early");
-        const auto nextFrame = pointer.wheel(tree, 1, {20, 20}, 0, -1, 2);
+        const auto nextFrame = pointer.wheel(tree, 1, {20, 20}, notches(0, -1), 2);
         check(nextFrame.scroll.value == 48, "New publication retained obsolete wheel prediction");
         pointer.reset();
-        check(pointer.wheel(tree, 1, {20, 20}, 0, -1, 2).scroll.value == 48, "Reset retained wheel prediction");
+        check(pointer.wheel(tree, 1, {20, 20}, notches(0, -1), 2).scroll.value == 48, "Reset retained wheel prediction");
     }
 
     void verifyPointerMoveBarriers() {
@@ -240,7 +251,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
             const auto bounds = interaction.caretRectangleForCharIndex(runtime.scene().tree(), true, index);
             return event({static_cast<float>(bounds.getX()), static_cast<float>(bounds.getCentreY())});
         };
-        const arrange::juce::TextInputCallbacks callbacks;
+        const arrange::core::InputCallbacks callbacks;
         check(!adapter.pointerDrag(runtime, session, diagnostics, interaction, event({20, 10}), callbacks), "down 之前的 move 建立了拖选");
         adapter.pointerDown(runtime, session, diagnostics, interaction, 1, event({1, 1}), callbacks);
         check(interaction.isTextInputActive(runtime.scene().tree(), true), "down 未建立正式编辑受体");

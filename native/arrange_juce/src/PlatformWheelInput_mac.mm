@@ -13,16 +13,16 @@ namespace arrange::juce {
         constexpr float eventPositionTolerancePoints = 0.5f;
         constexpr ::juce::int64 eventTimeToleranceMillis = 2;
 
-        WheelPhase wheelPhase(NSEventPhase phase) noexcept {
-            if ((phase & NSEventPhaseCancelled) != 0) return WheelPhase::Cancelled;
-            if ((phase & NSEventPhaseEnded) != 0) return WheelPhase::Ended;
-            if ((phase & NSEventPhaseBegan) != 0) return WheelPhase::Began;
-            if ((phase & NSEventPhaseMayBegin) != 0) return WheelPhase::MayBegin;
-            if ((phase & (NSEventPhaseChanged | NSEventPhaseStationary)) != 0) return WheelPhase::Changed;
-            return WheelPhase::None;
+        arrange::core::WheelPhase wheelPhase(NSEventPhase phase) noexcept {
+            if ((phase & NSEventPhaseCancelled) != 0) return arrange::core::WheelPhase::Cancelled;
+            if ((phase & NSEventPhaseEnded) != 0) return arrange::core::WheelPhase::Ended;
+            if ((phase & NSEventPhaseBegan) != 0) return arrange::core::WheelPhase::Began;
+            if ((phase & NSEventPhaseMayBegin) != 0) return arrange::core::WheelPhase::MayBegin;
+            if ((phase & (NSEventPhaseChanged | NSEventPhaseStationary)) != 0) return arrange::core::WheelPhase::Changed;
+            return arrange::core::WheelPhase::None;
         }
 
-        void transposeShiftWheel(WheelInput& input, const ::juce::MouseEvent& event) noexcept {
+        void transposeShiftWheel(arrange::core::WheelInput& input, const ::juce::MouseEvent& event) noexcept {
             // 系统已产生横向位移时保留原轴；精细手势不使用离散滚轮的 Shift 转轴约定
             if (input.precise || !event.mods.isShiftDown() || input.deltaX != 0.0f || input.deltaY == 0.0f) return;
             input.deltaX = input.deltaY;
@@ -30,8 +30,8 @@ namespace arrange::juce {
             input.unitX = input.unitY;
         }
 
-        WheelInput fallbackWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
-            WheelInput input;
+        arrange::core::WheelInput fallbackWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
+            arrange::core::WheelInput input;
             const auto distanceScale = wheel.isSmooth ? 1.0f / jucePreciseWheelScale : fallbackDiscreteWheelDistance;
             input.deltaX = wheel.deltaX * distanceScale;
             input.deltaY = wheel.deltaY * distanceScale;
@@ -79,16 +79,16 @@ namespace arrange::juce {
         }
     }
 
-    WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
+    arrange::core::WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
         auto* nativeEvent = matchingNativeWheelEvent(event, wheel);
         if (nativeEvent == nil) return fallbackWheelInput(event, wheel);
 
-        WheelInput input;
+        arrange::core::WheelInput input;
         input.deltaX = static_cast<float>(nativeEvent.scrollingDeltaX);
         input.deltaY = static_cast<float>(nativeEvent.scrollingDeltaY);
         input.timeMillis = ::juce::Time::getMillisecondCounterHiRes();
         input.precise = static_cast<bool>(nativeEvent.hasPreciseScrollingDeltas);
-        input.unitX = input.precise ? WheelUnit::LogicalPixels : WheelUnit::Lines;
+        input.unitX = input.precise ? arrange::core::WheelUnit::LogicalPixels : arrange::core::WheelUnit::Lines;
         input.unitY = input.unitX;
         input.phase = wheelPhase(nativeEvent.phase);
         input.momentumPhase = wheelPhase(nativeEvent.momentumPhase);

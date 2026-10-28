@@ -182,7 +182,7 @@ namespace arrange::juce {
             return pointerEvents_.wheelMove(runtime_, session_, diagnostics_, interaction_, rootNodeId, event, wheel);
         }
 
-        bool wheelMove(arrange::core::Point point, const WheelInput& input) {
+        bool wheelMove(arrange::core::Point point, const arrange::core::WheelInput& input) {
             return pointerEvents_.wheelMove(runtime_, session_, diagnostics_, interaction_, rootNodeId, point, input);
         }
 
@@ -269,7 +269,7 @@ namespace arrange::juce {
             return packageSource_.wantsReloadPolling();
         }
 
-        TextInputCallbacks inputCallbacks() {
+        arrange::core::InputCallbacks inputCallbacks() {
             return inputState_.callbacks(runtime_);
         }
 
@@ -403,7 +403,7 @@ namespace arrange::juce {
         return impl_->wheelMove(event, wheel);
     }
 
-    bool EditorSceneHost::wheelMove(arrange::core::Point point, const WheelInput& input) {
+    bool EditorSceneHost::wheelMove(arrange::core::Point point, const arrange::core::WheelInput& input) {
         return impl_->wheelMove(point, input);
     }
 

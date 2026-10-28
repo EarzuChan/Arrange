@@ -13,7 +13,7 @@
 
 namespace arrange::juce {
     namespace {
-        void recordWheelInput(ScrollProbe::Sample sample, const WheelInput& input, ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, arrange::core::NodeId root) {
+        void recordWheelInput(ScrollProbe::Sample sample, const arrange::core::WheelInput& input, ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, arrange::core::NodeId root) {
             if (!ScrollProbe::active()) return;
             sample.kind = ScrollProbe::Kind::Input;
             sample.phase = static_cast<std::uint8_t>(input.phase);
@@ -65,7 +65,7 @@ namespace arrange::juce {
         dispatchGesture(runtime, interaction, interaction.cancelPointer(runtime.scene().tree()));
     }
 
-    void JucePointerInputAdapter::pointerDown(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const {
+    void JucePointerInputAdapter::pointerDown(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const arrange::core::InputCallbacks& inputCallbacks) const {
         if (!session.interactive(diagnostics)) {
             return;
         }
@@ -81,7 +81,7 @@ namespace arrange::juce {
         dispatchGesture(runtime, interaction, interaction.pointerDown(runtime.scene().tree(), *runtime.publishedFrame().content.hitTest, event.position.x, event.position.y, inputCallbacks, {event.getNumberOfClicks(), event.mods.isShiftDown()}, modifiers));
     }
 
-    bool JucePointerInputAdapter::pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const TextInputCallbacks& inputCallbacks) const {
+    bool JucePointerInputAdapter::pointerDrag(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, const ::juce::MouseEvent& event, const arrange::core::InputCallbacks& inputCallbacks) const {
         if (!session.interactive(diagnostics)) {
             return false;
         }
@@ -121,7 +121,7 @@ namespace arrange::juce {
         return dispatchWheel(runtime, session, diagnostics, interaction, root, {event.position.x, event.position.y}, input);
     }
 
-    bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input) const {
+    bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const arrange::core::WheelInput& input) const {
         ScrollProbe::Sample sample;
         sample.sourceMillis = input.timeMillis;
         sample.x = point.x;
@@ -134,12 +134,23 @@ namespace arrange::juce {
         return dispatchWheel(runtime, session, diagnostics, interaction, root, point, input);
     }
 
-    bool JucePointerInputAdapter::dispatchWheel(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const WheelInput& input) const {
+    bool JucePointerInputAdapter::dispatchWheel(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const arrange::core::WheelInput& input) const {
         if (!session.interactive(diagnostics) || !runtime.scene().contains(root)) {
             interaction.cancelWheel();
             return false;
         }
         const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision, runtime.publishedFrame().content.hitTest.get());
+        if (ScrollProbe::active())
+            for (const auto& [identity, value] : wheelResult.droppedPredictions) {
+                ScrollProbe::Sample sample;
+                sample.kind = ScrollProbe::Kind::PredictionReset;
+                sample.previousRevision = wheelResult.droppedFromRevision;
+                sample.revision = runtime.publishedFrame().revision;
+                sample.modifierIdentity = identity;
+                sample.value = value;
+                sample.queueDepth = wheelResult.droppedPredictions.size();
+                ScrollProbe::record(sample);
+            }
         if (wheelResult.wheelEvent) {
             auto payload = std::get<arrange::core::WheelEventPayload>(wheelResult.wheelEvent->payload);
             payload.modifiers = keyModifierState(::juce::ModifierKeys::getCurrentModifiers());
@@ -149,8 +160,8 @@ namespace arrange::juce {
         if (wheelResult.locked && !wheelResult.scroll.target) return true;
         const auto& result = wheelResult.scroll;
         if (ScrollProbe::active()) {
-            const auto logicalDistance = [&](float delta, WheelUnit unit) {
-                return delta * (unit == WheelUnit::Lines ? scrollLineDistance : unit == WheelUnit::Pages ? result.viewportSize : 1.0f);
+            const auto logicalDistance = [&](float delta, arrange::core::WheelUnit unit) {
+                return delta * (unit == arrange::core::WheelUnit::Lines ? arrange::core::scrollLineDistance : unit == arrange::core::WheelUnit::Pages ? result.viewportSize : 1.0f);
             };
             ScrollProbe::Sample sample;
             sample.kind = ScrollProbe::Kind::Route;

@@ -1,8 +1,8 @@
 #include "PlatformWheelInput.h"
 
 namespace arrange::juce {
-    WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
-        WheelInput input;
+    arrange::core::WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
+        arrange::core::WheelInput input;
         input.deltaX = wheel.deltaX * 48.0f;
         input.deltaY = wheel.deltaY * 48.0f;
         input.timeMillis = ::juce::Time::getMillisecondCounterHiRes();

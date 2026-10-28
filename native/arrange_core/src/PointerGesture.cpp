@@ -1,4 +1,5 @@
 #include <arrange/core/PointerGesture.h>
+#include <arrange/core/ModifierGeometry.h>
 
 #include <algorithm>
 #include <cmath>
@@ -67,7 +68,12 @@ namespace arrange::core {
     void PointerGestureSession::emitPressed(const LayoutTree& tree, PointerInputType type, const PointerSample& sample, PointerGestureOutput& out) {
         if (!press_ || !press_->pointer) return;
         const auto& target = *press_->pointer;
-        if (const auto* input = liveInputModifier(tree, target)) emit(out, input->eventSlot, PointerInputPayload{type, target.local.x + sample.point.x - press_->start.x, target.local.y + sample.point.y - press_->start.y, sample.modifiers});
+        const auto* input = liveInputModifier(tree, target);
+        if (!input) return;
+        // 按下点之外的位置按受体所在层的逆变换外推，缩放与旋转下仍是受体本地坐标
+        const auto start = rootToNodeContent(tree, target.node, press_->start, target.modifier);
+        const auto now = rootToNodeContent(tree, target.node, sample.point, target.modifier);
+        emit(out, input->eventSlot, PointerInputPayload{type, target.local.x + now.x - start.x, target.local.y + now.y - start.y, sample.modifiers});
     }
 
     void PointerGestureSession::syncInteractions(const LayoutTree& tree, PointerGestureOutput& out) {
@@ -75,27 +81,32 @@ namespace arrange::core {
         const auto add = [&](NodeHandle node) {
             if (std::find(nodes.begin(), nodes.end(), node) == nodes.end()) nodes.push_back(node);
         };
-        for (const auto& [node, state] : interactions_) add(node);
+        for (const auto& [receptor, state] : interactions_) add(receptor.node);
         for (const auto& item : chain_) add({item.node, item.generation});
         if (press_)
             for (const auto* target : {press_->clickable ? &*press_->clickable : nullptr, press_->draggable ? &*press_->draggable : nullptr, press_->pointer ? &*press_->pointer : nullptr})
                 if (target) add({target->node, target->generation});
-        std::vector<std::pair<NodeHandle, InteractionPayload>> next;
+        std::vector<std::pair<InteractionReceptor, InteractionPayload>> next;
         for (const auto node : nodes) {
             if (!tree.contains(node.id) || tree.node(node.id).generation != node.generation) continue;
-            const auto is = [&](const std::optional<HitTestResult>& target) {
-                return target && target->node == node.id && target->generation == node.generation;
-            };
-            InteractionPayload state;
-            state.hovered = std::any_of(chain_.begin(), chain_.end(), [&](const auto& item) { return item.node == node.id && item.generation == node.generation; });
-            state.pressed = press_ && (is(press_->clickable) || is(press_->draggable) || is(press_->pointer));
-            state.dragged = press_ && press_->dragging && is(press_->draggable);
-            const auto previous = std::find_if(interactions_.begin(), interactions_.end(), [&](const auto& item) { return item.first == node; });
-            const auto before = previous == interactions_.end() ? InteractionPayload{} : previous->second;
-            if (state != before)
-                for (const auto& instance : tree.node(node.id).modifier.elements())
-                    if (const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value)) emit(out, input->interaction, state);
-            if (state != InteractionPayload{}) next.emplace_back(node, state);
+            // 悬停以节点为单位；按下与拖动只归属被按下的受体
+            const auto hovered = std::any_of(chain_.begin(), chain_.end(), [&](const auto& item) { return item.node == node.id && item.generation == node.generation; });
+            for (const auto& instance : tree.node(node.id).modifier.elements()) {
+                const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value);
+                if (!input || !input->interaction.valid()) continue;
+                const auto owns = [&](const std::optional<HitTestResult>& target) {
+                    return target && target->node == node.id && target->generation == node.generation && target->modifier == instance.handle;
+                };
+                InteractionPayload state;
+                state.hovered = hovered;
+                state.pressed = press_ && (owns(press_->clickable) || owns(press_->draggable) || owns(press_->pointer));
+                state.dragged = press_ && press_->dragging && owns(press_->draggable);
+                const InteractionReceptor receptor{node, instance.handle};
+                const auto previous = std::find_if(interactions_.begin(), interactions_.end(), [&](const auto& item) { return item.first == receptor; });
+                const auto before = previous == interactions_.end() ? InteractionPayload{} : previous->second;
+                if (state != before) emit(out, input->interaction, state);
+                if (state != InteractionPayload{}) next.emplace_back(receptor, state);
+            }
         }
         interactions_ = std::move(next);
     }

@@ -7,18 +7,18 @@
 namespace arrange::juce {
     namespace {
         // 未测试！
-        void normalizeWheelAxis(float rawDelta, UINT setting, float& delta, WheelUnit& unit) {
+        void normalizeWheelAxis(float rawDelta, UINT setting, float& delta, arrange::core::WheelUnit& unit) {
             UINT count = 3;
             SystemParametersInfoW(setting, 0, &count, 0);
             const auto turns = rawDelta * 512.0f / static_cast<float>(WHEEL_DELTA);
-            unit = count == WHEEL_PAGESCROLL ? WheelUnit::Pages : WheelUnit::Lines;
+            unit = count == WHEEL_PAGESCROLL ? arrange::core::WheelUnit::Pages : arrange::core::WheelUnit::Lines;
             delta = count == WHEEL_PAGESCROLL ? turns : turns * static_cast<float>(count);
         }
     }
 
     // 未测试！
-    WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
-        WheelInput input;
+    arrange::core::WheelInput readPlatformWheelInput(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
+        arrange::core::WheelInput input;
         input.timeMillis = ::juce::Time::getMillisecondCounterHiRes();
         input.precise = wheel.isSmooth;
         input.inertial = wheel.isInertial;

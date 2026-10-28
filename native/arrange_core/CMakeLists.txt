@@ -17,10 +17,13 @@ add_library(arrange_core STATIC
   src/FlowLayout.cpp
   src/LazyLayout.cpp
   src/Focus.cpp
+  src/FocusOwner.cpp
+  src/InputSession.cpp
   src/Layout.cpp
   src/MeasurePolicy.cpp
   src/HitTest.cpp
   src/PointerGesture.cpp
+  src/PointerInputState.cpp
   src/Scroll.cpp
   src/InputEditing.cpp
   src/Paint.cpp

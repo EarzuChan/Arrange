@@ -85,7 +85,7 @@ namespace {
         snapshot[0].groups = {9};
         snapshot[2].groups = {9};
         check(searchFocus(snapshot, snapshot[0], FocusDirection::Right)->node.id == 4, "方向搜索跳出了当前focusGroup");
-        arrange::juce::FocusOwner ordered;
+        arrange::core::FocusOwner ordered;
         ordered.synchronize(tree, true, {{FocusCommandKind::Request, 1}, {FocusCommandKind::Move, 0, FocusDirection::Next}, {FocusCommandKind::Request, 3}});
         check(ordered.focusedNode() == 4 && ordered.takeMoves().empty(), "同帧焦点命令没有按顺序执行");
         ordered.synchronize(tree, true, {{FocusCommandKind::Request, 99}, {FocusCommandKind::Cancel, 99}});
@@ -96,7 +96,7 @@ namespace {
         std::vector<bool> changes;
         std::vector<std::pair<bool, bool>> parentChanges;
         int clicks = 0;
-        arrange::juce::TextInputCallbacks callbacks;
+        arrange::core::InputCallbacks callbacks;
         callbacks.invokeFocusEvent = [&](const auto& slot, bool value, bool hasFocus) {
             if (slot == parentObserver.eventSlot)
                 parentChanges.emplace_back(value, hasFocus);
@@ -190,7 +190,7 @@ namespace {
         arrange::juce::TextInputOwner input(service);
         std::vector<std::string> edits;
         std::string clipboard;
-        arrange::juce::TextInputCallbacks callbacks;
+        arrange::core::InputCallbacks callbacks;
         callbacks.invokeStringEvent = [&](const auto&, const auto& value) {
             edits.push_back(value);
         };
@@ -221,8 +221,8 @@ namespace {
         (void)input.insertTextAtCaret(tree, true, ::juce::String::fromUTF8("中"), callbacks);
         (void)input.setTemporaryUnderlining(tree, true, {}, callbacks);
         check(edits == std::vector<std::string>{"a中"}, "IME提交未原子回写");
-        check(input.keyPressed(tree, true, command('z'), callbacks) && edits.back() == "ab", "IME一次undo未恢复组合前选区替换");
-        check(input.keyPressed(tree, true, command('z', true), callbacks) && edits.back() == "a中", "IME redo失败");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('z')), callbacks) && edits.back() == "ab", "IME一次undo未恢复组合前选区替换");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('z', true)), callbacks) && edits.back() == "a中", "IME redo失败");
         (void)input.setHighlightedRegion(tree, true, {1, 2}, callbacks);
         (void)input.insertTextAtCaret(tree, true, "wrong", callbacks);
         marked.clear();
@@ -232,15 +232,15 @@ namespace {
         (void)input.insertTextAtCaret(tree, true, "", callbacks);
         (void)input.setTemporaryUnderlining(tree, true, {}, callbacks);
         check(input.textInRange(tree, true, {0, input.totalNumChars(tree, true)}).toStdString() == "a中" && edits.size() == 3, "取消composition未还原原文或发送了新业务value");
-        check(input.keyPressed(tree, true, command('a'), callbacks) && input.keyPressed(tree, true, command('c'), callbacks) && clipboard == "a中", "全选复制失败");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('a')), callbacks) && input.keyPressed(tree, true, arrange::juce::keyInput(command('c')), callbacks) && clipboard == "a中", "全选复制失败");
         clipboard = "A\r\nB\rC";
-        check(input.keyPressed(tree, true, command('v'), callbacks) && edits.back() == "A B C", "单行粘贴换行没有正规化");
-        check(input.keyPressed(tree, true, command('z'), callbacks) && edits.back() == "a中", "整次粘贴不是一个undo");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('v')), callbacks) && edits.back() == "A B C", "单行粘贴换行没有正规化");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('z')), callbacks) && edits.back() == "a中", "整次粘贴不是一个undo");
         auto receipt = field;
         receipt.value = "a中";
         tree.setModifierInput(1, tree.node(1).modifier.elements()[1].handle, receipt);
         input.synchronizePublishedInput(tree, true);
-        check(input.keyPressed(tree, true, command('z'), callbacks) && edits.back() == "ab", "value编辑回执清除了撤销历史");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(command('z')), callbacks) && edits.back() == "ab", "value编辑回执清除了撤销历史");
     }
 
     void verifyMultiline() {
@@ -260,9 +260,9 @@ namespace {
         check(input.viewportY() > 0, "多行光标没有纵向滚入");
         const auto caret = input.caretRectangleForCharIndex(tree, true, input.totalNumChars(tree, true));
         check(caret.getBottom() <= 37 && input.charIndexForPoint(tree, true, caret.getCentre()) == input.totalNumChars(tree, true), "纵向viewport使IME与点击索引不一致");
-        check(input.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::upKey), {}) && input.caretPosition(tree, true) < input.totalNumChars(tree, true), "多行Up未沿视觉行移动");
-        check(input.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::homeKey), {}) && input.caretPosition(tree, true) == 8, "视觉行Home未移动到行首");
-        check(input.keyPressed(tree, true, ::juce::KeyPress(::juce::KeyPress::upKey, ::juce::ModifierKeys(::juce::ModifierKeys::shiftModifier), 0), {}) && !input.highlightedRegion(tree, true).isEmpty(), "Shift Up未跨行选择");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(::juce::KeyPress(::juce::KeyPress::upKey)), {}) && input.caretPosition(tree, true) < input.totalNumChars(tree, true), "多行Up未沿视觉行移动");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(::juce::KeyPress(::juce::KeyPress::homeKey)), {}) && input.caretPosition(tree, true) == 8, "视觉行Home未移动到行首");
+        check(input.keyPressed(tree, true, arrange::juce::keyInput(::juce::KeyPress(::juce::KeyPress::upKey, ::juce::ModifierKeys(::juce::ModifierKeys::shiftModifier), 0)), {}) && !input.highlightedRegion(tree, true).isEmpty(), "Shift Up未跨行选择");
         const auto ops = input.buildFocusedInputOps(tree, true);
         check(std::any_of(ops.begin(), ops.end(), [](const auto& op) { return op.type == DrawOpType::DrawText && op.maxLines == 0 && op.textLayout->lines.size() == 4; }), "覆盖层未保留完整多行排版");
     }
@@ -520,7 +520,7 @@ namespace {
         });
         engine.layout(tree, 1, {0, 100, 0, 100});
         arrange::juce::InteractionStateOwner interaction(service);
-        arrange::juce::TextInputCallbacks callbacks;
+        arrange::core::InputCallbacks callbacks;
         callbacks.invalidateNativeState = [&](NodeId id, DirtyFlag flag) {
             tree.markInputDirty(id, dirtyMask(flag));
         };
