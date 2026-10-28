@@ -1,7 +1,7 @@
 <template>
     <Box :modifier="M.fillMaxSize().verticalScroll(scroll)">
         <Column :modifier="M.requiredHeight(contentHeight.dp).fillMaxWidth().background(Color(0xff336699))">
-            <Text :text="`${scroll.value}/${scroll.maxValue}/${scroll.viewportSize}/${scroll.contentSize}`" />
+            <Text :text="`${scroll.valuePx}/${scroll.maxValuePx}/${scroll.viewportSizePx}/${scroll.contentSizePx}`" />
             <Input value="单位输入" :onSubmit="command" :textStyle="{ fontSize: 10.sp }" :modifier="M.width(80.dp).height(30.dp)" />
         </Column>
     </Box>
@@ -11,7 +11,7 @@
 import { createScrollState, ref, provide } from '@arrange/framework'
 import { M, Color, createDensity, DensityKey } from '@arrange/framework/ui'
 
-const scroll = createScrollState({ initial: 450.px })
+const scroll = createScrollState({ initialPx: 450.px })
 const contentHeight = ref(600)
 const density = createDensity()
 provide(DensityKey, density)

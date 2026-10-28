@@ -70,7 +70,7 @@ Lazy 需要两轴有界视口，拒绝同轴无界 Scroll 包裹与完整内容 
 
 itemKey 标识逻辑项，未指定时使用位置索引。稳定 key 在插入、删除、重排时保持首个可见项及其 PX 偏移；key 删除时就近保留可用位置。contentType 标识测量兼容类别，类型、内容版本或交叉轴约束变化使相应缓存失效；不同 key 不共享业务状态或回调。网格采用 Fixed / Adaptive 单元，默认 span 为 1，支持 MaxLineSpan；同一行的主轴尺寸取该行项最大值。
 
-LazyState 发布 firstVisibleItemIndex、firstVisibleItemScrollOffset、layoutInfo.visibleItemsInfo、总项数和滚动边界。scrollToItem 直接请求索引与 PX 偏移；animateScrollToItem 通过同一 Owner 动画时钟推进，目标尚未测量时采用估计位置并在最终目标材料化后校正。可变尺寸内容的总长度是估计值，已测量前缀与两端到达后不断校正。
+LazyState 发布 firstVisibleItemIndex、firstVisibleItemScrollOffsetPx、layoutInfo.visibleItemsInfo（每项 offsetPx、sizePx）、总项数和滚动边界。scrollToItem 直接请求索引与 PX 偏移；animateScrollToItem 通过同一 Owner 动画时钟推进，目标尚未测量时采用估计位置并在最终目标材料化后校正。可变尺寸内容的总长度是估计值，已测量前缀与两端到达后不断校正。
 
 条件退挂或 KeepAlive 停用后重建原生 Layout 时，已有 LazyState 通过同一索引请求链恢复最后发布的首项 key 与偏移；key 已删除则回退到原索引，由布局夹到可用范围。尺寸估算重新建立，不把旧绝对 PX 当作逻辑位置。隐藏期间尚未消费的 scrollToItem、scrollTo(PX) 或对 value 的显式改动优先；成功候选只确认自己读取过的请求版本，失败恢复不吞掉后来发出的定位请求。保持存活的 Layout 动态切换 state 仍采用当前几何下的 value。
 

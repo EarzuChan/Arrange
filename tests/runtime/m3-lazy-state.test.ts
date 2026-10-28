@@ -21,12 +21,12 @@ function lazyNodes(nodes: Map<number, RecordedLayoutNode>): RecordedLayoutNode[]
 function policy(node: RecordedLayoutNode) { return node.inputs.get('measurePolicy') as { requestedIndex: number; requestedOffset: number; requestVersion: number } }
 function scrollValue(node: RecordedLayoutNode): number {
     const scroll = (node.inputs.get('modifier') as Modifier).elements.find(element => element.type === 'verticalScroll')!
-    return (scroll.value.state as { value: number }).value
+    return scroll.value.value as number
 }
 function feedback(node: RecordedLayoutNode, value: object): void {
     const scroll = (node.inputs.get('modifier') as Modifier).elements.find(element => element.type === 'verticalScroll')!
-    const state = scroll.value.state as { __arrangeNativeScroll(value: object): void }
-    state.__arrangeNativeScroll(value)
+    const onScroll = scroll.value.onScroll as (value: object) => void
+    onScroll(value)
 }
 function rootFor(source: { value: LazyState | undefined }) {
     return defineArrangable({
@@ -38,8 +38,8 @@ function rootFor(source: { value: LazyState | undefined }) {
 
 test('Lazy 动态 state 在成功回执交接，失败恢复旧 owner 并结束候选动画', async () => {
     const native = recordingNative(false)
-    const a = createLazyState({ firstVisibleItemIndex: 1, firstVisibleItemScrollOffset: 2 })
-    const b = createLazyState({ firstVisibleItemIndex: 5, firstVisibleItemScrollOffset: 7 })
+    const a = createLazyState({ firstVisibleItemIndex: 1, firstVisibleItemScrollOffsetPx: 2 })
+    const b = createLazyState({ firstVisibleItemIndex: 5, firstVisibleItemScrollOffsetPx: 7 })
     const source = shallowRef<LazyState | undefined>(a)
     const errors: unknown[] = []
     const app = createApp(rootFor(source))
@@ -149,7 +149,7 @@ test('Lazy 缺省 state 是稳定实例，显式 state 移除后恢复其位置�
     native.finish()
     const first = lazyNodes(native.nodes)[0]
     const scroll = (first.inputs.get('modifier') as Modifier).elements.find(element => element.type === 'verticalScroll')!
-    const feedback = (scroll.value.state as { __arrangeNativeScroll: (value: object) => void }).__arrangeNativeScroll
+    const feedback = scroll.value.onScroll as (value: object) => void
     feedback({ value: 64, firstVisibleItemIndex: 3, firstVisibleItemScrollOffset: 4 })
     source.value = b
     await nextTick()
@@ -343,10 +343,10 @@ for (const keepAlive of [false, true]) test(`${keepAlive ? 'KeepAlive' : '条件
     assert.equal(policy(candidate).requestVersion, 0, '隐藏 PX 请求必须优先于旧 item 位置')
     native.finish()
     await hide()
-    state.value = 888
+    state.scrollTo(888)
     candidate = await show()
     assert.equal(scrollValue(candidate), 888)
-    assert.equal(policy(candidate).requestVersion, 0, '隐藏期间直接赋值必须保留 PX 定位')
+    assert.equal(policy(candidate).requestVersion, 0, '隐藏期间的 PX 定位必须保留')
     native.finish()
     assert.equal(errors.length, 1)
     app.unmount()

@@ -24,21 +24,48 @@ namespace arrange::core {
             return field->string;
         }
 
+        LayoutAlignment alignment(const PropValue& value, std::string_view key, LayoutAlignment fallback, bool (*valid)(LayoutAlignment), const char* error) {
+            const auto* field = value.field(key);
+            if (!field) return fallback;
+            if (!field->isString()) throw std::invalid_argument("MeasurePolicy 字段必须是字符串：" + std::string(key));
+            const auto parsed = parseLayoutAlignment(field->string);
+            if (!parsed || !valid(*parsed)) throw std::invalid_argument(error);
+            return *parsed;
+        }
+
+        bool horizontalItem(LayoutAlignment value) {
+            return isHorizontalAlignment(value);
+        }
+
+        bool verticalItem(LayoutAlignment value) {
+            return isVerticalAlignment(value);
+        }
+
+        bool rowItem(LayoutAlignment value) {
+            return isVerticalAlignment(value) || value == LayoutAlignment::Baseline;
+        }
+
+        bool boxItem(LayoutAlignment value) {
+            return isBoxAlignment(value);
+        }
+
         AxisArrangement arrangement(const PropValue* value, bool horizontal) {
-            if (!value) return {horizontal ? "Start" : "Top"};
             AxisArrangement result;
+            if (!value) return result;
+            std::string name;
             if (value->isString())
-                result.alignment = value->string;
+                name = value->string;
             else {
                 fields(*value, {"kind", "space", "alignment"});
                 if (text(*value, "kind", "") != "spacedBy") throw std::invalid_argument("排列策略对象必须声明 spacedBy");
                 const auto* space = value->field("space");
                 if (!space || !space->isNumber() || !std::isfinite(space->number) || space->number < 0) throw std::invalid_argument("排列间距必须是非负有限数值");
                 result.spacing = static_cast<float>(space->number);
-                result.alignment = text(*value, "alignment", horizontal ? "Start" : "Top");
+                name = text(*value, "alignment", horizontal ? "Start" : "Top");
             }
-            const auto distributed = value->isString() && (result.alignment == "SpaceBetween" || result.alignment == "SpaceAround" || result.alignment == "SpaceEvenly" || result.alignment == "Center");
-            if (!distributed && !(horizontal ? isHorizontalAlignment(result.alignment) : isVerticalAlignment(result.alignment))) throw std::invalid_argument("排列对齐方向不匹配：" + result.alignment);
+            const auto parsed = parseArrangement(name, horizontal, value->isString());
+            if (!parsed) throw std::invalid_argument("排列对齐方向不匹配：" + name);
+            result.arrangement = *parsed;
             return result;
         }
     }
@@ -48,8 +75,7 @@ namespace arrange::core {
         if (kind == "Box") {
             fields(value, {"kind", "contentAlignment", "propagateMinConstraints"});
             BoxMeasurePolicy result;
-            result.contentAlignment = text(value, "contentAlignment", "TopStart");
-            if (!isBoxAlignment(result.contentAlignment)) throw std::invalid_argument("BoxMeasurePolicy 对齐值无效");
+            result.contentAlignment = alignment(value, "contentAlignment", LayoutAlignment::TopStart, boxItem, "BoxMeasurePolicy 对齐值无效");
             if (const auto* propagate = value.field("propagateMinConstraints")) {
                 if (!propagate->isBoolean()) throw std::invalid_argument("propagateMinConstraints 必须是布尔值");
                 result.propagateMinConstraints = propagate->boolean;
@@ -58,15 +84,11 @@ namespace arrange::core {
         }
         if (kind == "Row") {
             fields(value, {"kind", "horizontalArrangement", "verticalAlignment"});
-            RowMeasurePolicy result{arrangement(value.field("horizontalArrangement"), true), text(value, "verticalAlignment", "Top")};
-            if (!isVerticalAlignment(result.verticalAlignment) && result.verticalAlignment != "Baseline") throw std::invalid_argument("RowMeasurePolicy 对齐值无效");
-            return result;
+            return RowMeasurePolicy{arrangement(value.field("horizontalArrangement"), true), alignment(value, "verticalAlignment", LayoutAlignment::Top, rowItem, "RowMeasurePolicy 对齐值无效")};
         }
         if (kind == "Column") {
             fields(value, {"kind", "verticalArrangement", "horizontalAlignment"});
-            ColumnMeasurePolicy result{arrangement(value.field("verticalArrangement"), false), text(value, "horizontalAlignment", "Start")};
-            if (!isHorizontalAlignment(result.horizontalAlignment)) throw std::invalid_argument("ColumnMeasurePolicy 对齐值无效");
-            return result;
+            return ColumnMeasurePolicy{arrangement(value.field("verticalArrangement"), false), alignment(value, "horizontalAlignment", LayoutAlignment::Start, horizontalItem, "ColumnMeasurePolicy 对齐值无效")};
         }
         if (kind == "FlowRow" || kind == "FlowColumn") {
             fields(value, kind == "FlowRow" ? std::initializer_list<std::string_view>{"kind", "horizontalArrangement", "verticalArrangement", "itemVerticalAlignment", "maxItemsInEachRow"} : std::initializer_list<std::string_view>{"kind", "horizontalArrangement", "verticalArrangement", "itemHorizontalAlignment", "maxItemsInEachColumn"});
@@ -74,8 +96,7 @@ namespace arrange::core {
             result.horizontal = kind == "FlowRow";
             result.mainArrangement = arrangement(value.field(result.horizontal ? "horizontalArrangement" : "verticalArrangement"), result.horizontal);
             result.crossArrangement = arrangement(value.field(result.horizontal ? "verticalArrangement" : "horizontalArrangement"), !result.horizontal);
-            result.itemAlignment = text(value, result.horizontal ? "itemVerticalAlignment" : "itemHorizontalAlignment", result.horizontal ? "Top" : "Start");
-            if (!(result.horizontal ? isVerticalAlignment(result.itemAlignment) : isHorizontalAlignment(result.itemAlignment))) throw std::invalid_argument("Flow 子项对齐方向不匹配");
+            result.itemAlignment = alignment(value, result.horizontal ? "itemVerticalAlignment" : "itemHorizontalAlignment", result.horizontal ? LayoutAlignment::Top : LayoutAlignment::Start, result.horizontal ? verticalItem : horizontalItem, "Flow 子项对齐方向不匹配");
             if (const auto* count = value.field(result.horizontal ? "maxItemsInEachRow" : "maxItemsInEachColumn")) {
                 if (!count->isNumber() || !std::isfinite(count->number) || count->number < 1 || count->number > 2147483647 || std::floor(count->number) != count->number) throw std::invalid_argument("Flow 每行数量必须是正整数");
                 result.maxItems = static_cast<int>(count->number);
@@ -111,8 +132,9 @@ namespace arrange::core {
             result.crossSpacing = static_cast<float>(number("crossSpacing", 0));
             result.crossBeforePadding = static_cast<float>(number("crossBeforePadding", 0));
             result.crossAfterPadding = static_cast<float>(number("crossAfterPadding", 0));
-            result.mainAlignment = text(value, "mainAlignment", result.horizontal ? "Start" : "Top");
-            if (result.mainAlignment != "SpaceBetween" && result.mainAlignment != "SpaceAround" && result.mainAlignment != "SpaceEvenly" && !(result.horizontal ? isHorizontalAlignment(result.mainAlignment) : isVerticalAlignment(result.mainAlignment))) throw std::invalid_argument("Lazy 主轴排列方向不匹配");
+            const auto main = parseArrangement(text(value, "mainAlignment", result.horizontal ? "Start" : "Top"), result.horizontal, true);
+            if (!main) throw std::invalid_argument("Lazy 主轴排列方向不匹配");
+            result.mainAlignment = *main;
             result.beforePadding = static_cast<float>(number("beforePadding", 0));
             result.afterPadding = static_cast<float>(number("afterPadding", 0));
             result.estimate = static_cast<float>(number("estimate", 48));
@@ -122,8 +144,7 @@ namespace arrange::core {
             result.requestVersion = static_cast<std::uint64_t>(number("requestVersion", 0, true));
             result.requestedIndex = static_cast<int>(number("requestedIndex", 0, true));
             result.requestedOffset = static_cast<float>(number("requestedOffset", 0));
-            result.itemAlignment = text(value, "itemAlignment", result.horizontal ? "Top" : "Start");
-            if (!(result.horizontal ? isVerticalAlignment(result.itemAlignment) : isHorizontalAlignment(result.itemAlignment))) throw std::invalid_argument("Lazy 子项对齐方向不匹配");
+            result.itemAlignment = alignment(value, "itemAlignment", result.horizontal ? LayoutAlignment::Top : LayoutAlignment::Start, result.horizontal ? verticalItem : horizontalItem, "Lazy 子项对齐方向不匹配");
             const auto hasMetadata = value.hasField("keys") || value.hasField("contentTypes") || value.hasField("spans");
             if (!hasMetadata) {
                 if (!inherited || inherited->version != result.version) throw std::invalid_argument("Lazy 元数据引用必须匹配当前受体的已接收版本");

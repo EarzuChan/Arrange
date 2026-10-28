@@ -103,15 +103,15 @@ test('Lazy 活动范围缩小不淘汰可见项，离屏逻辑缓存有限且恢
 
 test('Lazy state 参数验证与暂停前的请求保留正式单位边界', () => {
     assert.throws(() => createLazyState({ firstVisibleItemIndex: -1 }), RangeError)
-    assert.throws(() => createLazyState({ firstVisibleItemScrollOffset: Infinity }), RangeError)
-    const state = createLazyState({ firstVisibleItemIndex: 20, firstVisibleItemScrollOffset: 3 })
+    assert.throws(() => createLazyState({ firstVisibleItemScrollOffsetPx: Infinity }), RangeError)
+    const state = createLazyState({ firstVisibleItemIndex: 20, firstVisibleItemScrollOffsetPx: 3 })
     assert.equal(state.firstVisibleItemIndex, 20)
-    assert.equal(state.firstVisibleItemScrollOffset, 3)
+    assert.equal(state.firstVisibleItemScrollOffsetPx, 3)
     assert.throws(() => state.scrollToItem(1.5), RangeError)
     assert.throws(() => state.scrollToItem(2, -1), RangeError)
     assert.throws(() => state.scrollTo(NaN), RangeError)
     state.scrollToItem(100, 9)
-    assert.equal(state.value, 0)
+    assert.equal(state.valuePx, 0)
 })
 
 test('同一材料化候选移出再取回 key 重建原生身份，失败恢复已提交身份', async () => {

@@ -1,7 +1,7 @@
 <template>
     <Column :modifier="M.fillMaxSize()">
         <Input value="" :onSubmit="command" :modifier="M.height(30.dp)" />
-        <Text :text="`可见:${list.firstVisibleItemIndex}/${list.firstVisibleItemScrollOffset}/${list.layoutInfo.totalItemsCount}`" :modifier="M.height(20.dp)" />
+        <Text :text="`可见:${list.firstVisibleItemIndex}/${list.firstVisibleItemScrollOffsetPx}/${list.layoutInfo.totalItemsCount}`" :modifier="M.height(20.dp)" />
         <LazyColumn a-if="mode === 'column'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :contentType="typeOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
         <LazyRow a-else-if="mode === 'row'" :items="items" :itemKey="keyOf" :itemContent="RowItem" :itemProps="propsOf" :state="list" :modifier="M.weight(1).fillMaxWidth()" />
         <LazyVerticalGrid a-else-if="mode === 'verticalGrid'" :items="items" :itemKey="keyOf" :itemContent="Item" :itemProps="propsOf" :span="spanOf" :state="list" :cells="GridCells.Fixed(3)" :modifier="M.weight(1).fillMaxWidth()" />

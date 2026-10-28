@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { painter, M } from '../../packages/framework/src/ui.ts'
 import { Column, Icon, Text } from '../../packages/framework/src/foundation.ts'
 import { createApp, diagnostics, DiagnosticsToast, Log, nextTick, ref, createScrollState, onScopeDispose } from '../../packages/framework/src/index.ts'
+import { scrollStateInternal } from '../../packages/framework/src/state.ts'
 import { defineArrangable } from '../../packages/framework/src/internal.ts'
 import type { NativeTransactionTarget } from '../../packages/framework/src/internal.ts'
 import type { Modifier } from '../../packages/framework/src/ui.ts'
@@ -14,7 +15,7 @@ function diagnosticNative(): NativeTransactionTarget & { calls: (readonly [strin
         ...recordingNative().target,
         calls,
         log: (level, tag, args) => calls.push(['log', level, tag, args]),
-        diagnosticsToast: payload => calls.push(['diagnosticsToast', payload]),
+        diagnosticsToast: (level, tag, title, args, coalesce) => calls.push(['diagnosticsToast', { level, tag, title, args, coalesce }]),
         diagnosticsRequestReload: payload => calls.push(['diagnosticsRequestReload', payload]),
         diagnosticsSetToastsEnabled: enabled => calls.push(['diagnosticsSetToastsEnabled', enabled]),
     }
@@ -144,13 +145,13 @@ test('原生宿主拒绝双 App，清理异常仍释放宿主以便重新挂载'
 test('ScrollState 接收原生对象快照并更新文本和滚动 Modifier', async () => {
     const native = recordingNative()
     const scroll = createScrollState()
-    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.verticalScroll(scroll) }, { default: () => call(0, Text, { text: () => `滚动 ${scroll.value}` }) }) }))
+    const app = createApp(defineArrangable({ setup: (_props, { call }) => () => call(0, Column, { modifier: () => M.verticalScroll(scroll) }, { default: () => call(0, Text, { text: () => `滚动 ${scroll.valuePx}` }) }) }))
     mountFrame(app, native.target)
-    scroll.__arrangeNativeScroll({ value: 12, maxValue: 40, viewportSize: 80, contentSize: 120 })
+    scrollStateInternal(scroll).native({ value: 12, maxValue: 40, viewportSize: 80, contentSize: 120 })
     advanceFrames()
     assert.equal(native.textNodes()[0].text, '滚动 12')
-    assert.equal(scroll.maxValue, 40)
-    assert.equal(((native.nodes.get(2)!.inputs.get('modifier') as Modifier).elements[0].value.state as { value: number }).value, 12)
+    assert.equal(scroll.maxValuePx, 40)
+    assert.equal((native.nodes.get(2)!.inputs.get('modifier') as Modifier).elements[0].value.value, 12)
     app.unmount()
 })
 

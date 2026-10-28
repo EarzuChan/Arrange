@@ -177,14 +177,14 @@ namespace {
         fixture.policy.crossBeforePadding = 10;
         fixture.policy.crossAfterPadding = 20;
         fixture.policy.crossSpacing = 10;
-        fixture.policy.mainAlignment = "Center";
+        fixture.policy.mainAlignment = Arrangement::Center;
         fixture.policy.spans = std::vector<int>{1, 1, -1};
         fixture.settle();
         const auto& first = fixture.tree.node(fixture.active.at(0));
         const auto& second = fixture.tree.node(fixture.active.at(1));
         const auto& spanning = fixture.tree.node(fixture.active.at(2));
         check(first.bounds == Rect{10, 40, 30, 10} && second.bounds == Rect{50, 40, 30, 10} && spanning.bounds == Rect{10, 50, 70, 10}, "grid padding/span/少量内容主轴Center错误");
-        fixture.policy.mainAlignment = "SpaceBetween";
+        fixture.policy.mainAlignment = Arrangement::SpaceBetween;
         fixture.frame();
         check(fixture.tree.node(fixture.active.at(0)).bounds.y == 0 && fixture.tree.node(fixture.active.at(2)).bounds.y == 90, "Lazy主轴SpaceBetween未消费余量");
         fixture.policy.adaptiveMinSize = 35;
@@ -216,7 +216,7 @@ namespace {
             initial.operations = {TreeMutation{CreateNodeMutation{1, NodeType::Root}}, TreeMutation{CreateNodeMutation{2, NodeType::Layout}}, TreeMutation{CreateNodeMutation{4, NodeType::Layout}}, TreeMutation{SetModifierMutation{1, {{size}}}}, TreeMutation{SetModifierMutation{2, {{size}, {scroll}}}}, TreeMutation{InsertChildMutation{1, 2, 0}}, TreeMutation{InsertChildMutation{1, 4, 1}}};
             scene.apply(initial);
             LazyMeasurePolicy policy;
-            policy.mainAlignment = "Top";
+            policy.mainAlignment = Arrangement::Start;
             policy.keys = std::vector<std::string>{"guard"};
             policy.contentTypes = std::vector<std::string>{""};
             policy.spans = std::vector<int>{1};

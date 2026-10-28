@@ -2,7 +2,8 @@ import test, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { effectScope, watch } from '../../packages/framework/src/index.ts'
 import { hasInterop, invokeNative, onNativeEvent, useHost, useMeter, useParameter, useSpectrum, useTransport, useWaveform } from '@arrange/framework/interop'
-import type { NativeInterop, NativeInteropDriver, NativeTransactionTarget, NativeTransport } from '../../packages/framework/src/native.ts'
+import type { NativeInterop, NativeInteropDriver, NativeTransport } from '../../packages/framework/src/native.ts'
+import { createFakeNative } from '../helpers/fakeNative.ts'
 
 const stopped: NativeTransport = { playing: false, recording: false, looping: false, bpm: null, timeSignature: null, positionPpq: null, positionSeconds: null }
 
@@ -46,7 +47,7 @@ function fakeInterop() {
             return nextId++
         },
     }
-    const native = { interop: api } as unknown as NativeTransactionTarget
+    const native = createFakeNative({ interop: api })
     globalThis.__ARRANGE_NATIVE__ = native
     return { api, values, calls, subscriptions, get driver() { return driver! } }
 }
@@ -160,7 +161,7 @@ test('原生消息按名称分发，调用以 Promise 交付结果与拒绝', as
 })
 
 test('宿主未连接 Interop 时明确报错', () => {
-    globalThis.__ARRANGE_NATIVE__ = {} as NativeTransactionTarget
+    globalThis.__ARRANGE_NATIVE__ = createFakeNative()
     assert.equal(hasInterop(), false)
     assert.throws(() => useParameter('gain'), /未连接 Interop/)
 })

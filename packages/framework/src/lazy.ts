@@ -1,27 +1,40 @@
 import { batchUpdates, reactive, shallowRef, type EffectScope } from '@arrange/reactivity'
 import { animatedNumberAsRef, tween, type AnimationSpec } from './animation/value.ts'
 import { watch } from './runtime/apiWatch.ts'
-import type { ScrollState } from './state.ts'
+import { registerScrollState, type ScrollSnapshot, type ScrollState } from './state.ts'
 import type { ArrangableInstance } from './runtime/arrangable.ts'
 
 export type LazyItemKey = string | number
-export type LazyVisibleItemInfo = Readonly<{ index: number; key: LazyItemKey; offset: number; size: number; span: number }>
-export type LazyLayoutInfo = Readonly<{ visibleItemsInfo: readonly LazyVisibleItemInfo[]; totalItemsCount: number; viewportStartOffset: number; viewportEndOffset: number }>
+export type LazyVisibleItemInfo = Readonly<{ index: number; key: LazyItemKey; offsetPx: number; sizePx: number; span: number }>
+export type LazyLayoutInfo = Readonly<{ visibleItemsInfo: readonly LazyVisibleItemInfo[]; totalItemsCount: number; viewportStartOffsetPx: number; viewportEndOffsetPx: number }>
 export interface LazyState extends ScrollState {
-    firstVisibleItemIndex: number
-    firstVisibleItemScrollOffset: number
-    layoutInfo: LazyLayoutInfo
-    scrollToItem(index: number, scrollOffset?: number): void
-    animateScrollToItem(index: number, scrollOffset?: number, animationSpec?: AnimationSpec): Promise<void>
+    readonly firstVisibleItemIndex: number
+    readonly firstVisibleItemScrollOffsetPx: number
+    readonly layoutInfo: LazyLayoutInfo
+    scrollToItem(index: number, scrollOffsetPx?: number): void
+    animateScrollToItem(index: number, scrollOffsetPx?: number, animationSpec?: AnimationSpec): Promise<void>
 }
 
-interface LazyFeedback extends Partial<ScrollState> {
+// 原生 Lazy 回写，数值为逻辑 PX
+interface LazyFeedback extends ScrollSnapshot {
     firstVisibleItemIndex?: number
     firstVisibleItemScrollOffset?: number
     totalItemsCount?: number
     needsMoreItems?: boolean
     workGeneration?: number
-    visibleItemsInfo?: readonly Omit<LazyVisibleItemInfo, 'key'>[]
+    visibleItemsInfo?: readonly Readonly<{ index: number; offset: number; size: number; span: number }>[]
+}
+
+// 内部可写形态，只给 Lazy Layout 与本模块使用
+export interface LazyStateStore {
+    value: number
+    maxValue: number
+    viewportSize: number
+    contentSize: number
+    isScrollInProgress: boolean
+    firstVisibleItemIndex: number
+    firstVisibleItemScrollOffset: number
+    layoutInfo: LazyLayoutInfo
 }
 
 export interface LazyStateOwner {
@@ -41,6 +54,7 @@ interface StateControl {
     cancelAnimation?: () => void
     animationOwner?: LazyStateOwner
     animating: boolean
+    readonly store: LazyStateStore
 }
 const controls = new WeakMap<LazyState, StateControl>()
 
@@ -49,12 +63,16 @@ function itemPosition(index: number, offset: number): void {
     if (!Number.isFinite(offset) || offset < 0) throw new RangeError('Lazy 滚动偏移必须是非负有限 PX 数值')
 }
 
-export function createLazyState(args: { firstVisibleItemIndex?: number; firstVisibleItemScrollOffset?: number } = {}): LazyState {
+export function createLazyState(args: { firstVisibleItemIndex?: number; firstVisibleItemScrollOffsetPx?: number } = {}): LazyState {
     const initialIndex = args.firstVisibleItemIndex ?? 0
-    const initialOffset = args.firstVisibleItemScrollOffset ?? 0
+    const initialOffset = args.firstVisibleItemScrollOffsetPx ?? 0
     itemPosition(initialIndex, initialOffset)
-    const control: StateControl = { request: reactive({ version: initialIndex || initialOffset ? 1 : 0, kind: 'item', index: initialIndex, offset: initialOffset, value: 0, workVersion: 0 }), appliedRequestVersion: 0, publishedValue: 0, animating: false }
-    let state: LazyState
+    const store: LazyStateStore = reactive({
+        value: 0, maxValue: 0, viewportSize: 0, contentSize: 0, isScrollInProgress: false,
+        firstVisibleItemIndex: initialIndex, firstVisibleItemScrollOffset: initialOffset,
+        layoutInfo: Object.freeze({ visibleItemsInfo: Object.freeze([]) as readonly LazyVisibleItemInfo[], totalItemsCount: 0, viewportStartOffsetPx: 0, viewportEndOffsetPx: 0 }),
+    })
+    const control: StateControl = { request: reactive({ version: initialIndex || initialOffset ? 1 : 0, kind: 'item', index: initialIndex, offset: initialOffset, value: 0, workVersion: 0 }), appliedRequestVersion: 0, publishedValue: 0, animating: false, store }
     const jump = (index: number, offset: number) => {
         itemPosition(index, offset)
         batchUpdates(() => {
@@ -64,18 +82,44 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
             control.request.version++
         })
     }
-    state = reactive({
-        value: 0, maxValue: 0, viewportSize: 0, contentSize: 0,
-        isScrollInProgress: false, canScrollBackward: false, canScrollForward: false,
-        firstVisibleItemIndex: initialIndex, firstVisibleItemScrollOffset: initialOffset,
-        layoutInfo: Object.freeze({ visibleItemsInfo: Object.freeze([]) as readonly LazyVisibleItemInfo[], totalItemsCount: 0, viewportStartOffset: 0, viewportEndOffset: 0 }),
+    const native = (payload: LazyFeedback) => {
+        batchUpdates(() => {
+            if (payload.needsMoreItems) control.request.workVersion++
+            if (payload.value !== undefined) {
+                control.publishedValue = payload.value
+                store.value = payload.value
+            }
+            if (payload.maxValue !== undefined) store.maxValue = payload.maxValue
+            if (payload.viewportSize !== undefined) store.viewportSize = payload.viewportSize
+            if (payload.contentSize !== undefined) store.contentSize = payload.contentSize
+            if (payload.firstVisibleItemIndex !== undefined) store.firstVisibleItemIndex = payload.firstVisibleItemIndex
+            if (payload.firstVisibleItemScrollOffset !== undefined) store.firstVisibleItemScrollOffset = payload.firstVisibleItemScrollOffset
+            if (payload.visibleItemsInfo) store.layoutInfo = Object.freeze({
+                visibleItemsInfo: Object.freeze(payload.visibleItemsInfo.map(item => Object.freeze({ index: item.index, key: control.owner?.key(item.index) ?? item.index, offsetPx: item.offset, sizePx: item.size, span: item.span }))),
+                totalItemsCount: payload.totalItemsCount ?? store.layoutInfo.totalItemsCount,
+                viewportStartOffsetPx: 0, viewportEndOffsetPx: store.viewportSize,
+            })
+            store.isScrollInProgress = control.animating || Boolean(payload.isScrollInProgress)
+        })
+    }
+    const state: LazyState = Object.freeze({
+        get valuePx() { return store.value },
+        get maxValuePx() { return store.maxValue },
+        get viewportSizePx() { return store.viewportSize },
+        get contentSizePx() { return store.contentSize },
+        get isScrollInProgress() { return store.isScrollInProgress },
+        get canScrollBackward() { return store.value > 0 },
+        get canScrollForward() { return store.value < store.maxValue },
+        get firstVisibleItemIndex() { return store.firstVisibleItemIndex },
+        get firstVisibleItemScrollOffsetPx() { return store.firstVisibleItemScrollOffset },
+        get layoutInfo() { return store.layoutInfo },
         scrollTo(value: number) {
             if (!Number.isFinite(value)) throw new RangeError('滚动位置必须是有限 PX 数值')
             control.cancelAnimation?.()
             batchUpdates(() => {
-                state.value = Math.max(0, value)
+                store.value = Math.max(0, value)
                 control.request.kind = 'pixel'
-                control.request.value = state.value
+                control.request.value = store.value
                 control.request.version++
             })
         },
@@ -92,14 +136,14 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
                 return Promise.resolve()
             }
             return new Promise<void>(resolve => owner.scope.run(() => {
-                const target = shallowRef(state.value)
+                const target = shallowRef(store.value)
                 const animation = animatedNumberAsRef(target, {
                     animationSpec, finished: () => {
                         cancel()
                         jump(index, offset)
                     }
                 })
-                const stop = watch(animation, value => { state.value = Math.max(0, value) }, { flush: 'sync' })
+                const stop = watch(animation, value => { store.value = Math.max(0, value) }, { flush: 'sync' })
                 let done = false
                 const cancel = () => {
                     if (done) return
@@ -108,7 +152,7 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
                     animation.stop()
                     if (control.cancelAnimation === cancel) {
                         control.animating = false
-                        state.isScrollInProgress = false
+                        store.isScrollInProgress = false
                         control.cancelAnimation = undefined
                         control.animationOwner = undefined
                     }
@@ -117,40 +161,19 @@ export function createLazyState(args: { firstVisibleItemIndex?: number; firstVis
                 control.cancelAnimation = cancel
                 control.animationOwner = owner
                 control.animating = true
-                state.isScrollInProgress = true
-                const visible = state.layoutInfo.visibleItemsInfo.find(item => item.index === index)
-                const destination = visible ? state.value + visible.offset + offset : owner.estimatedOffset(index) + offset
+                store.isScrollInProgress = true
+                const visible = store.layoutInfo.visibleItemsInfo.find(item => item.index === index)
+                const destination = visible ? store.value + visible.offsetPx + offset : owner.estimatedOffset(index) + offset
                 target.value = Math.max(0, destination)
-                if (target.value === state.value) {
+                if (target.value === store.value) {
                     cancel()
                     jump(index, offset)
                 }
             }))
         },
-        __arrangeNativeScroll(payload: LazyFeedback) {
-            batchUpdates(() => {
-                if (payload.needsMoreItems) control.request.workVersion++
-                if (payload.value !== undefined) {
-                    control.publishedValue = payload.value
-                    state.value = payload.value
-                }
-                if (payload.maxValue !== undefined) state.maxValue = payload.maxValue
-                if (payload.viewportSize !== undefined) state.viewportSize = payload.viewportSize
-                if (payload.contentSize !== undefined) state.contentSize = payload.contentSize
-                if (payload.firstVisibleItemIndex !== undefined) state.firstVisibleItemIndex = payload.firstVisibleItemIndex
-                if (payload.firstVisibleItemScrollOffset !== undefined) state.firstVisibleItemScrollOffset = payload.firstVisibleItemScrollOffset
-                if (payload.visibleItemsInfo) state.layoutInfo = Object.freeze({
-                    visibleItemsInfo: Object.freeze(payload.visibleItemsInfo.map(item => Object.freeze({ ...item, key: control.owner?.key(item.index) ?? item.index }))),
-                    totalItemsCount: payload.totalItemsCount ?? state.layoutInfo.totalItemsCount,
-                    viewportStartOffset: 0, viewportEndOffset: state.viewportSize,
-                })
-                state.canScrollBackward = state.value > 0
-                state.canScrollForward = state.value < state.maxValue
-                state.isScrollInProgress = control.animating || Boolean(payload.isScrollInProgress)
-            })
-        },
-    }) as LazyState
+    })
     controls.set(state, control)
+    registerScrollState(state, { native })
     return state
 }
 
@@ -161,6 +184,12 @@ export function lazyStateRequest(state: LazyState): Readonly<{ version: number; 
     const control = controls.get(state)
     if (!control) throw new TypeError('Lazy state 必须通过 createLazyState 创建')
     return control.request
+}
+
+export function lazyStateStore(state: LazyState): LazyStateStore {
+    const control = controls.get(state)
+    if (!control) throw new TypeError('Lazy state 必须通过 createLazyState 创建')
+    return control.store
 }
 
 export function lazyStatePublishedValue(state: LazyState): number {

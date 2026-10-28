@@ -5,6 +5,7 @@
 #include "Animation.h"
 #include "Geometry.h"
 #include "DrawCommands.h"
+#include "Alignment.h"
 #include "DrawEnums.h"
 #include "Painter.h"
 #include "TextLayoutService.h"
@@ -90,7 +91,7 @@ namespace arrange::core {
         ParentDataKind kind = ParentDataKind::Weight;
         float weight = 0.0f;
         bool weightFill = true;
-        std::string align;
+        std::optional<LayoutAlignment> align;
         bool matchParentSize = false;
         bool operator==(const ParentDataModifierSemantics&) const = default;
     };

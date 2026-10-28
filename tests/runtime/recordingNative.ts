@@ -2,6 +2,7 @@ import { afterEach } from 'node:test'
 import type { ArrangeApp } from '../../packages/framework/src/app.ts'
 import type { NativeTransactionTarget, NativeModifierHandle } from '../../packages/framework/src/native.ts'
 import { Modifier, type ModifierElement } from '../../packages/framework/src/modifier.ts'
+import { createFakeNative } from '../helpers/fakeNative.ts'
 
 const frameSources = new Set<(time?: number) => void>()
 const drivers = new WeakMap<NativeTransactionTarget, (time?: number) => void>()
@@ -73,7 +74,7 @@ export function recordingNative(autoApply = true) {
         candidateBindings = undefined
         try { callback(error) } finally { completeFrame?.(!error) }
     }
-    const target: NativeTransactionTarget = {
+    const target: NativeTransactionTarget = createFakeNative({
         installFrameDriver(prepareCallback, completeCallback) {
             prepare = prepareCallback
             completeFrame = completeCallback
@@ -176,7 +177,7 @@ export function recordingNative(autoApply = true) {
             bindings.clear()
             target.abortRearrange()
         },
-    }
+    })
     drivers.set(target, frame)
     return {
         target,

@@ -481,17 +481,15 @@ namespace {
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         const auto loaded = host->executeModule("滚动输入回归.js", R"JS(
 const n = globalThis.__ARRANGE_NATIVE__
-const state = {
-    value: 0,
-    __arrangeNativeScroll(snapshot) {
-        if (state.value === snapshot.value) return
-        state.value = snapshot.value
-        n.setModifier(1, viewport())
-        n.diagnosticsToast('i', '滚动回归', '滚动回调', [String(state.value)], false)
-    }
+let value = 0
+function onScroll(snapshot) {
+    if (value === snapshot.value) return
+    value = snapshot.value
+    n.setModifier(1, viewport())
+    n.diagnosticsToast('i', '滚动回归', '滚动回调', [String(value)], false)
 }
 function viewport() {
-    return { elements: [{ type: 'size', value: { width: 100, height: 100 } }, { type: 'verticalScroll', key: 'scroll', value: { state } }] }
+    return { elements: [{ type: 'size', value: { width: 100, height: 100 } }, { type: 'verticalScroll', key: 'scroll', value: { value, onScroll, enabled: true } }] }
 }
 n.createNode(1, 'LayoutNode')
 n.setProp(1, 'measurePolicy', { kind: 'Box' })

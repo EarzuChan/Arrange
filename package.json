@@ -20,6 +20,8 @@
     "build:packages": "node --import tsx scripts/build-internal-packages.ts",
     "sync:version": "node --import tsx scripts/sync-version.ts",
     "verify:version": "node --import tsx scripts/verify-version.ts",
+    "sync:modifier-schema": "node --import tsx scripts/modifier-schema.ts",
+    "verify:modifier-schema": "node --import tsx scripts/modifier-schema.ts --check",
     "verify:native-fetchcontent": "node --import tsx scripts/verify-native-fetchcontent.ts",
     "pack:package": "node --import tsx scripts/pack-npm-package.ts",
     "publish:local": "node --import tsx scripts/publish-local.ts",

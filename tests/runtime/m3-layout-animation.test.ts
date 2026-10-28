@@ -4,7 +4,7 @@ import { ref } from '@arrange/framework'
 import { FlowRow, FlowColumn } from '@arrange/framework/foundation'
 import { M, IntrinsicSize, FlowRowMeasurePolicy, FlowColumnMeasurePolicy, Arrangement, createDensity } from '@arrange/framework/ui'
 import { repeatable, tween, snap, spring, linearEasing, animatedNumberAsRef, nativeAnimationSpec, createTransition } from '../../packages/framework/src/animation/value.ts'
-import { UnitResolver } from '../../packages/framework/src/resolveUnits.ts'
+import { ModifierLowering } from '../../packages/framework/src/modifierLowering.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import { frameScope } from './frameScope.ts'
 
@@ -14,7 +14,7 @@ test('固有尺寸在 TS 和 SFA 使用正式 overload，长度与 Flow 间距�
     const compiled = compileArrangeSfa(source, '固有尺寸.sfa')
     assert.match(compiled.code, /_unref\(IntrinsicSize\)\.Min/)
     assert.match(compiled.code, /spacedBy\(4, 2\)/)
-    const units = new UnitResolver(createDensity(2))
+    const units = new ModifierLowering(createDensity(2))
     assert.deepEqual(units.modifier(M.width(IntrinsicSize.Min)).elements[0].value, { maximum: false })
     const policy = units.measurePolicy(FlowRowMeasurePolicy({ horizontalArrangement: Arrangement.spacedBy(4, 2), verticalArrangement: Arrangement.spacedBy(3, 1) }))
     assert.deepEqual(policy, { kind: 'FlowRow', horizontalArrangement: { kind: 'spacedBy', space: 10 }, verticalArrangement: { kind: 'spacedBy', space: 7 } })

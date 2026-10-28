@@ -155,9 +155,9 @@ test('SFA 已知裸数和错单位在编译入口拒绝，普通 TS 参数仍直
     assert.throws(() => compileArrangeSfa(source('8.sp'), '单位错误.sfa'), /实际为 SP/)
     assert.equal(M.width(8, 0).elements[0].value.valueDp, 8)
     const script = (body: string) => `<script>import { createScrollState, ref } from '@arrange/framework'\nimport { M, Color, solidColor, createDensity, type Dp } from '@arrange/framework/ui'\n${body}</script>`
-    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState({ initial: 4.px }); scroll.scrollTo(scroll.value); const density = createDensity(); M.width(density.pxToDp(scroll.value).dp, 0).background(solidColor(Color(0xff123456)))'), '单位边界.sfa'))
-    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState(); M.width(scroll.value)'), '单位边界.sfa'))
-    assert.throws(() => compileArrangeSfa(script('createScrollState({ initial: 4 })'), '单位边界.sfa'), /要求 PX/)
+    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState({ initialPx: 4.px }); scroll.scrollTo(scroll.valuePx); const density = createDensity(); M.width(density.pxToDp(scroll.valuePx).dp, 0).background(solidColor(Color(0xff123456)))'), '单位边界.sfa'))
+    assert.doesNotThrow(() => compileArrangeSfa(script('const scroll = createScrollState(); M.width(scroll.valuePx)'), '单位边界.sfa'))
+    assert.throws(() => compileArrangeSfa(script('createScrollState({ initialPx: 4 })'), '单位边界.sfa'), /要求 PX/)
     assert.throws(() => compileArrangeSfa(script('function wrong(): Dp { return 4.sp }'), '单位边界.sfa'), /实际为 SP/)
     assert.throws(() => compileArrangeSfa(script('const value = ref(1.dp); value.value = 4.sp'), '单位边界.sfa'), /实际为 SP/)
 })

@@ -1,4 +1,5 @@
 #include "QuickJsModifierReader.h"
+#include "ModifierSchema.h"
 #include "QuickJsPainterResources.h"
 
 #if ARRANGE_WITH_QUICKJS_NG
@@ -6,10 +7,11 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <span>
 
 namespace arrange::quickjs {
     namespace {
-        bool fieldsMatch(JSContext* context, JSValueConst object, std::initializer_list<std::string_view> fields, std::string_view owner) {
+        bool fieldsMatch(JSContext* context, JSValueConst object, std::span<const std::string_view> fields, std::string_view owner) {
             JSPropertyEnum* properties = nullptr;
             std::uint32_t count = 0;
             if (JS_GetOwnPropertyNames(context, &properties, &count, object, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return false;
@@ -32,49 +34,13 @@ namespace arrange::quickjs {
             return valid;
         }
 
-        bool modifierFieldsMatch(JSContext* context, JSValueConst value, std::string_view type) {
-            const auto check = [&](std::initializer_list<std::string_view> fields) {
-                return fieldsMatch(context, value, fields, type);
-            };
-            if (type == "text") return check({"text", "style", "singleLine", "minLines", "maxLines", "textAlign", "overflow"});
-            if (type == "textField") return check({"value", "textStyle", "singleLine", "minLines", "maxLines", "placeholder", "enabled", "selectAllOnFocus", "onValueChange", "onSubmit", "onChange", "onBlur"});
-            if (type == "paint") return check({"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"});
-            if (type == "padding") return check({"start", "top", "end", "bottom"});
-            if (type == "width" || type == "height" || type == "alpha" || type == "zIndex") return check({"value"});
-            if (type == "intrinsicWidth" || type == "intrinsicHeight") return check({"maximum"});
-            if (type == "requiredWidth") return check({"width"});
-            if (type == "requiredHeight") return check({"height"});
-            if (type == "size" || type == "requiredSize") return check({"width", "height"});
-            if (type == "fillMaxWidth" || type == "fillMaxHeight" || type == "fillMaxSize") return check({"fraction"});
-            if (type == "widthIn" || type == "heightIn") return check({"min", "max"});
-            if (type == "sizeIn") return check({"minWidth", "maxWidth", "minHeight", "maxHeight"});
-            if (type == "defaultMinSize") return check({"minWidth", "minHeight"});
-            if (type == "verticalScroll" || type == "horizontalScroll") return check({"state", "enabled"});
-            if (type == "animateContentSize") return check({"animationSpec", "clip"});
-            if (type == "weight") return check({"weight", "fill"});
-            if (type == "align") return check({"alignment"});
-            if (type == "matchParentSize") return check({});
-            if (type == "offset" || type == "absoluteOffset") return check({"x", "y"});
-            if (type == "graphicsLayer") return check({"translationX", "translationY", "scaleX", "scaleY", "rotationZ", "transformOrigin", "alpha", "clip"});
-            if (type == "drawBehind" || type == "drawWithContent" || type == "drawWithCache") return check({"prepare", "revision", "transactional"});
-            if (type == "background") return check({"color", "brush", "shape"});
-            if (type == "border") return check({"width", "color", "brush", "shape"});
-            if (type == "clip") return check({"shape"});
-            if (type == "clickable") return check({"enabled", "focusable", "onClick", "onDoubleClick", "interaction"});
-            if (type == "hoverable") return check({"enabled", "onEnter", "onExit", "interaction"});
-            if (type == "focusable") return check({"enabled", "interaction"});
-            if (type == "onContextClick") return check({"enabled", "callback"});
-            if (type == "onWheel") return check({"enabled", "axis", "callback"});
-            if (type == "onKeyEvent") return check({"callback"});
-            if (type == "pointerInput") return check({"enabled", "callback"});
-            if (type == "pointerIcon") return check({"icon"});
-            if (type == "draggable") return check({"enabled", "axis", "startImmediately", "pointerLock", "onDelta", "onStart", "onStop", "interaction"});
-            if (type == "focusRequester") return check({"requester"});
-            if (type == "semantics") return check({"role", "label", "description", "valueText", "enabled", "increment", "decrement"});
-            if (type == "focusGroup") return check({});
-            if (type == "onFocusChanged") return check({"callback"});
-            if (type == "focusProperties") return check({"canFocus", "next", "previous", "up", "down", "left", "right"});
+        bool fieldsMatch(JSContext* context, JSValueConst object, std::initializer_list<std::string_view> fields, std::string_view owner) {
+            return fieldsMatch(context, object, std::span<const std::string_view>(fields.begin(), fields.size()), owner);
+        }
 
+        // 字段白名单由修饰 schema 生成
+        bool modifierFieldsMatch(JSContext* context, JSValueConst value, std::string_view type) {
+            if (const auto* entry = findModifierSchema(type)) return fieldsMatch(context, value, entry->fields, type);
             JS_ThrowTypeError(context, "Arrange Modifier 类型 '%.*s' 未定义", static_cast<int>(type.size()), type.data());
             return false;
         }
@@ -256,7 +222,8 @@ namespace arrange::quickjs {
             }
             const auto type = requiredStringField(element.get(), "type", "modifier element");
             if (failed_) return {};
-            if (!fieldsMatch(context_, element.get(), {"type", "key", "value"}, "Modifier 元素")) {
+            constexpr std::string_view elementFields[]{"type", "key", "value"};
+            if (!fieldsMatch(context_, element.get(), elementFields, "Modifier 元素")) {
                 failed_ = true;
                 return {};
             }
@@ -268,6 +235,10 @@ namespace arrange::quickjs {
                 failed_ = true;
                 return {};
             }
+            // 回调字段的事件种类由修饰 schema 决定
+            const auto eventKind = [schema = findModifierSchema(type)](std::string_view field) {
+                return modifierCallbackKind(*schema, field);
+            };
 
             const auto key = reader_.stringField(element.get(), "key");
             if (type == "padding") {
@@ -333,15 +304,14 @@ namespace arrange::quickjs {
             } else if (type == "verticalScroll" || type == "horizontalScroll") {
                 arrange::core::LayoutModifierSemantics item;
                 item.kind = type == "verticalScroll" ? arrange::core::LayoutModifierKind::VerticalScroll : arrange::core::LayoutModifierKind::HorizontalScroll;
-                ScopedValue state(context_, JS_GetPropertyStr(context_, payload, "state"));
-                if (!JS_IsObject(state.get())) {
-                    JS_ThrowTypeError(context_, "Arrange Modifier '%.*s' 的 state 需要对象", static_cast<int>(type.size()), type.data());
+                ScopedValue callback(context_, JS_GetPropertyStr(context_, payload, "onScroll"));
+                if (!JS_IsFunction(context_, callback.get())) {
+                    JS_ThrowTypeError(context_, "Arrange Modifier '%.*s' 的 onScroll 需要函数", static_cast<int>(type.size()), type.data());
                     return {};
                 }
-                item.scrollValue = numberField(state.get(), "value");
+                item.scrollValue = numberField(payload, "value");
                 item.enabled = boolField(payload, "enabled", true);
-                const auto kind = type == "verticalScroll" ? arrange::core::EventSlotKind::VerticalScroll : arrange::core::EventSlotKind::HorizontalScroll;
-                callbacks.push_back({result.size(), kind, ScopedValue(context_, JS_GetPropertyStr(context_, state.get(), "__arrangeNativeScroll"))});
+                callbacks.push_back({result.size(), eventKind("onScroll"), std::move(callback)});
                 result.push_back({item, key});
             } else if (type == "animateContentSize") {
                 arrange::core::AnimateContentSizeModifier item;
@@ -432,10 +402,7 @@ namespace arrange::quickjs {
                     field.presentation = std::move(text);
                     field.enabled = boolField(payload, "enabled", true);
                     field.selectAllOnFocus = boolField(payload, "selectAllOnFocus", false);
-                    using Kind = arrange::core::EventSlotKind;
-                    for (const auto& [name, kind] : {std::pair{"onValueChange", Kind::InputUpdate}, {"onSubmit", Kind::InputSubmit}, {"onChange", Kind::InputChange}, {"onBlur", Kind::InputBlur}}) {
-                        callbacks.push_back({result.size(), kind, ScopedValue(context_, JS_GetPropertyStr(context_, payload, name))});
-                    }
+                    for (const auto* name : {"onValueChange", "onSubmit", "onChange", "onBlur"}) callbacks.push_back({result.size(), eventKind(name), ScopedValue(context_, JS_GetPropertyStr(context_, payload, name))});
                     result.push_back({std::move(field), key});
                 } else
                     result.push_back({std::move(text), key});
@@ -472,7 +439,13 @@ namespace arrange::quickjs {
                     item.weightFill = boolField(payload, "fill", true);
                 } else if (type == "align") {
                     item.kind = arrange::core::ParentDataKind::Align;
-                    item.align = requiredStringField(payload, "alignment", type);
+                    const auto name = requiredStringField(payload, "alignment", type);
+                    item.align = arrange::core::parseLayoutAlignment(name);
+                    if (!failed_ && !item.align) {
+                        JS_ThrowTypeError(context_, "Arrange Modifier.align 不支持对齐值：'%s'", name.c_str());
+                        failed_ = true;
+                        return {};
+                    }
                 } else
                     item.kind = arrange::core::ParentDataKind::MatchParentSize;
                 result.push_back({item, key});
@@ -498,7 +471,7 @@ namespace arrange::quickjs {
                     (void)throwTypeError("绘制 prepare 需要函数");
                     return {};
                 }
-                callbacks.push_back({result.size(), arrange::core::EventSlotKind::DrawPrepare, std::move(callback)});
+                callbacks.push_back({result.size(), eventKind("prepare"), std::move(callback)});
                 result.push_back({item, key});
             } else if (type == "graphicsLayer") {
                 arrange::core::TransformModifierSemantics item;
@@ -538,14 +511,14 @@ namespace arrange::quickjs {
                 item.description = reader_.stringField(payload, "description");
                 item.valueText = reader_.stringField(payload, "valueText");
                 item.enabled = boolField(payload, "enabled", true);
-                for (const auto& [name, kind] : {std::pair{"increment", arrange::core::EventSlotKind::SemanticsIncrement}, std::pair{"decrement", arrange::core::EventSlotKind::SemanticsDecrement}}) {
+                for (const auto* name : {"increment", "decrement"}) {
                     ScopedValue action(context_, JS_GetPropertyStr(context_, payload, name));
                     if (JS_IsUndefined(action.get()) || JS_IsNull(action.get())) continue;
                     if (!JS_IsFunction(context_, action.get())) {
                         JS_ThrowTypeError(context_, "semantics.%s 需要函数", name);
                         return {};
                     }
-                    callbacks.push_back({result.size(), kind, std::move(action)});
+                    callbacks.push_back({result.size(), eventKind(name), std::move(action)});
                 }
                 if (JS_HasException(context_)) return {};
                 result.push_back({item, key});
@@ -575,24 +548,23 @@ namespace arrange::quickjs {
                         (void)throwTypeError("onFocusChanged 需要函数");
                         return {};
                     }
-                    callbacks.push_back({result.size(), arrange::core::EventSlotKind::FocusChanged, std::move(callback)});
+                    callbacks.push_back({result.size(), eventKind("callback"), std::move(callback)});
                 }
                 result.push_back({item, key});
             } else if (type == "clickable" || type == "hoverable" || type == "focusable" || type == "onContextClick" || type == "pointerIcon" || type == "onKeyEvent" || type == "onWheel" || type == "draggable" || type == "pointerInput") {
-                using Kind = arrange::core::EventSlotKind;
                 using InputKind = arrange::core::InputModifierKind;
                 arrange::core::InputModifierSemantics item;
                 item.enabled = boolField(payload, "enabled", true);
                 item.focusable = boolField(payload, "focusable", true);
                 // 必填回调缺失时报错；可选回调为 undefined 时不登记槽位
-                const auto callback = [&](const char* name, Kind kind, bool required) {
+                const auto callback = [&](const char* name, bool required) {
                     ScopedValue value(context_, JS_GetPropertyStr(context_, payload, name));
                     const auto present = !JS_IsUndefined(value.get()) && !JS_IsNull(value.get());
                     if ((required || present) && !JS_IsFunction(context_, value.get())) {
                         JS_ThrowTypeError(context_, "%.*s.%s 需要函数", static_cast<int>(type.size()), type.data(), name);
                         return false;
                     }
-                    if (present) callbacks.push_back({result.size(), kind, std::move(value)});
+                    if (present) callbacks.push_back({result.size(), eventKind(name), std::move(value)});
                     return true;
                 };
                 const auto readAxis = [&] {
@@ -611,25 +583,25 @@ namespace arrange::quickjs {
                 };
                 auto ok = true;
                 if (type == "clickable")
-                    ok = callback("onClick", Kind::Click, true) && callback("onDoubleClick", Kind::DoubleClick, false) && callback("interaction", Kind::Interaction, false);
+                    ok = callback("onClick", true) && callback("onDoubleClick", false) && callback("interaction", false);
                 else if (type == "hoverable") {
                     item.kind = InputKind::Hoverable;
-                    ok = callback("onEnter", Kind::HoverEnter, false) && callback("onExit", Kind::HoverExit, false) && callback("interaction", Kind::Interaction, false);
+                    ok = callback("onEnter", false) && callback("onExit", false) && callback("interaction", false);
                 } else if (type == "focusable") {
                     item.kind = InputKind::Focusable;
-                    ok = callback("interaction", Kind::Interaction, false);
+                    ok = callback("interaction", false);
                 } else if (type == "onContextClick") {
                     item.kind = InputKind::ContextClick;
-                    ok = callback("callback", Kind::ContextClick, true);
+                    ok = callback("callback", true);
                 } else if (type == "onKeyEvent") {
                     item.kind = InputKind::KeyEvent;
-                    ok = callback("callback", Kind::Key, true);
+                    ok = callback("callback", true);
                 } else if (type == "pointerInput") {
                     item.kind = InputKind::PointerInput;
-                    ok = callback("callback", Kind::PointerInput, true);
+                    ok = callback("callback", true);
                 } else if (type == "onWheel") {
                     item.kind = InputKind::Wheel;
-                    ok = readAxis() && callback("callback", Kind::Wheel, true);
+                    ok = readAxis() && callback("callback", true);
                 } else if (type == "pointerIcon") {
                     item.kind = InputKind::PointerIcon;
                     const auto icon = reader_.stringField(payload, "icon");
@@ -648,7 +620,7 @@ namespace arrange::quickjs {
                     }
                     item.startImmediately = boolField(payload, "startImmediately", false);
                     item.pointerLock = boolField(payload, "pointerLock", false);
-                    ok = callback("onDelta", Kind::DragDelta, true) && callback("onStart", Kind::DragStart, false) && callback("onStop", Kind::DragStop, false) && callback("interaction", Kind::Interaction, false);
+                    ok = callback("onDelta", true) && callback("onStart", false) && callback("onStop", false) && callback("interaction", false);
                 }
                 if (!ok) {
                     failed_ = true;

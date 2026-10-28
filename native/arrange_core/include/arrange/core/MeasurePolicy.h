@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Alignment.h"
 #include "PropValue.h"
 #include "ImmutableVector.h"
 
@@ -10,26 +11,26 @@
 
 namespace arrange::core {
     struct AxisArrangement {
-        std::string alignment = "Start";
+        Arrangement arrangement = Arrangement::Start;
         float spacing = 0.0f;
         bool operator==(const AxisArrangement&) const = default;
     };
 
     struct BoxMeasurePolicy {
-        std::string contentAlignment = "TopStart";
+        LayoutAlignment contentAlignment = LayoutAlignment::TopStart;
         bool propagateMinConstraints = false;
         bool operator==(const BoxMeasurePolicy&) const = default;
     };
 
     struct RowMeasurePolicy {
         AxisArrangement arrangement;
-        std::string verticalAlignment = "Top";
+        LayoutAlignment verticalAlignment = LayoutAlignment::Top;
         bool operator==(const RowMeasurePolicy&) const = default;
     };
 
     struct ColumnMeasurePolicy {
-        AxisArrangement arrangement{"Top"};
-        std::string horizontalAlignment = "Start";
+        AxisArrangement arrangement;
+        LayoutAlignment horizontalAlignment = LayoutAlignment::Start;
         bool operator==(const ColumnMeasurePolicy&) const = default;
     };
 
@@ -40,8 +41,8 @@ namespace arrange::core {
     struct FlowMeasurePolicy {
         bool horizontal = true;
         AxisArrangement mainArrangement;
-        AxisArrangement crossArrangement{"Top"};
-        std::string itemAlignment = "Top";
+        AxisArrangement crossArrangement;
+        LayoutAlignment itemAlignment = LayoutAlignment::Top;
         int maxItems = 2147483647;
         bool operator==(const FlowMeasurePolicy&) const = default;
     };
@@ -55,11 +56,11 @@ namespace arrange::core {
         float crossSpacing = 0;
         float crossBeforePadding = 0;
         float crossAfterPadding = 0;
-        std::string mainAlignment = "Start";
+        Arrangement mainAlignment = Arrangement::Start;
         float beforePadding = 0;
         float afterPadding = 0;
         float estimate = 48;
-        std::string itemAlignment = "Start";
+        LayoutAlignment itemAlignment = LayoutAlignment::Start;
         std::uint64_t version = 1;
         std::uint64_t requestVersion = 0;
         std::uint64_t workVersion = 0;

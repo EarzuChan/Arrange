@@ -61,7 +61,7 @@ namespace arrange::core {
             LayoutNode node;
             node.id = op->id;
             node.type = op->type;
-            if (op->type == NodeType::Root) node.measurePolicy = BoxMeasurePolicy{"TopStart", true};
+            if (op->type == NodeType::Root) node.measurePolicy = BoxMeasurePolicy{LayoutAlignment::TopStart, true};
             node.generation = op->generation ? op->generation : allocateRuntimeIdentity();
             markDirty(node, DirtyFlag::Structure);
             invalidation_.record(impliedDirty(DirtyFlag::Structure));

@@ -1,4 +1,4 @@
-import type { PxModifier } from './resolveUnits.ts'
+import type { PxModifier } from './modifierLowering.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
 import type { RearrangeHost, RearrangeNode } from './runtime/internal.ts'
 import type { NativeBindingHandle, NativeModifierHandle, NativeMutation, NativeTransactionTarget } from './native.ts'
@@ -25,7 +25,7 @@ export class NativeRearrangeHost implements RearrangeHost {
     continuing = false
 
     constructor(readonly native: NativeTransactionTarget) {
-        native.installLayoutDriver?.((id, indices) => {
+        native.installLayoutDriver((id, indices) => {
             const entry = this.providers.get(id)
             if (!entry || entry.node.owner.isUnmounted) throw new Error('子组合目标已退休')
             const session = entry.node.owner.rearrangeSession
@@ -37,7 +37,6 @@ export class NativeRearrangeHost implements RearrangeHost {
     }
 
     registerProvider(node: LayoutRearrangeNode, provider: LayoutContentProvider): void {
-        if (!this.native.installLayoutDriver || !this.native.continueRearrange) throw new Error('原生宿主缺少受控子组合驱动')
         const id = node.id
         this.providers.set(id, { node, provider })
         this.onAbort(() => this.providers.delete(id))
@@ -161,7 +160,7 @@ export class NativeRearrangeHost implements RearrangeHost {
 
     applyContinuation(): void {
         if (!this.preparing || !this.continuing) throw new Error('子组合候选尚未准备')
-        this.native.continueRearrange!()
+        this.native.continueRearrange()
         this.flushOperations()
         this.preparing = false
     }
@@ -437,7 +436,7 @@ function sameDescriptorFields(left: unknown, right: unknown): boolean {
 const descriptorFields: Readonly<Record<string, readonly string[]>> = {
     background: ['brush', 'shape'], border: ['brush', 'shape'], clip: ['shape'], graphicsLayer: ['transformOrigin'],
     text: ['style'], textField: ['textStyle'], paint: ['painter', 'colorFilter'],
-    verticalScroll: ['state'], horizontalScroll: ['state'], animateContentSize: ['animationSpec'],
+    animateContentSize: ['animationSpec'],
 }
 
 function sameModifierElement(left: ModifierElement, right: ModifierElement): boolean {

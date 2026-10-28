@@ -23,7 +23,7 @@ M.padding(8, 0).background(red)
 
 # 生产事实源
 
-Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型化输入。原生协调器维护每层实例的身份、绑定、阶段数据与退休；measure、place、paint、hit-test 消费同一条实例链。相等输入不触发无关阶段，事件回调替换只失效输入相关数据。
+Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型化输入。每种修饰的字段、单位字段、调用参数单位与回调字段的事件种类只在 `@arrange/shared` 的修饰 schema 声明一次：JS 降解与编译器单位检查直接读取它，原生字段白名单与回调种类表由 `pnpm sync:modifier-schema` 生成为 `ModifierSchema.inc`，`pnpm verify:modifier-schema` 与 JS 测试检查漂移；字段解析仍在 QuickJS 读取器手写。原生协调器维护每层实例的身份、绑定、阶段数据与退休；measure、place、paint、hit-test 消费同一条实例链。相等输入不触发无关阶段，事件回调替换只失效输入相关数据。
 
 显式 key 用于同类型元素的重排复用；无 key 元素按位置与类型协调。实例 handle 与数组下标分离，退休代际使旧绑定无法写入新实例。链条更新和单实例参数更新都进入同一原生提交。
 
@@ -306,7 +306,7 @@ M.horizontalScroll(state)
 - 自己成为 viewport。
 - 按滚动轴给子节点无界主轴约束。
 - 裁剪并平移子内容：scroll viewport 必须天然包含 viewport clip，不能只平移不裁剪。
-- 更新 `ScrollState.value/maxValue/viewportSize/contentSize`。
+- 更新 `ScrollState.valuePx/maxValuePx/viewportSizePx/contentSizePx`。
 
 scroll viewport clip 与普通 `M.clip(shape)` 同属于视觉裁剪，但来源不同：
 

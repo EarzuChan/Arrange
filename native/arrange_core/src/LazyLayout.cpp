@@ -233,29 +233,13 @@ namespace arrange::core {
             return result;
         }
 
-        float alignmentOffset(float parent, float child, const std::string& alignment) {
-            if (alignment == "CenterHorizontally" || alignment == "CenterVertically" || alignment == "Center") return (parent - child) / 2;
-            if (alignment == "End" || alignment == "Bottom") return parent - child;
-            return 0;
-        }
-
         MainPlacement mainPlacement(const LazyLayoutState& state, const LazyMeasurePolicy& policy) {
             MainPlacement result;
             const auto extra = std::max(0.0f, state.viewportSize - state.contentSize);
             const auto count = state.lines.size();
-            if (policy.mainAlignment == "Center" || policy.mainAlignment == "CenterHorizontally" || policy.mainAlignment == "CenterVertically")
-                result.offset = extra / 2;
-            else if (policy.mainAlignment == "End" || policy.mainAlignment == "Bottom")
-                result.offset = extra;
-            else if (policy.mainAlignment == "SpaceBetween" && count > 1)
-                result.extraSpacing = extra / (count - 1);
-            else if (policy.mainAlignment == "SpaceAround" && count) {
-                result.extraSpacing = extra / count;
-                result.offset = result.extraSpacing / 2;
-            } else if (policy.mainAlignment == "SpaceEvenly" && count) {
-                result.extraSpacing = extra / (count + 1);
-                result.offset = result.extraSpacing;
-            }
+            const auto placed = distribute(policy.mainAlignment, extra, count);
+            result.offset = placed.offset;
+            result.extraSpacing = placed.spacing;
             return result;
         }
     }
@@ -410,7 +394,7 @@ namespace arrange::core {
             const auto& child = tree.node(node.children[position]);
             const auto itemCross = itemCrossConstraint(state, index);
             const auto slot = std::max(0.0f, (state.crossSize - state.crossSpacing * (state.cells - 1)) / state.cells);
-            const auto crossStart = policy.crossBeforePadding + (policy.grid ? (slot + policy.crossSpacing) * state.itemSlots[index] : alignmentOffset(itemCross, policy.horizontal ? child.bounds.height : child.bounds.width, policy.itemAlignment));
+            const auto crossStart = policy.crossBeforePadding + (policy.grid ? (slot + policy.crossSpacing) * state.itemSlots[index] : alignOffset(itemCross, policy.horizontal ? child.bounds.height : child.bounds.width, policy.itemAlignment, !policy.horizontal));
             const auto mainStart = lineStart(state, line, policy.beforePadding) + placement.offset + placement.extraSpacing * line;
             place(tree, child.id, x + (policy.horizontal ? mainStart : crossStart), y + (policy.horizontal ? crossStart : mainStart));
         }

@@ -28,7 +28,7 @@ export function painterSnapshot(value: Painter): PainterSnapshot {
 // 获取层拥有资源请求；FA 只消费其状态、尺寸和内容版本
 export function painter(resource: ResourceRef): Painter {
     const native: NativeTransactionTarget | undefined = globalThis.__ARRANGE_NATIVE__
-    if (!native?.acquirePainter || !native.releasePainter) throw new Error('当前宿主未提供 Painter 资源服务')
+    if (!native) throw new Error('Painter 需要原生运行时')
     const location = typeof resource === 'string' ? resource : resource?.path
     if (typeof location !== 'string' || !location) throw new TypeError('Painter 资源地址必须是非空字符串')
 
@@ -45,7 +45,7 @@ export function painter(resource: ResourceRef): Painter {
         dispose() {
             if (state.value.status === 'disposed') return
             state.value = { status: 'disposed', contentVersion: state.value.contentVersion + 1 }
-            native.releasePainter!(handle)
+            native.releasePainter(handle)
         },
     })
     painters.set(result, () => {

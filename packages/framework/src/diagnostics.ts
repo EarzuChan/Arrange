@@ -15,7 +15,7 @@ function native(): NativeTransactionTarget | undefined {
 
 function log(level: LogLevelName, tag: string, args: unknown[]): void {
     if (!tag.trim()) throw new TypeError('打日志不得无 Tag')
-    native()?.log?.(level, tag, args.map(value => typeof value === 'string' ? value : String(value)))
+    native()?.log(level, tag, args.map(value => typeof value === 'string' ? value : String(value)))
 }
 
 export const Log = Object.freeze({
@@ -37,18 +37,19 @@ export const DiagnosticsToast = Object.freeze({
 function toast(level: LogLevelName, tag: string, title: string, args: unknown[]): void {
     if (!tag.trim()) throw new TypeError('打气泡不得无 Tag')
     if (!title.trim()) throw new TypeError('打气泡不得无标题')
-    native()?.diagnosticsToast?.({ level, tag, title, args: args.map(value => typeof value === 'string' ? value : String(value)), coalesce: true })
+    native()?.diagnosticsToast(level, tag, title, args.map(value => typeof value === 'string' ? value : String(value)), true)
 }
 
+// 无宿主（如纯 Node 环境）时诊断调用静默跳过
 export const diagnostics = Object.freeze({
     requestReload(path?: string): void {
-        native()?.diagnosticsRequestReload?.({ path, timestamp: Date.now() })
+        native()?.diagnosticsRequestReload({ path, timestamp: Date.now() })
     },
     triggerFakeError(message = "Manual script diagnostic error"): void {
-        native()?.diagnosticsTriggerFakeError?.({ message })
+        native()?.diagnosticsTriggerFakeError({ message })
     },
     setToastsEnabled(enabled: boolean): void {
-        native()?.diagnosticsSetToastsEnabled?.(enabled)
+        native()?.diagnosticsSetToastsEnabled(enabled)
     }
 })
 

@@ -4,7 +4,7 @@ import { currentInstance, retainContent } from '../runtime/internal.ts'
 import { parameterInputs, parameterObject } from '../runtime/rearrange.ts'
 import type { ArrangableDefinition, ArrangableProps, PropType } from '../runtime/index.ts'
 import { isArrangableDefinition } from '../runtime/apiDefineArrangable.ts'
-import { acknowledgeLazyStateRequest, attachLazyState, createLazyState, lazyStateAppliedRequestVersion, lazyStatePublishedValue, lazyStateRequest, pauseLazyState, type LazyItemKey, type LazyState, type LazyStateOwner } from '../lazy.ts'
+import { acknowledgeLazyStateRequest, attachLazyState, createLazyState, lazyStateAppliedRequestVersion, lazyStatePublishedValue, lazyStateRequest, lazyStateStore, pauseLazyState, type LazyItemKey, type LazyState, type LazyStateOwner } from '../lazy.ts'
 import { LazyMeasurePolicy, BoxMeasurePolicy, ColumnMeasurePolicy, RowMeasurePolicy } from '../measurePolicy.ts'
 import { M, Modifier } from '../modifier.ts'
 import { GridCells, type GridCellsValue, type GridItemSpanValue, type Padding, PaddingValues, type HorizontalAlignment, type VerticalAlignment } from '../primitives.ts'
@@ -68,7 +68,7 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
             const readState = () => {
                 const state = props.state ?? defaultState
                 const request = lazyStateRequest(state)
-                if (request.kind === 'pixel' && request.version > lazyStateAppliedRequestVersion(state) && state.value === lazyStatePublishedValue(state)) state.value = request.value
+                if (request.kind === 'pixel' && request.version > lazyStateAppliedRequestVersion(state) && lazyStateStore(state).value === lazyStatePublishedValue(state)) lazyStateStore(state).value = request.value
                 const session = owner.rearrangeSession
                 if (session.preparing) session.preserve(stateBinding, () => {
                     const previousAttachments = new Map(attachments)
@@ -101,10 +101,11 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                         isSelected: () => selected?.state === state,
                         key: index => props.itemKey?.(props.items[index], index) ?? index,
                         estimatedOffset: index => {
-                            const first = state.layoutInfo.visibleItemsInfo[0]
-                            const estimate = first?.size || 48
+                            const store = lazyStateStore(state)
+                            const first = store.layoutInfo.visibleItemsInfo[0]
+                            const estimate = first?.sizePx || 48
                             const cells = grid && props.cells.type === 'Fixed' ? props.cells.count : 1
-                            return Math.max(0, state.value + (Math.floor(index / cells) - Math.floor(state.firstVisibleItemIndex / cells)) * estimate - state.firstVisibleItemScrollOffset)
+                            return Math.max(0, store.value + (Math.floor(index / cells) - Math.floor(store.firstVisibleItemIndex / cells)) * estimate - store.firstVisibleItemScrollOffset)
                         },
                     }
                     attachment = { state, owner: stateOwner, detach: attachLazyState(state, stateOwner) }
@@ -197,10 +198,10 @@ function lazyDefinition(name: string, horizontal: boolean, grid: boolean) {
                         requestedOffset = request.offset
                         const pending = request.version > lazyStateAppliedRequestVersion(state)
                         if (pending && request.kind === 'item') nativeRequestVersion++
-                        else if (!pending && needsRestore && state.value === lazyStatePublishedValue(state) && state.layoutInfo.totalItemsCount > 0) {
+                        else if (!pending && needsRestore && state.valuePx === lazyStatePublishedValue(state) && state.layoutInfo.totalItemsCount > 0) {
                             const anchor = state.layoutInfo.visibleItemsInfo.find(item => item.index === state.firstVisibleItemIndex)
                             requestedIndex = anchor ? dataset.keyToIndex.get(identity(anchor.key, 'Lazy key')) ?? state.firstVisibleItemIndex : state.firstVisibleItemIndex
-                            requestedOffset = state.firstVisibleItemScrollOffset
+                            requestedOffset = state.firstVisibleItemScrollOffsetPx
                             nativeRequestVersion++
                         }
                         requestState = state

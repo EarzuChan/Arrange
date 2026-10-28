@@ -43,17 +43,6 @@ namespace arrange::core {
             return constraints;
         }
 
-        float crossAxisOffset(float parent, float child, const std::string& alignment, bool horizontal) {
-            if (horizontal) {
-                if (alignment == "Center" || alignment == "CenterHorizontally" || alignment == "TopCenter" || alignment == "BottomCenter") return (parent - child) * 0.5f;
-                if (alignment == "End" || alignment == "TopEnd" || alignment == "CenterEnd" || alignment == "BottomEnd") return parent - child;
-            } else {
-                if (alignment == "Center" || alignment == "CenterVertically" || alignment == "CenterStart" || alignment == "CenterEnd") return (parent - child) * 0.5f;
-                if (alignment == "Bottom" || alignment == "BottomStart" || alignment == "BottomCenter" || alignment == "BottomEnd") return parent - child;
-            }
-            return 0.0f;
-        }
-
         struct MainAxisPlacement {
             float offset = 0.0f;
             float spacing = 0.0f;
@@ -67,32 +56,19 @@ namespace arrange::core {
 
             float used = result.spacing * static_cast<float>(count - 1);
             for (auto childId : node.children) used += horizontal ? tree.node(childId).bounds.width : tree.node(childId).bounds.height;
-            const auto remaining = std::max(0.0f, size - used);
-            const auto& name = arrangement.alignment;
-
-            if (name == "Center" || name == "CenterHorizontally" || name == "CenterVertically")
-                result.offset = remaining * 0.5f;
-            else if (name == "End" || name == "Bottom")
-                result.offset = remaining;
-            else if (name == "SpaceBetween" && count > 1)
-                result.spacing = remaining / static_cast<float>(count - 1);
-            else if (name == "SpaceAround") {
-                result.spacing = remaining / static_cast<float>(count);
-                result.offset = result.spacing * 0.5f;
-            } else if (name == "SpaceEvenly") {
-                result.spacing = remaining / static_cast<float>(count + 1);
-                result.offset = result.spacing;
-            }
+            const auto placed = distribute(arrangement.arrangement, std::max(0.0f, size - used), count);
+            result.offset = placed.offset;
+            result.spacing += placed.spacing;
             return result;
         }
 
-        std::string alignModifier(const LayoutNode& node) {
+        std::optional<LayoutAlignment> alignModifier(const LayoutNode& node) {
             return node.modifier.parentData().align;
         }
 
         void validateParentData(const LayoutTree& tree, const LayoutNode& node) {
             const auto data = node.modifier.parentData();
-            if (data.weight == 0 && data.align.empty() && !data.matchParentSize) return;
+            if (data.weight == 0 && !data.align && !data.matchParentSize) return;
             const auto parent = tree.parentOf(node.id);
             if (!parent) throw std::invalid_argument("父布局 Modifier 必须用于相应布局的直接子项");
             const auto& policy = tree.node(*parent).measurePolicy;
@@ -100,8 +76,8 @@ namespace arrange::core {
             const auto* flow = std::get_if<FlowMeasurePolicy>(&policy);
             if (data.matchParentSize && !box) throw std::invalid_argument("matchParentSize 只能用于 Box 的直接子项");
             if (data.weight > 0 && !row && !column && !flow) throw std::invalid_argument("weight 只能用于 Row、Column 或 Flow 的直接子项");
-            if (!data.align.empty()) {
-                const auto valid = box ? isBoxAlignment(data.align) : row ? isVerticalAlignment(data.align) || data.align == "Baseline" : column ? isHorizontalAlignment(data.align) : flow ? flow->horizontal ? isVerticalAlignment(data.align) : isHorizontalAlignment(data.align) : false;
+            if (const auto align = data.align) {
+                const auto valid = box ? isBoxAlignment(*align) : row ? isVerticalAlignment(*align) || align == LayoutAlignment::Baseline : column ? isHorizontalAlignment(*align) : flow ? isAxisAlignment(*align, !flow->horizontal) : false;
                 if (!valid) throw std::invalid_argument("align 与父布局的交叉轴方向不匹配");
             }
         }
@@ -317,7 +293,7 @@ namespace arrange::core {
                     for (auto childId : node.children) {
                         const auto& child = tree.node(childId);
                         const auto alignment = alignModifier(child);
-                        if (child.baseline >= 0 && (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline"))) {
+                        if (child.baseline >= 0 && alignment.value_or(defaultAlign) == LayoutAlignment::Baseline) {
                             maxBaseline = std::max(maxBaseline, child.baseline);
                             maxDescent = std::max(maxDescent, child.bounds.height - child.baseline);
                         }
@@ -390,7 +366,7 @@ namespace arrange::core {
             if (child.baseline >= 0) {
                 const auto alignment = alignModifier(child);
                 const auto defaultAlign = policy->contentAlignment;
-                node.baseline = child.baseline + crossAxisOffset(node.bounds.height, child.bounds.height, alignment.empty() ? defaultAlign : alignment, false);
+                node.baseline = child.baseline + alignOffset(node.bounds.height, child.bounds.height, alignment.value_or(defaultAlign), false);
             }
         }
         return {node.bounds.width, node.bounds.height};
@@ -469,14 +445,13 @@ namespace arrange::core {
             for (auto childId : node.children) {
                 const auto& child = tree.node(childId);
                 const auto alignment = alignModifier(child);
-                if (alignment == "Baseline" || (alignment.empty() && defaultAlign == "Baseline")) baseline = std::max(baseline, child.baseline);
+                if (alignment.value_or(defaultAlign) == LayoutAlignment::Baseline) baseline = std::max(baseline, child.baseline);
             }
             float cursor = x + arrangement.offset;
             for (auto childId : node.children) {
                 const auto& child = tree.node(childId);
-                const auto childAlign = alignModifier(child);
-                const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
-                const auto offset = alignment == "Baseline" && child.baseline >= 0 ? baseline - child.baseline : crossAxisOffset(height, child.bounds.height, alignment, false);
+                const auto alignment = alignModifier(child).value_or(defaultAlign);
+                const auto offset = alignment == LayoutAlignment::Baseline && child.baseline >= 0 ? baseline - child.baseline : alignOffset(height, child.bounds.height, alignment, false);
                 place(tree, childId, cursor, y + offset);
                 cursor += child.bounds.width + arrangement.spacing;
             }
@@ -489,8 +464,7 @@ namespace arrange::core {
             float cursor = y + arrangement.offset;
             for (auto childId : node.children) {
                 const auto& child = tree.node(childId);
-                const auto childAlign = alignModifier(child);
-                const auto offset = crossAxisOffset(width, child.bounds.width, childAlign.empty() ? defaultAlign : childAlign, true);
+                const auto offset = alignOffset(width, child.bounds.width, alignModifier(child).value_or(defaultAlign), true);
                 place(tree, childId, x + offset, cursor);
                 cursor += child.bounds.height + arrangement.spacing;
             }
@@ -501,9 +475,8 @@ namespace arrange::core {
             const auto defaultAlign = policy->contentAlignment;
             for (auto childId : node.children) {
                 const auto& child = tree.node(childId);
-                const auto childAlign = alignModifier(child);
-                const auto alignment = childAlign.empty() ? defaultAlign : childAlign;
-                place(tree, childId, x + crossAxisOffset(width, child.bounds.width, alignment, true), y + crossAxisOffset(height, child.bounds.height, alignment, false));
+                const auto alignment = alignModifier(child).value_or(defaultAlign);
+                place(tree, childId, x + alignOffset(width, child.bounds.width, alignment, true), y + alignOffset(height, child.bounds.height, alignment, false));
             }
             return;
         }

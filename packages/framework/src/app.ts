@@ -69,9 +69,9 @@ export function createApp(root: ArrangableDefinition, props: Data = {}): Arrange
 
             if (mountedTargets.has(target)) throw new Error('原生宿主已由另一个 App 占用')
 
-            if (target.runtimeVersion !== undefined && target.runtimeVersion !== ARRANGE_RUNTIME_VERSION) throw new Error('Arrange 脚本与原生协议版本不一致')
+            if (target.runtimeVersion !== ARRANGE_RUNTIME_VERSION) throw new Error('Arrange 脚本与原生协议版本不一致')
 
-            for (const name of ['installFrameDriver', 'currentTime', 'requestFrame', 'beginRearrange', 'submitRearrange', 'abortRearrange', 'createNode', 'deleteNode', 'insertChild', 'removeChild', 'registerBinding', 'updateBinding', 'releaseBinding', 'modifierInstances', 'registerModifierBinding', 'unmount'] as const) if (typeof target[name] !== 'function') throw new TypeError(`原生运行时缺少正式入口：${name}`)
+            for (const name of ['focusCommand', 'installFrameDriver', 'installLayoutDriver', 'continueRearrange', 'currentTime', 'requestFrame', 'beginRearrange', 'submitRearrange', 'abortRearrange', 'acquirePainter', 'releasePainter', 'createNode', 'deleteNode', 'insertChild', 'removeChild', 'registerBinding', 'updateBinding', 'releaseBinding', 'modifierInstances', 'registerModifierBinding', 'unmount', 'log', 'diagnosticsToast', 'diagnosticsRequestReload', 'diagnosticsTriggerFakeError', 'diagnosticsSetToastsEnabled'] as const) if (typeof target[name] !== 'function') throw new TypeError(`原生运行时缺少正式入口：${name}`)
 
             native = target
             mountedTargets.add(target)

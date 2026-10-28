@@ -137,7 +137,7 @@ namespace arrange::core {
                 else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
                     finite(input.weight);
                     if (input.kind == ParentDataKind::Weight && input.weight <= 0) throw std::invalid_argument("weight 必须为正数");
-                    if (input.kind == ParentDataKind::Align && !isImageAlignment(input.align) && input.align != "Baseline") throw std::invalid_argument("Arrange Modifier.align 不支持对齐值：'" + input.align + "'");
+                    if (input.kind == ParentDataKind::Align && !input.align) throw std::invalid_argument("Arrange Modifier.align 缺少对齐值");
                 }
             },
             value);

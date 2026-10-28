@@ -7,6 +7,7 @@ import { applyArrangableHmr } from '../../packages/framework/src/runtime/arranga
 import { createApp, type ArrangableDefinition } from '../../packages/framework/src/index.ts'
 import { requireSfaModule } from './sfaModules.ts'
 import { recordingNative, mountFrame, advanceFrames } from './recordingNative.ts'
+import { createFakeNative } from '../helpers/fakeNative.ts'
 
 test('同批 HMR 保存旧 accept 边界，dispose/data 在新模块执行前交接', async () => {
     const events: string[] = []
@@ -70,7 +71,7 @@ test('模块执行失败保留旧 accept 边界，下一次修复能够接收更
 test('HotRuntime 通过 Arrange Log 记录更新接收与应用', async () => {
     const previous = globalThis.__ARRANGE_NATIVE__
     const events: unknown[][] = []
-    globalThis.__ARRANGE_NATIVE__ = { log: (...args: unknown[]) => { events.push(args) } } as never
+    globalThis.__ARRANGE_NATIVE__ = createFakeNative({ log: (...args: unknown[]) => { events.push(args) } })
     try {
         const runtime = new HotRuntime({
             send() { }, reload() { }, report: error => { throw error },

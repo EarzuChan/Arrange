@@ -79,7 +79,7 @@ namespace {
         required.kind = LayoutModifierKind::RequiredWidth;
         required.value = 50;
         tree.setModifierChain(2, {{required}, size(20, 10)});
-        tree.mutableNode(1).measurePolicy = RowMeasurePolicy{{"Start", 5}};
+        tree.mutableNode(1).measurePolicy = RowMeasurePolicy{{Arrangement::Start, 5}};
         tree.mutableNode(1).measurementValid = false;
         layout.layout(tree, 1, {0, 40, 0, 100});
         check(tree.node(1).bounds.width == 40 && tree.node(2).bounds.width == 35 && tree.node(3).bounds.width == 0 && tree.node(2).contentBounds.width == 50, "有界 Row 的 gap 或 required 强制尺寸处理错误");
@@ -108,7 +108,7 @@ namespace {
         check(rejected, "matchParentSize 非 Box 使用未诊断");
         ParentDataModifierSemantics alignment;
         alignment.kind = ParentDataKind::Align;
-        alignment.align = "Start";
+        alignment.align = LayoutAlignment::Start;
         tree.setModifierChain(3, {{alignment}, size(20, 10)});
         rejected = false;
         try {
@@ -165,9 +165,9 @@ namespace {
         layout.layout(tree, 1, {0, Constraints::Infinity, 0, 200});
         check(tree.node(1).flowLines.size() == 2 && tree.node(1).bounds.width == 65, "无界 Flow 按数量换行或 weight 自然尺寸错误");
         policy.horizontal = false;
-        policy.mainArrangement = {"Top", 5};
-        policy.crossArrangement = {"Start", 7};
-        policy.itemAlignment = "Start";
+        policy.mainArrangement = {Arrangement::Start, 5};
+        policy.crossArrangement = {Arrangement::Start, 7};
+        policy.itemAlignment = LayoutAlignment::Start;
         tree.mutableNode(1).measurePolicy = policy;
         tree.mutableNode(1).measurementValid = false;
         tree.setModifierChain(2, {size(30, 10)});

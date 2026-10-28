@@ -11,39 +11,21 @@ const sizeRange: UnitFields = { minWidth: 'length', maxWidth: 'length', minHeigh
 const padding: UnitFields = { start: 'length', top: 'length', end: 'length', bottom: 'length', horizontal: 'length', vertical: 'length' }
 const graphics: UnitFields = { translationX: 'px', translationY: 'px' }
 
-// 描述字段的单位由这份契约定义，编译器和前端解析共同消费
-export const modifierUnitFields: Readonly<Record<string, UnitFields>> = {
-    width: { value: 'length' }, height: { value: 'length' }, size,
-    requiredWidth: { width: 'length' }, requiredHeight: { height: 'length' }, requiredSize: size,
-    widthIn: range, heightIn: range, sizeIn: sizeRange, defaultMinSize: sizeRange,
-    padding, offset, absoluteOffset: offset,
-    background: { brush, shape }, border: { width: 'length', brush, shape }, clip: { shape },
-    text: { style }, textField: { textStyle: style },
-    graphicsLayer: graphics, paint: { colorFilter: { tint: 'color' } },
-}
-
-// 调用参数与描述字段之间的映射，不按业务变量名猜单位
-export const modifierArgumentUnits: Readonly<Record<string, readonly (ValueUnit | UnitFields | undefined)[]>> = {
-    width: ['length'], height: ['length'], size: ['length', 'length'], requiredWidth: ['length'], requiredHeight: ['length'], requiredSize: ['length', 'length'],
-    widthIn: [range], heightIn: [range], sizeIn: [sizeRange], defaultMinSize: [sizeRange],
-    padding: [padding], offset: [offset], absoluteOffset: [offset],
-    background: [brush, shape], border: ['length', brush, shape], clip: [shape],
-    text: [undefined, { style }], textField: [undefined, { textStyle: style }],
-    graphicsLayer: [graphics], paint: [undefined, modifierUnitFields.paint],
-}
+// 单位形状由修饰 schema 与值契约共用
+export const unitShapes = { shape, brush, style, offset, size, range, sizeRange, padding, graphics } as const
 
 export const unitFieldContracts: Readonly<Record<string, UnitFields>> = {
     style, shape, brush, padding, offset, size, rect: { ...offset, ...size }, range, sizeRange, graphics,
-    border: modifierUnitFields.border,
-    text: modifierUnitFields.text,
-    textField: modifierUnitFields.textField,
-    paint: modifierUnitFields.paint,
+    border: { width: 'length', brush, shape },
+    text: { style },
+    textField: { textStyle: style },
+    paint: { colorFilter: { tint: 'color' } },
     arrangement: { space: 'length' },
     row: { horizontalArrangement: { space: 'length' } },
     column: { verticalArrangement: { space: 'length' } },
     flow: { horizontalArrangement: { space: 'length' }, verticalArrangement: { space: 'length' } },
-    scroll: { value: 'px', maxValue: 'px', viewportSize: 'px', contentSize: 'px' },
-    scrollOptions: { initial: 'px' },
+    scroll: { valuePx: 'px', maxValuePx: 'px', viewportSizePx: 'px', contentSizePx: 'px' },
+    scrollOptions: { initialPx: 'px' },
     pxSize: { width: 'px', height: 'px' },
     drawRect: { x: 'px', y: 'px', width: 'px', height: 'px' },
     drawPaint: { color: 'color', strokeWidth: 'px' },

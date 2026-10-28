@@ -3,7 +3,7 @@ import { nativeAnimationSpec, spring, type AnimationSpec } from "./animation/val
 import { IntrinsicSize, PaddingValues } from "./primitives.ts"
 import type { IntrinsicSizeValue } from "./primitives.ts"
 import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts"
-import type { ScrollState } from "./state.ts"
+import { scrollStateInternal, type ScrollState } from "./state.ts"
 import { painterSnapshot } from './painter.ts'
 import type { Painter } from './painter.ts'
 import type { ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
@@ -20,7 +20,6 @@ export type ModifierValue = Readonly<Record<string, unknown>>
 
 export type ModifierElement = Readonly<{ type: string, key?: string, value: ModifierValue }>
 
-export type ScrollStateLike = Pick<ScrollState, "value" | "maxValue" | "viewportSize" | "contentSize" | "__arrangeNativeScroll">
 export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
 export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
 export type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean; interactionState?: InteractionState }
@@ -287,12 +286,12 @@ export class Modifier {
     }
 
     // pointerInput 将来会在 native typed pointer event slot、派发、释放与测试齐全后再正规添加回来；当前故意不公开半支持 API
-    verticalScroll(state: ScrollStateLike, args: EnabledOptions = {}): Modifier {
-        return this.#add("verticalScroll", { state: scrollStateSnapshot(state), enabled: true, ...args })
+    verticalScroll(state: ScrollState, args: EnabledOptions = {}): Modifier {
+        return this.#add("verticalScroll", { ...scrollPayload(state), enabled: true, ...args })
     }
 
-    horizontalScroll(state: ScrollStateLike, args: EnabledOptions = {}): Modifier {
-        return this.#add("horizontalScroll", { state: scrollStateSnapshot(state), enabled: true, ...args })
+    horizontalScroll(state: ScrollState, args: EnabledOptions = {}): Modifier {
+        return this.#add("horizontalScroll", { ...scrollPayload(state), enabled: true, ...args })
     }
 
     // 交互状态：指针部分由原生 interaction 槽回写，焦点部分附带同节点焦点观察
@@ -333,11 +332,9 @@ export function toModifier(value: Modifier | null | undefined): Modifier {
 
 export const M = new Modifier()
 
-function scrollStateSnapshot(state: ScrollStateLike): Pick<ScrollStateLike, 'value' | '__arrangeNativeScroll'> {
-    return {
-        value: state.value ?? 0,
-        __arrangeNativeScroll: state.__arrangeNativeScroll,
-    }
+// 原生只见当前值与稳定的回写入口，状态对象本身不进入描述
+function scrollPayload(state: ScrollState): { value: number; onScroll: (payload: never) => void } {
+    return { value: state.valuePx, onScroll: scrollStateInternal(state).native }
 }
 
 export const modifierStats = { parameterEvaluations: 0, chainsAssembled: 0, instanceWrites: 0, chainWrites: 0, equalWritesSkipped: 0 }

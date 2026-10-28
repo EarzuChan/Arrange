@@ -6,7 +6,7 @@ import { defineArrangable, getArrangeExecutionStats } from '@arrange/framework/i
 import { Layout } from '@arrange/framework/foundation'
 import { M, MinSizeMeasurePolicy, createDensity } from '@arrange/framework/ui'
 import { DrawInstance, type DrawScope } from '../../packages/framework/src/draw.ts'
-import { UnitResolver } from '../../packages/framework/src/resolveUnits.ts'
+import { ModifierLowering } from '../../packages/framework/src/modifierLowering.ts'
 import { recordingNative } from './recordingNative.ts'
 import { evaluateSfa } from './sfaModules.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
@@ -58,7 +58,7 @@ test('同一声明交给不同受体时缓存独立，keyed 移动保留，移�
         return { onDrawBehind(draw) { draw.drawRect({ color: 0xff123456, width }) } }
     }).keyed('绘制')
     scope.run(() => {
-        const first = new UnitResolver(createDensity()), second = new UnitResolver(createDensity())
+        const first = new ModifierLowering(createDensity()), second = new ModifierLowering(createDensity())
         const a = first.modifier(declaration).elements[0].value.prepare as (width: number, height: number) => readonly Record<string, unknown>[]
         const b = second.modifier(declaration).elements[0].value.prepare as typeof a
         assert.notEqual(a, b)
@@ -78,7 +78,7 @@ test('同一声明交给不同受体时缓存独立，keyed 移动保留，移�
 test('无 key 绘制实例按完整 Modifier 链的原生顺序协调', () => {
     const scope = effectScope()
     scope.run(() => {
-        const units = new UnitResolver(createDensity())
+        const units = new ModifierLowering(createDensity())
         const drawing = M.drawBehind(scope => scope.drawRect({ color: 0xff112233 }))
         const before = units.modifier(drawing.background(0xff000000).then(drawing))
         const first = before.elements[0].value.prepare as (width: number, height: number) => readonly Record<string, unknown>[]

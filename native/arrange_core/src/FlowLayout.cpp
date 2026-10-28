@@ -21,34 +21,10 @@ namespace arrange::core {
             return horizontal ? Constraints{minMain, maxMain, 0, maxCross} : Constraints{0, maxCross, minMain, maxMain};
         }
 
-        struct ArrangementPlacement {
-            float offset = 0, spacing = 0;
-        };
-
         ArrangementPlacement arrange(float available, float used, std::size_t count, const AxisArrangement& arrangement) {
-            ArrangementPlacement result{0, arrangement.spacing};
-            const auto remaining = std::max(0.0f, available - used);
-            const auto& alignment = arrangement.alignment;
-            if (alignment == "Center" || alignment == "CenterHorizontally" || alignment == "CenterVertically")
-                result.offset = remaining / 2;
-            else if (alignment == "End" || alignment == "Bottom")
-                result.offset = remaining;
-            else if (alignment == "SpaceBetween" && count > 1)
-                result.spacing = remaining / (count - 1);
-            else if (alignment == "SpaceAround" && count) {
-                result.spacing = remaining / count;
-                result.offset = result.spacing / 2;
-            } else if (alignment == "SpaceEvenly" && count) {
-                result.spacing = remaining / (count + 1);
-                result.offset = result.spacing;
-            }
+            auto result = distribute(arrangement.arrangement, std::max(0.0f, available - used), count);
+            result.spacing += arrangement.spacing;
             return result;
-        }
-
-        float align(float parent, float child, const std::string& alignment) {
-            if (alignment == "Center" || alignment == "CenterHorizontally" || alignment == "CenterVertically") return (parent - child) / 2;
-            if (alignment == "End" || alignment == "Bottom") return parent - child;
-            return 0;
         }
     }
 
@@ -121,8 +97,8 @@ namespace arrange::core {
             float mainCursor = placement.offset;
             for (auto childId : line) {
                 const auto& child = tree.node(childId);
-                const auto ownAlignment = child.modifier.parentData().align;
-                const auto crossOffset = crossCursor + align(lineCross[lineIndex], crossSize(measuredSize(child), horizontal), ownAlignment.empty() ? policy.itemAlignment : ownAlignment);
+                const auto alignment = child.modifier.parentData().align.value_or(policy.itemAlignment);
+                const auto crossOffset = crossCursor + alignOffset(lineCross[lineIndex], crossSize(measuredSize(child), horizontal), alignment, !horizontal);
                 place(tree, childId, x + (horizontal ? mainCursor : crossOffset), y + (horizontal ? crossOffset : mainCursor));
                 mainCursor += mainSize(measuredSize(child), horizontal) + placement.spacing;
             }

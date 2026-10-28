@@ -29,23 +29,23 @@ export function createFocusRequester(): FocusRequester {
     const requester = Object.freeze({
         requestFocus(): boolean {
             if (!alive) return false
-            return (captured ?? currentNative())?.focusCommand?.('request', identity) ?? false
+            return (captured ?? currentNative())?.focusCommand('request', identity) ?? false
         }
     })
     requesters.set(requester, identity)
     if (getCurrentScope()) onScopeDispose(() => {
         alive = false;
-        (captured ?? currentNative())?.focusCommand?.('cancel', identity)
+        (captured ?? currentNative())?.focusCommand('cancel', identity)
     })
     return requester
 }
 export function createNativeFocusManager(native: NativeTransactionTarget): { manager: FocusManager; dispose(): void } {
     let alive = true
     const manager: FocusManager = Object.freeze({
-        clearFocus() { if (alive) native.focusCommand?.('clear', 0) },
+        clearFocus() { if (alive) native.focusCommand('clear', 0) },
         moveFocus(direction: FocusDirection) {
             if (!['next', 'previous', 'up', 'down', 'left', 'right'].includes(direction)) throw new TypeError('焦点方向无效')
-            return alive && (native.focusCommand?.('move', 0, direction) ?? false)
+            return alive && native.focusCommand('move', 0, direction)
         },
     })
     return { manager, dispose() { alive = false } }

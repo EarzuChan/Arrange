@@ -1,23 +1,27 @@
-import { unitFieldContracts, type UnitFields } from '@arrange/shared'
+import { modifierUnitFields, unitFieldContracts, type UnitFields } from '@arrange/shared'
 import type { Density } from './density.ts'
 import type { Modifier, ModifierElement } from './modifier.ts'
 import type { MeasurePolicy } from './measurePolicy.ts'
 import type { ArrangementProp } from './native.ts'
 import { DrawInstance, type DrawDeclaration } from './draw.ts'
-import { dragStateInternal, type DragModifiers } from './gesture.ts'
+import { EventAdapters } from './eventAdapters.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
 
 export interface PxModifier {
     readonly elements: readonly ModifierElement[]
 }
 
-// 每个 Layout 在这里把 SFA/TS 的双通道长度表达式求成 native 使用的 PX 数字
-export class UnitResolver {
+// 每个 Layout 的修饰降解：按修饰 schema 把双通道长度与 SP 求成原生 PX，并管理绘制实例的事务生命；回调载荷适配交给 EventAdapters
+export class ModifierLowering {
     private previous: PxModifier | undefined
     private policy: MeasurePolicy | undefined
     private draws: readonly { index: number; instance: DrawInstance }[] = []
 
-    constructor(private readonly density: Density, private readonly owner?: ArrangableInstance) { }
+    private readonly events: EventAdapters
+
+    constructor(private readonly density: Density, private readonly owner?: ArrangableInstance) {
+        this.events = new EventAdapters(density)
+    }
 
     modifier(declaration: Modifier): PxModifier {
         const previousDraws = this.draws
@@ -106,125 +110,28 @@ export class UnitResolver {
         return this.policy = value
     }
 
-    // 原生指针事件为受体本地 PX；按回调缓存包装，避免每次重排都换掉事件槽
-    private readonly pointerCallbacks = new WeakMap<object, (event: { type?: string; x: number; y: number; modifiers: unknown }) => unknown>()
-
-    private pointerCallback(callback: unknown): unknown {
-        if (typeof callback !== 'function') return callback
-        let wrapped = this.pointerCallbacks.get(callback)
-        if (!wrapped) {
-            // pointerInput 事件另带 type
-            wrapped = event => callback(Object.freeze({ ...'type' in event ? { type: event.type } : {}, xDp: this.density.pxToDp(event.x), yDp: this.density.pxToDp(event.y), modifiers: Object.freeze(event.modifiers) }))
-            this.pointerCallbacks.set(callback, wrapped)
-        }
-        return wrapped
-    }
-
-    // 每个手势状态一组稳定的原生回调，回调内读取最新声明，事件槽因此不随重排更换
-    private readonly drags = new WeakMap<object, { input: Readonly<Record<string, unknown>>; native: Readonly<Record<string, (event: never) => void>> }>()
-
-    private resolveDraggable(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-        const state = input.state as object
-        let entry = this.drags.get(state)
-        if (!entry) {
-            const internal = dragStateInternal(state)
-            const dp = (value: number) => this.density.pxToDp(value)
-            const created: { input: Readonly<Record<string, unknown>>; native: Readonly<Record<string, (event: never) => void>> } = {
-                input,
-                native: Object.freeze({
-                    onDelta: (event: { deltaX: number; deltaY: number; modifiers: DragModifiers }) => {
-                        const orientation = created.input.orientation
-                        internal.delta(dp(orientation === 'vertical' ? event.deltaY : event.deltaX), orientation === 'both' ? dp(event.deltaY) : 0, Object.freeze(event.modifiers))
-                    },
-                    onStart: (event: { x: number; y: number; width: number; height: number; modifiers: DragModifiers }) => {
-                        internal.setDragging(true)
-                        const callback = created.input.onDragStarted as ((start: unknown) => void) | undefined
-                        callback?.(Object.freeze({ xDp: dp(event.x), yDp: dp(event.y), widthDp: dp(event.width), heightDp: dp(event.height), modifiers: Object.freeze(event.modifiers) }))
-                    },
-                    onStop: (event: { velocity: number; cancelled: boolean }) => {
-                        internal.setDragging(false)
-                        const callback = created.input.onDragStopped as ((stop: unknown) => void) | undefined
-                        callback?.(Object.freeze({ velocityDp: dp(event.velocity), cancelled: event.cancelled }))
-                    },
-                }),
-            }
-            entry = created
-            this.drags.set(state, entry)
-        }
-        entry.input = input
-        const resolved: Record<string, unknown> = { enabled: input.enabled ?? true, axis: input.orientation, startImmediately: input.startImmediately ?? false, pointerLock: input.pointerLock ?? false, ...entry.native }
-        if (input.interaction) resolved.interaction = input.interaction
-        return resolved
-    }
-
-    private readonly wheelCallbacks = new WeakMap<object, (event: { deltaX: number; deltaY: number; modifiers: unknown }) => unknown>()
-
-    private wheelCallback(callback: unknown): unknown {
-        if (typeof callback !== 'function') return callback
-        let wrapped = this.wheelCallbacks.get(callback)
-        if (!wrapped) {
-            wrapped = event => callback(Object.freeze({ deltaXDp: this.density.pxToDp(event.deltaX), deltaYDp: this.density.pxToDp(event.deltaY), modifiers: Object.freeze(event.modifiers) }))
-            this.wheelCallbacks.set(callback, wrapped)
-        }
-        return wrapped
-    }
-
     private resolveModifierValue(type: string, input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-        let value = input
-
-        if (type === 'width' || type === 'height') value = replaceLength(value, 'value', this.resolveLength(value.valueDp, value.valuePx))
-        else if (type === 'requiredWidth') value = replaceLength(value, 'width', this.resolveLength(value.widthDp, value.widthPx))
-        else if (type === 'requiredHeight') value = replaceLength(value, 'height', this.resolveLength(value.heightDp, value.heightPx))
-        else if (type === 'size' || type === 'requiredSize') value = replaceLengths(value, [
-            ['width', 'widthDp', 'widthPx'],
-            ['height', 'heightDp', 'heightPx'],
-        ], this.density)
-        else if (type === 'widthIn' || type === 'heightIn') value = replaceLengths(value, [
-            ['min', 'minDp', 'minPx'],
-            ['max', 'maxDp', 'maxPx'],
-        ], this.density)
-        else if (type === 'sizeIn') value = replaceLengths(value, [
-            ['minWidth', 'minWidthDp', 'minWidthPx'],
-            ['maxWidth', 'maxWidthDp', 'maxWidthPx'],
-            ['minHeight', 'minHeightDp', 'minHeightPx'],
-            ['maxHeight', 'maxHeightDp', 'maxHeightPx'],
-        ], this.density)
-        else if (type === 'defaultMinSize') value = replaceLengths(value, [
-            ['minWidth', 'minWidthDp', 'minWidthPx'],
-            ['minHeight', 'minHeightDp', 'minHeightPx'],
-        ], this.density)
-        else if (type === 'padding') value = replaceLengths(value, [
-            ['start', 'startDp', 'startPx'],
-            ['top', 'topDp', 'topPx'],
-            ['end', 'endDp', 'endPx'],
-            ['bottom', 'bottomDp', 'bottomPx'],
-        ], this.density)
-        else if (type === 'offset' || type === 'absoluteOffset') value = replaceLengths(value, [
-            ['x', 'xDp', 'xPx'],
-            ['y', 'yDp', 'yPx'],
-        ], this.density)
-        else if (type === 'border') value = replaceLength(value, 'width', this.resolveLength(value.widthDp, value.widthPx))
-        else if (type === 'onContextClick') value = { ...value, callback: this.pointerCallback(value.callback) }
-        else if (type === 'draggable') value = this.resolveDraggable(value)
-        else if (type === 'onWheel') value = { ...value, callback: this.wheelCallback(value.callback) }
-        else if (type === 'pointerInput') value = { ...value, callback: this.pointerCallback(value.callback) }
-
-        if (value.shape && typeof value.shape === 'object') value = { ...value, shape: resolveShape(value.shape as Readonly<Record<string, unknown>>, this) }
-        value = this.resolveFixedFields(type, value)
-        return value
+        const units = Object.hasOwn(modifierUnitFields, type) ? modifierUnitFields[type] : undefined
+        return this.events.adapt(type, units ? this.lower(input, units) : input)
     }
 
-    private resolveFixedFields(type: string, input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-        const schema = fixedSchema(type)
-        return schema ? this.fields(input, schema) : input
-    }
-
-    private fields<T extends Readonly<Record<string, unknown>>>(input: T, schema: UnitFields): T {
+    // length 字段由 xxxDp / xxxPx 双通道合成 PX，sp 换算为 PX，其余单位原样；未变化时保留原对象
+    private lower<T extends Readonly<Record<string, unknown>>>(input: T, units: UnitFields): T {
         let result: Record<string, unknown> | undefined
-        for (const [name, unit] of Object.entries(schema)) {
+        for (const [name, unit] of Object.entries(units)) {
+            if (unit === 'length') {
+                const dp = input[`${name}Dp`]
+                const px = input[`${name}Px`]
+                if (dp === undefined && px === undefined) continue
+                result ??= { ...input }
+                delete result[`${name}Dp`]
+                delete result[`${name}Px`]
+                result[name] = this.resolveLength(dp, px)
+                continue
+            }
             const value = input[name]
             if (value === undefined) continue
-            const next = unit === 'sp' ? this.density.spToPx(value as number) : typeof unit === 'object' && value !== null && typeof value === 'object' ? this.fields(value as Record<string, unknown>, unit) : value
+            const next = unit === 'sp' ? this.density.spToPx(value as number) : typeof unit === 'object' && value !== null && typeof value === 'object' ? this.lower(value as Record<string, unknown>, unit) : value
             if (next !== value) (result ??= { ...input })[name] = next
         }
         return result ? Object.freeze(result) as T : input
@@ -259,38 +166,6 @@ export class UnitResolver {
         delete (resolved as { spacePx?: number }).spacePx
         return Object.freeze({ ...declaration, [name]: Object.freeze(resolved) }) as T
     }
-}
-
-function resolveShape(shape: Readonly<Record<string, unknown>>, resolver: UnitResolver): Readonly<Record<string, unknown>> {
-    if (shape.type !== 'rounded') return shape
-    return replaceLength(shape, 'radius', resolver.resolveLength(shape.radiusDp, shape.radiusPx))
-}
-
-function fixedSchema(type: string): UnitFields | undefined {
-    if (type === 'text') return { style: unitFieldContracts.style }
-    if (type === 'textField') return { textStyle: unitFieldContracts.style }
-    if (type === 'background' || type === 'border' || type === 'clip') return { shape: unitFieldContracts.shape }
-    if (type === 'paint') return { colorFilter: { tint: 'color' } }
-    return undefined
-}
-
-function replaceLength(input: Readonly<Record<string, unknown>>, name: string, value: number): Readonly<Record<string, unknown>> {
-    const keys = Object.keys(input).filter(key => key !== `${name}Dp` && key !== `${name}Px`)
-    const result: Record<string, unknown> = {}
-    for (const key of keys) result[key] = input[key]
-    result[name] = value
-    return Object.freeze(result)
-}
-
-function replaceLengths(input: Readonly<Record<string, unknown>>, fields: readonly (readonly [string, string, string])[], density: Density): Readonly<Record<string, unknown>> {
-    const removed = new Set(fields.flatMap(([, dp, px]) => [dp, px]))
-    const result: Record<string, unknown> = {}
-    for (const [name, dp, px] of fields) {
-        if (input[dp] === undefined && input[px] === undefined) continue
-        result[name] = density.dpToPx(input[dp] === undefined ? 0 : finite(input[dp], 'DP')) + (input[px] === undefined ? 0 : finite(input[px], 'PX'))
-    }
-    for (const key of Object.keys(input)) if (!removed.has(key)) result[key] = input[key]
-    return Object.freeze(result)
 }
 
 function finite(value: unknown, unit: string): number {

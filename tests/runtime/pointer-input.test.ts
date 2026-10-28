@@ -2,13 +2,13 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { M, createDensity } from '@arrange/framework/ui'
 import type { ContextClickEvent } from '@arrange/framework/ui'
-import { UnitResolver } from '../../packages/framework/src/resolveUnits.ts'
+import { ModifierLowering } from '../../packages/framework/src/modifierLowering.ts'
 import { createDraggableState, createDraggable2DState, createInteractionState } from '../../packages/framework/src/index.ts'
 
 const fire = (callback: unknown, event: unknown) => (callback as (event: unknown) => void)(event)
 
 test('onContextClick 把原生 PX 坐标换算为 dp，且包装回调在重排间保持同一身份', () => {
-    const units = new UnitResolver(createDensity(2))
+    const units = new ModifierLowering(createDensity(2))
     const events: ContextClickEvent[] = []
     const callback = (event: ContextClickEvent) => { events.push(event) }
     const first = units.modifier(M.onContextClick(callback).pointerIcon('hand'))
@@ -29,7 +29,7 @@ test('hoverable 与 clickable 的可选回调只在提供时进入描述', () =>
 })
 
 test('draggable 把原生 PX 位移换算为所选轴的 dp，并维护 isDragging', () => {
-    const units = new UnitResolver(createDensity(2))
+    const units = new ModifierLowering(createDensity(2))
     const deltas: number[] = []
     const starts: unknown[] = []
     const stops: unknown[] = []
@@ -51,7 +51,7 @@ test('draggable 把原生 PX 位移换算为所选轴的 dp，并维护 isDraggi
 })
 
 test('draggable2D 交付二维 dp 位移，单轴与二维状态不能混用', () => {
-    const units = new UnitResolver(createDensity(2))
+    const units = new ModifierLowering(createDensity(2))
     const deltas: unknown[] = []
     const state = createDraggable2DState(delta => { deltas.push(delta) })
     const native = units.modifier(M.draggable2D(state)).elements[0].value
@@ -82,7 +82,7 @@ test('semantics 原样声明角色、文本与增减动作', () => {
 })
 
 test('pointerInput 把原生 PX 坐标换算为 dp 并保留事件类型', () => {
-    const units = new UnitResolver(createDensity(2))
+    const units = new ModifierLowering(createDensity(2))
     const events: unknown[] = []
     const callback = (event: unknown) => { events.push(event) }
     const [element] = units.modifier(M.pointerInput(callback)).elements

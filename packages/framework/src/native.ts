@@ -1,4 +1,4 @@
-import type { PxModifier } from './resolveUnits.ts'
+import type { PxModifier } from './modifierLowering.ts'
 import type { Modifier, ModifierElement } from "./modifier.ts"
 import type { ArrangementName, AxisAlignment, HorizontalAlignment, VerticalAlignment } from "./primitives.ts"
 import { ARRANGE_PROTOCOL_VERSION } from "./version.ts"
@@ -11,20 +11,6 @@ export type NativeEventCallback = (...args: unknown[]) => unknown
 export type NativeReloadPayload = {
     path?: string
     timestamp?: number
-}
-
-export type NativeDiagnosticPayload = {
-    tag?: string
-    message?: string
-    detail?: string
-}
-
-export type NativeToastPayload = {
-    level: string
-    tag: string
-    title: string
-    args: string[]
-    coalesce: boolean
 }
 
 export type TextStyleProp = Readonly<{
@@ -112,34 +98,35 @@ export type NativeInterop = {
     invoke: (name: string, args: NativeInteropValue) => number
 }
 
+// 真实宿主（QuickJsNativeApi）必然提供的成员均为必选；interop 只在宿主连接 Interop 时出现
 export type NativeTransactionTarget = {
-    focusCommand?: (operation: 'request' | 'clear' | 'move' | 'cancel', requester: number, direction?: import('./focus.ts').FocusDirection) => boolean
+    focusCommand: (operation: 'request' | 'clear' | 'move' | 'cancel', requester: number, direction?: import('./focus.ts').FocusDirection) => boolean
     installFrameDriver: (prepare: (time: number) => void, complete: (success: boolean) => void, dispose: () => void) => void
-    installLayoutDriver?: (materialize: (id: NodeId, indices: readonly number[]) => void) => void
-    continueRearrange?: () => void
+    installLayoutDriver: (materialize: (id: NodeId, indices: readonly number[]) => void) => void
+    continueRearrange: () => void
     currentTime: () => number
     requestFrame: (pending: boolean) => void
     beginRearrange: () => void
     submitRearrange: (complete: (error?: string) => void) => void
     abortRearrange: () => void
-    acquirePainter?: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
-    releasePainter?: (handle: NativeBindingHandle) => void
+    acquirePainter: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
+    releasePainter: (handle: NativeBindingHandle) => void
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
     updateBinding: (handle: NativeBindingHandle, value: NativePropValue | import('./measurePolicy.ts').MeasurePolicy | PxModifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void
     modifierInstances: (id: NodeId) => readonly NativeModifierHandle[]
     registerModifierBinding: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle
-    runtimeVersion?: number
+    runtimeVersion: number
     createNode: (id: NodeId, type: string) => void
     deleteNode: (id: NodeId) => void
     insertChild: (parent: NodeId, child: NodeId, index: number) => void
     removeChild: (parent: NodeId, child: NodeId) => void
     unmount: () => void
-    log?: (level: string, tag: string, args: string[]) => void
-    diagnosticsToast?: (payload: NativeToastPayload) => void
-    diagnosticsRequestReload?: (payload?: NativeReloadPayload) => void
-    diagnosticsTriggerFakeError?: (payload?: { message?: string }) => void
-    diagnosticsSetToastsEnabled?: (enabled: boolean) => void
+    log: (level: string, tag: string, args: string[]) => void
+    diagnosticsToast: (level: string, tag: string, title: string, args: string[], coalesce: boolean) => void
+    diagnosticsRequestReload: (payload?: NativeReloadPayload) => void
+    diagnosticsTriggerFakeError: (payload?: { message?: string }) => void
+    diagnosticsSetToastsEnabled: (enabled: boolean) => void
     interop?: NativeInterop
 }
 

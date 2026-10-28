@@ -368,16 +368,16 @@ AnimatedRef 为只读值，附带 isRunning、label 和 stop；DP、颜色及字
 # 状态 helper
 
 ```ts
-createScrollState(args?: {initial?: number}): ScrollState
-createLazyState(args?: {firstVisibleItemIndex?: number; firstVisibleItemScrollOffset?: number}): LazyState
+createScrollState(args?: {initialPx?: number}): ScrollState
+createLazyState(args?: {firstVisibleItemIndex?: number; firstVisibleItemScrollOffsetPx?: number}): LazyState
 createLazyListState: typeof createLazyState
 createLazyGridState: typeof createLazyState
 interface LazyState extends ScrollState {
-    firstVisibleItemIndex: number
-    firstVisibleItemScrollOffset: number
-    layoutInfo: LazyLayoutInfo
-    scrollToItem(index: number, scrollOffset?: number): void
-    animateScrollToItem(index: number, scrollOffset?: number, animationSpec?: AnimationSpec): Promise<void>
+    readonly firstVisibleItemIndex: number
+    readonly firstVisibleItemScrollOffsetPx: number
+    readonly layoutInfo: LazyLayoutInfo
+    scrollToItem(index: number, scrollOffsetPx?: number): void
+    animateScrollToItem(index: number, scrollOffsetPx?: number, animationSpec?: AnimationSpec): Promise<void>
 }
 ```
 
@@ -421,7 +421,7 @@ interface ValueDragState extends Required<Omit<ValueDragOptions, 'value' | 'step
 adjustable(state: ValueDragState, args?: { pointerLock?: boolean; startImmediately?: boolean; valueText?: string; enabled?: boolean; interactionState?: InteractionState }): Modifier
 ```
 
-在 setup 中创建一次即可。ScrollState 提供响应式 value、maxValue、viewportSize、contentSize、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(value)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。LazyState 的索引、可见项与缓存语义归属 [内建 Arrangable](12-内建Arrangable.md)。
+在 setup 中创建一次即可。ScrollState 提供只读的响应式 valuePx、maxValuePx、viewportSizePx、contentSizePx、isScrollInProgress、canScrollBackward、canScrollForward，以及 scrollTo(valuePx)。把对象交给 verticalScroll 后，原生滚动回执同步这些属性。所有 `createXxxState()` 返回冻结对象，对外只有 getter 与方法（ValueDragState 的配置项另有带校验的 setter），框架内部通道经模块私有的 WeakMap 取得，公开类型上不出现内部钩子。LazyState 的索引、可见项与缓存语义归属 [内建 Arrangable](12-内建Arrangable.md)。
 
 # Interop API
 
