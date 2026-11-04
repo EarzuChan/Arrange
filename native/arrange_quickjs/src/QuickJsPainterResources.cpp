@@ -5,6 +5,7 @@
 #include "QuickJsRuntimeContext.h"
 #include "QuickJsValueReader.h"
 #include <arrange/core/SlotUpdate.h>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -109,6 +110,25 @@ namespace arrange::quickjs {
         Resource resource;
         resource.snapshot.identity = arrange::core::allocateRuntimeIdentity();
         resource.snapshot.generation = arrange::core::allocateRuntimeIdentity();
+        resource.location = location;
+        if (auto content = owner.cached(location)) {
+            // 已解码的内容直接就绪，随句柄同步交给 JS
+            resource.snapshot.content = std::move(content);
+            resource.snapshot.contentVersion = 1;
+            const auto handle = resource.snapshot;
+            owner.resources_.emplace(handle.identity, std::move(resource));
+            const auto result = JS_NewObject(context);
+            JS_SetPropertyStr(context, result, "identity", JS_NewBigUint64(context, handle.identity));
+            JS_SetPropertyStr(context, result, "generation", JS_NewBigUint64(context, handle.generation));
+            const auto ready = JS_NewObject(context);
+            JS_SetPropertyStr(context, ready, "contentVersion", JS_NewFloat64(context, 1));
+            if (handle.content->intrinsicSize) {
+                JS_SetPropertyStr(context, ready, "width", JS_NewFloat64(context, handle.content->intrinsicSize->width));
+                JS_SetPropertyStr(context, ready, "height", JS_NewFloat64(context, handle.content->intrinsicSize->height));
+            }
+            JS_SetPropertyStr(context, result, "ready", ready);
+            return result;
+        }
         try {
             resource.pending = owner.loader_(location, static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(context))->wakeOwner);
         } catch (const std::exception& error) {
@@ -138,6 +158,20 @@ namespace arrange::quickjs {
         return JS_UNDEFINED;
     }
 
+    std::shared_ptr<const arrange::core::PainterContent> QuickJsPainterResources::cached(const std::string& location) {
+        const auto found = std::find_if(recent_.begin(), recent_.end(), [&](const auto& item) { return item.first == location; });
+        if (found == recent_.end()) return nullptr;
+        recent_.splice(recent_.begin(), recent_, found);
+        return recent_.front().second;
+    }
+
+    void QuickJsPainterResources::remember(const std::string& location, std::shared_ptr<const arrange::core::PainterContent> content) {
+        if (location.empty() || !content) return;
+        std::erase_if(recent_, [&](const auto& item) { return item.first == location; });
+        recent_.emplace_front(location, std::move(content));
+        if (recent_.size() > cachedContentLimit) recent_.pop_back();
+    }
+
     bool QuickJsPainterResources::hasPending() const {
         for (const auto& [_, resource] : resources_)
             if (resource.pending.valid()) return true;
@@ -161,7 +195,10 @@ namespace arrange::quickjs {
                 loaded.error = error.what();
             }
             if (!loaded.content && loaded.error.empty()) loaded.error = "Painter 加载器未返回绘制内容";
-            if (loaded.error.empty()) resource.snapshot.content = std::move(loaded.content);
+            if (loaded.error.empty()) {
+                remember(resource.location, loaded.content);
+                resource.snapshot.content = std::move(loaded.content);
+            }
             ++resource.snapshot.contentVersion;
             ScopedValue completion(context_, JS_NewObject(context_));
             JS_SetPropertyStr(context_, completion.get(), "contentVersion", JS_NewFloat64(context_, static_cast<double>(resource.snapshot.contentVersion)));

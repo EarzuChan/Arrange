@@ -220,29 +220,52 @@ namespace arrange::core {
     }
 
     std::vector<std::size_t> matchModifierDescriptors(std::span<const ModifierDescriptor* const> previous, const ModifierDescriptors& next) {
-        // key 允许移动，无 key 按类型及相对次序匹配；FFI 回调和原生实例使用同一规则
+        // key 允许移动；无 key 元素按类型求最长公共子序列，插入或移除其它元素不会让后续元素错配重建
+        // FFI 回调和原生实例使用同一规则
+        std::vector<std::size_t> matches(next.size(), previous.size());
         std::unordered_map<std::string, std::size_t> keyed;
         for (std::size_t i = 0; i < previous.size(); ++i)
             if (!previous[i]->key.empty()) keyed.emplace(previous[i]->key, i);
-        std::vector<bool> used(previous.size(), false);
-        std::vector<std::size_t> matches;
-        matches.reserve(next.size());
-        std::size_t cursor = 0;
-        for (const auto& descriptor : next) {
-            auto match = previous.size();
-            if (!descriptor.key.empty()) {
-                if (auto found = keyed.find(descriptor.key); found != keyed.end() && !used[found->second] && sameModifierKind(previous[found->second]->value, descriptor.value)) match = found->second;
-            } else {
-                for (auto i = cursor; i < previous.size(); ++i) {
-                    if (!used[i] && previous[i]->key.empty() && sameModifierKind(previous[i]->value, descriptor.value)) {
-                        match = i;
-                        cursor = i + 1;
-                        break;
-                    }
-                }
+        std::vector<std::size_t> before;
+        std::vector<std::size_t> after;
+        for (std::size_t i = 0; i < previous.size(); ++i)
+            if (previous[i]->key.empty()) before.push_back(i);
+        for (std::size_t j = 0; j < next.size(); ++j) {
+            if (next[j].key.empty()) {
+                after.push_back(j);
+            } else if (auto found = keyed.find(next[j].key); found != keyed.end() && sameModifierKind(previous[found->second]->value, next[j].value)) {
+                matches[j] = found->second;
             }
-            if (match < previous.size()) used[match] = true;
-            matches.push_back(match);
+        }
+        const auto same = [&](std::size_t i, std::size_t j) {
+            return sameModifierKind(previous[before[i]]->value, next[after[j]].value);
+        };
+        // 常见情形是形状不变，逐位同类直接对应
+        if (before.size() == after.size()) {
+            auto aligned = true;
+            for (std::size_t k = 0; aligned && k < before.size(); ++k) aligned = same(k, k);
+            if (aligned) {
+                for (std::size_t k = 0; k < before.size(); ++k) matches[after[k]] = before[k];
+                return matches;
+            }
+        }
+        // 后缀表：lengths[i][j] 为 before[i..] 与 after[j..] 的最长同类子序列长度
+        const auto width = after.size() + 1;
+        std::vector<std::uint32_t> lengths((before.size() + 1) * width, 0);
+        for (auto i = before.size(); i-- > 0;)
+            for (auto j = after.size(); j-- > 0;) lengths[i * width + j] = same(i, j) ? lengths[(i + 1) * width + j + 1] + 1 : std::max(lengths[(i + 1) * width + j], lengths[i * width + j + 1]);
+        std::size_t i = 0;
+        std::size_t j = 0;
+        while (i < before.size() && j < after.size()) {
+            if (same(i, j) && lengths[i * width + j] == lengths[(i + 1) * width + j + 1] + 1) {
+                matches[after[j]] = before[i];
+                ++i;
+                ++j;
+            } else if (lengths[i * width + j + 1] >= lengths[(i + 1) * width + j]) {
+                ++j;
+            } else {
+                ++i;
+            }
         }
         return matches;
     }

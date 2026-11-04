@@ -6,6 +6,7 @@
 #include <arrange/Log.h>
 #include <arrange/core/Interop.h>
 #include <arrange/core/DiagnosticsOverlay.h>
+#include <arrange/core/WheelSmoother.h>
 #include "App.h"
 #include "EditorFrameClock.h"
 
@@ -146,6 +147,8 @@ namespace arrange::juce {
         std::unique_ptr<WindowsPrecisionWheelSource> precisionWheelSource_;
 #endif
         EditorFrameClock frameClock_;
+        // 普通鼠标滚轮按帧分发成连续位移
+        arrange::core::WheelSmoother wheelSmoother_;
         EditorShellDriver shell_;
     };
 

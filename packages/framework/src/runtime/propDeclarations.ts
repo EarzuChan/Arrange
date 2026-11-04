@@ -2,6 +2,7 @@ import { EMPTY_OBJ, arrangeParameterName, hasOwn, isArray, isFunction, isObject 
 import type { ArrangablePropsOptions, NormalizedProps } from './arrangableProps.ts'
 import type { ArrangableDefinition } from './arrangable.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
+import { sameHotArrangable } from './arrangableHmr.ts'
 
 const declarationsCache = new WeakMap<object, NormalizedProps>()
 
@@ -55,6 +56,16 @@ export function prepareParameters(definition: ArrangableDefinition, names: reado
     return plan
 }
 
-export function checkParameterPlan(plan: ParameterPlan, definition: ArrangableDefinition): void {
-    if (!parameterPlans.has(plan) || plan.definition !== definition) throw new TypeError('参数位置计划不属于当前 Arrangable 定义')
+const hotPlans = new WeakMap<ParameterPlan, ParameterPlan>()
+
+// 父级在 setup 中按导入时的定义预备计划；子组件热更新后实例可能仍沿用同一 SFA 的另一版本定义，此时按实例定义重建并缓存
+export function resolveParameterPlan(plan: ParameterPlan, definition: ArrangableDefinition, source?: string): ParameterPlan {
+    if (!parameterPlans.has(plan)) throw new TypeError('参数位置计划不属于当前 Arrangable 定义')
+    if (plan.definition === definition) return plan
+    if (!sameHotArrangable(plan.definition, definition)) throw new TypeError('参数位置计划不属于当前 Arrangable 定义')
+    const cached = hotPlans.get(plan)
+    if (cached?.definition === definition) return cached
+    const rebuilt = prepareParameters(definition, plan.names, [], source)
+    hotPlans.set(plan, rebuilt)
+    return rebuilt
 }

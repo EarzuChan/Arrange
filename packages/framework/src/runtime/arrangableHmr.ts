@@ -62,6 +62,12 @@ export function resolveHotArrangable(definition: ArrangableDefinition): Arrangab
     return definitions.get(definition)?.identity ?? definition
 }
 
+// 两个定义是否为同一 SFA 的不同热更新版本
+export function sameHotArrangable(left: ArrangableDefinition, right: ArrangableDefinition): boolean {
+    const record = definitions.get(left)
+    return record !== undefined && record === definitions.get(right)
+}
+
 export function inheritHotState(instance: ArrangableInstance, previous?: ArrangableInstance): void {
     const record = definitions.get(instance.type)
     if (!record || !previous || definitions.get(previous.type) !== record) return

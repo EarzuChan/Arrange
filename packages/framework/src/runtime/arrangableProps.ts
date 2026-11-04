@@ -1,7 +1,7 @@
 import { batchUpdates, isRef, isReadonly, shallowReadonly, shallowRef, pauseTracking, resetTracking, type ShallowRef } from '@arrange/reactivity'
 import { type IfAny, hasOwn, isArray } from '@arrange/shared'
 import type { ArrangableInstance, CallMetadata, Data } from './arrangable.ts'
-import { checkParameterPlan, normalizeDeclaredProps, prepareParameters } from './propDeclarations.ts'
+import { normalizeDeclaredProps, prepareParameters, resolveParameterPlan } from './propDeclarations.ts'
 import { arrangeExecutionStats } from './executionStats.ts'
 import { ValueBinding } from './valueBinding.ts'
 import { queueJob, SchedulerJobFlags, type SchedulerJob } from './scheduler.ts'
@@ -191,12 +191,12 @@ export class PropStore {
     }
 
     update(inputs: Record<string, PropGetter<unknown>>, metadata: CallMetadata = {}): void {
-        if (metadata.parameters) checkParameterPlan(metadata.parameters, this.owner.type)
+        const prepared = metadata.parameters ? resolveParameterPlan(metadata.parameters, this.owner.type, metadata.source) : undefined
         if (inputs === this.inputs && Object.isFrozen(inputs)) {
             this.refreshDirty()
             return
         }
-        const plan = metadata.parameters ?? prepareParameters(this.owner.type, Object.keys(inputs), [], metadata.source)
+        const plan = prepared ?? prepareParameters(this.owner.type, Object.keys(inputs), [], metadata.source)
         const entries = Object.entries(inputs)
         if (entries.length !== plan.names.length) throw new TypeError('参数组与声明位置计划不一致')
         const getters = entries.map(([name, getter], index) => {

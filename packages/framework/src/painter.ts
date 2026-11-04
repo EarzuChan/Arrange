@@ -33,10 +33,12 @@ export function painter(resource: ResourceRef): Painter {
     if (typeof location !== 'string' || !location) throw new TypeError('Painter 资源地址必须是非空字符串')
 
     const state = shallowRef<{ status: PainterStatus; contentVersion: number; intrinsicSize?: PainterSize; error?: string }>({ status: 'loading', contentVersion: 0 })
-    const handle = native.acquirePainter(location, completion => {
+    const complete = (completion: PainterCompletion) => {
         if (state.value.status === 'disposed' || completion.contentVersion <= state.value.contentVersion) return
         state.value = { status: completion.error ? 'failed' : 'ready', contentVersion: completion.contentVersion, intrinsicSize: completion.width === undefined || completion.height === undefined ? undefined : Object.freeze({ width: completion.width, height: completion.height }), error: completion.error }
-    })
+    }
+    const { ready, ...handle } = native.acquirePainter(location, complete)
+    if (ready) complete(ready)
     const result: Painter = Object.freeze({
         get intrinsicSize() { return state.value.intrinsicSize },
         get contentVersion() { return state.value.contentVersion },

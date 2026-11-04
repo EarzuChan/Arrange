@@ -7,6 +7,7 @@
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/JucePointerInputAdapter.h>
 #include <arrange/core/PointerInputState.h>
+#include <arrange/core/WheelSmoother.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/VBlankSource.h>
 #include <arrange/core/WheelInput.h>
@@ -598,6 +599,53 @@ n.insertChild(1, 2, 0)
         tick();
         check(near(ScrollDispatcher::verticalScrollValue(runtime.scene().node(1)), 165.375f), "零惯性事件改变了已稳定滚动位置");
     }
+
+    // 普通滚轮每格的距离按缓出曲线分发，总量不变；连拨累加，反拨丢弃余量，精细输入原样交还
+    void verifyWheelSmoother() {
+        WheelSmoother smoother;
+        WheelInput line;
+        line.unitY = WheelUnit::Lines;
+        line.deltaY = -3;
+        WheelInput precise = line;
+        precise.precise = true;
+        check(!smoother.push({1, 2}, precise, 0) && !smoother.active(), "精细滚动被平滑器接管");
+        check(smoother.push({1, 2}, line, 0) && smoother.active(), "普通滚轮未被平滑器接管");
+        float total = 0;
+        float first = 0;
+        for (double now = 16; now <= 160; now += 16)
+            if (const auto step = smoother.tick(now)) {
+                check(step->first.x == 1 && step->first.y == 2 && step->second.unitY == WheelUnit::Lines, "平滑增量丢失了落点或单位");
+                if (first == 0) first = step->second.deltaY;
+                total += step->second.deltaY;
+            }
+        check(std::abs(total + 3) < 1e-4f && !smoother.active(), "平滑后的总距离与原始格数不一致");
+        check(first < 0 && first > -3 && std::abs(first) > 3.0f / 9.0f, "首帧增量不是缓出曲线的较大一段");
+
+        // 连拨两格：第二格从当前位置继续，总量为两格
+        total = 0;
+        (void)smoother.push({}, line, 0);
+        if (const auto step = smoother.tick(48)) total += step->second.deltaY;
+        (void)smoother.push({}, line, 48);
+        for (double now = 64; now <= 260; now += 16)
+            if (const auto step = smoother.tick(now)) total += step->second.deltaY;
+        check(std::abs(total + 6) < 1e-4f, "连续拨动的距离没有累加");
+
+        // 反向拨动丢弃未走完的距离
+        total = 0;
+        (void)smoother.push({}, line, 0);
+        if (const auto step = smoother.tick(32)) total += step->second.deltaY;
+        const auto travelled = total;
+        auto back = line;
+        back.deltaY = 3;
+        (void)smoother.push({}, back, 32);
+        for (double now = 48; now <= 240; now += 16)
+            if (const auto step = smoother.tick(now)) total += step->second.deltaY;
+        check(std::abs(total - (travelled + 3)) < 1e-4f, "反向拨动没有丢弃旧方向余量");
+
+        (void)smoother.push({}, line, 0);
+        smoother.cancel();
+        check(!smoother.active() && !smoother.tick(100), "取消后仍在分发");
+    }
 }
 
 int runScrollInput() {
@@ -617,6 +665,7 @@ int runScrollInput() {
         verifyGestureAndMomentumLifecycle();
         verifyLockedTargetInvalidation();
         verifyAdapterCallbackAndManualFrame();
+        verifyWheelSmoother();
         std::cout << "滚动输入：轴选择、目标锁定、手势与惯性、亚像素累计、边界、真实回调与手动帧发布通过\n";
         return 0;
     } catch (const std::exception& error) {

@@ -109,7 +109,8 @@ export type NativeTransactionTarget = {
     beginRearrange: () => void
     submitRearrange: (complete: (error?: string) => void) => void
     abortRearrange: () => void
-    acquirePainter: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
+    // 资源已在本运行时解码过时，句柄携带 ready，Painter 首帧即就绪且不再回调
+    acquirePainter: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle & { ready?: PainterCompletion }
     releasePainter: (handle: NativeBindingHandle) => void
     createPixelBuffer: (width: number, height: number) => NativeBindingHandle
     // 返回提交后的内容版本

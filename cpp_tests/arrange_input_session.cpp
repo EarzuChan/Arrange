@@ -1,6 +1,9 @@
 #include <arrange/core/Focus.h>
 #include <arrange/core/InputSession.h>
+#include <arrange/core/HitTest.h>
 #include <arrange/core/Layout.h>
+#include <algorithm>
+#include <string>
 #include <iostream>
 #include <stdexcept>
 
@@ -92,11 +95,52 @@ namespace {
         session.commitState(std::move(candidate));
         check(session.focusedNode() == 3, "候选会话提交后焦点未更新");
     }
+
+    // 按下到抬起之间链条插入或移除其它元素，clickable 受体身份不变，点击照常触发
+    void verifyClickSurvivesChainShapeChange() {
+        PaintStyleSemantics background;
+        background.color = 0xffffffff;
+        PaintStyleSemantics border;
+        border.kind = PaintStyleKind::Border;
+        border.color = 0xff007aff;
+        LayoutModifierSemantics padding;
+        padding.kind = LayoutModifierKind::Padding;
+        padding.padding = {4, 4, 4, 4};
+        InputModifierSemantics click;
+        click.eventSlot = makeEventSlotId(1, EventSlotKind::Click);
+        const std::vector<std::pair<ModifierDescriptors, ModifierDescriptors>> cases{
+            {{{size(100, 60)}, {background}, {click}}, {{size(100, 60)}, {background}, {border}, {click}}},
+            {{{size(100, 60)}, {background}, {click}, {padding}}, {{size(100, 60)}, {padding}, {background}, {click}, {padding}}},
+            {{{size(100, 60)}, {click}, {background}}, {{size(100, 60)}, {background}, {click}, {background}}},
+            {{{size(100, 60)}, {background}, {border}, {click}, {padding}}, {{size(100, 60)}, {background}, {click}, {padding}}},
+        };
+        for (std::size_t index = 0; index < cases.size(); ++index) {
+            LayoutTree tree;
+            create(tree, 1, cases[index].first);
+            LayoutEngine{}.layout(tree, 1, {0, 400, 0, 200});
+            InputSession session;
+            TextInputBridge text;
+            InputCallbacks callbacks;
+            const auto before = buildHitTestSnapshot(tree, 1);
+            (void)session.pointerDown(tree, before, {{20, 20}}, text, callbacks);
+            const auto handle = tree.node(1).modifier.elements()[index == 2 ? 1 : index == 3 ? 3 : 2].handle;
+            tree.apply({SetModifierMutation{1, cases[index].second}});
+            LayoutEngine{}.layout(tree, 1, {0, 400, 0, 200});
+            session.synchronizePublishedInput(tree, true, text);
+            const auto after = buildHitTestSnapshot(tree, 1);
+            const auto released = session.pointerUp(tree, after, {{20, 20}}, text);
+            const auto& elements = tree.node(1).modifier.elements();
+            const auto kept = std::any_of(elements.begin(), elements.end(), [&](const auto& item) { return item.handle == handle; });
+            if (!kept) throw std::runtime_error("链条形状变化第 " + std::to_string(index) + " 例重建了 clickable 受体");
+            if (!released.clickTriggered) throw std::runtime_error("链条形状变化第 " + std::to_string(index) + " 例丢失了点击");
+        }
+    }
 }
 
 int main() {
     try {
         verifyKeys();
+        verifyClickSurvivesChainShapeChange();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

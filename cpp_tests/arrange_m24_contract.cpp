@@ -273,6 +273,22 @@ const handle = native.acquirePainter('成功', completion => {
         const auto transaction = host.takePendingTransaction();
         require(transaction.has_value(), "Painter 完成没有提交类型化操作");
 
+        // 同一运行时再次获取已解码的地址：新身份、获取即就绪、不再请求加载器
+        const auto caching = host.executeModule("m24-painter-cache.js", R"JS(
+const native = globalThis.__ARRANGE_NATIVE__
+native.createNode(1, 'Root')
+const first = native.acquirePainter('缓存', () => {
+    const again = native.acquirePainter('缓存', () => { throw new Error('已缓存的资源不得再回调') })
+    if (!again.ready || again.ready.contentVersion !== 1 || again.ready.width !== 18 || again.ready.height !== 12 || again.identity === first.identity) throw new Error('已解码资源再次获取没有立即就绪')
+})
+)JS");
+        require(caching.ok, caching.error.c_str());
+        require(requests.size() == 3, "缓存用例没有发出首个请求");
+        requests[2]->set_value({content, {}});
+        const auto cached = host.semanticCheckpoint(24);
+        require(cached.ok, cached.error.c_str());
+        require(requests.size() == 3 && !host.hasPendingSemanticWork(), "已缓存的资源再次请求了加载器");
+
         const auto waiting = host.executeModule("m24-painter-reset.js", R"JS(
 const native = globalThis.__ARRANGE_NATIVE__
 native.createNode(1, 'Root')
@@ -281,7 +297,7 @@ native.acquirePainter('旧上下文', () => { throw new Error('reset 后不得�
         require(waiting.ok && host.hasPendingSemanticWork(), "未完成资源请求没有登记");
         const auto reset = host.executeModule("m24-painter-new.js", "globalThis.__ARRANGE_NATIVE__.createNode(1, 'Root')");
         require(reset.ok, reset.error.c_str());
-        requests[2]->set_value({content, {}});
+        requests[3]->set_value({content, {}});
         require(!host.hasPendingSemanticWork(), "reset 后旧资源仍在等待队列");
         require(host.semanticCheckpoint(32).ok, "reset 后迟到结果执行了旧回调");
 
@@ -294,7 +310,7 @@ const handle = native.acquirePainter('失败', completion => {
 })
 )JS");
         require(failing.ok, failing.error.c_str());
-        requests[3]->set_exception(std::make_exception_ptr(std::runtime_error("解码失败")));
+        requests[4]->set_exception(std::make_exception_ptr(std::runtime_error("解码失败")));
         const auto failure = host.semanticCheckpoint(48);
         require(failure.ok, failure.error.c_str());
         require(!host.hasPendingSemanticWork(), "失败完成后未释放资源请求");

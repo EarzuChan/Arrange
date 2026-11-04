@@ -96,6 +96,25 @@ function evaluate(source: string, id: string, state: object = {}): ArrangableDef
     return exports.default!
 }
 
+test('子组件兼容热更新后，新挂载的父级按新导入定义预备的参数计划仍可调用沿用旧身份的子组件', () => {
+    const childId = 'hmr-plan-child.sfa'
+    const child = (text: string) => `<script>const { label } = defineProps<{ label: string }>()</script><template><Text :text="label + '${text}'" /></template>`
+    evaluate(child('旧'), childId)
+    const next = evaluate(child('新'), childId)
+    applyArrangableHmr(childId, next)
+    const { code } = compileArrangeSfa(`<script>import Child from './Child.sfa'</script><template><Child label="甲" /></template>`, 'hmr-plan-parent.sfa', true)
+    assert.match(code, /prepareParameters/)
+    const output = ts.transpileModule(code.replaceAll('import.meta.hot', 'undefined'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+    const exports: { default?: ArrangableDefinition } = {}
+    const childModule = Object.defineProperty({ default: next }, '__esModule', { value: true })
+    new Function('require', 'exports', output)((name: string) => name === './Child.sfa' ? childModule : requireSfaModule(name), exports)
+    const native = recordingNative()
+    const app = createApp(exports.default!)
+    mountFrame(app, native.target)
+    assert.deepEqual(native.textNodes().map(node => node.text), ['甲新'])
+    app.unmount()
+})
+
 test('SFA 不增加对 console API 的额外编译期拦截', () => {
     assert.doesNotThrow(() => compileArrangeSfa('<script>console.log("未定义 API 会在运行时自然失败")</script>', 'console.sfa'))
 })

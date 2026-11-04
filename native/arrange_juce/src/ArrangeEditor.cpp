@@ -4,6 +4,7 @@
 
 #include <arrange/juce/EditorSceneHost.h>
 #include "ScrollProbe.h"
+#include "PlatformWheelInput.h"
 #if JUCE_WINDOWS
 #include "WindowsPrecisionWheelSource.h"
 #endif
@@ -59,6 +60,7 @@ namespace arrange::juce {
         // 未测试！
         if (editor.precisionWheelSource_) editor.precisionWheelSource_->tick();
 #endif
+        if (const auto step = editor.wheelSmoother_.tick(::juce::Time::getMillisecondCounterHiRes())) (void)editor.sceneHost_->wheelMove(step->first, step->second);
         // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线
         // 场景发布或诊断叠加层变化都需要转交重绘
         const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
@@ -223,6 +225,7 @@ namespace arrange::juce {
         // 为仍按下的键补发 key up
         (void)sceneHost_->keyStateChanged({});
         cancelPointer();
+        wheelSmoother_.cancel();
         sceneHost_->cancelWheel();
 #if JUCE_WINDOWS
         // 未测试！
@@ -240,6 +243,7 @@ namespace arrange::juce {
     void ArrangeEditor::visibilityChanged() {
         if (!isShowing()) {
             cancelPointer();
+            wheelSmoother_.cancel();
             sceneHost_->cancelWheel();
         }
 #if JUCE_WINDOWS
@@ -267,9 +271,13 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::mouseDown(const ::juce::MouseEvent& event) {
+        // 按下打断滚轮会话，未分发完的平滑距离一并丢弃
+        wheelSmoother_.cancel();
         sceneHost_->pointerDown(event);
         // 点击非焦点受体时交还键盘，宿主快捷键不被空白区域吞掉
-        if (sceneHost_->hasKeyboardFocusTarget())
+        // Standalone 没有宿主可交还，编辑器继续持有键盘，Tab 与快捷键随时可用
+        const auto hosted = processor.wrapperType != ::juce::AudioProcessor::wrapperType_Standalone && processor.wrapperType != ::juce::AudioProcessor::wrapperType_Undefined;
+        if (sceneHost_->hasKeyboardFocusTarget() || !hosted)
             grabKeyboardFocus();
         else if (hasKeyboardFocus(true))
             giveAwayKeyboardFocus();
@@ -290,6 +298,12 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::mouseWheelMove(const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) {
+        // 普通滚轮交给平滑器逐帧分发；精细与惯性输入照常直达
+        if (wheelSmoother_.push({event.position.x, event.position.y}, readPlatformWheelInput(event, wheel), ::juce::Time::getMillisecondCounterHiRes())) {
+            shell_.afterFrameRelevantChange(*this);
+            return;
+        }
+        wheelSmoother_.cancel();
         (void)sceneHost_->wheelMove(event, wheel);
         shell_.afterFrameRelevantChange(*this);
     }
@@ -409,7 +423,7 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::updateFrameClockState() {
-        auto wantsVBlank = sceneHost_->wantsVBlank();
+        auto wantsVBlank = sceneHost_->wantsVBlank() || wheelSmoother_.active();
 #if JUCE_WINDOWS
         // 未测试！
         wantsVBlank = wantsVBlank || (precisionWheelSource_ && precisionWheelSource_->needsTicks());

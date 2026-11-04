@@ -8,6 +8,7 @@ import ts from 'typescript'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { checkSfaProject } from '../../packages/vite-plugin/src/typecheck.ts'
+import { painterSnapshot } from '../../packages/framework/src/painter.ts'
 import { compile, baseParse, NodeTypes, processExpression } from '../../packages/compiler/src/template/index.ts'
 import { compileArrangeSfa } from '../../packages/vite-plugin/src/sfa.ts'
 import * as runtime from '../../packages/framework/src/index.ts'
@@ -615,6 +616,26 @@ test('Painter 资源状态保留版本、失败、取消和所属作用域释放
     }
 })
 
+
+test('原生已解码的资源随句柄就绪，Painter 首帧即可绘制且快照不夹带就绪字段', () => {
+    const previous = globalThis.__ARRANGE_NATIVE__
+    globalThis.__ARRANGE_NATIVE__ = {
+        ...recordingNative().target,
+        acquirePainter: () => ({ identity: 7n, generation: 1n, ready: { contentVersion: 1, width: 16, height: 16 } }),
+        releasePainter: () => { },
+    }
+    try {
+        const icon = ui.painter('icons/图标.svg')
+        assert.equal(icon.status, 'ready')
+        assert.deepEqual(icon.intrinsicSize, { width: 16, height: 16 })
+        const snapshot = painterSnapshot(icon)
+        assert.equal(snapshot.contentVersion, 1)
+        assert.equal('ready' in snapshot, false)
+        icon.dispose()
+    } finally {
+        globalThis.__ARRANGE_NATIVE__ = previous
+    }
+})
 
 test('跨文件 Ref 转导出保留身份，循环转导出产生定位诊断', () => {
     const directory = mkdtempSync(resolve('tmp-refs/sfa-ref-exports-'))
