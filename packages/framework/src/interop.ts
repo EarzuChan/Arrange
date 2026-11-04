@@ -1,4 +1,5 @@
 import { batchUpdates, computed, getCurrentScope, onScopeDispose, shallowRef, type ComputedRef, type ShallowRef } from '@arrange/reactivity'
+import { DataSourceState, sourceView, type DataSource, type DataSourceKind } from './dataSource.ts'
 import { currentInstance } from './runtime/arrangable.ts'
 import type { EditableValue } from './valueDrag.ts'
 import type { NativeHostFormat, NativeHostInfo, NativeInterop, NativeInteropDriver, NativeInteropValue, NativeParameterDescriptor, NativeTransactionTarget, NativeTransport } from './native.ts'
@@ -45,8 +46,12 @@ interface ParameterState {
     handle?: Parameter
 }
 
-interface StreamState<T> {
-    readonly data: ShallowRef<T>
+// 数据源之上的响应式包装：交付时推进 tick，计算值复制一份快照
+interface StreamState {
+    readonly source: DataSourceState
+    readonly tick: ShallowRef<number>
+    // 电平的响应式包装保留双精度原值，数据源数组为单精度
+    level: number
 }
 
 class InteropClient {
@@ -54,9 +59,9 @@ class InteropClient {
     private readonly parametersByIndex: ParameterState[] = []
     private hostState: ShallowRef<HostInfo> | undefined
     private transportState: ShallowRef<Transport> | undefined
-    private readonly meters = new Map<string, StreamState<number>>()
-    private readonly waveforms = new Map<string, StreamState<Float32Array>>()
-    private readonly spectra = new Map<string, StreamState<Float32Array>>()
+    private readonly meters = new Map<string, StreamState>()
+    private readonly waveforms = new Map<string, StreamState>()
+    private readonly spectra = new Map<string, StreamState>()
     private readonly listeners = new Map<string, Set<(value: InteropValue) => void>>()
     private readonly calls = new Map<number, { resolve(value: InteropValue): void; reject(error: Error): void }>()
 
@@ -81,15 +86,26 @@ class InteropClient {
             transport: state => { if (this.transportState) this.transportState.value = state },
             meter: (name, level) => {
                 const state = this.meters.get(name)
-                if (state) state.data.value = level
+                if (!state) return
+                state.source.array[0] = state.level = level
+                this.publish(state)
             },
             waveform: (name, samples) => {
                 const state = this.waveforms.get(name)
-                if (state) state.data.value = samples
+                if (!state) return
+                // 原生按最大订阅长度交付，右对齐写入固定数组
+                const target = state.source.array
+                const count = Math.min(target.length, samples.length)
+                target.set(samples.subarray(samples.length - count), target.length - count)
+                this.publish(state)
             },
             spectrum: (name, values) => {
                 const state = this.spectra.get(name)
-                if (state) state.data.value = values
+                if (!state) return
+                // 频点数变化时换新数组，其余时间原地写入
+                if (state.source.array.length !== values.length) state.source.array = new Float32Array(values.length)
+                state.source.array.set(values)
+                this.publish(state)
             },
             message: (name, value) => { for (const listener of [...this.listeners.get(name) ?? []]) listener(value) },
             reply: (id, ok, value, error) => {
@@ -198,25 +214,52 @@ class InteropClient {
     }
 
     meter(name: string): ComputedRef<number> {
-        this.subscribe('meter', name)
-        const state = getOrCreate(this.meters, name, () => ({ data: shallowRef(0) }))
-        return computed(() => state.data.value)
+        const state = this.stream('meter', name, 1)
+        return computed(() => {
+            void state.tick.value
+            return state.level
+        })
     }
 
     waveform(name: string, size: number): ComputedRef<Float32Array> {
-        this.subscribe('waveform', name, size)
-        const state = getOrCreate(this.waveforms, name, () => ({ data: shallowRef(new Float32Array(size)) }))
-        // 多处订阅同名波形时原生按最大长度交付，各自取最近 size 个样本
+        const state = this.stream('waveform', name, size)
+        // 多处订阅同名波形时原生按最大长度交付，各自取最近 size 个样本的快照
         return computed(() => {
-            const samples = state.data.value
-            return samples.length <= size ? samples : samples.subarray(samples.length - size)
+            void state.tick.value
+            const samples = state.source.array
+            return samples.slice(Math.max(0, samples.length - size))
         })
     }
 
     spectrum(name: string): ComputedRef<Float32Array> {
-        this.subscribe('spectrum', name)
-        const state = getOrCreate(this.spectra, name, () => ({ data: shallowRef(new Float32Array(0)) }))
-        return computed(() => state.data.value)
+        const state = this.stream('spectrum', name, 0)
+        return computed(() => {
+            void state.tick.value
+            return state.source.array.slice()
+        })
+    }
+
+    source(kind: DataSourceKind, name: string, size?: number): DataSource {
+        const state = this.stream(kind, name, kind === 'meter' ? 1 : size ?? 0)
+        return sourceView(state.source, kind === 'waveform' ? size : undefined)
+    }
+
+    private stream(kind: DataSourceKind, name: string, size: number): StreamState {
+        this.subscribe(kind, name, kind === 'waveform' ? size : undefined)
+        const table = kind === 'meter' ? this.meters : kind === 'waveform' ? this.waveforms : this.spectra
+        const state = getOrCreate(table, name, () => ({ source: new DataSourceState(kind, name, new Float32Array(size)), tick: shallowRef(0), level: 0 }))
+        // 同名波形取最大长度，旧数据右对齐保留
+        if (kind === 'waveform' && state.source.array.length < size) {
+            const grown = new Float32Array(size)
+            grown.set(state.source.array, size - state.source.array.length)
+            state.source.array = grown
+        }
+        return state
+    }
+
+    private publish(state: StreamState): void {
+        state.source.publish()
+        state.tick.value = state.source.version
     }
 
     onEvent(name: string, handler: (value: InteropValue) => void): () => void {
@@ -304,6 +347,22 @@ export function useWaveform(name: string, options: { size: number }): ComputedRe
 export function useSpectrum(name: string): ComputedRef<Float32Array> {
     return client().spectrum(name)
 }
+
+// 原生数据源：Canvas 绘制中 read() 直接取数，auto 失效按版本登记；不经响应式
+export function meterSource(name: string): DataSource {
+    return client().source('meter', name)
+}
+
+export function waveformSource(name: string, options: { size: number }): DataSource {
+    if (!Number.isInteger(options.size) || options.size < 1) throw new RangeError('波形长度必须是正整数')
+    return client().source('waveform', name, options.size)
+}
+
+export function spectrumSource(name: string): DataSource {
+    return client().source('spectrum', name)
+}
+
+export type { DataSource, DataSourceKind } from './dataSource.ts'
 
 export function onNativeEvent<T extends InteropValue = InteropValue>(name: string, handler: (value: T) => void): () => void {
     return client().onEvent(name, handler as (value: InteropValue) => void)

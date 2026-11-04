@@ -3,7 +3,7 @@
 inline constexpr std::string_view textFields[]{"text", "style", "singleLine", "minLines", "maxLines", "textAlign", "overflow"};
 inline constexpr std::string_view textFieldFields[]{"value", "textStyle", "singleLine", "minLines", "maxLines", "placeholder", "enabled", "selectAllOnFocus", "onValueChange", "onSubmit", "onChange", "onBlur"};
 inline constexpr ModifierCallbackField textFieldCallbacks[]{{"onValueChange", arrange::core::EventSlotKind::InputUpdate}, {"onSubmit", arrange::core::EventSlotKind::InputSubmit}, {"onChange", arrange::core::EventSlotKind::InputChange}, {"onBlur", arrange::core::EventSlotKind::InputBlur}};
-inline constexpr std::string_view paintFields[]{"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics"};
+inline constexpr std::string_view paintFields[]{"painter", "contentScale", "alignment", "alpha", "colorFilter", "sizeToIntrinsics", "tile", "ninePatch"};
 inline constexpr std::string_view paddingFields[]{"start", "top", "end", "bottom"};
 inline constexpr std::string_view widthFields[]{"value"};
 inline constexpr std::string_view heightFields[]{"value"};
@@ -41,6 +41,10 @@ inline constexpr ModifierCallbackField drawWithCacheCallbacks[]{{"prepare", arra
 inline constexpr std::string_view backgroundFields[]{"color", "brush", "shape"};
 inline constexpr std::string_view borderFields[]{"width", "color", "brush", "shape"};
 inline constexpr std::string_view clipFields[]{"shape"};
+inline constexpr std::string_view dropShadowFields[]{"shape", "radius", "spread", "offset", "color"};
+inline constexpr std::string_view innerShadowFields[]{"shape", "radius", "spread", "offset", "color"};
+inline constexpr std::string_view blurFields[]{"radius"};
+inline constexpr std::string_view backdropBlurFields[]{"radius", "shape"};
 inline constexpr std::string_view clickableFields[]{"enabled", "focusable", "onClick", "onDoubleClick", "interaction"};
 inline constexpr ModifierCallbackField clickableCallbacks[]{{"onClick", arrange::core::EventSlotKind::Click}, {"onDoubleClick", arrange::core::EventSlotKind::DoubleClick}, {"interaction", arrange::core::EventSlotKind::Interaction}};
 inline constexpr std::string_view hoverableFields[]{"enabled", "onEnter", "onExit", "interaction"};
@@ -102,6 +106,10 @@ inline constexpr ModifierSchemaEntry modifierSchemaEntries[]{
     {"background", backgroundFields, {}},
     {"border", borderFields, {}},
     {"clip", clipFields, {}},
+    {"dropShadow", dropShadowFields, {}},
+    {"innerShadow", innerShadowFields, {}},
+    {"blur", blurFields, {}},
+    {"backdropBlur", backdropBlurFields, {}},
     {"clickable", clickableFields, clickableCallbacks},
     {"hoverable", hoverableFields, hoverableCallbacks},
     {"focusable", focusableFields, focusableCallbacks},

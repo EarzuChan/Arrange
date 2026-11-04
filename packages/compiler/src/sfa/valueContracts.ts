@@ -52,7 +52,7 @@ export function createSfaValueContracts(checker: ts.TypeChecker, source: ts.Sour
     register(color, { value: 'color' })
     register(property(color, 'hsl'), { value: 'color' })
     const fields = {
-        Shape: 'shape', Brush: 'brush', PaddingValue: 'padding', Padding: 'padding', SizeRange: 'sizeRange', BorderOptions: 'border', PaintOptions: 'paint', TextOptions: 'text', TextFieldOptions: 'textField', GraphicsLayerOptions: 'graphics', TextStyleProp: 'style', ArrangementProp: 'arrangement', RowPolicyOptions: 'row', ColumnPolicyOptions: 'column', FlowRowPolicyOptions: 'flow', FlowColumnPolicyOptions: 'flow', PainterSize: 'pxSize',
+        Shape: 'shape', CornerSizes: 'shape', Brush: 'brush', SolidColor: 'brush', LinearGradient: 'brush', RadialGradient: 'brush', SweepGradient: 'brush', PaddingValue: 'padding', Padding: 'padding', SizeRange: 'sizeRange', BorderOptions: 'border', ShadowOptions: 'shadow', PaintOptions: 'paint', TextOptions: 'text', TextFieldOptions: 'textField', GraphicsLayerOptions: 'graphics', TextStyleProp: 'style', ArrangementProp: 'arrangement', RowPolicyOptions: 'row', ColumnPolicyOptions: 'column', FlowRowPolicyOptions: 'flow', FlowColumnPolicyOptions: 'flow', PainterSize: 'pxSize',
     }
     for (const [name, field] of Object.entries(fields)) register(exported(ui, name), { fields: unitFieldContracts[field] })
     for (const [name, field] of [['DrawSize', 'pxSize'], ['DrawRect', 'drawRect'], ['DrawPaint', 'drawPaint'], ['DrawTransform', 'graphics']] as const) register(exported(ui, name), { fields: unitFieldContracts[field] })
@@ -63,6 +63,9 @@ export function createSfaValueContracts(checker: ts.TypeChecker, source: ts.Sour
     register(drawType?.getProperty('drawRoundRect'), { arguments: [unitFieldContracts.drawRoundRect] })
     register(drawType?.getProperty('drawCircle'), { arguments: [unitFieldContracts.drawCircle] })
     register(drawType?.getProperty('drawLine'), { arguments: [unitFieldContracts.drawLine] })
+    register(drawType?.getProperty('drawPath'), { arguments: [undefined, unitFieldContracts.drawPaint] })
+    register(drawType?.getProperty('drawText'), { arguments: [unitFieldContracts.drawText] })
+    register(drawType?.getProperty('drawPainter'), { arguments: [undefined, unitFieldContracts.drawRect] })
     for (const method of ['clipRect', 'clipOval']) register(drawType?.getProperty(method), { arguments: [unitFieldContracts.drawRect] })
     register(drawType?.getProperty('clipRoundRect'), { arguments: [{ ...unitFieldContracts.drawRect, radius: 'px' }] })
     register(drawType?.getProperty('withTransform'), { arguments: [unitFieldContracts.graphics] })
@@ -90,6 +93,7 @@ export function createSfaValueContracts(checker: ts.TypeChecker, source: ts.Sour
     register(exported(ui, 'colorToHex'), { arguments: ['color'] })
     register(exported(ui, 'solidColor'), { arguments: ['color'] })
     register(exported(ui, 'rounded'), { arguments: ['length'] })
+    register(exported(ui, 'roundedCorners'), { arguments: [unitFieldContracts.shape] })
     register(exported(ui, 'PaddingValues'), { arguments: [unitFieldContracts.padding] })
     const spacedBy = property(exported(ui, 'Arrangement'), 'spacedBy')
     register(spacedBy, { arguments: ['length'] })

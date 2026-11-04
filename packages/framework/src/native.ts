@@ -111,6 +111,9 @@ export type NativeTransactionTarget = {
     abortRearrange: () => void
     acquirePainter: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle
     releasePainter: (handle: NativeBindingHandle) => void
+    createPixelBuffer: (width: number, height: number) => NativeBindingHandle
+    // 返回提交后的内容版本
+    commitPixelBuffer: (handle: NativeBindingHandle, pixels: Uint32Array) => number
     registerBinding: (id: NodeId, input: string) => NativeBindingHandle
     updateBinding: (handle: NativeBindingHandle, value: NativePropValue | import('./measurePolicy.ts').MeasurePolicy | PxModifier | ModifierElement | null) => void
     releaseBinding: (handle: NativeBindingHandle) => void

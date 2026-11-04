@@ -363,10 +363,10 @@ namespace {
         outer.translationX = 22;
         outer.alpha = 0.65f;
         ClipModifier rounded;
-        rounded.shape.shapeType = "rounded";
-        rounded.shape.cornerRadius = 30;
+        rounded.shape.shapeType = ShapeKind::Rounded;
+        rounded.shape.corners = CornerRadii::uniform(30);
         ClipModifier circle;
-        circle.shape.shapeType = "circle";
+        circle.shape.shapeType = ShapeKind::Circle;
         PaintStyleSemantics border;
         border.kind = PaintStyleKind::Border;
         border.color = 0xff11ff44;

@@ -45,7 +45,8 @@ export class ModifierLowering {
             if (match >= 0) matched.add(match)
             if (element.type === 'drawBehind' || element.type === 'drawWithContent' || element.type === 'drawWithCache') {
                 const retained = previousDraws.find(item => item.index === match)?.instance
-                const instance = retained && retained.declaration.draw === input.draw ? retained : new DrawInstance(element.type, input as DrawDeclaration, this.owner)
+                const declaration = input as DrawDeclaration
+                const instance = retained && retained.declaration.draw === declaration.draw && retained.declaration.invalidation === declaration.invalidation && retained.declaration.controller === declaration.controller ? retained : new DrawInstance(element.type, declaration, this.owner)
                 used.add(instance)
                 draws.push({ index, instance })
                 const value = Object.freeze({ prepare: instance.prepare, revision: instance.revision.value, transactional: true })

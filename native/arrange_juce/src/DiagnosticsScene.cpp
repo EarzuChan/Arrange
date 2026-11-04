@@ -102,7 +102,7 @@ namespace arrange::juce {
         op.rect = rect;
         op.color = color;
         op.shape = radius > 0.0f ? arrange::core::DrawShapeType::Rounded : arrange::core::DrawShapeType::Rectangle;
-        op.cornerRadius = radius;
+        op.corners = arrange::core::CornerRadii::uniform(radius);
         return op;
     }
 
@@ -113,7 +113,7 @@ namespace arrange::juce {
         op.color = color;
         op.strokeWidth = width;
         op.shape = radius > 0.0f ? arrange::core::DrawShapeType::Rounded : arrange::core::DrawShapeType::Rectangle;
-        op.cornerRadius = radius;
+        op.corners = arrange::core::CornerRadii::uniform(radius);
         return op;
     }
 

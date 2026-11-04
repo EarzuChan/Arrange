@@ -9,6 +9,7 @@
 #include <arrange/core/WheelInput.h>
 #include <arrange/core/Geometry.h>
 #include <arrange/core/PointerGesture.h>
+#include <arrange/core/DiagnosticsOverlay.h>
 #include <string>
 #include <string_view>
 
@@ -35,6 +36,14 @@ namespace arrange::juce {
         [[nodiscard]] bool triggerManualDiagnosticError();
         [[nodiscard]] bool pushManualDiagnosticToast();
         [[nodiscard]] bool copyDiagnosticsToClipboard();
+
+        [[nodiscard]] bool diagnosticsOverlayAvailable() const;
+        bool setDiagnosticsOverlay(bool enabled);
+        [[nodiscard]] bool diagnosticsOverlayEnabled() const;
+        void setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers);
+        [[nodiscard]] arrange::core::OverlayLayers diagnosticsOverlayLayers() const;
+        void setFrameTimelineEnabled(bool enabled);
+        [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const;
 
         void repaintDirty(::juce::Component& owner);
         [[nodiscard]] bool wantsVBlank() const;

@@ -73,12 +73,54 @@ namespace arrange::juce {
             return actions_.copyDiagnosticsToClipboard(diagnostics_, runtime_, chrome_.diagnosticsTextContext(packageSource_, diagnostics_));
         }
 
+        bool diagnosticsOverlayAvailable() const {
+            return diagnosticVisibilityEnabled(config_.diagnostics.overlay);
+        }
+
+        bool setDiagnosticsOverlay(bool enabled) {
+            if (enabled && !diagnosticsOverlayAvailable()) return false;
+            if (overlay_.enabled() == enabled) return true;
+            overlay_.setEnabled(enabled);
+            syncTimeline();
+            overlayPending_ = true;
+            return true;
+        }
+
+        bool diagnosticsOverlayEnabled() const {
+            return overlay_.enabled();
+        }
+
+        void setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers) {
+            if (overlay_.layers() == layers) return;
+            overlay_.setLayers(layers);
+            overlayPending_ = true;
+        }
+
+        arrange::core::OverlayLayers diagnosticsOverlayLayers() const {
+            return overlay_.layers();
+        }
+
+        void setFrameTimelineEnabled(bool enabled) {
+            timelineRequested_ = enabled;
+            syncTimeline();
+        }
+
+        const arrange::core::FrameTimeline& frameTimeline() const {
+            return runtime_.frameTimeline();
+        }
+
+        // 场景脏区只在发布帧推进后转交；叠加层自身的重绘单独请求，不计入场景脏区
         void repaintDirty(::juce::Component& owner) {
-            repaint_.repaintDirty(owner, runtime_.publishedFrame());
+            if (std::exchange(sceneChanged_, false)) repaint_.repaintDirty(owner, runtime_.publishedFrame());
+            if (overlayRegion_.full)
+                owner.repaint();
+            else
+                for (const auto& rect : overlayRegion_.rects) owner.repaint(::juce::Rectangle<float>(rect.x, rect.y, rect.width, rect.height).getSmallestIntegerContainer());
+            overlayRegion_ = {};
         }
 
         bool wantsVBlank() const {
-            return pendingReload_ != ReloadKind::None || wantsReloadPolling() || diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork();
+            return pendingReload_ != ReloadKind::None || wantsReloadPolling() || diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork() || overlayPending_ || overlay_.animating();
         }
 
         bool pumpFrame(double nowMillis) {
@@ -121,7 +163,9 @@ namespace arrange::juce {
                     applyPackageLoadOutcome(packageSource_.manualReload(true));
                     break;
             }
-            return framePump_.pumpFrame(runtime_, session_, diagnostics_, interaction_, paint_, rootNodeId, config_.app.distPath(), lastPaintBounds_, config_.diagnostics.errorScreen, chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_), nowMillis);
+            const auto sceneChanged = framePump_.pumpFrame(runtime_, session_, diagnostics_, interaction_, paint_, rootNodeId, config_.app.distPath(), lastPaintBounds_, config_.diagnostics.errorScreen, chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_), nowMillis);
+            sceneChanged_ = sceneChanged_ || sceneChanged;
+            return updateOverlay(nowMillis) || sceneChanged;
         }
 
         bool ready() const {
@@ -145,14 +189,22 @@ namespace arrange::juce {
                 ScrollProbe::record(sample);
             }
             lastPaintBounds_ = bounds;
-            paint_.paint(g, runtime_.publishedFrame());
+            const auto& frame = runtime_.publishedFrame();
+            const auto millis = paint_.paint(g, frame, overlayOps_);
+            runtime_.frameTimeline().notePaint(frame.revision, millis);
         }
 
         void pointerMove(const ::juce::MouseEvent& event) {
+            if (overlay_.enabled() && overlay_.layers().hit) {
+                overlay_.setPointer(arrange::core::Point{event.position.x, event.position.y});
+                overlayPending_ = true;
+            }
             pointerEvents_.pointerMove(runtime_, session_, diagnostics_, interaction_, event);
         }
 
         void pointerExit() {
+            overlay_.setPointer(std::nullopt);
+            overlayPending_ = overlayPending_ || overlay_.enabled();
             pointerEvents_.pointerExit(runtime_, interaction_);
         }
 
@@ -265,6 +317,28 @@ namespace arrange::juce {
         }
 
        private:
+        void syncTimeline() {
+            runtime_.frameTimeline().setEnabled(timelineRequested_ || overlay_.enabled());
+        }
+
+        // 返回叠加层是否需要重绘
+        bool updateOverlay(double nowMillis) {
+            if (!overlay_.enabled() && overlay_.ops().empty()) {
+                overlayPending_ = false;
+                return false;
+            }
+            overlayPending_ = false;
+            const auto region = overlay_.update(runtime_.frameTimeline(), runtime_.publishedFrame(), runtime_.scene().tree(), rootNodeId, nowMillis);
+            if (region.empty()) return false;
+            overlayOps_ = overlay_.ops();
+            for (auto& op : overlayOps_) arrange::core::DrawOpsBuilder::prepareText(op, textLayoutService_);
+            if (region.full || overlayRegion_.full)
+                overlayRegion_ = {true, {}};
+            else
+                overlayRegion_.rects.insert(overlayRegion_.rects.end(), region.rects.begin(), region.rects.end());
+            return true;
+        }
+
         bool wantsReloadPolling() const {
             return packageSource_.wantsReloadPolling();
         }
@@ -297,6 +371,12 @@ namespace arrange::juce {
         DiagnosticsState diagnostics_;
         JuceRepaintAdapter repaint_;
         ::juce::Rectangle<int> lastPaintBounds_;
+        arrange::core::DiagnosticsOverlay overlay_;
+        std::vector<arrange::core::DrawOp> overlayOps_;
+        arrange::core::RepaintRegion overlayRegion_;
+        bool overlayPending_ = false;
+        bool sceneChanged_ = false;
+        bool timelineRequested_ = false;
     };
 
     EditorSceneHost::EditorSceneHost() : impl_(std::make_unique<Impl>()) {}
@@ -333,6 +413,34 @@ namespace arrange::juce {
 
     bool EditorSceneHost::copyDiagnosticsToClipboard() {
         return impl_->copyDiagnosticsToClipboard();
+    }
+
+    bool EditorSceneHost::diagnosticsOverlayAvailable() const {
+        return impl_->diagnosticsOverlayAvailable();
+    }
+
+    bool EditorSceneHost::setDiagnosticsOverlay(bool enabled) {
+        return impl_->setDiagnosticsOverlay(enabled);
+    }
+
+    bool EditorSceneHost::diagnosticsOverlayEnabled() const {
+        return impl_->diagnosticsOverlayEnabled();
+    }
+
+    void EditorSceneHost::setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers) {
+        impl_->setDiagnosticsOverlayLayers(layers);
+    }
+
+    arrange::core::OverlayLayers EditorSceneHost::diagnosticsOverlayLayers() const {
+        return impl_->diagnosticsOverlayLayers();
+    }
+
+    void EditorSceneHost::setFrameTimelineEnabled(bool enabled) {
+        impl_->setFrameTimelineEnabled(enabled);
+    }
+
+    const arrange::core::FrameTimeline& EditorSceneHost::frameTimeline() const {
+        return impl_->frameTimeline();
     }
 
     void EditorSceneHost::repaintDirty(::juce::Component& owner) {

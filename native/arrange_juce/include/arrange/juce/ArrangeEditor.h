@@ -5,6 +5,7 @@
 #include <utility>
 #include <arrange/Log.h>
 #include <arrange/core/Interop.h>
+#include <arrange/core/DiagnosticsOverlay.h>
 #include "App.h"
 #include "EditorFrameClock.h"
 
@@ -38,6 +39,8 @@ namespace arrange::juce {
         bool errorScreen = true;
         bool copyFullDiagnosticsInRelease = true;
         bool allowScriptDiagnosticsControl = true;
+        // 诊断叠加层是否可用；可用时仍默认关闭，由快捷键或宿主调用开启
+        DiagnosticVisibility overlay = DiagnosticVisibility::DebugOnly;
     };
 
     struct EditorConfig {
@@ -83,6 +86,15 @@ namespace arrange::juce {
         const EditorConfig& config() const noexcept {
             return config_;
         }
+
+        // 诊断叠加层：配置不可用时开启失败并返回 false；供宿主调试菜单调用
+        bool setDiagnosticsOverlay(bool enabled);
+        [[nodiscard]] bool diagnosticsOverlayEnabled() const;
+        void setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers);
+        [[nodiscard]] arrange::core::OverlayLayers diagnosticsOverlayLayers() const;
+        // 诊断第 0 层的只读时间线；叠加层开启时自动记录，也可单独开启
+        void setFrameTimelineEnabled(bool enabled);
+        [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const;
 
         void paint(::juce::Graphics& g) override;
         void resized() override;

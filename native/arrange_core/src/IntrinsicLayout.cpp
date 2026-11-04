@@ -68,7 +68,9 @@ namespace arrange::core {
                 return result;
             }
             auto result = intrinsic(tree, id, index + 1, width, maximum, opposite);
-            if (const auto* paint = std::get_if<PaintModifier>(&descriptor); paint && paint->sizeToIntrinsics && paint->painter.content && paint->painter.content->intrinsicSize) result = std::max(result, width ? paint->painter.content->intrinsicSize->width : paint->painter.content->intrinsicSize->height);
+            if (const auto* paint = std::get_if<PaintModifier>(&descriptor); paint && paint->sizeToIntrinsics) {
+                if (const auto size = painterIntrinsicSize(paint->painter)) result = std::max(result, width ? size->width : size->height);
+            }
             if (const auto* text = textPresentation(descriptor)) {
                 const auto source = modifierText(descriptor);
                 float natural = 0;

@@ -33,7 +33,7 @@ namespace arrange::core {
             if (std::holds_alternative<TextFieldModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             if (std::holds_alternative<PaintModifier>(value)) return kMeasure | dirtyMask(DirtyFlag::Resource);
             if (std::holds_alternative<OffsetModifier>(value)) return kPlace;
-            if (std::holds_alternative<PaintStyleSemantics>(value)) return kPaint;
+            if (std::holds_alternative<PaintStyleSemantics>(value) || std::holds_alternative<EffectModifier>(value)) return kPaint;
             if (std::holds_alternative<DrawModifier>(value)) return kPaint | dirtyMask(DirtyFlag::EventSlot);
             if (std::holds_alternative<InputModifierSemantics>(value)) return kHit | dirtyMask(DirtyFlag::EventSlot) | dirtyMask(DirtyFlag::Focus);
             if (std::holds_alternative<FocusModifier>(value)) return dirtyMask(DirtyFlag::Focus) | dirtyMask(DirtyFlag::EventSlot);
@@ -72,6 +72,10 @@ namespace arrange::core {
                 if constexpr (std::is_same_v<T, ZIndexModifier>) return "zIndex";
                 if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) return "animateContentSize";
                 if constexpr (std::is_same_v<T, SemanticsModifier>) return "semantics";
+                if constexpr (std::is_same_v<T, EffectModifier>) {
+                    constexpr std::string_view names[]{"dropShadow", "innerShadow", "blur", "backdropBlur"};
+                    return names[static_cast<std::size_t>(input.kind)];
+                }
                 if constexpr (std::is_same_v<T, DrawModifier>) {
                     constexpr std::string_view names[]{"drawBehind", "drawWithContent", "drawWithCache"};
                     return names[static_cast<std::size_t>(input.kind)];
@@ -102,9 +106,9 @@ namespace arrange::core {
                     if (input.minWidth >= 0 && input.maxWidth >= 0 && input.minWidth > input.maxWidth) throw std::invalid_argument("Arrange Modifier minWidth exceeds maxWidth");
                     if (input.minHeight >= 0 && input.maxHeight >= 0 && input.minHeight > input.maxHeight) throw std::invalid_argument("Arrange Modifier minHeight exceeds maxHeight");
                 } else if constexpr (std::is_same_v<T, PaintStyleSemantics>) {
-                    for (auto number : {input.strokeWidth, input.cornerRadius, input.alpha}) finite(number);
-                    if (input.strokeWidth < 0 || input.cornerRadius < 0 || input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange invalid paint Modifier input");
-                    if (!input.shapeType.empty() && input.shapeType != "rectangle" && input.shapeType != "rounded" && input.shapeType != "circle") throw std::invalid_argument("Arrange unknown Modifier shape");
+                    const auto& corners = input.corners;
+                    for (auto number : {input.strokeWidth, corners.topStart, corners.topEnd, corners.bottomEnd, corners.bottomStart, input.alpha}) finite(number);
+                    if (input.strokeWidth < 0 || corners.topStart < 0 || corners.topEnd < 0 || corners.bottomEnd < 0 || corners.bottomStart < 0 || input.alpha < 0 || input.alpha > 1) throw std::invalid_argument("Arrange invalid paint Modifier input");
                 } else if constexpr (std::is_same_v<T, AnimateContentSizeModifier>) {
                     const auto& spec = input.animationSpec;
                     for (auto value : {spec.durationMillis, spec.delayMillis, spec.stiffness, spec.dampingRatio, spec.threshold}) finite(value);
@@ -120,6 +124,7 @@ namespace arrange::core {
                         finite(size.height);
                         if (size.width < 0 || size.height < 0) throw std::invalid_argument("Painter 固有尺寸不能为负数");
                     }
+                    validatePainterView(input.painter, input.repeat, input.slices);
                 } else if constexpr (std::is_same_v<T, TextModifier>)
                     validateTextPresentation(input);
                 else if constexpr (std::is_same_v<T, TextFieldModifier>)
@@ -134,7 +139,12 @@ namespace arrange::core {
                     finite(input.y);
                 } else if constexpr (std::is_same_v<T, ZIndexModifier>)
                     finite(input.value);
-                else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
+                else if constexpr (std::is_same_v<T, EffectModifier>) {
+                    for (auto number : {input.radius, input.spread, input.offset.x, input.offset.y}) finite(number);
+                    if (input.radius < 0 || input.radius > 1000) throw std::invalid_argument("阴影与模糊半径需要在 0 到 1000 PX 之间");
+                    if (std::abs(input.spread) > 10000) throw std::invalid_argument("阴影扩展超出范围");
+                    validateModifierValue(input.shape);
+                } else if constexpr (std::is_same_v<T, ParentDataModifierSemantics>) {
                     finite(input.weight);
                     if (input.kind == ParentDataKind::Weight && input.weight <= 0) throw std::invalid_argument("weight 必须为正数");
                     if (input.kind == ParentDataKind::Align && !input.align) throw std::invalid_argument("Arrange Modifier.align 缺少对齐值");
@@ -167,8 +177,8 @@ namespace arrange::core {
         }
         if (const auto* a = std::get_if<PaintModifier>(&before)) {
             if (const auto* b = std::get_if<PaintModifier>(&after)) {
-                const auto oldSize = a->painter.content ? a->painter.content->intrinsicSize : std::nullopt;
-                const auto newSize = b->painter.content ? b->painter.content->intrinsicSize : std::nullopt;
+                const auto oldSize = painterIntrinsicSize(a->painter);
+                const auto newSize = painterIntrinsicSize(b->painter);
                 if (a->sizeToIntrinsics == b->sizeToIntrinsics && (!a->sizeToIntrinsics || oldSize == newSize)) return kPaint | dirtyMask(DirtyFlag::Resource);
             }
         }
@@ -316,5 +326,21 @@ namespace arrange::core {
         for (const auto& instance : elements_)
             if (const auto* input = std::get_if<ZIndexModifier>(&instance.descriptor.value)) result += input->value;
         return result;
+    }
+
+    Rect effectOutputBounds(const EffectModifier& effect, Rect layer) noexcept {
+        if (effect.kind != EffectKind::DropShadow) return layer;
+        const auto margin = std::max(0.0f, effect.spread) + effectSigma(effect) * 3.0f;
+        const Rect shadow{layer.x + effect.offset.x - margin, layer.y + effect.offset.y - margin, layer.width + margin * 2, layer.height + margin * 2};
+        const auto left = std::min(layer.x, shadow.x), top = std::min(layer.y, shadow.y);
+        return {left, top, std::max(layer.x + layer.width, shadow.x + shadow.width) - left, std::max(layer.y + layer.height, shadow.y + shadow.height) - top};
+    }
+
+    void validatePainterView(const PainterSnapshot& painter, ImageRepeat repeat, const ImageSlices& slices) {
+        if (painter.frames < 1 || painter.frames > 4096 || painter.frame >= painter.frames) throw std::invalid_argument("filmstrip 帧数需要在 1 到 4096 之间，帧下标不能越界");
+        if (repeat != ImageRepeat::NinePatch) return;
+        for (const auto value : {slices.left, slices.top, slices.right, slices.bottom})
+            if (!std::isfinite(value) || value < 0) throw std::invalid_argument("九宫格切分需要非负有限数值");
+        if (const auto size = painterIntrinsicSize(painter); size && (slices.left + slices.right > size->width || slices.top + slices.bottom > size->height)) throw std::invalid_argument("九宫格切分超过图片固有尺寸");
     }
 }

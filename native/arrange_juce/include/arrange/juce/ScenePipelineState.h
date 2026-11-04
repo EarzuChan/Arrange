@@ -44,6 +44,14 @@ namespace arrange::juce {
             return pipeline_.counters();
         }
 
+        [[nodiscard]] const arrange::core::FrameTimeline& timeline() const noexcept {
+            return pipeline_.timeline();
+        }
+
+        [[nodiscard]] arrange::core::FrameTimeline& timeline() noexcept {
+            return pipeline_.timeline();
+        }
+
         bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
             return pipeline_.publishRetained(scene_, publishedFrame_, finalize);
         }

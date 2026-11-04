@@ -6,6 +6,8 @@
 #include "QuickJsValueReader.h"
 #include <arrange/core/SlotUpdate.h>
 #include <chrono>
+#include <cmath>
+#include <cstring>
 
 namespace arrange::quickjs {
     namespace {
@@ -40,6 +42,60 @@ namespace arrange::quickjs {
     void QuickJsPainterResources::install(JSValueConst native) {
         JS_SetPropertyStr(context_, native, "acquirePainter", JS_NewCFunction(context_, acquire, "acquirePainter", 2));
         JS_SetPropertyStr(context_, native, "releasePainter", JS_NewCFunction(context_, release, "releasePainter", 1));
+        JS_SetPropertyStr(context_, native, "createPixelBuffer", JS_NewCFunction(context_, createPixels, "createPixelBuffer", 2));
+        JS_SetPropertyStr(context_, native, "commitPixelBuffer", JS_NewCFunction(context_, commitPixels, "commitPixelBuffer", 2));
+    }
+
+    JSValue QuickJsPainterResources::createPixels(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        std::int32_t width = 0, height = 0;
+        if (argc != 2 || JS_ToInt32(context, &width, argv[0]) < 0 || JS_ToInt32(context, &height, argv[1]) < 0) return JS_ThrowTypeError(context, "createPixelBuffer 需要宽与高");
+        if (width < 1 || height < 1 || width > 4096 || height > 4096 || static_cast<std::int64_t>(width) * height > 4 * 1024 * 1024) return JS_ThrowRangeError(context, "像素缓冲边长需要在 1 到 4096 之间，总像素不超过 4194304");
+        auto& owner = resources(context);
+        if (owner.resources_.size() >= 4096) return JS_ThrowRangeError(context, "Painter 活动资源超过 4096 项预算");
+        Resource resource;
+        resource.snapshot.identity = arrange::core::allocateRuntimeIdentity();
+        resource.snapshot.generation = arrange::core::allocateRuntimeIdentity();
+        auto content = std::make_shared<arrange::core::PixelBufferContent>();
+        content->width = width;
+        content->height = height;
+        content->pixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0u);
+        content->intrinsicSize = arrange::core::Size{static_cast<float>(width), static_cast<float>(height)};
+        resource.snapshot.content = std::move(content);
+        resource.snapshot.contentVersion = 1;
+        const auto handle = resource.snapshot;
+        owner.resources_.emplace(handle.identity, std::move(resource));
+        const auto result = JS_NewObject(context);
+        JS_SetPropertyStr(context, result, "identity", JS_NewBigUint64(context, handle.identity));
+        JS_SetPropertyStr(context, result, "generation", JS_NewBigUint64(context, handle.generation));
+        return result;
+    }
+
+    // 提交时整块复制像素，生成新内容与新版本；已发布帧继续持有旧内容
+    JSValue QuickJsPainterResources::commitPixels(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        if (argc != 2) return JS_ThrowTypeError(context, "commitPixelBuffer 需要句柄与像素");
+        const auto handle = identity(context, argv[0]);
+        if (!handle) return JS_EXCEPTION;
+        auto& owner = resources(context);
+        const auto found = owner.resources_.find(handle->first);
+        const auto* current = found == owner.resources_.end() ? nullptr : dynamic_cast<const arrange::core::PixelBufferContent*>(found->second.snapshot.content.get());
+        if (!current || found->second.snapshot.generation != handle->second) return JS_ThrowTypeError(context, "像素缓冲已释放或属于其他运行时代际");
+        if (JS_GetTypedArrayType(argv[1]) != JS_TYPED_ARRAY_UINT32) return JS_ThrowTypeError(context, "像素缓冲数据需要 Uint32Array");
+        std::size_t offset = 0, byteLength = 0, elementSize = 0;
+        ScopedValue buffer(context, JS_GetTypedArrayBuffer(context, argv[1], &offset, &byteLength, &elementSize));
+        if (JS_IsException(buffer.get())) return JS_EXCEPTION;
+        std::size_t bufferSize = 0;
+        const auto* bytes = JS_GetArrayBuffer(context, &bufferSize, buffer.get());
+        const auto count = current->pixels.size();
+        if (!bytes || offset + byteLength > bufferSize || byteLength != count * sizeof(std::uint32_t)) return JS_ThrowRangeError(context, "像素缓冲数据长度与尺寸不符");
+        auto next = std::make_shared<arrange::core::PixelBufferContent>();
+        next->width = current->width;
+        next->height = current->height;
+        next->intrinsicSize = current->intrinsicSize;
+        next->pixels.resize(count);
+        std::memcpy(next->pixels.data(), bytes + offset, byteLength);
+        found->second.snapshot.content = std::move(next);
+        ++found->second.snapshot.contentVersion;
+        return JS_NewFloat64(context, static_cast<double>(found->second.snapshot.contentVersion));
     }
 
     JSValue QuickJsPainterResources::acquire(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
@@ -140,7 +196,22 @@ namespace arrange::quickjs {
             JS_ThrowTypeError(context, "Painter 内容版本已过期");
             return std::nullopt;
         }
-        return found->second.snapshot;
+        auto snapshot = found->second.snapshot;
+        // filmstrip 视图：frames、frame 与方向随快照传入
+        ScopedValue frames(context, JS_GetPropertyStr(context, value, "frames"));
+        if (!JS_IsUndefined(frames.get())) {
+            ScopedValue frame(context, JS_GetPropertyStr(context, value, "frame"));
+            ScopedValue horizontal(context, JS_GetPropertyStr(context, value, "horizontal"));
+            double count = 0, index = 0;
+            if (JS_ToFloat64(context, &count, frames.get()) < 0 || JS_ToFloat64(context, &index, frame.get()) < 0 || !JS_IsBool(horizontal.get()) || count != std::floor(count) || index != std::floor(index) || count < 1 || count > 4096 || index < 0 || index >= count) {
+                if (!JS_HasException(context)) JS_ThrowRangeError(context, "filmstrip 帧数需要在 1 到 4096 之间，帧下标不能越界");
+                return std::nullopt;
+            }
+            snapshot.frames = static_cast<std::uint32_t>(count);
+            snapshot.frame = static_cast<std::uint32_t>(index);
+            snapshot.horizontal = JS_ToBool(context, horizontal.get()) != 0;
+        }
+        return snapshot;
     }
 }
 

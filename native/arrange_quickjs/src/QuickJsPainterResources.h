@@ -28,6 +28,8 @@ namespace arrange::quickjs {
 
         static JSValue acquire(JSContext* context, JSValueConst self, int argc, JSValueConst* argv);
         static JSValue release(JSContext* context, JSValueConst self, int argc, JSValueConst* argv);
+        static JSValue createPixels(JSContext* context, JSValueConst self, int argc, JSValueConst* argv);
+        static JSValue commitPixels(JSContext* context, JSValueConst self, int argc, JSValueConst* argv);
         JSContext* context_;
         arrange::core::PainterLoader loader_;
         std::unordered_map<std::uint64_t, Resource> resources_;

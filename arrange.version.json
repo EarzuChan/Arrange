@@ -1,6 +1,6 @@
 {
-  "frameworkVersion": "0.6.0",
-  "frameworkInternalProtocolCode": 9,
+  "frameworkVersion": "0.7.0",
+  "frameworkInternalProtocolCode": 10,
   "nativeDevReadinessProtocolCode": 1,
   "cliVersion": "1.1.0",
   "cliCompatibility": 1

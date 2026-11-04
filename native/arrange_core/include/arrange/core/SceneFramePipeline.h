@@ -8,6 +8,7 @@
 #include "MutationTransaction.h"
 #include "NativeScene.h"
 #include "Paint.h"
+#include "FrameTimeline.h"
 #include "Repaint.h"
 #include "LayoutTree.h"
 
@@ -91,6 +92,7 @@ namespace arrange::core {
         std::uint64_t candidateNodesCopied = 0;
         double measureMillis = 0;
         double placeMillis = 0;
+        double drawPrepareMillis = 0;
         double paintBuildMillis = 0;
         double hitBuildMillis = 0;
         std::uint64_t fullLayouts = 0;
@@ -140,8 +142,19 @@ namespace arrange::core {
             return counters_;
         }
 
+        // 诊断第 0 层：发布或失败的帧在开启时记入时间线
+        [[nodiscard]] const FrameTimeline& timeline() const noexcept {
+            return timeline_;
+        }
+
+        [[nodiscard]] FrameTimeline& timeline() noexcept {
+            return timeline_;
+        }
+
        private:
         FrameExecutionCounters counters_;
+        FrameTimeline timeline_;
+        void recordFrame(const FrameExecutionCounters& before, std::uint64_t drawsBefore, const NativeScene& scene, const PublishedFrame& frame, PhaseSet phases, double timeMillis, double totalMillis, bool failed);
         void finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate);
 
         LayoutEngine layout_;

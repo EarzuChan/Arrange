@@ -98,13 +98,17 @@ namespace arrange::core {
 
     enum class PaintStyleKind { Background, Border, Alpha };
 
+    enum class ShapeKind { Rectangle, Rounded, Circle };
+
     struct PaintStyleSemantics {
         PaintStyleKind kind = PaintStyleKind::Background;
         std::uint32_t color = 0;
         float strokeWidth = 1.0f;
-        std::string shapeType;
-        float cornerRadius = 0.0f;
+        ShapeKind shapeType = ShapeKind::Rectangle;
+        CornerRadii corners;
         float alpha = 1.0f;
+        // 渐变存在时 color 不参与着色
+        GradientRef gradient;
         bool operator==(const PaintStyleSemantics&) const = default;
     };
 
@@ -186,6 +190,29 @@ namespace arrange::core {
         bool operator==(const ZIndexModifier&) const = default;
     };
 
+    enum class EffectKind : std::uint8_t { DropShadow, InnerShadow, Blur, BackdropBlur };
+
+    // 阴影与模糊，长度均为 PX。阴影的 radius 是设计工具的模糊半径，高斯标准差为其一半；blur 与 backdropBlur 的 radius 即标准差
+    struct EffectModifier {
+        EffectKind kind = EffectKind::Blur;
+        PaintStyleSemantics shape;
+        float radius = 0.0f;
+        float spread = 0.0f;
+        Point offset;
+        std::uint32_t color = 0;
+        bool operator==(const EffectModifier&) const = default;
+    };
+
+    // 效果在层局部坐标中的输出外包盒；内容模糊不在此求，取决于子片段
+    // filmstrip 帧与九宫格切分的范围校验，修饰器与绘制命令共用
+    void validatePainterView(const PainterSnapshot& painter, ImageRepeat repeat, const ImageSlices& slices);
+    [[nodiscard]] Rect effectOutputBounds(const EffectModifier& effect, Rect layer) noexcept;
+
+    // 高斯标准差，外扩取三倍
+    [[nodiscard]] inline float effectSigma(const EffectModifier& effect) noexcept {
+        return effect.kind == EffectKind::DropShadow || effect.kind == EffectKind::InnerShadow ? effect.radius * 0.5f : effect.radius;
+    }
+
     enum class FocusModifierKind { Requester, Properties, Group, Observer };
 
     struct FocusModifier {
@@ -210,6 +237,8 @@ namespace arrange::core {
         float alpha = 1.0f;
         std::optional<std::uint32_t> tint;
         bool sizeToIntrinsics = true;
+        ImageRepeat repeat = ImageRepeat::None;
+        ImageSlices slices;
         bool operator==(const PaintModifier&) const = default;
     };
 
@@ -266,7 +295,7 @@ namespace arrange::core {
         bool operator==(const SemanticsModifier&) const = default;
     };
 
-    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier, FocusModifier, DrawModifier, SemanticsModifier>;
+    using ModifierValue = std::variant<LayoutModifierSemantics, PaintStyleSemantics, ClipModifier, InputModifierSemantics, TransformModifierSemantics, OffsetModifier, ParentDataModifierSemantics, ZIndexModifier, AnimateContentSizeModifier, PaintModifier, TextModifier, TextFieldModifier, FocusModifier, DrawModifier, SemanticsModifier, EffectModifier>;
 
     struct ModifierDescriptor {
         ModifierValue value;

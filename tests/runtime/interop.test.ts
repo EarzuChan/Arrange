@@ -1,7 +1,7 @@
 import test, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { effectScope, watch } from '../../packages/framework/src/index.ts'
-import { hasInterop, invokeNative, onNativeEvent, useHost, useMeter, useParameter, useSpectrum, useTransport, useWaveform } from '@arrange/framework/interop'
+import { hasInterop, invokeNative, meterSource, onNativeEvent, spectrumSource, useHost, useMeter, useParameter, useSpectrum, useTransport, useWaveform, waveformSource } from '@arrange/framework/interop'
 import type { NativeInterop, NativeInteropDriver, NativeTransport } from '../../packages/framework/src/native.ts'
 import { createFakeNative } from '../helpers/fakeNative.ts'
 
@@ -135,6 +135,38 @@ test('宿主与走带为只读响应式快照，走带与观测流的订阅随 s
     host.driver.spectrum('bins', new Float32Array([5, 6]))
     assert.deepEqual([...bins.value], [5, 6])
 
+    scope.stop()
+    assert.equal(host.subscriptions.size, 0)
+})
+
+test('原生数据源写入固定数组并推进版本，读取不经响应式，响应式包装取快照', () => {
+    const host = fakeInterop()
+    const scope = effectScope()
+    const { meter, wave, bins, reactiveWave } = scope.run(() => ({ meter: meterSource('out'), wave: waveformSource('scope', { size: 2 }), bins: spectrumSource('bins'), reactiveWave: useWaveform('scope', { size: 3 }) }))!
+    const meterArray = meter.read(), waveArray = wave.read()
+    let reads = 0
+    const stop = watch(() => {
+        reads++
+        return meter.read()[0]
+    }, () => { }, { flush: 'sync' })
+    host.driver.meter('out', 0.5)
+    assert.equal(meter.version, 1)
+    assert.equal(meter.read(), meterArray, '同一固定数组')
+    assert.equal(meterArray[0], 0.5)
+    assert.equal(reads, 1, '读取数据源不登记响应式依赖')
+    stop()
+    host.driver.waveform('scope', new Float32Array([1, 2, 3, 4]))
+    assert.deepEqual([...wave.read()], [3, 4], '各自取最近 size 个样本')
+    assert.equal(wave.read().buffer, waveArray.buffer, '原地写入')
+    const snapshot = reactiveWave.value
+    assert.deepEqual([...snapshot], [2, 3, 4])
+    host.driver.waveform('scope', new Float32Array([5, 6, 7]))
+    assert.deepEqual([...snapshot], [2, 3, 4], '响应式包装是快照')
+    assert.deepEqual([...reactiveWave.value], [5, 6, 7])
+    host.driver.spectrum('bins', new Float32Array([1, 2, 3]))
+    assert.deepEqual([...bins.read()], [1, 2, 3])
+    assert.equal(bins.version, 1)
+    assert.throws(() => waveformSource('scope', { size: 0 }), /正整数/)
     scope.stop()
     assert.equal(host.subscriptions.size, 0)
 })

@@ -6,15 +6,16 @@ import type { AlignmentValue, Brush, PaddingValue, Shape } from "./primitives.ts
 import { scrollStateInternal, type ScrollState } from "./state.ts"
 import { painterSnapshot } from './painter.ts'
 import type { Painter } from './painter.ts'
+import type { NinePatch } from './draw.ts'
 import type { ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
 import type { TextStyleProp } from './native.ts'
 import { focusRequesterIdentity } from './focus.ts'
 import type { FocusRequester, FocusProperties, FocusState } from './focus.ts'
-import type { DrawCallback, DrawContentCallback, DrawCacheBuilder } from './draw.ts'
+import { isCanvasController, type CanvasController, type CanvasInvalidation, type DrawCallback, type DrawContentCallback, type DrawCacheBuilder } from './draw.ts'
 import { dragStateInternal, interactionStateInternal } from './gesture.ts'
 import type { DraggableOptions, DraggableState, Draggable2DState, InteractionState } from './gesture.ts'
-export type { DrawSize, DrawRect, DrawPaint, DrawTransform, DrawCallback, DrawContentCallback, DrawCacheResult, DrawCacheBuilder } from './draw.ts'
-export { DrawScope } from './draw.ts'
+export type { DrawSize, DrawRect, DrawPaint, DrawPathPaint, DrawTextOptions, DrawPainterOptions, DrawNativeOptions, NativePainterParams, NinePatch, StrokeCap, StrokeJoin, DrawTransform, DrawCallback, DrawContentCallback, DrawCacheResult, DrawCacheBuilder, CanvasInvalidation, CanvasController } from './draw.ts'
+export { DrawScope, Path, createCanvasController } from './draw.ts'
 
 export type ModifierValue = Readonly<Record<string, unknown>>
 
@@ -22,6 +23,8 @@ export type ModifierElement = Readonly<{ type: string, key?: string, value: Modi
 
 export type SizeRange = { minWidthDp?: number; minWidthPx?: number; maxWidthDp?: number; maxWidthPx?: number; minHeightDp?: number; minHeightPx?: number; maxHeightDp?: number; maxHeightPx?: number }
 export type BorderOptions = { widthDp: number; widthPx: number; brush: Brush | number; shape?: Shape }
+// 设计工具式阴影：radius 为模糊半径（高斯标准差为其一半），spread 为扩展，均为 DP/PX 长度；shape 默认矩形
+export type ShadowOptions = Readonly<{ shape?: Shape; radiusDp?: number; radiusPx?: number; spreadDp?: number; spreadPx?: number; offset?: Readonly<{ xDp?: number; xPx?: number; yDp?: number; yPx?: number }>; color: number }>
 export type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean; interactionState?: InteractionState }
 export type EnabledOptions = { enabled?: boolean }
 export type FocusableOptions = { enabled?: boolean; interactionState?: InteractionState }
@@ -34,7 +37,8 @@ export type ContextClickEvent = Readonly<{ xDp: number; yDp: number; modifiers: 
 export type WheelEvent = Readonly<{ deltaXDp: number; deltaYDp: number; modifiers: KeyModifiers }>
 export type PointerInputEvent = Readonly<{ type: 'down' | 'move' | 'up' | 'cancel' | 'enter' | 'exit'; xDp: number; yDp: number; modifiers: KeyModifiers }>
 export type KeyEvent = Readonly<{ type: 'down' | 'up'; key: string; text: string; repeat: boolean; modifiers: KeyModifiers }>
-export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean }>
+// tile 按固有尺寸平铺；ninePatch 以固有尺寸为单位切分，四角保持源尺寸。两者都忽略 contentScale 与 alignment
+export type PaintOptions = Readonly<{ contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: Readonly<{ tint: number }>; sizeToIntrinsics?: boolean; tile?: boolean; ninePatch?: NinePatch }>
 export type TextOptions = Readonly<{ style?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
 export type TextFieldOptions = Readonly<{ textStyle?: TextStyleProp; singleLine?: boolean; minLines?: number; maxLines?: number; placeholder?: string; enabled?: boolean; selectAllOnFocus?: boolean; onValueChange?: (value: string) => void; onSubmit?: (value: string) => void; onChange?: (value: string) => void; onBlur?: (value: string) => void }>
 export type GraphicsLayerOptions = {
@@ -46,6 +50,10 @@ export type GraphicsLayerOptions = {
     alpha?: number
     clip?: boolean
     transformOrigin?: "TopStart" | "TopCenter" | "TopEnd" | "CenterStart" | "Center" | "CenterEnd" | "BottomStart" | "BottomCenter" | "BottomEnd" | { x?: number; y?: number }
+}
+
+function shadowValue(args: ShadowOptions): ModifierValue {
+    return { shape: args.shape, radiusDp: args.radiusDp ?? 0, radiusPx: args.radiusPx ?? 0, spreadDp: args.spreadDp ?? 0, spreadPx: args.spreadPx ?? 0, offset: Object.freeze({ xDp: args.offset?.xDp ?? 0, xPx: args.offset?.xPx ?? 0, yDp: args.offset?.yDp ?? 0, yPx: args.offset?.yPx ?? 0 }), color: args.color }
 }
 
 export const modifierAllocationStats = { chains: 0, elementReferences: 0 }
@@ -196,6 +204,26 @@ export class Modifier {
         return this.#add("clip", { shape })
     }
 
+    // 外阴影画在后续内容之后方，不改变布局与命中
+    dropShadow(args: ShadowOptions): Modifier {
+        return this.#add("dropShadow", shadowValue(args))
+    }
+
+    // 内阴影画在本层形状内、后续内容之前
+    innerShadow(args: ShadowOptions): Modifier {
+        return this.#add("innerShadow", shadowValue(args))
+    }
+
+    // 模糊后续内容；半径即高斯标准差
+    blur(radiusDp: number, radiusPx: number): Modifier {
+        return this.#add("blur", { radiusDp, radiusPx })
+    }
+
+    // 模糊绘制顺序上位于本层之前、落在形状内的内容；半径即高斯标准差
+    backdropBlur(radiusDp: number, radiusPx: number, shape?: Shape): Modifier {
+        return this.#add("backdropBlur", { radiusDp, radiusPx, shape })
+    }
+
     alpha(value: number): Modifier {
         return this.#add("alpha", { value })
     }
@@ -317,6 +345,13 @@ export class Modifier {
 function checkedFraction(fraction: number): Readonly<{ fraction: number }> {
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) throw new RangeError("fillMax* 的比例必须在 0..1 之间")
     return { fraction }
+}
+
+// Canvas 降解为带失效方式的 drawBehind，与绘制修饰器共用实例、编码与缓存
+export function canvasModifier(base: Modifier, draw: DrawCallback, invalidation: CanvasInvalidation, controller: CanvasController | undefined): Modifier {
+    if (invalidation !== 'auto' && invalidation !== 'manual' && invalidation !== 'frame') throw new TypeError('Canvas invalidation 只能是 auto、manual 或 frame')
+    if (controller !== undefined && !isCanvasController(controller)) throw new TypeError('Canvas controller 需要 createCanvasController() 创建')
+    return new Modifier([...base.elements, Object.freeze({ type: 'drawBehind', value: Object.freeze({ ...checkedDraw(draw), invalidation, controller }) })])
 }
 
 function checkedDraw(draw: unknown): { draw: unknown } {

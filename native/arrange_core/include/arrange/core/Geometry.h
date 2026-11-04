@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -22,6 +23,33 @@ namespace arrange::core {
         float width = 0.0f;
         float height = 0.0f;
         bool operator==(const Rect&) const = default;
+    };
+
+    // 四角半径；当前只有从左到右布局，start 即左侧
+    struct CornerRadii {
+        float topStart = 0.0f;
+        float topEnd = 0.0f;
+        float bottomEnd = 0.0f;
+        float bottomStart = 0.0f;
+
+        static constexpr CornerRadii uniform(float radius) noexcept {
+            return {radius, radius, radius, radius};
+        }
+
+        // 同一边上两角之和超过边长时整体等比缩小，与 CSS 一致
+        [[nodiscard]] CornerRadii fitted(float width, float height) const noexcept {
+            auto scale = 1.0f;
+            const auto limit = [&](float length, float first, float second) {
+                if (first + second > length && first + second > 0) scale = std::min(scale, std::max(0.0f, length) / (first + second));
+            };
+            limit(width, topStart, topEnd);
+            limit(width, bottomStart, bottomEnd);
+            limit(height, topStart, bottomStart);
+            limit(height, topEnd, bottomEnd);
+            return {topStart * scale, topEnd * scale, bottomEnd * scale, bottomStart * scale};
+        }
+
+        bool operator==(const CornerRadii&) const = default;
     };
 
     struct Constraints {

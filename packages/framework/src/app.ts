@@ -7,6 +7,7 @@ import { Box, Row, Column, Spacer, FlowRow, FlowColumn } from './arrangable/Layo
 import { LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid } from './arrangable/LazyArrangables.ts'
 import { Text, Input } from './arrangable/TextAndInput.ts'
 import { Image, Icon } from './arrangable/ImageAndIcon.ts'
+import { Canvas } from './arrangable/Canvas.ts'
 import { DynamicArrangable } from './arrangable/ToolArrangables.ts'
 import { ARRANGE_RUNTIME_VERSION, type NativeTransactionTarget } from './native.ts'
 import { createDensity, DensityKey } from './density.ts'
@@ -29,7 +30,7 @@ export interface ArrangeApp {
 }
 
 // 这个滚木又有何意味！
-const foundationArrangables = { Layout, Box, Row, Column, Spacer, FlowRow, FlowColumn, LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid, Text, Input, Image, Icon, DynamicArrangable }
+const foundationArrangables = { Layout, Box, Row, Column, Spacer, FlowRow, FlowColumn, LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid, Text, Input, Image, Icon, Canvas, DynamicArrangable }
 
 const mountedTargets = new WeakSet<NativeTransactionTarget>()
 

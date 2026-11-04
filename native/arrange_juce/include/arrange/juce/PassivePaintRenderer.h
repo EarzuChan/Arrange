@@ -24,7 +24,8 @@ namespace arrange::juce {
         void clearResources();
         void prepareResources(arrange::core::PublishedFrameContent& content);
 
-        void paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame);
+        // 诊断叠加层画在场景之后、badge 与 toast 之前；返回本次重放耗时
+        double paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame, const std::vector<arrange::core::DrawOp>& diagnosticsOverlay = {});
 
         void setCullingEnabled(bool enabled) noexcept {
             drawOpsPainter_.setCullingEnabled(enabled);

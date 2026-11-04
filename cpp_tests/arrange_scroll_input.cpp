@@ -316,7 +316,7 @@ namespace {
 
         LayoutTree clipped;
         PaintStyleSemantics circle;
-        circle.shapeType = "circle";
+        circle.shapeType = ShapeKind::Circle;
         clipped.apply({CreateNodeMutation{1, NodeType::Layout}, boxPolicy(1), SetModifierMutation{1, {{fixedSize(100, 100), "viewport"}, {ClipModifier{circle}, "clip"}, {scroll(true, 1), "scroll"}, {fixedSize(100, 400), "content"}}}});
         LayoutEngine{}.layout(clipped, 1, {0, 500, 0, 500});
         check(ScrollDispatcher::hitPath(clipped, 1, {1, 1}).empty() && ScrollDispatcher::hitPath(clipped, 1, {50, 50}).size() == 1, "滚动初始命中路径忽略了 Modifier clip");

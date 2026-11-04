@@ -219,7 +219,7 @@ namespace {
         LayoutModifierSemantics required = size(120, 80);
         required.kind = LayoutModifierKind::RequiredSize;
         PaintStyleSemantics circle;
-        circle.shapeType = "circle";
+        circle.shapeType = ShapeKind::Circle;
         ModifierDescriptors chain{{size(60, 60), {}}, {background(0xff111111), {}}, {required, {}}, {background(0xff222222), {}}, {ClipModifier{circle}, {}}, {click("circle"), {}}};
         tree.apply({CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}, SetModifierMutation{1, chain}});
         LayoutEngine layout;
@@ -248,7 +248,7 @@ namespace {
         innerLayer.transformOriginX = 0;
         innerLayer.transformOriginY = 0;
         PaintStyleSemantics circle;
-        circle.shapeType = "circle";
+        circle.shapeType = ShapeKind::Circle;
         ModifierDescriptors wrappers{
             {size(120, 100), {}}, {background(1), {}}, {outerPadding, {}}, {ClipModifier{}, {}}, {outerLayer, {}}, {innerPadding, {}}, {background(2), {}}, {ClipModifier{circle}, {}}, {innerLayer, {}}, {click("deep"), {}},
         };

@@ -1,5 +1,6 @@
 #include "QuickJsModifierReader.h"
 #include "ModifierSchema.h"
+#include "QuickJsBrushReader.h"
 #include "QuickJsPainterResources.h"
 
 #if ARRANGE_WITH_QUICKJS_NG
@@ -155,35 +156,43 @@ namespace arrange::quickjs {
         return {0.5f, 0.5f};
     }
 
-    std::uint32_t QuickJsModifierReader::colorOrBrush(JSValueConst object, const char* colorKey, const char* brushKey) const {
-        ScopedValue color(context_, JS_GetPropertyStr(context_, object, colorKey));
-        ScopedValue brush(context_, JS_GetPropertyStr(context_, object, brushKey));
+    void QuickJsModifierReader::colorOrBrush(JSValueConst object, arrange::core::PaintStyleSemantics& style) const {
+        ScopedValue color(context_, JS_GetPropertyStr(context_, object, "color"));
+        ScopedValue brush(context_, JS_GetPropertyStr(context_, object, "brush"));
         if (!JS_IsUndefined(color.get())) {
             if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "颜色输入不能同时提供 color 和 brush");
-            return reader_.colorValue(color.get());
+            style.color = reader_.colorValue(color.get());
+            return;
         }
-        if (JS_IsNumber(brush.get())) return reader_.colorValue(brush.get());
-        if (JS_IsObject(brush.get()) && !JS_IsArray(brush.get())) {
-            if (!fieldsMatch(context_, brush.get(), {"type", "color"}, "brush")) return 0;
-            if (reader_.stringField(brush.get(), "type") != "solidColor") JS_ThrowTypeError(context_, "brush.type 需要 solidColor");
-            ScopedValue brushColor(context_, JS_GetPropertyStr(context_, brush.get(), "color"));
-            return reader_.colorValue(brushColor.get());
+        if (JS_IsUndefined(brush.get())) return;
+        try {
+            auto value = QuickJsBrushReader(context_).read(brush.get());
+            style.color = value.color;
+            style.gradient = std::move(value.gradient);
+        } catch (const std::exception& error) {
+            JS_ThrowTypeError(context_, "%s", error.what());
         }
-        if (!JS_IsUndefined(brush.get())) JS_ThrowTypeError(context_, "brush 需要数值颜色或 solidColor 对象");
-        return 0;
     }
 
     arrange::core::PaintStyleSemantics QuickJsModifierReader::paintStyle(JSValueConst value, arrange::core::PaintStyleKind kind) const {
         arrange::core::PaintStyleSemantics style;
         style.kind = kind;
-        style.color = colorOrBrush(value, "color", "brush");
+        colorOrBrush(value, style);
         style.strokeWidth = numberField(value, "width", 1.0f);
         ScopedValue shape(context_, JS_GetPropertyStr(context_, value, "shape"));
         if (JS_IsObject(shape.get()) && !JS_IsArray(shape.get())) {
-            style.shapeType = reader_.stringField(shape.get(), "type");
-            if (!fieldsMatch(context_, shape.get(), style.shapeType == "rounded" ? std::initializer_list<std::string_view>{"type", "radius"} : std::initializer_list<std::string_view>{"type"}, "shape")) return style;
-            if (style.shapeType.empty()) JS_ThrowTypeError(context_, "shape.type 不能为空");
-            style.cornerRadius = style.shapeType == "rounded" ? numberField(shape.get(), "radius") : 0.0f;
+            // 形状名只在读取边界解析一次
+            const auto type = reader_.stringField(shape.get(), "type");
+            if (type != "rectangle" && type != "rounded" && type != "circle") {
+                JS_ThrowTypeError(context_, "shape.type 需要 rectangle、rounded 或 circle");
+                return style;
+            }
+            style.shapeType = type == "rounded" ? arrange::core::ShapeKind::Rounded : type == "circle" ? arrange::core::ShapeKind::Circle : arrange::core::ShapeKind::Rectangle;
+            if (style.shapeType == arrange::core::ShapeKind::Rounded) {
+                if (!fieldsMatch(context_, shape.get(), {"type", "topStart", "topEnd", "bottomEnd", "bottomStart"}, "shape")) return style;
+                style.corners = {numberField(shape.get(), "topStart"), numberField(shape.get(), "topEnd"), numberField(shape.get(), "bottomEnd"), numberField(shape.get(), "bottomStart")};
+            } else if (!fieldsMatch(context_, shape.get(), {"type"}, "shape"))
+                return style;
         } else if (!JS_IsUndefined(shape.get()))
             JS_ThrowTypeError(context_, "shape 需要形状对象");
         style.alpha = numberField(value, "value", 1.0f);
@@ -418,6 +427,17 @@ namespace arrange::quickjs {
                 item.alpha = numberField(payload, "alpha", 1.0f);
                 item.sizeToIntrinsics = boolField(payload, "sizeToIntrinsics", true);
                 if (!enumField(payload, "contentScale", arrange::core::parseContentScale, item.contentScale) || !enumField(payload, "alignment", arrange::core::parseImageAlignment, item.alignment)) return {};
+                if (boolField(payload, "tile", false)) item.repeat = arrange::core::ImageRepeat::Tile;
+                ScopedValue slices(context_, JS_GetPropertyStr(context_, payload, "ninePatch"));
+                if (!JS_IsUndefined(slices.get())) {
+                    if (item.repeat == arrange::core::ImageRepeat::Tile || !JS_IsObject(slices.get()) || JS_IsArray(slices.get()) || !fieldsMatch(context_, slices.get(), {"left", "top", "right", "bottom"}, "ninePatch")) {
+                        if (!JS_HasException(context_)) JS_ThrowTypeError(context_, "ninePatch 需要 { left, top, right, bottom }，且不能与 tile 同用");
+                        failed_ = true;
+                        return {};
+                    }
+                    item.repeat = arrange::core::ImageRepeat::NinePatch;
+                    item.slices = {numberField(slices.get(), "left"), numberField(slices.get(), "top"), numberField(slices.get(), "right"), numberField(slices.get(), "bottom")};
+                }
                 ScopedValue filter(context_, JS_GetPropertyStr(context_, payload, "colorFilter"));
                 if (!JS_IsUndefined(filter.get())) {
                     if (!JS_IsObject(filter.get()) || !fieldsMatch(context_, filter.get(), {"tint"}, "colorFilter")) {
@@ -488,6 +508,26 @@ namespace arrange::quickjs {
                 result.push_back({item, key});
             } else if (type == "zIndex") {
                 result.push_back({arrange::core::ZIndexModifier{requiredNumberField(payload, "value", type)}, key});
+            } else if (type == "dropShadow" || type == "innerShadow" || type == "blur" || type == "backdropBlur") {
+                using arrange::core::EffectKind;
+                arrange::core::EffectModifier effect;
+                effect.kind = type == "dropShadow" ? EffectKind::DropShadow : type == "innerShadow" ? EffectKind::InnerShadow : type == "blur" ? EffectKind::Blur : EffectKind::BackdropBlur;
+                // 形状与颜色沿用背景的读取，颜色只属于阴影
+                effect.shape = paintStyle(payload, arrange::core::PaintStyleKind::Background);
+                effect.color = effect.shape.color;
+                effect.shape.color = 0;
+                effect.radius = numberField(payload, "radius");
+                effect.spread = numberField(payload, "spread");
+                ScopedValue offset(context_, JS_GetPropertyStr(context_, payload, "offset"));
+                if (!JS_IsUndefined(offset.get())) {
+                    if (!JS_IsObject(offset.get()) || JS_IsArray(offset.get()) || !fieldsMatch(context_, offset.get(), {"x", "y"}, "offset")) {
+                        if (!JS_HasException(context_)) JS_ThrowTypeError(context_, "offset 需要 { x, y }");
+                        failed_ = true;
+                        return {};
+                    }
+                    effect.offset = {numberField(offset.get(), "x"), numberField(offset.get(), "y")};
+                }
+                result.push_back({effect, key});
             } else if (type == "background" || type == "border" || type == "alpha") {
                 auto kind = arrange::core::PaintStyleKind::Background;
                 if (type == "border")

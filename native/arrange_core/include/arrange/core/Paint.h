@@ -22,12 +22,15 @@ namespace arrange::core {
         PopTransform,
         DrawLine,
         ContentMarker,
+        DrawPath,
+        DrawNative,
     };
 
     enum class DrawShapeType {
         Rectangle,
         Rounded,
         Circle,
+        Path,
     };
 
     struct DrawOp {
@@ -39,7 +42,12 @@ namespace arrange::core {
         float fontSize = 14.0f;
         float lineHeight = 0.0f;
         DrawShapeType shape = DrawShapeType::Rectangle;
-        float cornerRadius = 0.0f;
+        CornerRadii corners;
+        // 渐变存在时 color 只携带不透明度
+        GradientRef gradient;
+        PathRef path;
+        StrokeCap cap = StrokeCap::Butt;
+        StrokeJoin join = StrokeJoin::Miter;
         int maxLines = 0;
         std::string text;
         std::shared_ptr<const TextLayout> textLayout;
@@ -48,6 +56,11 @@ namespace arrange::core {
         PainterSnapshot painter;
         ContentScale contentScale = ContentScale::Fit;
         ImageAlignment alignment = ImageAlignment::Center;
+        ImageRepeat repeat = ImageRepeat::None;
+        ImageSlices slices;
+        std::shared_ptr<const NativePainterEntry> native;
+        SharedValue<NativePainterParams> nativeParams;
+        std::uint64_t nativeRevision = 0;
         bool hasTint = false;
         bool inputText = false;
         ModifierHandle textField;

@@ -198,8 +198,8 @@ namespace arrange::core {
                     break;
             }
         }
-        if (const auto* paint = std::get_if<PaintModifier>(&instance.descriptor.value); paint && paint->sizeToIntrinsics && paint->painter.content && paint->painter.content->intrinsicSize) {
-            const auto size = *paint->painter.content->intrinsicSize;
+        if (const auto* paint = std::get_if<PaintModifier>(&instance.descriptor.value); paint && paint->sizeToIntrinsics && painterIntrinsicSize(paint->painter)) {
+            const auto size = *painterIntrinsicSize(paint->painter);
             inner.minWidth = std::max(inner.minWidth, std::min(size.width, inner.maxWidth));
             inner.minHeight = std::max(inner.minHeight, std::min(size.height, inner.maxHeight));
         }

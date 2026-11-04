@@ -19,6 +19,8 @@ const length = (name: string) => ({ fields: [name], units: { [name]: 'length' },
 const colorFilter: UnitFields = { colorFilter: { tint: 'color' } }
 const scroll = (kind: ModifierEventKind) => ({ fields: ['value', 'onScroll', 'enabled'], events: { onScroll: kind } }) as const
 const draw: ModifierSchemaEntry = { fields: ['prepare', 'revision', 'transactional'], events: { prepare: 'drawPrepare' } }
+const shadowUnits: UnitFields = { shape, radius: 'length', spread: 'length', offset, color: 'color' }
+const shadow: ModifierSchemaEntry = { fields: ['shape', 'radius', 'spread', 'offset', 'color'], units: shadowUnits, arguments: [shadowUnits] }
 
 // 修饰表的唯一事实源：JS 降解、编译器单位检查与原生字段白名单都由它驱动
 export const modifierSchema: Readonly<Record<string, ModifierSchemaEntry>> = {
@@ -28,7 +30,7 @@ export const modifierSchema: Readonly<Record<string, ModifierSchemaEntry>> = {
         units: { textStyle: style }, arguments: [undefined, { textStyle: style }],
         events: { onValueChange: 'inputUpdate', onSubmit: 'inputSubmit', onChange: 'inputChange', onBlur: 'inputBlur' },
     },
-    paint: { fields: ['painter', 'contentScale', 'alignment', 'alpha', 'colorFilter', 'sizeToIntrinsics'], units: colorFilter, arguments: [undefined, colorFilter] },
+    paint: { fields: ['painter', 'contentScale', 'alignment', 'alpha', 'colorFilter', 'sizeToIntrinsics', 'tile', 'ninePatch'], units: colorFilter, arguments: [undefined, colorFilter] },
     padding: { fields: ['start', 'top', 'end', 'bottom'], units: padding, arguments: [padding] },
     width: length('value'), height: length('value'),
     alpha: { fields: ['value'] }, zIndex: { fields: ['value'] },
@@ -53,6 +55,9 @@ export const modifierSchema: Readonly<Record<string, ModifierSchemaEntry>> = {
     background: { fields: ['color', 'brush', 'shape'], units: { brush, shape }, arguments: [brush, shape] },
     border: { fields: ['width', 'color', 'brush', 'shape'], units: { width: 'length', brush, shape }, arguments: ['length', brush, shape] },
     clip: { fields: ['shape'], units: { shape }, arguments: [shape] },
+    dropShadow: shadow, innerShadow: shadow,
+    blur: { fields: ['radius'], units: { radius: 'length' }, arguments: ['length'] },
+    backdropBlur: { fields: ['radius', 'shape'], units: { radius: 'length', shape }, arguments: ['length', shape] },
     clickable: { fields: ['enabled', 'focusable', 'onClick', 'onDoubleClick', 'interaction'], events: { onClick: 'click', onDoubleClick: 'doubleClick', interaction: 'interaction' } },
     hoverable: { fields: ['enabled', 'onEnter', 'onExit', 'interaction'], events: { onEnter: 'hoverEnter', onExit: 'hoverExit', interaction: 'interaction' } },
     focusable: { fields: ['enabled', 'interaction'], events: { interaction: 'interaction' } },

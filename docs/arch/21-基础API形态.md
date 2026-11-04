@@ -55,6 +55,19 @@ config.app.useLive("http://host:port");
 
 规则见 [App入口](02-App入口.md)。
 
+Canvas C 档的原生 painter 在 C++ 按名称注册，可在任何时刻注册或替换：
+
+```cpp
+arrange::juce::registerNativePainter("meter", {{"level", NativeParamKind::Number}, {"color", NativeParamKind::Color}, {"peak", NativeParamKind::Boolean}, {"source", NativeParamKind::Source}},
+    [](juce::Graphics& g, juce::Rectangle<float> area, const arrange::core::NativePainterParams& params) {
+        g.setColour(juce::Colour(params.color("color")));
+        g.fillRect(area.withTrimmedTop(area.getHeight() * (1.0f - static_cast<float>(params.number("level")))));
+    });
+arrange::juce::unregisterNativePainter("meter");
+```
+
+绘制函数在消息线程调用，只能画在目标矩形内，不得阻塞。语义见 [Canvas](18-文本输入与绘制.md#canvas)。
+
 # 基础类型 API
 
 `Dp`、`Sp`、`Px`、Color、Shape、Brush 等值的写法与含义见 [基础类型](10-基础类型.md)。SFA 模板与脚本的特色构造和独立 `.ts` 的区别见 [SFA 与模板写法](33-SFA与模板写法.md#sfa-与纯-typescript-的编译边界)。
@@ -63,8 +76,14 @@ config.app.useLive("http://host:port");
 
 ```ts
 declare function solidColor(color: number): Brush
+declare function linearGradient(colors: readonly (number | ColorStop)[], options?: { start?: BrushPoint; end?: BrushPoint }): Brush
+declare function verticalGradient(colors: readonly (number | ColorStop)[]): Brush
+declare function horizontalGradient(colors: readonly (number | ColorStop)[]): Brush
+declare function radialGradient(colors: readonly (number | ColorStop)[], options?: { center?: BrushPoint; radius?: number }): Brush
+declare function sweepGradient(colors: readonly (number | ColorStop)[], options?: { center?: BrushPoint; startAngle?: number }): Brush
 declare function colorToHex(color: number): string
 declare function rounded(radiusDp: number, radiusPx: number): Shape
+declare function roundedCorners(corners: CornerSizes): Shape
 ```
 
 # Modifier API
@@ -101,6 +120,10 @@ interface Modifier {
     border(args: BorderOptions): Modifier
     border(widthDp: number, widthPx: number, brush: Brush | number, shape?: Shape): Modifier
     clip(shape: Shape): Modifier
+    dropShadow(args: ShadowOptions): Modifier
+    innerShadow(args: ShadowOptions): Modifier
+    blur(radiusDp: number, radiusPx: number): Modifier
+    backdropBlur(radiusDp: number, radiusPx: number, shape?: Shape): Modifier
     alpha(value: number): Modifier
     graphicsLayer(args?: GraphicsLayerOptions): Modifier
     clickable(arg: (() => void) | ClickableOptions): Modifier
@@ -127,9 +150,12 @@ interface Modifier {
 }
 ```
 
-参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，EnabledOptions 只包含 enabled。完整类型见包声明。阴影与渐变为后续能力，目前不导出。
+参数类型从 Framework 导出；GraphicsLayerOptions 只包含平移、缩放、rotationZ、alpha、矩形 clip 与 transformOrigin，EnabledOptions 只包含 enabled。完整类型见包声明。阴影与模糊的语义见 [Modifier](11-Modifier.md#阴影)。
 
 ```ts
+type ShadowOptions = { shape?: Shape; radiusDp?: number; radiusPx?: number; spreadDp?: number; spreadPx?: number; offset?: { xDp?: number; xPx?: number; yDp?: number; yPx?: number }; color: number }
+type PaintOptions = { contentScale?: ContentScaleValue; alignment?: ImageAlignment; alpha?: number; colorFilter?: { tint: number }; sizeToIntrinsics?: boolean; tile?: boolean; ninePatch?: NinePatch }
+type NinePatch = { left: number; top: number; right: number; bottom: number }
 type ClickableOptions = { onClick: () => void; onDoubleClick?: () => void; enabled?: boolean; focusable?: boolean; interactionState?: InteractionState }
 type HoverableOptions = { enabled?: boolean; onEnter?: () => void; onExit?: () => void; interactionState?: InteractionState }
 type PointerIcon = 'default' | 'hand' | 'text' | 'crosshair' | 'resizeHorizontal' | 'resizeVertical' | 'grab' | 'grabbing' | 'none'
@@ -250,11 +276,36 @@ interface IconProps {
 
 Painter 获取 API 为 painter(resource: string | {path: string}): Painter。Painter 提供只读 intrinsicSize、contentVersion、status、error 及 dispose()。业务通过 painter 取得能力对象再传入 Image/Icon；生命周期与绘制语义见 [内建 Arrangable](12-内建Arrangable.md)，路径约束见 [工具链与 App 发布包](14-工具链与App发布包.md)。
 
+## 图片与 Painter
+
+```ts
+declare function filmstrip(painter: Painter, args: { frames: number; orientation?: 'vertical' | 'horizontal' }): Filmstrip
+interface Filmstrip {
+    readonly painter: Painter
+    readonly frames: number
+    readonly orientation: 'vertical' | 'horizontal'
+    frame(index: number): Painter
+    at(fraction: number): Painter
+}
+
+declare function createPixelBuffer(width: number, height: number): PixelBuffer
+interface PixelBuffer extends Painter {
+    readonly width: number
+    readonly height: number
+    readonly data: Uint32Array
+    commit(): void
+}
+```
+
+- 铺放：`M.paint` 与 `drawPainter` 的 `tile` 按 painter 固有尺寸从目标左上角重复；`ninePatch` 以固有尺寸为单位切分，四角保持源尺寸，边与中心拉伸，目标放不下四角时等比缩小。二者忽略 `contentScale` 与 `alignment`，不能同用；矢量 painter 先按物理缩放栅格化。
+- filmstrip：一张图按帧数等分，默认竖向。`frame(i)` 与 `at(fraction)`（0 到 1 四舍五入到帧）返回单帧视图，视图本身就是 Painter，可用于 Image、Icon、`M.paint` 与 `drawPainter`，固有尺寸为单帧。视图按帧缓存，不拥有资源，释放由原 painter 负责。旋钮常写作 `M.paint(strip.at(value.value))`，换帧只改绘制、局部重绘。
+- 像素缓冲：定长位图，`data` 为非预乘 ARGB，边长 1 到 4096、总像素不超过 4194304。JS 填写后 `commit()` 把整块像素复制进原生并递增内容版本，未提交的修改不可见；同一版本只复制、只转换一次。它本身是 Painter，绘制时平滑缩放，适合低分辨率生成的背景。作用域释放时自动 `dispose()`。
+
 ## 后续能力的签名草案
 
-Canvas 与 InputState 为后续设计。Flow、Lazy 和焦点 API 已有完整消费者，列在下面的正式公开 API 中。
+InputState 为后续设计。Canvas、Flow、Lazy 和焦点 API 已有完整消费者，列在下面的正式公开 API 中。
 
-### Canvas
+## Canvas
 
 ```ts
 interface CanvasProps {
@@ -263,9 +314,18 @@ interface CanvasProps {
     controller?: CanvasController
     onDraw: (scope: DrawScope) => void
 }
+
+declare function createCanvasController(): CanvasController
+interface CanvasController {
+    invalidate(): void
+}
+
+interface DrawScope {
+    drawNative(name: string, args?: { x?: number; y?: number; width?: number; height?: number; params?: Record<string, number | boolean | string | DataSource> }): void
+}
 ```
 
-Canvas 行为见 [文本输入与绘制](18-文本输入与绘制.md) 与 [内建 Arrangable](12-内建Arrangable.md)。
+Canvas 与 `createCanvasController` 分别从 foundation 与 UI 入口导出。`DrawScope` 其余方法见 [Modifier 绘制](11-Modifier.md#绘制)。行为见 [文本输入与绘制](18-文本输入与绘制.md#canvas)。
 
 ## Flow
 
@@ -433,6 +493,9 @@ useTransport(): Transport
 useMeter(name: string): ComputedRef<number>
 useWaveform(name: string, options: { size: number }): ComputedRef<Float32Array>
 useSpectrum(name: string): ComputedRef<Float32Array>
+meterSource(name: string): DataSource
+waveformSource(name: string, options: { size: number }): DataSource
+spectrumSource(name: string): DataSource
 onNativeEvent<T extends InteropValue>(name: string, handler: (value: T) => void): () => void
 invokeNative<T extends InteropValue>(name: string, args?: InteropValue): Promise<T>
 ```

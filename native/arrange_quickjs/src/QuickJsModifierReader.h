@@ -48,7 +48,8 @@ namespace arrange::quickjs {
         [[nodiscard]] arrange::core::ModifierPadding readPadding(JSValueConst value);
         [[nodiscard]] std::pair<float, float> transformOriginFrom(JSValueConst value) const;
         [[nodiscard]] arrange::core::PaintStyleSemantics paintStyle(JSValueConst value, arrange::core::PaintStyleKind kind) const;
-        [[nodiscard]] std::uint32_t colorOrBrush(JSValueConst object, const char* colorKey, const char* brushKey) const;
+        // 读取 color 或 brush，结果写入 style 的颜色与渐变
+        void colorOrBrush(JSValueConst object, arrange::core::PaintStyleSemantics& style) const;
 
         JSContext* context_ = nullptr;
         QuickJsValueReader reader_;

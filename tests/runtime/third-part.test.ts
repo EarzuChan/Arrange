@@ -160,6 +160,11 @@ test('SFA 已知裸数和错单位在编译入口拒绝，普通 TS 参数仍直
     assert.throws(() => compileArrangeSfa(script('createScrollState({ initialPx: 4 })'), '单位边界.sfa'), /要求 PX/)
     assert.throws(() => compileArrangeSfa(script('function wrong(): Dp { return 4.sp }'), '单位边界.sfa'), /实际为 SP/)
     assert.throws(() => compileArrangeSfa(script('const value = ref(1.dp); value.value = 4.sp'), '单位边界.sfa'), /实际为 SP/)
+    const visual = (body: string) => `<script>import { M, Color, verticalGradient, sweepGradient, roundedCorners } from '@arrange/framework/ui'\n${body}</script>`
+    const lowered = compileArrangeSfa(visual('M.background(verticalGradient([Color(0xff000000), Color(0xffffffff)]), roundedCorners({ topStart: 4.dp, bottomEnd: 2.px })).border(1.dp, sweepGradient([Color(0xff000000), Color(0xffffffff)]))'), '视觉单位.sfa')
+    assert.match(lowered.code, /topStartDp: 4, topStartPx: 0/)
+    assert.match(lowered.code, /bottomEndDp: 0, bottomEndPx: 2/)
+    assert.throws(() => compileArrangeSfa(visual('roundedCorners({ topStart: 4 })'), '视觉单位.sfa'), /要求 LENGTH/)
 })
 
 test('跨 SFA、TS 转导出及脚本表达式保留正式单位契约', () => {
@@ -377,7 +382,7 @@ observe({ shape, spacing, style, graphics, shadow: shadow(value => value + 1) })
         const native = recordingNative()
         app.mount(native.target)
         native.frame()
-        assert.deepEqual(observed, { shape: { type: 'rounded', radiusDp: 8, radiusPx: 3 }, spacing: { kind: 'spacedBy', spaceDp: 4, spacePx: 2, alignment: undefined }, style: { fontSize: 12, lineHeight: 16, color: 0xff123456 }, graphics: { translationX: 7 }, shadow: 10 })
+        assert.deepEqual(observed, { shape: { type: 'rounded', topStartDp: 8, topStartPx: 3, topEndDp: 8, topEndPx: 3, bottomEndDp: 8, bottomEndPx: 3, bottomStartDp: 8, bottomStartPx: 3 }, spacing: { kind: 'spacedBy', spaceDp: 4, spacePx: 2, alignment: undefined }, style: { fontSize: 12, lineHeight: 16, color: 0xff123456 }, graphics: { translationX: 7 }, shadow: 10 })
         const chain = [...native.nodes.values()].map(node => node.inputs.get('modifier') as typeof M | undefined).find(chain => chain?.elements.some(element => element.type === 'text'))!
         assert.equal(chain.elements.find(element => element.type === 'text')!.value.text, '正式契约')
         app.unmount()

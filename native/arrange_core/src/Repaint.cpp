@@ -1,3 +1,4 @@
+#include <arrange/core/Affine.h>
 #include <arrange/core/Repaint.h>
 
 #include <algorithm>
@@ -6,32 +7,9 @@
 
 namespace arrange::core {
     namespace {
-        // x' = a·x + c·y + tx，y' = b·x + d·y + ty
-        struct Affine {
-            double a = 1, b = 0, c = 0, d = 1, tx = 0, ty = 0;
-        };
-
-        // 先 inner 后 outer
-        Affine compose(const Affine& outer, const Affine& inner) {
-            return {
-                outer.a * inner.a + outer.c * inner.b, outer.b * inner.a + outer.d * inner.b, outer.a * inner.c + outer.c * inner.d, outer.b * inner.c + outer.d * inner.d, outer.a * inner.tx + outer.c * inner.ty + outer.tx, outer.b * inner.tx + outer.d * inner.ty + outer.ty,
-            };
-        }
-
-        Affine translation(Point offset) {
-            return {1, 0, 0, 1, offset.x, offset.y};
-        }
-
-        // 与 JUCE 重放一致：绕轴心缩放、旋转后平移
+        // 与 JUCE 重放一致的层变换
         Affine opTransform(const DrawOp& op) {
-            const double px = op.rect.x + op.rect.width * op.transformOriginX;
-            const double py = op.rect.y + op.rect.height * op.transformOriginY;
-            const auto radians = op.rotationZ * 3.14159265358979323846 / 180.0;
-            const auto cosine = std::cos(radians), sine = std::sin(radians);
-            Affine result{cosine * op.scaleX, sine * op.scaleX, -sine * op.scaleY, cosine * op.scaleY, 0, 0};
-            result.tx = px + op.translationX - result.a * px - result.c * py;
-            result.ty = py + op.translationY - result.b * px - result.d * py;
-            return result;
+            return Affine::layer(op.rect, op.transformOriginX, op.transformOriginY, op.scaleX, op.scaleY, op.rotationZ, op.translationX, op.translationY);
         }
 
         // 当前变换与窗口坐标下的保守裁剪范围；裁剪取变换后矩形的外包盒，只会多画
@@ -40,39 +18,15 @@ namespace arrange::core {
             std::optional<Rect> clip;
         };
 
-        // 返回外包盒；坐标非有限时返回空
-        std::optional<Rect> project(const Rect& r, const Affine& transform) {
-            double left = 0, top = 0, right = 0, bottom = 0;
-            bool first = true;
-            for (const double x : {static_cast<double>(r.x), static_cast<double>(r.x) + r.width})
-                for (const double y : {static_cast<double>(r.y), static_cast<double>(r.y) + r.height}) {
-                    const auto px = transform.a * x + transform.c * y + transform.tx;
-                    const auto py = transform.b * x + transform.d * y + transform.ty;
-                    if (!std::isfinite(px) || !std::isfinite(py)) return std::nullopt;
-                    left = first ? px : std::min(left, px);
-                    top = first ? py : std::min(top, py);
-                    right = first ? px : std::max(right, px);
-                    bottom = first ? py : std::max(bottom, py);
-                    first = false;
-                }
-            return Rect{static_cast<float>(left), static_cast<float>(top), static_cast<float>(right - left), static_cast<float>(bottom - top)};
-        }
-
-        Rect intersect(const Rect& a, const Rect& b) {
-            const auto left = std::max(a.x, b.x), top = std::max(a.y, b.y);
-            const auto right = std::min(a.x + a.width, b.x + b.width), bottom = std::min(a.y + a.height, b.y + b.height);
-            return {left, top, std::max(0.0f, right - left), std::max(0.0f, bottom - top)};
-        }
-
         // 子片段与内容在 before 命令之后重放；before 中出现弹出或自定义绘制时无法给出单一作用域
         std::optional<Scope> enterLayer(const PaintLayerFragment& layer, Scope scope) {
             if (layer.drawCommands) return std::nullopt;
             for (const auto& op : layer.before) {
-                if (op.type == DrawOpType::PushTransform) scope.transform = compose(scope.transform, opTransform(op));
+                if (op.type == DrawOpType::PushTransform) scope.transform = scope.transform.after(opTransform(op));
                 if (op.type == DrawOpType::PushClip) {
-                    const auto clip = project(op.rect, scope.transform);
+                    const auto clip = scope.transform.project(op.rect);
                     if (!clip) return std::nullopt;
-                    scope.clip = scope.clip ? intersect(*scope.clip, *clip) : *clip;
+                    scope.clip = scope.clip ? intersectRect(*scope.clip, *clip) : *clip;
                 }
                 if (op.type == DrawOpType::PopTransform || op.type == DrawOpType::PopClip) return std::nullopt;
             }
@@ -85,17 +39,17 @@ namespace arrange::core {
                 return;
             }
             if (bounds.empty) return;
-            auto rect = project(bounds.rect, scope.transform);
+            auto rect = scope.transform.project(bounds.rect);
             if (!rect) {
                 damage.markFull();
                 return;
             }
-            if (scope.clip) rect = intersect(*rect, *scope.clip);
+            if (scope.clip) rect = intersectRect(*rect, *scope.clip);
             if (rect->width > 0 && rect->height > 0) damage.addRect(*rect);
         }
 
         Scope placedScope(const Scope& parent, Point offset) {
-            return {compose(parent.transform, translation(offset)), parent.clip};
+            return {parent.transform.after(Affine::translation(offset.x, offset.y)), parent.clip};
         }
 
         void addPlaced(RepaintDamage& damage, const PlacedPaintFragment& placed, const Scope& parent) {
@@ -112,6 +66,8 @@ namespace arrange::core {
             const auto& previous = *before.fragment;
             const auto& next = *after.fragment;
             if (previous.layer != next.layer || previous.content != next.content || previous.children.size() != next.children.size()) return replaceWhole();
+            // 内容模糊把子片段的变化扩散到模糊半径内，不向下递归
+            if (const auto* effect = previous.layer ? std::get_if<EffectModifier>(&previous.layer->value) : nullptr; effect && effect->kind == EffectKind::Blur) return replaceWhole();
             // 内容命令先于子片段重放，其中的状态命令会改变子片段作用域
             if (previous.content && std::any_of(previous.content->begin(), previous.content->end(), [](const DrawOp& op) { return op.type == DrawOpType::PushClip || op.type == DrawOpType::PushTransform; })) return replaceWhole();
             auto inner = placedScope(parent, before.offset);
@@ -133,11 +89,11 @@ namespace arrange::core {
                 for (const auto& op : list) {
                     switch (op.type) {
                         case DrawOpType::PushTransform:
-                            stack.push_back({compose(stack.back().transform, opTransform(op)), stack.back().clip});
+                            stack.push_back({stack.back().transform.after(opTransform(op)), stack.back().clip});
                             break;
                         case DrawOpType::PushClip: {
                             auto next = stack.back();
-                            if (const auto clip = project(op.rect, next.transform)) next.clip = next.clip ? intersect(*next.clip, *clip) : *clip;
+                            if (const auto clip = next.transform.project(op.rect)) next.clip = next.clip ? intersectRect(*next.clip, *clip) : *clip;
                             stack.push_back(next);
                             break;
                         }
@@ -169,6 +125,41 @@ namespace arrange::core {
                 if (fragment.layer) ops(fragment.layer->before, stack, nullptr);
                 if (fragment.content) ops(*fragment.content, stack, nullptr);
                 for (const auto& child : fragment.children) placed(child, stack.back());
+            }
+        };
+
+        // 收集背景模糊层：采样范围取输出外扩三倍标准差，与重放一致
+        struct BackdropSearch {
+            struct Backdrop {
+                Rect output;
+                Rect sample;
+            };
+
+            std::vector<Backdrop> found;
+            bool unknown = false;
+
+            void placed(const PlacedPaintFragment& target, const Scope& parent) {
+                if (!target.fragment || unknown) return;
+                const auto& fragment = *target.fragment;
+                auto scope = placedScope(parent, target.offset);
+                if (fragment.layer) {
+                    if (const auto* effect = std::get_if<EffectModifier>(&fragment.layer->value); effect && effect->kind == EffectKind::BackdropBlur) {
+                        const auto margin = effectSigma(*effect) * 3.0f;
+                        const auto& rect = fragment.layer->bounds;
+                        auto output = scope.transform.project(rect);
+                        auto sample = scope.transform.project({rect.x - margin, rect.y - margin, rect.width + margin * 2, rect.height + margin * 2});
+                        if (!output || !sample) {
+                            unknown = true;
+                            return;
+                        }
+                        if (scope.clip) output = intersectRect(*output, *scope.clip);
+                        found.push_back({*output, *sample});
+                    }
+                    const auto entered = enterLayer(*fragment.layer, scope);
+                    // 无法给出单一作用域的层按变换前范围保守处理
+                    if (entered) scope = *entered;
+                }
+                for (const auto& child : fragment.children) placed(child, scope);
             }
         };
 
@@ -217,6 +208,25 @@ namespace arrange::core {
         FieldSearch search{*this, field};
         search.placed(scene, {});
         if (!search.found) markFull();
+    }
+
+    void RepaintDamage::addBackdrops(const PlacedPaintFragment& scene) {
+        if (full_) return;
+        BackdropSearch search;
+        search.placed(scene, {});
+        if (search.unknown) return markFull();
+        // 背景模糊的采样范围与任一变化相交时整块重绘其输出；新增范围可能再牵动其它背景模糊，直到稳定
+        std::vector<bool> added(search.found.size(), false);
+        for (auto changed = true; changed && !full_;) {
+            changed = false;
+            for (std::size_t index = 0; index < search.found.size(); ++index) {
+                if (added[index]) continue;
+                const auto& sample = search.found[index].sample;
+                if (!std::any_of(rects_.begin(), rects_.end(), [&](const Rect& rect) { return intersectRect(rect, sample).width > 0 && intersectRect(rect, sample).height > 0; })) continue;
+                added[index] = changed = true;
+                addRect(search.found[index].output);
+            }
+        }
     }
 
     RepaintRegion RepaintDamage::finish(Size viewport) const {

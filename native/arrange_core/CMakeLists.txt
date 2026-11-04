@@ -28,6 +28,7 @@ add_library(arrange_core STATIC
   src/InputEditing.cpp
   src/Paint.cpp
   src/Repaint.cpp
+  src/DiagnosticsOverlay.cpp
   src/Interop.cpp
 )
 add_library(Arrange::core ALIAS arrange_core)

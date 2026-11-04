@@ -1,7 +1,7 @@
 export type ValueUnit = 'dp' | 'sp' | 'px' | 'color' | 'length'
 export type UnitFields = Readonly<{ [name: string]: ValueUnit | UnitFields }>
 
-const shape: UnitFields = { radius: 'length' }
+const shape: UnitFields = { topStart: 'length', topEnd: 'length', bottomEnd: 'length', bottomStart: 'length' }
 const brush: UnitFields = { color: 'color' }
 const style: UnitFields = { fontSize: 'sp', lineHeight: 'sp', color: 'color' }
 const offset: UnitFields = { x: 'length', y: 'length' }
@@ -17,6 +17,7 @@ export const unitShapes = { shape, brush, style, offset, size, range, sizeRange,
 export const unitFieldContracts: Readonly<Record<string, UnitFields>> = {
     style, shape, brush, padding, offset, size, rect: { ...offset, ...size }, range, sizeRange, graphics,
     border: { width: 'length', brush, shape },
+    shadow: { shape, radius: 'length', spread: 'length', offset, color: 'color' },
     text: { style },
     textField: { textStyle: style },
     paint: { colorFilter: { tint: 'color' } },
@@ -32,6 +33,7 @@ export const unitFieldContracts: Readonly<Record<string, UnitFields>> = {
     drawRoundRect: { x: 'px', y: 'px', width: 'px', height: 'px', radius: 'px', color: 'color', strokeWidth: 'px' },
     drawCircle: { centerX: 'px', centerY: 'px', radius: 'px', color: 'color', strokeWidth: 'px' },
     drawLine: { startX: 'px', startY: 'px', endX: 'px', endY: 'px', color: 'color', strokeWidth: 'px' },
+    drawText: { x: 'px', y: 'px', width: 'px', color: 'color', fontSize: 'px', lineHeight: 'px' },
     dpOffset: { x: 'dp', y: 'dp' },
     dpSize: { width: 'dp', height: 'dp' },
     dpRect: { x: 'dp', y: 'dp', width: 'dp', height: 'dp' },

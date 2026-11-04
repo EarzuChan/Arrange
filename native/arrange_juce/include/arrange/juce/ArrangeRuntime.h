@@ -129,6 +129,14 @@ namespace arrange::juce {
             return pipelineState_.counters();
         }
 
+        [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const noexcept {
+            return pipelineState_.timeline();
+        }
+
+        [[nodiscard]] arrange::core::FrameTimeline& frameTimeline() noexcept {
+            return pipelineState_.timeline();
+        }
+
         bool publishRetained(const arrange::core::FrameFinalizer& finalize) {
             return pipelineState_.publishRetained(finalize);
         }

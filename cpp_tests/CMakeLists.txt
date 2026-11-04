@@ -29,6 +29,10 @@ add_executable(arrange_repaint_region arrange_repaint_region.cpp)
 target_link_libraries(arrange_repaint_region PRIVATE Arrange::core)
 add_test(NAME arrange_repaint_region COMMAND arrange_repaint_region)
 
+add_executable(arrange_diagnostics_overlay arrange_diagnostics_overlay.cpp)
+target_link_libraries(arrange_diagnostics_overlay PRIVATE Arrange::core)
+add_test(NAME arrange_diagnostics_overlay COMMAND arrange_diagnostics_overlay)
+
 add_executable(arrange_input_session arrange_input_session.cpp)
 target_link_libraries(arrange_input_session PRIVATE Arrange::core)
 add_test(NAME arrange_input_session COMMAND arrange_input_session)

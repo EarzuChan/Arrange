@@ -279,14 +279,22 @@ int main() {
                     throw new Error(`无效参数被接受：${field}`)
                 }
                 rejects({ type: 'background', value: { brush: { type: 'solidColor', color: 1, extra: 2 } } }, 'extra')
-                rejects({ type: 'clip', value: { shape: { type: 'rounded', radius: 8, extra: 2 } } }, 'extra')
+                rejects({ type: 'clip', value: { shape: { type: 'rounded', topStart: 8, topEnd: 8, bottomEnd: 8, bottomStart: 8, extra: 2 } } }, 'extra')
                 rejects({ type: 'graphicsLayer', value: { transformOrigin: 'Typo' } }, 'transformOrigin')
                 rejects({ type: 'clickable', value: { onClick: 42 } }, 'onClick')
                 rejects({ type: 'align', value: { alignment: 'Centre' } }, 'Centre')
                 rejects({ type: 'background', value: { color: -1 } }, '颜色')
                 rejects({ type: 'background', value: { color: 1.5 } }, '颜色')
                 rejects({ type: 'background', value: { color: NaN } }, '颜色')
-                n.setModifier(1, { elements: [{ type: 'background', value: { brush: { type: 'solidColor', color: 0xff123456 } } }] })
+                const gradient = (patch) => ({ type: 'linearGradient', colors: [0xff000000, 0xffffffff], stops: [0, 1], start: { x: 0, y: 0 }, end: { x: 0, y: 1 }, ...patch })
+                rejects({ type: 'background', value: { brush: gradient({ extra: 2 }) } }, 'extra')
+                rejects({ type: 'background', value: { brush: gradient({ colors: [1], stops: [0] }) } }, '色标')
+                rejects({ type: 'background', value: { brush: gradient({ stops: [0.6, 0.4] }) } }, '不递减')
+                rejects({ type: 'background', value: { brush: gradient({ colors: [1, -1] }) } }, '颜色')
+                rejects({ type: 'background', value: { brush: { type: 'radialGradient', colors: [1, 2], stops: [0, 1], center: { x: 0.5, y: 0.5 }, radius: -1 } } }, '半径')
+                rejects({ type: 'background', value: { brush: { type: 'conic', colors: [1, 2], stops: [0, 1] } } }, 'brush.type')
+                rejects({ type: 'background', value: { brush: gradient(), shape: { type: 'rounded', topStart: -1, topEnd: 0, bottomEnd: 0, bottomStart: 0 } } }, 'paint')
+                n.setModifier(1, { elements: [{ type: 'background', value: { brush: { type: 'sweepGradient', colors: [0xffff0000, 0xff0000ff], stops: [0, 1], center: { x: 0.25, y: 0.75 }, startAngle: -90 }, shape: { type: 'rounded', topStart: 4, topEnd: 0, bottomEnd: 8, bottomStart: 2 } } }] })
             )JS");
             if (!schema.ok) throw std::runtime_error(schema.error);
 
@@ -294,7 +302,11 @@ int main() {
             SceneFramePipeline schemaPipeline;
             PublishedFrame schemaFrame;
             frame(schemaHost, schemaScene, schemaPipeline, schemaFrame);
-            check(schemaHost.eventSlotCount() == 0 && exportDrawOps(schemaFrame.content.scenePaint).size() == 1, "参数拒绝后不能残留回调或污染下一次有效提交");
+            const auto accepted = exportDrawOps(schemaFrame.content.scenePaint);
+            check(schemaHost.eventSlotCount() == 0 && accepted.size() == 1, "参数拒绝后不能残留回调或污染下一次有效提交");
+            const auto& sweep = accepted.front();
+            check(sweep.gradient && sweep.gradient->kind == GradientKind::Sweep && sweep.gradient->stops.size() == 2 && sweep.gradient->stops[1] == GradientStop{1, 0xff0000ff} && sweep.gradient->center == Point{0.25f, 0.75f} && sweep.gradient->startAngle == -90, "扫描渐变读取后丢失色标或几何");
+            check(sweep.color == 0xffffffffu && sweep.shape == DrawShapeType::Rounded && sweep.corners == CornerRadii{4, 0, 8, 2}, "渐变背景没有携带不透明度与分角圆角");
         }
         {
             QuickJsScriptHost host;

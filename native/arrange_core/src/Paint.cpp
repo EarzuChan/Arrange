@@ -1,3 +1,4 @@
+#include <arrange/core/Affine.h>
 #include <arrange/core/ModifierGeometry.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/Modifier.h>
@@ -5,6 +6,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -26,8 +28,8 @@ namespace arrange::core {
         }
 
         DrawShapeType shapeType(const PaintStyleSemantics& style) {
-            if (style.shapeType == "circle") return DrawShapeType::Circle;
-            if (style.shapeType == "rounded") return DrawShapeType::Rounded;
+            if (style.shapeType == ShapeKind::Circle) return DrawShapeType::Circle;
+            if (style.shapeType == ShapeKind::Rounded) return DrawShapeType::Rounded;
             return DrawShapeType::Rectangle;
         }
 
@@ -84,21 +86,66 @@ namespace arrange::core {
             target.rect.height = bottom - target.rect.y;
         }
 
+        Affine opTransform(const DrawOp& op) {
+            return Affine::layer(op.rect, op.transformOriginX, op.transformOriginY, op.scaleX, op.scaleY, op.rotationZ, op.translationX, op.translationY);
+        }
+
         PaintBounds transformBounds(PaintBounds bounds, const DrawOp& op) {
             if (!bounds.known || bounds.empty) return bounds;
-            const auto px = op.rect.x + op.rect.width * op.transformOriginX;
-            const auto py = op.rect.y + op.rect.height * op.transformOriginY;
-            const auto radians = op.rotationZ * 3.14159265358979323846 / 180.0;
+            const auto rect = opTransform(op).project(bounds.rect);
+            if (!rect) return {{}, false, false};
+            return {*rect, true, false};
+        }
+
+        // 按重放顺序跟踪变换与裁剪栈，求自定义绘制层的局部外包盒；子片段在内容标记处按当时的变换并入
+        PaintBounds commandBounds(const std::vector<DrawOp>& ops, const PaintBounds& children) {
+            struct State {
+                Affine transform;
+                std::optional<Rect> clip;
+            };
+
+            std::vector<State> stack{{}};
             PaintBounds result;
-            for (const auto x : {bounds.rect.x, bounds.rect.x + bounds.rect.width})
-                for (const auto y : {bounds.rect.y, bounds.rect.y + bounds.rect.height}) {
-                    const auto sx = (x - px) * op.scaleX;
-                    const auto sy = (y - py) * op.scaleY;
-                    const auto tx = px + op.translationX + sx * std::cos(radians) - sy * std::sin(radians);
-                    const auto ty = py + op.translationY + sx * std::sin(radians) + sy * std::cos(radians);
-                    if (!std::isfinite(tx) || !std::isfinite(ty)) return {{}, false, false};
-                    includeBounds(result, {{static_cast<float>(tx), static_cast<float>(ty), 0, 0}, true, false});
+            const auto include = [&](const PaintBounds& local) {
+                if (!local.known) {
+                    result.known = false;
+                    return;
                 }
+                if (local.empty) return;
+                auto rect = stack.back().transform.project(local.rect);
+                if (!rect) {
+                    result.known = false;
+                    return;
+                }
+                if (stack.back().clip) rect = intersectRect(*rect, *stack.back().clip);
+                if (rect->width > 0 && rect->height > 0) includeBounds(result, {*rect, true, false});
+            };
+            for (const auto& op : ops) {
+                switch (op.type) {
+                    case DrawOpType::PushTransform:
+                        stack.push_back({stack.back().transform.after(opTransform(op)), stack.back().clip});
+                        break;
+                    case DrawOpType::PushClip: {
+                        auto next = stack.back();
+                        if (const auto clip = next.transform.project(op.rect))
+                            next.clip = next.clip ? intersectRect(*next.clip, *clip) : *clip;
+                        else
+                            result.known = false;
+                        stack.push_back(next);
+                        break;
+                    }
+                    case DrawOpType::PopTransform:
+                    case DrawOpType::PopClip:
+                        if (stack.size() > 1) stack.pop_back();
+                        break;
+                    case DrawOpType::ContentMarker:
+                        include(children);
+                        break;
+                    default:
+                        include(drawOpBounds(op));
+                        break;
+                }
+            }
             return result;
         }
 
@@ -106,10 +153,15 @@ namespace arrange::core {
             DrawOp op;
             op.nodeId = node;
             op.rect = command.rect;
-            op.color = command.color;
+            op.color = command.gradient ? 0xffffffffu : command.color;
+            op.gradient = command.gradient;
             op.strokeWidth = command.strokeWidth;
-            op.cornerRadius = command.radius;
+            op.cap = command.cap;
+            op.join = command.join;
+            op.corners = CornerRadii::uniform(command.radius);
             op.lineEnd = command.lineEnd;
+            op.path = command.path;
+            if (command.path) op.rect = command.path->bounds;
             switch (command.kind) {
                 case DrawCommandKind::Rectangle:
                 case DrawCommandKind::RoundedRectangle:
@@ -122,7 +174,7 @@ namespace arrange::core {
                     break;
                 case DrawCommandKind::PushClip:
                     op.type = DrawOpType::PushClip;
-                    op.shape = command.shape == DrawCommandShape::Rectangle ? DrawShapeType::Rectangle : command.shape == DrawCommandShape::Rounded ? DrawShapeType::Rounded : DrawShapeType::Circle;
+                    op.shape = command.shape == DrawCommandShape::Rectangle ? DrawShapeType::Rectangle : command.shape == DrawCommandShape::Rounded ? DrawShapeType::Rounded : command.shape == DrawCommandShape::Oval ? DrawShapeType::Circle : DrawShapeType::Path;
                     break;
                 case DrawCommandKind::PopClip:
                     op.type = DrawOpType::PopClip;
@@ -143,6 +195,35 @@ namespace arrange::core {
                 case DrawCommandKind::Content:
                     op.type = DrawOpType::ContentMarker;
                     break;
+                case DrawCommandKind::Path:
+                    op.type = DrawOpType::DrawPath;
+                    op.shape = DrawShapeType::Path;
+                    break;
+                case DrawCommandKind::Text:
+                    op.type = DrawOpType::DrawText;
+                    op.text = command.text;
+                    op.fontSize = command.fontSize;
+                    op.lineHeight = command.lineHeight;
+                    op.maxLines = command.maxLines;
+                    op.textAlign = command.textAlign;
+                    op.overflow = command.overflow;
+                    break;
+                case DrawCommandKind::Native:
+                    op.type = DrawOpType::DrawNative;
+                    op.native = command.native;
+                    op.nativeParams = command.nativeParams;
+                    op.nativeRevision = command.nativeRevision;
+                    break;
+                case DrawCommandKind::Painter:
+                    op.type = DrawOpType::DrawPainter;
+                    op.painter = command.painter;
+                    op.contentScale = command.contentScale;
+                    op.alignment = command.alignment;
+                    op.repeat = command.repeat;
+                    op.slices = command.slices;
+                    op.hasTint = command.hasTint;
+                    op.color = withAlpha(command.hasTint ? command.color : 0xffffffffu, command.alpha);
+                    break;
             }
             return op;
         }
@@ -153,6 +234,20 @@ namespace arrange::core {
                 return previous;
             }
             for (const auto& child : next.children) includeBounds(next.bounds, translated(child.fragment->bounds, child.offset));
+            // 自定义绘制层只在内容标记处重放子片段，边界由命令求出
+            if (next.layer && next.layer->drawCommands) {
+                next.bounds = commandBounds(next.layer->before, next.bounds);
+                ++counters.fragmentsBuilt;
+                return std::make_shared<const PaintFragment>(std::move(next));
+            }
+            // 内容模糊把子片段边界外扩三倍标准差；阴影与背景模糊并入自身输出范围
+            if (const auto* effect = next.layer ? std::get_if<EffectModifier>(&next.layer->value) : nullptr) {
+                if (effect->kind == EffectKind::Blur && next.bounds.known && !next.bounds.empty) {
+                    const auto margin = effectSigma(*effect) * 3.0f;
+                    next.bounds.rect = {next.bounds.rect.x - margin, next.bounds.rect.y - margin, next.bounds.rect.width + margin * 2, next.bounds.rect.height + margin * 2};
+                } else if (effect->kind != EffectKind::Blur)
+                    includeBounds(next.bounds, {effectOutputBounds(*effect, next.layer->bounds), true, false});
+            }
             if (next.content)
                 for (const auto& op : *next.content) includeBounds(next.bounds, drawOpBounds(op));
             if (next.layer) {
@@ -160,8 +255,6 @@ namespace arrange::core {
                     if (it->type == DrawOpType::PushTransform) next.bounds = transformBounds(next.bounds, *it);
                 for (const auto& op : next.layer->before) includeBounds(next.bounds, drawOpBounds(op));
                 for (const auto& op : next.layer->after) includeBounds(next.bounds, drawOpBounds(op));
-                // 自定义绘制可在内容标记间切换变换；未知投影保守保留，逐操作仍可剔除。
-                if (next.layer->drawCommands) next.bounds.known = false;
             }
             ++counters.fragmentsBuilt;
             return std::make_shared<const PaintFragment>(std::move(next));
@@ -185,9 +278,11 @@ namespace arrange::core {
             rect.y += op.rect.y;
             rect.width += maxShift - minShift;
         }
-        if (op.type == DrawOpType::DrawPainter && (op.contentScale == ContentScale::Unscaled || op.contentScale == ContentScale::Inside || op.contentScale == ContentScale::Crop)) return {{}, false, false};
+        if (op.type == DrawOpType::DrawPainter && op.repeat == ImageRepeat::None && (op.contentScale == ContentScale::Unscaled || op.contentScale == ContentScale::Inside || op.contentScale == ContentScale::Crop)) return {{}, false, false};
         auto margin = 1.0f;
         if (op.type == DrawOpType::StrokeRect) margin += op.strokeWidth * 0.5f;
+        // 尖角线接最多伸出三倍线宽，其余线帽与线接不超过一倍
+        if (op.type == DrawOpType::DrawPath && op.strokeWidth > 0) margin += op.strokeWidth * (op.join == StrokeJoin::Miter ? 3.0f : 1.0f);
         if (op.type == DrawOpType::DrawLine) {
             rect = {std::min(op.rect.x, op.lineEnd.x), std::min(op.rect.y, op.lineEnd.y), std::abs(op.rect.x - op.lineEnd.x), std::abs(op.rect.y - op.lineEnd.y)};
             margin += std::max(1.0f, op.strokeWidth) * 0.5f;
@@ -228,7 +323,15 @@ namespace arrange::core {
                 std::size_t split = 0;
                 if (customDraw) {
                     next->drawCommands = instance.preparedDraw;
-                    for (const auto& command : *instance.preparedDraw) ops.push_back(drawCommandOp(command, id));
+                    for (const auto& command : *instance.preparedDraw) {
+                        auto op = drawCommandOp(command, id);
+                        if (op.type == DrawOpType::DrawText) {
+                            prepareText(op, textLayoutService_);
+                            op.rect.height = op.textLayout->height;
+                        }
+                        // 未加载完成的 painter 不出命令
+                        if (op.type != DrawOpType::DrawPainter || op.painter.content) ops.push_back(std::move(op));
+                    }
                     split = ops.size();
                 } else
                     collectModifier(
@@ -335,7 +438,7 @@ namespace arrange::core {
             op.nodeId = id;
             op.rect = instance.bounds;
             op.shape = shapeType(shape);
-            op.cornerRadius = shape.cornerRadius;
+            op.corners = shape.corners;
             ops.push_back(op);
         };
         const auto pop = [&](DrawOpType type) {
@@ -352,15 +455,16 @@ namespace arrange::core {
             }
             const auto overlay = style->kind == PaintStyleKind::Border;
             if (overlay) content();
-            if (style->color != 0) {
+            if (style->color != 0 || style->gradient) {
                 DrawOp op;
                 op.type = overlay ? DrawOpType::StrokeRect : DrawOpType::FillRect;
                 op.nodeId = id;
                 op.rect = instance.bounds;
-                op.color = withAlpha(style->color, alpha);
+                op.color = withAlpha(style->gradient ? 0xffffffffu : style->color, alpha);
+                op.gradient = style->gradient;
                 op.strokeWidth = style->strokeWidth;
                 op.shape = shapeType(*style);
-                op.cornerRadius = style->cornerRadius;
+                op.corners = style->corners;
                 ops.push_back(op);
             }
             if (!overlay) content();
@@ -427,6 +531,8 @@ namespace arrange::core {
                 op.painter = paint->painter;
                 op.contentScale = paint->contentScale;
                 op.alignment = paint->alignment;
+                op.repeat = paint->repeat;
+                op.slices = paint->slices;
                 op.hasTint = paint->tint.has_value();
                 op.color = withAlpha(paint->tint.value_or(0xffffffffu), alpha * paint->alpha);
                 ops.push_back(std::move(op));

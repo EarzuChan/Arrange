@@ -68,15 +68,21 @@ namespace arrange::core {
 
     bool containsShape(Rect bounds, const PaintStyleSemantics& shape, Point point) noexcept {
         if (!containsRect(bounds, point)) return false;
-        if (shape.shapeType == "circle") {
+        if (shape.shapeType == ShapeKind::Circle) {
             const auto x = (point.x - bounds.x - bounds.width * 0.5f) / (bounds.width * 0.5f);
             const auto y = (point.y - bounds.y - bounds.height * 0.5f) / (bounds.height * 0.5f);
             return x * x + y * y <= 1;
         }
-        if (shape.shapeType == "rounded") {
-            const auto radius = std::min(shape.cornerRadius, std::min(bounds.width, bounds.height) * 0.5f);
-            const auto x = point.x - std::clamp(point.x, bounds.x + radius, bounds.x + bounds.width - radius);
-            const auto y = point.y - std::clamp(point.y, bounds.y + radius, bounds.y + bounds.height - radius);
+        if (shape.shapeType == ShapeKind::Rounded) {
+            // 按点所在象限取对应角的半径，只在该角的圆角方块内做圆判定
+            const auto corners = shape.corners.fitted(bounds.width, bounds.height);
+            const auto left = point.x < bounds.x + bounds.width * 0.5f;
+            const auto top = point.y < bounds.y + bounds.height * 0.5f;
+            const auto radius = top ? (left ? corners.topStart : corners.topEnd) : (left ? corners.bottomStart : corners.bottomEnd);
+            const auto centerX = left ? bounds.x + radius : bounds.x + bounds.width - radius;
+            const auto centerY = top ? bounds.y + radius : bounds.y + bounds.height - radius;
+            const auto x = left ? std::max(0.0f, centerX - point.x) : std::max(0.0f, point.x - centerX);
+            const auto y = top ? std::max(0.0f, centerY - point.y) : std::max(0.0f, point.y - centerY);
             return x * x + y * y <= radius * radius;
         }
         return true;

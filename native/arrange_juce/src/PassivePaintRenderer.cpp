@@ -18,7 +18,7 @@ namespace arrange::juce {
         preparationMillis_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     }
 
-    void PassivePaintRenderer::paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame) {
+    double PassivePaintRenderer::paint(::juce::Graphics& g, const arrange::core::PublishedFrame& frame, const std::vector<arrange::core::DrawOp>& diagnosticsOverlay) {
         const auto started = std::chrono::steady_clock::now();
         ++fullViewportPaints_;
         lastFullPaintReason_ = "宿主重绘复用已发布片段，并跳过确定不可见的绘制";
@@ -29,9 +29,12 @@ namespace arrange::juce {
         } else {
             (void)drawOpsPainter_.paint(g, content.scenePaint, content.focusedInputModifier, content.focusedInputViewportX, content.overlayDrawOps);
         }
+        if (!diagnosticsOverlay.empty()) (void)drawOpsPainter_.paint(g, diagnosticsOverlay);
         (void)drawOpsPainter_.paint(g, content.diagnosticsBadgeDrawOps);
         (void)drawOpsPainter_.paint(g, content.diagnosticsToastDrawOps);
-        paintMillis_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        const auto millis = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        paintMillis_ += millis;
+        return millis;
     }
 }
 

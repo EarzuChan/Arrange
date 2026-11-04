@@ -40,6 +40,7 @@ target_sources(arrange_juce PRIVATE
   src/InputTextSession.cpp
   src/TextInputLayoutModel.cpp
   src/JuceDrawOpsPainter.cpp
+  src/ImageBlur.cpp
   src/JuceTextServices.cpp
   src/PackageRuntimeSource.cpp
   src/PassivePaintRenderer.cpp

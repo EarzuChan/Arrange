@@ -3,7 +3,7 @@ import { ARRANGE_RUNTIME_VERSION } from '../../packages/framework/src/native.ts'
 
 // 补齐真实宿主必然提供的全部成员，测试按需覆盖；interop 仅在传入时出现
 export function createFakeNative(overrides: Partial<NativeTransactionTarget> = {}): NativeTransactionTarget {
-    let handle = 1n
+    let handle = 1n, pixelVersion = 1
     return {
         focusCommand: () => false,
         installFrameDriver: () => { },
@@ -16,6 +16,8 @@ export function createFakeNative(overrides: Partial<NativeTransactionTarget> = {
         abortRearrange: () => { },
         acquirePainter: () => ({ identity: handle++, generation: 1n }),
         releasePainter: () => { },
+        createPixelBuffer: () => ({ identity: handle++, generation: 1n }),
+        commitPixelBuffer: () => ++pixelVersion,
         registerBinding: () => ({ identity: handle++, generation: 1n }),
         updateBinding: () => { },
         releaseBinding: () => { },

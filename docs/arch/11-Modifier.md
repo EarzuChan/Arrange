@@ -31,7 +31,7 @@ Modifier 使用有序 descriptor，QuickJS 直接读取 JSValue 并生成类型�
 
 TS 方法使用明确的参数类型；原生 reader 校验字段集合、类型及取值，不忽略未知字段。新增能力必须同时实现 TS 参数、JSValue 解码、原生语义、失效、生命周期和真实链路测试。源码定位与 authoring 契约见 [SFA 与模板写法](33-SFA与模板写法.md)。
 
-下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)；阴影等尚属后续能力。
+下面包含最终设计示例。正式导出与签名统一见 [基础 API 形态](21-基础API形态.md)。
 
 # 便捷组合
 
@@ -148,7 +148,12 @@ M.border(1, 0, 0xFF606060)
 M.border(1, 0, 0xFF606060, rounded(8, 0))
 
 M.clip(rounded(8, 0))
+
+M.background(verticalGradient([0xFF303030, 0xFF202020]), roundedCorners({ topStartDp: 12, topEndDp: 12 }))
+M.border(1, 0, sweepGradient([0xFFFF0000, 0xFF00FF00, 0xFFFF0000]), CircleShape)
 ```
+
+Brush 与 Shape 的取值见 [基础类型](10-基础类型.md#brush)。渐变 `background` 与 `border` 按本层形状的外包盒定位渐变。
 
 `background` 与 `border` 绘制在对应 Modifier 层的尺寸内。`clip` 裁剪后续绘制，不改变布局尺寸；命中也受该层精确形状约束，矩形、圆形/椭圆及圆角矩形分别按对应形状判断。每层 clip 在其局部坐标中判断，沿命中路径共同生效。
 
@@ -191,7 +196,28 @@ M.innerShadow({
 })
 ```
 
+SFA 中长度直接写单位：`M.dropShadow({ radius: 12.dp, offset: { y: 4.dp }, color: Color(0x66000000) })`，编译期合并为上面的双通道字段。
+
+参数与设计工具一致：`radius` 是模糊半径，高斯标准差取其一半（同 CSS `box-shadow`）；`spread` 为扩展，外阴影向外扩大形状，内阴影向内收缩挖空区域，圆角随之增减；`offset` 移动阴影；`shape` 省略时为矩形。字段均可省略，只有 `color` 必填。
+
+- `dropShadow` 画在本层形状之后、后续内容之前，不裁到形状内，可超出布局 bounds；不改布局与命中。
+- `innerShadow` 画在本层形状之内、后续内容之前：阴影色铺满形状外围，挖去收缩并偏移后的形状，模糊后裁到形状内。顺序依链条，常见写法是 `background` 在前，内阴影压在背景上。
+
 注意：我们不采用 `M.shadow(elevation)`，这和设计工具不接轨，太和 Material 捆绑，不进入核心 API。
+
+# 模糊
+
+```ts
+M.blur(6, 0)                        // 模糊后续内容
+M.backdropBlur(16, 0, rounded(12, 0)) // 毛玻璃：模糊本层之前已画的内容
+```
+
+两者的半径即高斯标准差，为 DP/PX 双通道长度，SFA 中写 `M.blur(6.dp)`。
+
+- `blur` 把后续内容整体画到离屏位图再模糊，输出向外扩展三倍标准差；后续内容的透明度在模糊之后统一乘上。
+- `backdropBlur` 在本层形状内显示绘制顺序上位于本层之前的内容的模糊结果，再画后续内容；毛玻璃的半透明底色用其后的 `background` 表达，颗粒用 `paint` 或 `drawPainter` 叠加。它读取的是整棵场景已画的像素，祖先变换与裁剪都会计入。
+
+两者与阴影都建立在[位图缓存层](05-渲染设计.md#位图缓存层)上，脏区规则见[脏区重绘](05-渲染设计.md#脏区重绘)。混合模式、着色器效果不在核心能力中。
 
 # 绘制
 
@@ -211,15 +237,31 @@ M.drawWithCache((cache) => ({
 
 `DrawScope.size` 是当前候选中该 Modifier 层的只读尺寸。所有绘制坐标、尺寸、半径、线宽和平移使用 JUCE 逻辑 PX；纯 TS 传数字，SFA 使用 `.px` 或声明为 PX 的值，颜色按既有 `Color(...)` 值契约编写。需要 DP/SP 换算时显式读取 Density，不由绘制作用域隐式推断单位。
 
-作用域提供纯色 `drawRect`、`drawRoundRect`、`drawOval`、`drawCircle` 和 `drawLine`。形状参数包含 `color` 与可选 `strokeWidth`，形状的线宽为零表示填充；线条默认线宽为 1，必须大于零。矩形默认从 `(0, 0)` 填满当前层；圆形默认中心在当前层中心，半径为较短边的一半。圆角矩形另需 `radius`。坐标、尺寸和变换须有限，尺寸、半径和线宽不得为负数。
+作用域提供 `drawRect`、`drawRoundRect`、`drawOval`、`drawCircle`、`drawLine` 与 `drawPath`。画笔参数为 `color` 或 `brush` 二选一，`brush` 接受任意 [Brush](10-基础类型.md#brush)，另有可选 `strokeWidth`；形状与路径的线宽为零表示填充，线条默认线宽为 1，必须大于零。矩形默认从 `(0, 0)` 填满当前层；圆形默认中心在当前层中心，半径为较短边的一半。圆角矩形另需 `radius`。坐标、尺寸和变换须有限，尺寸、半径和线宽不得为负数。
 
-`clipRect`、`clipRoundRect`、`clipOval` 及 `withTransform` 接收嵌套同步回调，退出时恢复前一绘制状态。变换支持 `translationX/Y`、`scaleX/Y`、`rotationZ` 及比例原点 `originX/Y`（默认中心）。这些局部绘制状态只影响绘制，不改布局或输入几何；需要移动交互范围时使用 `graphicsLayer`。作用域在回调返回后失效，不能保留后异步调用。
+```ts
+const needle = new Path().moveTo(0, 0).lineTo(40, 4).lineTo(0, 8).close()
+M.drawWithCache(() => ({
+  onDrawBehind(scope) {
+    scope.drawPath(needle, { brush: horizontalGradient([0xFFFFFFFF, 0x00FFFFFF]) })
+    scope.drawPath(arc, { color: 0xFF61D6BB, strokeWidth: 3, cap: 'round' })
+    scope.drawText({ text: '-12 dB', x: 20, y: 30, color: 0xFFD7E6EF, fontSize: 11, textAlign: 'center' })
+    scope.drawPainter(knobFace, { width: 48, height: 48 })
+  },
+}))
+```
+
+`Path` 是可复用的路径对象，提供 `moveTo`、`lineTo`、`quadraticTo`、`cubicTo`、`arcTo`（沿矩形内切椭圆、起始角与扫过角为度数，0 指向右侧、顺时针，可选另起子路径）、`close` 与 `reset`，`fillType` 为 `nonZero` 或 `evenOdd`。路径描边另有线帽 `cap`（`butt`、`round`、`square`）与线接 `join`（`miter`、`round`、`bevel`）。路径对象可放进 `drawWithCache` 的构建阶段复用，每次绘制时整段写入命令。
+
+`drawText` 经原生 `TextLayoutService` 排版，与 Text 共用测量与绘制；字号、行高为 PX，`width` 为 0 或省略时不限宽，此时 `textAlign` 以 `x` 为锚点（居中即以 `x` 为中线）。另有 `maxLines`、`overflow`。`drawPainter` 绘制 painter 到目标矩形，参数与 `M.paint` 相同（`contentScale`、`alignment`、`alpha`、`tint`、`tile`、`ninePatch`），读取 painter 状态会把其加载与内容版本登记为绘制依赖，未加载完成时不出命令。filmstrip 视图与像素缓冲都是 painter，见 [基础 API 形态](21-基础API形态.md#图片与-painter)。
+
+`clipRect`、`clipRoundRect`、`clipOval`、`clipPath` 及 `withTransform` 接收嵌套同步回调，退出时恢复前一绘制状态。变换支持 `translationX/Y`、`scaleX/Y`、`rotationZ` 及比例原点 `originX/Y`（默认中心）。这些局部绘制状态只影响绘制，不改布局或输入几何；需要移动交互范围时使用 `graphicsLayer`。作用域在回调返回后失效，不能保留后异步调用。
 
 `drawBehind` 在后续内容前绘制，并自动保留一次内容。`drawWithContent` 的 `drawContent()` 可调用零次、一次或多次，每次在当时 clip/transform 状态下绘制同一后续内容；零次隐藏后续绘制，不删除布局或交互节点。输入光标与选区覆盖层遵守同一内容次数和绘制状态。实现通过共享内容片段引用保存这些调用，不能复制后续节点或逐条重建其绘制命令。
 
 `drawWithCache` 构建函数可返回 `onDrawBehind`、`onDrawWithContent` 或两者；前者先执行，后者控制内容，未提供后者时默认绘制一次内容。缓存归最终 Layout 的对应 Modifier 实例所有；层尺寸变化或构建函数读取的响应式依赖变化时重建，绘制回调自身读取的依赖只刷新绘制命令。构建和绘制分别追踪依赖，显式读取 Density 时其变化自然进入对应依赖。keyed 移动保留缓存，替换回调、移除或退休释放缓存和订阅；内容停用冻结工作，恢复读取最新值。失败候选恢复已发布缓存及订阅，不泄漏候选依赖。
 
-全部回调在统一候选的绘制准备阶段同步执行，应只读取状态并录制绘制，不能产生事件、改变响应式状态或异步工作。准备将命令解码为原生类型化不可变片段，JUCE `paint()` 只重放；尺寸更新与录制属于同一候选，失败遵守 [统一发布边界](26-调度线程与帧阶段.md)。更完整的路径、渐变、文字、图片及通用 Canvas 能力在独立绘图 API 中定义。
+全部回调在统一候选的绘制准备阶段同步执行，应只读取状态并录制绘制，不能产生事件、改变响应式状态或异步工作。准备将命令解码为原生类型化不可变片段，JUCE `paint()` 只重放；尺寸更新与录制属于同一候选，失败遵守 [统一发布边界](26-调度线程与帧阶段.md)。命令编码、引用表与求界见 [渲染设计](05-渲染设计.md#片段发布与重放)。Canvas 与绘制修饰器共用同一机制，见 [文本输入与绘制](18-文本输入与绘制.md#canvas)。
 
 # 图层与变换
 

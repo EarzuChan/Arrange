@@ -38,6 +38,14 @@ namespace arrange::core {
 
     SceneFramePipelineResult SceneFramePipeline::run(NativeScene& scene, NodeId root, Constraints constraints, const MutationTransaction* transaction, bool framePipelineRequested, PublishedFrame& publishedFrame, const FrameFinalizer& finalize, double timeMillis, const FramePreparation& prepare) {
         SceneFramePipelineResult result;
+        const auto runStarted = std::chrono::steady_clock::now();
+        // 关闭时不做任何记录准备
+        const auto tracing = timeline_.enabled();
+        const auto countersBefore = tracing ? counters_ : FrameExecutionCounters{};
+        const auto drawsBefore = tracing ? scene.drawPreparations() : 0;
+        const auto elapsed = [&] {
+            return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - runStarted).count();
+        };
         (void)layout_.takeScrollUpdates();
         result.ran = true;
         // 所有构建原地写入 scene，写入日志保存首次写入前的原值；任一阶段失败都回滚到上次成功 scene/PublishedFrame
@@ -97,7 +105,11 @@ namespace arrange::core {
                 }
                 result.phases.record(FramePhase::Layout, result.plan.layout);
                 if (result.plan.buildPaint) {
-                    if (prepare.draw) prepare.draw(scene);
+                    if (prepare.draw) {
+                        const auto drawStarted = std::chrono::steady_clock::now();
+                        prepare.draw(scene);
+                        counters_.drawPrepareMillis += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - drawStarted).count();
+                    }
                     const auto started = std::chrono::steady_clock::now();
                     candidateFrame.content.scenePaint = drawOpsBuilder_.build(tree, root, counters_.paintWork);
                     ++counters_.paintBuilds;
@@ -129,11 +141,13 @@ namespace arrange::core {
             scene.clearDirty();
             publishedFrame = std::move(candidateFrame);
             result.scrollUpdates = layout_.takeScrollUpdates();
+            if (tracing && result.plan.publishFrame) recordFrame(countersBefore, drawsBefore, scene, publishedFrame, result.phases, timeMillis, elapsed(), false);
         } catch (const std::exception& exception) {
             ++counters_.failedSubmissions;
             counters_.candidateNodesCopied += scene.tree().journaledNodes();
             scene.rollbackJournal();
             result.error = exception.what();
+            if (tracing) recordFrame(countersBefore, drawsBefore, scene, publishedFrame, result.phases, timeMillis, elapsed(), true);
             // 错误通过结果交给宿主诊断；不覆盖先前已发布的图像或输入几何
         } catch (...) {
             scene.rollbackJournal();
@@ -142,6 +156,36 @@ namespace arrange::core {
         }
         layout_.setMaterializer({});
         return result;
+    }
+
+    void SceneFramePipeline::recordFrame(const FrameExecutionCounters& before, std::uint64_t drawsBefore, const NativeScene& scene, const PublishedFrame& frame, PhaseSet phases, double timeMillis, double totalMillis, bool failed) {
+        const auto& after = counters_;
+        FrameRecord record;
+        record.revision = frame.revision;
+        record.timeMillis = timeMillis;
+        record.failed = failed;
+        record.phases = phases.bits;
+        record.millis.measure = after.measureMillis - before.measureMillis;
+        record.millis.place = after.placeMillis - before.placeMillis;
+        record.millis.drawPrepare = after.drawPrepareMillis - before.drawPrepareMillis;
+        record.millis.paintBuild = after.paintBuildMillis - before.paintBuildMillis;
+        record.millis.hitBuild = after.hitBuildMillis - before.hitBuildMillis;
+        record.millis.total = totalMillis;
+        record.measuredNodes = after.layoutWork.measuredNodes - before.layoutWork.measuredNodes;
+        record.measureCacheHits = after.layoutWork.measureCacheHits - before.layoutWork.measureCacheHits;
+        record.placedNodes = after.layoutWork.placedNodes - before.layoutWork.placedNodes;
+        record.placeCacheHits = after.layoutWork.placeCacheHits - before.layoutWork.placeCacheHits;
+        record.fragmentsBuilt = after.paintWork.fragmentsBuilt - before.paintWork.fragmentsBuilt;
+        record.fragmentsReused = after.paintWork.fragmentsReused - before.paintWork.fragmentsReused;
+        record.contentBuilds = after.paintWork.contentBuilds - before.paintWork.contentBuilds;
+        record.contentReuses = after.paintWork.contentReuses - before.paintWork.contentReuses;
+        record.emittedOps = after.paintWork.emittedOps - before.paintWork.emittedOps;
+        record.hitNodesBuilt = after.hitWork.nodesBuilt - before.hitWork.nodesBuilt;
+        record.hitSubtreeCacheHits = after.hitWork.subtreeCacheHits - before.hitWork.subtreeCacheHits;
+        record.drawRecords = scene.drawPreparations() - drawsBefore;
+        record.nodes = scene.tree().size();
+        if (!failed && frame.plan.passivePaint) record.repaint = frame.changes.repaint;
+        timeline_.record(std::move(record));
     }
 
     void SceneFramePipeline::finishCandidate(const PublishedFrame& previous, PublishedFrame& candidate) {
@@ -164,6 +208,7 @@ namespace arrange::core {
                 damage.addInputField(before.scenePaint, before.focusedInputModifier);
                 damage.addInputField(after.scenePaint, after.focusedInputModifier);
             }
+            damage.addBackdrops(after.scenePaint);
             candidate.changes.repaint = damage.finish(after.viewport);
         }
         candidate.revision = previous.revision + (candidate.plan.publishFrame ? 1 : 0);

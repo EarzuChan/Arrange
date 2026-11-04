@@ -412,6 +412,7 @@ namespace arrange::quickjs {
                     instance.preparedDrawSize = size;
                     instance.preparedDrawRevision = input->revision;
                     instance.preparedDrawCallback = input->prepare;
+                    candidateScene.noteDrawPrepared();
                 }
             }
             return {true, {}};

@@ -2,8 +2,19 @@ import { requireArgb } from './color.ts'
 
 export { Dp, Sp, Px } from './unit.ts'
 
-export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; radiusDp: number; radiusPx: number }>
-export type Brush = Readonly<{ type: "solidColor"; color: number }>
+export type CornerSizes = Readonly<{ topStartDp?: number; topStartPx?: number; topEndDp?: number; topEndPx?: number; bottomEndDp?: number; bottomEndPx?: number; bottomStartDp?: number; bottomStartPx?: number }>
+export type Shape = Readonly<{ type: "rectangle" | "circle" }> | Readonly<{ type: "rounded"; topStartDp: number; topStartPx: number; topEndDp: number; topEndPx: number; bottomEndDp: number; bottomEndPx: number; bottomStartDp: number; bottomStartPx: number }>
+// 渐变几何取所绘形状外包盒的 0 到 1 比例
+export type BrushPoint = Readonly<{ x: number; y: number }>
+export type ColorStop = readonly [position: number, color: number]
+type GradientColors = Readonly<{ colors: readonly number[]; stops: readonly number[] }>
+export type LinearGradient = GradientColors & Readonly<{ type: "linearGradient"; start: BrushPoint; end: BrushPoint }>
+// 半径 1 表示到达离中心最远的角
+export type RadialGradient = GradientColors & Readonly<{ type: "radialGradient"; center: BrushPoint; radius: number }>
+// 起始角为度数，0 指向右侧、顺时针
+export type SweepGradient = GradientColors & Readonly<{ type: "sweepGradient"; center: BrushPoint; startAngle: number }>
+export type SolidColor = Readonly<{ type: "solidColor"; color: number }>
+export type Brush = SolidColor | LinearGradient | RadialGradient | SweepGradient
 export type PaddingValue = Readonly<{ startDp?: number; startPx?: number; topDp?: number; topPx?: number; endDp?: number; endPx?: number; bottomDp?: number; bottomPx?: number; horizontalDp?: number; horizontalPx?: number; verticalDp?: number; verticalPx?: number }>
 export type Padding = Readonly<{ startDp: number; startPx: number; topDp: number; topPx: number; endDp: number; endPx: number; bottomDp: number; bottomPx: number }>
 
@@ -15,12 +26,67 @@ export const RectangleShape = Object.freeze({ type: "rectangle" })
 export const CircleShape = Object.freeze({ type: "circle" })
 
 export function rounded(radiusDp: number, radiusPx: number): Shape {
-    if (!Number.isFinite(radiusDp) || !Number.isFinite(radiusPx) || radiusDp < 0 || radiusPx < 0) throw new RangeError("圆角半径必须是非负有限数值")
-    return Object.freeze({ type: "rounded", radiusDp, radiusPx })
+    return roundedCorners({ topStartDp: radiusDp, topStartPx: radiusPx, topEndDp: radiusDp, topEndPx: radiusPx, bottomEndDp: radiusDp, bottomEndPx: radiusPx, bottomStartDp: radiusDp, bottomStartPx: radiusPx })
 }
 
-export function solidColor(color: number): Brush {
+// 分角圆角，未给出的角为 0；当前只有从左到右布局，start 即左侧
+export function roundedCorners(value: CornerSizes): Shape {
+    const corner = (dp: number | undefined, px: number | undefined): readonly [number, number] => {
+        const result = [dp ?? 0, px ?? 0] as const
+        if (!result.every(Number.isFinite) || result[0] < 0 || result[1] < 0) throw new RangeError("圆角半径必须是非负有限数值")
+        return result
+    }
+    const [topStartDp, topStartPx] = corner(value.topStartDp, value.topStartPx)
+    const [topEndDp, topEndPx] = corner(value.topEndDp, value.topEndPx)
+    const [bottomEndDp, bottomEndPx] = corner(value.bottomEndDp, value.bottomEndPx)
+    const [bottomStartDp, bottomStartPx] = corner(value.bottomStartDp, value.bottomStartPx)
+    return Object.freeze({ type: "rounded", topStartDp, topStartPx, topEndDp, topEndPx, bottomEndDp, bottomEndPx, bottomStartDp, bottomStartPx })
+}
+
+export function solidColor(color: number): SolidColor {
     return Object.freeze({ type: "solidColor", color: requireArgb(color) })
+}
+
+// 颜色均匀分布，或以 [位置, 颜色] 给出不递减的 0 到 1 位置
+function gradientColors(input: readonly (number | ColorStop)[]): GradientColors {
+    if (!Array.isArray(input) || input.length < 2 || input.length > 64) throw new RangeError("渐变需要 2 到 64 个颜色")
+    const pairs = input.every(value => typeof value !== "number")
+    if (pairs ? !input.every(value => Array.isArray(value) && value.length === 2) : !input.every(value => typeof value === "number")) throw new TypeError("渐变颜色需要全为颜色或全为 [位置, 颜色]")
+    const colors = input.map(value => requireArgb(typeof value === "number" ? value : value[1]))
+    const stops = input.map((value, index) => typeof value === "number" ? index / (input.length - 1) : value[0])
+    stops.forEach((stop, index) => {
+        if (!Number.isFinite(stop) || stop < 0 || stop > 1 || index > 0 && stop < stops[index - 1]) throw new RangeError("渐变色标位置需要在 0 到 1 之间且不递减")
+    })
+    return { colors: Object.freeze(colors), stops: Object.freeze(stops) }
+}
+
+function brushPoint(value: BrushPoint, name: string): BrushPoint {
+    if (!Number.isFinite(value.x) || !Number.isFinite(value.y)) throw new TypeError(`${name} 需要有限数值`)
+    return Object.freeze({ x: value.x, y: value.y })
+}
+
+export function linearGradient(colors: readonly (number | ColorStop)[], options: Readonly<{ start?: BrushPoint; end?: BrushPoint }> = {}): Brush {
+    return Object.freeze({ type: "linearGradient", ...gradientColors(colors), start: brushPoint(options.start ?? { x: 0, y: 0 }, "start"), end: brushPoint(options.end ?? { x: 1, y: 1 }, "end") })
+}
+
+export function verticalGradient(colors: readonly (number | ColorStop)[]): Brush {
+    return linearGradient(colors, { start: { x: 0, y: 0 }, end: { x: 0, y: 1 } })
+}
+
+export function horizontalGradient(colors: readonly (number | ColorStop)[]): Brush {
+    return linearGradient(colors, { start: { x: 0, y: 0 }, end: { x: 1, y: 0 } })
+}
+
+export function radialGradient(colors: readonly (number | ColorStop)[], options: Readonly<{ center?: BrushPoint; radius?: number }> = {}): Brush {
+    const radius = options.radius ?? 1
+    if (!Number.isFinite(radius) || radius < 0) throw new RangeError("径向渐变半径必须是非负有限数值")
+    return Object.freeze({ type: "radialGradient", ...gradientColors(colors), center: brushPoint(options.center ?? { x: 0.5, y: 0.5 }, "center"), radius })
+}
+
+export function sweepGradient(colors: readonly (number | ColorStop)[], options: Readonly<{ center?: BrushPoint; startAngle?: number }> = {}): Brush {
+    const startAngle = options.startAngle ?? 0
+    if (!Number.isFinite(startAngle)) throw new TypeError("扫描渐变起始角需要有限数值")
+    return Object.freeze({ type: "sweepGradient", ...gradientColors(colors), center: brushPoint(options.center ?? { x: 0.5, y: 0.5 }, "center"), startAngle })
 }
 
 export const Alignment = Object.freeze({

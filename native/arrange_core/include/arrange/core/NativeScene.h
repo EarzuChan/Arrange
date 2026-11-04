@@ -63,6 +63,15 @@ namespace arrange::core {
             return slotCounters_;
         }
 
+        // 绘制准备每重录一个绘制修饰器（含 Canvas）计一次，帧时间线取帧内增量
+        void noteDrawPrepared() noexcept {
+            ++drawPreparations_;
+        }
+
+        [[nodiscard]] std::uint64_t drawPreparations() const noexcept {
+            return drawPreparations_;
+        }
+
        private:
         friend class SceneFramePipeline;
 
@@ -87,6 +96,7 @@ namespace arrange::core {
         std::uint32_t applySlot(const BindingTarget& target, const SlotValue& value);
         std::unordered_map<std::uint64_t, RegisterBinding> bindings_;
         SlotRuntimeCounters slotCounters_;
+        std::uint64_t drawPreparations_ = 0;
         LayoutTree tree_;
         std::unordered_set<EventSlotId, EventSlotIdHash> activeEventSlots_;
         std::optional<Journal> journal_;

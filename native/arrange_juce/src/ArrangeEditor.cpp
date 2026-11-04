@@ -60,6 +60,7 @@ namespace arrange::juce {
         if (editor.precisionWheelSource_) editor.precisionWheelSource_->tick();
 #endif
         // reload 在本帧求值前处理；一次 VBlank 只调用一次视觉流水线
+        // 场景发布或诊断叠加层变化都需要转交重绘
         const auto frameChanged = editor.sceneHost_->pumpFrame(nowMillis);
         editor.updateWindowTitle();
         editor.updateFrameClockState();
@@ -99,6 +100,33 @@ namespace arrange::juce {
         sceneHost_->configure(config_);
         sceneHost_->resized(getWidth(), getHeight());
         shell_.afterConfigure(*this);
+    }
+
+    bool ArrangeEditor::setDiagnosticsOverlay(bool enabled) {
+        const auto applied = sceneHost_->setDiagnosticsOverlay(enabled);
+        shell_.afterFrameRelevantChange(*this);
+        return applied;
+    }
+
+    bool ArrangeEditor::diagnosticsOverlayEnabled() const {
+        return sceneHost_->diagnosticsOverlayEnabled();
+    }
+
+    void ArrangeEditor::setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers) {
+        sceneHost_->setDiagnosticsOverlayLayers(layers);
+        shell_.afterFrameRelevantChange(*this);
+    }
+
+    arrange::core::OverlayLayers ArrangeEditor::diagnosticsOverlayLayers() const {
+        return sceneHost_->diagnosticsOverlayLayers();
+    }
+
+    void ArrangeEditor::setFrameTimelineEnabled(bool enabled) {
+        sceneHost_->setFrameTimelineEnabled(enabled);
+    }
+
+    const arrange::core::FrameTimeline& ArrangeEditor::frameTimeline() const {
+        return sceneHost_->frameTimeline();
     }
 
     void ArrangeEditor::reload() {
@@ -297,6 +325,18 @@ namespace arrange::juce {
             return true;
         }
 #endif
+        // F9 切换诊断叠加层，Shift+F9 切换 bounds 描边与命中高亮；配置不可用时不消费按键
+        if (key.isKeyCode(::juce::KeyPress::F9Key) && sceneHost_->diagnosticsOverlayAvailable()) {
+            if (key.getModifiers().isShiftDown()) {
+                auto layers = sceneHost_->diagnosticsOverlayLayers();
+                layers.bounds = layers.hit = !(layers.bounds || layers.hit);
+                sceneHost_->setDiagnosticsOverlayLayers(layers);
+                (void)sceneHost_->setDiagnosticsOverlay(true);
+            } else
+                (void)sceneHost_->setDiagnosticsOverlay(!sceneHost_->diagnosticsOverlayEnabled());
+            shell_.afterFrameRelevantChange(*this);
+            return true;
+        }
         if (key.getModifiers().isCommandDown() && (key.getTextCharacter() == 'c' || key.getTextCharacter() == 'C')) {
             if (sceneHost_->copyDiagnosticsToClipboard()) {
                 shell_.afterFrameRelevantChange(*this);

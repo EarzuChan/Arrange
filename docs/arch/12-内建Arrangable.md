@@ -80,4 +80,4 @@ LazyState 发布 firstVisibleItemIndex、firstVisibleItemScrollOffsetPx、layout
 
 ## 后续能力
 
-Canvas 与复杂图像滤镜尚未公开。Canvas 必须采用受控绘制描述与缓存；不能以任意 onDraw JS 回调穿透原生绘制阶段。基础 draw 修饰器的公开边界见 [Modifier](11-Modifier.md)。
+Canvas 已公开，见 [文本输入与绘制](18-文本输入与绘制.md#canvas)：`onDraw` 只在绘制准备阶段录制受控命令，不穿透原生绘制阶段。基础 draw 修饰器的公开边界见 [Modifier](11-Modifier.md)。复杂图像滤镜（着色器、混合模式）暂无能力。
