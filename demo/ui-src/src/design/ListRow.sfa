@@ -1,0 +1,32 @@
+<template>
+    <Row vertical-alignment="CenterVertically" :modifier="rowModifier" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
+        <Text :text="title" :single-line="true" overflow="ellipsis" :style="{ fontSize: typeScale.body.sp, color: Color(onClick && accent ? theme.accent : theme.label) }" :modifier="M.weight(1)" />
+        <Text a-if="value" :text="value" :single-line="true" :style="{ fontSize: typeScale.body.sp, color: Color(theme.secondaryLabel) }" />
+        <Slot />
+        <Icon a-if="chevron" :painter="chevronPainter" :tint="Color(theme.tertiaryLabel)" :modifier="M.size(18.dp, 18.dp)" />
+    </Row>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { Arrangement, Color, M, painter } from '@arrange/framework/ui'
+import { typeScale, useGalleryTheme } from './theme'
+
+// 卡片里的一行：标题、行尾值或控件、可选的「›」；separator 时在底部画一条缩进分隔线
+const { title, value = '', chevron = false, accent = false, separator = false, onClick } = defineProps<{ title: string; value?: string; chevron?: boolean; accent?: boolean; separator?: boolean; onClick?: () => void }>()
+const theme = useGalleryTheme()
+const chevronPainter = painter('icons/lucide/chevron-right.svg')
+const interaction = createInteractionState()
+const rowModifier = computed(() => {
+    const color = theme.value.separator
+    const base = M.fillMaxWidth()
+        .heightIn({ min: 48.dp })
+        .drawBehind(scope => {
+            if (separator) scope.drawLine({ color: Color(color), startX: 16.px, startY: scope.size.height, endX: scope.size.width, endY: scope.size.height, strokeWidth: 1.px })
+        })
+    const interactive = onClick
+        ? base.background(Color(interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.cardHover : 0x00000000)).clickable({ onClick, interactionState: interaction }).pointerIcon('hand')
+        : base
+    return interactive.padding({ horizontal: 16.dp, vertical: 10.dp })
+})
+</script>

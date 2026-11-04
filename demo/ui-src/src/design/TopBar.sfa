@@ -1,0 +1,33 @@
+<template>
+    <Box :modifier="M.fillMaxWidth().height(88.dp)">
+        // 内容滚到栏下后淡入：上沿是不透明的页面底色，向下过渡到透明
+        <Box :modifier="M.matchParentSize().alpha(barAlpha).background(fade)" />
+        <Box :modifier="M.fillMaxWidth().height(68.dp)">
+            <Text :text="title" :single-line="true" text-align="center" :style="{ fontSize: typeScale.headline.sp, color: Color(theme.label) }" :modifier="M.align(Alignment.Center).padding({ horizontal: 72.dp }).alpha(titleAlpha)" />
+            <Box a-if="leading" :modifier="M.align(Alignment.CenterStart).padding({ start: 16.dp })">
+                <IconButton :icon="leading!.icon" :label="leading!.label" :on-click="leading!.onClick" />
+            </Box>
+            <Box a-if="trailing" :modifier="M.align(Alignment.CenterEnd).padding({ end: 16.dp })">
+                <IconButton :icon="trailing!.icon" :label="trailing!.label" :on-click="trailing!.onClick" />
+            </Box>
+        </Box>
+    </Box>
+</template>
+
+<script>
+import { computed } from '@arrange/framework'
+import { Alignment, Color, M, verticalGradient } from '@arrange/framework/ui'
+import { animatedNumberAsRef, tween } from '@arrange/framework/animation'
+import IconButton from './IconButton.sfa'
+import { typeScale, useGalleryTheme, type BarAction } from './theme'
+
+// 浮在滚动内容上的标题栏：左右各一个可选的圆形操作位，标题居中
+const { title, scrolled, showTitle, leading, trailing } = defineProps<{ title: string; scrolled: boolean; showTitle: boolean; leading?: BarAction; trailing?: BarAction }>()
+const theme = useGalleryTheme()
+const barAlpha = animatedNumberAsRef(() => scrolled ? 1 : 0, { animationSpec: tween({ durationMillis: 160 }) })
+const titleAlpha = animatedNumberAsRef(() => showTitle ? 1 : 0, { animationSpec: tween({ durationMillis: 160 }) })
+const fade = computed(() => {
+    const solid = theme.value.background
+    return verticalGradient([[0, solid], [0.6, solid], [1, (solid & 0x00ffffff) >>> 0]])
+})
+</script>

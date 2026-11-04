@@ -25,17 +25,37 @@
 #include <string>
 
 namespace {
-    std::optional<arrange::core::EventSlotId> firstModifierEventSlot(const arrange::core::LayoutTree& tree, arrange::core::EventSlotKind kind) {
-        for (const auto id : tree.nodeIds()) {
-            if (kind == arrange::core::EventSlotKind::Click && test_support::textOf(tree.node(id)) != "撅了啊 0 次") continue;
-
-            for (const auto& instance : tree.node(id).modifier.elements()) {
-                arrange::core::EventSlotId slot;
-                if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
-                if (const auto* input = std::get_if<arrange::core::LayoutModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
-                if (slot.kind == kind && slot.valid()) return slot;
-            }
+    std::optional<arrange::core::EventSlotId> modifierEventSlot(const arrange::core::LayoutNode& node, arrange::core::EventSlotKind kind) {
+        for (const auto& instance : node.modifier.elements()) {
+            arrange::core::EventSlotId slot;
+            if (const auto* input = std::get_if<arrange::core::InputModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+            if (const auto* input = std::get_if<arrange::core::LayoutModifierSemantics>(&instance.descriptor.value)) slot = input->eventSlot;
+            if (slot.kind == kind && slot.valid()) return slot;
         }
+        return std::nullopt;
+    }
+
+    std::optional<arrange::core::EventSlotId> firstModifierEventSlot(const arrange::core::LayoutTree& tree, arrange::core::EventSlotKind kind) {
+        for (const auto id : tree.nodeIds())
+            if (const auto slot = modifierEventSlot(tree.node(id), kind)) return slot;
+        return std::nullopt;
+    }
+
+    // 从给定文本的节点向上找最近的可点击节点，覆盖点击修饰挂在容器上的卡片与按钮
+    std::optional<arrange::core::EventSlotId> clickSlotForText(const arrange::core::LayoutTree& tree, const std::string& text) {
+        for (const auto id : tree.nodeIds()) {
+            if (test_support::textOf(tree.node(id)) != text) continue;
+            for (std::optional<arrange::core::NodeId> current = id; current; current = tree.parentOf(*current))
+                if (const auto slot = modifierEventSlot(tree.node(*current), arrange::core::EventSlotKind::Click)) return slot;
+        }
+        return std::nullopt;
+    }
+
+    // 无文字的图标按钮按语义标签查找点击槽
+    std::optional<arrange::core::EventSlotId> clickSlotForLabel(const arrange::core::LayoutTree& tree, const std::string& label) {
+        for (const auto id : tree.nodeIds())
+            for (const auto& instance : tree.node(id).modifier.elements())
+                if (const auto* semantics = std::get_if<arrange::core::SemanticsModifier>(&instance.descriptor.value); semantics && semantics->label == label) return modifierEventSlot(tree.node(id), arrange::core::EventSlotKind::Click);
         return std::nullopt;
     }
 
@@ -123,49 +143,95 @@ int runSmoke() {
     runtime.setScriptHost(std::move(host));
     if (initial) runtime.enqueue(std::move(*initial));
 
-    const arrange::core::Constraints constraints{0.0f, 520.0f, 0.0f, 380.0f};
+    // 计数器在页首无需滚动即可命中；视口低于页面内容，整页滚动才有可写的范围
+    const arrange::core::Constraints constraints{0.0f, 960.0f, 0.0f, 700.0f};
     const auto firstFrame = runtime.pumpFrame(1, constraints, 0.0);
     if (!firstFrame.ok || !firstFrame.pipelineRan || !runtime.scene().contains(1)) {
         std::cerr << "运行时初始帧失败：" << firstFrame.error << "\n";
         return 7;
     }
 
-    const auto clickSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::Click);
-    if (!clickSlot || !clickSlot->valid()) return 5;
-    const auto scrollSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
-    if (!scrollSlot || !scrollSlot->valid()) {
-        std::cerr << "实际布局节点中未找到 VerticalScroll 事件槽\n";
-        return 6;
-    }
-
+    // 经命中测试点在槽位区域中心，按真实指针手势派发点击
     arrange::core::PointerGestureSession pointer;
-    for (int index = 0; index < 13; ++index) {
+    auto frameTime = 0.0;
+    const auto click = [&](arrange::core::EventSlotId slot) -> int {
         const auto& snapshot = *runtime.publishedFrame().content.hitTest;
-        auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) { return candidate.target.eventSlot == *clickSlot; });
+        auto region = std::find_if(snapshot.regions.begin(), snapshot.regions.end(), [&](const auto& candidate) { return candidate.target.eventSlot == slot; });
         if (region == snapshot.regions.end()) return 20;
         const arrange::core::Point point{region->bounds.x + region->bounds.width / 2, region->bounds.y + region->bounds.height / 2};
         arrange::core::PointerGestureOutput down;
         arrange::core::PointerGestureOutput clicked;
         pointer.primaryDown(runtime.scene().tree(), snapshot, {point}, 1, down);
         pointer.primaryUp(runtime.scene().tree(), snapshot, {point}, clicked);
-        const auto click = std::find_if(clicked.events.begin(), clicked.events.end(), [&](const auto& event) { return event.slot == *clickSlot; });
-        if (click == clicked.events.end()) return 21;
-        runtime.enqueueEvent(click->slot);
-        const auto frame = runtime.pumpFrame(1, constraints, 16.0 * static_cast<double>(index + 1));
+        const auto event = std::find_if(clicked.events.begin(), clicked.events.end(), [&](const auto& candidate) { return candidate.slot == slot; });
+        if (event == clicked.events.end()) return 21;
+        runtime.enqueueEvent(event->slot);
+        frameTime += 16.0;
+        const auto frame = runtime.pumpFrame(1, constraints, frameTime);
         if (!frame.ok) {
-            std::cerr << "事件帧失败，索引为 " << index << ": " << frame.error << "\n";
+            std::cerr << "点击事件帧失败：" << frame.error << "\n";
             return 8;
         }
+        return 0;
+    };
+    const auto settle = [&]() -> bool {
+        if (!runtime.hasPendingTransactions() && !runtime.hasPendingIntents()) return true;
+        frameTime += 16.0;
+        const auto frame = runtime.pumpFrame(1, constraints, frameTime);
+        return frame.ok && frame.pipelineRan;
+    };
+
+    // 主页滚动位置由 App 持有：先滚到中段，进出主题页后应回到原处
+    const auto homeScrollSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
+    if (!homeScrollSlot) return 41;
+    const auto homeScrollValue = [&]() -> float {
+        const auto slot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
+        return slot ? arrange::core::ScrollDispatcher::verticalScrollValue(runtime.scene().tree().node(slot->node)) : -1.0f;
+    };
+    {
+        arrange::core::ScrollResult home;
+        home.consumed = true;
+        home.target = homeScrollSlot->node;
+        home.value = 150.0f;
+        home.eventSlot = *homeScrollSlot;
+        runtime.enqueueScrollSnapshotEvent(*homeScrollSlot, home);
+        if (!runtime.pumpFrame(1, constraints, frameTime += 16.0).ok || !settle()) return 42;
+        if (homeScrollValue() != 150.0f) {
+            std::cerr << "主页滚动值未写入：" << homeScrollValue() << "\n";
+            return 43;
+        }
     }
+
+    const auto openSlot = clickSlotForText(runtime.scene().tree(), "组合与状态");
+    if (!openSlot) {
+        std::cerr << "Demo 首页未找到「组合与状态」展项卡的点击槽\n";
+        return 5;
+    }
+    if (const auto failed = click(*openSlot)) return failed;
+    if (!settle()) return 23;
+
+    const auto clickSlot = clickSlotForText(runtime.scene().tree(), "撅了啊 0 次");
+    if (!clickSlot) {
+        std::cerr << "「组合与状态」页未找到计数器的点击槽\n";
+        return 5;
+    }
+    const auto scrollSlot = firstModifierEventSlot(runtime.scene().tree(), arrange::core::EventSlotKind::VerticalScroll);
+    if (!scrollSlot || !scrollSlot->valid()) {
+        std::cerr << "实际布局节点中未找到 VerticalScroll 事件槽\n";
+        return 6;
+    }
+
+    for (int index = 0; index < 13; ++index)
+        if (const auto failed = click(*clickSlot)) return failed;
 
     // 动画与事件可在已有候选等待 apply 时失效，回执后的候选由下一次宿主帧消费
     if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
         if (!runtime.hasPendingFrameWork()) return 22;
-        const auto frame = runtime.pumpFrame(1, constraints, 224.0);
+        const auto frame = runtime.pumpFrame(1, constraints, frameTime += 16.0);
         if (!frame.ok || !frame.pipelineRan) return 23;
     }
     if (!treeContainsText(runtime.scene().tree(), "撅了啊 13 次")) {
-        std::cerr << "计数器文本未达到预期的“撅了啊 13 次”\n";
+        std::cerr << "计数器文本未达到预期的「撅了啊 13 次」\n";
         return 9;
     }
 
@@ -178,13 +244,13 @@ int runSmoke() {
     scroll.contentSize = 100.0f;
     scroll.eventSlot = *scrollSlot;
     runtime.enqueueScrollSnapshotEvent(*scrollSlot, scroll);
-    const auto scrollFrame = runtime.pumpFrame(1, constraints, 240.0);
+    const auto scrollFrame = runtime.pumpFrame(1, constraints, frameTime += 16.0);
     if (!scrollFrame.ok) {
         std::cerr << "滚动快照帧失败：" << scrollFrame.error << "\n";
         return 10;
     }
     if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
-        const auto applied = runtime.pumpFrame(1, constraints, 256.0);
+        const auto applied = runtime.pumpFrame(1, constraints, frameTime += 16.0);
         if (!applied.ok || !applied.pipelineRan) return 24;
     }
 
@@ -204,19 +270,32 @@ int runSmoke() {
         return 13;
     }
     runtime.enqueueStringEvent(inputSubmitSlot, "Runtime Smoke");
-    const auto inputFrame = runtime.pumpFrame(1, constraints, 272.0);
+    const auto inputFrame = runtime.pumpFrame(1, constraints, frameTime += 16.0);
     if (!inputFrame.ok) {
         std::cerr << "输入提交帧失败：" << inputFrame.error << "\n";
         return 14;
     }
     if (runtime.hasPendingTransactions() || runtime.hasPendingIntents()) {
-        const auto applied = runtime.pumpFrame(1, constraints, 288.0);
+        const auto applied = runtime.pumpFrame(1, constraints, frameTime += 16.0);
         if (!applied.ok || !applied.pipelineRan) return 25;
     }
 
-    if (!treeContainsText(runtime.scene().tree(), "提交啊一个：Runtime Smoke")) {
+    if (!treeContainsText(runtime.scene().tree(), "提交：Runtime Smoke")) {
         std::cerr << "输入提交文本未通过运行时事件队列同步\n";
         return 15;
+    }
+
+    const auto backSlot = clickSlotForLabel(runtime.scene().tree(), "返回");
+    if (!backSlot) {
+        std::cerr << "主题页未找到「返回」按钮的点击槽\n";
+        return 44;
+    }
+    if (const auto failed = click(*backSlot)) return failed;
+    if (!settle()) return 45;
+    if (!treeContainsText(runtime.scene().tree(), "组合与状态")) return 46;
+    if (homeScrollValue() != 150.0f) {
+        std::cerr << "返回主页后滚动位置没有恢复：" << homeScrollValue() << "\n";
+        return 47;
     }
 
     arrange::juce::DiagnosticsScene diagnosticsScene;
@@ -258,8 +337,6 @@ int runSmoke() {
     const auto resourceDir = std::filesystem::temp_directory_path() / "arrange-resource-prepare-smoke";
     std::filesystem::create_directories(resourceDir);
     const auto acquire = arrange::juce::packagePainterLoader(resourceDir);
-    const auto missing = acquire("missing.png", {}).get();
-    if (missing.error.empty() || missing.content) return 21;
     const auto validPath = resourceDir / "valid.png";
     {
         ::juce::Image validImage(::juce::Image::RGB, 2, 2, true);
@@ -268,10 +345,30 @@ int runSmoke() {
         ::juce::FileOutputStream out(::juce::File(validPath.string()));
         if (!out.openedOk() || !png.writeImageToStream(validImage, out)) return 22;
     }
+    const auto validSvg = resourceDir / "play.svg";
+    {
+        std::ofstream svg(validSvg);
+        svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
+    }
+    // SVG 解析要取消息线程锁；应用发出的 SVG 请求可能正占着工作线程，阻塞等待会互锁
+    // 派发循环停下后不能再次进入，三个请求一并发出，在同一次循环里等全部完成
+    auto remaining = std::make_shared<int>(3);
+    const auto wake = [remaining] {
+        ::juce::MessageManager::callAsync([remaining] {
+            if (--*remaining == 0) ::juce::MessageManager::getInstance()->stopDispatchLoop();
+        });
+    };
+    auto missingRequest = acquire("missing.png", wake);
+    auto validRequest = acquire("valid.png", wake);
+    auto iconRequest = acquire("play.svg", wake);
+    ::juce::MessageManager::getInstance()->runDispatchLoop();
+
+    const auto missing = missingRequest.get();
+    if (missing.error.empty() || missing.content) return 21;
 
     arrange::juce::JuceDrawOpsPainter painter;
     ::juce::Image canvas(::juce::Image::RGB, 16, 16, true);
-    const auto prepared = acquire("valid.png", {}).get();
+    const auto prepared = validRequest.get();
     if (!prepared.error.empty() || !prepared.content || prepared.content->intrinsicSize != arrange::core::Size{2, 2}) return 24;
     const std::vector validOps{painterOp(prepared.content)};
     {
@@ -283,14 +380,6 @@ int runSmoke() {
         return 25;
     }
 
-    const auto validSvg = resourceDir / "play.svg";
-    {
-        std::ofstream svg(validSvg);
-        svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
-    }
-    // SVG 解析需要消息线程锁，Owner 等待期间继续派发语义消息而不授予视觉帧
-    auto iconRequest = acquire("play.svg", [] { ::juce::MessageManager::callAsync([] { ::juce::MessageManager::getInstance()->stopDispatchLoop(); }); });
-    ::juce::MessageManager::getInstance()->runDispatchLoop();
     const auto iconPrepared = iconRequest.get();
     if (!iconPrepared.error.empty() || !iconPrepared.content || iconPrepared.content->intrinsicSize != arrange::core::Size{24, 24}) return 31;
     const std::vector iconOps{painterOp(iconPrepared.content, true)};

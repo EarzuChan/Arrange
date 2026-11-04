@@ -1,0 +1,48 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="排列方式">
+            <Segmented :options="lazyModes" :value="lazyMode" :on-change="mode => lazyMode = mode" />
+        </Section>
+
+        <Section title="列表" :footer="`共 ${items.length} 项 · 首项 ${activeState.firstVisibleItemIndex + 1} · 选中 ${selected}。滚轮或触控板滚动，每项可编辑，重排后文本跟着项走，分组项占满网格一行`">
+            <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <GalleryButton text="到第 500 项" :on-click="() => activeState.scrollToItem(499)" />
+                <GalleryButton text="平滑回顶部" :on-click="() => activeState.animateScrollToItem(0)" />
+                <GalleryButton text="重排" :on-click="() => items.reverse()" />
+                <GalleryButton text="删除选中" :on-click="removeSelected" />
+            </FlowRow>
+
+            <LazyColumn a-if="lazyMode === '纵列'" :items="items" :item-key="itemKey" :item-content="LazyItem" :item-props="itemProps" :content-type="contentType" :state="columnState" :modifier="viewport" :vertical-arrangement="Arrangement.spacedBy(8.dp)" :content-padding="listPadding" />
+            <LazyRow a-if="lazyMode === '横列'" :items="items" :item-key="itemKey" :item-content="LazyItem" :item-props="itemProps" :content-type="contentType" :state="rowState" :modifier="viewport" :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :content-padding="listPadding" />
+            <LazyVerticalGrid a-if="lazyMode === '纵网格'" :items="items" :item-key="itemKey" :item-content="LazyItem" :item-props="itemProps" :content-type="contentType" :span="itemSpan" :cells="GridCells.Fixed(2)" :state="verticalGridState" :modifier="viewport" :vertical-arrangement="Arrangement.spacedBy(8.dp)" :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :content-padding="listPadding" />
+            <LazyHorizontalGrid a-if="lazyMode === '横网格'" :items="items" :item-key="itemKey" :item-content="LazyItem" :item-props="itemProps" :content-type="contentType" :span="itemSpan" :cells="GridCells.Fixed(2)" :state="horizontalGridState" :modifier="viewport" :vertical-arrangement="Arrangement.spacedBy(8.dp)" :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :content-padding="listPadding" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { computed, createLazyState, ref } from '@arrange/framework'
+import { M, Arrangement, Color, GridCells, GridItemSpan, PaddingValues, rounded } from '@arrange/framework/ui'
+import { FlowRow, LazyColumn, LazyRow, LazyVerticalGrid, LazyHorizontalGrid } from '@arrange/framework/foundation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import Section from '../../design/Section.sfa'
+import Segmented from '../../design/Segmented.sfa'
+import LazyItem from './LazyItem.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const lazyModes = ['纵列', '横列', '纵网格', '横网格']
+const lazyMode = ref('纵列')
+const columnState = createLazyState(), rowState = createLazyState(), verticalGridState = createLazyState(), horizontalGridState = createLazyState()
+const activeState = computed(() => lazyMode.value === '纵列' ? columnState : lazyMode.value === '横列' ? rowState : lazyMode.value === '纵网格' ? verticalGridState : horizontalGridState)
+const items = ref(Array.from({ length: 1000 }, (_, index) => ({ id: index + 1, name: `音轨 ${index + 1}`, note: '', height: 72 + index % 3 * 12 })))
+const selected = ref(1)
+const viewport = computed(() => M.fillMaxWidth().height(320.dp).background(Color(theme.value.fill), rounded(12.dp)).clip(rounded(12.dp)))
+const listPadding = PaddingValues({ start: 6.dp, end: 6.dp, top: 6.dp, bottom: 6.dp })
+const itemKey = (item: typeof items.value[number]) => item.id
+const contentType = (item: typeof items.value[number]) => item.id % 12 === 0 ? '分组' : '普通'
+const itemSpan = (item: typeof items.value[number]) => item.id % 12 === 0 ? GridItemSpan.MaxLineSpan : GridItemSpan(1)
+const select = (id: number) => { selected.value = id }
+const itemProps = (item: typeof items.value[number]) => ({ item, selected: selected.value === item.id, horizontal: lazyMode.value === '横列' || lazyMode.value === '横网格', onSelect: select })
+function removeSelected() { items.value = items.value.filter(item => item.id !== selected.value) }
+</script>

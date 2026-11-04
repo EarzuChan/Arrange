@@ -1,0 +1,15 @@
+<template>
+    <ValueSurface :tone="tone" :offset="offset">
+        <Text :text="label" text-align="center" :style="{ fontSize: 15.sp, color: Color(0xffffffff) }" :modifier="M.width(180.dp).clickable(onTap).pointerIcon('hand').padding({ vertical: 12.dp })" />
+    </ValueSurface>
+</template>
+
+<script>
+import { computed } from '@arrange/framework'
+import { M, Color, type Dp } from '@arrange/framework/ui'
+import ValueSurface from '../../design/ValueSurface.sfa'
+
+const props = defineProps<{ clicks: number; color: Color; offset: Dp; onTap: () => void }>()
+const label = computed(() => `撅了啊 ${props.clicks} 次`)
+const tone = computed(() => props.color)
+</script>

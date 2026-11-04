@@ -1,0 +1,25 @@
+<template>
+    <Box content-alignment="Center" :modifier="itemModifier">
+        <Text :text="text" :single-line="true" :style="{ fontSize: typeScale.footnote.sp, color: Color(selected ? theme.label : theme.secondaryLabel) }" />
+    </Box>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { Color, M, rounded } from '@arrange/framework/ui'
+import { typeScale, useGalleryTheme } from './theme'
+
+const { text, selected, onClick } = defineProps<{ text: string; selected: boolean; onClick: () => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+const itemModifier = computed(() => {
+    const shape = rounded(9.dp)
+    return M.height(32.dp)
+        .dropShadow({ shape, radius: 6.dp, offset: { y: 1.dp }, color: Color(selected ? theme.value.shadow : 0x00000000) })
+        .background(Color(selected ? theme.value.card : interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.fillHover : 0x00000000), shape)
+        .clickable({ onClick, interactionState: interaction })
+        .pointerIcon('hand')
+        .semantics({ role: 'button', label: text })
+        .padding({ horizontal: 14.dp })
+})
+</script>

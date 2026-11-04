@@ -1,0 +1,12 @@
+<template>
+    <Box :modifier="M.offset({ x: offset }).background(tone, rounded(12.dp))">
+        <Slot />
+    </Box>
+</template>
+
+<script>
+import type { Color, Dp } from '@arrange/framework/ui'
+import { M, rounded } from '@arrange/framework/ui'
+
+defineProps<{ tone: Color; offset: Dp }>()
+</script>

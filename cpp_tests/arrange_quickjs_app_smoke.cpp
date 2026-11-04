@@ -40,24 +40,16 @@ namespace {
         return std::nullopt;
     }
 
-    std::optional<arrange::core::EventSlotId> firstInputSubmitEventSlot(const arrange::core::LayoutTree& tree) {
-        for (const auto id : tree.nodeIds()) {
-            const auto& node = tree.node(id);
-            const auto slot = test_support::event(node, arrange::core::EventSlotKind::InputSubmit);
-            if (slot.valid()) return slot;
-        }
-        return std::nullopt;
-    }
-
+    // Demo 首页：分组底色与主题卡的白底
     bool hasInitialDemoVisuals(const arrange::core::LayoutTree& tree) {
-        return treeContainsBackgroundColor(tree, 1, 0xff0e1722u) && treeContainsBackgroundColor(tree, 1, 0xff3a7afeu) && treeContainsBackgroundColor(tree, 1, 0xffffb020u);
+        return treeContainsBackgroundColor(tree, 1, 0xfff2f2f7u) && treeContainsBackgroundColor(tree, 1, 0xffffffffu);
     }
 
+    // 首页可点击展项卡，页面主体可滚动
     bool hasInitialDemoEventSlots(const arrange::core::LayoutTree& tree) {
         const auto click = firstEventSlotInTree(tree, arrange::core::EventSlotKind::Click);
         const auto scroll = firstEventSlotInTree(tree, arrange::core::EventSlotKind::VerticalScroll);
-        const auto submit = firstInputSubmitEventSlot(tree);
-        return click && click->valid() && scroll && scroll->valid() && submit && submit->valid();
+        return click && click->valid() && scroll && scroll->valid();
     }
 
     bool transactionContainsTypedModifier(const arrange::core::MutationTransaction& transaction) {
@@ -222,7 +214,10 @@ int main(int argc, char** argv) {
         return 7;
     }
     auto& tree = scene.tree();
-    if (!tree.contains(1) || !hasInitialDemoVisuals(tree) || !hasInitialDemoEventSlots(tree)) return 7;
+    if (!tree.contains(1) || !hasInitialDemoVisuals(tree) || !hasInitialDemoEventSlots(tree)) {
+        std::cerr << "Demo 首页初始树不符：根节点=" << tree.contains(1) << " 首页颜色=" << hasInitialDemoVisuals(tree) << " 事件槽=" << hasInitialDemoEventSlots(tree) << '\n';
+        return 7;
+    }
 
     host.publishScene(scene);
     if (const auto result = host.completeRearrange(initialTransaction->rearrange); !result.ok) throw std::runtime_error(result.error);

@@ -21,19 +21,19 @@ namespace {
 
         arrange::juce::registerNativePainter("demo.meter", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
             const auto taps = source.lock();
-            g.setColour(juce::Colour(0xff223647));
+            g.setColour(juce::Colour(0xffe5e5ea));
             g.fillRect(area);
             if (!taps) return;
             const auto decibels = juce::Decibels::gainToDecibels(taps->level.load(std::memory_order_relaxed), -60.0f);
             const auto fill = juce::jlimit(0.0f, 1.0f, (decibels + 60.0f) / 60.0f);
-            g.setColour(decibels > -3.0f ? juce::Colour(0xffef9a74) : juce::Colour(0xff79a8ea));
+            g.setColour(decibels > -3.0f ? juce::Colour(0xffff3b30) : juce::Colour(0xff007aff));
             g.fillRect(area.withWidth(area.getWidth() * fill));
         });
 
         arrange::juce::registerNativePainter("demo.waveform", {{"source", NativeParamKind::Source}, {"color", NativeParamKind::Color}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams& params) {
-            g.setColour(juce::Colour(0xff101b26));
+            g.setColour(juce::Colour(0xfff2f2f7));
             g.fillRect(area);
-            g.setColour(juce::Colour(0xff29394a));
+            g.setColour(juce::Colour(0xffd1d1d6));
             g.drawHorizontalLine(static_cast<int>(area.getCentreY()), area.getX(), area.getRight());
             const auto taps = source.lock();
             if (!taps) return;
@@ -46,12 +46,12 @@ namespace {
                 if (i == 0) path.startNewSubPath(x, y);
                 else path.lineTo(x, y);
             }
-            g.setColour(juce::Colour(params.color("color", 0xff61d6bb)));
+            g.setColour(juce::Colour(params.color("color", 0xff007aff)));
             g.strokePath(path, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved));
         });
 
         arrange::juce::registerNativePainter("demo.spectrum", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
-            g.setColour(juce::Colour(0xff101b26));
+            g.setColour(juce::Colour(0xfff2f2f7));
             g.fillRect(area);
             const auto taps = source.lock();
             if (!taps) return;

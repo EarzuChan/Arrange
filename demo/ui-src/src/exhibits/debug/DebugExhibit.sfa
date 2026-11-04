@@ -1,0 +1,45 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="重新加载" :flush="true" footer="手动重载、HMR 与错误页重试走同一条加载链路；live 关闭时回落到随包的 dist">
+            <ListRow title="按当前配置重新加载" value="F5" :separator="true"/>
+            <ListRow title="切换 live 后重新加载" value="Ctrl + F5"/>
+        </Section>
+
+        <Section title="Debug 构建" :flush="true" footer="这两个快捷键只在 Debug 构建中存在，先于 App 消费；Release 不绑定，按键照常交给 App 或宿主">
+            <ListRow title="发送一条测试 toast" value="F6" :separator="true"/>
+            <ListRow title="打开诊断错误页" value="F7"/>
+        </Section>
+
+        <Section title="帧诊断" :flush="true" footer="左上角是最近 60 帧的耗时柱与状态，场景脏区以红色闪烁渐隐；默认只在 Debug 构建可用">
+            <ListRow title="诊断叠加层" value="F9" :separator="true"/>
+            <ListRow title="加上 bounds 描边与命中高亮" value="Shift + F9"/>
+        </Section>
+
+        <Section title="对照样本" footer="打开 F9 后，只有跑动的圆点一直在闪；点按钮时只有计数那一行重绘">
+            // 圆点在固定轨道上往返，逐帧只重绘自己扫过的一小块
+            <Box :modifier="M.width(200.dp).height(12.dp).background(Color(theme.fill), rounded(6.dp))">
+                <Box :modifier="M.offset({ x: (188 * (1 - Math.abs(2 * phase - 1))).dp }).size(12.dp, 12.dp).background(Color(theme.accent), CircleShape)"/>
+            </Box>
+            <Row vertical-alignment="CenterVertically" :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
+                <GalleryButton text="加一" :on-click="() => count++"/>
+                <Text :text="`已点 ${count} 次`" :style="{ fontSize: typeScale.body.sp, color: Color(theme.label) }"/>
+            </Row>
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { Arrangement, CircleShape, Color, M, rounded } from '@arrange/framework/ui'
+import { tween, linearEasing, createInfiniteTransition } from '@arrange/framework/animation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import ListRow from '../../design/ListRow.sfa'
+import Section from '../../design/Section.sfa'
+import { typeScale, useGalleryTheme } from '../../design/theme'
+
+// 框架自带的调试快捷键一览，外加一块便于对照脏区的小样本
+const theme = useGalleryTheme()
+const count = ref(0)
+const sweep = createInfiniteTransition({ label: 'DebugSweep' })
+const phase = sweep.animatedNumber('Phase', 0, 1, { animationSpec: tween({ durationMillis: 2400, easing: linearEasing }) })
+</script>

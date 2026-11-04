@@ -1,0 +1,16 @@
+<template>
+    <Column :modifier="M.if(horizontal, M.width(150.dp), M.fillMaxWidth()).height(item.height.dp).background(Color(selected ? theme.accentTint : interaction.hovered ? theme.cardHover : theme.card), rounded(6.dp)).clickable({ onClick: () => onSelect(item.id), interactionState: interaction }).padding(10.dp)" :vertical-arrangement="Arrangement.spacedBy(6.dp)">
+        <Text :text="`${item.id % 12 === 0 ? '分组' : '条目'} ${item.id} · ${item.name}`" :single-line="true" overflow="ellipsis" :style="{ fontSize: 13.sp, color: Color(item.id % 12 === 0 ? theme.accent : theme.label) }" />
+        <Input :value="item.note" :onValueChange="value => item.note = value" :single-line="true" placeholder="写点什么" :text-style="{ fontSize: 12.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().height(28.dp).background(Color(theme.fill), rounded(8.dp)).padding({ horizontal: 8.dp, vertical: 6.dp })" />
+    </Column>
+</template>
+
+<script>
+import { createInteractionState } from '@arrange/framework'
+import { M, Arrangement, Color, rounded } from '@arrange/framework/ui'
+import { useGalleryTheme } from '../../design/theme'
+
+defineProps<{ item: { id: number; name: string; note: string; height: number }; selected: boolean; horizontal: boolean; onSelect: (id: number) => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+</script>

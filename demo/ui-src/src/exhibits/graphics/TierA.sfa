@@ -1,0 +1,24 @@
+<template>
+    <Column :vertical-arrangement="Arrangement.spacedBy(12.dp)">
+        <Canvas :modifier="M.fillMaxWidth().height(12.dp).clip(rounded(6.dp))" :on-draw="drawLevel"/>
+        <Canvas :modifier="M.fillMaxWidth().height(88.dp).clip(rounded(12.dp))" :on-draw="drawSamples"/>
+        <Canvas :modifier="M.fillMaxWidth().height(88.dp).clip(rounded(12.dp))" :on-draw="drawBins"/>
+    </Column>
+</template>
+
+<script>
+// A 档：JS 状态加 JS 绘制，数据经响应式快照交付
+import { useMeter, useWaveform, useSpectrum } from '@arrange/framework/interop'
+import { Arrangement, M, rounded, type DrawScope } from '@arrange/framework/ui'
+import { Canvas } from '@arrange/framework/foundation'
+import { drawMeter, drawWaveform, drawSpectrum } from './tierDrawing.ts'
+
+const level = useMeter('output')
+const samples = useWaveform('output', { size: 256 })
+const bins = useSpectrum('output')
+
+const drawLevel = (scope: DrawScope) => drawMeter(scope, level.value)
+const drawSamples = (scope: DrawScope) => drawWaveform(scope, samples.value)
+const drawBins = (scope: DrawScope) => drawSpectrum(scope, bins.value)
+</script>
+

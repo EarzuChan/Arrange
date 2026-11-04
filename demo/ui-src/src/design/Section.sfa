@@ -1,0 +1,26 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+        <Text a-if="title" :text="title" :style="{ fontSize: typeScale.footnote.sp, color: Color(theme.secondaryLabel) }" :modifier="M.padding({ horizontal: 4.dp })" />
+        <Column :modifier="cardModifier" :vertical-arrangement="flush ? Arrangement.spacedBy(0.dp) : Arrangement.spacedBy(14.dp)">
+            <Slot />
+        </Column>
+        <Text a-if="footer" :text="footer" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" :modifier="M.padding({ horizontal: 4.dp })" />
+    </Column>
+</template>
+
+<script>
+import { computed } from '@arrange/framework'
+import { Arrangement, Color, M, rounded } from '@arrange/framework/ui'
+import { typeScale, useGalleryTheme } from './theme'
+
+// 页面里的一个分区：小标题、白卡、脚注；flush 时卡内不留边距，交给列表行自己排
+// 卡片圆角 28 = 内层控件圆角 12 + 内边距 16，保持同轴
+const { title = '', footer = '', flush = false } = defineProps<{ title?: string; footer?: string; flush?: boolean }>()
+const theme = useGalleryTheme()
+const cardModifier = computed(() => {
+    const shape = rounded(28.dp)
+    const card = M.fillMaxWidth().background(Color(theme.value.card), shape)
+    // flush 时裁到卡片圆角，行的按下底色不越过圆角
+    return flush ? card.clip(shape) : card.padding(16.dp)
+})
+</script>

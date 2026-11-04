@@ -1,0 +1,15 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+        <Input :value="note" :onValueChange="value => note = value" :text-style="{ fontSize: 15.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().height(44.dp).background(Color(theme.fill), rounded(12.dp)).padding({ horizontal: 14.dp, vertical: 12.dp })" />
+        <Text :text="`笔记：${note}`" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+    </Column>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { M, Arrangement, Color, rounded } from '@arrange/framework/ui'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const note = ref('切页后仍保留这段笔记')
+</script>

@@ -1,0 +1,27 @@
+<template>
+    <Scaffold :title="title" :title-threshold="130" :max-width="720" :gap="28" :leading="back">
+        <Column :modifier="M.fillMaxWidth().background(Color(theme.card), rounded(36.dp)).padding(20.dp)">
+            <Box content-alignment="Center" :modifier="M.size(64.dp, 64.dp).background(Color(theme.fill), rounded(16.dp))">
+                <Icon :painter="iconPainter" :tint="Color(theme.label)" :modifier="M.size(30.dp, 30.dp)" />
+            </Box>
+            <Spacer :modifier="M.height(20.dp)" />
+            <Text :text="title" :style="{ fontSize: typeScale.largeTitle.sp, color: Color(theme.label) }" />
+            <Spacer :modifier="M.height(8.dp)" />
+            <Text :text="subtitle" :style="{ fontSize: typeScale.body.sp, color: Color(theme.secondaryLabel) }" />
+        </Column>
+        <Slot />
+    </Scaffold>
+</template>
+
+<script>
+import { computed } from '@arrange/framework'
+import { Color, M, painter, rounded } from '@arrange/framework/ui'
+import Scaffold from './Scaffold.sfa'
+import { typeScale, useGalleryTheme } from './theme'
+
+// 次级界面：页头卡加若干分区，标题栏左侧返回；页头卡的大标题约在 130dp 处滚出栏下
+const { title, subtitle, icon, onBack } = defineProps<{ title: string; subtitle: string; icon: string; onBack: () => void }>()
+const theme = useGalleryTheme()
+const iconPainter = computed(() => painter(icon))
+const back = computed(() => ({ icon: 'icons/lucide/chevron-left.svg', label: '返回', onClick: onBack }))
+</script>

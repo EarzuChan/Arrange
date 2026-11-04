@@ -1,9 +1,0 @@
-<template>
-    <Text :text="text" :style="{fontSize: 12.sp, color: active ? Color(0xff101c26) : Color(0xffdae6f0)}" :modifier="M.padding({horizontal: 10.dp, vertical: 7.dp}).background(active ? Color(0xff61d6bb) : Color(0xff29394a)).clickable(onClick)" />
-</template>
-
-<script>
-import { M, Color } from '@arrange/framework/ui'
-
-defineProps<{ text: string; active?: boolean; onClick: () => void }>()
-</script>

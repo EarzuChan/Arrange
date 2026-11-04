@@ -1,0 +1,15 @@
+<template>
+    <Row :modifier="M.background(Color(theme.fill), rounded(12.dp)).padding(3.dp)" :horizontal-arrangement="Arrangement.spacedBy(2.dp)">
+        <SegmentedItem a-for="option in options" :key="option" :text="option" :selected="option === value" :on-click="() => onChange(option)" />
+    </Row>
+</template>
+
+<script>
+import { Arrangement, Color, M, rounded } from '@arrange/framework/ui'
+import SegmentedItem from './SegmentedItem.sfa'
+import { useGalleryTheme } from './theme'
+
+// 分段控件：在同一组互斥选项间切换，选中段是浮起的白块
+const { options, value, onChange } = defineProps<{ options: readonly string[]; value: string; onChange: (value: string) => void }>()
+const theme = useGalleryTheme()
+</script>

@@ -30,7 +30,7 @@ async function fixture(t: TestContext, publicDir: string | false = 'public') {
     await mkdir(assets, { recursive: true })
     await mkdir(join(root, 'src'))
     await writeFile(join(root, 'src/main.ts'), 'export const value = 1\n')
-    const png = await readFile(resolve('demo/ui-src/public/logo.png'))
+    const png = await readFile(resolve('demo/ui-src/public/arrange-logo.png'))
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z"/></svg>'
     await writeFile(join(assets, 'logo.png'), png)
     await writeFile(join(assets, 'play.svg'), svg)

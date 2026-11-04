@@ -1,0 +1,29 @@
+<template>
+    <Box content-alignment="Center" :modifier="buttonModifier">
+        <Text :text="text" :single-line="true" :style="{ fontSize: typeScale.body.sp, color: Color(prominent ? theme.onAccent : theme.accent) }" />
+    </Box>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { M, Color, rounded } from '@arrange/framework/ui'
+import { typeScale, useGalleryTheme } from './theme'
+
+// 胶囊按钮：默认灰底强调色字，prominent 为强调色实底
+const { text, prominent = false, onClick } = defineProps<{ text: string; prominent?: boolean; onClick: () => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+const buttonModifier = computed(() => {
+    const shape = rounded(20.dp)
+    const pressed = interaction.pressed
+    const hovered = interaction.hovered
+    const fill = prominent ? theme.value.accent : pressed ? theme.value.fillPressed : hovered ? theme.value.fillHover : theme.value.fill
+    return M.height(40.dp)
+        .alpha(!prominent ? 1 : pressed ? 0.8 : hovered ? 0.9 : 1)
+        .background(Color(fill), shape)
+        .clickable({ onClick, interactionState: interaction })
+        .pointerIcon('hand')
+        .semantics({ role: 'button', label: text })
+        .padding({ horizontal: 18.dp })
+})
+</script>

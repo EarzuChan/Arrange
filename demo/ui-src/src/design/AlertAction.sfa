@@ -1,0 +1,27 @@
+<template>
+    <Box content-alignment="Center" :modifier="actionModifier">
+        <Text :text="text" :single-line="true" :style="{ fontSize: typeScale.headline.sp, color: Color(theme.accent) }" />
+    </Box>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { Color, M } from '@arrange/framework/ui'
+import { typeScale, useGalleryTheme } from './theme'
+
+// 弹窗底部的全宽按钮：顶部一条分隔线，强调色字，悬停与按下只改底色；圆角交给弹窗卡片裁切
+const { text, onClick } = defineProps<{ text: string; onClick: () => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+const actionModifier = computed(() => {
+    const separator = theme.value.separator
+    const fill = interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.cardHover : 0x00000000
+    return M.fillMaxWidth()
+        .height(48.dp)
+        .background(Color(fill))
+        .drawBehind(scope => scope.drawLine({ color: Color(separator), startX: 0.px, startY: 0.px, endX: scope.size.width, endY: 0.px, strokeWidth: 1.px }))
+        .clickable({ onClick, interactionState: interaction })
+        .pointerIcon('hand')
+        .semantics({ role: 'button', label: text })
+})
+</script>

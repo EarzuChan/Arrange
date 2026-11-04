@@ -1,149 +1,89 @@
 <template>
-    <Column :modifier="M.fillMaxSize().background(Color(0xff0e1722)).padding(18.dp)" :vertical-arrangement="Arrangement.spacedBy(12.dp)">
-        <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
-            <Icon :painter="playPainter" :tint="Color(0xFF00FFFF)" :modifier="M.size(20.dp, 20.dp)"/>
+    <Box :modifier="M.fillMaxSize().background(Color(theme.background))">
+        <GalleryHome a-if="!page" :scroll="homeScroll" :show-interop="interopEnabled" :on-open="openTopic" :on-about="() => aboutOpen = true" />
 
-            <Text :text="preset" :style="{ fontSize: 28.sp, color: Color.hsl(hue, 1, 0.5) }" :modifier="M"/>
+        <SubPage a-else :title="current.title" :subtitle="current.description" :icon="current.icon" :on-back="goHome">
+            <CompositionPage a-if="current.key === 'composition'" />
+            <DrawingExhibit a-else-if="current.key === 'drawing'" />
+            <LayoutExhibit a-else-if="current.key === 'layout'" />
+            <FocusExhibit a-else-if="current.key === 'focus'" />
+            <LazyExhibit a-else-if="current.key === 'lazy'" />
+            <ShowcaseGallery a-else-if="current.key === 'lab'" />
+            <AnimationGallery a-else-if="current.key === 'animation'" />
+            <M5Gallery a-else-if="current.key === 'visual'" />
+            <TierGallery a-else-if="current.key === 'tiers'" />
+            <InteropPanel a-else-if="current.key === 'audio'" />
+            <DebugExhibit a-else-if="current.key === 'debug'" />
+        </SubPage>
 
-            <Image :painter="logoPainter" :modifier="M.size(96.dp, 40.dp)"/>
-        </Row>
+        // 遮罩淡入淡出，卡片在其中由略大缩回原尺寸；退场期间整层不再接收点击
+        <AnimatedVisibility :visible="aboutOpen" :animation-spec="dialogSpec">
+            <Box content-alignment="Center" :modifier="M.fillMaxSize().background(Color(0x66000000)).clickable({ onClick: () => aboutOpen = false, focusable: false })">
+                <AnimatedVisibility :visible="aboutOpen" :appear="true" :animation-spec="dialogSpec" :enter-from="{ scaleX: 1.12, scaleY: 1.12 }" :exit-to="{ scaleX: 0.94, scaleY: 0.94 }">
+                    // 卡片自身吞掉点击，只有点遮罩或「好」才关闭；裁到圆角让底部按钮的底色不越界
+                    <Column :modifier="M.width(300.dp).background(Color(theme.card), rounded(20.dp)).clip(rounded(20.dp)).clickable({ onClick: () => {}, focusable: false })">
+                        <Column horizontal-alignment="CenterHorizontally" :modifier="M.fillMaxWidth().padding({ start: 24.dp, end: 24.dp, top: 28.dp, bottom: 22.dp })">
+                            <Image :painter="logo" :modifier="M.size(64.dp, 64.dp)" />
 
-        // 切页展示：一次只挂载一页，Debug 下也不至于整页卡顿
-        <Row :horizontal-arrangement="Arrangement.spacedBy(6.dp)">
-            <GalleryButton a-for="tab in tabs" :key="tab.key" :text="tab.title" :active="page === tab.key" :on-click="() => page = tab.key"/>
-        </Row>
+                            <Spacer :modifier="M.height(16.dp)" />
 
-        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :vertical-arrangement="Arrangement.spacedBy(12.dp)" a-if="page === 'basics'">
-            <Row :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :modifier="M.fillMaxWidth().height(44.dp)">
-                <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFF3A7AFE))"/>
+                            <Text text="Arrange Gallery" :style="{ fontSize: typeScale.headline.sp, color: Color(theme.label) }" />
 
-                <Spacer :modifier="M.width(8.dp)"/>
+                            <Spacer :modifier="M.height(6.dp)" />
 
-                <Box :modifier="M.size(180.dp, 38.dp).background(Color(0xFFFFB020))"/>
-            </Row>
+                            <Text text="Arrange 声明式 UI 框架的交互式展示应用" text-align="center" :style="{ fontSize: typeScale.footnote.sp, color: Color(theme.secondaryLabel) }" />
 
-            // 模版内支持单行双斜杠注释，带派不带派！
-            <Spacer :modifier="M.height(4.dp)"/>
+                            <Spacer :modifier="M.height(4.dp)" />
 
-            <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :onTap="handleTap"/>
+                            <Text :text="`版本 ${buildInfo.version} · Framework ${buildInfo.framework}`" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
 
-            <PropBoundary secret="App 传给 PropBoundary 的恩情"/> // 这是一个“不透传”的测试
+                            <Spacer :modifier="M.height(4.dp)" />
 
-            <RefRelay :state="selectedKey ? <secondRef> : <firstRef>" :name="selectedRefName" :on-toggle="toggleSelectedRef"/>
+                            <Text text="Earzu Chan 携众 AI 妻，为您呈现" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
+                        </Column>
 
-            <Input :value="preset" :onValueChange="value => preset = value" placeholder="搜索格调" :select-all-on-focus="true" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" :text-style="{ fontSize: 13.sp, color: Color(0xFFE8EAED) }" :modifier="M.size(240.dp, 28.dp).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))"/>
-
-            <Text :text="inputStatus" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(16.dp)"/>
-
-            <Column :modifier="M.size(260.dp, 58.dp).verticalScroll(scrollState).background(Color(0xFF151922)).border(1.dp, Color(0xFF4B5563))" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
-                <Text text="才不想当你的滚动视口呢，哼" :style="{ fontSize: 12.sp, color: Color(0xFFE8EAED) }" :modifier="M.height(14.dp)"/>
-
-                <Text text="滚动modifier撅遍本地状态（意味不明）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
-
-                <Text text="滚轮也可以触发啊一个" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
-
-                <Text text="这个你滚动后才能看见嘛（喜）" :style="{ fontSize: 12.sp, color: Color(0xFFB8BDC7) }" :modifier="M.height(14.dp)"/>
-            </Column>
-        </Column>
-
-        <Row :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :horizontal-arrangement="Arrangement.spacedBy(16.dp)" a-else-if="page === 'showcase'">
-            <ShowcaseGallery/>
-
-            <Text text="润" :style="{ color: Color(0xFFAAAA00) }"/>
-
-            <AnimationGallery/>
-        </Row>
-
-        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" :vertical-arrangement="Arrangement.spacedBy(12.dp)" a-else-if="page === 'm3'">
-            <Text text="Arrangeの本格界面" :style="{fontSize: 12.sp, color: Color(0xff91a6b8)}"/>
-
-            <M3Gallery/>
-        </Column>
-
-        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" a-else-if="page === 'm5'">
-            <M5Gallery/>
-        </Column>
-
-        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" a-else>
-            <InteropPanel/>
-        </Column>
-    </Column>
+                        <AlertAction text="好" :on-click="() => aboutOpen = false" />
+                    </Column>
+                </AnimatedVisibility>
+            </Box>
+        </AnimatedVisibility>
+    </Box>
 </template>
 
 <script>
-import { painter, Arrangement, Color, M } from "@arrange/framework/ui"
-import { tween, linearEasing, animatedDpAsRef, animatedColorAsRef, createInfiniteTransition } from "@arrange/framework/animation"
-import { Icon } from "@arrange/framework/foundation"
-import { Log } from "@arrange/framework"
-import { onMounted, ref, createScrollState, shallowRef } from '@arrange/framework'
-import CounterPanel from './view/CounterPanel.sfa'
-import AnimationGallery from './view/AnimationGallery.sfa'
-import ShowcaseGallery from './view/ShowcaseGallery.sfa'
-import PropBoundary from './view/PropBoundary.sfa'
-import RefRelay from './view/RefRelay.sfa'
-import M3Gallery from './view/M3Gallery.sfa'
-import InteropPanel from './view/InteropPanel.sfa'
-import M5Gallery from './view/M5Gallery.sfa'
-import GalleryButton from './view/GalleryButton.sfa'
+import { provide, ref, computed, createScrollState } from '@arrange/framework'
+import { Color, M, painter, rounded } from '@arrange/framework/ui'
+import { AnimatedVisibility, tween } from '@arrange/framework/animation'
 import { hasInterop } from '@arrange/framework/interop'
+import GalleryHome from './exhibits/home/GalleryHome.sfa'
+import SubPage from './design/SubPage.sfa'
+import AlertAction from './design/AlertAction.sfa'
+import CompositionPage from './exhibits/composition/CompositionPage.sfa'
+import DrawingExhibit from './exhibits/drawing/DrawingExhibit.sfa'
+import LayoutExhibit from './exhibits/layout/LayoutExhibit.sfa'
+import FocusExhibit from './exhibits/focus/FocusExhibit.sfa'
+import LazyExhibit from './exhibits/lazy/LazyExhibit.sfa'
+import ShowcaseGallery from './exhibits/showcase/ShowcaseGallery.sfa'
+import AnimationGallery from './exhibits/animation/AnimationGallery.sfa'
+import M5Gallery from './exhibits/graphics/M5Gallery.sfa'
+import TierGallery from './exhibits/graphics/TierGallery.sfa'
+import InteropPanel from './exhibits/audio/InteropPanel.sfa'
+import DebugExhibit from './exhibits/debug/DebugExhibit.sfa'
+import { LocalGalleryTheme, lightGalleryTheme, typeScale } from './design/theme'
+import { topics, type TopicKey } from './exhibits/topics'
+import { buildInfo } from './buildInfo.ts'
 
-const TAG = "App"
-
-// 插件宿主才连接 Interop；无宿主的预览与测试夹具不显示互操作页
-const tabs = [
-    { key: 'basics', title: '基础' },
-    { key: 'showcase', title: '展示与动画' },
-    { key: 'm3', title: 'M3' },
-    { key: 'm5', title: 'M5 视觉' },
-    ...hasInterop() ? [{ key: 'interop', title: '宿主互操作' }] : [],
-]
-const page = ref('basics')
-
-const clicks = ref(0)
-const firstRef = ref(11)
-const secondRef = ref(29)
-const selectedRefName = ref('firstRef')
-const selectedKey = ref(false)
-const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? 6.dp : 0.dp, { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
-const playPainter = painter('icons/play.svg')
-const logoPainter = painter('logo.png')
-
-const preset = ref("Arrangable与动画发廊")
-const hueTransition = createInfiniteTransition({ label: 'HueTransition' })
-const hue = hueTransition.animatedNumber('Hue', 0, 360, {
-    animationSpec: tween({ durationMillis: 4000, easing: linearEasing }) // 没完全复刻api，之后再检查一下
-})
-
-const inputStatus = ref("你来和我（指输入框↑）搞一下嘛")
-const scrollState = createScrollState()
-const pageScroll = createScrollState()
-const counterColor = animatedColorAsRef(() => clicks.value % 2 === 0 ? Color(0xFF2E7D32) : Color(0xFF3A7AFE), { animationSpec: tween({ durationMillis: 240, easing: linearEasing }) })
-
-function toggleSelectedRef() {
-    if (!selectedKey.value) {
-        selectedKey.value = true
-        selectedRefName.value = 'secondRef'
-    } else {
-        selectedKey.value = false
-        selectedRefName.value = 'firstRef'
-    }
-}
-
-function handleTap() {
-    clicks.value += 1
-    Log.i(TAG, "点击次数", clicks.value)
-    Log.i(TAG, "南下", clicks.value)
-}
-
-function handleSubmit(value: string) {
-    inputStatus.value = `提交啊一个：${value}`
-}
-
-function handleChange(value: string) {
-    inputStatus.value = `改变：${value}`
-}
-
-function handleBlur(value: string) {
-    inputStatus.value = `焦点搞倒：${value}`
-}
+const theme = ref(lightGalleryTheme)
+provide(LocalGalleryTheme, theme)
+const interopEnabled = hasInterop()
+const page = ref<TopicKey | null>(null)
+// 首页时 current 不渲染，回落值只为类型收窄
+const current = computed(() => topics.find(topic => topic.key === page.value) ?? topics[0])
+const aboutOpen = ref(false)
+const dialogSpec = tween({ durationMillis: 220 })
+// 主页滚动位置由这里持有，从主题页返回时回到原处
+const homeScroll = createScrollState()
+const logo = painter('arrange-logo.png')
+function openTopic(key: TopicKey) { page.value = key }
+function goHome() { page.value = null }
 </script>

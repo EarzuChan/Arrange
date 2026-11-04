@@ -1,0 +1,21 @@
+<template>
+    <ValueSurface :tone="color" :offset="offset">
+        <Text :text="label(caption)" :single-line="true" :style="{ fontSize: 14.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().clickable({ onClick: () => onSelect(item.id), interactionState: interaction }).padding({ horizontal: 14.dp, vertical: 11.dp }).keyed('条目交互')" />
+    </ValueSurface>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { M, Color } from '@arrange/framework/ui'
+import { tween, animatedColorAsRef, animatedDpAsRef } from '@arrange/framework/animation'
+import ValueSurface from '../../design/ValueSurface.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const props = defineProps<{ item: { id: number; name: string }; selected: boolean; tone: Color; onSelect: (id: number) => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+const color = animatedColorAsRef(() => props.selected ? props.tone : Color(interaction.hovered ? theme.value.fillHover : theme.value.fill), { animationSpec: tween({ durationMillis: 180 }) })
+const offset = animatedDpAsRef(() => props.selected ? 8.dp : 0.dp, { animationSpec: tween({ durationMillis: 180 }) })
+const caption = computed(() => `${props.item.id.toString().padStart(3, '0')}  ${props.item.name}`)
+function label(value: string) { return value }
+</script>

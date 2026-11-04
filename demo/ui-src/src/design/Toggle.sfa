@@ -1,0 +1,25 @@
+<template>
+    <Box :modifier="trackModifier">
+        <Box :modifier="M.offset({ x: thumbOffset }).size(27.dp, 27.dp).dropShadow({ shape: CircleShape, radius: 4.dp, offset: { y: 2.dp }, color: Color(0x26000000) }).background(Color(0xffffffff), CircleShape)" />
+    </Box>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { Color, M, CircleShape, rounded } from '@arrange/framework/ui'
+import { animatedColorAsRef, animatedDpAsRef, spring, tween } from '@arrange/framework/animation'
+import { useGalleryTheme } from './theme'
+
+// 开关：胶囊形轨道，绿底表示开启，滑块随状态弹到另一端
+const { value, label, onChange } = defineProps<{ value: boolean; label: string; onChange: (value: boolean) => void }>()
+const theme = useGalleryTheme()
+const interaction = createInteractionState()
+const thumbOffset = animatedDpAsRef(() => value ? 20.dp : 0.dp, { animationSpec: spring({ stiffness: 500, dampingRatio: 0.8 }) })
+const track = animatedColorAsRef(() => Color(value ? theme.value.positive : interaction.hovered ? 0xffdadadf : 0xffe4e4e9), { animationSpec: tween({ durationMillis: 180 }) })
+const trackModifier = computed(() => M.size(51.dp, 31.dp)
+    .background(track.value, rounded(15.5.dp))
+    .clickable({ onClick: () => onChange(!value), interactionState: interaction })
+    .pointerIcon('hand')
+    .semantics({ role: 'switch', label, valueText: value ? '开' : '关' })
+    .padding(2.dp))
+</script>

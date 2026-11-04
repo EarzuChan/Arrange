@@ -1,0 +1,32 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="档位" :footer="current.hint">
+            <Segmented :options="tiers.map(item => item.title)" :value="current.title" :on-change="title => tier = tiers.find(item => item.title === title)!.key" />
+        </Section>
+
+        <Section title="电平、波形与频谱" footer="三档画的是同一组图形；按 F9 打开帧诊断，可以直接对照各档的帧耗时">
+            // 一次只挂载一档，只有当前档订阅数据
+            <TierA a-if="tier === 'A'"/>
+            <TierB a-else-if="tier === 'B'"/>
+            <TierC a-else/>
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { computed, ref } from '@arrange/framework'
+import { Arrangement, M } from '@arrange/framework/ui'
+import Section from '../../design/Section.sfa'
+import Segmented from '../../design/Segmented.sfa'
+import TierA from './TierA.sfa'
+import TierB from './TierB.sfa'
+import TierC from './TierC.sfa'
+
+const tiers = [
+    { key: 'A', title: 'A 档', hint: 'JS 状态 + JS 绘制：数据经响应式快照交付，适合低频变化' },
+    { key: 'B', title: 'B 档', hint: '原生数据源 + JS 绘制：固定 Float32Array 原地更新，不经响应式' },
+    { key: 'C', title: 'C 档', hint: '原生数据源 + 原生 painter：JS 只传名称与数据源' },
+]
+const tier = ref('A')
+const current = computed(() => tiers.find(item => item.key === tier.value)!)
+</script>

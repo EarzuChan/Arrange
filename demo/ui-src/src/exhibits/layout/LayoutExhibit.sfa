@@ -1,0 +1,43 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="流式换行" footer="标签按可用宽度自动换行">
+            <GalleryButton :text="narrow ? '展宽' : '收窄'" :on-click="() => narrow = !narrow" />
+            <FlowRow :modifier="M.fillMaxWidth(narrow ? 0.5 : 1)" :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <Text a-for="label in tags" :key="label" :text="label" :style="tagStyle" :modifier="M.background(Color(theme.fill), rounded(16.dp)).padding({ horizontal: 12.dp, vertical: 7.dp })" />
+            </FlowRow>
+        </Section>
+
+        <Section title="流式换列" footer="限定高度后，标签按高度换到下一列">
+            <FlowColumn :modifier="M.height(92.dp)" :vertical-arrangement="Arrangement.spacedBy(6.dp)" :horizontal-arrangement="Arrangement.spacedBy(8.dp)">
+                <Text a-for="label in tags" :key="label" :text="label" :style="tagStyle" :modifier="M.background(Color(theme.fill), rounded(8.dp)).padding({ horizontal: 10.dp, vertical: 5.dp })" />
+            </FlowColumn>
+        </Section>
+
+        <Section title="固有尺寸" footer="左右两列高度不同，中间的分隔线取较高那列的高度；下方边框匹配父尺寸，高度由文字决定">
+            <Row :modifier="M.height(IntrinsicSize.Min).background(Color(theme.fill), rounded(12.dp))" :horizontal-arrangement="Arrangement.spacedBy(4.dp)">
+                <Text text="短列" :style="bodyStyle" :modifier="M.padding(12.dp)" />
+                <Spacer :modifier="M.width(2.dp).fillMaxHeight().background(Color(theme.accent))" />
+                <Text :text="'这列有两行\n分隔线跟随内容高度'" :style="bodyStyle" :modifier="M.padding(12.dp)" />
+            </Row>
+            <Box :modifier="M.fillMaxWidth()">
+                <Spacer :modifier="M.matchParentSize().border(1.dp, Color(theme.accent), rounded(12.dp))" />
+                <Text text="边框匹配父尺寸，内容决定高度" :style="bodyStyle" :modifier="M.padding(14.dp)" />
+            </Box>
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { computed, ref } from '@arrange/framework'
+import { M, Arrangement, Color, IntrinsicSize, rounded } from '@arrange/framework/ui'
+import { FlowRow, FlowColumn } from '@arrange/framework/foundation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import Section from '../../design/Section.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const narrow = ref(false)
+const tags = ['音轨', '音量自动化', '节奏', '中文标题', '合成器', '混响', '立体声']
+const tagStyle = computed(() => ({ fontSize: 13.sp, color: Color(theme.value.label) }))
+const bodyStyle = computed(() => ({ fontSize: 15.sp, color: Color(theme.value.label) }))
+</script>

@@ -1,0 +1,24 @@
+<template>
+    <Box :modifier="M.fillMaxSize()">
+        <Column horizontal-alignment="CenterHorizontally" :modifier="M.fillMaxSize().verticalScroll(scroll)">
+            <Column :modifier="M.widthIn({ max: maxWidth.dp }).fillMaxWidth().padding({ start: 20.dp, end: 20.dp, top: 76.dp, bottom: 48.dp })" :vertical-arrangement="Arrangement.spacedBy(gap.dp)">
+                <Slot />
+            </Column>
+        </Column>
+        <TopBar :title="title" :scrolled="scrolledDp > 2" :show-title="scrolledDp > titleThreshold" :leading="leading" :trailing="trailing" />
+    </Box>
+</template>
+
+<script>
+import { computed, createScrollState, inject, type ScrollState } from '@arrange/framework'
+import { Arrangement, DensityKey, M } from '@arrange/framework/ui'
+import TopBar from './TopBar.sfa'
+import type { BarAction } from './theme'
+
+// 主界面与次级界面共用的骨架：整页滚动，标题栏浮在上方；页内大标题滚出 titleThreshold 后栏内补上小标题
+// 传入 scroll 时由调用方持有滚动位置，界面重新挂载后回到原处；否则每次挂载从顶部开始
+const { title, titleThreshold, maxWidth, gap, leading, trailing, scroll: kept } = defineProps<{ title: string; titleThreshold: number; maxWidth: number; gap: number; leading?: BarAction; trailing?: BarAction; scroll?: ScrollState }>()
+const density = inject(DensityKey)
+const scroll = kept ?? createScrollState()
+const scrolledDp = computed(() => density ? density.pxToDp(scroll.valuePx) : scroll.valuePx)
+</script>

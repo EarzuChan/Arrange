@@ -1,0 +1,23 @@
+<template>
+    <Box content-alignment="Center" :modifier="buttonModifier">
+        <Icon :painter="iconPainter" :tint="Color(theme.label)" :modifier="M.size(22.dp, 22.dp)" />
+    </Box>
+</template>
+
+<script>
+import { computed, createInteractionState } from '@arrange/framework'
+import { M, Color, CircleShape, painter } from '@arrange/framework/ui'
+import { useGalleryTheme } from './theme'
+
+// 浮在内容上的圆形白底图标按钮：返回、关于
+const { icon, label, onClick } = defineProps<{ icon: string; label: string; onClick: () => void }>()
+const theme = useGalleryTheme()
+const iconPainter = computed(() => painter(icon))
+const interaction = createInteractionState()
+const buttonModifier = computed(() => M.size(44.dp, 44.dp)
+    .dropShadow({ shape: CircleShape, radius: 12.dp, offset: { y: 2.dp }, color: Color(theme.value.shadow) })
+    .background(Color(interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.cardHover : theme.value.card), CircleShape)
+    .clickable({ onClick, interactionState: interaction })
+    .pointerIcon('hand')
+    .semantics({ role: 'button', label }))
+</script>

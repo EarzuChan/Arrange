@@ -1,0 +1,36 @@
+<template>
+    <Column :modifier="M.fillMaxWidth().focusGroup()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="焦点" footer="Tab / Shift+Tab 在两个框之间切换，也可以用按钮直接移动焦点">
+            <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <GalleryButton text="聚焦第一框" :on-click="() => firstFocus.requestFocus()" />
+                <GalleryButton text="下一个" :on-click="() => focusManager.moveFocus('next')" />
+                <GalleryButton text="清除焦点" :on-click="() => focusManager.clearFocus()" />
+            </FlowRow>
+            <Text :text="status" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+        </Section>
+
+        <Section title="单行" footer="双击选词，三击选行，回车提交">
+            <Input value="双击选词，三击选行" :single-line="true" :onSubmit="value => status = `提交：${value}`" :text-style="bodyStyle" :modifier="fieldModifier(44).focusRequester(firstFocus).focusProperties({ next: secondFocus }).onFocusChanged(state => status = state.isFocused ? '第一框获得焦点' : '第一框离开焦点')" />
+        </Section>
+
+        <Section title="多行" footer="拖动选区、Shift + 方向键扩选，复制粘贴与中文组合输入">
+            <Input :value="'中文输入与换行\n拖动选区，试试 Shift + 方向键'" :single-line="false" :min-lines="3" :max-lines="5" :text-style="bodyStyle" :modifier="fieldModifier(110).focusRequester(secondFocus).focusProperties({ previous: firstFocus }).onFocusChanged(state => status = state.isFocused ? '第二框获得焦点' : '第二框离开焦点')" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { computed, createFocusRequester, FocusManagerKey, inject, ref } from '@arrange/framework'
+import { M, Arrangement, Color, rounded } from '@arrange/framework/ui'
+import { FlowRow } from '@arrange/framework/foundation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import Section from '../../design/Section.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const status = ref('还没有框获得焦点')
+const firstFocus = createFocusRequester(), secondFocus = createFocusRequester()
+const focusManager = inject(FocusManagerKey)!
+const bodyStyle = computed(() => ({ fontSize: 15.sp, color: Color(theme.value.label) }))
+const fieldModifier = (height: number) => M.fillMaxWidth().height(height.dp).background(Color(theme.value.fill), rounded(12.dp)).padding({ horizontal: 14.dp, vertical: 12.dp })
+</script>

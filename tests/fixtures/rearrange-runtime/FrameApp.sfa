@@ -28,9 +28,9 @@ import { ref, shallowRef, onScopeDispose, watch, getCurrentScope, effectScope } 
 import { animatedNumberAsRef, tween, linearEasing } from '@arrange/framework/animation'
 import { getArrangeExecutionStats } from '@arrange/framework/internal'
 import { Log } from '@arrange/framework'
-import AnimationGallery from '../../../demo/ui-src/src/view/AnimationGallery.sfa'
-import CounterPanel from '../../../demo/ui-src/src/view/CounterPanel.sfa'
-import ShowcaseGallery from '../../../demo/ui-src/src/view/ShowcaseGallery.sfa'
+import AnimationGallery from '../../../demo/ui-src/src/exhibits/animation/AnimationGallery.sfa'
+import CounterPanel from '../../../demo/ui-src/src/exhibits/composition/CounterPanel.sfa'
+import ShowcaseGallery from '../../../demo/ui-src/src/exhibits/showcase/ShowcaseGallery.sfa'
 
 const color = ref(Color(0xff336699))
 const offset = ref<Dp>(0.dp)

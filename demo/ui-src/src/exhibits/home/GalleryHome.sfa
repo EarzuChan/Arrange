@@ -1,0 +1,34 @@
+<template>
+    <Scaffold title="Arrange" :title-threshold="56" :max-width="760" :gap="16" :trailing="about" :scroll="scroll">
+        <Column :modifier="M.padding({ start: 4.dp, bottom: 12.dp })" :vertical-arrangement="Arrangement.spacedBy(6.dp)">
+            <Text text="Arrange" :style="{ fontSize: 40.sp, color: Color(theme.label) }" />
+            <Text :text="`共 ${shown.length} 个主题`" :style="{ fontSize: typeScale.headline.sp, color: Color(theme.secondaryLabel) }" />
+        </Column>
+        <Row a-for="row in rows" :key="row[0].key" :modifier="M.fillMaxWidth().height(IntrinsicSize.Min)" :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
+            <Box a-for="topic in row" :key="topic.key" :modifier="M.weight(1).fillMaxHeight()">
+                <TopicCard :title="topic.title" :description="topic.description" :icon="topic.icon" :on-click="() => onOpen(topic.key)" />
+            </Box>
+            <Spacer a-if="row.length === 1" :modifier="M.weight(1)" />
+        </Row>
+    </Scaffold>
+</template>
+
+<script>
+import { computed, type ScrollState } from '@arrange/framework'
+import { Arrangement, Color, IntrinsicSize, M } from '@arrange/framework/ui'
+import Scaffold from '../../design/Scaffold.sfa'
+import TopicCard from '../../design/TopicCard.sfa'
+import { typeScale, useGalleryTheme } from '../../design/theme'
+import { topics, type TopicKey } from '../topics'
+
+// 主界面：大标题加两列宫格；大标题滚出后栏内补上小标题，「关于」在栏右侧，与次级界面左侧的返回同构
+const { showInterop, scroll, onOpen, onAbout } = defineProps<{ showInterop: boolean; scroll: ScrollState; onOpen: (key: TopicKey) => void; onAbout: () => void }>()
+const theme = useGalleryTheme()
+const about = computed(() => ({ icon: 'icons/lucide/info.svg', label: '关于 Arrange', onClick: onAbout }))
+const shown = computed(() => topics.filter(topic => showInterop || !topic.interop))
+const rows = computed(() => {
+    const result = []
+    for (let index = 0; index < shown.value.length; index += 2) result.push(shown.value.slice(index, index + 2))
+    return result
+})
+</script>

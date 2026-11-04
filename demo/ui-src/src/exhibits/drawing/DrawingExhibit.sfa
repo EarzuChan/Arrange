@@ -1,0 +1,67 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="内容绘制" :footer="`内容绘制 ${copies} 次；换色与改宽度时网格立即重画`">
+            <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <GalleryButton text="换色" :on-click="() => tone = !tone" />
+                <GalleryButton text="改宽度" :on-click="() => wide = !wide" />
+                <GalleryButton text="内容次数" :on-click="() => copies = (copies + 1) % 3" />
+            </FlowRow>
+            <Box :modifier="M.fillMaxWidth(wide ? 1 : 0.7).height(110.dp).clip(rounded(12.dp)).then(gridDrawing).then(contentDrawing)">
+                <Text text="内容" :style="{ fontSize: 20.sp, color: Color(theme.onAccent) }" :modifier="M.padding(16.dp).then(behindDrawing).padding({ horizontal: 12.dp, vertical: 6.dp })" />
+            </Box>
+        </Section>
+
+        <Section title="变换与层级" footer="旋转后点椭圆依然命中；在两块重叠处点击，上层的那块接住点击">
+            <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <GalleryButton text="旋转" :on-click="() => rotation = (rotation + 30) % 360" />
+                <GalleryButton text="镜像" :on-click="() => mirror = !mirror" />
+                <GalleryButton text="交换层级" :on-click="() => front = !front" />
+            </FlowRow>
+            <Row :horizontal-arrangement="Arrangement.spacedBy(24.dp)">
+                <Box content-alignment="Center" :modifier="M.size(120.dp, 110.dp)">
+                    <Text text="点我" text-align="center" :style="{ fontSize: 13.sp, color: Color(theme.onAccent) }" :modifier="M.size(84.dp, 60.dp).graphicsLayer({ rotationZ: rotation, scaleX: mirror ? -1 : 1 }).clip(CircleShape).background(Color(theme.accent)).clickable(() => status = '命中了变换后的椭圆').padding({ vertical: 20.dp })" />
+                </Box>
+                <Box :modifier="M.size(160.dp, 110.dp)">
+                    <Box :modifier="M.size(90.dp, 66.dp).background(Color(0xffff9f0a), rounded(14.dp)).zIndex(front ? 2 : -1).clickable(() => status = '点中了橙色块')" />
+                    <Box :modifier="M.size(90.dp, 66.dp).offset({ x: 32.dp, y: 26.dp }).background(Color(0xff5e5ce6), rounded(14.dp)).zIndex(front ? -1 : 2).clickable(() => status = '点中了紫色块')" />
+                </Box>
+            </Row>
+            <Text :text="status" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { M, Arrangement, Color, CircleShape, rounded, type Px } from '@arrange/framework/ui'
+import { FlowRow } from '@arrange/framework/foundation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import Section from '../../design/Section.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const status = ref('点一点上面的图形')
+const tone = ref(false), wide = ref(false), copies = ref(1)
+const rotation = ref(0), mirror = ref(false), front = ref(false)
+
+const behindDrawing = M.drawBehind(scope => {
+    scope.drawRoundRect({ color: Color(theme.value.accent), radius: 10.px })
+})
+const gridDrawing = M.drawWithCache(cache => {
+    const step: Px = 20.px
+    return {
+        onDrawBehind(scope) {
+            scope.drawRect({ color: Color(tone.value ? theme.value.accentTint : theme.value.fill) })
+            for (let x = step; x < cache.size.width; x += step) scope.drawLine({ color: Color(theme.value.separator), startX: x.px, startY: 0.px, endX: x.px, endY: cache.size.height, strokeWidth: 1.px })
+            for (let y = step; y < cache.size.height; y += step) scope.drawLine({ color: Color(theme.value.separator), startX: 0.px, startY: y.px, endX: cache.size.width, endY: y.px, strokeWidth: 1.px })
+            scope.drawCircle({ color: Color(theme.value.accent), centerX: (cache.size.width - 24).px, centerY: 24.px, radius: 12.px })
+        }
+    }
+})
+const contentDrawing = M.drawWithContent((scope, drawContent) => {
+    scope.clipRoundRect({ radius: 12.px }, () => {
+        if (copies.value > 0) drawContent()
+        if (copies.value > 1) scope.withTransform({ translationX: 140.px }, drawContent)
+    })
+})
+</script>

@@ -71,7 +71,8 @@ int main(int argc, char** argv) {
         runtime.setScriptHost(std::move(host));
         if (initialSubmission) runtime.enqueue(std::move(*initialSubmission));
         double timestamp = 0;
-        const Constraints constraints{0, 520, 0, 380};
+        // 视口容纳真实动画画廊的各分区，输入框可直接命中
+        const Constraints constraints{0, 520, 0, 1200};
         const auto initial = runtime.pumpFrame(1, constraints, timestamp);
         if (!initial.ok) throw std::runtime_error(initial.error);
         const auto counter = findText(runtime.scene(), "撅了啊 0 次");

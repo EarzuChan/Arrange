@@ -1,0 +1,20 @@
+<template>
+    <Row vertical-alignment="CenterVertically" :modifier="M.fillMaxWidth()" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
+        <Column :modifier="M.weight(1)" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
+            <Text :text="`原样 Ref：${name}`" :style="{ fontSize: 15.sp, color: Color(theme.label) }" />
+            <Text :text="`子层读取 state：` + state.value" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+        </Column>
+        <GalleryButton text="切换 Ref" :on-click="onToggle" />
+    </Row>
+</template>
+
+<script>
+import type { Ref } from '@arrange/framework'
+import { Arrangement, M, Color } from '@arrange/framework/ui'
+import { Column, Row, Text } from '@arrange/framework/foundation'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const { state, name, onToggle } = defineProps<{ state: Ref<number>; name: string; onToggle: () => void }>()
+const theme = useGalleryTheme()
+</script>

@@ -1,0 +1,30 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="试一试" footer="每点一次计数加一，底色与位移按奇偶交替过渡">
+            <CounterPanel :clicks="clicks" :color="counterColor" :offset="counterOffset" :on-tap="() => clicks++" />
+        </Section>
+
+        <FoundationBasics />
+
+        <Section title="组合上下文" footer="PropBoundary 收下属性却不往下传，内层只能显示自己的默认值；RefRelay 原样拿到父层的 Ref，点一下换成另一个">
+            <PropBoundary secret="父级明确声明并接收的属性" />
+            <RefRelay :state="secondSelected ? <secondRef> : <firstRef>" :name="secondSelected ? 'secondRef' : 'firstRef'" :on-toggle="() => secondSelected = !secondSelected" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { ref } from '@arrange/framework'
+import { Arrangement, Color, M } from '@arrange/framework/ui'
+import { animatedColorAsRef, animatedDpAsRef, tween } from '@arrange/framework/animation'
+import Section from '../../design/Section.sfa'
+import CounterPanel from './CounterPanel.sfa'
+import FoundationBasics from './FoundationBasics.sfa'
+import PropBoundary from './PropBoundary.sfa'
+import RefRelay from './RefRelay.sfa'
+
+const clicks = ref(0)
+const counterColor = animatedColorAsRef(() => clicks.value % 2 === 0 ? Color(0xff007aff) : Color(0xff34c759), { animationSpec: tween({ durationMillis: 240 }) })
+const counterOffset = animatedDpAsRef(() => clicks.value % 2 ? 12.dp : 0.dp, { animationSpec: tween({ durationMillis: 240 }) })
+const firstRef = ref(11), secondRef = ref(29), secondSelected = ref(false)
+</script>

@@ -1,0 +1,150 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="宿主" :flush="true">
+            <ListRow title="宿主" :value="host.name ?? '独立运行'" :separator="true" />
+            <ListRow title="格式" :value="host.format" :separator="true" />
+            <ListRow title="音频" :value="audioLine" :separator="true" />
+            <ListRow title="走带" :value="transportLine" />
+        </Section>
+
+        <Section title="增益" footer="拖动调节，Shift 精调，双击复位，方向键步进，右键打开宿主菜单">
+            <Row vertical-alignment="CenterVertically" :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
+                <Box :modifier="M.size(64.dp, 64.dp).then(adjustable(knob, { pointerLock: true, valueText: gain.text, interactionState: knobInteraction })).pointerIcon('resizeVertical').onContextClick(showGainMenu).then(knobDrawing)" />
+                <Text :text="gain.text" :style="{ fontSize: 28.sp, color: Color(theme.label) }" />
+            </Row>
+            <Box :modifier="M.fillMaxWidth().height(6.dp).clip(rounded(3.dp)).then(gainBar)" />
+        </Section>
+
+        <Section title="削波模式">
+            <Segmented :options="modeNames" :value="modeNames[mode.value] ?? modeNames[0]" :on-change="name => mode.value = modeNames.indexOf(name)" />
+        </Section>
+
+        <Section :flush="true">
+            <ListRow title="旁通">
+                <Toggle :value="bypass.value > 0.5" label="旁通" :on-change="on => bypass.value = on ? 1 : 0" />
+            </ListRow>
+        </Section>
+
+        <Section title="实时观测" footer="电平、波形与频谱随音频实时刷新；宿主里的自动化也会同步到这页">
+            <Box :modifier="M.fillMaxWidth().height(12.dp).clip(rounded(6.dp)).then(meterBar)" />
+            <Box :modifier="M.fillMaxWidth().height(88.dp).clip(rounded(12.dp)).then(scopeDrawing)" />
+            <Box :modifier="M.fillMaxWidth().height(88.dp).clip(rounded(12.dp)).then(spectrumDrawing)" />
+        </Section>
+
+        <Section title="预设" :flush="true" :footer="status">
+            <ListRow a-for="name in presets" :key="name" :title="name" :chevron="true" :separator="true" :on-click="() => loadPreset(name)" />
+            <ListRow title="存为新预设" :accent="true" :on-click="savePreset" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { computed, ref, onMounted, createValueDragState, createInteractionState, adjustable } from '@arrange/framework'
+import { useParameter, useHost, useTransport, useMeter, useWaveform, useSpectrum, onNativeEvent, invokeNative } from '@arrange/framework/interop'
+import { Arrangement, Color, M, rounded } from '@arrange/framework/ui'
+import ListRow from '../../design/ListRow.sfa'
+import Section from '../../design/Section.sfa'
+import Segmented from '../../design/Segmented.sfa'
+import Toggle from '../../design/Toggle.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+const modeNames = ['Clean', 'Soft Clip', 'Hard Clip']
+
+const gain = useParameter('gain')
+const mode = useParameter('mode')
+const bypass = useParameter('bypass')
+const host = useHost()
+const transport = useTransport()
+const level = useMeter('output')
+const samples = useWaveform('output', { size: 256 })
+const bins = useSpectrum('output')
+
+const presets = ref<string[]>([])
+const status = ref('点一个预设载入，或把当前设置存为新预设')
+
+const audioLine = computed(() => host.sampleRate ? `${host.sampleRate} Hz / ${host.blockSize} 样本` : '未就绪')
+const transportLine = computed(() => transport.playing ? `播放 · ${transport.bpm?.toFixed(1) ?? '—'} BPM · 第 ${(transport.positionPpq ?? 0).toFixed(2)} 拍` : '停止')
+
+// 旋钮：一次拖动只对应一对参数 gesture，宿主记录为一次编辑；外观只读 fraction 与交互状态
+const knob = createValueDragState({ value: gain.editable() })
+const knobInteraction = createInteractionState()
+
+function showGainMenu() {
+    if (!gain.showHostMenu()) status.value = '宿主未提供参数菜单'
+}
+
+const knobDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const radius = Math.min(width, height) / 2
+    const active = knob.isDragging || knobInteraction.hovered || knobInteraction.focused
+    scope.drawCircle({ color: Color(active ? theme.value.accentTint : theme.value.fill) })
+    // 指针在正上方两侧各 135° 内扫动
+    const angle = (knob.fraction * 270 - 135) * Math.PI / 180
+    const length = radius * 0.78
+    scope.drawLine({ startX: (width / 2).px, startY: (height / 2).px, endX: (width / 2 + Math.sin(angle) * length).px, endY: (height / 2 - Math.cos(angle) * length).px, color: Color(theme.value.accent), strokeWidth: 3.px })
+})
+
+const gainBar = M.drawBehind(scope => {
+    scope.drawRect({ color: Color(theme.value.separator) })
+    scope.drawRect({ width: (scope.size.width * gain.normalized).px, color: Color(theme.value.accent) })
+})
+
+const meterBar = M.drawBehind(scope => {
+    const decibels = 20 * Math.log10(Math.max(level.value, 1e-4))
+    const fill = Math.min(1, Math.max(0, (decibels + 60) / 60))
+    scope.drawRect({ color: Color(theme.value.separator) })
+    scope.drawRect({ width: (scope.size.width * fill).px, color: decibels > -3 ? Color(theme.value.danger) : Color(theme.value.accent) })
+})
+
+const scopeDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const data = samples.value
+    scope.drawRect({ color: Color(theme.value.background) })
+    scope.drawLine({ startX: 0.px, startY: (height / 2).px, endX: width.px, endY: (height / 2).px, color: Color(0xffd1d1d6), strokeWidth: 1.px })
+    for (let i = 1; i < data.length; i++) {
+        const x0 = (i - 1) / (data.length - 1) * width
+        const x1 = i / (data.length - 1) * width
+        scope.drawLine({ startX: x0.px, startY: (height / 2 * (1 - data[i - 1])).px, endX: x1.px, endY: (height / 2 * (1 - data[i])).px, color: Color(theme.value.accent), strokeWidth: 1.5.px })
+    }
+})
+
+const spectrumDrawing = M.drawBehind(scope => {
+    const { width, height } = scope.size
+    const data = bins.value
+    scope.drawRect({ color: Color(theme.value.background) })
+    if (!data.length) return
+    const step = width / data.length
+    for (let i = 0; i < data.length; i++) {
+        const barHeight = Math.max(1, data[i] * height)
+        scope.drawRect({ x: (i * step + 1).px, y: (height - barHeight).px, width: Math.max(1, step - 2).px, height: barHeight.px, color: Color.hsl(200 - data[i] * 160, 0.7, 0.55) })
+    }
+})
+
+async function refreshPresets() {
+    presets.value = [...await invokeNative<string[]>('presets')]
+}
+
+async function loadPreset(name: string) {
+    try {
+        await invokeNative('loadPreset', name)
+    } catch (error) {
+        status.value = `载入失败：${(error as Error).message}`
+    }
+}
+
+async function savePreset() {
+    try {
+        const saved = await invokeNative<string>('savePreset', `User ${presets.value.filter(name => name.startsWith('User ')).length + 1}`)
+        status.value = `已保存 ${saved}`
+        await refreshPresets()
+    } catch (error) {
+        status.value = `保存失败：${(error as Error).message}`
+    }
+}
+
+onNativeEvent<{ name: string }>('presetLoaded', value => { status.value = `已载入预设 ${value.name}` })
+onMounted(refreshPresets)
+</script>
+
+

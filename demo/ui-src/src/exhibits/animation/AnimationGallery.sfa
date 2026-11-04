@@ -1,0 +1,129 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="试一试" footer="一次触发颜色、位移、尺寸、展开、可见性与切页六种过渡；再点一次全部反向">
+            <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                <GalleryButton text="全部播放" :prominent="true" :on-click="() => run('all')" />
+                <GalleryButton text="统计" :on-click="() => run('stats')" />
+            </FlowRow>
+            <Text :text="status" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+        </Section>
+
+        <Section title="数值过渡" footer="颜色走补间，位置走弹簧，尺寸跟随目标值；下面的条随过渡状态一起变化">
+            <Row vertical-alignment="CenterVertically" :modifier="M.height(40.dp)" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
+                <Box :modifier="M.width(72.dp).height(28.dp).background(color, rounded(8.dp))" />
+                <Box :modifier="M.size(dimensions.width.dp, dimensions.height.dp).offset({ x: position.x.dp, y: position.y.dp }).background(Color(0xff5e5ce6), rounded(8.dp))" />
+            </Row>
+            <ValueSurface :tone="groupColor" :offset="groupOffset">
+                <Box :modifier="M.size(72.dp, 12.dp)" />
+            </ValueSurface>
+        </Section>
+
+        <Section title="内容尺寸" footer="展开时卡片跟着动画长高，相邻内容随之下移">
+            <Column :modifier="M.fillMaxWidth().animateContentSize(spec).background(Color(theme.fill), rounded(12.dp)).padding(12.dp)">
+                <Text :text="label" :style="{ color: Color(theme.label), fontSize: 15.sp }" />
+                <Text a-if="expanded" text="相邻内容跟随动画高度放置" :style="{ color: Color(theme.secondaryLabel), fontSize: 13.sp }" :modifier="M.padding({ top: 6.dp })" />
+            </Column>
+        </Section>
+
+        <Section title="可见性与交叉淡入" footer="退场中途反向时，输入框保留编辑内容；完全离场后再进入会重置">
+            <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16.px }" :exit-to="{ alpha: 0, translationX: 16.px }">
+                <Row vertical-alignment="CenterVertically" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
+                    <Text text="可见的内容" :style="{ color: Color(theme.label), fontSize: 15.sp }" />
+                    <Input value="编辑我，如果我彻底离场会被重置" :text-style="{ color: Color(theme.label), fontSize: 13.sp }" :modifier="M.width(240.dp).height(36.dp).background(Color(theme.fill), rounded(10.dp)).padding({ horizontal: 10.dp, vertical: 9.dp })" />
+                </Row>
+            </AnimatedVisibility>
+            <Crossfade :is="Text" :props="{ text: `页面 ${page}`, style: { color: Color(theme.label), fontSize: 15.sp }, modifier: M.background(page === 'A' ? Color(theme.accentTint) : Color(0xffe6dcfa), rounded(10.dp)).padding({ horizontal: 14.dp, vertical: 8.dp }) }" :targetState="page" :animationSpec="spec" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { Text, FlowRow } from '@arrange/framework/foundation'
+import { AnimatedVisibility, Crossfade, tween, spring, linearEasing, animatedColorAsRef, animatedOffsetAsRef, animatedSizeAsRef, createTransition, animationStats } from '@arrange/framework/animation'
+import { Arrangement, M, modifierStats, modifierAllocationStats, Color, rounded } from '@arrange/framework/ui'
+import { ref, computed, watch } from '@arrange/framework'
+import { getArrangeExecutionStats } from '@arrange/framework/internal'
+import GalleryButton from '../../design/GalleryButton.sfa'
+import Section from '../../design/Section.sfa'
+import ValueSurface from '../../design/ValueSurface.sfa'
+import { useGalleryTheme } from '../../design/theme'
+
+const props = defineProps({ command: { type: String, default: '' } })
+const theme = useGalleryTheme()
+
+const expanded = ref(false)
+const visible = ref(true)
+const page = ref('A')
+const colorTarget = ref(Color(0xff34c759))
+const positionTarget = ref({ x: 0.dp, y: 0.dp })
+const sizeTarget = ref({ width: 72.dp, height: 24.dp })
+const spec = tween({ durationMillis: 320, easing: linearEasing })
+const color = animatedColorAsRef(colorTarget, { animationSpec: spec })
+const position = animatedOffsetAsRef(positionTarget, { animationSpec: spring({ stiffness: 220, dampingRatio: 0.8 }) })
+const dimensions = animatedSizeAsRef(sizeTarget, { animationSpec: spec })
+const transition = createTransition(expanded, { animationSpec: spec })
+const groupColor = transition.animatedColor('group-color', state => state ? Color(0xffff9f0a) : Color(0xff007aff))
+const groupOffset = transition.animatedDp('group-offset', state => state ? 24.dp : 0.dp)
+const label = computed(() => expanded.value ? '展开后多出一行说明' : '收起的内容')
+const status = ref('点「全部播放」开始，「统计」查看本页执行计数')
+let baseline: ReturnType<typeof getArrangeExecutionStats> | undefined
+
+function run(command: string) {
+    switch (command) {
+        case 'baseline':
+            baseline = getArrangeExecutionStats()
+            break
+
+        case 'color':
+            colorTarget.value = colorTarget.value === Color(0xff34c759) ? Color(0xffff2d55) : Color(0xff34c759)
+            break
+
+        case 'move':
+            positionTarget.value = { x: positionTarget.value.x ? 0 : 28, y: 0.dp }
+            break
+
+        case 'size':
+            sizeTarget.value = { width: sizeTarget.value.width === 72 ? 130 : 72, height: 24.dp }
+            break
+
+        case 'expand':
+            expanded.value = !expanded.value
+            break
+
+        case 'visibility':
+            visible.value = !visible.value
+            break
+
+        case 'page':
+            page.value = page.value === 'A' ? 'B' : 'A'
+            break
+
+        case 'all':
+            run('color')
+            run('move')
+            run('size')
+            run('expand')
+            run('visibility')
+            run('page')
+            break
+
+        case 'validate-color':
+            if (getArrangeExecutionStats().structureRuns !== baseline?.structureRuns) throw new Error('颜色动画错误地重跑了结构')
+            break
+
+        case 'validate-settled':
+            if (animationStats.activeAnimations !== 0) throw new Error('画廊动画结束后仍保留帧需求')
+            break
+
+        case 'stats': {
+            const stats = getArrangeExecutionStats()
+            status.value = `结构 ${stats.structureRuns} / 值 ${stats.valueEvaluations} / 参数 ${modifierStats.parameterEvaluations} / 链 ${modifierAllocationStats.chains}`
+            break
+        }
+    }
+}
+
+// 测试外壳经 command 属性驱动同一套动作
+watch(() => props.command, command => run(command), { flush: 'sync' })
+</script>
+
