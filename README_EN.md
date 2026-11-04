@@ -1,7 +1,7 @@
 # Arrange
 
-[![npm version](https://img.shields.io/badge/npm%20%7C%20%40arrange%2Fframework-0.0.0--m.3.0-CB3837?style=flat-square)](https://www.npmjs.com/package/@arrange/framework)
-[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.0.0--m.3.0-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
+[![npm version](https://img.shields.io/npm/v/@arrange/framework?style=flat-square&label=npm%20%7C%20%40arrange%2Fframework&color=CB3837)](https://www.npmjs.com/package/@arrange/framework)
+[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.3-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
 
 [简体中文](README.md)
@@ -28,7 +28,8 @@ Arrange also ships its own CLI, which helps you create, sync, dev, build and pac
 1. Arrange is **not** a web UI framework or a WebView wrapper. It does not support or adopt web conventions (HTML elements, HTML styles, CSS). Arrangables differ greatly from HTML elements, and SFA templates are not HTML documents. Arrange also does not promise that arbitrary JS libraries, or standard Vue.js libraries and frameworks, will work in Arrange. More capabilities, such as navigation and state management, are still under consideration.
 2. Because the UI runs on a JS engine, performance or visual quality may fall short of native code in complex scenarios, and resource usage may be higher.
 3. The CLI may not handle every scenario. In complex or unusual cases, you (or your AI agent) may need to adjust things by hand.
-4. Arrange is in early development and evolving quickly. APIs and capabilities may change or be removed.
+4. Arrange is in early development and evolving quickly. APIs and capabilities may change or be removed. Please give it a try and share your feedback and issues to help us make her better. Thank you!
+5. The demo, documentation, and code comments are currently in Chinese only. We appreciate your understanding; internationalization will come later.
 
 ## What's Included
 

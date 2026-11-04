@@ -1,8 +1,8 @@
 # Arrange
 
-[![npm version](https://img.shields.io/badge/npm%20%7C%20%40arrange%2Fframework-0.0.0--m.3.0-CB3837?style=flat-square)](https://www.npmjs.com/package/@arrange/framework)
-[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.0.0--m.3.0-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
-[![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
+[![npm version](https://img.shields.io/npm/v/@arrange/framework?style=flat-square&label=npm%20%7C%20%40arrange%2Fframework&color=CB3837)](https://www.npmjs.com/package/@arrange/framework)
+[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.3-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
+[![License](npm dist-tag add @arrange/framework@0.7.3 latesthttps://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
 
 [English](README_EN.md)
 
@@ -28,7 +28,7 @@ Arrange 另提供有一套自研 CLI（以面向用户为主），以方便您�
 1. Arrange 并非 Web UI 框架或者 WebView 套壳，其不支持、不沿用 Web 写法（如 HTML Elements、HTML Styles、CSS），且 Arrangable 也和 HTML Element 具有很大不同，SFA 模板也不是 HTML Document，请知晓。Arrange 也不承诺任意 JS 或标准 Vue.js 库和框架能在 Arrange 场景下沿用。未来 Arrange 计划提供如导航、状态等的更多能力，尚待考虑和开发。
 2. 由于 UI 侧需要使用 JS 引擎，在复杂场景下，性能或者效果可能不如原生，占用也或会偏大。
 3. CLI 不一定能处理全场景问题，遇到某些复杂或极少见的情况，或许需要您（或者 AI AGENT）亲自调整修正。
-4. Arrange 尚处于早期开发阶段且在持续快速演进，API 和各项能力可能会被更改或者移除，请注意。
+4. Arrange 尚处于早期开发阶段且在持续快速演进，API 和各项能力可能会被更改或者移除，请注意。请您多多体验和提出问题，让我们使她变得更好，感谢您。
 
 ## 提供的设施
 
