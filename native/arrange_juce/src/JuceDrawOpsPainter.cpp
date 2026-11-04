@@ -201,7 +201,9 @@ namespace arrange::juce {
         if (op.gradient->kind == arrange::core::GradientKind::Sweep) {
             g.reduceClipRegion(path);
             g.setOpacity(colorAlpha(op.color) * alpha);
-            g.drawImage(sweepImage(g, op.gradient, box), box, ::juce::RectanglePlacement::stretchToFit);
+            // 描边轮廓会超出形状矩形，图像铺满路径与矩形的并集
+            const auto area = path.getBounds().getUnion(box);
+            g.drawImage(sweepImage(g, op.gradient, box, area), area, ::juce::RectanglePlacement::stretchToFit);
             return;
         }
         g.setGradientFill(colourGradient(*op.gradient, box));
@@ -209,11 +211,15 @@ namespace arrange::juce {
         g.fillPath(path);
     }
 
-    ::juce::Image JuceDrawOpsPainter::sweepImage(::juce::Graphics& g, const arrange::core::GradientRef& gradient, ::juce::Rectangle<float> box) const {
+    ::juce::Image JuceDrawOpsPainter::sweepImage(::juce::Graphics& g, const arrange::core::GradientRef& gradient, ::juce::Rectangle<float> box, ::juce::Rectangle<float> area) const {
         const auto scale = std::max(1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
-        const auto width = std::clamp(static_cast<int>(std::ceil(box.getWidth() * scale)), 1, 4096);
-        const auto height = std::clamp(static_cast<int>(std::ceil(box.getHeight() * scale)), 1, 4096);
-        return bitmapCache_.get({gradient.value, 0x5733u, width, height}, [&] {
+        const auto width = std::clamp(static_cast<int>(std::ceil(area.getWidth() * scale)), 1, 4096);
+        const auto height = std::clamp(static_cast<int>(std::ceil(area.getHeight() * scale)), 1, 4096);
+        // 中心在图像中的像素位置随 box 与 area 的关系变化，计入缓存键
+        const auto centerX = (box.getX() + box.getWidth() * gradient->center.x - area.getX()) / std::max(area.getWidth(), 1e-3f) * static_cast<float>(width);
+        const auto centerY = (box.getY() + box.getHeight() * gradient->center.y - area.getY()) / std::max(area.getHeight(), 1e-3f) * static_cast<float>(height);
+        const auto detail = CacheDetail().add(0x5733u).add(std::round(centerX * 4.0f)).add(std::round(centerY * 4.0f)).value();
+        return bitmapCache_.get({gradient.value, detail, width, height}, [&] {
             // 色标先展开为查找表，逐像素只算一次角度
             constexpr int lookupSize = 1024;
             ::juce::ColourGradient colours;
@@ -226,7 +232,6 @@ namespace arrange::juce {
             ::juce::Image image(::juce::Image::ARGB, width, height, false);
             {
                 ::juce::Image::BitmapData data(image, ::juce::Image::BitmapData::writeOnly);
-                const auto centerX = gradient->center.x * static_cast<float>(width), centerY = gradient->center.y * static_cast<float>(height);
                 for (int y = 0; y < height; ++y)
                     for (int x = 0; x < width; ++x) {
                         auto degrees = std::atan2(static_cast<float>(y) + 0.5f - centerY, static_cast<float>(x) + 0.5f - centerX) * 180.0f / ::juce::MathConstants<float>::pi - gradient->startAngle;

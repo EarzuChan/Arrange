@@ -123,13 +123,21 @@ namespace arrange::core {
         } else {
             // 只把新记录的场景脏区加入闪烁；叠加层自身的重绘不进时间线
             if (layers_.dirtyFlash) {
+                // 同一区域连续重绘只重新计时，不叠加，否则逐帧动画的半透明闪烁会叠成不透明
+                const auto flash = [&](const Rect& rect) {
+                    const auto existing = std::find_if(flashes_.begin(), flashes_.end(), [&](const Flash& item) { return item.rect == rect; });
+                    if (existing != flashes_.end())
+                        existing->started = nowMillis;
+                    else
+                        flashes_.push_back({rect, nowMillis});
+                };
                 for (auto index = timeline.size(); index > 0; --index) {
                     const auto& record = timeline.at(index - 1);
                     if (record.sequence <= seenSequence_) break;
                     if (record.repaint.full)
-                        flashes_.push_back({{0, 0, frame.content.viewport.width, frame.content.viewport.height}, nowMillis});
+                        flash({0, 0, frame.content.viewport.width, frame.content.viewport.height});
                     else
-                        for (const auto& rect : record.repaint.rects) flashes_.push_back({rect, nowMillis});
+                        for (const auto& rect : record.repaint.rects) flash(rect);
                 }
                 if (flashes_.size() > maxFlashes) flashes_.erase(flashes_.begin(), flashes_.end() - static_cast<std::ptrdiff_t>(maxFlashes));
             } else

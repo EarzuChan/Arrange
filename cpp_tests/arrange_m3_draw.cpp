@@ -425,6 +425,11 @@ namespace {
         // 起始角 0 在右侧：右侧略下方接近首色，右侧略上方接近末色
         check(sweep.getPixelAt(95, 52).getRed() > 200 && sweep.getPixelAt(95, 47).getBlue() > 200, "扫描渐变的起始角或方向错误");
         check(sweep.getPixelAt(110, 8).getGreen() > 200 && sweep.getPixelAt(110, 4).getAlpha() == 0, "圆线帽没有越过端点半个线宽");
+        // 描边外沿超出形状矩形，扫描渐变也要铺到外沿
+        DrawFixture ring;
+        if (const auto ringError = ring.run(drawScript("{type:'sweepGradient',colors:[0xffff0000,0xff0000ff],stops:[0,1],center:{x:0.5,y:0.5},startAngle:0}", "3, 20,20,60,60, -1, 10, 9"))) throw std::runtime_error(*ringError);
+        const auto ringImage = render(ring.published);
+        check(ringImage.getPixelAt(16, 50).getAlpha() > 200 && ringImage.getPixelAt(50, 16).getAlpha() > 200 && ringImage.getPixelAt(50, 50).getAlpha() == 0, "扫描渐变描边被裁到形状矩形内");
         const auto strokeBounds = stroke.scene.node(1).paintCache->bounds;
         check(strokeBounds.known && strokeBounds.rect.x + strokeBounds.rect.width >= 113 && strokeBounds.rect.y <= 7, "描边路径边界没有计入线宽");
 

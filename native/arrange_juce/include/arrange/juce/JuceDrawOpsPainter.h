@@ -61,7 +61,8 @@ namespace arrange::juce {
         void drawPainter(::juce::Graphics& g, const arrange::core::DrawOp& op, ::juce::Rectangle<float> rect, float alpha) const;
         ::juce::Image pixelImage(const std::shared_ptr<const arrange::core::PainterContent>& content) const;
         void fillWithPaint(::juce::Graphics& g, const ::juce::Path& path, const arrange::core::DrawOp& op, ::juce::Rectangle<float> box, float alpha) const;
-        ::juce::Image sweepImage(::juce::Graphics& g, const arrange::core::GradientRef& gradient, ::juce::Rectangle<float> box) const;
+        // 扫描渐变的角度场按 box 定中心，图像铺满 area；描边外沿可超出 box
+        ::juce::Image sweepImage(::juce::Graphics& g, const arrange::core::GradientRef& gradient, ::juce::Rectangle<float> box, ::juce::Rectangle<float> area) const;
         // 效果层的重放；返回 true 表示子片段已由效果自行绘制
         bool replayEffect(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, const arrange::core::EffectModifier& effect, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const;
         // 从根重放到目标片段之前，得到目标层局部 area 内已绘制的内容

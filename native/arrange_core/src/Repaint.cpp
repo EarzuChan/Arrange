@@ -79,6 +79,44 @@ namespace arrange::core {
             for (std::size_t index = 0; index < previous.children.size(); ++index) compare(damage, previous.children[index], next.children[index], inner);
         }
 
+        bool containsFragment(const PlacedPaintFragment& placed, const PaintFragment* target) {
+            if (!placed.fragment) return false;
+            if (placed.fragment.get() == target) return true;
+            return std::any_of(placed.fragment->children.begin(), placed.fragment->children.end(), [&](const PlacedPaintFragment& child) { return containsFragment(child, target); });
+        }
+
+        // 与 compare 相同的比较，只收集重放顺序在目标片段之前的变化；目标自身的内容与子片段画在背景之上，不计入
+        // 返回 true 表示已到达目标，后续兄弟不再比较
+        bool compareUntil(RepaintDamage& damage, const PlacedPaintFragment& before, const PlacedPaintFragment& after, const Scope& parent, const PaintFragment* target) {
+            if (damage.full()) return true;
+            if (after.fragment.get() == target) return true;
+            if (!containsFragment(after, target)) {
+                compare(damage, before, after, parent);
+                return false;
+            }
+            if (before.fragment == after.fragment && before.offset == after.offset) return true;
+            const auto replaceWhole = [&] {
+                addPlaced(damage, before, parent);
+                addPlaced(damage, after, parent);
+                return true;
+            };
+            if (!before.fragment || before.offset != after.offset) return replaceWhole();
+            const auto& previous = *before.fragment;
+            const auto& next = *after.fragment;
+            if (previous.layer != next.layer || previous.content != next.content || previous.children.size() != next.children.size()) return replaceWhole();
+            if (const auto* effect = previous.layer ? std::get_if<EffectModifier>(&previous.layer->value) : nullptr; effect && effect->kind == EffectKind::Blur) return replaceWhole();
+            if (previous.content && std::any_of(previous.content->begin(), previous.content->end(), [](const DrawOp& op) { return op.type == DrawOpType::PushClip || op.type == DrawOpType::PushTransform; })) return replaceWhole();
+            auto inner = placedScope(parent, before.offset);
+            if (previous.layer) {
+                const auto entered = enterLayer(*previous.layer, inner);
+                if (!entered) return replaceWhole();
+                inner = *entered;
+            }
+            for (std::size_t index = 0; index < previous.children.size(); ++index)
+                if (compareUntil(damage, previous.children[index], next.children[index], inner, target)) return true;
+            return true;
+        }
+
         // 按重放顺序跟踪 clip / transform 状态栈，定位聚焦 Input 的叶项
         struct FieldSearch {
             RepaintDamage& damage;
@@ -131,6 +169,7 @@ namespace arrange::core {
         // 收集背景模糊层：采样范围取输出外扩三倍标准差，与重放一致
         struct BackdropSearch {
             struct Backdrop {
+                const PaintFragment* fragment;
                 Rect output;
                 Rect sample;
             };
@@ -153,7 +192,7 @@ namespace arrange::core {
                             return;
                         }
                         if (scope.clip) output = intersectRect(*output, *scope.clip);
-                        found.push_back({*output, *sample});
+                        found.push_back({&fragment, *output, *sample});
                     }
                     const auto entered = enterLayer(*fragment.layer, scope);
                     // 无法给出单一作用域的层按变换前范围保守处理
@@ -205,27 +244,40 @@ namespace arrange::core {
 
     void RepaintDamage::addInputField(const PlacedPaintFragment& scene, ModifierHandle field) {
         if (full_ || !field.valid()) return;
-        FieldSearch search{*this, field};
+        RepaintDamage local(limits_);
+        FieldSearch search{local, field};
         search.placed(scene, {});
-        if (!search.found) markFull();
+        if (!search.found || local.full()) return markFull();
+        for (const auto& rect : local.rects_) {
+            unordered_.push_back(rect);
+            addRect(rect);
+        }
     }
 
-    void RepaintDamage::addBackdrops(const PlacedPaintFragment& scene) {
+    bool RepaintDamage::intersects(const Rect& rect) const {
+        if (full_) return true;
+        const auto hit = [&](const Rect& other) {
+            const auto overlap = intersectRect(other, rect);
+            return overlap.width > 0 && overlap.height > 0;
+        };
+        return std::any_of(rects_.begin(), rects_.end(), hit) || std::any_of(unordered_.begin(), unordered_.end(), hit);
+    }
+
+    void RepaintDamage::addBackdrops(const PlacedPaintFragment& before, const PlacedPaintFragment& after) {
         if (full_) return;
         BackdropSearch search;
-        search.placed(scene, {});
+        search.placed(after, {});
         if (search.unknown) return markFull();
-        // 背景模糊的采样范围与任一变化相交时整块重绘其输出；新增范围可能再牵动其它背景模糊，直到稳定
-        std::vector<bool> added(search.found.size(), false);
-        for (auto changed = true; changed && !full_;) {
-            changed = false;
-            for (std::size_t index = 0; index < search.found.size(); ++index) {
-                if (added[index]) continue;
-                const auto& sample = search.found[index].sample;
-                if (!std::any_of(rects_.begin(), rects_.end(), [&](const Rect& rect) { return intersectRect(rect, sample).width > 0 && intersectRect(rect, sample).height > 0; })) continue;
-                added[index] = changed = true;
-                addRect(search.found[index].output);
-            }
+        // 搜索按重放顺序给出背景模糊；之前已牵动的背景模糊输出也画在后者之前
+        RepaintDamage earlier(limits_);
+        earlier.unordered_ = unordered_;
+        for (const auto& backdrop : search.found) {
+            if (full_) return;
+            RepaintDamage prefix(limits_);
+            compareUntil(prefix, before, after, {}, backdrop.fragment);
+            if (!prefix.intersects(backdrop.sample) && !earlier.intersects(backdrop.sample)) continue;
+            earlier.addRect(backdrop.output);
+            addRect(backdrop.output);
         }
     }
 

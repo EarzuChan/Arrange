@@ -45,13 +45,16 @@ namespace arrange::core {
         void compareScene(const PlacedPaintFragment& before, const PlacedPaintFragment& after);
         // 聚焦 Input 的局部编辑命令在 TextField 叶项原位重放，范围取叶项在窗口中的区域；找不到叶项则整块重绘
         void addInputField(const PlacedPaintFragment& scene, ModifierHandle field);
-        // 背景模糊依赖绘制在它之前的内容：变化落入其采样范围时并入其输出范围
-        void addBackdrops(const PlacedPaintFragment& scene);
+        // 背景模糊只依赖绘制在它之前的内容：按重放顺序取它之前的变化，落入其采样范围时并入其输出范围
+        void addBackdrops(const PlacedPaintFragment& before, const PlacedPaintFragment& after);
+        [[nodiscard]] bool intersects(const Rect& rect) const;
         [[nodiscard]] RepaintRegion finish(Size viewport) const;
 
        private:
         RepaintLimits limits_;
         bool full_ = false;
         std::vector<Rect> rects_;
+        // 不来自场景比较、无法定位重放顺序的区域，对所有背景模糊都视为在前
+        std::vector<Rect> unordered_;
     };
 }

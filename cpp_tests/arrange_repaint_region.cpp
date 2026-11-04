@@ -131,6 +131,10 @@ int main() {
         check(!behind.full && covers(behind, {20, 0, 20, 10}), "背景模糊之后的内容变化没有重绘背景模糊的输出");
         const auto& far = harness.apply(modify(10, box(0, 0xff123456)));
         check(!covers(far, {20, 0, 20, 10}), "采样范围外的变化不应牵动背景模糊");
+        // 节点 5 位于 x=40..60，落在采样范围内但画在背景模糊之后，不影响其背景
+        const auto& above = harness.apply(modify(5, box(0, 0xff654321)));
+        check(!above.full && covers(above, {40, 0, 20, 10}), "背景模糊之后的兄弟变化没有局部重绘");
+        check(!covers(above, {20, 0, 20, 10}), "画在背景模糊之后的变化不应牵动背景模糊");
 
         // 内容模糊的子内容变化按外扩后的整块重绘；节点 9 位于 x=120..140
         (void)harness.apply(modify(9, effected(EffectKind::Blur, 3, 0xff336699)));

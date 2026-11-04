@@ -60,6 +60,10 @@
             <M3Gallery/>
         </Column>
 
+        <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" a-else-if="page === 'm5'">
+            <M5Gallery/>
+        </Column>
+
         <Column :modifier="M.fillMaxWidth().weight(1).verticalScroll(pageScroll)" a-else>
             <InteropPanel/>
         </Column>
@@ -79,6 +83,7 @@ import PropBoundary from './view/PropBoundary.sfa'
 import RefRelay from './view/RefRelay.sfa'
 import M3Gallery from './view/M3Gallery.sfa'
 import InteropPanel from './view/InteropPanel.sfa'
+import M5Gallery from './view/M5Gallery.sfa'
 import GalleryButton from './view/GalleryButton.sfa'
 import { hasInterop } from '@arrange/framework/interop'
 
@@ -89,6 +94,7 @@ const tabs = [
     { key: 'basics', title: '基础' },
     { key: 'showcase', title: '展示与动画' },
     { key: 'm3', title: 'M3' },
+    { key: 'm5', title: 'M5 视觉' },
     ...hasInterop() ? [{ key: 'interop', title: '宿主互操作' }] : [],
 ]
 const page = ref('basics')

@@ -208,7 +208,7 @@ namespace arrange::core {
                 damage.addInputField(before.scenePaint, before.focusedInputModifier);
                 damage.addInputField(after.scenePaint, after.focusedInputModifier);
             }
-            damage.addBackdrops(after.scenePaint);
+            damage.addBackdrops(before.scenePaint, after.scenePaint);
             candidate.changes.repaint = damage.finish(after.viewport);
         }
         candidate.revision = previous.revision + (candidate.plan.publishFrame ? 1 : 0);

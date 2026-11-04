@@ -158,7 +158,11 @@ namespace {
         check(overlay.animating() && hasOp(overlay.ops(), DrawOpType::FillRect, scene.rects.front()), "脏区闪烁没有画在场景脏区上");
         check(covers(flashed, scene.rects.front()), "叠加层重绘没有覆盖闪烁");
         check(harness.pipeline.timeline().latest()->repaint == scene, "叠加层改动了时间线中的场景脏区");
-        const auto faded = overlay.update(harness.pipeline.timeline(), harness.frame, tree, 1, 2000 + DiagnosticsOverlay::flashMillis);
+        // 同一区域再次重绘只重新计时，不叠加第二层闪烁
+        harness.apply(modify(10, box(0xff00ff00)));
+        (void)overlay.update(harness.pipeline.timeline(), harness.frame, tree, 1, 2100);
+        check(std::count_if(overlay.ops().begin(), overlay.ops().end(), [&](const DrawOp& op) { return op.type == DrawOpType::FillRect && op.rect == scene.rects.front(); }) == 1, "同一区域连续重绘叠加了多层闪烁");
+        const auto faded = overlay.update(harness.pipeline.timeline(), harness.frame, tree, 1, 2100 + DiagnosticsOverlay::flashMillis);
         check(!overlay.animating() && covers(faded, scene.rects.front()), "闪烁褪尽后没有重绘原处");
 
         // bounds 描边与命中高亮

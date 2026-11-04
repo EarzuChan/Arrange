@@ -1,7 +1,9 @@
 #include "DemoProcessor.h"
 
 #include <arrange/juce/ArrangeEditor.h>
+#include <arrange/juce/NativePainters.h>
 #include <cmath>
+#include <vector>
 #include <stdexcept>
 #include <utility>
 
@@ -10,12 +12,65 @@ namespace {
     const juce::String modeId = "mode";
     const juce::String bypassId = "bypass";
     constexpr float minimumDecibels = -72.0f;
+
+    // C 档：按名称注册的原生 painter，JS 以 drawNative 引用并把数据源作为参数传入。
+    // 注册表是进程级的，多实例时最后创建的处理器提供数据
+    void registerDemoPainters(const std::weak_ptr<DemoDisplayTaps>& source) {
+        using arrange::core::NativeParamKind;
+        using arrange::core::NativePainterParams;
+
+        arrange::juce::registerNativePainter("demo.meter", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
+            const auto taps = source.lock();
+            g.setColour(juce::Colour(0xff223647));
+            g.fillRect(area);
+            if (!taps) return;
+            const auto decibels = juce::Decibels::gainToDecibels(taps->level.load(std::memory_order_relaxed), -60.0f);
+            const auto fill = juce::jlimit(0.0f, 1.0f, (decibels + 60.0f) / 60.0f);
+            g.setColour(decibels > -3.0f ? juce::Colour(0xffef9a74) : juce::Colour(0xff79a8ea));
+            g.fillRect(area.withWidth(area.getWidth() * fill));
+        });
+
+        arrange::juce::registerNativePainter("demo.waveform", {{"source", NativeParamKind::Source}, {"color", NativeParamKind::Color}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams& params) {
+            g.setColour(juce::Colour(0xff101b26));
+            g.fillRect(area);
+            g.setColour(juce::Colour(0xff29394a));
+            g.drawHorizontalLine(static_cast<int>(area.getCentreY()), area.getX(), area.getRight());
+            const auto taps = source.lock();
+            if (!taps) return;
+            std::array<float, 256> samples{};
+            (void)taps->waveform.read(samples);
+            juce::Path path;
+            for (std::size_t i = 0; i < samples.size(); ++i) {
+                const auto x = area.getX() + area.getWidth() * static_cast<float>(i) / static_cast<float>(samples.size() - 1);
+                const auto y = area.getCentreY() - area.getHeight() / 2.0f * juce::jlimit(-1.0f, 1.0f, samples[i]);
+                if (i == 0) path.startNewSubPath(x, y);
+                else path.lineTo(x, y);
+            }
+            g.setColour(juce::Colour(params.color("color", 0xff61d6bb)));
+            g.strokePath(path, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved));
+        });
+
+        arrange::juce::registerNativePainter("demo.spectrum", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
+            g.setColour(juce::Colour(0xff101b26));
+            g.fillRect(area);
+            const auto taps = source.lock();
+            if (!taps) return;
+            const auto step = area.getWidth() / static_cast<float>(taps->bins.size());
+            for (std::size_t i = 0; i < taps->bins.size(); ++i) {
+                const auto value = taps->bins[i].load(std::memory_order_relaxed);
+                const auto height = std::max(1.0f, value * area.getHeight());
+                g.setColour(juce::Colour::fromHSL((200.0f - value * 160.0f) / 360.0f, 0.7f, 0.55f, 1.0f));
+                g.fillRect(area.getX() + static_cast<float>(i) * step + 1.0f, area.getBottom() - height, std::max(1.0f, step - 2.0f), height);
+            }
+        });
+    }
 }
 
 ArrangeDemoProcessor::ArrangeDemoProcessor() : juce::AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)), state_(*this, nullptr, "ArrangeDemo", createParameters()) {
     gain_ = state_.getRawParameterValue(gainId);
     mode_ = state_.getRawParameterValue(modeId);
     bypass_ = state_.getRawParameterValue(bypassId);
+    registerDemoPainters(taps_);
     // 参数在成员初始化时已全部登记；Interop 在此之后构造才能看到它们
     registerInteropHandlers();
 }
@@ -59,6 +114,7 @@ void ArrangeDemoProcessor::loadPreset(const juce::String& name) {
         parameter->setValueNotifyingHost(parameter->convertTo0to1(plain));
         parameter->endChangeGesture();
     };
+
     if (name == "Hot") {
         apply(gainId, 9.0f);
         apply(modeId, 1.0f);
@@ -72,6 +128,7 @@ void ArrangeDemoProcessor::loadPreset(const juce::String& name) {
         if (found == presets_.end()) throw std::invalid_argument("未知预设：" + name.toStdString());
         state_.replaceState(found->second.createCopy());
     }
+
     interop_.emit("presetLoaded", arrange::juce::InteropValue::object({{"name", name.toStdString()}}));
 }
 
@@ -109,16 +166,19 @@ void ArrangeDemoProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
     }
 
     if (channels == 0 || samples > mono_.getNumSamples()) return;
-    outputMeter_.push(buffer.getMagnitude(0, samples));
+    const auto magnitude = buffer.getMagnitude(0, samples);
+    outputMeter_.push(magnitude);
+    taps_->level.store(magnitude, std::memory_order_relaxed);
     auto* mono = mono_.getWritePointer(0);
     juce::FloatVectorOperations::copy(mono, buffer.getReadPointer(0), samples);
     for (int channel = 1; channel < channels; ++channel) juce::FloatVectorOperations::add(mono, buffer.getReadPointer(channel), samples);
     juce::FloatVectorOperations::multiply(mono, 1.0f / static_cast<float>(channels), samples);
     outputWaveform_.push(mono, static_cast<std::size_t>(samples));
-    analyse(mono, samples);
+    taps_->waveform.push(mono, static_cast<std::size_t>(samples));
+    analyze(mono, samples);
 }
 
-void ArrangeDemoProcessor::analyse(const float* samples, int count) noexcept {
+void ArrangeDemoProcessor::analyze(const float* samples, int count) noexcept {
     for (int i = 0; i < count; ++i) {
         fifo_[static_cast<std::size_t>(fifoIndex_++)] = samples[i];
         if (fifoIndex_ < fftSize) continue;
@@ -137,6 +197,7 @@ void ArrangeDemoProcessor::analyse(const float* samples, int count) noexcept {
             bins_[static_cast<std::size_t>(bin)] = juce::jmap(decibels, minimumDecibels, 0.0f, 0.0f, 1.0f);
         }
         outputSpectrum_.publish(bins_.data(), bins_.size());
+        for (std::size_t bin = 0; bin < bins_.size(); ++bin) taps_->bins[bin].store(bins_[bin], std::memory_order_relaxed);
     }
 }
 

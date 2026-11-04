@@ -4,7 +4,17 @@
 #include <arrange/juce/Interop.h>
 
 #include <array>
+#include <atomic>
 #include <map>
+#include <memory>
+
+// C 档原生 painter 读取的显示数据：音频线程无锁写入，消息线程绘制时读取
+struct DemoDisplayTaps {
+    static constexpr int spectrumBins = 48;
+    std::atomic<float> level{0.0f};
+    arrange::juce::Waveform waveform{2048};
+    std::array<std::atomic<float>, spectrumBins> bins{};
+};
 
 class ArrangeDemoProcessor final : public juce::AudioProcessor {
    public:
@@ -66,14 +76,16 @@ class ArrangeDemoProcessor final : public juce::AudioProcessor {
    private:
     static constexpr int fftOrder = 10;
     static constexpr int fftSize = 1 << fftOrder;
-    static constexpr int spectrumBins = 48;
+    static constexpr int spectrumBins = DemoDisplayTaps::spectrumBins;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     void registerInteropHandlers();
     void loadPreset(const juce::String& name);
-    void analyse(const float* samples, int count) noexcept;
+    void analyze(const float* samples, int count) noexcept;
 
     juce::AudioProcessorValueTreeState state_;
+    // 原生 painter 以弱引用持有，处理器销毁后绘制为空
+    std::shared_ptr<DemoDisplayTaps> taps_ = std::make_shared<DemoDisplayTaps>();
     arrange::juce::Interop interop_{*this};
     arrange::juce::Meter& outputMeter_ = interop_.meter("output");
     arrange::juce::Waveform& outputWaveform_ = interop_.waveform("output", 8192);
