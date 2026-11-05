@@ -70,7 +70,7 @@ export class TerminalSession {
 
     private makeUi(document: SessionDocument): SessionUi {
         return Object.freeze({
-            reporter: new Reporter(entry => this.append(entry, document)),
+            reporter: new Reporter(entry => this.append(entry, document), reason => this.document.showsFailure(reason)),
             prompt: Object.freeze({ controller: Object.freeze({ ask: <T>(request: Parameters<PromptController['ask']>[0]) => this.prompts.ask<T>(request, document) }) }),
             tasks: Object.freeze({ group: (title: string, options?: { readonly transient?: boolean }) => this.tasks.group(title, options, document) }),
             stoppable: <T>(hint: string, body: (control: StopControl) => Promise<T>) => {
@@ -163,7 +163,7 @@ export class TerminalSession {
         }
         this.document.phase = 'failed'
         this.prompts.cancel()
-        this.ui.reporter.error(reason instanceof Error ? reason.message : String(reason))
+        this.ui.reporter.failure(reason)
         return 1
     }
 

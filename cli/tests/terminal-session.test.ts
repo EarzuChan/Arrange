@@ -16,6 +16,10 @@ import { EmulatedTty } from './terminal-emulator.ts'
 import { registerDevCommand } from '../src/business/command/Dev.ts'
 import { ApplicationCommand } from '../src/business/ApplicationCommand.ts'
 import { cliVersion } from '../src/CliMetadata.ts'
+import { createServer } from 'node:http'
+import { DevSupervisor } from '../src/feature/platform/DevSupervisor.ts'
+import { Reporter } from '../src/terminal/Reporter.ts'
+import { SessionDocument, type Entry } from '../src/terminal/SessionDocument.ts'
 
 class Input extends EventEmitter {
     isTTY = true
@@ -360,6 +364,153 @@ test('业务异常先完成控制台收尾再停屏，失败快照可滚动且�
     assert.match(transcript, /异常批次 失败/)
     assert.ok(!transcript.includes('按 Enter'))
     assert.equal(driverClosed(output), 1)
+})
+
+test('任务已经呈现失败详情时，会话出口不重复输出原始错误', async () => {
+    const { session, send, output } = fixture()
+    const running = session.run(async ui => {
+        const tasks = new WorkPresenter(ui.tasks)
+        await tasks.run({ id: 'broken-task', title: '检查工程' }, async () => {
+            throw new Error('配置文件不存在')
+        })
+    })
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    send('\r')
+    assert.equal(await running, 1)
+    const transcript = (await output.lines()).join('\n')
+    assert.equal(transcript.match(/配置文件不存在/g)?.length, 1)
+    assert.match(transcript, /检查工程 · 失败/)
+    output.terminal.dispose()
+})
+
+function occurrences(transcript: string, text: string): number {
+    return transcript.split(text).length - 1
+}
+
+async function finishAndRead(output: ReturnType<typeof fixture>['output'], send: (text: string) => void, running: Promise<number>): Promise<{ code: number, transcript: string }> {
+    await until(() => output.written.some(frame => frame.includes('按 Enter')))
+    send('\r')
+    const code = await running
+    const transcript = (await output.lines()).join('\n')
+    output.terminal.dispose()
+    return { code, transcript }
+}
+
+test('多个任务失败时每条详情只显示一次，不再拼成汇总行重复', async () => {
+    const { session, send, output } = fixture()
+    const running = session.run(async ui => {
+        await new WorkPresenter(ui.tasks).all([
+            { spec: { id: 'a', title: '任务甲' }, run: async () => { throw new Error('甲失败原因') } },
+            { spec: { id: 'b', title: '任务乙' }, run: async () => { throw new Error('乙失败原因') } },
+            { spec: { id: 'c', title: '任务丙' }, run: async () => 'ok' },
+        ])
+    })
+    const { code, transcript } = await finishAndRead(output, send, running)
+    assert.equal(code, 1)
+    assert.equal(occurrences(transcript, '甲失败原因'), 1)
+    assert.equal(occurrences(transcript, '乙失败原因'), 1)
+    assert.doesNotMatch(transcript, /任务甲：甲失败原因/)
+})
+
+test('dev 命令的失败结果已显示在进程面板上时不重复，退出码保持', async () => {
+    const { session, send, output } = fixture()
+    const message = 'ui 意外退出（退出码 3）'
+    const running = session.run(async (ui, signal) => {
+        const cli = new ApplicationCommand({ close: async () => { } }).exitOverride()
+        registerDevCommand(cli, {
+            run: async () => {
+                const progress = new WorkPresenter(ui.tasks).processes()
+                const child = await progress.open({ id: 'ui', title: 'UI' })
+                await child.finish({ kind: 'failed', message })
+                await progress.close({ kind: 'failed', message })
+                return { kind: 'failed', exitCode: 3, message }
+            }
+        }, signal, commandInterface(ui, signal))
+        await cli.parseAsync(['node', 'arrange', 'dev'])
+        return cli.resultCode
+    })
+    const { code, transcript } = await finishAndRead(output, send, running)
+    assert.equal(code, 3)
+    assert.equal(occurrences(transcript, message), 1)
+})
+
+test('dev 命令的失败结果没有显示在任何面板上时仍然输出', async () => {
+    const { session, send, output } = fixture()
+    const message = '开发地址已被占用：http://127.0.0.1:9178'
+    const running = session.run(async (ui, signal) => {
+        const cli = new ApplicationCommand({ close: async () => { } }).exitOverride()
+        registerDevCommand(cli, { run: async () => ({ kind: 'failed', exitCode: 1, message }) }, signal, commandInterface(ui, signal))
+        await cli.parseAsync(['node', 'arrange', 'dev'])
+        return cli.resultCode
+    })
+    const { code, transcript } = await finishAndRead(output, send, running)
+    assert.equal(code, 1)
+    assert.equal(occurrences(transcript, message), 1)
+})
+
+test('开发监管在进程面板打开前失败（端口被占用）时，错误文本仍然显示一次', async () => {
+    const server = createServer((request, response) => response.end('ok'))
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as { port: number }).port
+    try {
+        const { session, send, output } = fixture()
+        const running = session.run(async ui => {
+            await new DevSupervisor(new Executor()).run([{ name: 'ui', title: 'UI', command: process.execPath, args: ['-e', 'setInterval(()=>{},100)'], readyUrl: `http://127.0.0.1:${port}` }], { progress: new WorkPresenter(ui.tasks).processes() })
+        })
+        const { code, transcript } = await finishAndRead(output, send, running)
+        assert.equal(code, 1)
+        assert.equal(occurrences(transcript, '开发地址已被占用'), 1)
+    } finally {
+        server.closeAllConnections()
+        await new Promise<void>(resolve => server.close(() => resolve()))
+    }
+})
+
+test('不属于任何任务的错误照常输出一次', async () => {
+    const { session, send, output } = fixture()
+    const running = session.run(async () => { throw new Error('会话级错误') })
+    const { code, transcript } = await finishAndRead(output, send, running)
+    assert.equal(code, 1)
+    assert.equal(occurrences(transcript, '会话级错误'), 1)
+})
+
+test('文档只把失败任务面板上的完整文本视为已显示，备注、普通消息与部分文本都不算', () => {
+    const document = new SessionDocument()
+    const batch = document.batch('批次')
+    const failed = document.task(batch, '失败任务')
+    failed.state = 'failed'
+    failed.failure = '配置文件不存在'
+    const succeeded = document.task(batch, '成功任务')
+    succeeded.state = 'done'
+    succeeded.note = '仅是备注'
+    succeeded.failure = '已完成任务的残留文本'
+    document.append({ type: 'message', text: '一条普通消息', tone: 'info' })
+    const boom = new Error('配置文件不存在')
+    assert.equal(document.showsFailure(boom), true)
+    assert.equal(document.showsFailure('  配置文件不存在  '), true)
+    assert.equal(document.showsFailure(new Error('配置文件不存在，请检查路径')), false, '只是包含不算已显示')
+    assert.equal(document.showsFailure(new Error('仅是备注')), false)
+    assert.equal(document.showsFailure(new Error('一条普通消息')), false)
+    assert.equal(document.showsFailure(new Error('已完成任务的残留文本')), false)
+    assert.equal(document.showsFailure(new AggregateError([boom], '汇总')), true)
+    assert.equal(document.showsFailure(new AggregateError([boom, new Error('收尾失败')], '汇总')), false, '有成员未显示就必须输出')
+    assert.equal(document.showsFailure(new AggregateError([], '空汇总')), false)
+})
+
+test('失败报告只在详情已显示时跳过，其余照常按错误输出', () => {
+    const document = new SessionDocument()
+    const task = document.task(document.batch('批次'), '任务')
+    task.state = 'failed'
+    task.failure = '已显示的失败'
+    const entries: Entry[] = []
+    const reporter = new Reporter(entry => entries.push(entry), reason => document.showsFailure(reason))
+    reporter.failure(new Error('已显示的失败'))
+    assert.equal(entries.length, 0)
+    reporter.failure(new Error('没显示过的失败'))
+    reporter.failure('字符串形式的失败')
+    assert.deepEqual(entries.slice(), [{ type: 'message', text: '没显示过的失败', tone: 'error' }, { type: 'message', text: '字符串形式的失败', tone: 'error' }])
+    new Reporter(entry => entries.push(entry)).failure(new Error('已显示的失败'))
+    assert.equal(entries.length, 3, '没有显示判断时始终输出')
 })
 
 test('鼠标回看和点击不夺取问题输入，PageUp 滚历史、Home End 编辑当前文本，resize 不闪退', async () => {

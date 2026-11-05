@@ -28,7 +28,7 @@ export function registerDevCommand(program: ApplicationCommand, service: Pick<De
                 reporter.warn('开发会话已取消')
                 return 130
             } else if (outcome.kind === 'failed') {
-                reporter.error(outcome.message)
+                reporter.failure(outcome.message)
                 return outcome.exitCode
             }
             else reporter.success("开发会话已结束")

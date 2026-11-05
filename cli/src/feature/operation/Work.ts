@@ -58,9 +58,9 @@ export interface TaskRunner {
     processes(): ProcessProgressGroup
 }
 
-export class TaskFailures extends Error {
+export class TaskFailures extends AggregateError {
     constructor(readonly failures: readonly { readonly title: string, readonly error: unknown }[]) {
-        super(failures.map(failure => `${failure.title}：${errorMessage(failure.error)}`).join("；"))
+        super(failures.map(failure => failure.error), failures.map(failure => `${failure.title}：${errorMessage(failure.error)}`).join("；"))
         this.name = "TaskFailures"
     }
 }

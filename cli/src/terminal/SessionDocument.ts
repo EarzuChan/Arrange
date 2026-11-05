@@ -1,3 +1,5 @@
+import { errorMessage } from '../util/Utils.ts'
+
 export type TaskState = 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | 'stopped'
 export type Tone = 'info' | 'step' | 'success' | 'warn' | 'error'
 export interface ConsoleContent { lines: string[], started: boolean }
@@ -42,6 +44,12 @@ export class SessionDocument {
             if (entry.type === 'region') yield* this.walk(entry.entries)
             else yield entry
         }
+    }
+    // 失败文本是否已经显示在某个失败的任务面板上；聚合错误要求全部成员都已显示
+    showsFailure(reason: unknown): boolean {
+        const text = errorMessage(reason).trim()
+        for (const entry of this.contents()) if (entry.type === 'batch') for (const task of entry.tasks) if (task.state === 'failed' && task.failure?.trim() === text) return true
+        return reason instanceof AggregateError && reason.errors.length > 0 && reason.errors.every(member => this.showsFailure(member))
     }
     append(entry: Entry): void {
         this.advance()
