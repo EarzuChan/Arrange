@@ -16,6 +16,10 @@ import type { ProcessOutcome, ProcessProgress, ProcessProgressGroup, TaskSpec } 
 import { isAbortError, throwIfProcessCancelled } from "../src/feature/platform/ProcessSpec.ts"
 import { stateFor } from "./fixture.ts"
 import { minimumNodeMajor } from "../src/CliMetadata.ts"
+import { ManagedProcesses } from "../src/feature/operation/ManagedProcesses.ts"
+import { WindowsTreeScanContainment } from "../src/feature/platform/WindowsTreeScan.ts"
+import type { CleanupVerdict, RunningProcess } from "../src/feature/platform/ProcessSpec.ts"
+import type { ProcessContainer, ProcessContainment } from "../src/feature/platform/ProcessContainer.ts"
 
 async function freePort(): Promise<number> {
     const server = createServer()
@@ -52,9 +56,133 @@ test("父进程退出后仍停止其后代进程", async t => {
     const source = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(`setTimeout(()=>{${descendant}},${delay})`)}],{stdio:'ignore'}).unref()`
     const child = new Executor().start({ command: process.execPath, args: ["-e", source] })
     await child.completion
-    await child.stop()
+    assert.ok(["clean", "reaped"].includes(await child.stop()))
     await new Promise(resolve => setTimeout(resolve, delay + 100))
     await assert.rejects(readFile(marker), /ENOENT/)
+})
+
+test("没有后代的进程清理结论为 clean，重复清理结论不变", async () => {
+    const child = new Executor().start({ command: process.execPath, args: ["-e", "0"] })
+    await child.completion
+    assert.equal(await child.stop(), "clean")
+    assert.equal(await child.stop(), "clean")
+})
+
+test("脱离父进程的长驻后代由容器确认并结束，结论为 reaped", { timeout: 20000 }, async () => {
+    const port = await freePort()
+    const descendant = `require('node:http').createServer((q,s)=>s.end('alive')).listen(${port},'127.0.0.1',()=>process.send('ready'))`
+    // 后代断开 IPC 后与父进程互不相干，父进程先行退出，Windows 与 POSIX 都不会自动带走它
+    const source = `const child=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:['ignore','ignore','ignore','ipc']});child.on('message',()=>{child.disconnect();child.unref();process.exit(0)})`
+    const child = new Executor().start({ command: process.execPath, args: ["-e", source] })
+    const result = await child.completion
+    assert.equal(result.exitCode, 0)
+    const verdict = await child.stop()
+    assert.ok(["reaped", "clean"].includes(verdict))
+    await assert.rejects(fetch(`http://127.0.0.1:${port}`))
+})
+
+class ScriptedContainer implements ProcessContainer {
+    reaps = 0
+    constructor(private readonly verdicts: CleanupVerdict[]) { }
+    async reap(): Promise<CleanupVerdict> { return this.verdicts[Math.min(this.reaps++, this.verdicts.length - 1)]! }
+    releaseIfEmpty(): void { }
+}
+
+function scripted(container: ProcessContainer): ProcessContainment {
+    return { contain: () => container }
+}
+
+test("清理结论为 unknown 时 stop 不抛错，可重试并在确认后固定结论", async () => {
+    const container = new ScriptedContainer(["unknown", "unknown", "reaped"])
+    const child = new Executor(process.platform, undefined, undefined, scripted(container)).start({ command: process.execPath, args: ["-e", "0"] })
+    const result = await child.completion
+    assert.equal(result.exitCode, 0)
+    assert.equal(await child.stop(), "unknown")
+    assert.equal(await child.stop(), "unknown")
+    assert.equal(await child.stop(), "reaped")
+    assert.equal(await child.stop(), "reaped")
+    assert.equal(container.reaps, 3)
+})
+
+test("容器清理动作出错时 stop 拒绝，之后仍可重试", async () => {
+    let attempts = 0
+    const container: ProcessContainer = { reap: async () => { if (attempts++ === 0) throw new Error("无法执行清理"); return "clean" }, releaseIfEmpty() { } }
+    const child = new Executor(process.platform, undefined, undefined, scripted(container)).start({ command: process.execPath, args: ["-e", "0"] })
+    await child.completion
+    await assert.rejects(child.stop(), /无法执行清理/)
+    assert.equal(await child.stop(), "clean")
+})
+
+test("主进程已关闭后内部触发的清理出错，不使完成结果失败", async () => {
+    const container: ProcessContainer = { reap: async () => { throw new Error("无法执行清理") }, releaseIfEmpty() { } }
+    const child = new Executor(process.platform, undefined, undefined, scripted(container)).start({ command: process.execPath, args: ["-e", "setTimeout(()=>{},300)"], timeoutMs: 100 })
+    const result = await child.completion.catch(error => error)
+    assert.ok(result instanceof Error, "主进程仍在运行时清理出错应让执行失败")
+    const done = new Executor(process.platform, undefined, undefined, scripted(container)).start({ command: process.execPath, args: ["-e", "process.stdout.write('x')"] })
+    assert.equal((await done.completion).exitCode, 0)
+    await assert.rejects(done.stop(), /无法执行清理/)
+})
+
+test("后代清理未确认不改变已成功的任务结果", async () => {
+    const result = await new Executor(process.platform, undefined, undefined, scripted(new ScriptedContainer(["unknown"]))).run({ command: process.execPath, args: ["-e", "process.stdout.write('done')"] })
+    assert.equal(result.exitCode, 0)
+    assert.equal(result.stdout, "done")
+})
+
+function fakeProcess(verdicts: (CleanupVerdict | Error)[]): RunningProcess {
+    let stops = 0
+    return {
+        pid: 1, completion: Promise.resolve({ exitCode: 0, stdout: "", stderr: "", cancelled: false, timedOut: false }),
+        async stop(): Promise<CleanupVerdict> {
+            const next = verdicts[Math.min(stops++, verdicts.length - 1)]!
+            if (next instanceof Error) throw next
+            return next
+        }
+    }
+}
+
+test("清理账本只在确认结束后撤销登记，未确认的保持并可重试", async () => {
+    const retired: string[] = []
+    const processes = new ManagedProcesses(async id => { retired.push(id) })
+    processes.add("a", fakeProcess(["clean"]))
+    processes.add("b", fakeProcess(["unknown", "reaped"]))
+    processes.add("c", fakeProcess([new Error("无法执行清理"), "clean"]))
+    assert.equal(await processes.confirm("a"), "clean")
+    assert.equal(await processes.confirm("b"), "unknown")
+    assert.equal(await processes.confirm("c"), "unknown")
+    assert.deepEqual(retired, ["a"])
+    assert.equal(processes.pending, true)
+    assert.equal(await processes.retry(), true)
+    assert.deepEqual(retired.sort(), ["a", "b", "c"])
+    assert.equal(processes.pending, false)
+})
+
+test("清理账本在重试仍未确认时继续报告未完成", async () => {
+    const processes = new ManagedProcesses(async () => { })
+    processes.add("stuck", fakeProcess(["unknown"]))
+    assert.equal(await processes.stopAll(), false)
+    assert.equal(await processes.retry(), false)
+    assert.equal(processes.pending, true)
+})
+
+test("清理账本可撤销从未启动成功的登记", async () => {
+    const retired: string[] = []
+    const processes = new ManagedProcesses(async id => { retired.push(id) })
+    processes.add("never", fakeProcess(["unknown"]))
+    processes.markUnconfirmed("never")
+    await processes.discard("never")
+    assert.deepEqual(retired, ["never"])
+    assert.equal(processes.pending, false)
+})
+
+test("Windows 兜底扫描容器仍能结束已退出父进程留下的后代", { ...windowsOnly, timeout: 60000 }, async () => {
+    const port = await freePort()
+    const descendant = `require('node:http').createServer((q,s)=>s.end('alive')).listen(${port},'127.0.0.1',()=>process.send('ready'))`
+    const source = `const child=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:['ignore','ignore','ignore','ipc']});child.on('message',()=>{child.disconnect();process.exit(0)})`
+    const child = new Executor("win32", undefined, undefined, new WindowsTreeScanContainment()).start({ command: process.execPath, args: ["-e", source] })
+    await child.completion
+    assert.ok(["clean", "reaped"].includes(await child.stop()))
+    await assert.rejects(fetch(`http://127.0.0.1:${port}`))
 })
 
 test("父进程退出后清理仍持有捕获管道的后代进程", { timeout: 20000 }, async () => {
@@ -185,8 +313,9 @@ test("开发监管在取消后保留清理失败，并继续停止其余进程",
             return {
                 ...child, stop: async () => {
                     this.stopped.push(ordinal)
-                    await child.stop()
+                    const verdict = await child.stop()
                     if (ordinal === 0) throw new Error("拒绝终止一个子进程")
+                    return verdict
                 }
             }
         }

@@ -126,8 +126,9 @@ export class DevSupervisor {
             controller.abort()
             const stopped = await Promise.allSettled(children.map(child => child.process.stop()))
             stopped.forEach((result, index) => {
-                if (result.status !== 'rejected') return
-                const error = new Error('开发进程清理失败：' + errorMessage(result.reason), { cause: result.reason })
+                const reason = result.status === 'rejected' ? result.reason : result.value === 'unknown' ? new Error('无法确认进程树已结束') : undefined
+                if (reason === undefined) return
+                const error = new Error('开发进程清理失败：' + errorMessage(reason), { cause: reason })
                 cleanupFailures.set(children[index]!.name, error)
                 failures.push(error)
             })

@@ -60,6 +60,10 @@ class WorkOutput implements ProcessProgress {
         this.presentation.console('')
         return {
             ...spec, retainOutput: false, env: { ...colorEnvironment(), ...spec.env },
+            onCleanup: verdict => {
+                if (verdict === 'unknown') this.status('未能确认后代进程已结束，相关资源占用保留', 'warn')
+                spec.onCleanup?.(verdict)
+            },
             onOutput: (chunk, stream) => {
                 const text = decoders[stream].push(chunk)
                 if (text) this.presentation.console(text)

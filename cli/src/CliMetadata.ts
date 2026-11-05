@@ -28,6 +28,11 @@ export const productTargetSuffixes = { standalone: "Standalone", vst3: "VST3" } 
 export const defaultNativeGenerator = "Ninja"
 export const defaultBundleIdPrefix = "com"
 export const processStopGraceMs = 2000
+export const processReapPollMs = 20
+// 主进程退出后内核对 Job 成员的收尾有短暂延迟，先等其自然排空再判定残留
+export const processExitDrainMs = 150
+// 兜底扫描要冷启动 PowerShell 并枚举全机进程，量级与优雅停止等待不同
+export const processTreeScanTimeoutMs = 30000
 export const toolProbeTimeoutMs = 15000
 export const frameworkSourceProbeTimeoutMs = 30000
 export const devReadinessTimeoutMs = 30000

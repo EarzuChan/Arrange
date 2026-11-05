@@ -1,7 +1,7 @@
 import type { ProcessResult, ProcessSpec } from "../platform/ProcessSpec.ts"
 import type { Resource } from "./Resource.ts"
 
-export type WireProcess = Omit<ProcessSpec, "signal" | "onOutput" | "onOutputEnd">
+export type WireProcess = Omit<ProcessSpec, "signal" | "onOutput" | "onOutputEnd" | "onCleanup">
 export type WorkerRequest =
     | { readonly kind: "acquire", readonly id: string, readonly label: string, readonly resources: readonly Resource[], readonly observe: boolean }
     | { readonly kind: "release" | "cancel", readonly id: string }

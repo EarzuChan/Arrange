@@ -1,5 +1,5 @@
 import { Executor } from "../platform/Executor.ts"
-import type { RunningProcess } from "../platform/ProcessSpec.ts"
+import { ManagedProcesses } from "./ManagedProcesses.ts"
 import type { WorkerRequest, WorkerResponse } from "./Protocol.ts"
 import { OperationRegistry } from "./Registry.ts"
 import { ownWindowsJob } from "./WindowsJob.ts"
@@ -8,12 +8,10 @@ const [directory, session, client] = process.argv.slice(2) as [string, string, s
 const registry = new OperationRegistry(directory, session, Number(client))
 const executor = new Executor()
 const pending = new Map<string, AbortController>()
-const children = new Map<string, RunningProcess>()
 const active = new Set<Promise<void>>()
 // 终端 Ctrl+C 由客户端经 IPC 取消任务；工作进程必须活到清理完成，不能随控制台广播提前退出
 process.on("SIGINT", () => { })
 let closing = false
-let unsafe = false
 const job = ownWindowsJob()
 const send = (response: WorkerResponse): void => { if (process.connected) process.send!(response, () => { }) }
 let mutations = Promise.resolve()
@@ -23,13 +21,13 @@ const mutate = <T>(body: () => Promise<T>): Promise<T> => {
     return next
 }
 
+const processes = new ManagedProcesses(id => mutate(() => registry.completed(id)))
+
 async function close(): Promise<void> {
     if (closing) return
     closing = true
     for (const controller of pending.values()) controller.abort()
-    const stopped = await Promise.allSettled([...children.values()].map(child => child.stop()))
-    if (stopped.some(result => result.status === "rejected")) throw new Error("受管工具清理失败，保留资源占用")
-    await Promise.allSettled([...children.values()].map(child => child.completion))
+    if (!await processes.stopAll()) throw new Error("受管工具清理失败，保留资源占用")
     await Promise.allSettled([...active])
     await mutations
     await registry.close()
@@ -51,7 +49,7 @@ async function handle(message: WorkerRequest): Promise<void> {
             try { await registry.acquire(message.id, message.label, message.resources, message.observe, controller.signal, text => send({ kind: "waiting", id: message.id, message: text })) } finally { pending.delete(message.id) }
             send({ kind: "ok", id: message.id })
         } else if (message.kind === "release") {
-            if (unsafe) throw new Error("工具尚未确认停止，保留资源占用")
+            if (!await processes.retry()) throw new Error("工具尚未确认停止，保留资源占用")
             await registry.release(message.id)
             send({ kind: "ok", id: message.id })
         } else if (message.kind === "cancel") pending.get(message.id)?.abort()
@@ -65,27 +63,18 @@ async function handle(message: WorkerRequest): Promise<void> {
             }
             const child = executor.start({ ...message.process, signal: controller.signal, onOutput: (bytes, channel) => send({ kind: "output", id: message.id, bytes: bytes.toString("base64"), channel }) })
             void child.completion.catch(() => { })
-            children.set(message.id, child)
+            processes.add(message.id, child)
             await mutate(() => registry.started(message.id, child.pid))
-            let cleaned = false
             try {
                 const result = await child.completion
-                // 主进程结束不代表后代已结束，必须在撤销登记及报告完成前清理整个进程树
-                await child.stop()
-                await mutate(() => registry.completed(message.id))
-                cleaned = true
-                send({ kind: "result", id: message.id, result })
+                // 主进程结束不代表后代已结束；确认前不撤销登记，任务本身的结果不因清理未确认而改变
+                const cleanup = await processes.confirm(message.id)
+                send({ kind: "result", id: message.id, result: { ...result, cleanup } })
             } catch (error) {
-                if (child.pid === undefined) {
-                    await mutate(() => registry.completed(message.id))
-                    cleaned = true
-                }
-                else unsafe = true
+                if (child.pid === undefined) await processes.discard(message.id)
+                else processes.markUnconfirmed(message.id)
                 throw error
-            } finally {
-                if (cleaned) children.delete(message.id)
-                pending.delete(message.id)
-            }
+            } finally { pending.delete(message.id) }
         }
     } catch (error) {
         send({ kind: "error", id: message.id, name: error instanceof Error ? error.name : "Error", message: error instanceof Error ? error.message : String(error) })

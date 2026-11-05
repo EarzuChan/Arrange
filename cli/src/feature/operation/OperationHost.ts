@@ -134,7 +134,7 @@ export class OperationHost {
 
     start(spec: ProcessSpec): RunningProcess {
         const id = randomUUID()
-        const { signal: requestedSignal, onOutput, onOutputEnd, ...process } = spec
+        const { signal: requestedSignal, onOutput, onOutputEnd, onCleanup, ...process } = spec
         const stopped = new AbortController()
         const signal = requestedSignal ? AbortSignal.any([requestedSignal, stopped.signal]) : stopped.signal
         const cancel = (): void => { if (this.worker?.connected) this.send({ kind: "cancel", id }) }
@@ -147,6 +147,7 @@ export class OperationHost {
                     onOutput?.(bytes, channel)
                 }
             })
+            if (result!.cleanup && result!.cleanup !== "clean") onCleanup?.(result!.cleanup)
             return result!
         })().finally(() => {
             signal?.removeEventListener("abort", cancel)
@@ -155,7 +156,7 @@ export class OperationHost {
         return {
             pid: undefined, completion, stop: async () => {
                 stopped.abort()
-                await completion
+                return (await completion).cleanup ?? "clean"
             }
         }
     }
