@@ -17,7 +17,8 @@ namespace arrange::quickjs {
 
     class QuickJsDrawReader {
        public:
-        explicit QuickJsDrawReader(JSContext* context) : context_(context) {}
+        // local 为本实例的 painter 注册表，可为空；名称先查它再查进程级注册表
+        explicit QuickJsDrawReader(JSContext* context, const arrange::core::NativePainterRegistry* local = nullptr) : context_(context), local_(local) {}
 
         // 读取 { ops: Float64Array, refs: [] }：一次取得整块数值流，顺序解码；非数值参数按下标取引用表
         arrange::core::DrawCommands read(JSValueConst value) {
@@ -130,7 +131,8 @@ namespace arrange::quickjs {
                         ScopedValue name(context_, ref(cursor));
                         if (!JS_IsString(name.get())) throw std::invalid_argument("原生 painter 名称需要字符串");
                         const auto key = text(name.get());
-                        command.native = NativePainterRegistry::global().find(key);
+                        command.native = local_ ? local_->find(key) : nullptr;
+                        if (!command.native) command.native = NativePainterRegistry::global().find(key);
                         if (!command.native) throw std::invalid_argument("原生 painter '" + key + "' 未注册");
                         command.rect = cursor.rect();
                         ScopedValue params(context_, ref(cursor));
@@ -173,6 +175,7 @@ namespace arrange::quickjs {
 
        private:
         JSContext* context_;
+        const arrange::core::NativePainterRegistry* local_;
         ScopedValue refs_{context_, JS_UNDEFINED};
         std::uint32_t refCount_ = 0;
 

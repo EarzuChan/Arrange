@@ -542,6 +542,39 @@ namespace {
             check(image.getPixelAt(37, 60).getAlpha() > 0 && image.getPixelAt(37, 60).getAlpha() < 160, "内容模糊没有把边缘向外柔化");
             check(image.getPixelAt(42, 60).getAlpha() < 255 && image.getPixelAt(70, 60).getAlpha() > 250, "内容模糊的柔化范围错误");
             check(image.getPixelAt(20, 60).getAlpha() == 0, "内容模糊超出三倍标准差");
+
+            // 焦点在模糊子树之外时照常命中缓存
+            arrange::juce::JuceDrawOpsPainter painter;
+            ::juce::Image again(::juce::Image::ARGB, 180, 140, true);
+            const ModifierHandle elsewhere{77, 1};
+            for (int pass = 0; pass < 2; ++pass) {
+                ::juce::Graphics graphics(again);
+                painter.paint(graphics, published.content.scenePaint, elsewhere);
+            }
+            check(painter.bitmapCache().counters().builds == 1 && painter.bitmapCache().counters().hits == 1, "焦点不在模糊子树里时没有复用模糊缓存");
+        }
+        {
+            // 先画的内容模糊在截取背景时整块可见，截取途中也应命中缓存
+            NativeScene scene;
+            SceneFramePipeline pipeline;
+            PublishedFrame published;
+            MutationTransaction initial;
+            initial.operations = {CreateNodeMutation{1, NodeType::Layout}, policy(1, "Box"), SetModifierMutation{1, {{size(180, 140), {}}}}, CreateNodeMutation{2, NodeType::Layout}, policy(2, "Box"), SetModifierMutation{2, {{size(90, 140), {}}, {effect(EffectKind::Blur, 4), {}}, {background(0xffff0000), {}}}}, CreateNodeMutation{3, NodeType::Layout}, policy(3, "Box"), SetModifierMutation{3, {{size(180, 140), {}}, {effect(EffectKind::BackdropBlur, 6), {}}}}, InsertChildMutation{1, 2, 0}, InsertChildMutation{1, 3, 1}};
+            check(!pipeline.run(scene, 1, {0, 180, 0, 140}, &initial, true, published).error, "模糊加背景模糊场景失败");
+            ::juce::Image image(::juce::Image::ARGB, 180, 140, true);
+            arrange::juce::JuceDrawOpsPainter painter;
+            {
+                ::juce::Graphics graphics(image);
+                painter.paint(graphics, published.content.scenePaint);
+            }
+            const auto before = painter.bitmapCache().counters();
+            {
+                ::juce::Graphics graphics(image);
+                painter.paint(graphics, published.content.scenePaint);
+            }
+            const auto after = painter.bitmapCache().counters();
+            // 第二帧：内容模糊在正常绘制与截取背景中各命中一次，背景模糊按像素摘要命中一次
+            check(after.builds == before.builds && after.hits == before.hits + 3, "截取背景途中没有复用子树外的内容模糊");
         }
         {
             // 左半黑块之上叠一层全幅背景模糊：边界两侧被抹匀，远处保持原样
@@ -723,6 +756,119 @@ namespace {
         rejects("测试填充", "{color: 0, inset: 0, outline: false, source: ''}", "未注册");
     }
 
+    // 只提供 painter 注册表的宿主，其余能力一律为空
+    class PainterOnlyHost final : public arrange::core::InteropHost {
+       public:
+        arrange::core::NativePainterRegistry painters;
+
+        void attach(arrange::core::InteropSessionSink&) override {}
+
+        void detach(arrange::core::InteropSessionSink&) noexcept override {}
+
+        const std::vector<arrange::core::InteropParameter>& parameters() const override {
+            return parameters_;
+        }
+
+        float parameterValue(std::size_t) const override {
+            return 0;
+        }
+
+        void takeParameterChanges(std::vector<std::size_t>&) override {}
+
+        double toPlain(std::size_t, float normalized) const override {
+            return normalized;
+        }
+
+        float toNormalized(std::size_t, double plain) const override {
+            return static_cast<float>(plain);
+        }
+
+        std::string text(std::size_t, float) const override {
+            return {};
+        }
+
+        std::optional<float> parse(std::size_t, std::string_view) const override {
+            return std::nullopt;
+        }
+
+        void beginGesture(std::size_t) override {}
+
+        void setParameter(std::size_t, float) override {}
+
+        void endGesture(std::size_t) override {}
+
+        arrange::core::InteropHostInfo hostInfo() const override {
+            return {};
+        }
+
+        arrange::core::InteropTransport transport() const override {
+            return {};
+        }
+
+        bool hasMeter(std::string_view) const override {
+            return false;
+        }
+
+        float takeMeter(std::string_view) override {
+            return 0;
+        }
+
+        std::optional<std::size_t> waveformCapacity(std::string_view) const override {
+            return std::nullopt;
+        }
+
+        std::uint64_t readWaveform(std::string_view, std::span<float>) const override {
+            return 0;
+        }
+
+        std::optional<std::size_t> spectrumSize(std::string_view) const override {
+            return std::nullopt;
+        }
+
+        bool readSpectrum(std::string_view, std::span<float>) override {
+            return false;
+        }
+
+        void invoke(std::string_view, const arrange::core::InteropValue&, arrange::core::InteropReply reply) override {
+            reply.reject("无");
+        }
+
+        const arrange::core::NativePainterRegistry* nativePainters() const noexcept override {
+            return &painters;
+        }
+
+       private:
+        std::vector<arrange::core::InteropParameter> parameters_;
+    };
+
+    // 实例注册表先于进程级注册表：两个实例同名各画各的，实例里没有的名称回落到进程级
+    void verifyInstanceNativePainters() {
+        using arrange::core::NativeParamKind;
+        const auto solid = [](std::uint32_t color) {
+            return std::make_shared<const arrange::juce::NativePaint>([color](::juce::Graphics& g, ::juce::Rectangle<float> area, const NativePainterParams&) {
+                g.setColour(::juce::Colour(color));
+                g.fillRect(area);
+            });
+        };
+        const std::vector<arrange::core::NativeParamSpec> params{{"source", NativeParamKind::Source}};
+        arrange::juce::registerNativePainter("实例填充", params, *solid(0xff00ff00));
+        arrange::juce::registerNativePainter("进程填充", params, *solid(0xffffff00));
+        const auto colorOf = [&](PainterOnlyHost* instance, const char* name) {
+            DrawFixture fixture;
+            if (instance) fixture.host.setInteropHost(instance);
+            if (const auto error = fixture.run(nativeScript(name, "{source: 'out'}"))) throw std::runtime_error(*error);
+            return render(fixture.published).getPixelAt(40, 30).getARGB();
+        };
+        PainterOnlyHost first, second;
+        first.painters.add({"实例填充", params, solid(0xffff0000)});
+        second.painters.add({"实例填充", params, solid(0xff0000ff)});
+        check(colorOf(&first, "实例填充") == 0xffff0000 && colorOf(&second, "实例填充") == 0xff0000ff, "两个实例的同名 painter 没有各画各的");
+        check(colorOf(nullptr, "实例填充") == 0xff00ff00, "没有实例宿主时没有使用进程级注册项");
+        check(colorOf(&first, "进程填充") == 0xffffff00, "实例里没有的名称没有回落到进程级注册表");
+        arrange::juce::unregisterNativePainter("实例填充");
+        arrange::juce::unregisterNativePainter("进程填充");
+    }
+
     void verifySfaDraw(const char* path) {
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         auto* host = scriptHost.get();
@@ -820,6 +966,7 @@ int main(int argc, char** argv) {
         verifyEffects();
         verifyImages();
         verifyNativePainters();
+        verifyInstanceNativePainters();
         verifySfaDraw(argv[1]);
         std::cout << "M3 绘制准备、共享内容、变换和排序验收通过\n";
     } catch (const std::exception& error) {

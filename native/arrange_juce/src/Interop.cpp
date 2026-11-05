@@ -225,6 +225,14 @@ namespace arrange::juce {
         handlers_[std::move(name)] = std::move(handler);
     }
 
+    void Interop::painter(std::string name, std::vector<arrange::core::NativeParamSpec> params, NativePaint paint) {
+        painters_.add({std::move(name), std::move(params), std::make_shared<const NativePaint>(std::move(paint))});
+    }
+
+    void Interop::removePainter(const std::string& name) {
+        painters_.remove(name);
+    }
+
     void Interop::invoke(std::string_view name, const InteropValue& args, InteropReply reply) {
         const auto found = handlers_.find(name);
         if (found == handlers_.end()) {

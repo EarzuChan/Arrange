@@ -406,7 +406,7 @@ namespace arrange::quickjs {
                     JSValueConst arguments[]{width.get(), height.get(), phase.get()};
                     ScopedValue prepared(state.context, JS_Call(state.context, callback.get(), JS_UNDEFINED, input->transactional ? 3 : 2, arguments));
                     if (JS_IsException(prepared.get())) throw std::runtime_error(impl_->exceptionText(state.context));
-                    auto commands = QuickJsDrawReader(state.context).read(prepared.get());
+                    auto commands = QuickJsDrawReader(state.context, state.interopHost ? state.interopHost->nativePainters() : nullptr).read(prepared.get());
                     auto& instance = candidateScene.tree().mutableNode(id).modifier.elements()[index];
                     if (!instance.preparedDraw || *instance.preparedDraw != commands) instance.preparedDraw = std::make_shared<const arrange::core::DrawCommands>(std::move(commands));
                     instance.preparedDrawSize = size;

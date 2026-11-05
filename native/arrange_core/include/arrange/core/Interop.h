@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NativePainter.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -192,5 +194,10 @@ namespace arrange::core {
 
         // 调用不存在时以拒绝回执结束
         virtual void invoke(std::string_view name, const InteropValue& args, InteropReply reply) = 0;
+
+        // 本实例注册的原生 painter；解码时先查这里，查不到再查进程级注册表
+        [[nodiscard]] virtual const NativePainterRegistry* nativePainters() const noexcept {
+            return nullptr;
+        }
     };
 }

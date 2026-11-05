@@ -1,2 +1,2 @@
-export const ARRANGE_PACKAGE_VERSION = "0.7.3"
+export const ARRANGE_PACKAGE_VERSION = "0.7.4"
 export const ARRANGE_PROTOCOL_VERSION = 10

@@ -55,16 +55,18 @@ config.app.useLive("http://host:port");
 
 规则见 [App入口](02-App入口.md)。
 
-Canvas C 档的原生 painter 在 C++ 按名称注册，可在任何时刻注册或替换：
+Canvas C 档的原生 painter 在 C++ 按名称注册，可在任何时刻注册或替换。通常注册在处理器持有的 `Interop` 上，只属于本实例，可捕获本处理器的数据：
 
 ```cpp
-arrange::juce::registerNativePainter("meter", {{"level", NativeParamKind::Number}, {"color", NativeParamKind::Color}, {"peak", NativeParamKind::Boolean}, {"source", NativeParamKind::Source}},
-    [](juce::Graphics& g, juce::Rectangle<float> area, const arrange::core::NativePainterParams& params) {
+interop_.painter("meter", {{"level", NativeParamKind::Number}, {"color", NativeParamKind::Color}, {"peak", NativeParamKind::Boolean}, {"source", NativeParamKind::Source}},
+    [this](juce::Graphics& g, juce::Rectangle<float> area, const arrange::core::NativePainterParams& params) {
         g.setColour(juce::Colour(params.color("color")));
         g.fillRect(area.withTrimmedTop(area.getHeight() * (1.0f - static_cast<float>(params.number("level")))));
     });
-arrange::juce::unregisterNativePainter("meter");
+interop_.removePainter("meter");
 ```
+
+不依赖实例状态的 painter 也可注册到进程级表，`arrange::juce::registerNativePainter` 与 `unregisterNativePainter` 参数相同；同名时实例项优先。
 
 绘制函数在消息线程调用，只能画在目标矩形内，不得阻塞。语义见 [Canvas](18-文本输入与绘制.md#canvas)。
 

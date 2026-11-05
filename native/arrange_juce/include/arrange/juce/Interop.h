@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/Interop.h>
+#include <arrange/juce/NativePainters.h>
 
 #include <atomic>
 #include <cstdint>
@@ -96,6 +97,9 @@ namespace arrange::juce {
         void emit(std::string name, InteropValue value = {});
         void handle(std::string name, Handler handler);
         void handleAsync(std::string name, AsyncHandler handler);
+        // 按名称注册只属于本实例的原生 painter，可捕获本处理器的数据；同名时遮蔽进程级注册项
+        void painter(std::string name, std::vector<arrange::core::NativeParamSpec> params, NativePaint paint);
+        void removePainter(const std::string& name);
 
         void attach(arrange::core::InteropSessionSink& sink) override;
         void detach(arrange::core::InteropSessionSink& sink) noexcept override;
@@ -119,6 +123,10 @@ namespace arrange::juce {
         std::optional<std::size_t> spectrumSize(std::string_view name) const override;
         bool readSpectrum(std::string_view name, std::span<float> out) override;
         void invoke(std::string_view name, const InteropValue& args, InteropReply reply) override;
+
+        const arrange::core::NativePainterRegistry* nativePainters() const noexcept override {
+            return &painters_;
+        }
 
        private:
         struct TransportCell {
@@ -156,6 +164,7 @@ namespace arrange::juce {
         std::map<std::string, std::unique_ptr<Waveform>, std::less<>> waveforms_;
         std::map<std::string, std::unique_ptr<Spectrum>, std::less<>> spectra_;
         std::map<std::string, AsyncHandler, std::less<>> handlers_;
+        arrange::core::NativePainterRegistry painters_;
         arrange::core::InteropSessionSink* sink_ = nullptr;
         mutable std::optional<std::string> hostName_;
     };

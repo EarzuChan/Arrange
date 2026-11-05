@@ -189,6 +189,24 @@ namespace arrange::juce {
             for (const auto& stop : gradient.stops) result.addColour(stop.position, ::juce::Colour(stop.color));
             return result;
         }
+
+        bool drawsFocusedInput(std::span<const arrange::core::DrawOp> ops, arrange::core::ModifierHandle focused) {
+            return std::any_of(ops.begin(), ops.end(), [&](const auto& op) { return op.inputText && op.textField == focused; });
+        }
+
+        // 子树是否画了焦点输入框：光标与选区不在片段身份里，这样的子树不能用缓存结果
+        bool containsFocusedInput(const arrange::core::PaintFragment& fragment, arrange::core::ModifierHandle focused) {
+            if (fragment.layer && (drawsFocusedInput(fragment.layer->before, focused) || drawsFocusedInput(fragment.layer->after, focused))) return true;
+            if (fragment.content && drawsFocusedInput(*fragment.content, focused)) return true;
+            return std::any_of(fragment.children.begin(), fragment.children.end(), [&](const auto& child) { return child.fragment && containsFocusedInput(*child.fragment, focused); });
+        }
+
+        // 截取背景只画到目标为止；目标在子树里时子树画不完整，不能写进缓存
+        bool containsPlacement(const arrange::core::PlacedPaintFragment& placed, const arrange::core::PlacedPaintFragment* target) {
+            if (&placed == target) return true;
+            if (!placed.fragment) return false;
+            return std::any_of(placed.fragment->children.begin(), placed.fragment->children.end(), [&](const auto& child) { return containsPlacement(child, target); });
+        }
     }
 
     void JuceDrawOpsPainter::fillWithPaint(::juce::Graphics& g, const ::juce::Path& path, const arrange::core::DrawOp& op, ::juce::Rectangle<float> box, float alpha) const {
@@ -586,8 +604,9 @@ namespace arrange::juce {
                     gaussianBlur(result, sigma * target->scale);
                     return result;
                 };
-                // 焦点输入的光标与选区不在片段身份里，含焦点时不缓存；截取背景途中也不缓存
-                const auto image = focused.valid() || stopAt_ ? build() : bitmapCache_.get({placed.fragment, CacheDetail{}.add(target->scale).value(), target->width, target->height}, build);
+                // 只有子树画了焦点输入框，或截取背景的目标落在子树里时才绕开缓存，其余情况照常命中
+                const auto bypass = (focused.valid() && containsFocusedInput(fragment, focused)) || (stopAt_ && containsPlacement(placed, stopAt_));
+                const auto image = bypass ? build() : bitmapCache_.get({placed.fragment, CacheDetail{}.add(target->scale).value(), target->width, target->height}, build);
                 if (!stopped_) drawOffscreen(g, image, *target, alpha);
                 return true;
             }
