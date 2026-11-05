@@ -1,7 +1,6 @@
 #include "DemoProcessor.h"
 
 #include <arrange/juce/ArrangeEditor.h>
-#include <arrange/juce/NativePainters.h>
 #include <cmath>
 #include <vector>
 #include <stdexcept>
@@ -14,12 +13,12 @@ namespace {
     constexpr float minimumDecibels = -72.0f;
 
     // C 档：按名称注册的原生 painter，JS 以 drawNative 引用并把数据源作为参数传入。
-    // 注册表是进程级的，多实例时最后创建的处理器提供数据
-    void registerDemoPainters(const std::weak_ptr<DemoDisplayTaps>& source) {
+    // 注册在本处理器的 Interop 上，只画本实例的数据，多实例各自独立
+    void registerDemoPainters(arrange::juce::Interop& interop, const std::weak_ptr<DemoDisplayTaps>& source) {
         using arrange::core::NativeParamKind;
         using arrange::core::NativePainterParams;
 
-        arrange::juce::registerNativePainter("demo.meter", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
+        interop.painter("demo.meter", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
             const auto taps = source.lock();
             g.setColour(juce::Colour(0xffe5e5ea));
             g.fillRect(area);
@@ -30,7 +29,7 @@ namespace {
             g.fillRect(area.withWidth(area.getWidth() * fill));
         });
 
-        arrange::juce::registerNativePainter("demo.waveform", {{"source", NativeParamKind::Source}, {"color", NativeParamKind::Color}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams& params) {
+        interop.painter("demo.waveform", {{"source", NativeParamKind::Source}, {"color", NativeParamKind::Color}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams& params) {
             g.setColour(juce::Colour(0xfff2f2f7));
             g.fillRect(area);
             g.setColour(juce::Colour(0xffd1d1d6));
@@ -50,7 +49,7 @@ namespace {
             g.strokePath(path, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved));
         });
 
-        arrange::juce::registerNativePainter("demo.spectrum", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
+        interop.painter("demo.spectrum", {{"source", NativeParamKind::Source}}, [source](juce::Graphics& g, juce::Rectangle<float> area, const NativePainterParams&) {
             g.setColour(juce::Colour(0xfff2f2f7));
             g.fillRect(area);
             const auto taps = source.lock();
@@ -70,7 +69,7 @@ ArrangeDemoProcessor::ArrangeDemoProcessor() : juce::AudioProcessor(BusesPropert
     gain_ = state_.getRawParameterValue(gainId);
     mode_ = state_.getRawParameterValue(modeId);
     bypass_ = state_.getRawParameterValue(bypassId);
-    registerDemoPainters(taps_);
+    registerDemoPainters(interop_, taps_);
     // 参数在成员初始化时已全部登记；Interop 在此之后构造才能看到它们
     registerInteropHandlers();
 }

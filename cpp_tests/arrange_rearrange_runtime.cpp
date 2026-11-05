@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
         const Constraints constraints{0, 520, 0, 1200};
         const auto initial = runtime.pumpFrame(1, constraints, timestamp);
         if (!initial.ok) throw std::runtime_error(initial.error);
-        const auto counter = findText(runtime.scene(), "撅了啊 0 次");
+        const auto counter = findText(runtime.scene(), "点了 0 次");
         const auto originalHandles = handles(runtime.scene().node(counter));
         EventSlotId submit;
         for (const auto& slot : runtime.scene().activeEventSlots()) {
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         command("text");
         const auto steadyBindings = runtime.scene().bindingCount();
         check(runtime.frameCounters().measures == baseline.measures + 1, "Text change skipped measurement");
-        check(findText(runtime.scene(), "撅了啊 1 次") == counter, "文本变化错误替换了宿主节点");
+        check(findText(runtime.scene(), "点了 1 次") == counter, "文本变化错误替换了宿主节点");
         command("validate");
         for (int index = 0; index < 12; ++index) {
             command("color");
@@ -389,7 +389,7 @@ int main(int argc, char** argv) {
             check(driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16), "HMR did not publish through the production host driver");
             check(retiredPaint.expired(), "HMR 后旧发布片段仍被运行时持有");
             replay();
-            check(!diagnostics.hasError() && findText(runtime.scene(), "撅了啊 0 次") != 0, "stale HMR event reached fresh context");
+            check(!diagnostics.hasError() && findText(runtime.scene(), "点了 0 次") != 0, "stale HMR event reached fresh context");
             check(runtime.scene().bindingCount() == bindings && nextView->bindingCount() == bindings && nextView->eventSlotCount() == callbacks, "HMR retained previous context bindings/callbacks");
             check(runtime.publishedFrame().revision == 1 && runtime.frameCounters().publications >= 1, "HMR attachments caused extra publication");
             for (const auto& slot : runtime.scene().activeEventSlots())

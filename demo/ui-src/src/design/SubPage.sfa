@@ -4,11 +4,16 @@
             <Box content-alignment="Center" :modifier="M.size(64.dp, 64.dp).background(Color(theme.fill), rounded(16.dp))">
                 <Icon :painter="iconPainter" :tint="Color(theme.label)" :modifier="M.size(30.dp, 30.dp)" />
             </Box>
+
             <Spacer :modifier="M.height(20.dp)" />
+
             <Text :text="title" :style="{ fontSize: typeScale.largeTitle.sp, color: Color(theme.label) }" />
+
             <Spacer :modifier="M.height(8.dp)" />
+
             <Text :text="subtitle" :style="{ fontSize: typeScale.body.sp, color: Color(theme.secondaryLabel) }" />
         </Column>
+
         <Slot />
     </Scaffold>
 </template>

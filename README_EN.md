@@ -1,7 +1,7 @@
 # Arrange
 
 [![npm version](https://img.shields.io/npm/v/@arrange/framework?style=flat-square&label=npm%20%7C%20%40arrange%2Fframework&color=CB3837)](https://www.npmjs.com/package/@arrange/framework)
-[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.3-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
+[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.4-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
 
 [简体中文](README.md)
@@ -82,15 +82,18 @@ During development, you mostly organize code around "what the UI should look lik
 Windows x64 and macOS x64/arm64 are currently supported. Before you begin, make sure you have:
 
 - **Node.js 24 or newer** (with npm) and **Git**. To use pnpm as your package manager, have pnpm installed.
-- **CMake 3.24 or newer**; with the default Ninja generator, **Ninja** is also required.
-- **A C++ toolchain**: on Windows, Visual Studio or Build Tools with the "Desktop development with C++" workload (includes MSVC and the Windows SDK); on macOS, the Xcode Command Line Tools or full Xcode.
+- **CMake 3.24 or newer**; with the default Ninja generator, **Ninja** is also required. On Windows you do not need to install them separately, because the "Desktop development with C++" workload below bundles them; on macOS, install them yourself (e.g. `brew install cmake ninja`).
+- **A C++ toolchain**: on Windows, Visual Studio (Visual Studio 2026 recommended) or its Build Tools with the "Desktop development with C++" workload (includes MSVC, CMake and Ninja; make sure **Windows SDK** is checked on the right); on macOS, the Xcode Command Line Tools or full Xcode.
+- If you want to develop **plugins**, make sure you have a DAW (host) that can load them.
+
+> Tip: you can ask your AI Agent to help with the environment setup above. If you only want to run our Demo rather than develop, you do not need to install these dependencies.
 
 The CLI detects your local tools and fetches dependencies such as the Framework, JUCE and QuickJS-NG when preparing a project. The first preparation and build take a while and require access to npm and GitHub. Run the following commands in a regular interactive terminal.
 
 **1. Install the CLI and create a project**
 
 ```sh
-npm install -g @arrange/cli
+npm install -g @arrange/cli --allow-scripts=koffi # This flag is needed because Koffi runs an install script
 arrange create
 ```
 
@@ -127,6 +130,8 @@ arrange build
 ```
 
 It runs a Release build by default and collects the deliverables. The CLI prints their final location, which is the project's `artifacts/` directory by default. Existing JUCE projects can be brought in with `arrange adopt`.
+
+Cross-compilation is not supported yet. To build artifacts for a specific platform, run `arrange build` on that platform.
 
 ## Development
 

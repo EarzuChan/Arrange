@@ -4,15 +4,25 @@
 
         <SubPage a-else :title="current.title" :subtitle="current.description" :icon="current.icon" :on-back="goHome">
             <CompositionPage a-if="current.key === 'composition'" />
+
             <DrawingExhibit a-else-if="current.key === 'drawing'" />
+
             <LayoutExhibit a-else-if="current.key === 'layout'" />
+
             <FocusExhibit a-else-if="current.key === 'focus'" />
+
             <LazyExhibit a-else-if="current.key === 'lazy'" />
+
             <ShowcaseGallery a-else-if="current.key === 'lab'" />
+
             <AnimationGallery a-else-if="current.key === 'animation'" />
+
             <M5Gallery a-else-if="current.key === 'visual'" />
+
             <TierGallery a-else-if="current.key === 'tiers'" />
+
             <InteropPanel a-else-if="current.key === 'audio'" />
+
             <DebugExhibit a-else-if="current.key === 'debug'" />
         </SubPage>
 
@@ -35,7 +45,7 @@
 
                             <Spacer :modifier="M.height(4.dp)" />
 
-                            <Text :text="`版本 ${buildInfo.version} · Framework ${buildInfo.framework}`" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
+                            <Text :text="`Demo ${buildInfo.version}、Framework ${buildInfo.framework}`" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
 
                             <Spacer :modifier="M.height(4.dp)" />
 
@@ -75,15 +85,24 @@ import { buildInfo } from './buildInfo.ts'
 
 const theme = ref(lightGalleryTheme)
 provide(LocalGalleryTheme, theme)
+
 const interopEnabled = hasInterop()
+
 const page = ref<TopicKey | null>(null)
+
 // 首页时 current 不渲染，回落值只为类型收窄
 const current = computed(() => topics.find(topic => topic.key === page.value) ?? topics[0])
+
 const aboutOpen = ref(false)
+
 const dialogSpec = tween({ durationMillis: 220 })
+
 // 主页滚动位置由这里持有，从主题页返回时回到原处
 const homeScroll = createScrollState()
+
 const logo = painter('arrange-logo.png')
+
 function openTopic(key: TopicKey) { page.value = key }
+
 function goHome() { page.value = null }
 </script>

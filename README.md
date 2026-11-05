@@ -1,8 +1,8 @@
 # Arrange
 
 [![npm version](https://img.shields.io/npm/v/@arrange/framework?style=flat-square&label=npm%20%7C%20%40arrange%2Fframework&color=CB3837)](https://www.npmjs.com/package/@arrange/framework)
-[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.3-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
-[![License](npm dist-tag add @arrange/framework@0.7.3 latesthttps://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
+[![cmake version](https://img.shields.io/badge/cmake%20%7C%20FetchContent-0.7.4-064F8C?style=flat-square)](https://github.com/EarzuChan/Arrange)
+[![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](https://opensource.org/license/MIT)
 
 [English](README_EN.md)
 
@@ -81,15 +81,18 @@ function increment() {
 目前支持 Windows x64 与 macOS x64/arm64。开始前，请准备：
 
 - **Node.js 24 或更新版本**（含 npm）、**Git**。欲使用 pnpm 作为包管理器，则应准备好 pnpm。
-- **CMake 3.24 或更新版本**；使用默认 Ninja 生成器时，还需安装 **Ninja**。
-- **C++ 工具链**：Windows 安装 Visual Studio 或 Build Tools，并选中“使用 C++ 的桌面开发”（包含 MSVC 和 Windows SDK）；macOS 安装 Xcode Command Line Tools 或完整 Xcode。
+- **CMake 3.24 或更新版本**；使用默认 Ninja 生成器时，还需安装 **Ninja**。Windows 上无需单独安装，下方 Visual Studio 的“使用 C++ 的桌面开发”会附带它们；macOS 则需自行安装（如 `brew install cmake ninja`）。
+- **C++ 工具链**：Windows 安装 Visual Studio（建议 Visual Studio 2026）或其 Build Tools，并选中“使用 C++ 的桌面开发”（包含 MSVC、CMake 与 Ninja；请确认右侧已勾选 **Windows SDK**）；macOS 安装 Xcode Command Line Tools 或完整 Xcode。
+- 如果您需要开发**插件**，请确保有一个能加载插件的 DAW（宿主）。
+
+> 温馨提示：您可以让您的 AI Agent 协助您完成以上环境配置。如果只是运行我们的 Demo 而不开发，则无需安装这些依赖。
 
 CLI 会检测本机工具，并在准备工程时获取 Framework、JUCE、QuickJS-NG 等依赖；首次准备和编译需要一些时间，也需要能够访问 npm 与 GitHub。请在正常的交互式终端中执行以下命令。
 
 **1. 安装 CLI，创建工程**
 
 ```sh
-npm install -g @arrange/cli
+npm install -g @arrange/cli --allow-scripts=koffi # 带上这个 Flag 是因为 Koffi 要执行安装脚本
 arrange create
 ```
 
@@ -126,6 +129,8 @@ arrange build
 ```
 
 它默认执行 Release 构建并整理交付物，最终位置由 CLI 显示，默认位于工程的 `artifacts/` 目录下。已有 JUCE 工程可以使用 `arrange adopt` 接入。
+
+目前暂不支持交叉编译，在构建具体平台的工件时，需要在对应平台上执行 `arrange build`。
 
 ## 开发
 

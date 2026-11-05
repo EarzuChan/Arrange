@@ -10,6 +10,6 @@ import { M, Color, type Dp } from '@arrange/framework/ui'
 import ValueSurface from '../../design/ValueSurface.sfa'
 
 const props = defineProps<{ clicks: number; color: Color; offset: Dp; onTap: () => void }>()
-const label = computed(() => `撅了啊 ${props.clicks} 次`)
+const label = computed(() => `点了 ${props.clicks} 次`)
 const tone = computed(() => props.color)
 </script>

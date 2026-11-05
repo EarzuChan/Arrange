@@ -24,9 +24,7 @@ const rowModifier = computed(() => {
         .drawBehind(scope => {
             if (separator) scope.drawLine({ color: Color(color), startX: 16.px, startY: scope.size.height, endX: scope.size.width, endY: scope.size.height, strokeWidth: 1.px })
         })
-    const interactive = onClick
-        ? base.background(Color(interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.cardHover : 0x00000000)).clickable({ onClick, interactionState: interaction }).pointerIcon('hand')
-        : base
+    const interactive = onClick ? base.background(Color(interaction.pressed ? theme.value.fillPressed : interaction.hovered ? theme.value.cardHover : 0x00000000)).clickable({ onClick, interactionState: interaction }).pointerIcon('hand') : base
     return interactive.padding({ horizontal: 16.dp, vertical: 10.dp })
 })
 </script>

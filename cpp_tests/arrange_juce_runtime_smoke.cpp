@@ -210,7 +210,7 @@ int runSmoke() {
     if (const auto failed = click(*openSlot)) return failed;
     if (!settle()) return 23;
 
-    const auto clickSlot = clickSlotForText(runtime.scene().tree(), "撅了啊 0 次");
+    const auto clickSlot = clickSlotForText(runtime.scene().tree(), "点了 0 次");
     if (!clickSlot) {
         std::cerr << "「组合与状态」页未找到计数器的点击槽\n";
         return 5;
@@ -230,8 +230,8 @@ int runSmoke() {
         const auto frame = runtime.pumpFrame(1, constraints, frameTime += 16.0);
         if (!frame.ok || !frame.pipelineRan) return 23;
     }
-    if (!treeContainsText(runtime.scene().tree(), "撅了啊 13 次")) {
-        std::cerr << "计数器文本未达到预期的「撅了啊 13 次」\n";
+    if (!treeContainsText(runtime.scene().tree(), "点了 13 次")) {
+        std::cerr << "计数器文本未达到预期的「点了 13 次」\n";
         return 9;
     }
 

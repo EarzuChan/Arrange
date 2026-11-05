@@ -3,9 +3,13 @@
         <Box content-alignment="Center" :modifier="M.size(56.dp, 56.dp).background(Color(theme.fill), rounded(16.dp))">
             <Icon :painter="iconPainter" :tint="Color(theme.label)" :modifier="M.size(26.dp, 26.dp)" />
         </Box>
+
         <Spacer :modifier="M.height(36.dp)" />
+
         <Text :text="title" :style="{ fontSize: typeScale.cardTitle.sp, color: Color(theme.label) }" />
+
         <Spacer :modifier="M.height(6.dp)" />
+
         <Text :text="description" :max-lines="2" overflow="ellipsis" :style="{ fontSize: typeScale.footnote.sp, color: Color(theme.secondaryLabel) }" />
     </Column>
 </template>
@@ -17,12 +21,18 @@ import { animatedNumberAsRef, spring, tween } from '@arrange/framework/animation
 import { typeScale, useGalleryTheme } from './theme'
 
 const { title, description, icon, onClick } = defineProps<{ title: string; description: string; icon: string; onClick: () => void }>()
+
 const theme = useGalleryTheme()
+
 const iconPainter = computed(() => painter(icon))
+
 const interaction = createInteractionState()
+
 // 悬停时浮起一层柔和阴影；按下时整卡轻微收缩，松手回弹
 const scale = animatedNumberAsRef(() => interaction.pressed ? 0.97 : 1, { animationSpec: spring({ stiffness: 600, dampingRatio: 0.7 }) })
+
 const lift = animatedNumberAsRef(() => interaction.hovered && !interaction.pressed ? 1 : 0, { animationSpec: tween({ durationMillis: 160 }) })
+
 const cardModifier = computed(() => {
     const shape = rounded(36.dp)
     // 悬停只改阴影数值，链条形状不变时走单实例参数更新
