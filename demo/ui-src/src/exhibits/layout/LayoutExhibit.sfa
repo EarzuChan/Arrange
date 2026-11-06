@@ -38,6 +38,6 @@ import { useGalleryTheme } from '../../design/theme'
 const theme = useGalleryTheme()
 const narrow = ref(false)
 const tags = ['音轨', '音量自动化', '节奏', '中文标题', '合成器', '混响', '立体声']
-const tagStyle = computed(() => ({ fontSize: 13.sp, color: Color(theme.value.label) }))
-const bodyStyle = computed(() => ({ fontSize: 15.sp, color: Color(theme.value.label) }))
+const tagStyle = computed(() => ({ fontSize: 11.sp, color: Color(theme.value.label) }))
+const bodyStyle = computed(() => ({ fontSize: 13.sp, color: Color(theme.value.label) }))
 </script>

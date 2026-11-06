@@ -59,16 +59,21 @@ namespace arrange::juce {
 
     arrange::core::TextLayout JuceTextMeasurer::createLayout(std::string_view source, arrange::core::TextStyle style, arrange::core::TextLayoutOptions options) const {
         arrange::core::TextLayout result;
-        result.lineHeight = style.lineHeight;
+        // 字号是 em：以点高度建字体，回落字体沿用同一个 em，不随字体的上下行之和缩放
+        const auto fontSize = style.fontSize > 0.0f ? style.fontSize : arrange::core::defaultFontSize;
+        const auto lineHeight = style.lineHeight > 0.0f ? style.lineHeight : fontSize * arrange::core::defaultLineHeightRatio;
+        result.lineHeight = lineHeight;
         auto resource = std::make_shared<JuceTextResource>();
         result.resource = resource;
-        const auto font = ::juce::Font(::juce::FontOptions(style.fontSize));
-        result.baseline = font.getAscent() + std::max(0.0f, (style.lineHeight - font.getHeight()) * 0.5f);
+        const auto font = ::juce::Font(::juce::FontOptions().withPointHeight(fontSize));
+        // 行盒由 Arrange 定：每行高 lineHeight，基线取主字体的半行距（可为负）加上行；JUCE 的行盒（含回落字体撑高）不参与
+        const auto lineBaseline = (lineHeight - font.getHeight()) * 0.5f + font.getAscent();
+        result.baseline = lineBaseline;
         auto text = ::juce::String::fromUTF8(source.data(), static_cast<int>(source.size()));
         if (options.singleLine) text = text.upToFirstOccurrenceOf("\n", false, false);
 
         // JUCE 固定版本的 shaping 接口同时提供 fallback 字体、簇几何和省略后的字形
-        auto settings = ::juce::detail::ShapedText::Options{}.withFont(font).withBaselineAtZero(false).withAdditiveLineSpacing(std::max(0.0f, style.lineHeight - font.getHeight())).withDrawLinesInFull(!options.ellipsis);
+        auto settings = ::juce::detail::ShapedText::Options{}.withFont(font).withBaselineAtZero(false).withDrawLinesInFull(!options.ellipsis);
         if (options.maxLines > 0) settings = settings.withMaxNumLines(options.maxLines);
         if (options.maxWidth > 0 && (!options.singleLine || options.ellipsis)) settings = settings.withWordWrapWidth(options.maxWidth);
         if (options.ellipsis) settings = settings.withEllipsis();
@@ -88,11 +93,13 @@ namespace arrange::juce {
             const auto lineIndex = static_cast<std::size_t>(metrics.lineNumber);
             if (result.lines.size() <= lineIndex) result.lines.resize(lineIndex + 1);
             auto& line = result.lines[lineIndex];
-            line.y = metrics.top;
-            line.height = metrics.nextLineTop - metrics.top;
-            line.baseline = metrics.anchor.y;
-            if (lineIndex == 0) result.baseline = metrics.anchor.y;
-            result.height = std::max(result.height, metrics.nextLineTop);
+            line.y = static_cast<float>(lineIndex) * lineHeight;
+            line.height = lineHeight;
+            line.baseline = line.y + lineBaseline;
+            if (lineIndex == 0) result.baseline = line.baseline;
+            result.height = std::max(result.height, line.y + lineHeight);
+            // 字形位置里的行基线换成 Arrange 的行基线
+            const auto shiftY = line.baseline - metrics.anchor.y;
 
             JuceTextResource::Run run;
             run.font = resolvedFont;
@@ -104,9 +111,10 @@ namespace arrange::juce {
                 const auto& glyph = glyphs[i];
                 if (!glyph.isNewline() && !glyph.isPlaceholderForLigature()) {
                     run.glyphs.push_back(static_cast<std::uint16_t>(glyph.glyphId));
-                    run.positions.push_back(positions[i]);
+                    const auto position = ::juce::Point<float>(positions[i].x, positions[i].y + shiftY);
+                    run.positions.push_back(position);
                     if (typeface) {
-                        const auto bounds = typeface->getGlyphBounds(resolvedFont.getMetricsKind(), static_cast<int>(glyph.glyphId)).transformedBy(::juce::AffineTransform::scale(resolvedFont.getHeight() * resolvedFont.getHorizontalScale(), resolvedFont.getHeight())).translated(positions[i].x, positions[i].y);
+                        const auto bounds = typeface->getGlyphBounds(resolvedFont.getMetricsKind(), static_cast<int>(glyph.glyphId)).transformedBy(::juce::AffineTransform::scale(resolvedFont.getHeight() * resolvedFont.getHorizontalScale(), resolvedFont.getHeight())).translated(position.x, position.y);
                         if (!bounds.isEmpty()) {
                             ink = hasInk ? ink.getUnion(bounds) : bounds;
                             hasInk = true;
@@ -153,12 +161,12 @@ namespace arrange::juce {
             arrange::core::TextLineLayout trailing;
             trailing.start = trailing.end = source.size();
             trailing.y = result.height;
-            trailing.height = style.lineHeight;
+            trailing.height = lineHeight;
             trailing.baseline = trailing.y + result.baseline;
             result.lines.push_back(trailing);
-            result.height += style.lineHeight;
+            result.height += lineHeight;
         }
-        result.height = std::max(style.lineHeight, result.height);
+        result.height = std::max(lineHeight, result.height);
         if (hasInk) result.inkBounds = {ink.getX(), ink.getY(), ink.getWidth(), ink.getHeight()};
         result.truncated = result.lines.back().end < source.size();
         return result;

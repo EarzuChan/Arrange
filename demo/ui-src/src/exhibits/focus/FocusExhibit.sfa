@@ -6,7 +6,7 @@
                 <GalleryButton text="下一个" :on-click="() => focusManager.moveFocus('next')" />
                 <GalleryButton text="清除焦点" :on-click="() => focusManager.clearFocus()" />
             </FlowRow>
-            <Text :text="status" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+            <Text :text="status" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
         </Section>
 
         <Section title="单行" footer="双击选词，三击选行，回车提交">
@@ -31,6 +31,6 @@ const theme = useGalleryTheme()
 const status = ref('还没有框获得焦点')
 const firstFocus = createFocusRequester(), secondFocus = createFocusRequester()
 const focusManager = inject(FocusManagerKey)!
-const bodyStyle = computed(() => ({ fontSize: 15.sp, color: Color(theme.value.label) }))
+const bodyStyle = computed(() => ({ fontSize: 13.sp, color: Color(theme.value.label) }))
 const fieldModifier = (height: number) => M.fillMaxWidth().height(height.dp).background(Color(theme.value.fill), rounded(12.dp)).padding({ horizontal: 14.dp, vertical: 12.dp })
 </script>

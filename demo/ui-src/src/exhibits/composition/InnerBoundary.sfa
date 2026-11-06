@@ -1,5 +1,5 @@
 <template>
-    <Text :text="secret" :modifier="M.fillMaxWidth().background(Color(theme.fill), rounded(12.dp)).padding(12.dp)" :style="{ fontSize: 13.sp, color: Color(theme.label) }" />
+    <Text :text="secret" :modifier="M.fillMaxWidth().background(Color(theme.fill), rounded(12.dp)).padding(12.dp)" :style="{ fontSize: 11.sp, color: Color(theme.label) }" />
 </template>
 
 <script>

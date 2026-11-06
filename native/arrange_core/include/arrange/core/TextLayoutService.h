@@ -12,8 +12,12 @@
 #include <vector>
 
 namespace arrange::core {
+    // 字号与行高的单位是 SP，数值就是字体的 em 大小；行高未设置时取字号的 1.2 倍
+    inline constexpr float defaultFontSize = 12.0f;
+    inline constexpr float defaultLineHeightRatio = 1.2f;
+
     struct TextStyle {
-        float fontSize = 14.0f;
+        float fontSize = defaultFontSize;
         float lineHeight = 0.0f;
         bool operator==(const TextStyle&) const = default;
     };
@@ -53,7 +57,7 @@ namespace arrange::core {
         std::string text;
         TextStyle style;
         TextLayoutOptions options;
-        float lineHeight = 16.8f;
+        float lineHeight = defaultFontSize * defaultLineHeightRatio;
         float width = 0.0f;
         float height = 0.0f;
         std::vector<TextLineLayout> lines;

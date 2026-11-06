@@ -1,8 +1,8 @@
 <template>
     <Row vertical-alignment="CenterVertically" :modifier="M.fillMaxWidth()" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
         <Column :modifier="M.weight(1)" :vertical-arrangement="Arrangement.spacedBy(4.dp)">
-            <Text :text="`原样 Ref：${name}`" :style="{ fontSize: 15.sp, color: Color(theme.label) }" />
-            <Text :text="`子层读取 state：` + state.value" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+            <Text :text="`原样 Ref：${name}`" :style="{ fontSize: 13.sp, color: Color(theme.label) }" />
+            <Text :text="`子层读取 state：` + state.value" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
         </Column>
         <GalleryButton text="切换 Ref" :on-click="onToggle" />
     </Row>

@@ -10,7 +10,7 @@
         <Section title="增益" footer="拖动调节，Shift 精调，双击复位，方向键步进，右键打开宿主菜单">
             <Row vertical-alignment="CenterVertically" :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
                 <Box :modifier="M.size(64.dp, 64.dp).then(adjustable(knob, { pointerLock: true, valueText: gain.text, interactionState: knobInteraction })).pointerIcon('resizeVertical').onContextClick(showGainMenu).then(knobDrawing)" />
-                <Text :text="gain.text" :style="{ fontSize: 28.sp, color: Color(theme.label) }" />
+                <Text :text="gain.text" :style="{ fontSize: 24.sp, color: Color(theme.label) }" />
             </Row>
             <Box :modifier="M.fillMaxWidth().height(6.dp).clip(rounded(3.dp)).then(gainBar)" />
         </Section>

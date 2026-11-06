@@ -1,13 +1,13 @@
 <template>
     <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
         <Section title="输入" footer="回车提交；每次输入与失焦都会回报到下面">
-            <Input :value="query" :onValueChange="handleChange" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" placeholder="输入并提交" :text-style="{ fontSize: 15.sp, color: Color(theme.label) }" :modifier="field" />
-            <Text :text="inputStatus || '还没有输入'" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+            <Input :value="query" :onValueChange="handleChange" :onSubmit="handleSubmit" :onChange="handleChange" :onBlur="handleBlur" placeholder="输入并提交" :text-style="{ fontSize: 13.sp, color: Color(theme.label) }" :modifier="field" />
+            <Text :text="inputStatus || '还没有输入'" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
         </Section>
 
         <Section title="独立滚动" footer="卡片里的小视口自己滚动，不带动整页">
             <Column :modifier="M.fillMaxWidth().height(96.dp).background(Color(theme.fill), rounded(12.dp)).verticalScroll(localScroll).padding(12.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
-                <Text a-for="line in scrollLines" :key="line" :text="line" :style="{ fontSize: 13.sp, color: Color(theme.label) }" />
+                <Text a-for="line in scrollLines" :key="line" :text="line" :style="{ fontSize: 11.sp, color: Color(theme.label) }" />
             </Column>
         </Section>
     </Column>
