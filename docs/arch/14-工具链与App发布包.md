@@ -90,6 +90,8 @@ Painter 获取层接收以下资源引用：
 - 指向 UI package 内资源的字符串路径。
 - Vite 产出的 SVG、PNG、JPEG、GIF `data:` 地址；Live 与 Dist 共用内联解码，不发起网络请求。默认字节预算为 16 MiB。
 
+自带字体（`defineFontFamily`）使用同一条获取链路、同一份路径规则与字节预算，只是解码结果换成字体内容：地址指向 `.ttf`、`.otf`、`.ttc`、`.otc` 文件，或 `data:` 地址的 MIME 为 `font/*`、`application/font-*` 或 `application/octet-stream`，Live 响应的 MIME 同样接受 `font/*`；WOFF 不被接受。字体的使用规则见 [文本输入与绘制](18-文本输入与绘制.md#自带字体)。
+
 Dist 字符串路径规则：
 
 - `"/logo.png"` 表示 UI package root 下的资源 URL：去掉 URL 查询和片段后，单次解码百分号编码，再检查文件边界。Vite 非内联资源中编码后的空格、中文与百分号由此对应实际文件名。

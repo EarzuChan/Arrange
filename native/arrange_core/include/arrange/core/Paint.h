@@ -39,8 +39,7 @@ namespace arrange::core {
         Rect rect;
         std::uint32_t color = 0;
         float strokeWidth = 0.0f;
-        float fontSize = defaultFontSize;
-        float lineHeight = 0.0f;
+        TextStyle textStyle;
         DrawShapeType shape = DrawShapeType::Rectangle;
         CornerRadii corners;
         // 渐变存在时 color 只携带不透明度
@@ -80,6 +79,8 @@ namespace arrange::core {
         std::shared_ptr<const TextLayout> textLayout;
         ModifierValue value;
         Rect bounds;
+        // 构建时的字体环境代际：含文字的命令在代际推进后重建
+        std::uint64_t fontEnvironment = 0;
         float contentAlpha = 1;
         std::vector<DrawOp> before;
         std::vector<DrawOp> after;

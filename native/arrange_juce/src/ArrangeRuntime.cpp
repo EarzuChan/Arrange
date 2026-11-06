@@ -251,7 +251,17 @@ namespace arrange::juce {
     }
 
     bool ArrangeRuntime::hasPendingFrameWork() const noexcept {
-        return reloadRequested_ || rearrangeHost_.hasPendingDiagnostics() || (!suspended_ && frame_.hasPendingFrameWork(frameWorkState()));
+        return reloadRequested_ || rearrangeHost_.hasPendingDiagnostics() || (!suspended_ && (frame_.hasPendingFrameWork(frameWorkState()) || fontGeneration_ != arrange::core::FontRegistry::shared().generation()));
+    }
+
+    bool ArrangeRuntime::holdsFirstFrameForFonts() {
+        if (pipelineState_.publishedFrame().revision != 0 || arrange::core::FontRegistry::shared().pendingPreloads() == 0) {
+            fontPreloadSince_.reset();
+            return false;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (!fontPreloadSince_) fontPreloadSince_ = now;
+        return now - *fontPreloadSince_ < std::chrono::seconds(3);
     }
 
     bool ArrangeRuntime::captureRearrangeTransactions() {
@@ -405,6 +415,12 @@ namespace arrange::juce {
         if (!semantic.ok) return {true, false, false, RuntimeFrameErrorPhase::Event, semantic.error};
         const ::juce::ScopedValueSetter<bool> frameGuard(inFrame_, true);
         pipelineState_.setFrameTime(nowMillis);
+        if (holdsFirstFrameForFonts()) return result;
+        // 字体环境代际推进（自带字体到达、族被替换等）后重跑流水线，由它让 Text、Input 与含文字的绘制片段重建
+        if (const auto generation = arrange::core::FontRegistry::shared().generation(); generation != fontGeneration_) {
+            fontGeneration_ = generation;
+            requestFramePipelineRun();
+        }
         if (pipelineState_.scene().tree().activeAnimationCount() > 0) requestFramePipelineRun();
         auto plan = frame_.planTick(frameWorkState());
 

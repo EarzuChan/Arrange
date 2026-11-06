@@ -95,3 +95,11 @@ Arrange 不包含 JUCE 源代码，我们是在构建时获取 JUCE 并与之链
 ## 其他依赖项
 
 Arrange 各个包的 npm 依赖项（例如 `@babel/parser` 和 `magic-string`）会由您的包管理器作为独立的包进行安装，并附带它们各自的许可证文件。
+
+## Noto Serif SC（Demo 自带字体）
+
+- 来源：https://github.com/notofonts/noto-cjk（Noto Serif CJK / Noto Serif SC，Adobe 与 Google）
+- 许可证：SIL Open Font License 1.1，全文见 https://openfontlicense.org
+- 位置：`demo/ui-src/public/fonts/NotoSerifSC-*.ttf`
+
+Demo 仅随 App 打包由系统可变字体切出的静态常规体与粗体，并裁剪到 Demo 源码用到的字符（脚本见 `demo/ui-src/scripts/make-fonts.py`）；字体本身遵循 OFL，不随框架包分发。

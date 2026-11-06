@@ -42,6 +42,7 @@ target_sources(arrange_juce PRIVATE
   src/JuceDrawOpsPainter.cpp
   src/ImageBlur.cpp
   src/JuceTextServices.cpp
+  src/JuceFonts.cpp
   src/PackageRuntimeSource.cpp
   src/PassivePaintRenderer.cpp
   src/JucePointerInputAdapter.cpp
@@ -60,12 +61,12 @@ target_link_libraries(arrange_juce PUBLIC
 )
 
 if(APPLE)
-  target_sources(arrange_juce PRIVATE src/PlatformWheelInput_mac.mm)
+  target_sources(arrange_juce PRIVATE src/PlatformWheelInput_mac.mm src/JuceFonts_mac.mm)
 elseif(WIN32)
   # 未测试！
   target_compile_definitions(arrange_juce PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
   target_sources(arrange_juce PRIVATE src/PlatformWheelInput_windows.cpp src/WindowsPrecisionWheelSource.cpp)
-  target_link_libraries(arrange_juce PRIVATE comctl32 ole32 uuid)
+  target_link_libraries(arrange_juce PRIVATE comctl32 ole32 uuid dwrite)
 else()
   target_sources(arrange_juce PRIVATE src/PlatformWheelInput_fallback.cpp)
 endif()

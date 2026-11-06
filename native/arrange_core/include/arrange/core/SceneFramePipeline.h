@@ -159,5 +159,7 @@ namespace arrange::core {
 
         LayoutEngine layout_;
         DrawOpsBuilder drawOpsBuilder_;
+        // 上次流水线所见的字体环境代际；变化时先标脏再规划
+        std::uint64_t fontEnvironment_ = 0;
     };
 }

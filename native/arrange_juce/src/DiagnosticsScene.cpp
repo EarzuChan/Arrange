@@ -122,8 +122,8 @@ namespace arrange::juce {
         op.type = arrange::core::DrawOpType::DrawText;
         op.rect = rect;
         op.color = color;
-        op.fontSize = fontSize;
-        op.lineHeight = fontSize * arrange::core::defaultLineHeightRatio;
+        op.textStyle.fontSize = fontSize;
+        op.textStyle.lineHeight = fontSize * arrange::core::defaultLineHeightRatio;
         op.maxLines = maxLines;
         op.text = std::move(value);
         op.overflow = arrange::core::TextOverflow::Clip;

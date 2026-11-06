@@ -3,6 +3,7 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/juce/AppResolver.h>
+#include <arrange/core/Font.h>
 #include <stdexcept>
 #include <cmath>
 #include <atomic>
@@ -17,8 +18,18 @@ namespace arrange::juce {
         struct PainterPayload {
             ::juce::MemoryBlock bytes;
             bool svg = false;
+            // 字体字节：由 defineFontFamily 经同一条资源获取链路取得
+            bool font = false;
             std::string source;
         };
+
+        bool isFontMime(const ::juce::String& mime) {
+            return mime.startsWith("font/") || mime.startsWith("application/font-") || mime.startsWith("application/x-font-");
+        }
+
+        bool isFontPath(const ::juce::String& path) {
+            return path.endsWith(".ttf") || path.endsWith(".otf") || path.endsWith(".ttc") || path.endsWith(".otc");
+        }
 
         struct HttpAddress {
             std::string origin;
@@ -124,11 +135,13 @@ namespace arrange::juce {
             auto type = ::juce::String(resource.substr(5, comma - 5)).toLowerCase().toStdString();
             const bool base64 = type.ends_with(";base64");
             if (base64) type.resize(type.size() - 7);
-            if (type != "image/svg+xml" && type != "image/png" && type != "image/jpeg" && type != "image/gif") throw std::runtime_error("Painter data URL 只支持 SVG、PNG、JPEG 或 GIF 图片");
+            const auto font = isFontMime(::juce::String(type)) || type == "application/octet-stream";
+            if (!font && type != "image/svg+xml" && type != "image/png" && type != "image/jpeg" && type != "image/gif") throw std::runtime_error("Painter data URL 只支持 SVG、PNG、JPEG、GIF 图片或 TrueType、OpenType 字体");
             const auto body = resource.substr(comma + 1);
             if (body.size() > limits.maxBytes * (base64 ? 2 : 3)) throw std::runtime_error("Painter data URL 超出资源字节预算");
             PainterPayload result;
             result.svg = type == "image/svg+xml";
+            result.font = font;
             if (base64) {
                 ::juce::MemoryOutputStream output(result.bytes, false);
                 if (!::juce::Base64::convertFromBase64(output, ::juce::String(body))) throw std::runtime_error("Painter data URL 的 base64 内容无效");
@@ -168,11 +181,12 @@ namespace arrange::juce {
             const auto length = stream.getTotalLength();
             if (length > static_cast<::juce::int64>(limits.maxBytes)) fail("HTTP 200，响应超出资源字节预算");
             const auto mime = stream.getResponseHeaders()["Content-Type"].upToFirstOccurrenceOf(";", false, false).trim().toLowerCase();
-            if (mime.isNotEmpty() && !mime.startsWith("image/") && mime != "application/octet-stream") fail("HTTP 200，资源 MIME 不支持：" + mime.toStdString());
+            if (mime.isNotEmpty() && !mime.startsWith("image/") && !isFontMime(mime) && mime != "application/octet-stream") fail("HTTP 200，资源 MIME 不支持：" + mime.toStdString());
             PainterPayload result;
             result.source = address + "（HTTP 200）";
             const auto path = ::juce::String(address.substr(0, address.find('?'))).toLowerCase();
             result.svg = mime == "image/svg+xml" || path.endsWith(".svg");
+            result.font = isFontMime(mime) || isFontPath(path);
             std::array<char, 8192> buffer;
             while (!stream.isExhausted()) {
                 const auto count = stream.read(buffer.data(), static_cast<int>(buffer.size()));
@@ -217,8 +231,19 @@ namespace arrange::juce {
             for (auto* child = element.getFirstChildElement(); child; child = child->getNextElement()) validateSvgReferences(*child, source);
         }
 
-        std::shared_ptr<JucePainterContent> decodePainter(const PainterPayload& payload, const std::string& resource) {
+        std::shared_ptr<const arrange::core::PainterContent> decodeFont(const PainterPayload& payload, const std::string& source) {
+            auto bytes = std::make_shared<std::vector<std::uint8_t>>(static_cast<const std::uint8_t*>(payload.bytes.getData()), static_cast<const std::uint8_t*>(payload.bytes.getData()) + payload.bytes.getSize());
+            const auto info = arrange::core::readFontFaceInfo({bytes->data(), bytes->size()});
+            if (!info) throw std::runtime_error("字体资源不是 TrueType 或 OpenType（不支持 WOFF）：" + source);
+            auto content = std::make_shared<arrange::core::FontContent>();
+            content->bytes = std::move(bytes);
+            content->info = *info;
+            return content;
+        }
+
+        std::shared_ptr<const arrange::core::PainterContent> decodePainter(const PainterPayload& payload, const std::string& resource) {
             const auto& source = payload.source.empty() ? resource : payload.source;
+            if (payload.font) return decodeFont(payload, source);
             auto content = std::make_shared<JucePainterContent>();
             if (payload.svg) {
                 const auto xmlText = ::juce::String::fromUTF8(static_cast<const char*>(payload.bytes.getData()), static_cast<int>(payload.bytes.getSize()));
@@ -284,6 +309,7 @@ namespace arrange::juce {
             const ::juce::File file(::juce::String::fromUTF8(reinterpret_cast<const char*>(fileName.data()), static_cast<int>(fileName.size())));
             if (!file.loadFileAsData(result.bytes)) throw std::runtime_error("Painter 资源读取失败：" + resource);
             result.svg = file.hasFileExtension("svg");
+            result.font = isFontPath(file.getFileName().toLowerCase());
             return result;
         });
     }

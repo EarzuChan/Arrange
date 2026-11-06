@@ -46,6 +46,8 @@ namespace arrange::quickjs {
         }
 
         [[nodiscard]] arrange::core::ModifierPadding readPadding(JSValueConst value);
+        // 读取字体族、字重、字形与伪造开关；失败时已抛出 JS 异常
+        bool readFontStyle(JSValueConst style, arrange::core::TextStyle& result);
         [[nodiscard]] std::pair<float, float> transformOriginFrom(JSValueConst value) const;
         [[nodiscard]] arrange::core::PaintStyleSemantics paintStyle(JSValueConst value, arrange::core::PaintStyleKind kind) const;
         // 读取 color 或 brush，结果写入 style 的颜色与渐变

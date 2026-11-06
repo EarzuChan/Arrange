@@ -44,7 +44,7 @@ namespace arrange::core {
     void DrawOpsBuilder::prepareText(DrawOp& op, const TextLayoutService& service) {
         if (op.type != DrawOpType::DrawText) return;
         const auto width = op.inputText && op.maxLines == 1 ? 0.0f : op.rect.width;
-        op.textLayout = service.layout(op.text, {op.fontSize, op.lineHeight}, {op.maxLines, width, op.maxLines == 1, op.overflow == TextOverflow::Ellipsis}, op.textLayout);
+        op.textLayout = service.layout(op.text, op.textStyle, {op.maxLines, width, op.maxLines == 1, op.overflow == TextOverflow::Ellipsis}, op.textLayout);
     }
 
     std::vector<DrawOp> DrawOpsBuilder::exportScene(const LayoutTree& tree, NodeId root) const {
@@ -202,8 +202,7 @@ namespace arrange::core {
                 case DrawCommandKind::Text:
                     op.type = DrawOpType::DrawText;
                     op.text = command.text;
-                    op.fontSize = command.fontSize;
-                    op.lineHeight = command.lineHeight;
+                    op.textStyle = command.textStyle;
                     op.maxLines = command.maxLines;
                     op.textAlign = command.textAlign;
                     op.overflow = command.overflow;
@@ -311,12 +310,14 @@ namespace arrange::core {
             auto value = instance.descriptor.value;
             if (auto* layout = std::get_if<LayoutModifierSemantics>(&value)) layout->scrollValue = 0;
             const Rect localBounds{0, 0, instance.bounds.width, instance.bounds.height};
+            const auto fontEnvironment = textLayoutService_.environment();
             auto layer = instance.paintCache;
             const auto customDraw = std::holds_alternative<DrawModifier>(value);
             if (customDraw && !instance.preparedDraw) throw std::logic_error("绘制 Modifier 尚未在候选准备阶段生成内容");
-            if (!layer || layer->value != value || layer->bounds != localBounds || layer->textLayout != instance.textLayout || customDraw && layer->drawCommands != instance.preparedDraw) {
+            if (!layer || layer->value != value || layer->bounds != localBounds || layer->textLayout != instance.textLayout || layer->fontEnvironment != fontEnvironment || customDraw && layer->drawCommands != instance.preparedDraw) {
                 auto next = std::make_shared<PaintLayerFragment>();
                 next->value = value;
+                next->fontEnvironment = fontEnvironment;
                 next->textLayout = instance.textLayout;
                 next->bounds = localBounds;
                 std::vector<DrawOp> ops;
@@ -508,8 +509,7 @@ namespace arrange::core {
             op.nodeId = id;
             op.rect = instance.bounds;
             op.text = modifierText(value);
-            op.fontSize = text->style.fontSize;
-            op.lineHeight = text->style.lineHeight;
+            op.textStyle = text->style;
             op.color = withAlpha(text->color, alpha);
             op.textAlign = text->textAlign;
             op.overflow = text->overflow;
@@ -637,8 +637,7 @@ namespace arrange::core {
         text.rect.height += state.viewportY;
         text.text = state.text.empty() ? field.placeholder : state.text;
         text.color = input.color;
-        text.fontSize = input.style.fontSize;
-        text.lineHeight = input.style.lineHeight;
+        text.textStyle = input.style;
         text.maxLines = input.singleLine ? 1 : 0;
         text.overflow = TextOverflow::Clip;
         text.textAlign = TextAlign::Start;

@@ -21,7 +21,7 @@ namespace arrange::juce {
             for (std::size_t index = 0; index < std::min(target.size(), source.size()); ++index) {
                 auto& next = source[index];
                 const auto& previous = target[index];
-                if (next.type == arrange::core::DrawOpType::DrawText && previous.type == arrange::core::DrawOpType::DrawText && !next.textLayout && next.text == previous.text && next.fontSize == previous.fontSize && next.lineHeight == previous.lineHeight && next.rect.width == previous.rect.width && next.maxLines == previous.maxLines && next.overflow == previous.overflow) next.textLayout = previous.textLayout;
+                if (next.type == arrange::core::DrawOpType::DrawText && previous.type == arrange::core::DrawOpType::DrawText && !next.textLayout && next.text == previous.text && next.textStyle == previous.textStyle && next.rect.width == previous.rect.width && next.maxLines == previous.maxLines && next.overflow == previous.overflow) next.textLayout = previous.textLayout;
             }
             target = std::move(source);
         }

@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "Font.h"
 #include "Geometry.h"
 
 #include <cstddef>
@@ -19,6 +20,12 @@ namespace arrange::core {
     struct TextStyle {
         float fontSize = defaultFontSize;
         float lineHeight = 0.0f;
+        // 字体族按序回落，空表示平台默认字体
+        std::vector<std::string> fontFamily;
+        int fontWeight = defaultFontWeight;
+        bool italic = false;
+        // 缺失字重或字形时由 Arrange 自己伪造；关闭后严格使用选中的字面
+        bool fontSynthesis = true;
         bool operator==(const TextStyle&) const = default;
     };
 
@@ -107,6 +114,8 @@ namespace arrange::core {
 
         std::shared_ptr<const TextLayout> layout(std::string_view text, TextStyle style = {}, TextLayoutOptions options = {}, const std::shared_ptr<const TextLayout>& previous = {}) const;
         void invalidateFontEnvironment();
+        // 字体环境代际：本服务自身的推进与字体注册表的代际合并，读取时同步，变化即清空缓存
+        std::uint64_t environment() const;
         void clearCache() const;
 
         TextLayoutCounters counters() const noexcept {
@@ -145,7 +154,8 @@ namespace arrange::core {
         mutable std::list<Entry> lru_;
         mutable std::unordered_map<Key, std::list<Entry>::iterator, KeyHash> cache_;
         std::shared_ptr<TextLayoutCounters> counters_ = std::make_shared<TextLayoutCounters>();
-        std::uint64_t environment_ = 1;
+        mutable std::uint64_t environment_ = 1;
+        mutable std::uint64_t fontGeneration_ = FontRegistry::shared().generation();
     };
 
     const TextLayoutService& defaultTextLayoutService();

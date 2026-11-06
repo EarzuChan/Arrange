@@ -118,6 +118,10 @@ namespace arrange::core {
         };
         mix(std::hash<float>{}(key.style.fontSize));
         mix(std::hash<float>{}(key.style.lineHeight));
+        for (const auto& family : key.style.fontFamily) mix(std::hash<std::string>{}(family));
+        mix(std::hash<int>{}(key.style.fontWeight));
+        mix(key.style.italic);
+        mix(key.style.fontSynthesis);
         mix(std::hash<float>{}(key.options.maxWidth));
         mix(std::hash<int>{}(key.options.maxLines));
         mix(key.options.singleLine);
@@ -129,6 +133,8 @@ namespace arrange::core {
         if (!std::isfinite(style.fontSize) || !std::isfinite(style.lineHeight) || !std::isfinite(options.maxWidth)) throw std::invalid_argument("文本排版参数必须是有限数值");
         if (!(style.fontSize > 0)) style.fontSize = defaultFontSize;
         style.lineHeight = effectiveLineHeight(style);
+        style.fontWeight = clampFontWeight(style.fontWeight);
+        const auto environment = this->environment();
         options.singleLine = options.singleLine || options.maxLines == 1;
         if (options.singleLine && !options.ellipsis) options.maxWidth = 0;
         auto equivalentOptions = previous && previous->options == options;
@@ -137,7 +143,7 @@ namespace arrange::core {
             const auto newWidth = options.maxWidth;
             if (newWidth >= previous->width && ((oldWidth > 0 && newWidth <= oldWidth) || previous->lines.size() == 1)) equivalentOptions = true;
         }
-        if (previous && previous->serviceIdentity == counters_.get() && previous->environment == environment_ && previous->text == text && previous->style == style && equivalentOptions) {
+        if (previous && previous->serviceIdentity == counters_.get() && previous->environment == environment && previous->text == text && previous->style == style && equivalentOptions) {
             ++counters_->nodeReuses;
             return previous;
         }
@@ -154,7 +160,7 @@ namespace arrange::core {
         result->text = key.text;
         result->style = style;
         result->options = options;
-        result->environment = environment_;
+        result->environment = environment;
         result->serviceIdentity = counters_.get();
         auto bytes = sizeof(TextLayout) + result->text.capacity() + result->lines.capacity() * sizeof(TextLineLayout);
         for (const auto& line : result->lines) bytes += line.runs.capacity() * sizeof(TextRunLayout);
@@ -195,6 +201,15 @@ namespace arrange::core {
     void TextLayoutService::invalidateFontEnvironment() {
         ++environment_;
         clearCache();
+    }
+
+    std::uint64_t TextLayoutService::environment() const {
+        if (const auto generation = FontRegistry::shared().generation(); generation != fontGeneration_) {
+            fontGeneration_ = generation;
+            ++environment_;
+            clearCache();
+        }
+        return environment_;
     }
 
     Size TextLayoutService::measure(std::string_view text, TextStyle style, TextLayoutOptions options) const {

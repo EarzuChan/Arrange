@@ -14,7 +14,7 @@ const fields: Readonly<Record<number, readonly [string, readonly string[]]>> = {
     [DrawOpcode.PopTransform]: ['popTransform', []],
     [DrawOpcode.Content]: ['content', []],
     [DrawOpcode.Path]: ['path', ['color:paint', 'strokeWidth', 'cap', 'join', 'path:path']],
-    [DrawOpcode.Text]: ['text', ['text:ref', 'x', 'y', 'width', 'color', 'fontSize', 'lineHeight', 'maxLines', 'textAlign', 'overflow']],
+    [DrawOpcode.Text]: ['text', ['text:ref', 'x', 'y', 'width', 'color', 'fontSize', 'lineHeight', 'maxLines', 'textAlign', 'overflow', 'fontFamily:ref', 'fontWeight', 'italic', 'fontSynthesis']],
     [DrawOpcode.Painter]: ['painter', ['painter:ref', 'x', 'y', 'width', 'height', 'alpha', 'tint', 'contentScale', 'alignment', 'repeat', 'sliceLeft', 'sliceTop', 'sliceRight', 'sliceBottom']],
     [DrawOpcode.Native]: ['native', ['name:ref', 'x', 'y', 'width', 'height', 'params:ref', 'revision']],
     [DrawOpcode.ClipPath]: ['clipPath', ['path:path']],

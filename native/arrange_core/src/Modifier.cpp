@@ -22,6 +22,7 @@ namespace arrange::core {
         void validateTextPresentation(const TextPresentation& input) {
             finite(input.style.fontSize);
             finite(input.style.lineHeight);
+            if (input.style.fontWeight < minFontWeight || input.style.fontWeight > maxFontWeight) throw std::invalid_argument("字重必须在 1 到 1000 之间");
             if (input.style.fontSize <= 0 || input.style.lineHeight < 0) throw std::invalid_argument("文本字号必须大于零，行高不能为负数");
             if (input.minLines < 1 || input.maxLines < 0 || input.maxLines > 0 && input.maxLines < input.minLines) throw std::invalid_argument("文本行数范围无效");
             if (input.singleLine && (input.minLines != 1 || input.maxLines > 1)) throw std::invalid_argument("单行文本不能要求多行范围");

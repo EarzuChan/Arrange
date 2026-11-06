@@ -4,6 +4,7 @@
 
 #include "QuickJsRuntimeContext.h"
 #include "QuickJsValueReader.h"
+#include <arrange/core/Font.h>
 #include <arrange/core/SlotUpdate.h>
 #include <algorithm>
 #include <chrono>
@@ -38,13 +39,83 @@ namespace arrange::quickjs {
 
     QuickJsPainterResources::~QuickJsPainterResources() {
         for (auto& [_, resource] : resources_) JS_FreeValue(context_, resource.callback);
+        // 运行时销毁时撤销自己登记的字体族与未结束的预加载
+        auto& fonts = arrange::core::FontRegistry::shared();
+        fonts.removeOwned(this);
+        while (heldPreloads_ > 0) {
+            fonts.endPreload();
+            --heldPreloads_;
+        }
     }
 
     void QuickJsPainterResources::install(JSValueConst native) {
         JS_SetPropertyStr(context_, native, "acquirePainter", JS_NewCFunction(context_, acquire, "acquirePainter", 2));
         JS_SetPropertyStr(context_, native, "releasePainter", JS_NewCFunction(context_, release, "releasePainter", 1));
+        JS_SetPropertyStr(context_, native, "defineFontFamily", JS_NewCFunction(context_, defineFontFamily, "defineFontFamily", 2));
+        JS_SetPropertyStr(context_, native, "removeFontFamily", JS_NewCFunction(context_, removeFontFamily, "removeFontFamily", 1));
+        JS_SetPropertyStr(context_, native, "beginFontPreload", JS_NewCFunction(context_, beginFontPreload, "beginFontPreload", 0));
+        JS_SetPropertyStr(context_, native, "endFontPreload", JS_NewCFunction(context_, endFontPreload, "endFontPreload", 0));
         JS_SetPropertyStr(context_, native, "createPixelBuffer", JS_NewCFunction(context_, createPixels, "createPixelBuffer", 2));
         JS_SetPropertyStr(context_, native, "commitPixelBuffer", JS_NewCFunction(context_, commitPixels, "commitPixelBuffer", 2));
+    }
+
+    JSValue QuickJsPainterResources::defineFontFamily(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsArray(argv[1])) return JS_ThrowTypeError(context, "defineFontFamily 需要族名与字面数组");
+        auto& owner = resources(context);
+        QuickJsValueReader reader(context);
+        arrange::core::FontFamilyDefinition family;
+        family.name = reader.toString(argv[0]);
+        if (family.name.empty() || family.name.size() > 128 || family.name.find(arrange::core::fontFamilySeparator) != std::string::npos) return JS_ThrowTypeError(context, "字体族名不能为空、超长或含换行");
+        ScopedValue length(context, JS_GetPropertyStr(context, argv[1], "length"));
+        const auto count = static_cast<std::uint32_t>(reader.toDouble(length.get()));
+        if (count > 64) return JS_ThrowRangeError(context, "单个字体族最多 64 个字面");
+        for (std::uint32_t index = 0; index < count; ++index) {
+            ScopedValue item(context, JS_GetPropertyUint32(context, argv[1], index));
+            if (!JS_IsObject(item.get())) return JS_ThrowTypeError(context, "字面需要对象");
+            const auto snapshot = read(context, item.get());
+            if (!snapshot) return JS_EXCEPTION;
+            const auto* content = dynamic_cast<const arrange::core::FontContent*>(snapshot->content.get());
+            if (!content) return JS_ThrowTypeError(context, "字面资源不是字体");
+            arrange::core::FontFaceSource face;
+            face.bytes = content->bytes;
+            ScopedValue weight(context, JS_GetPropertyStr(context, item.get(), "weight"));
+            if (!JS_IsUndefined(weight.get())) {
+                double value = 0;
+                if (!JS_IsNumber(weight.get()) || JS_ToFloat64(context, &value, weight.get()) < 0 || value != std::floor(value) || value < arrange::core::minFontWeight || value > arrange::core::maxFontWeight) return JS_ThrowRangeError(context, "字面 weight 需要 1 到 1000 的整数");
+                face.weight = static_cast<int>(value);
+            }
+            ScopedValue style(context, JS_GetPropertyStr(context, item.get(), "style"));
+            if (!JS_IsUndefined(style.get())) {
+                const auto name = JS_IsString(style.get()) ? reader.toString(style.get()) : std::string{};
+                if (name != "normal" && name != "italic") return JS_ThrowTypeError(context, "字面 style 只能是 normal 或 italic");
+                face.italic = name == "italic";
+            }
+            family.faces.push_back(std::move(face));
+        }
+        arrange::core::FontRegistry::shared().define(&owner, std::move(family));
+        return JS_UNDEFINED;
+    }
+
+    JSValue QuickJsPainterResources::removeFontFamily(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        if (argc != 1 || !JS_IsString(argv[0])) return JS_ThrowTypeError(context, "removeFontFamily 需要族名");
+        QuickJsValueReader reader(context);
+        arrange::core::FontRegistry::shared().remove(&resources(context), reader.toString(argv[0]));
+        return JS_UNDEFINED;
+    }
+
+    JSValue QuickJsPainterResources::beginFontPreload(JSContext* context, JSValueConst, int, JSValueConst*) {
+        auto& owner = resources(context);
+        arrange::core::FontRegistry::shared().beginPreload();
+        ++owner.heldPreloads_;
+        return JS_UNDEFINED;
+    }
+
+    JSValue QuickJsPainterResources::endFontPreload(JSContext* context, JSValueConst, int, JSValueConst*) {
+        auto& owner = resources(context);
+        if (owner.heldPreloads_ == 0) return JS_UNDEFINED;
+        --owner.heldPreloads_;
+        arrange::core::FontRegistry::shared().endPreload();
+        return JS_UNDEFINED;
     }
 
     JSValue QuickJsPainterResources::createPixels(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {

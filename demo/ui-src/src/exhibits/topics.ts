@@ -1,5 +1,5 @@
 // 主页宫格与次级页页头共用的一份主题清单；interop 为 true 的只在插件宿主里出现
-export type TopicKey = 'composition' | 'drawing' | 'layout' | 'focus' | 'lazy' | 'lab' | 'animation' | 'visual' | 'tiers' | 'audio' | 'debug'
+export type TopicKey = 'composition' | 'drawing' | 'layout' | 'focus' | 'lazy' | 'lab' | 'animation' | 'visual' | 'fonts' | 'tiers' | 'audio' | 'debug'
 
 export type Topic = Readonly<{
     key: TopicKey
@@ -18,6 +18,7 @@ export const topics: readonly Topic[] = [
     { key: 'lab', title: '列表与页面', description: '筛选重排的动态列表，切页保留输入，异步加载详情', icon: 'icons/lucide/layers.svg' },
     { key: 'animation', title: '动画', description: '颜色、位移与尺寸过渡，可见性进出与内容交叉淡入', icon: 'icons/lucide/iteration-ccw.svg' },
     { key: 'visual', title: '视觉效果', description: '渐变、投影、背景模糊、像素缓冲与 filmstrip 旋钮', icon: 'icons/lucide/sparkles.svg' },
+    { key: 'fonts', title: '字体样式', description: '字重阶梯、斜体与伪造对照，自带字体与中英混排', icon: 'icons/lucide/type.svg' },
     { key: 'tiers', title: 'Canvas 三档', description: '同一组电平、波形、频谱，分别用三种数据与绘制路径', icon: 'icons/lucide/activity.svg', interop: true },
     { key: 'audio', title: '音频宿主', description: '参数、自动化、走带与实时观测，预设读写', icon: 'icons/lucide/audio-lines.svg', interop: true },
     { key: 'debug', title: '调试工具', description: '仅在 Debug 版中可用。F5 重新加载、F9 帧诊断叠加层，Debug 下的测试 toast 与错误页', icon: 'icons/lucide/bug.svg' },

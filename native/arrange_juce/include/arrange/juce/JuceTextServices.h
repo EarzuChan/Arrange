@@ -27,6 +27,10 @@ namespace arrange::juce {
             std::vector<std::uint16_t> glyphs;
             std::vector<::juce::Point<float>> positions;
             std::size_t line = 0;
+            // 伪斜体绕本行基线错切；伪粗体是字形轮廓的描边区域，已按布局坐标定位
+            float baseline = 0.0f;
+            float skew = 0.0f;
+            ::juce::Path boldStroke;
         };
 
         std::vector<Run> runs;

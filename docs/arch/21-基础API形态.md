@@ -278,6 +278,8 @@ interface IconProps {
 
 Painter 获取 API 为 painter(resource: string | {path: string}): Painter。Painter 提供只读 intrinsicSize、contentVersion、status、error 及 dispose()。业务通过 painter 取得能力对象再传入 Image/Icon；生命周期与绘制语义见 [内建 Arrangable](12-内建Arrangable.md)，路径约束见 [工具链与 App 发布包](14-工具链与App发布包.md)。
 
+自带字体 API 为 `defineFontFamily(name: string, options: { faces: { src: string | {path: string}; weight?: number; style?: 'normal' | 'italic' }[]; preload?: boolean }): FontFamily`，与 `FontWeight` 常量一同从 `@arrange/framework/ui` 导出。`FontFamily` 提供只读 `name`、`status`（`loading`、`ready`、`failed`、`disposed`）、`error` 及 `dispose()`，创建作用域退出时自动释放。字体字节的获取、解析与使用规则见 [文本输入与绘制](18-文本输入与绘制.md#字体样式)。
+
 ## 图片与 Painter
 
 ```ts

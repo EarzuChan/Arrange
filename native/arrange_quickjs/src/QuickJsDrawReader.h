@@ -119,11 +119,25 @@ namespace arrange::quickjs {
                         JS_FreeCString(context_, chars);
                         command.rect = {cursor.number(), cursor.number(), cursor.number(true), 0};
                         command.color = cursor.color();
-                        command.fontSize = cursor.number(true);
-                        command.lineHeight = cursor.number(true);
+                        command.textStyle.fontSize = cursor.number(true);
+                        command.textStyle.lineHeight = cursor.number(true);
                         command.maxLines = cursor.integer(0, 1000000, "最大行数");
                         command.textAlign = static_cast<TextAlign>(cursor.integer(0, 2, "文字对齐"));
                         command.overflow = static_cast<TextOverflow>(cursor.integer(0, 2, "文字溢出"));
+                        // 字体族以换行分隔写入引用表，负数表示平台默认字体
+                        const auto familyIndex = cursor.integer(-1, 1000000, "字体族引用");
+                        if (familyIndex >= 0) {
+                            if (static_cast<std::uint32_t>(familyIndex) >= refCount_) throw std::invalid_argument("绘制引用下标无效");
+                            ScopedValue families(context_, JS_GetPropertyUint32(context_, refs_.get(), static_cast<std::uint32_t>(familyIndex)));
+                            if (!JS_IsString(families.get())) throw std::invalid_argument("绘制文字的字体族需要字符串");
+                            const char* familyChars = JS_ToCString(context_, families.get());
+                            if (!familyChars) throw std::invalid_argument("绘制文字的字体族不可读");
+                            command.textStyle.fontFamily = arrange::core::splitFontFamilies(familyChars);
+                            JS_FreeCString(context_, familyChars);
+                        }
+                        command.textStyle.fontWeight = cursor.integer(arrange::core::minFontWeight, arrange::core::maxFontWeight, "字重");
+                        command.textStyle.italic = cursor.integer(0, 1, "字形") != 0;
+                        command.textStyle.fontSynthesis = cursor.integer(0, 1, "字体伪造") != 0;
                         break;
                     }
                     case DrawOpcode::Native: {

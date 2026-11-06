@@ -31,7 +31,7 @@ namespace arrange::core {
         float translationX = 0, translationY = 0, scaleX = 1, scaleY = 1, rotationZ = 0, originX = 0.5f, originY = 0.5f;
         // 文字：rect 宽为 0 表示不限宽
         std::string text;
-        float fontSize = defaultFontSize, lineHeight = 0;
+        TextStyle textStyle;
         int maxLines = 0;
         TextAlign textAlign = TextAlign::Start;
         TextOverflow overflow = TextOverflow::Visible;

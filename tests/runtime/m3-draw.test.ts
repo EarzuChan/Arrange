@@ -303,6 +303,8 @@ test('路径、文字与渐变画笔写入数值流，非数值参数进引用�
     assert.deepEqual(commands[0].verbs, [['moveTo', 0, 0], ['lineTo', 10, 0], ['arcTo', 0, 0, 10, 10, 0, 90, 0], ['close']])
     assert.deepEqual(commands[1].verbs, commands[0].verbs)
     assert.deepEqual([commands[2].text, commands[2].x, commands[2].width, commands[2].fontSize, commands[2].textAlign, commands[2].overflow, commands[2].maxLines], ['刻度', 3, 0, 12, 1, 1, 1])
+    // 未指定字体时不占引用表，字重 400、正体、允许伪造
+    assert.deepEqual([commands[2].fontFamily, commands[2].fontWeight, commands[2].italic, commands[2].fontSynthesis], [undefined, 400, 0, 1])
     // 纯色 Brush 直接写为颜色，不占引用表
     assert.equal(commands[4].color, 0xff445566)
     assert.deepEqual(prepared.refs, [gradient, '刻度'])

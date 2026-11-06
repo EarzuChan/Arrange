@@ -358,6 +358,20 @@ namespace arrange::core {
         invalidation_.record(dirty);
     }
 
+    void LayoutTree::invalidateFontEnvironment() {
+        std::vector<std::pair<NodeId, DirtyFlag>> targets;
+        for (const auto& [id, node] : nodes_) {
+            auto measure = false, paint = false;
+            for (const auto& instance : node.modifier.elements()) {
+                if (textPresentation(instance.descriptor.value)) measure = true;
+                if (instance.preparedDraw && std::any_of(instance.preparedDraw->begin(), instance.preparedDraw->end(), [](const DrawCommand& command) { return command.kind == DrawCommandKind::Text; })) paint = true;
+            }
+            if (measure) targets.emplace_back(id, DirtyFlag::Layout);
+            if (paint) targets.emplace_back(id, DirtyFlag::Paint);
+        }
+        for (const auto& [id, flag] : targets) invalidateNode(id, flag);
+    }
+
     void LayoutTree::invalidateViewport() noexcept {
         invalidation_.record(impliedDirty(DirtyFlag::Layout));
     }

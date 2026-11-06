@@ -62,6 +62,8 @@ namespace arrange::core {
 
         // 全场景失效：每个节点都标记该阶段
         void invalidateScene(DirtyFlag flag);
+        // 字体环境代际推进：Text 与 Input 所在节点重新测量，含文字命令的绘制 Modifier 所在节点重建绘制，其余节点不动
+        void invalidateFontEnvironment();
         // 视口约束变化只改变根约束，后代自行检查实际传入的约束
         void invalidateViewport() noexcept;
         void clearDirty();

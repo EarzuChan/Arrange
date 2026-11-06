@@ -20,6 +20,13 @@ export type TextStyleProp = Readonly<{
     fontSize?: number
     lineHeight?: number
     color?: number
+    // 字体族按序取首个可用者，缺字回落交给平台；省略时用平台默认字体（Windows 为 Segoe UI，macOS 为 Helvetica Neue）
+    fontFamily?: string | readonly string[]
+    // 1 至 1000 的数值字重，规则同 CSS；FontWeight 提供常用常量
+    fontWeight?: number
+    fontStyle?: 'normal' | 'italic'
+    // 缺失字重或字形时是否由 Arrange 伪造，默认 true；关闭后严格使用选中的字面
+    fontSynthesis?: boolean
 }>
 
 export type ArrangementProp<A extends AxisAlignment = AxisAlignment, N extends ArrangementName = ArrangementName> = N | Readonly<{
@@ -115,6 +122,11 @@ export type NativeTransactionTarget = {
     // 资源已在本运行时解码过时，句柄携带 ready，Painter 首帧即就绪且不再回调
     acquirePainter: (resource: string, completion: (result: PainterCompletion) => void) => NativeBindingHandle & { ready?: PainterCompletion }
     releasePainter: (handle: NativeBindingHandle) => void
+    // 自带字体：字节经 acquirePainter 取得，已到达的字面登记进字体注册表并推进字体环境代际
+    defineFontFamily: (name: string, faces: readonly (NativeBindingHandle & Readonly<{ contentVersion: number; weight?: number; style?: 'normal' | 'italic' }>)[]) => void
+    removeFontFamily: (name: string) => void
+    beginFontPreload: () => void
+    endFontPreload: () => void
     createPixelBuffer: (width: number, height: number) => NativeBindingHandle
     // 返回提交后的内容版本
     commitPixelBuffer: (handle: NativeBindingHandle, pixels: Uint32Array) => number

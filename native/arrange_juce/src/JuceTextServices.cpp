@@ -1,4 +1,5 @@
 ﻿#include <arrange/juce/JuceTextServices.h>
+#include <arrange/juce/JuceFonts.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
 
@@ -43,7 +44,7 @@ namespace arrange::juce {
 
     std::size_t JuceTextResource::estimatedBytes() const noexcept {
         auto bytes = sizeof(JuceTextResource) + runs.capacity() * sizeof(Run);
-        for (const auto& run : runs) bytes += run.glyphs.capacity() * sizeof(std::uint16_t) + run.positions.capacity() * sizeof(::juce::Point<float>);
+        for (const auto& run : runs) bytes += run.glyphs.capacity() * sizeof(std::uint16_t) + run.positions.capacity() * sizeof(::juce::Point<float>) + (run.boldStroke.isEmpty() ? 0 : run.glyphs.size() * 512);
         return bytes;
     }
 
@@ -53,7 +54,12 @@ namespace arrange::juce {
             const auto width = layout.lines[run.line].width;
             const auto x = area.x - viewportX + arrange::core::textAlignShift(alignment, area.width, width);
             context.setFont(run.font);
-            context.drawGlyphs({run.glyphs.data(), run.glyphs.size()}, {run.positions.data(), run.positions.size()}, ::juce::AffineTransform::translation(x, area.y));
+            // 伪斜体：绕本行基线错切，窗口、离屏与各种填充走同一条变换
+            auto transform = run.skew != 0.0f ? ::juce::AffineTransform(1.0f, -run.skew, run.skew * run.baseline, 0.0f, 1.0f, 0.0f) : ::juce::AffineTransform();
+            transform = transform.followedBy(::juce::AffineTransform::translation(x, area.y));
+            context.drawGlyphs({run.glyphs.data(), run.glyphs.size()}, {run.positions.data(), run.positions.size()}, transform);
+            // 伪粗体：字形原样绘制后补一圈轮廓描边，字距不变，粗细不随填充方式改变
+            if (!run.boldStroke.isEmpty()) context.fillPath(run.boldStroke, transform);
         }
     }
 
@@ -65,7 +71,10 @@ namespace arrange::juce {
         result.lineHeight = lineHeight;
         auto resource = std::make_shared<JuceTextResource>();
         result.resource = resource;
-        const auto font = ::juce::Font(::juce::FontOptions().withPointHeight(fontSize));
+        // 字面由 Arrange 按 CSS 规则选定后经 withTypeface 交给 JUCE，不依赖 JUCE 的名字匹配与合成
+        const auto resolved = JuceFontResolver::shared().resolve(style);
+        const auto baseOptions = resolved.typeface ? ::juce::FontOptions(resolved.typeface) : ::juce::FontOptions();
+        const auto font = ::juce::Font(baseOptions.withPointHeight(fontSize));
         // 行盒由 Arrange 定：每行高 lineHeight，基线取主字体的半行距（可为负）加上行；JUCE 的行盒（含回落字体撑高）不参与
         const auto lineBaseline = (lineHeight - font.getHeight()) * 0.5f + font.getAscent();
         result.baseline = lineBaseline;
@@ -104,6 +113,11 @@ namespace arrange::juce {
             JuceTextResource::Run run;
             run.font = resolvedFont;
             run.line = lineIndex;
+            run.baseline = line.baseline;
+            // 伪斜体对所有字形生效（回落字体不随斜体）；伪粗体只作用于主字体，回落字体已跟随请求的字重
+            if (resolved.syntheticItalic) run.skew = arrange::core::syntheticItalicSkew;
+            const auto synthesizeBold = resolved.syntheticBold && resolvedFont.getTypefacePtr() == resolved.typeface;
+            ::juce::Path outlines;
             run.glyphs.reserve(glyphs.size());
             run.positions.reserve(glyphs.size());
             const auto typeface = resolvedFont.getTypefacePtr();
@@ -113,6 +127,12 @@ namespace arrange::juce {
                     run.glyphs.push_back(static_cast<std::uint16_t>(glyph.glyphId));
                     const auto position = ::juce::Point<float>(positions[i].x, positions[i].y + shiftY);
                     run.positions.push_back(position);
+                    if (synthesizeBold && typeface) {
+                        ::juce::Path glyphPath;
+                        typeface->getOutlineForGlyph(resolvedFont.getMetricsKind(), static_cast<int>(glyph.glyphId), glyphPath);
+                        glyphPath.applyTransform(::juce::AffineTransform::scale(resolvedFont.getHeight() * resolvedFont.getHorizontalScale(), resolvedFont.getHeight()).translated(position.x, position.y));
+                        outlines.addPath(glyphPath);
+                    }
                     if (typeface) {
                         const auto bounds = typeface->getGlyphBounds(resolvedFont.getMetricsKind(), static_cast<int>(glyph.glyphId)).transformedBy(::juce::AffineTransform::scale(resolvedFont.getHeight() * resolvedFont.getHorizontalScale(), resolvedFont.getHeight())).translated(position.x, position.y);
                         if (!bounds.isEmpty()) {
@@ -137,6 +157,7 @@ namespace arrange::juce {
                     if (!glyph.isNewline()) line.runs.push_back({start, end, penX, glyph.advance.x});
                 }
             }
+            if (!outlines.isEmpty()) ::juce::PathStrokeType(arrange::core::syntheticBoldStroke * fontSize, ::juce::PathStrokeType::curved).createStrokedPath(run.boldStroke, outlines);
             if (!run.glyphs.empty()) resource->runs.push_back(std::move(run));
         });
         for (auto& line : result.lines) {
@@ -167,7 +188,12 @@ namespace arrange::juce {
             result.height += lineHeight;
         }
         result.height = std::max(lineHeight, result.height);
-        if (hasInk) result.inkBounds = {ink.getX(), ink.getY(), ink.getWidth(), ink.getHeight()};
+        if (hasInk) {
+            // 伪造会超出字形本身：描边向外半个笔宽，错切向右推移
+            if (resolved.syntheticBold) ink = ink.expanded(arrange::core::syntheticBoldStroke * fontSize * 0.5f);
+            if (resolved.syntheticItalic) ink = ink.withWidth(ink.getWidth() + arrange::core::syntheticItalicSkew * ink.getHeight()).withX(ink.getX() - arrange::core::syntheticItalicSkew * fontSize * 0.25f);
+            result.inkBounds = {ink.getX(), ink.getY(), ink.getWidth(), ink.getHeight()};
+        }
         result.truncated = result.lines.back().end < source.size();
         return result;
     }

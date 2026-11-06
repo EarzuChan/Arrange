@@ -124,6 +124,47 @@ namespace arrange::quickjs {
         return reader_.toString(value.get());
     }
 
+    bool QuickJsModifierReader::readFontStyle(JSValueConst style, arrange::core::TextStyle& result) {
+        const auto fail = [&](const char* message) {
+            failed_ = true;
+            JS_ThrowTypeError(context_, "%s", message);
+            return false;
+        };
+        ScopedValue family(context_, JS_GetPropertyStr(context_, style, "fontFamily"));
+        if (!JS_IsUndefined(family.get())) {
+            if (!JS_IsArray(family.get())) return fail("fontFamily 需要字符串数组");
+            ScopedValue length(context_, JS_GetPropertyStr(context_, family.get(), "length"));
+            const auto count = static_cast<std::uint32_t>(reader_.toDouble(length.get()));
+            if (count > 16) return fail("fontFamily 最多 16 个族名");
+            for (std::uint32_t index = 0; index < count; ++index) {
+                ScopedValue item(context_, JS_GetPropertyUint32(context_, family.get(), index));
+                if (!JS_IsString(item.get())) return fail("fontFamily 的每一项需要字符串");
+                auto name = reader_.toString(item.get());
+                if (name.empty() || name.size() > 128 || name.find(arrange::core::fontFamilySeparator) != std::string::npos) return fail("fontFamily 的族名不能为空、超长或含换行");
+                result.fontFamily.push_back(std::move(name));
+            }
+        }
+        const auto weight = numberField(style, "fontWeight", static_cast<float>(arrange::core::defaultFontWeight));
+        if (JS_HasException(context_)) {
+            failed_ = true;
+            return false;
+        }
+        if (!std::isfinite(weight) || std::floor(weight) != weight || weight < arrange::core::minFontWeight || weight > arrange::core::maxFontWeight) return fail("fontWeight 需要 1 到 1000 的整数");
+        result.fontWeight = static_cast<int>(weight);
+        ScopedValue fontStyle(context_, JS_GetPropertyStr(context_, style, "fontStyle"));
+        if (!JS_IsUndefined(fontStyle.get())) {
+            const auto name = JS_IsString(fontStyle.get()) ? reader_.toString(fontStyle.get()) : std::string{};
+            if (name != "normal" && name != "italic") return fail("fontStyle 只能是 normal 或 italic");
+            result.italic = name == "italic";
+        }
+        result.fontSynthesis = boolField(style, "fontSynthesis", true);
+        if (JS_HasException(context_)) {
+            failed_ = true;
+            return false;
+        }
+        return true;
+    }
+
     arrange::core::ModifierPadding QuickJsModifierReader::readPadding(JSValueConst value) {
         return {
             requiredNumberField(value, "start", "padding modifier"),
@@ -389,12 +430,13 @@ namespace arrange::quickjs {
                 const auto styleName = editable ? "textStyle" : "style";
                 ScopedValue style(context_, JS_GetPropertyStr(context_, payload, styleName));
                 if (!JS_IsUndefined(style.get())) {
-                    if (!JS_IsObject(style.get()) || JS_IsArray(style.get()) || !fieldsMatch(context_, style.get(), {"fontSize", "lineHeight", "color"}, styleName)) {
+                    if (!JS_IsObject(style.get()) || JS_IsArray(style.get()) || !fieldsMatch(context_, style.get(), {"fontSize", "lineHeight", "color", "fontFamily", "fontWeight", "fontStyle", "fontSynthesis"}, styleName)) {
                         (void)throwTypeError((std::string(styleName) + " 需要正式文本样式对象").c_str());
                         return {};
                     }
                     text.style.fontSize = numberField(style.get(), "fontSize", arrange::core::defaultFontSize);
                     text.style.lineHeight = numberField(style.get(), "lineHeight", 0);
+                    if (!readFontStyle(style.get(), text.style)) return {};
                     ScopedValue color(context_, JS_GetPropertyStr(context_, style.get(), "color"));
                     if (!JS_IsUndefined(color.get())) {
                         text.color = reader_.colorValue(color.get());

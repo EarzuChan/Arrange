@@ -1,4 +1,5 @@
 #include "TextFixtures.h"
+#include <arrange/juce/JuceFonts.h>
 #include <arrange/juce/PainterResources.h>
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/JuceTextServices.h>
@@ -68,7 +69,7 @@ namespace {
         red.type = DrawOpType::DrawText;
         red.rect = {10, 10, 200, 30};
         red.text = "同一字形资源";
-        red.fontSize = 20;
+        red.textStyle.fontSize = 20;
         red.maxLines = 1;
         red.color = 0xffff0000;
         DrawOpsBuilder::prepareText(red, service);
@@ -139,8 +140,8 @@ namespace {
             DrawOp multiline;
             multiline.type = DrawOpType::DrawText;
             multiline.text = "A\nA";
-            multiline.fontSize = 18;
-            multiline.lineHeight = 24;
+            multiline.textStyle.fontSize = 18;
+            multiline.textStyle.lineHeight = 24;
             multiline.rect = {10, 10, 180, 80};
             multiline.textAlign = alignment;
             multiline.color = 0xffffffff;
@@ -164,7 +165,9 @@ namespace {
                 for (int x = 0; x < 200; ++x) check(actual.getPixelAt(x, y) == expected.getPixelAt(x, y), "显式换行改变了居中或末端对齐的绘制位置");
         }
 
-        const auto font = ::juce::Font(::juce::FontOptions().withPointHeight(18));
+        // 默认字体是各平台的静态 UI 字体，参照字体与后端用同一个解析结果
+        const auto defaultTypeface = arrange::juce::JuceFontResolver::shared().resolve(TextStyle{}).typeface;
+        const auto font = ::juce::Font((defaultTypeface ? ::juce::FontOptions(defaultTypeface) : ::juce::FontOptions()).withPointHeight(18));
         const auto settings = ::juce::detail::ShapedText::Options{}.withFont(font).withBaselineAtZero(false).withAdditiveLineSpacing(24 - font.getHeight()).withMaxNumLines(1).withDrawLinesInFull(true);
         for (const std::string text : {"e\xcc\x81X", "👨‍👩‍👧‍👦X"}) {
             const auto layout = service.layout(text, {18, 24}, {1, 0, true});

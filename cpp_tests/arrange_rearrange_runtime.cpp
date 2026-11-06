@@ -276,7 +276,7 @@ int main(int argc, char** argv) {
         check(!runtime.hasPendingFrameWork(), "保留页恢复后未稳定");
         check(runtime.scene().bindingCount() == retainedCount, "KeepAlive 激活累计了原生绑定");
         command("showcase:async");
-        findText(runtime.scene(), "详情正在等待，点击完成加载");
+        findText(runtime.scene(), "异步加载详情。请点击“完成加载”");
         command("showcase:resolve");
         // 命令参数先提交，Promise 完成产生的新候选仍须获得下一次宿主帧
         if (runtime.hasPendingVisualWork()) {
@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
             const auto resolved = runtime.pumpFrame(1, constraints, timestamp += 16);
             check(resolved.ok && resolved.pipelineRan, "Promise 完成后的候选未提交");
         }
-        findText(runtime.scene(), "详情已就绪 1");
+        findText(runtime.scene(), "已加载完成详情 1 次");
         command("showcase:list");
 
         arrange::juce::PassivePaintRenderer performancePaint(textService);

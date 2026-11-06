@@ -5,7 +5,7 @@
 #include <utility>
 
 namespace arrange::core {
-    SceneFramePipeline::SceneFramePipeline(LayoutEngine layoutEngine) : layout_(std::move(layoutEngine)), drawOpsBuilder_(layout_.textLayoutService()) {}
+    SceneFramePipeline::SceneFramePipeline(LayoutEngine layoutEngine) : layout_(std::move(layoutEngine)), drawOpsBuilder_(layout_.textLayoutService()), fontEnvironment_(layout_.textLayoutService().environment()) {}
 
     FramePlan SceneFramePipeline::planFrame(const NativeScene& scene, NodeId root, bool hasTransaction, bool framePipelineRequested) const {
         FramePlan plan;
@@ -70,6 +70,10 @@ namespace arrange::core {
             auto& tree = scene.tree();
             if (prepare.interaction) prepare.interaction(tree);
             tree.advanceAnimations(timeMillis);
+            if (const auto environment = layout_.textLayoutService().environment(); environment != fontEnvironment_) {
+                fontEnvironment_ = environment;
+                tree.invalidateFontEnvironment();
+            }
             if (tree.contains(root) && tree.node(root).measurementValid && tree.node(root).measuredConstraints != constraints) tree.invalidateViewport();
             result.plan = planFrame(scene, root, transaction != nullptr, framePipelineRequested);
             candidateFrame.dirty = scene.dirtySnapshot();

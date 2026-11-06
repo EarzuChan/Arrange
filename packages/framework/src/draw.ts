@@ -6,6 +6,7 @@ import { requireArgb } from './color.ts'
 import { painterSnapshot, type Painter } from './painter.ts'
 import type { Brush, ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
+import { normalizeFontStyle } from './font.ts'
 import { defaultFontSize } from './native.ts'
 
 export type DrawSize = Readonly<{ width: number; height: number }>
@@ -15,7 +16,7 @@ export type DrawPaint = Readonly<{ color?: number; brush?: Brush; strokeWidth?: 
 export type StrokeCap = 'butt' | 'round' | 'square'
 export type StrokeJoin = 'miter' | 'round' | 'bevel'
 export type DrawPathPaint = DrawPaint & Readonly<{ cap?: StrokeCap; join?: StrokeJoin }>
-export type DrawTextOptions = Readonly<{ text: string; x?: number; y?: number; width?: number; color: number; fontSize?: number; lineHeight?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible' }>
+export type DrawTextOptions = Readonly<{ text: string; x?: number; y?: number; width?: number; color: number; fontSize?: number; lineHeight?: number; maxLines?: number; textAlign?: TextAlignment; overflow?: 'clip' | 'ellipsis' | 'visible'; fontFamily?: string | readonly string[]; fontWeight?: number; fontStyle?: 'normal' | 'italic'; fontSynthesis?: boolean }>
 // 九宫格切分以图片固有尺寸为单位：四角保持源尺寸，边与中心拉伸
 export type NinePatch = Readonly<{ left: number; top: number; right: number; bottom: number }>
 export type DrawPainterOptions = DrawRect & Readonly<{ alpha?: number; tint?: number; contentScale?: ContentScaleValue; alignment?: ImageAlignment; tile?: boolean; ninePatch?: NinePatch }>
@@ -172,7 +173,8 @@ export class DrawScope {
         if (typeof args.text !== 'string') throw new TypeError('drawText 需要字符串')
         const maxLines = args.maxLines ?? 0
         if (!Number.isSafeInteger(maxLines) || maxLines < 0) throw new RangeError('maxLines 需要非负整数')
-        this.emit(DrawOpcode.Text, this.ref(args.text), finite(args.x ?? 0, 'x'), finite(args.y ?? 0, 'y'), nonnegative(args.width ?? 0, 'width'), requireArgb(args.color), nonnegative(args.fontSize ?? defaultFontSize, 'fontSize'), nonnegative(args.lineHeight ?? 0, 'lineHeight'), maxLines, lookup(textAligns, args.textAlign ?? 'start', 'textAlign'), lookup(textOverflows, args.overflow ?? 'visible', 'overflow'))
+        const font = normalizeFontStyle({ fontFamily: args.fontFamily, fontWeight: args.fontWeight, fontStyle: args.fontStyle, fontSynthesis: args.fontSynthesis }) as { fontFamily?: readonly string[]; fontWeight?: number; fontStyle?: string; fontSynthesis?: boolean }
+        this.emit(DrawOpcode.Text, this.ref(args.text), finite(args.x ?? 0, 'x'), finite(args.y ?? 0, 'y'), nonnegative(args.width ?? 0, 'width'), requireArgb(args.color), nonnegative(args.fontSize ?? defaultFontSize, 'fontSize'), nonnegative(args.lineHeight ?? 0, 'lineHeight'), maxLines, lookup(textAligns, args.textAlign ?? 'start', 'textAlign'), lookup(textOverflows, args.overflow ?? 'visible', 'overflow'), font.fontFamily?.length ? this.ref(font.fontFamily.join('\n')) : -1, font.fontWeight ?? 400, font.fontStyle === 'italic' ? 1 : 0, font.fontSynthesis === false ? 0 : 1)
     }
     drawPainter(painter: Painter, args: DrawPainterOptions = {}): void {
         const alpha = nonnegative(args.alpha ?? 1, 'alpha')

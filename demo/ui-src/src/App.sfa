@@ -19,6 +19,8 @@
 
             <M5Gallery a-else-if="current.key === 'visual'" />
 
+            <FontExhibit a-else-if="current.key === 'fonts'" />
+
             <TierGallery a-else-if="current.key === 'tiers'" />
 
             <InteropPanel a-else-if="current.key === 'audio'" />
@@ -76,6 +78,7 @@ import LazyExhibit from './exhibits/lazy/LazyExhibit.sfa'
 import ShowcaseGallery from './exhibits/showcase/ShowcaseGallery.sfa'
 import AnimationGallery from './exhibits/animation/AnimationGallery.sfa'
 import M5Gallery from './exhibits/graphics/M5Gallery.sfa'
+import FontExhibit from './exhibits/fonts/FontExhibit.sfa'
 import TierGallery from './exhibits/graphics/TierGallery.sfa'
 import InteropPanel from './exhibits/audio/InteropPanel.sfa'
 import DebugExhibit from './exhibits/debug/DebugExhibit.sfa'

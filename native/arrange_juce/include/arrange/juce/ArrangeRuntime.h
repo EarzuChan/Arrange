@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/EventSlot.h>
+#include <arrange/core/Font.h>
 #include <arrange/core/InputEvent.h>
 #include <arrange/core/Geometry.h>
 #include <arrange/core/InputIntent.h>
@@ -19,6 +20,7 @@
 #endif
 
 #include <juce_events/juce_events.h>
+#include <chrono>
 #include <mutex>
 #include <deque>
 #include <memory>
@@ -186,6 +188,10 @@ namespace arrange::juce {
         std::function<void()> workAvailable_;
         std::uint64_t ownerGeneration_ = 1;
         std::uint64_t nextSequence_ = 1;
+        // 声明预加载的字体未到齐时，首帧最多等待这段时间
+        bool holdsFirstFrameForFonts();
+        std::uint64_t fontGeneration_ = arrange::core::FontRegistry::shared().generation();
+        std::optional<std::chrono::steady_clock::time_point> fontPreloadSince_;
         bool inFrame_ = false;
         bool inSemantic_ = false;
         std::optional<std::string> semanticError_;

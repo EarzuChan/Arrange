@@ -47,8 +47,8 @@ namespace arrange::core {
             op.rect = rect;
             op.text = std::move(value);
             op.color = color;
-            op.fontSize = 9.5f;
-            op.lineHeight = lineHeight;
+            op.textStyle.fontSize = 9.5f;
+            op.textStyle.lineHeight = lineHeight;
             op.maxLines = 1;
             op.overflow = TextOverflow::Clip;
             return op;

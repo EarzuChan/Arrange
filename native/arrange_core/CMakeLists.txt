@@ -3,6 +3,7 @@ add_library(arrange_core STATIC
   src/EventSlot.cpp
   src/PropValue.cpp
   src/PropSchema.cpp
+  src/Font.cpp
   src/TextLayoutService.cpp
   src/Mutation.cpp
   src/MutationTransaction.cpp

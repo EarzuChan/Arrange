@@ -1,0 +1,60 @@
+<template>
+    <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
+        <Section title="字重阶梯" footer="默认字体是各平台的静态 UI 字体。请求的字重没有真字面时，按 CSS 规则取最近的字面；600 以上而字面低于 600 才伪造粗体">
+            <Text a-for="weight in weights" :key="weight" :text="`字重 ${weight}  Hamburgefons 中文`" :style="{ fontSize: 16.sp, fontWeight: weight, color: Color(theme.label) }" />
+        </Section>
+
+        <Section title="字形与伪造" footer="右栏关闭伪造，严格使用选中的字面。伪斜体是绘制时的错切，伪粗体是字形轮廓加描边，窗口、离屏与渐变填充下粗细一致">
+            <Row :horizontal-arrangement="Arrangement.spacedBy(16.dp)">
+                <Column :modifier="M.weight(1)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                    <Text text="允许伪造（默认）" :style="{ fontSize: typeScale.footnote.sp, color: Color(theme.secondaryLabel) }" />
+                    <Text text="Regular 400" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, color: Color(theme.label) }" />
+                    <Text text="请求 700：伪粗体" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontWeight: FontWeight.Bold, color: Color(theme.label) }" />
+                    <Text text="请求斜体：伪斜体" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontStyle: 'italic', color: Color(theme.label) }" />
+                    <Text text="粗斜体：两者都伪造" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontWeight: FontWeight.Bold, fontStyle: 'italic', color: Color(theme.label) }" />
+                </Column>
+                <Column :modifier="M.weight(1)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
+                    <Text text="关闭伪造" :style="{ fontSize: typeScale.footnote.sp, color: Color(theme.secondaryLabel) }" />
+                    <Text text="Regular 400" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontSynthesis: false, color: Color(theme.label) }" />
+                    <Text text="请求 700：仍是常规体" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontWeight: FontWeight.Bold, fontSynthesis: false, color: Color(theme.label) }" />
+                    <Text text="请求斜体：仍是正体" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontStyle: 'italic', fontSynthesis: false, color: Color(theme.label) }" />
+                    <Text text="粗斜体：严格取字面" :style="{ fontSize: 16.sp, fontFamily: onlyRegular, fontWeight: FontWeight.Bold, fontStyle: 'italic', fontSynthesis: false, color: Color(theme.label) }" />
+                </Column>
+            </Row>
+        </Section>
+
+        <Section title="自带字体" :footer="`随 App 打包的 Noto Serif SC 子集（只含 Demo 用到的字符，OFL 许可），经现有资源获取层加载（live 与 dist 同一条链路），加载状态：${serif.status}。到达前用回落字体排版，到达后自动重排`">
+            <Text text="Hamburgefons 2026 衬线宋体，笔画有粗细" :style="{ fontSize: 20.sp, fontFamily: 'Noto Serif SC', color: Color(theme.label) }" />
+            <Text text="Hamburgefons 2026 真 Bold 粗体字面" :style="{ fontSize: 20.sp, fontFamily: 'Noto Serif SC', fontWeight: FontWeight.Bold, color: Color(theme.label) }" />
+            <Text text="Hamburgefons 2026 无斜体字面，伪造斜体" :style="{ fontSize: 20.sp, fontFamily: 'Noto Serif SC', fontStyle: 'italic', color: Color(theme.label) }" />
+            <Text text="族名列表按序取首个可用者：不存在的族被跳过" :style="{ fontSize: 13.sp, fontFamily: ['No Such Family', 'Noto Serif SC'], color: Color(theme.label) }" />
+        </Section>
+
+        <Section title="中英混排" footer="字号是 em：同一字号下拉丁、中文与 emoji 大小一致，每行行距恒为 lineHeight，缺字回落交给平台">
+            <Text text="Arrange 声明式 UI，中文、日本語、한국어 和 🙂 混排" :style="{ fontSize: 16.sp, lineHeight: 28.sp, color: Color(theme.label) }" />
+            <Text text="Arrange 声明式 UI，中文、日本語、한국어 和 🙂 混排" :style="{ fontSize: 16.sp, lineHeight: 28.sp, fontWeight: FontWeight.Bold, color: Color(theme.label) }" />
+            <Text text="Arrange 声明式 UI，中文、日本語、한국어 和 🙂 混排" :style="{ fontSize: 16.sp, lineHeight: 28.sp, fontStyle: 'italic', color: Color(theme.label) }" />
+            <Input value="编辑我：Input 同样走字体样式，字体到达后重新测量" :text-style="{ fontSize: 14.sp, fontWeight: FontWeight.Medium, color: Color(theme.label) }" :modifier="M.fillMaxWidth().height(36.dp).background(Color(theme.fill), rounded(10.dp)).padding({ horizontal: 10.dp, vertical: 8.dp })" />
+        </Section>
+    </Column>
+</template>
+
+<script>
+import { Input, Text } from '@arrange/framework/foundation'
+import { Arrangement, Color, FontWeight, M, defineFontFamily, rounded } from '@arrange/framework/ui'
+import Section from '../../design/Section.sfa'
+import { typeScale, useGalleryTheme } from '../../design/theme'
+
+const theme = useGalleryTheme()
+
+const weights = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+
+// 自带字体：常规与粗体两个静态字面，字重与字形读自字体的 OS/2 表
+const serif = defineFontFamily('Noto Serif SC', {
+    faces: [{ src: 'fonts/NotoSerifSC-Regular.ttf' }, { src: 'fonts/NotoSerifSC-Bold.ttf' }],
+})
+
+// 只有一个常规字面的族：请求粗体与斜体时才看得出伪造
+const regularOnly = defineFontFamily('Arrange Demo Regular', { faces: [{ src: 'fonts/NotoSerifSC-Regular.ttf' }] })
+const onlyRegular = regularOnly.name
+</script>
