@@ -11,53 +11,72 @@ namespace arrange::core {
     FocusSnapshot buildFocusSnapshot(const LayoutTree& tree) {
         FocusSnapshot result;
         std::unordered_set<std::uint32_t> requesters;
+
         const std::function<void(NodeId, std::vector<std::uint64_t>, std::vector<FocusObservation>)> visit = [&](NodeId id, std::vector<std::uint64_t> groups, std::vector<FocusObservation> ancestors) {
             if (!nodeInteractionEnabled(tree, id)) return;
+
             const auto& node = tree.node(id);
             std::uint32_t requester = 0;
             std::array<std::uint32_t, 6> directions{};
             bool canFocus = true;
             std::vector<FocusObservation> observers;
             bool hasReceiver = false;
+
             for (const auto& instance : node.modifier.elements()) {
                 if (const auto* focus = std::get_if<FocusModifier>(&instance.descriptor.value)) {
                     if (focus->kind == FocusModifierKind::Group) groups.push_back(instance.handle.identity);
+
                     if (focus->kind == FocusModifierKind::Requester) requester = focus->requester;
+
                     if (focus->kind == FocusModifierKind::Properties) {
                         directions = focus->directions;
                         canFocus = focus->canFocus;
                     }
+
                     if (focus->kind == FocusModifierKind::Observer && focus->eventSlot.valid()) observers.push_back({focus->eventSlot, true, true});
+
                     continue;
                 }
+
                 const auto* field = std::get_if<TextFieldModifier>(&instance.descriptor.value);
                 const auto* input = std::get_if<InputModifierSemantics>(&instance.descriptor.value);
                 const auto eligible = field && field->enabled || input && input->enabled && (input->kind == InputModifierKind::Focusable || input->kind == InputModifierKind::Clickable && input->focusable);
-                // 同一 Layout 的显式 focusable 与内建编辑/点击语义组成一个焦点受体。
+
+                // 同一 Layout 的显式 focusable 与内建编辑/点击语义组成一个焦点受体
                 if (!eligible || hasReceiver) continue;
                 hasReceiver = true;
+
                 if (!canFocus) continue;
+
                 if (requester && !requesters.insert(requester).second) throw std::invalid_argument("FocusRequester 不能绑定多个存活焦点受体");
+
                 FocusTarget target{{id, node.generation}, instance.handle, nodeContentRectToRoot(tree, id, instance.bounds, instance.handle), requester, directions, groups, observers};
+
                 target.observers.insert(target.observers.begin(), ancestors.begin(), ancestors.end());
+
                 for (const auto& member : node.modifier.elements()) {
                     if (const auto* editor = std::get_if<TextFieldModifier>(&member.descriptor.value); editor && editor->enabled) {
                         target.modifier = member.handle;
                         target.editable = true;
                         target.bounds = nodeContentRectToRoot(tree, id, member.bounds, member.handle);
                     }
+
                     if (const auto* click = std::get_if<InputModifierSemantics>(&member.descriptor.value); click && click->kind == InputModifierKind::Clickable && click->enabled) target.click = click->eventSlot;
                 }
+
                 result.push_back(std::move(target));
             }
+
             for (auto observer : observers) {
                 observer.isFocused = false;
                 ancestors.push_back(observer);
             }
+
             for (const auto child : node.children) visit(child, groups, ancestors);
         };
-        for (const auto id : tree.nodeIds())
-            if (!tree.parentOf(id)) visit(id, {}, {});
+
+        for (const auto id : tree.nodeIds()) if (!tree.parentOf(id)) visit(id, {}, {});
+        
         return result;
     }
 

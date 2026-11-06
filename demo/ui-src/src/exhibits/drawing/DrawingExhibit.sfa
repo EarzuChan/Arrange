@@ -49,6 +49,7 @@ const behindDrawing = M.drawBehind(scope => {
 })
 const gridDrawing = M.drawWithCache(cache => {
     const step: Px = 20.px
+
     return {
         onDrawBehind(scope) {
             scope.drawRect({ color: Color(tone.value ? theme.value.accentTint : theme.value.fill) })
@@ -61,6 +62,7 @@ const gridDrawing = M.drawWithCache(cache => {
 const contentDrawing = M.drawWithContent((scope, drawContent) => {
     scope.clipRoundRect({ radius: 12.px }, () => {
         if (copies.value > 0) drawContent()
+
         if (copies.value > 1) scope.withTransform({ translationX: 140.px }, drawContent)
     })
 })

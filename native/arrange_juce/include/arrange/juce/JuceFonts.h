@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -43,14 +44,19 @@ namespace arrange::juce {
     };
 
     // 字面解析：自带字体与系统字体统一按 CSS 匹配，结果经 withTypeface 交给 JUCE，不依赖 JUCE 的名字匹配与合成。
-    // 只在 UI 线程使用；字体环境代际变化时丢弃缓存
-    class JuceFontResolver {
+    // 字体环境代际变化时丢弃缓存；单例创建与解析都加锁，可从任意线程调用
+    // 由 JUCE 在 shutdown 时销毁：函数内静态对象会在进程退出时晚于 JUCE 内部的字体登记表销毁，释放字面时锁已销毁的互斥量（macOS）
+    class JuceFontResolver final : public ::juce::DeletedAtShutdown {
        public:
         static JuceFontResolver& shared();
+
+        ~JuceFontResolver() override;
 
         [[nodiscard]] ResolvedFont resolve(const arrange::core::TextStyle& style);
 
        private:
+        JuceFontResolver() = default;
+
         struct BundledFace {
             ::juce::Typeface::Ptr typeface;
             arrange::core::FontFaceInfo info;
@@ -65,6 +71,7 @@ namespace arrange::juce {
         ResolvedFont resolveFamily(const std::string& family, const arrange::core::TextStyle& style, bool& found);
         const SystemFontFamily& systemFamily(const std::string& family);
 
+        std::mutex mutex_;
         std::uint64_t generation_ = 0;
         std::map<std::string, SystemFontFamily> systemFamilies_;
         std::map<const arrange::core::FontFamilyDefinition*, std::vector<BundledFace>> bundled_;

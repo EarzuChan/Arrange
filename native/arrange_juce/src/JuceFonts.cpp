@@ -84,9 +84,20 @@ namespace arrange::juce {
     }
 #endif
 
+    namespace {
+        JuceFontResolver* sharedResolver = nullptr;
+        std::mutex sharedResolverMutex;
+    }
+
     JuceFontResolver& JuceFontResolver::shared() {
-        static JuceFontResolver resolver;
-        return resolver;
+        const std::scoped_lock lock(sharedResolverMutex);
+        if (!sharedResolver) sharedResolver = new JuceFontResolver();
+        return *sharedResolver;
+    }
+
+    JuceFontResolver::~JuceFontResolver() {
+        const std::scoped_lock lock(sharedResolverMutex);
+        if (sharedResolver == this) sharedResolver = nullptr;
     }
 
     void JuceFontResolver::syncGeneration() {
@@ -159,6 +170,7 @@ namespace arrange::juce {
     }
 
     ResolvedFont JuceFontResolver::resolve(const arrange::core::TextStyle& style) {
+        const std::scoped_lock lock(mutex_);
         syncGeneration();
         std::string key = arrange::core::joinFontFamilies(style.fontFamily);
         key += '\x1f' + std::to_string(style.fontWeight) + (style.italic ? 'i' : 'n') + (style.fontSynthesis ? 's' : 'x');
