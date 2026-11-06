@@ -368,7 +368,7 @@ namespace arrange::juce {
         const auto* resource = dynamic_cast<const JuceTextResource*>(op.textLayout->resource.get());
         if (!resource) throw std::logic_error("发布的文字不是 JUCE 绘制资源");
         ::juce::Graphics::ScopedSaveState scope(g);
-        if (op.inputText || op.overflow != arrange::core::TextOverflow::Visible) g.reduceClipRegion(::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height).getSmallestIntegerContainer());
+        if (op.inputText || (op.overflow != arrange::core::TextOverflow::Visible && arrange::core::textHasVisualOverflow(op))) g.reduceClipRegion(::juce::Rectangle<float>(op.rect.x, op.rect.y, op.rect.width, op.rect.height).getSmallestIntegerContainer());
         g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
         const auto started = std::chrono::steady_clock::now();
         resource->replay(g, *op.textLayout, op.rect, op.textAlign, horizontalViewportOffset);

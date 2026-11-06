@@ -260,11 +260,17 @@ namespace arrange::core {
         }
     }
 
+    bool textHasVisualOverflow(const DrawOp& op) {
+        if (!op.textLayout) return true;
+        constexpr float epsilon = 0.01f;
+        return op.textLayout->truncated || op.textLayout->width > op.rect.width + epsilon || op.textLayout->height > op.rect.height + epsilon;
+    }
+
     PaintBounds drawOpBounds(const DrawOp& op) {
         if (op.type == DrawOpType::PushClip || op.type == DrawOpType::PopClip || op.type == DrawOpType::PushTransform || op.type == DrawOpType::PopTransform || op.type == DrawOpType::ContentMarker) return {};
         auto rect = op.rect;
         if (op.type == DrawOpType::DrawText) {
-            if (op.inputText || op.overflow != TextOverflow::Visible) return {rect, true, rect.width <= 0 || rect.height <= 0};
+            if (op.inputText || (op.overflow != TextOverflow::Visible && textHasVisualOverflow(op))) return {rect, true, rect.width <= 0 || rect.height <= 0};
             if (!op.textLayout || !op.textLayout->boundsKnown) return {{}, false, false};
             rect = op.textLayout->inkBounds;
             float minShift = 0, maxShift = 0;

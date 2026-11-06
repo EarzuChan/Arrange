@@ -110,6 +110,9 @@ namespace arrange::core {
     };
 
     PaintBounds drawOpBounds(const DrawOp& op);
+    // 文字是否发生视觉溢出：被截断，或排版尺寸超出文字框。只有溢出且 overflow 不是 Visible 才裁到文字框，
+    // 字形（如斜体）伸出前进量的部分不算溢出，对齐 Compose 的 hasVisualOverflow
+    bool textHasVisualOverflow(const DrawOp& op);
     std::vector<DrawOp> exportDrawOps(const PlacedPaintFragment& root);
 
     struct PaintWorkCounters {

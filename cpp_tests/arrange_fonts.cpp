@@ -291,6 +291,64 @@ namespace {
         FontRegistry::shared().removeOwned(&backend);
     }
 
+    // 找到右边界之外的墨迹列数（相对文字框右边缘）
+    int inkBeyond(const ::juce::Image& image, int right) {
+        int count = 0;
+        for (int y = 0; y < image.getHeight(); ++y)
+            for (int x = right; x < image.getWidth(); ++x)
+                if (image.getPixelAt(x, y).getAlpha() > 8) ++count;
+        return count;
+    }
+
+    // 斜体末字伸出前进量的部分不是视觉溢出，不裁；真正的溢出（排版比文字框宽）才裁到文字框，对齐 Compose 的 hasVisualOverflow
+    void verifyItalicOverhang(const std::filesystem::path& fonts) {
+        arrange::juce::JuceTextMeasurer backend;
+        TextLayoutService service(backend);
+        FontRegistry::shared().define(&backend, testFamily(fonts));
+        arrange::juce::JuceDrawOpsPainter painter;
+        const auto render = [&](TextStyle style, float boxWidth, TextOverflow overflow, DrawOp* out = nullptr) {
+            DrawOp op;
+            op.type = DrawOpType::DrawText;
+            op.rect = {10, 10, boxWidth, 80};
+            op.text = "HHHH";
+            op.textStyle = style;
+            op.maxLines = 1;
+            op.overflow = overflow;
+            op.color = 0xff000000u;
+            DrawOpsBuilder::prepareText(op, service);
+            if (boxWidth <= 0) op.rect.width = op.textLayout->width;
+            DrawOpsBuilder::prepareText(op, service);
+            ::juce::Image image(::juce::Image::ARGB, 400, 120, true);
+            ::juce::Graphics graphics(image);
+            painter.paint(graphics, std::vector<DrawOp>{op});
+            if (out) *out = op;
+            return image;
+        };
+        TextStyle real = bundledStyle(400, true);
+        real.fontSize = 60;
+        // 方块字体的真 Italic 字面右上角超出前进量：框正好等于排版宽度时，默认 clip 也要画出来
+        DrawOp op;
+        const auto image = render(real, 0, TextOverflow::Clip, &op);
+        check(!textHasVisualOverflow(op), "前进量刚好等于文字框不是视觉溢出");
+        check(inkBeyond(image, static_cast<int>(std::ceil(op.rect.x + op.rect.width)) + 1) > 0, "真斜体末字伸出前进量的部分不应被裁掉");
+        check(drawOpBounds(op).rect.x + drawOpBounds(op).rect.width >= op.rect.x + op.textLayout->inkBounds.x + op.textLayout->inkBounds.width - 0.5f, "绘制边界应包含伸出的墨迹");
+        // 伪斜体同样不裁
+        FontFamilyDefinition upright;
+        upright.name = "Arrange Test Upright";
+        upright.faces.push_back({readFile(fonts / "ArrangeTestSans-Regular.ttf"), std::nullopt, std::nullopt});
+        FontRegistry::shared().define(&backend, upright);
+        TextStyle fake = real;
+        fake.fontFamily = {"Arrange Test Upright"};
+        DrawOp fakeOp;
+        const auto fakeImage = render(fake, 0, TextOverflow::Clip, &fakeOp);
+        check(inkBeyond(fakeImage, static_cast<int>(std::ceil(fakeOp.rect.x + fakeOp.rect.width)) + 1) > 0, "伪斜体末字伸出前进量的部分不应被裁掉");
+        // 文字框比排版窄是真溢出：clip 仍裁到文字框，visible 不裁
+        const auto narrow = render(fake, 100, TextOverflow::Clip, &fakeOp);
+        check(textHasVisualOverflow(fakeOp) && inkBeyond(narrow, 111) == 0, "真正溢出时 clip 应裁到文字框");
+        check(inkBeyond(render(fake, 100, TextOverflow::Visible), 111) > 0, "visible 不应裁剪");
+        FontRegistry::shared().removeOwned(&backend);
+    }
+
     LayoutModifierSemantics fixedSize(float width, float height) {
         LayoutModifierSemantics value;
         value.kind = LayoutModifierKind::Size;
@@ -390,6 +448,7 @@ int main(int argc, char** argv) {
         verifyDefaultFont();
         verifySystemFaces();
         verifySyntheticRendering(fonts);
+        verifyItalicOverhang(fonts);
         verifyRebuildOnGeneration(fonts);
         verifyPipelineHook(fonts);
     } catch (const std::exception& error) {

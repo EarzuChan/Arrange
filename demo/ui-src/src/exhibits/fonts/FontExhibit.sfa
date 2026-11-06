@@ -23,6 +23,13 @@
             </Row>
         </Section>
 
+        <Section title="真斜体与伪斜体" footer="默认字体有真斜体字面，下方灰底是文字框：斜体末字伸出框右边缘的部分照常画出，不被裁剪，测量与布局仍只按前进量。下一行是只有常规体的族，伪斜体同样如此">
+            <Row :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
+                <Text text="Italic offiff" :style="{ fontSize: 20.sp, fontStyle: 'italic', color: Color(theme.label) }" :modifier="M.background(Color(theme.fill))" />
+                <Text text="Oblique ff" :style="{ fontSize: 20.sp, fontFamily: onlyRegular, fontStyle: 'italic', color: Color(theme.label) }" :modifier="M.background(Color(theme.fill))" />
+            </Row>
+        </Section>
+
         <Section title="自带字体" :footer="`随 App 打包的 Noto Serif SC 子集（只含 Demo 用到的字符，OFL 许可），经现有资源获取层加载（live 与 dist 同一条链路），加载状态：${serif.status}。到达前用回落字体排版，到达后自动重排`">
             <Text text="Hamburgefons 2026 衬线宋体，笔画有粗细" :style="{ fontSize: 20.sp, fontFamily: 'Noto Serif SC', color: Color(theme.label) }" />
             <Text text="Hamburgefons 2026 真 Bold 粗体字面" :style="{ fontSize: 20.sp, fontFamily: 'Noto Serif SC', fontWeight: FontWeight.Bold, color: Color(theme.label) }" />
