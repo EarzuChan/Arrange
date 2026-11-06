@@ -5,12 +5,12 @@
             <ListRow title="切换 live 后重新加载" value="Ctrl + F5"/>
         </Section>
 
-        <Section title="Debug 构建" :flush="true" footer="这两个快捷键只在 Debug 构建中存在，先于 App 消费；Release 不绑定，按键照常交给 App 或宿主">
+        <Section title="Debug 构建" :flush="true" footer="这两个快捷键只在先于 App 消费；Release 不绑定，按键照常交给 App 或宿主">
             <ListRow title="发送一条测试 toast" value="F6" :separator="true"/>
             <ListRow title="打开诊断错误页" value="F7"/>
         </Section>
 
-        <Section title="帧诊断" :flush="true" footer="左上角是最近 60 帧的耗时柱与状态，场景脏区以红色闪烁渐隐；默认只在 Debug 构建可用">
+        <Section title="帧诊断" :flush="true" footer="左上角是最近 60 帧的耗时柱与状态，场景脏区以红色闪烁渐隐">
             <ListRow title="诊断叠加层" value="F9" :separator="true"/>
             <ListRow title="加上 bounds 描边与命中高亮" value="Shift + F9"/>
         </Section>

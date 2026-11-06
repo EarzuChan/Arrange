@@ -1,6 +1,6 @@
 <template>
     <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
-        <Section title="试一试" footer="一次触发颜色、位移、尺寸、展开、可见性与切页六种过渡；再点一次全部反向">
+        <Section title="试一试" footer="一次触发颜色、位移、尺寸、展开、可见性与切页六种过渡；再点一次全部反向。快速点击（即在一次动画播放尚未完成时就点击）即可体验“动画打断”">
             <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
                 <GalleryButton text="全部播放" :prominent="true" :on-click="() => run('all')" />
                 <GalleryButton text="统计" :on-click="() => run('stats')" />
@@ -18,6 +18,7 @@
             </ValueSurface>
         </Section>
 
+        // FIXME？（不确定是否是BUG）：↓，收起时，只有Section会有慢慢变矮，而Column的高度是跳变。而展开时都是慢慢变高
         <Section title="内容尺寸" footer="展开时卡片跟着动画长高，相邻内容随之下移">
             <Column :modifier="M.fillMaxWidth().animateContentSize(spec).background(Color(theme.fill), rounded(12.dp)).padding(12.dp)">
                 <Text :text="label" :style="{ color: Color(theme.label), fontSize: 13.sp }" />

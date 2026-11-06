@@ -7,6 +7,6 @@ import { M, Color, rounded } from '@arrange/framework/ui'
 import { Text } from '@arrange/framework/foundation'
 import { useGalleryTheme } from '../../design/theme'
 
-const { secret = 'InnerBoundary 的默认值（父层没有传入）' } = defineProps<{ secret?: string }>()
+const { secret = 'InnerBoundary 默认值（显示本文本则正确，代表没有发生Props父层透传）' } = defineProps<{ secret?: string }>()
 const theme = useGalleryTheme()
 </script>

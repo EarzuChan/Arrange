@@ -1,4 +1,4 @@
-# ADR 021：字体样式与 SP 改为 em
+# ADR 021：字体样式与 SP 改为对齐 em 语义
 
 日期：2026-11-06。状态：已定，施工中。
 
@@ -13,7 +13,7 @@ M5-EX 要给文字加字体族、字重与字形，需求与两个平台的原�
 
 ## 决策与理由
 
-1. **SP 就是 em。** 名字和 `16.sp` 的写法不变，Density 的 `spScale` 照旧只缩放 SP；变的是定义：`fontSize` 的数值是字体的 em 大小，对齐 CSS 的 `font-size` 与 Compose 的 `sp`。JUCE 侧用 `FontOptions::withPointHeight`（它的点高度即 CoreText 与 DirectWrite 的字体大小）。已在 macOS 上验证拉丁与回落字体的 em 一致、换族 em 不变，Windows 侧在施工中用同样的检查复验。不另造单位，也不改属性名：名实不符只靠改定义就能消除，改名要动公开 API 与 SFA 编译规则，收益只是名字。
+1. **SP 在 Compose 基本就是 em 的意思。** 名字和 `16.sp` 的写法不变，Density 的 `spScale` 照旧只缩放 SP；变的是定义：`fontSize` 的数值是字体的 em 大小，对齐 CSS 的 `font-size` 与 Compose 的 `sp`。JUCE 侧用 `FontOptions::withPointHeight`（它的点高度即 CoreText 与 DirectWrite 的字体大小）。已在 macOS 上验证拉丁与回落字体的 em 一致、换族 em 不变，Windows 与 macOS 的原生测试均已覆盖。不另造单位，也不改属性名：名实不符只靠改定义就能消除，改名要动公开 API 与 SFA 编译规则，收益只是名字。
 
 2. **这是破坏性变更，旧数值不做兼容换算。** 旧数值是 JUCE 高度，按 em 看约为 0.85 倍，是不同字体下的不同倍数，没有统一的换算。框架默认字号、Demo 与诊断表层的字号一次按 em 重新取值：默认字号由 14 改为 12，Demo 的字号阶梯改为 29、24、16、14、13、11、10，按各字号在当前默认字体下的视觉大小取整，使现有界面的观感基本不变。使用方升级后要自己重新取值，没有迁移开关。
 

@@ -70,7 +70,7 @@ const filtered = computed(() => items.value.filter(item => item.name.includes(qu
 const spec = tween({ durationMillis: 240 })
 let release: (() => void) | undefined
 let request = 0
-const details = ref('详情正在等待，点击完成加载')
+const details = ref('异步加载详情。请点击“完成加载”')
 onScopeDispose(() => {
     request++
     release = undefined
@@ -78,10 +78,12 @@ onScopeDispose(() => {
 
 function makeAsyncDetails() {
     const identity = ++request
-    details.value = '详情正在等待，点击完成加载'
+
+    details.value = '异步加载详情。请点击“完成加载”'
+
     const ready = new Promise<void>(resolve => { release = resolve })
     ready.then(() => {
-        if (identity === request) details.value = `详情已就绪 ${identity}`
+        if (identity === request) details.value = `已加载完成详情 ${identity} 次`
     })
 }
 

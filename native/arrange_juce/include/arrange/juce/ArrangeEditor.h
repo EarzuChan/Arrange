@@ -57,7 +57,6 @@ namespace arrange::juce {
     };
 
 #if ARRANGE_JUCE_WITH_JUCE
-
     class ArrangeEditor;
     class EditorSceneHost;
 #if JUCE_WINDOWS

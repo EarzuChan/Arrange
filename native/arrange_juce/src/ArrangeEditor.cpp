@@ -33,9 +33,8 @@ namespace arrange::juce {
     }
 
     void EditorShellDriver::afterPointerDown(ArrangeEditor& editor) const {
-        if (auto* peer = editor.getPeer()) {
-            peer->refreshTextInputTarget();
-        }
+        if (auto* peer = editor.getPeer()) peer->refreshTextInputTarget();
+
         editor.updateFrameClockState();
     }
 
@@ -56,6 +55,7 @@ namespace arrange::juce {
             sample.pending = editor.sceneHost_->wantsVBlank();
             ScrollProbe::record(sample);
         }
+
 #if JUCE_WINDOWS
         // 未测试！
         if (editor.precisionWheelSource_) editor.precisionWheelSource_->tick();
@@ -346,8 +346,8 @@ namespace arrange::juce {
                 layers.bounds = layers.hit = !(layers.bounds || layers.hit);
                 sceneHost_->setDiagnosticsOverlayLayers(layers);
                 (void)sceneHost_->setDiagnosticsOverlay(true);
-            } else
-                (void)sceneHost_->setDiagnosticsOverlay(!sceneHost_->diagnosticsOverlayEnabled());
+            } else (void)sceneHost_->setDiagnosticsOverlay(!sceneHost_->diagnosticsOverlayEnabled());
+
             shell_.afterFrameRelevantChange(*this);
             return true;
         }
@@ -365,6 +365,7 @@ namespace arrange::juce {
 
     bool ArrangeEditor::keyStateChanged(bool isKeyDown) {
         if (isKeyDown) return false;
+
         const auto consumed = sceneHost_->keyStateChanged([](int code) { return ::juce::KeyPress::isKeyCurrentlyDown(code); });
         shell_.afterFrameRelevantChange(*this);
         return consumed;
@@ -431,32 +432,27 @@ namespace arrange::juce {
         frameClock_.sync(*this, wantsVBlank, [this](double timestampMillis) {
             frameClock_.beginVBlankCallback();
             shell_.vblankTick(*this, timestampMillis);
-            if (frameClock_.endVBlankCallback()) {
-                requestFrameClockResyncAsync();
-            }
+
+            if (frameClock_.endVBlankCallback()) requestFrameClockResyncAsync();
         });
     }
 
     void ArrangeEditor::requestFrameClockResyncAsync() {
         ::juce::Component::SafePointer<ArrangeEditor> safeThis(this);
         ::juce::MessageManager::callAsync([safeThis]() mutable {
-            if (auto* editor = safeThis.getComponent()) {
-                editor->updateFrameClockState();
-            }
+            if (auto* editor = safeThis.getComponent()) editor->updateFrameClockState();
         });
     }
 
     void ArrangeEditor::updateWindowTitle() {
         const auto title = ScrollProbe::active() ? ::juce::String::fromUTF8("Arrange 滚动采样中 · F8 结束") : ::juce::String(sceneHost_->windowTitle(config_.window.title));
         setName(title);
-        if (auto* peer = getPeer()) {
-            peer->setTitle(title);
-        }
+
+        if (auto* peer = getPeer()) peer->setTitle(title);
+
         if (auto* topLevel = getTopLevelComponent()) {
             topLevel->setName(title);
-            if (auto* peer = topLevel->getPeer()) {
-                peer->setTitle(title);
-            }
+            if (auto* peer = topLevel->getPeer()) peer->setTitle(title);
         }
     }
 

@@ -20,5 +20,5 @@ export const topics: readonly Topic[] = [
     { key: 'visual', title: '视觉效果', description: '渐变、投影、背景模糊、像素缓冲与 filmstrip 旋钮', icon: 'icons/lucide/sparkles.svg' },
     { key: 'tiers', title: 'Canvas 三档', description: '同一组电平、波形、频谱，分别用三种数据与绘制路径', icon: 'icons/lucide/activity.svg', interop: true },
     { key: 'audio', title: '音频宿主', description: '参数、自动化、走带与实时观测，预设读写', icon: 'icons/lucide/audio-lines.svg', interop: true },
-    { key: 'debug', title: '调试工具', description: 'F5 重新加载、F9 帧诊断叠加层，Debug 下的测试 toast 与错误页', icon: 'icons/lucide/bug.svg' },
+    { key: 'debug', title: '调试工具', description: '仅在 Debug 版中可用。F5 重新加载、F9 帧诊断叠加层，Debug 下的测试 toast 与错误页', icon: 'icons/lucide/bug.svg' },
 ]

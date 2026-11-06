@@ -3,7 +3,7 @@
         <Section title="焦点" footer="Tab / Shift+Tab 在两个框之间切换，也可以用按钮直接移动焦点">
             <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
                 <GalleryButton text="聚焦第一框" :on-click="() => firstFocus.requestFocus()" />
-                <GalleryButton text="下一个" :on-click="() => focusManager.moveFocus('next')" />
+                <GalleryButton text="下一个" :on-click="() => focusManager.moveFocus('next')" /> // FIXME：点击离开第一个后，无论如何点击都无法走到下一个
                 <GalleryButton text="清除焦点" :on-click="() => focusManager.clearFocus()" />
             </FlowRow>
             <Text :text="status" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
