@@ -411,6 +411,32 @@ namespace {
         FontRegistry::shared().removeOwned(&backend);
     }
 
+    // 经完整流水线与被动绘制渲染器（含剔除）：斜体 Text 默认 clip，末字伸出的部分仍被画出
+    void verifyItalicThroughPipeline(const std::filesystem::path& fonts) {
+        arrange::juce::JuceTextMeasurer backend;
+        TextLayoutService service(backend);
+        FontRegistry::shared().define(&backend, testFamily(fonts));
+        NativeScene scene;
+        SceneFramePipeline pipeline{LayoutEngine{service}};
+        PublishedFrame frame;
+        arrange::juce::PassivePaintRenderer painter(service);
+        auto text = test_support::text("HHHH", 0xff000000u, 60);
+        text.style = bundledStyle(400, true);
+        text.style.fontSize = 60;
+        MutationTransaction initial;
+        initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", policy("MinSize")}, SetModifierMutation{1, {{text, {}}}}};
+        const auto result = pipeline.run(scene, 1, {0, 400, 0, 200}, &initial, true, frame, [&](const auto&, auto& next) { painter.prepareResources(next.content); });
+        check(!result.error, "斜体 Text 的帧失败");
+        const auto box = scene.node(1).bounds;
+        ::juce::Image image(::juce::Image::ARGB, 400, 200, true);
+        {
+            ::juce::Graphics graphics(image);
+            painter.paint(graphics, frame);
+        }
+        check(inkBeyond(image, static_cast<int>(std::ceil(box.x + box.width)) + 1) > 0, "完整流水线下真斜体末字伸出的部分被裁掉了");
+        FontRegistry::shared().removeOwned(&backend);
+    }
+
     // 流水线在代际推进后无需其它失效也会重新测量与重建
     void verifyPipelineHook(const std::filesystem::path& fonts) {
         arrange::juce::JuceTextMeasurer backend;
@@ -449,6 +475,7 @@ int main(int argc, char** argv) {
         verifySystemFaces();
         verifySyntheticRendering(fonts);
         verifyItalicOverhang(fonts);
+        verifyItalicThroughPipeline(fonts);
         verifyRebuildOnGeneration(fonts);
         verifyPipelineHook(fonts);
     } catch (const std::exception& error) {

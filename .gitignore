@@ -46,3 +46,6 @@ tests/smoke/*.output.json
 # Arrange local state
 .arrange/
 arrange.local.yaml
+# Demo 消费本机发行的 Framework 包，锁文件的 integrity 与 pnpm 自动写入的豁免因机器而异，各机自行生成
+demo/ui-src/pnpm-lock.yaml
+demo/ui-src/pnpm-workspace.yaml

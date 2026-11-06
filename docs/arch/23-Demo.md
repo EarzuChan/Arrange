@@ -25,19 +25,18 @@ demo/
   ui-src/
     ...
     package.json
-    package-lock.json
     tsconfig.json
     dist/                 # 构建产物，不提交
   artifacts/              # CLI 交付物，不提交
 ```
 
-`ui-src/` 是独立 npm UI 项目；发布运行时的 `ui/` 是 CLI 在产品旁或 bundle 内整理的构建产物目录。
+`ui-src/` 是独立 pnpm UI 项目，不提交 `pnpm-lock.yaml` 与 `pnpm-workspace.yaml`：Framework 来自本机发行包期间，锁里的 integrity 与 pnpm 自动写入的发布年龄豁免因机器而异，各机由 `arrange sync` 与安装自行生成（`esbuild` 构建授权由 SETUP 写入）；其余依赖在 `package.json` 里固定为精确版本。Framework 改用公开来源后再决定是否提交锁。发布运行时的 `ui/` 是 CLI 在产品旁或 bundle 内整理的构建产物目录。
 
 Demo 保留 `ui-src/`、`plugin-src/` 目录，通过共享配置声明实际路径。它是由 Arrange CLI 管理的普通工程；位于 Arrange Git 仓库内不改变工程主权。标准命令、配置职责与交付规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，运行步骤见 [Demo 说明](../../demo/README.md)。
 
 ## 消费与版本
 
-UI 使用独立安装的 `@arrange/framework` npm 包和公开 exports，自带 manifest、npm 锁文件、Vite 配置与 SFA 类型检查入口，不继承根 TS paths 或 workspace 链接。UI 构建输出为自身 `dist/`，由 CLI 调用工程脚本及整理交付物。
+UI 使用独立安装的 `@arrange/framework` npm 包和公开 exports，自带 manifest、pnpm 锁文件、Vite 配置与 SFA 类型检查入口，不继承根 TS paths 或 workspace 链接。UI 构建输出为自身 `dist/`，由 CLI 调用工程脚本及整理交付物。
 
 Native 使用 `FetchContent_Declare(arrange)`、`FetchContent_MakeAvailable(arrange)` 并链接 `Arrange::framework`。默认使用公开 Arrange Git 仓库和固定 Framework 版本 tag，仓库地址、tag 与 npm 依赖版本由 CLI CONFIG 管理。禁止从 Demo `add_subdirectory` Arrange 根或直接引用内部 TS/C++ 源文件构建产品。
 

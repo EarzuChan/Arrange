@@ -9,10 +9,10 @@ project:
     - standalone
     - vst3
 framework:
-  version: 0.8.0
+  version: 0.9.0
 ui:
   directory: ui-src
-  packageManager: npm
+  packageManager: pnpm
   outputDirectory: dist
 native:
   directory: plugin-src
