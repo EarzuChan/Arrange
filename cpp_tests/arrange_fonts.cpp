@@ -213,6 +213,41 @@ namespace {
         style.fontWeight = 600;
         const auto resolved = arrange::juce::JuceFontResolver::shared().resolve(style);
         check(resolved.typeface && resolved.syntheticBold == false, "Helvetica Neue 的 600 应往上取真 Bold");
+        check(resolved.typeface->getStyle() == "Bold", "Helvetica Neue 的 600 选中的字面名应为 Bold");
+        // 以 CoreText 样式名取字面，返回的字面名与请求一致（JUCE 的名字匹配区分大小写，样式名不一致会落到族内第一个样式）
+        const auto resolveFace = [](const char* familyName, int weight, bool italicRequest) {
+            TextStyle request;
+            request.fontFamily = {familyName};
+            request.fontWeight = weight;
+            request.italic = italicRequest;
+            return arrange::juce::JuceFontResolver::shared().resolve(request);
+        };
+        check(resolveFace("Helvetica Neue", 300, false).typeface->getStyle() == "Light", "Helvetica Neue 的 300 应取 Light");
+        check(resolveFace("Helvetica Neue", 500, false).typeface->getStyle() == "Medium", "Helvetica Neue 的 500 应取 Medium");
+        check(resolveFace("Helvetica Neue", 400, true).typeface->getStyle() == "Italic" && !resolveFace("Helvetica Neue", 400, true).syntheticItalic, "Helvetica Neue 的斜体应取真 Italic");
+        // PingFang SC 没有 Bold：600 与 700 都取 Semibold，不伪造；没有斜体字面：斜体伪造
+        for (const int weight : {600, 700}) {
+            const auto pingfang = resolveFace("PingFang SC", weight, false);
+            check(pingfang.typeface && pingfang.typeface->getStyle() == "Semibold" && !pingfang.syntheticBold, "PingFang SC 的 600 与 700 应取真 Semibold");
+        }
+        check(resolveFace("PingFang SC", 400, true).syntheticItalic, "PingFang SC 的斜体应由 Arrange 伪造");
+        // Menlo：500 取 Regular，600 取 Bold
+        check(resolveFace("Menlo", 500, false).typeface->getStyle() == "Regular", "Menlo 的 500 应取 Regular");
+        const auto menloBold = resolveFace("Menlo", 600, false);
+        check(menloBold.typeface->getStyle() == "Bold" && !menloBold.syntheticBold, "Menlo 的 600 应取真 Bold");
+        // Apple Chancery 只有一个字面：600 以上伪造粗体
+        check(resolveFace("Apple Chancery", 700, false).syntheticBold, "Apple Chancery 的粗体应由 Arrange 伪造");
+        // 可变字体族枚举为空，请求落到默认字体，且不伪造（默认字体的 400 是真字面）
+        check(arrange::juce::enumerateSystemFontFamily("SF Pro").faces.empty(), "可变字体 SF Pro 不应枚举出命名实例");
+        const auto fallback = resolveFace("SF Pro", 400, false);
+        const auto standard = resolveFace("Helvetica Neue", 400, false);
+        check(fallback.typeface && fallback.typeface->getName() == standard.typeface->getName() && fallback.typeface->getStyle() == standard.typeface->getStyle() && !fallback.syntheticBold, "可变字体族应落到下一个族（默认字体）");
+        // 枚举按 PostScript 名去重：同一字重与斜体的字面不应重复出现
+        for (const char* name : {"Helvetica Neue", "Menlo", "PingFang SC"}) {
+            const auto enumerated = arrange::juce::enumerateSystemFontFamily(name);
+            for (std::size_t first = 0; first < enumerated.faces.size(); ++first)
+                for (std::size_t second = first + 1; second < enumerated.faces.size(); ++second) check(enumerated.faces[first].styleName != enumerated.faces[second].styleName, "枚举结果不应有重复的样式名");
+        }
 #endif
     }
 

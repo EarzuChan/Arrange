@@ -84,9 +84,17 @@ namespace arrange::juce {
     }
 #endif
 
+    namespace {
+        JuceFontResolver* sharedResolver = nullptr;
+    }
+
     JuceFontResolver& JuceFontResolver::shared() {
-        static JuceFontResolver resolver;
-        return resolver;
+        if (!sharedResolver) sharedResolver = new JuceFontResolver();
+        return *sharedResolver;
+    }
+
+    JuceFontResolver::~JuceFontResolver() {
+        if (sharedResolver == this) sharedResolver = nullptr;
     }
 
     void JuceFontResolver::syncGeneration() {

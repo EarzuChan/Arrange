@@ -1,6 +1,6 @@
 # ADR 021：字体样式与 SP 改为对齐 em 语义
 
-日期：2026-11-06。状态：已定；字体样式部分 Windows 已施工完成，macOS 待验。
+日期：2026-11-06。状态：已定；字体样式部分在 Windows 与 macOS 上均已施工完成并验证。
 
 ## 背景
 
@@ -33,6 +33,8 @@ M5-EX 要给文字加字体族、字重与字形，需求与两个平台的原�
 
 8. **字体环境代际一变，Text 与 Input 重新测量，含文字命令的绘制层重建。** 注册表任何变化都推进代际，排版服务读取代际并清空缓存，流水线运行前比较代际，变化时只标脏 Text、Input 所在节点（测量）和含文字命令的绘制 Modifier 所在节点（绘制），不整树失效；Canvas 的 `onDraw` 不重录，命令本身没变，只有排版结果换了。绘制层记录构建时的代际，代际不同即重建，因此缓存片段不会沿用旧字体的字形。运行时发现代际推进就请求一次流水线运行，不依赖其它失效。
 
-9. **平台分歧留待 macOS 验证。** macOS 的枚举（CoreText、Apple 刻度映射）、字面取用（`createSystemTypefaceFor` 以 CoreText 样式名取字面）、默认字体与伪造观感依原型结论实现，但 macOS 部分在 Windows 上无法编译验证，验证项列在 [M5-EX 需求与待办](../proj/m5：快完成了/02-M5-EX需求与待办.md#macos-待验)。
+9. **平台分歧先在 Windows 施工，再在 macOS 验证。** macOS 的枚举（CoreText、Apple 刻度映射）、字面取用（`createSystemTypefaceFor` 以 CoreText 样式名取字面）、默认字体与伪造观感依原型结论实现，macOS 部分在 Windows 上无法编译，随后已在 macOS 上完成验证，逐项结论见 [M5-EX 需求与待办](../proj/m5：快完成了/02-M5-EX需求与待办.md#macos-验证)。
 
 10. **文字只在视觉溢出时才裁剪。** 原先 `overflow: clip` 无条件裁到文字框，文字框宽度是前进量之和，斜体末字（真斜体与伪斜体都一样）伸出前进量的右上角被切掉。Compose 只在 `hasVisualOverflow && overflow != Visible` 时裁剪，而 `hasVisualOverflow` 指被截断或排版超出约束，字形突出不算，测量框也不含斜体突出。我们对齐：被截断或排版尺寸超出文字框才裁，布局与测量不变，绘制边界在不裁时取墨迹边界。
+
+11. **字体解析器随 JUCE shutdown 销毁，不用函数内静态对象。** macOS 的 `CoreTextTypeface` 释放时要锁 JUCE 内部的函数内静态登记表，而解析器持有字面，若解析器是函数内静态对象，进程退出时会晚于该登记表销毁，析构去锁已销毁的互斥量而 abort（macOS 上 9 项原生测试在退出时失败，Windows 没有这张表所以不出现）。解析器改为继承 `juce::DeletedAtShutdown` 的堆对象，在 JUCE shutdown 时销毁，此时登记表仍存活。这条同样适用于以后任何持有 JUCE 字面或字体对象的进程级单例。
