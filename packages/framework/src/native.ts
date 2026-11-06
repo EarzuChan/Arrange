@@ -13,6 +13,9 @@ export type NativeReloadPayload = {
     timestamp?: number
 }
 
+// 字号单位 SP 即 em 大小；与 native/arrange_core 的 defaultFontSize 保持一致
+export const defaultFontSize = 12
+
 export type TextStyleProp = Readonly<{
     fontSize?: number
     lineHeight?: number

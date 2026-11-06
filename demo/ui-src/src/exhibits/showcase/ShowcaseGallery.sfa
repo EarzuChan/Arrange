@@ -2,19 +2,19 @@
     <Column :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(28.dp)">
         <Section title="页面" footer="笔记页切走再回来，输入仍然保留；详情页的加载可以随时完成">
             <Segmented :options="pages" :value="page" :on-change="openPage" />
-            <Crossfade :is="Text" :props="{ text: `当前位置：${page}`, style: { fontSize: 13.sp, color: Color(theme.secondaryLabel) } }" :targetState="page" :animationSpec="spec" />
+            <Crossfade :is="Text" :props="{ text: `当前位置：${page}`, style: { fontSize: 11.sp, color: Color(theme.secondaryLabel) } }" :targetState="page" :animationSpec="spec" />
 
             <KeepAlive :cacheKey="page">
                 <RetainedEditor a-if="page === '笔记'" />
             </KeepAlive>
 
             <Row a-if="page === '详情'" vertical-alignment="CenterVertically" :modifier="M.fillMaxWidth()" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
-                <Text :text="details" :style="{ fontSize: 15.sp, color: Color(theme.label) }" :modifier="M.weight(1)" />
+                <Text :text="details" :style="{ fontSize: 13.sp, color: Color(theme.label) }" :modifier="M.weight(1)" />
                 <GalleryButton text="完成加载" :on-click="() => run('resolve')" />
             </Row>
 
             <Column a-if="page === '列表'" :modifier="M.fillMaxWidth()" :vertical-arrangement="Arrangement.spacedBy(12.dp)">
-                <Input :value="query" :onValueChange="value => query = value" placeholder="筛选音轨" :text-style="{ fontSize: 15.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().height(44.dp).background(Color(theme.fill), rounded(12.dp)).padding({ horizontal: 14.dp, vertical: 12.dp })" />
+                <Input :value="query" :onValueChange="value => query = value" placeholder="筛选音轨" :text-style="{ fontSize: 13.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().height(44.dp).background(Color(theme.fill), rounded(12.dp)).padding({ horizontal: 14.dp, vertical: 12.dp })" />
 
                 <FlowRow :horizontal-arrangement="Arrangement.spacedBy(8.dp)" :vertical-arrangement="Arrangement.spacedBy(8.dp)">
                     <GalleryButton text="重排" :on-click="() => run('reverse')" />
@@ -27,7 +27,7 @@
                     <GalleryItem a-for="item in filtered" :key="item.id" :item="item" :selected="selected === item.id" :tone="tone" :on-select="select" />
                 </Column>
 
-                <Text :text="`显示 ${filtered.length} 条 · 选中 ${selected}`" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+                <Text :text="`显示 ${filtered.length} 条 · 选中 ${selected}`" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
             </Column>
         </Section>
 
@@ -36,7 +36,7 @@
                 <Toggle :value="shown" label="显示提示" :on-change="() => run('hide')" />
             </ListRow>
             <AnimatedVisibility :visible="shown" :animation-spec="spec" :exit-to="{alpha: 0, translationX: 20.px}">
-                <Text text="动画期间仍可筛选、重排、删除与切页" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" :modifier="M.padding({ start: 16.dp, end: 16.dp, bottom: 12.dp })" />
+                <Text text="动画期间仍可筛选、重排、删除与切页" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" :modifier="M.padding({ start: 16.dp, end: 16.dp, bottom: 12.dp })" />
             </AnimatedVisibility>
         </Section>
     </Column>

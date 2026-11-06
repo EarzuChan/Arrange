@@ -29,20 +29,20 @@ namespace arrange::juce {
         ops.push_back(fill(area, detailed ? 0xff2a1014u : 0xff111827u, 10.0f));
         if (detailed) {
             const auto titleArea = arrange::core::Rect{area.x, area.y, area.width, 34.0f};
-            ops.push_back(text(titleArea, error.title.empty() ? "Arrange Error" : error.title, 0xffff6b6bu, 18.0f));
+            ops.push_back(text(titleArea, error.title.empty() ? "Arrange Error" : error.title, 0xffff6b6bu, 15.0f));
             area.y += 34.0f;
             area.height = std::max(0.0f, area.height - 34.0f);
             auto body = error.diagnosticText();
             if (error.retryAvailable) body += "\nClick anywhere to retry.";
-            ops.push_back(text(area, std::move(body), 0xe0ffffffu, 13.0f, 8));
+            ops.push_back(text(area, std::move(body), 0xe0ffffffu, 11.0f, 8));
             return ops;
         }
 
         const auto titleArea = arrange::core::Rect{area.x, area.y, area.width, 32.0f};
-        ops.push_back(text(titleArea, "Arrange error screen hidden", 0xfff59e0bu, 17.0f));
+        ops.push_back(text(titleArea, "Arrange error screen hidden", 0xfff59e0bu, 14.5f));
         area.y += 32.0f;
         area.height = std::max(0.0f, area.height - 32.0f);
-        ops.push_back(text(area, error.summary + "\nError details are still available in logs and Cmd/Ctrl+C diagnostics.", 0xc7ffffffu, 13.0f, 4));
+        ops.push_back(text(area, error.summary + "\nError details are still available in logs and Cmd/Ctrl+C diagnostics.", 0xc7ffffffu, 11.0f, 4));
         return ops;
     }
 
@@ -57,7 +57,7 @@ namespace arrange::juce {
         ops.push_back(fill(badge, 0xcc111827u, 6.0f));
         ops.push_back(stroke(badge, 0x664b5563u, 1.0f, 6.0f));
         ops.push_back(fill({badge.x + 8.0f, badge.y + 7.0f, 6.0f, 6.0f}, static_cast<std::uint32_t>(model.dot.getARGB()), 3.0f));
-        ops.push_back(text({badge.x + 20.0f, badge.y + 1.0f, badge.width - 20.0f, badge.height - 2.0f}, model.text, 0xffe8eaedu, 11.0f));
+        ops.push_back(text({badge.x + 20.0f, badge.y + 1.0f, badge.width - 20.0f, badge.height - 2.0f}, model.text, 0xffe8eaedu, 9.5f));
         return ops;
     }
 
@@ -78,9 +78,9 @@ namespace arrange::juce {
             ops.push_back(fill(toast, 0xe6111827u, 8.0f));
             ops.push_back(stroke(toast, accentColour(it->level), 1.0f, 8.0f));
             ops.push_back(fill({toast.x, toast.y, 4.0f, toast.height}, accentColour(it->level), 4.0f));
-            ops.push_back(text({toast.x + 12.0f, toast.y + 6.0f, toast.width - 24.0f, 15.0f}, it->title, 0xfff8fafcu, 12.0f));
+            ops.push_back(text({toast.x + 12.0f, toast.y + 6.0f, toast.width - 24.0f, 15.0f}, it->title, 0xfff8fafcu, 10.0f));
             if (!it->message.empty()) {
-                ops.push_back(text({toast.x + 12.0f, toast.y + 23.0f, toast.width - 24.0f, toast.height - 29.0f}, it->message, 0xffcbd5e1u, 11.0f));
+                ops.push_back(text({toast.x + 12.0f, toast.y + 23.0f, toast.width - 24.0f, toast.height - 29.0f}, it->message, 0xffcbd5e1u, 9.5f));
             }
             y += height + 8;
         }
@@ -123,7 +123,7 @@ namespace arrange::juce {
         op.rect = rect;
         op.color = color;
         op.fontSize = fontSize;
-        op.lineHeight = fontSize * 1.2f;
+        op.lineHeight = fontSize * arrange::core::defaultLineHeightRatio;
         op.maxLines = maxLines;
         op.text = std::move(value);
         op.overflow = arrange::core::TextOverflow::Clip;

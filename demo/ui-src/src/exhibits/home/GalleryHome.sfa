@@ -1,7 +1,7 @@
 <template>
     <Scaffold title="Arrange" :title-threshold="56" :max-width="760" :gap="16" :trailing="about" :scroll="scroll">
         <Column :modifier="M.padding({ start: 4.dp, bottom: 12.dp })" :vertical-arrangement="Arrangement.spacedBy(6.dp)">
-            <Text text="Arrange" :style="{ fontSize: 40.sp, color: Color(theme.label) }" />
+            <Text text="Arrange" :style="{ fontSize: 34.sp, color: Color(theme.label) }" />
             <Text :text="`共 ${shown.length} 个主题`" :style="{ fontSize: typeScale.headline.sp, color: Color(theme.secondaryLabel) }" />
         </Column>
         <Row a-for="row in rows" :key="row[0].key" :modifier="M.fillMaxWidth().height(IntrinsicSize.Min)" :horizontal-arrangement="Arrangement.spacedBy(16.dp)">

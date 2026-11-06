@@ -6,6 +6,7 @@ import { requireArgb } from './color.ts'
 import { painterSnapshot, type Painter } from './painter.ts'
 import type { Brush, ContentScaleValue, ImageAlignment, TextAlignment } from './primitives.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
+import { defaultFontSize } from './native.ts'
 
 export type DrawSize = Readonly<{ width: number; height: number }>
 export type DrawRect = Readonly<{ x?: number; y?: number; width?: number; height?: number }>
@@ -171,7 +172,7 @@ export class DrawScope {
         if (typeof args.text !== 'string') throw new TypeError('drawText 需要字符串')
         const maxLines = args.maxLines ?? 0
         if (!Number.isSafeInteger(maxLines) || maxLines < 0) throw new RangeError('maxLines 需要非负整数')
-        this.emit(DrawOpcode.Text, this.ref(args.text), finite(args.x ?? 0, 'x'), finite(args.y ?? 0, 'y'), nonnegative(args.width ?? 0, 'width'), requireArgb(args.color), nonnegative(args.fontSize ?? 14, 'fontSize'), nonnegative(args.lineHeight ?? 0, 'lineHeight'), maxLines, lookup(textAligns, args.textAlign ?? 'start', 'textAlign'), lookup(textOverflows, args.overflow ?? 'visible', 'overflow'))
+        this.emit(DrawOpcode.Text, this.ref(args.text), finite(args.x ?? 0, 'x'), finite(args.y ?? 0, 'y'), nonnegative(args.width ?? 0, 'width'), requireArgb(args.color), nonnegative(args.fontSize ?? defaultFontSize, 'fontSize'), nonnegative(args.lineHeight ?? 0, 'lineHeight'), maxLines, lookup(textAligns, args.textAlign ?? 'start', 'textAlign'), lookup(textOverflows, args.overflow ?? 'visible', 'overflow'))
     }
     drawPainter(painter: Painter, args: DrawPainterOptions = {}): void {
         const alpha = nonnegative(args.alpha ?? 1, 'alpha')

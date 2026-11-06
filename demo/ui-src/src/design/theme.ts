@@ -44,13 +44,13 @@ export const lightGalleryTheme: GalleryTheme = {
 
 // 字号阶梯（sp）；没有字重时以字号和颜色区分层级
 export const typeScale = {
-    largeTitle: 34,
-    title: 28,
-    cardTitle: 19,
-    headline: 17,
-    body: 15,
-    footnote: 13,
-    caption: 12,
+    largeTitle: 29,
+    title: 24,
+    cardTitle: 16,
+    headline: 14,
+    body: 13,
+    footnote: 11,
+    caption: 10,
 } as const
 
 // 标题栏左右的圆形操作位

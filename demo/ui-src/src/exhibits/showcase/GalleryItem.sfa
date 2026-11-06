@@ -1,6 +1,6 @@
 <template>
     <ValueSurface :tone="color" :offset="offset">
-        <Text :text="label(caption)" :single-line="true" :style="{ fontSize: 14.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().clickable({ onClick: () => onSelect(item.id), interactionState: interaction }).padding({ horizontal: 14.dp, vertical: 11.dp }).keyed('条目交互')" />
+        <Text :text="label(caption)" :single-line="true" :style="{ fontSize: 12.sp, color: Color(theme.label) }" :modifier="M.fillMaxWidth().clickable({ onClick: () => onSelect(item.id), interactionState: interaction }).padding({ horizontal: 14.dp, vertical: 11.dp }).keyed('条目交互')" />
     </ValueSurface>
 </template>
 

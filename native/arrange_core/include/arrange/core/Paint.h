@@ -39,7 +39,7 @@ namespace arrange::core {
         Rect rect;
         std::uint32_t color = 0;
         float strokeWidth = 0.0f;
-        float fontSize = 14.0f;
+        float fontSize = defaultFontSize;
         float lineHeight = 0.0f;
         DrawShapeType shape = DrawShapeType::Rectangle;
         CornerRadii corners;
@@ -172,7 +172,7 @@ namespace arrange::core {
             float viewportX = 0.0f;
             float viewportY = 0.0f;
             float lineHeight = 12.0f;
-            float fontSize = 14.0f;
+            float fontSize = defaultFontSize;
             bool singleLine = true;
         };
 

@@ -5,7 +5,7 @@
                 <GalleryButton text="全部播放" :prominent="true" :on-click="() => run('all')" />
                 <GalleryButton text="统计" :on-click="() => run('stats')" />
             </FlowRow>
-            <Text :text="status" :style="{ fontSize: 13.sp, color: Color(theme.secondaryLabel) }" />
+            <Text :text="status" :style="{ fontSize: 11.sp, color: Color(theme.secondaryLabel) }" />
         </Section>
 
         <Section title="数值过渡" footer="颜色走补间，位置走弹簧，尺寸跟随目标值；下面的条随过渡状态一起变化">
@@ -20,19 +20,19 @@
 
         <Section title="内容尺寸" footer="展开时卡片跟着动画长高，相邻内容随之下移">
             <Column :modifier="M.fillMaxWidth().animateContentSize(spec).background(Color(theme.fill), rounded(12.dp)).padding(12.dp)">
-                <Text :text="label" :style="{ color: Color(theme.label), fontSize: 15.sp }" />
-                <Text a-if="expanded" text="相邻内容跟随动画高度放置" :style="{ color: Color(theme.secondaryLabel), fontSize: 13.sp }" :modifier="M.padding({ top: 6.dp })" />
+                <Text :text="label" :style="{ color: Color(theme.label), fontSize: 13.sp }" />
+                <Text a-if="expanded" text="相邻内容跟随动画高度放置" :style="{ color: Color(theme.secondaryLabel), fontSize: 11.sp }" :modifier="M.padding({ top: 6.dp })" />
             </Column>
         </Section>
 
         <Section title="可见性与交叉淡入" footer="退场中途反向时，输入框保留编辑内容；完全离场后再进入会重置">
             <AnimatedVisibility :visible="visible" :animation-spec="spec" :enter-from="{ alpha: 0, translationX: -16.px }" :exit-to="{ alpha: 0, translationX: 16.px }">
                 <Row vertical-alignment="CenterVertically" :horizontal-arrangement="Arrangement.spacedBy(12.dp)">
-                    <Text text="可见的内容" :style="{ color: Color(theme.label), fontSize: 15.sp }" />
-                    <Input value="编辑我，如果我彻底离场会被重置" :text-style="{ color: Color(theme.label), fontSize: 13.sp }" :modifier="M.width(240.dp).height(36.dp).background(Color(theme.fill), rounded(10.dp)).padding({ horizontal: 10.dp, vertical: 9.dp })" />
+                    <Text text="可见的内容" :style="{ color: Color(theme.label), fontSize: 13.sp }" />
+                    <Input value="编辑我，如果我彻底离场会被重置" :text-style="{ color: Color(theme.label), fontSize: 11.sp }" :modifier="M.width(240.dp).height(36.dp).background(Color(theme.fill), rounded(10.dp)).padding({ horizontal: 10.dp, vertical: 9.dp })" />
                 </Row>
             </AnimatedVisibility>
-            <Crossfade :is="Text" :props="{ text: `页面 ${page}`, style: { color: Color(theme.label), fontSize: 15.sp }, modifier: M.background(page === 'A' ? Color(theme.accentTint) : Color(0xffe6dcfa), rounded(10.dp)).padding({ horizontal: 14.dp, vertical: 8.dp }) }" :targetState="page" :animationSpec="spec" />
+            <Crossfade :is="Text" :props="{ text: `页面 ${page}`, style: { color: Color(theme.label), fontSize: 13.sp }, modifier: M.background(page === 'A' ? Color(theme.accentTint) : Color(0xffe6dcfa), rounded(10.dp)).padding({ horizontal: 14.dp, vertical: 8.dp }) }" :targetState="page" :animationSpec="spec" />
         </Section>
     </Column>
 </template>

@@ -164,7 +164,7 @@ namespace {
                 for (int x = 0; x < 200; ++x) check(actual.getPixelAt(x, y) == expected.getPixelAt(x, y), "显式换行改变了居中或末端对齐的绘制位置");
         }
 
-        const auto font = ::juce::Font(::juce::FontOptions(18));
+        const auto font = ::juce::Font(::juce::FontOptions().withPointHeight(18));
         const auto settings = ::juce::detail::ShapedText::Options{}.withFont(font).withBaselineAtZero(false).withAdditiveLineSpacing(24 - font.getHeight()).withMaxNumLines(1).withDrawLinesInFull(true);
         for (const std::string text : {"e\xcc\x81X", "👨‍👩‍👧‍👦X"}) {
             const auto layout = service.layout(text, {18, 24}, {1, 0, true});
@@ -203,6 +203,35 @@ namespace {
                     if (actual.getPixelAt(x, y) != expected.getPixelAt(x, y)) throw std::runtime_error("字形绘制与后端不同，文本：" + text + "，坐标：" + std::to_string(x) + "," + std::to_string(y));
                 }
         }
+    }
+
+    // 字号是 em：拉丁与中文回落 run 的 em 一致；行高是绝对行距，与回落字体撑高的行盒无关
+    void verifyTextEmAndLineHeight() {
+        arrange::juce::JuceTextMeasurer backend;
+        TextLayoutService service(backend);
+        const auto near = [](float left, float right) {
+            return std::abs(left - right) < 0.01f;
+        };
+        const auto text = std::string("Hello \xe4\xbd\xa0\xe5\xa5\xbd");
+        for (const float fontSize : {10.0f, 14.0f, 30.0f}) {
+            const auto layout = service.layout(text, {fontSize, 0});
+            const auto* resource = dynamic_cast<const arrange::juce::JuceTextResource*>(layout->resource.get());
+            check(resource != nullptr && resource->runs.size() >= 2, "拉丁与中文没有分成回落字体的多个 run");
+            for (const auto& run : resource->runs) check(near(run.font.getHeightInPoints(), fontSize), "回落字体的 em 与字号不一致");
+        }
+
+        // 纯拉丁行、纯中文行与混排行的行距相同，等于 lineHeight；lineHeight 小于字体上下行之和时同样生效
+        for (const float lineHeight : {14.0f, 20.0f, 30.0f}) {
+            const auto layout = service.layout("Hello\n\xe4\xbd\xa0\xe5\xa5\xbd\nHello \xe4\xbd\xa0\xe5\xa5\xbd", {14, lineHeight});
+            check(layout->lines.size() == 3 && near(layout->height, lineHeight * 3), "多行总高不是行数乘行高");
+            const auto offset = layout->lines[0].baseline - layout->lines[0].y;
+            for (std::size_t index = 0; index < layout->lines.size(); ++index) {
+                const auto& line = layout->lines[index];
+                check(near(line.y, lineHeight * static_cast<float>(index)) && near(line.height, lineHeight), "行盒位置或行高不是绝对行距");
+                check(near(line.baseline - line.y, offset), "含回落字体的行基线相对行盒位置发生漂移");
+            }
+        }
+        check(near(service.layout("A", {14, 0})->lineHeight, 14 * defaultLineHeightRatio), "行高默认值不是字号的 1.2 倍");
     }
 
     void verifyPublishedReuseAndCulling() {
@@ -481,6 +510,7 @@ int main() {
         ::juce::ScopedJuceInitialiser_GUI initializer;
         verifyTextResources();
         verifyTextInputGeometry();
+        verifyTextEmAndLineHeight();
         verifyPublishedReuseAndCulling();
         verifyInputAndPublicationLifetime();
         verifyTransformedOverflowAndState();

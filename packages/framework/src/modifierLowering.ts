@@ -2,7 +2,7 @@ import { modifierUnitFields, unitFieldContracts, type UnitFields } from '@arrang
 import type { Density } from './density.ts'
 import type { Modifier, ModifierElement } from './modifier.ts'
 import type { MeasurePolicy } from './measurePolicy.ts'
-import type { ArrangementProp } from './native.ts'
+import { defaultFontSize, type ArrangementProp } from './native.ts'
 import { DrawInstance, type DrawDeclaration } from './draw.ts'
 import { EventAdapters } from './eventAdapters.ts'
 import type { ArrangableInstance } from './runtime/internal.ts'
@@ -54,7 +54,7 @@ export class ModifierLowering {
                 return previous && previous.type === element.type && previous.key === element.key && sameValue(previous.value, value) ? previous : Object.freeze({ ...element, value })
             }
             const styleField = element.type === 'text' ? 'style' : element.type === 'textField' ? 'textStyle' : undefined
-            const styled = styleField ? { ...input, [styleField]: { fontSize: 14, lineHeight: 0, ...input[styleField] as object } } : input
+            const styled = styleField ? { ...input, [styleField]: { fontSize: defaultFontSize, lineHeight: 0, ...input[styleField] as object } } : input
             const value = this.resolveModifierValue(element.type, styled)
             const previous = this.previous?.elements[index]
             if (previous && previous.type === element.type && previous.key === element.key && sameValue(previous.value, value)) return previous

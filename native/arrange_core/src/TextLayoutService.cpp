@@ -9,8 +9,8 @@
 namespace arrange::core {
     namespace {
         float effectiveLineHeight(TextStyle style) noexcept {
-            const auto fontSize = style.fontSize > 0.0f ? style.fontSize : 14.0f;
-            return std::max(fontSize, style.lineHeight > 0.0f ? style.lineHeight : fontSize * 1.2f);
+            const auto fontSize = style.fontSize > 0.0f ? style.fontSize : defaultFontSize;
+            return std::max(fontSize, style.lineHeight > 0.0f ? style.lineHeight : fontSize * defaultLineHeightRatio);
         }
 
         float xInLine(const TextLineLayout& line, std::size_t index) {
@@ -25,7 +25,7 @@ namespace arrange::core {
     }
 
     float ApproximateTextMeasurer::advance(std::string_view, char32_t codepoint, const TextStyle& style) const {
-        return textCodepointAdvance(codepoint, style.fontSize > 0.0f ? style.fontSize : 14.0f);
+        return textCodepointAdvance(codepoint, style.fontSize > 0.0f ? style.fontSize : defaultFontSize);
     }
 
     TextLayoutService::TextLayoutService(const TextMeasurer& measurer, std::size_t maxEntries, std::size_t maxBytes) : measurer_(measurer), maxEntries_(maxEntries), maxBytes_(maxBytes) {}
@@ -42,7 +42,7 @@ namespace arrange::core {
     }
 
     TextLayout ApproximateTextMeasurer::createLayout(std::string_view source, TextStyle style, TextLayoutOptions options) const {
-        if (!(style.fontSize > 0.0f)) style.fontSize = 14.0f;
+        if (!(style.fontSize > 0.0f)) style.fontSize = defaultFontSize;
 
         TextLayout result;
         result.text = std::string(source);
@@ -127,7 +127,7 @@ namespace arrange::core {
 
     std::shared_ptr<const TextLayout> TextLayoutService::layout(std::string_view text, TextStyle style, TextLayoutOptions options, const std::shared_ptr<const TextLayout>& previous) const {
         if (!std::isfinite(style.fontSize) || !std::isfinite(style.lineHeight) || !std::isfinite(options.maxWidth)) throw std::invalid_argument("文本排版参数必须是有限数值");
-        if (!(style.fontSize > 0)) style.fontSize = 14;
+        if (!(style.fontSize > 0)) style.fontSize = defaultFontSize;
         style.lineHeight = effectiveLineHeight(style);
         options.singleLine = options.singleLine || options.maxLines == 1;
         if (options.singleLine && !options.ellipsis) options.maxWidth = 0;

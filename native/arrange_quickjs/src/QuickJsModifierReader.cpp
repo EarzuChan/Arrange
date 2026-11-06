@@ -393,7 +393,7 @@ namespace arrange::quickjs {
                         (void)throwTypeError((std::string(styleName) + " 需要正式文本样式对象").c_str());
                         return {};
                     }
-                    text.style.fontSize = numberField(style.get(), "fontSize", 14);
+                    text.style.fontSize = numberField(style.get(), "fontSize", arrange::core::defaultFontSize);
                     text.style.lineHeight = numberField(style.get(), "lineHeight", 0);
                     ScopedValue color(context_, JS_GetPropertyStr(context_, style.get(), "color"));
                     if (!JS_IsUndefined(color.get())) {
