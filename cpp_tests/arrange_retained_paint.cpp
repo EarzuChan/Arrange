@@ -5,7 +5,10 @@
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/TextInputLayoutModel.h>
+#include <algorithm>
 #include <chrono>
+#include <cstdlib>
+#include <utility>
 #include <iostream>
 #include <stdexcept>
 
@@ -244,6 +247,8 @@ namespace {
         SceneFramePipeline pipeline{LayoutEngine{service}};
         PublishedFrame frame;
         arrange::juce::PassivePaintRenderer painter(service);
+        // 本项验证直接重放的两级裁剪，图块路径另有验证
+        painter.setScrollTilesEnabled(false);
         LayoutModifierSemantics scroll;
         scroll.kind = LayoutModifierKind::VerticalScroll;
         MutationTransaction initial;
@@ -316,6 +321,198 @@ namespace {
         compare(painter, frame);
         const auto stats = painter.replayCounters();
         std::cout << "片段验证：排版=" << service.counters().layoutsCreated << "，内容构建=" << pipeline.counters().paintWork.contentBuilds << "，整段跳过=" << stats.fragmentsSkipped << "，文字提交=" << stats.textSubmissions << "，绘制毫秒=" << painter.paintMillis() << "，排版毫秒=" << service.counters().layoutMillis << '\n';
+    }
+
+    // 滚动层图块：与直接绘制逐像素对照、图块复用、局部失效、预算回退与降级
+    void verifyScrollTiles() {
+        arrange::juce::JuceTextMeasurer backend;
+        TextLayoutService service(backend);
+        NativeScene scene;
+        SceneFramePipeline pipeline{LayoutEngine{service}};
+        PublishedFrame frame;
+        arrange::juce::PassivePaintRenderer painter(service);
+        LayoutModifierSemantics scroll;
+        scroll.kind = LayoutModifierKind::VerticalScroll;
+        MutationTransaction initial;
+        initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Column")}})}, SetModifierMutation{1, {{size(320, 240), {}}, {scroll, "scroll"}}}};
+        const auto rowModifier = [](NodeId id, std::uint32_t color) {
+            PaintStyleSemantics fill;
+            fill.color = color;
+            return ModifierDescriptors{{size(300, 30), {}}, {fill, {}}, {test_support::text("滚动行 " + std::to_string(id) + " English", 0xff102030, 16), {}}};
+        };
+        for (NodeId id = 2; id < 82; ++id) {
+            initial.operations.push_back(CreateNodeMutation{id, arrange::core::NodeType::Layout});
+            initial.operations.push_back(SetPropMutation{id, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})});
+            initial.operations.push_back(SetModifierMutation{id, rowModifier(id, id % 2 ? 0xffe8f0ff : 0xfffff0e0)});
+            initial.operations.push_back(InsertChildMutation{1, id, id - 2});
+        }
+        const auto publish = [&](const MutationTransaction& transaction) {
+            return pipeline.run(scene, 1, {0, 320, 0, 240}, &transaction, true, frame, [&](const auto&, auto& next) { painter.prepareResources(next.content); });
+        };
+        check(!publish(initial).error, "图块场景初始发布失败");
+        const auto scrollTo = [&](float value) {
+            scroll.scrollValue = value;
+            MutationTransaction movement;
+            movement.operations = {SetModifierMutation{1, {{size(320, 240), {}}, {scroll, "scroll"}}}};
+            check(!publish(movement).error, "图块场景滚动发布失败");
+        };
+        const auto maxDifference = [](const ::juce::Image& a, const ::juce::Image& b) {
+            int difference = 0;
+            for (int y = 0; y < a.getHeight(); ++y)
+                for (int x = 0; x < a.getWidth(); ++x) {
+                    const auto p = a.getPixelAt(x, y), q = b.getPixelAt(x, y);
+                    difference = std::max({difference, std::abs(p.getRed() - q.getRed()), std::abs(p.getGreen() - q.getGreen()), std::abs(p.getBlue() - q.getBlue()), std::abs(p.getAlpha() - q.getAlpha())});
+                }
+            return difference;
+        };
+        const auto direct = [&] {
+            painter.setScrollTilesEnabled(false);
+            auto image = render(painter, frame, true);
+            painter.setScrollTilesEnabled(true);
+            return image;
+        };
+
+        // 与直接绘制对照：整数偏移下图块与直接重放应一致
+        for (const float value : {0.0f, 37.0f, 300.0f, 511.0f, 1200.0f}) {
+            scrollTo(value);
+            const auto tiled = render(painter, frame, true);
+            const auto reference = direct();
+            const auto difference = maxDifference(tiled, reference);
+            std::cout << "图块对照：滚动 " << value << "，最大通道差 " << difference << '\n';
+            check(difference <= 8, "图块绘制与直接绘制的图像不一致");
+        }
+
+        // 高分屏：物理缩放 2 与 1.25 下，图块与直接绘制一致，图块按物理像素对齐
+        for (const auto [factor, value] : {std::pair{2.0f, 37.5f}, std::pair{1.25f, 40.0f}}) {
+            scrollTo(value);
+            const auto renderScaled = [&] {
+                ::juce::Image image(::juce::Image::ARGB, static_cast<int>(320 * factor), static_cast<int>(240 * factor), true);
+                ::juce::Graphics graphics(image);
+                graphics.addTransform(::juce::AffineTransform::scale(factor));
+                painter.paint(graphics, frame);
+                return image;
+            };
+            const auto tiledScaled = renderScaled();
+            painter.setScrollTilesEnabled(false);
+            const auto directScaled = renderScaled();
+            painter.setScrollTilesEnabled(true);
+            const auto difference = maxDifference(tiledScaled, directScaled);
+            std::cout << "图块对照：缩放 " << factor << "，滚动 " << value << "，最大通道差 " << difference << '\n';
+            check(difference <= 8, "高分屏下图块绘制与直接绘制的图像不一致");
+        }
+
+        // 编辑器原点不一定落在整数设备像素上（逻辑整数位置乘以缩放）：原点偏移 1 逻辑像素时，
+        // 图块吸附到整数设备像素，画面应与零偏移的图块完全相同，只整体平移若干整数像素，不得被重采样而发糊
+        for (const auto [factor, value] : {std::pair{1.5f, 40.0f}, std::pair{1.25f, 40.0f}, std::pair{1.75f, 40.0f}}) {
+            scrollTo(value);
+            const auto renderShifted = [&](int shift) {
+                ::juce::Image image(::juce::Image::ARGB, static_cast<int>(320 * factor) + 8, static_cast<int>(240 * factor) + 8, true);
+                ::juce::Graphics graphics(image);
+                graphics.addTransform(::juce::AffineTransform::scale(factor));
+                graphics.setOrigin(shift, shift);
+                painter.setDeviceOrigin({static_cast<float>(shift), static_cast<float>(shift)});
+                painter.paint(graphics, frame);
+                painter.setDeviceOrigin({});
+                return image;
+            };
+            const auto base = renderShifted(0);
+            const auto shifted = renderShifted(1);
+            // 内容原点的设备位置：零偏移时为 -value * factor（整数），偏移后吸附到最近的整数像素
+            // 横向没有滚动，原点为 0；纵向原点为 -value * factor
+            const auto moveX = static_cast<int>(std::round(factor));
+            const auto originY = -value * factor;
+            const auto moveY = static_cast<int>(std::round(originY + factor) - originY);
+            const auto shiftedDifference = [&](int dx, int dy) {
+                int result = 0;
+                for (int y = 8; y < base.getHeight() - 16; ++y)
+                    for (int x = 8; x < base.getWidth() - 16; ++x) {
+                        const auto p = base.getPixelAt(x, y), q = shifted.getPixelAt(x + dx, y + dy);
+                        result = std::max({result, std::abs(p.getRed() - q.getRed()), std::abs(p.getGreen() - q.getGreen()), std::abs(p.getBlue() - q.getBlue()), std::abs(p.getAlpha() - q.getAlpha())});
+                    }
+                return result;
+            };
+            const auto difference = shiftedDifference(moveX, moveY);
+            std::cout << "图块对齐：缩放 " << factor << "，原点偏移 1 逻辑像素，整体平移 " << moveX << "," << moveY << " 像素，最大通道差 " << difference << '\n';
+            check(difference <= 2, "编辑器原点不在整数设备像素时图块被重采样");
+        }
+
+        // 复用：滚动只让新进入的图块重建
+        {
+            // 缩放变化会让图块整体失效，先在当前缩放下预热
+            scrollTo(0);
+            render(painter, frame, true);
+            const auto before = painter.scrollTileCounters();
+            scrollTo(0);
+            render(painter, frame, true);
+            scrollTo(300);
+            render(painter, frame, true);
+            scrollTo(310);
+            render(painter, frame, true);
+            const auto after = painter.scrollTileCounters();
+            check(after.layersTiled - before.layersTiled == 3 && after.tilesInvalidated == before.tilesInvalidated, "滚动导致图块失效");
+            check(after.tileHits > before.tileHits, "滚动没有复用图块");
+            check(after.tileBuilds - before.tileBuilds <= 1, "滚动重建了已有图块");
+        }
+
+        // 局部变化：改第 2 行颜色只让其所在的图块局部重画（不整块重建），其余沿用
+        {
+            scrollTo(300);
+            render(painter, frame, true);
+            const auto before = painter.scrollTileCounters();
+            MutationTransaction color;
+            color.operations = {SetModifierMutation{3, rowModifier(3, 0xffff0000)}};
+            check(!publish(color).error, "图块场景颜色更新失败");
+            const auto tiled = render(painter, frame, true);
+            const auto after = painter.scrollTileCounters();
+            std::cout << "局部变化：局部重画 " << after.tilesRepainted - before.tilesRepainted << "，失效 " << after.tilesInvalidated - before.tilesInvalidated << "，重建 " << after.tileBuilds - before.tileBuilds << "，命中 " << after.tileHits - before.tileHits << '\n';
+            check(after.tilesRepainted - before.tilesRepainted == 1 && after.tilesInvalidated == before.tilesInvalidated && after.tileBuilds == before.tileBuilds && after.tileHits > before.tileHits, "局部变化没有只局部重画相交的图块");
+            check(maxDifference(tiled, direct()) <= 8, "局部重画后图块与直接绘制不一致");
+            // 同一处再次变回原色：仍只局部重画
+            MutationTransaction restore;
+            restore.operations = {SetModifierMutation{3, rowModifier(3, 0xffe8f0ff)}};
+            check(!publish(restore).error, "图块场景颜色恢复失败");
+            const auto restored = render(painter, frame, true);
+            check(painter.scrollTileCounters().tileBuilds == before.tileBuilds && maxDifference(restored, direct()) <= 8, "再次局部重画后图块与直接绘制不一致");
+        }
+
+        // 关闭图块时不经过图块路径
+        {
+            const auto before = painter.scrollTileCounters();
+            direct();
+            const auto after = painter.scrollTileCounters();
+            check(after.layersTiled == before.layersTiled && after.layersDirect == before.layersDirect, "关闭图块后仍进入了图块路径");
+        }
+
+        // 预算放不下一次绘制所需的图块时直接绘制，结果一致
+        {
+            scrollTo(300);
+            painter.setScrollTileBudget(arrange::juce::ScrollTileCache::tileBytes);
+            const auto before = painter.scrollTileCounters();
+            const auto image = render(painter, frame, true);
+            const auto after = painter.scrollTileCounters();
+            check(after.layersDirect == before.layersDirect + 1 && after.layersTiled == before.layersTiled, "预算不足没有回退直接绘制");
+            check(maxDifference(image, direct()) <= 8, "预算回退后图像不一致");
+            check(after.retainedBytes <= arrange::juce::ScrollTileCache::tileBytes, "图块预算没有生效");
+            painter.setScrollTileBudget(96u * 1024u * 1024u);
+        }
+
+        // 降级：内容连续整体变化时改为直接绘制，稳定后恢复
+        {
+            scrollTo(0);
+            render(painter, frame, true);
+            const auto before = painter.scrollTileCounters();
+            for (int round = 0; round < 3; ++round) {
+                MutationTransaction recolor;
+                for (NodeId id = 2; id < 82; ++id) recolor.operations.push_back(SetModifierMutation{id, rowModifier(id, 0xff000000u | static_cast<std::uint32_t>((round + 1) * 0x303030))});
+                check(!publish(recolor).error, "图块场景整体变色失败");
+                render(painter, frame, true);
+            }
+            const auto churned = painter.scrollTileCounters();
+            check(churned.demotions == before.demotions + 1, "内容持续整体变化没有降级");
+            render(painter, frame, true);
+            const auto settled = painter.scrollTileCounters();
+            check(settled.layersTiled > churned.layersTiled, "内容稳定后没有恢复图块绘制");
+        }
     }
 
     void verifyInputAndPublicationLifetime() {
@@ -515,6 +712,7 @@ int main() {
         verifyTextInputGeometry();
         verifyTextEmAndLineHeight();
         verifyPublishedReuseAndCulling();
+        verifyScrollTiles();
         verifyInputAndPublicationLifetime();
         verifyTransformedOverflowAndState();
         std::cout << "文本资源、发布片段及两级裁剪行为通过\n";

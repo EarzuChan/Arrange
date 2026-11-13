@@ -52,7 +52,8 @@ namespace arrange::juce {
         [[nodiscard]] std::string windowTitle(std::string_view baseTitle) const;
 
         void resized(int width, int height);
-        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds);
+        // origin 为绘制目标在窗口中的逻辑位置，供滚动图块按设备像素对齐
+        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin = {});
 
         void pointerMove(const ::juce::MouseEvent& event);
         void pointerExit();

@@ -146,7 +146,8 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::paint(::juce::Graphics& g) {
-        sceneHost_->paint(g, getLocalBounds());
+        // 编辑器在窗口里的逻辑位置：滚动图块的物理像素对齐要按窗口坐标算
+        sceneHost_->paint(g, getLocalBounds(), getTopLevelComponent()->getLocalPoint(this, ::juce::Point<float>()));
         scheduleDevReadyCheck();
     }
 

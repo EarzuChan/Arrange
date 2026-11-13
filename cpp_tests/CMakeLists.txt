@@ -120,6 +120,9 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
 endif()
 
 if(TARGET juce::juce_audio_processors)
+  # 重放层性能基准，手动运行，不进 CTest
+  add_executable(arrange_paint_bench arrange_paint_bench.cpp)
+  target_link_libraries(arrange_paint_bench PRIVATE Arrange::framework)
   add_executable(arrange_retained_paint arrange_retained_paint.cpp)
   target_link_libraries(arrange_retained_paint PRIVATE Arrange::framework)
   add_test(NAME arrange_retained_paint COMMAND arrange_retained_paint)

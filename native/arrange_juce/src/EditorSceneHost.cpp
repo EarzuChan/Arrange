@@ -181,7 +181,8 @@ namespace arrange::juce {
             session_.resize(width, height, runtime_);
         }
 
-        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
+        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin) {
+            paint_.setDeviceOrigin(origin);
             if (ScrollProbe::active()) {
                 ScrollProbe::Sample sample;
                 sample.kind = ScrollProbe::Kind::Paint;
@@ -467,8 +468,8 @@ namespace arrange::juce {
         impl_->resized(width, height);
     }
 
-    void EditorSceneHost::paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
-        impl_->paint(g, bounds);
+    void EditorSceneHost::paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin) {
+        impl_->paint(g, bounds, origin);
     }
 
     void EditorSceneHost::pointerMove(const ::juce::MouseEvent& event) {

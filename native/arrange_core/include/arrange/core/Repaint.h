@@ -48,6 +48,10 @@ namespace arrange::core {
         // 背景模糊只依赖绘制在它之前的内容：按重放顺序取它之前的变化，落入其采样范围时并入其输出范围
         void addBackdrops(const PlacedPaintFragment& before, const PlacedPaintFragment& after);
         [[nodiscard]] bool intersects(const Rect& rect) const;
+        // 已收集的变化范围：不外扩、不取整、不裁剪，坐标系同比较时的根；full() 为真时无意义
+        [[nodiscard]] const std::vector<Rect>& collected() const noexcept {
+            return rects_;
+        }
         [[nodiscard]] RepaintRegion finish(Size viewport) const;
 
        private:
