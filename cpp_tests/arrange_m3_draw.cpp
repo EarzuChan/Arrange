@@ -696,6 +696,61 @@ namespace {
             rejected("globalThis.__ARRANGE_NATIVE__.createPixelBuffer(0, 4)", "边长");
             rejected("const n = globalThis.__ARRANGE_NATIVE__; n.commitPixelBuffer(n.createPixelBuffer(2, 2), Uint32Array.of(1))", "长度");
         }
+        {
+            // tint 矢量：蒙版与颜色无关，换色只复用蒙版；蒙版按物理像素缓存
+            auto content = std::make_shared<arrange::juce::JucePainterContent>();
+            const auto xml = ::juce::parseXML("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" fill=\"#00ff00\"/></svg>");
+            check(xml != nullptr, "测试用 SVG 解析失败");
+            content->vector = ::juce::Drawable::createFromSVG(*xml);
+            content->vectorViewport = {0, 0, 24, 24};
+            content->intrinsicSize = Size{24, 24};
+            const auto publish = [&](std::uint32_t tint) {
+                NativeScene scene;
+                SceneFramePipeline pipeline;
+                PublishedFrame published;
+                PaintModifier paint;
+                paint.painter.content = content;
+                paint.tint = tint;
+                paint.sizeToIntrinsics = false;
+                paint.contentScale = ContentScale::FillBounds;
+                MutationTransaction initial;
+                initial.operations = {CreateNodeMutation{1, NodeType::Layout}, policy(1, "Box"), SetModifierMutation{1, {{size(20, 20), {}}, {paint, {}}}}};
+                check(!pipeline.run(scene, 1, {0, 180, 0, 140}, &initial, true, published).error, "tint 矢量场景失败");
+                return published;
+            };
+            arrange::juce::JuceDrawOpsPainter painter;
+            const auto draw = [&](const PublishedFrame& frame) {
+                ::juce::Image image(::juce::Image::ARGB, 180, 140, true);
+                {
+                    ::juce::Graphics graphics(image);
+                    painter.paint(graphics, frame.content.scenePaint);
+                }
+                return image;
+            };
+            const auto red = draw(publish(0xffff0000));
+            check(red.getPixelAt(10, 10).getRed() > 240 && red.getPixelAt(10, 10).getGreen() < 20 && red.getPixelAt(10, 10).getAlpha() > 240, "tint 矢量没有按色着色");
+            check(red.getPixelAt(1, 1).getAlpha() == 0, "tint 矢量的蒙版范围错误");
+            const auto blue = draw(publish(0xff0000ff));
+            check(blue.getPixelAt(10, 10).getBlue() > 240 && blue.getPixelAt(10, 10).getRed() < 20, "换色后没有着新色");
+            const auto counters = painter.bitmapCache().counters();
+            check(counters.builds == 1 && counters.hits == 1 && counters.entries == 1, "tint 矢量换色重建了蒙版");
+        }
+        {
+            // 位图缓存：条目为原生图，哈希索引在大量条目与淘汰下保持一致
+            arrange::juce::BitmapCache cache;
+            const auto owner = std::make_shared<int>(1);
+            const auto first = cache.get({owner, 1, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true, ::juce::SoftwareImageType()); });
+            check(first.getPixelData()->createType()->getTypeID() == ::juce::NativeImageType().getTypeID(), "位图缓存条目没有转成原生图");
+            cache.setBudget(4 * 4 * 4 * 8);
+            for (std::uint64_t detail = 2; detail < 200; ++detail) cache.get({owner, detail, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true); });
+            auto counters = cache.counters();
+            check(counters.entries == 8 && counters.retainedBytes == 4 * 4 * 4 * 8 && counters.evictions == 191, "位图缓存淘汰计数与预算不符");
+            const auto builds = counters.builds;
+            cache.get({owner, 199, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true); });
+            check(cache.counters().builds == builds && cache.counters().hits == 1, "最近条目没有命中");
+            cache.get({owner, 1, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true); });
+            check(cache.counters().builds == builds + 1, "已淘汰的条目被索引残留命中");
+        }
     }
 
     std::string nativeScript(const char* name, const char* params) {

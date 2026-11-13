@@ -8,6 +8,7 @@
 #include <cstring>
 #include <list>
 #include <memory>
+#include <unordered_map>
 
 namespace arrange::juce {
     struct BitmapCacheCounters {
@@ -19,6 +20,7 @@ namespace arrange::juce {
     };
 
     // 重放层的离屏位图缓存：键为不可变片段或资源的身份加参数摘要，按最近使用淘汰，保留字节不超过预算
+    // 条目转成平台原生图后入缓存：Direct2D 绘制软件图每次都要重新上传，原生图则驻留 GPU
     class BitmapCache {
        public:
         struct Key {
@@ -37,18 +39,19 @@ namespace arrange::juce {
 
         template <class Build>
         ::juce::Image get(const Key& key, Build&& build) {
-            for (auto it = entries_.begin(); it != entries_.end(); ++it)
-                if (it->key == key) {
-                    entries_.splice(entries_.begin(), entries_, it);
-                    ++counters_.hits;
-                    return entries_.front().image;
-                }
+            if (const auto found = index_.find(key); found != index_.end()) {
+                entries_.splice(entries_.begin(), entries_, found->second);
+                ++counters_.hits;
+                return entries_.front().image;
+            }
             auto image = build();
             ++counters_.builds;
             const auto bytes = imageBytes(image);
             // 超过整个预算的位图只用一次，不进缓存
             if (bytes > budget_) return image;
+            image = toNative(image);
             entries_.push_front({key, image, bytes});
+            index_.emplace(key, entries_.begin());
             counters_.retainedBytes += bytes;
             trim();
             return image;
@@ -60,6 +63,7 @@ namespace arrange::juce {
         }
 
         void clear() noexcept {
+            index_.clear();
             entries_.clear();
             counters_.retainedBytes = 0;
         }
@@ -74,6 +78,11 @@ namespace arrange::juce {
             return image.isValid() ? static_cast<std::size_t>(image.getWidth()) * static_cast<std::size_t>(image.getHeight()) * 4u : 0u;
         }
 
+        // 软件图转平台原生图；已是原生图时原样返回
+        static ::juce::Image toNative(const ::juce::Image& image) {
+            return image.isValid() ? ::juce::NativeImageType().convert(image) : image;
+        }
+
        private:
         struct Entry {
             Key key;
@@ -81,9 +90,21 @@ namespace arrange::juce {
             std::size_t bytes = 0;
         };
 
+        struct KeyHash {
+            std::size_t operator()(const Key& key) const noexcept {
+                auto hash = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(key.owner.get()));
+                for (const auto part : {key.detail, static_cast<std::uint64_t>(static_cast<std::uint32_t>(key.width)), static_cast<std::uint64_t>(static_cast<std::uint32_t>(key.height))}) {
+                    hash = (hash ^ part) * 0x100000001b3ull;
+                    hash ^= hash >> 29;
+                }
+                return static_cast<std::size_t>(hash);
+            }
+        };
+
         void trim() {
             while (counters_.retainedBytes > budget_ && !entries_.empty()) {
                 counters_.retainedBytes -= entries_.back().bytes;
+                index_.erase(entries_.back().key);
                 entries_.pop_back();
                 ++counters_.evictions;
             }
@@ -91,6 +112,7 @@ namespace arrange::juce {
 
         std::size_t budget_;
         std::list<Entry> entries_;
+        std::unordered_map<Key, std::list<Entry>::iterator, KeyHash> index_;
         BitmapCacheCounters counters_;
     };
 

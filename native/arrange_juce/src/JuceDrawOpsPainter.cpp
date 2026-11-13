@@ -302,11 +302,17 @@ namespace arrange::juce {
         if (op.repeat == ImageRepeat::None) {
             if (image.isValid()) return drawImageOp(g, image, rect, op, alpha);
             if (op.hasTint) {
-                ::juce::Image mask(::juce::Image::ARGB, std::max(1, static_cast<int>(std::ceil(rect.getWidth()))), std::max(1, static_cast<int>(std::ceil(rect.getHeight()))), true);
-                {
-                    ::juce::Graphics graphics(mask);
-                    drawVector(graphics, *juceContent->vector, vectorBounds, mask.getBounds().toFloat(), op, 1.0f);
-                }
+                // 蒙版与颜色无关，按物理像素栅格化后缓存；着色在绘制时由 alpha 着色完成，换色不重建
+                const auto scale = std::round(std::clamp(g.getInternalContext().getPhysicalPixelScaleFactor(), 0.25f, 8.0f) * 16.0f) / 16.0f;
+                const auto width = std::clamp(static_cast<int>(std::ceil(rect.getWidth() * scale)), 1, 4096), height = std::clamp(static_cast<int>(std::ceil(rect.getHeight() * scale)), 1, 4096);
+                const auto detail = CacheDetail{}.add(0x7a5cu).add(op.painter.frame).add(op.painter.frames).add(op.painter.horizontal).add(static_cast<int>(op.contentScale)).add(static_cast<int>(op.alignment)).add(rect.getWidth()).add(rect.getHeight()).add(scale).value();
+                const auto mask = bitmapCache_.get({content, detail, width, height}, [&] {
+                    ::juce::Image result(::juce::Image::ARGB, width, height, true, ::juce::SoftwareImageType());
+                    ::juce::Graphics graphics(result);
+                    graphics.addTransform(::juce::AffineTransform::scale(static_cast<float>(width) / rect.getWidth(), static_cast<float>(height) / rect.getHeight()));
+                    drawVector(graphics, *juceContent->vector, vectorBounds, rect.withZeroOrigin(), op, 1.0f);
+                    return result;
+                });
                 g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 g.drawImage(mask, rect, ::juce::RectanglePlacement::stretchToFit, true);
             } else
