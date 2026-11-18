@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createArrangeTransformPlugin } from "./transform.ts"
 import { invalidateSfaTypeDependency } from "./sfa.ts"
 import { bindPublicResourceReload } from "./public-resource-hmr.ts"
-import { uiPackageHooks } from './ui-package.ts'
+import { bytecodeBuildInput, uiPackageHooks } from './ui-package.ts'
 import type { ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule } from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
@@ -22,6 +22,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
         ...uiPackageHooks(),
         config(_config: unknown = {}, env: ConfigEnv = {}): ArrangeViteConfig {
             command = env.command
+            const extension = env.command === "build" && bytecodeBuildInput() ? "aex" : "js"
             const nodeEnv = env.mode === "production" || env.command === "build" ? "production" : "development"
             return {
                 define: {
@@ -36,9 +37,9 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
                         input: entry,
                         output: {
                             format: "es",
-                            entryFileNames: "app.js",
+                            entryFileNames: `app.${extension}`,
                             codeSplitting: false,
-                            chunkFileNames: "chunks/[name]-[hash].js",
+                            chunkFileNames: `chunks/[name]-[hash].${extension}`,
                             assetFileNames: "assets/[name]-[hash][extname]",
                         },
                     },

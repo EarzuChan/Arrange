@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
         } catch (const std::exception& error) {
             const std::string_view description = error.what();
             const std::string_view mode(argv[2]);
-            const auto expected = mode == "digest" ? "摘要" : mode == "legacy" ? "arrange-ui.json" : mode == "engine" ? "构建身份" : mode == "old-format" ? "不支持的 UI 包格式" : "ZIP";
+            const auto expected = mode == "digest" ? "摘要" : mode == "legacy" ? "arrange-ui.json" : mode == "engine" ? "构建身份" : mode == "old-format" ? "不支持的 UI 包格式" : mode == "script-format" ? "脚本表示无效" : mode == "entry-fields" ? "条目格式无效" : "ZIP";
             return description.find(expected) != std::string_view::npos ? 0 : 1;
         }
         return 1;

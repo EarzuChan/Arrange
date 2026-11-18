@@ -28,5 +28,5 @@ import { typeScale, useGalleryTheme } from './theme'
 const { title, subtitle, icon, onBack } = defineProps<{ title: string; subtitle: string; icon: string; onBack: () => void }>()
 const theme = useGalleryTheme()
 const iconPainter = computed(() => painter(icon))
-const back = computed(() => ({ icon: 'icons/lucide/chevron-left.svg', label: '返回', onClick: onBack }))
+const back = computed(() => ({ icon: 'icons/chevron-left.svg', label: '返回', onClick: onBack }))
 </script>

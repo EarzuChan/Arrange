@@ -7,7 +7,7 @@ import type { NodeJsService } from '../nodejs/NodeJsService.ts'
 import type { TaskOutput } from '../operation/Work.ts'
 import { safeUiOutputDirectory } from '../project/ProjectPaths.ts'
 import type { BuildFlavor, ProjectState } from '../project/ProjectState.ts'
-import { bytecodeFile, PackagePaths, verifyUiPackage } from '../packing/UiPackage.ts'
+import { verifyUiBuildInput, verifyUiPackage } from '../packing/UiPackage.ts'
 import { recordBuild } from './BuildReceipt.ts'
 
 export function uiScriptFormat(state: ProjectState): 'bytecode' | 'js' {
@@ -29,12 +29,8 @@ export class UiBuildService {
             const backup = join(stage, 'previous')
             let keepStage = false
             try {
-                await this.node.build(state, task, input)
-                const source = await verifyUiPackage(input, framework)
-                if (source.manifest.scriptFormat !== 'js') throw new Error('Vite 构建输入必须为 ESM')
-                const entries = source.entries.map(row => row.kind === 'module' && scriptFormat === 'bytecode' ? { ...row, file: bytecodeFile(row.path) } : row)
-                const paths = new PackagePaths()
-                for (const row of entries) paths.add(row.file ?? row.path)
+                await this.node.build(state, task, input, scriptFormat)
+                const { manifest, entries } = await verifyUiBuildInput(input, framework, scriptFormat)
                 let engine: string | undefined
                 if (scriptFormat === 'bytecode') {
                     const modules = join(stage, 'modules.txt')
@@ -42,8 +38,8 @@ export class UiBuildService {
                     engine = await this.cmake.compileUi(state, flavor, task, input, assembled, modules, await native)
                 }
                 for (const row of entries) {
-                    if (row.file !== undefined) {
-                        const bytes = await readFile(join(assembled, row.file))
+                    if (row.kind === 'module' && scriptFormat === 'bytecode') {
+                        const bytes = await readFile(join(assembled, row.path))
                         row.size = bytes.length
                         row.sha256 = createHash('sha256').update(bytes).digest('hex')
                     } else {
@@ -52,7 +48,7 @@ export class UiBuildService {
                         await copyFile(join(input, row.path), target)
                     }
                 }
-                await writeFile(join(assembled, uiManifestName), JSON.stringify({ ...source.manifest, scriptFormat, engine, entries }, null, 2) + '\n')
+                await writeFile(join(assembled, uiManifestName), JSON.stringify({ ...manifest, scriptFormat, engine }, null, 2) + '\n')
                 const final = await verifyUiPackage(assembled, framework)
                 await safeUiOutputDirectory(state)
                 let moved = false

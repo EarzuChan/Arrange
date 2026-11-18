@@ -15,20 +15,17 @@ const schema = z.object({
     framework: z.string(),
     protocol: z.number().int().positive(),
     entry: z.string(),
-    scriptFormat: z.enum(['js', 'bytecode']),
+    scriptFormat: z.enum(['js', 'bytecode', 'esm']),
     engine: z.string().regex(/^[0-9a-f]{64}$/u).optional(),
-    entries: z.array(z.object({
+    entries: z.array(z.strictObject({
         path: z.string(),
-        file: z.string().optional(),
         kind: z.enum(['module', 'asset']),
         size: z.number().int().min(0).max(maxEntryBytes),
         sha256: z.string().regex(/^[0-9a-f]{64}$/u),
     })).min(1).max(8192),
 })
 
-export function bytecodeFile(path: string): string { return `${path}.qbc` }
-
-export class PackagePaths {
+class PackagePaths {
     private readonly names = new Map([[uiManifestName, uiManifestName]])
     private readonly directories = new Map<string, string>()
 
@@ -48,7 +45,15 @@ export class PackagePaths {
     }
 }
 
-export async function verifyUiPackage(root: string, framework: string, signal?: AbortSignal) {
+export function verifyUiPackage(root: string, framework: string, signal?: AbortSignal) {
+    return verify(root, framework, undefined, signal)
+}
+
+export function verifyUiBuildInput(root: string, framework: string, target: 'js' | 'bytecode') {
+    return verify(root, framework, target === 'bytecode' ? 'esm' : 'js')
+}
+
+async function verify(root: string, framework: string, input?: 'js' | 'esm', signal?: AbortSignal) {
     const file = join(root, uiManifestName)
     if (!(await lstat(root).catch(() => undefined))?.isDirectory()) throw new Error(`UI dist 不是普通目录，缺少 ${uiManifestName}：${root}`)
     const info = await lstat(file).catch(() => undefined)
@@ -60,21 +65,21 @@ export async function verifyUiPackage(root: string, framework: string, signal?: 
     if (!parsed.success) throw new Error(`UI dist 清单格式无效：${file}`)
     const manifest = parsed.data
     if (manifest.framework !== framework) throw new Error(`UI dist 的 Framework ${manifest.framework} 不匹配工程 ${framework}；请重新构建 UI`)
+    if (input ? manifest.scriptFormat !== input : manifest.scriptFormat === 'esm') throw new Error(`UI 清单的脚本表示无效：${manifest.scriptFormat}`)
     if ((manifest.scriptFormat === 'bytecode') !== (manifest.engine !== undefined)) throw new Error('UI 包字节码引擎声明无效')
-    const logicalPaths = new PackagePaths()
-    const physicalPaths = new PackagePaths()
+    const aex = manifest.scriptFormat !== 'js'
+    if (aex && manifest.entry !== 'app.aex') throw new Error(`字节码包入口必须为 app.aex：${manifest.entry}`)
+    const paths = new PackagePaths()
     for (const entry of manifest.entries) {
         signal?.throwIfAborted()
-        const file = entry.kind === 'module' && manifest.scriptFormat === 'bytecode' ? bytecodeFile(entry.path) : undefined
-        if (entry.file !== file) throw new Error(`UI 包条目载荷名无效：${entry.path}`)
-        logicalPaths.add(entry.path)
-        const physical = physicalPaths.add(file ?? entry.path)
+        if (entry.kind === 'module' && (aex ? !entry.path.endsWith('.aex') : entry.path.toLowerCase().endsWith('.aex'))) throw new Error(`UI 包模块名不符合脚本表示：${entry.path}`)
+        const parts = paths.add(entry.path)
         let path = root
-        for (const part of physical.slice(0, -1)) {
+        for (const part of parts.slice(0, -1)) {
             path = join(path, part)
             if (!(await lstat(path).catch(() => undefined))?.isDirectory()) throw new Error(`UI 包缺少普通目录：${path}`)
         }
-        path = join(path, physical.at(-1)!)
+        path = join(path, parts.at(-1)!)
         const info = await lstat(path).catch(() => undefined)
         if (!info?.isFile() || info.size !== entry.size) throw new Error(`UI 包缺少普通文件或大小不符：${entry.path}`)
         const hash = createHash('sha256')
@@ -101,23 +106,21 @@ export async function stageUiPackage(source: string, staged: string, framework: 
         await writeFile(join(directory, uiManifestName), input.contents, { flag: 'wx' })
         for (const entry of input.entries) {
             signal?.throwIfAborted()
-            const file = entry.file ?? entry.path
-            const target = join(directory, file)
+            const target = join(directory, entry.path)
             await mkdir(dirname(target), { recursive: true })
-            await copyFile(join(source, file), target)
+            await copyFile(join(source, entry.path), target)
         }
         await verifyUiPackage(directory, framework, signal)
         if (format === 'zip') {
-            const total = input.entries.reduce((sum, entry) => sum + entry.size + Buffer.byteLength(entry.file ?? entry.path) * 2 + 256, input.contents.length + 1024)
+            const total = input.entries.reduce((sum, entry) => sum + entry.size + Buffer.byteLength(entry.path) * 2 + 256, input.contents.length + 1024)
             if (total >= maxZipBytes) throw new Error('UI ZIP 超过 2 GiB 预算，请使用目录包')
             const zip = new ZipFile()
             zip.on('error', error => zip.outputStream.emit('error', error))
             const written = pipeline(zip.outputStream, createWriteStream(staged, { flags: 'wx' }), { signal })
             const mtime = new Date(2000, 0, 1)
             zip.addBuffer(input.contents, uiManifestName, { mtime, compress: false })
-            for (const entry of input.entries) {
-                const file = entry.file ?? entry.path
-                zip.addFile(join(directory, file), file, { mtime, compress: !compressed.test(file) })
+            for (const { path } of input.entries) {
+                zip.addFile(join(directory, path), path, { mtime, compress: !compressed.test(path) })
             }
             zip.end()
             await written

@@ -1,8 +1,8 @@
 {
   "name": "@arrange/cli",
   "description": "Arrange 官方工程管理 CLI",
-  "version": "1.4.3",
-  "compatibility": 3,
+  "version": "1.4.4",
+  "compatibility": 4,
   "private": false,
   "type": "module",
   "bin": {

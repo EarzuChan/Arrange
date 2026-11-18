@@ -37,7 +37,7 @@ namespace test_support {
         for (auto name : assets) add(name, "asset");
         ::juce::var manifest(new ::juce::DynamicObject());
         auto* object = manifest.getDynamicObject();
-        object->setProperty("format", 2);
+        object->setProperty("format", 3);
         object->setProperty("scriptFormat", "js");
         object->setProperty("protocol", static_cast<int>(arrange::core::RuntimeVersion));
         object->setProperty("entry", "app.js");

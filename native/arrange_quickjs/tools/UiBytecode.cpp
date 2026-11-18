@@ -19,7 +19,9 @@ namespace {
         Compiler(Path input, Path output, const Path& list) : input_(std::move(input)), output_(std::move(output)) {
             std::ifstream names(list, std::ios::binary);
             if (!names) throw std::runtime_error("无法读取 UI 模块列表");
-            for (std::string name; std::getline(names, name);) modules_.emplace(name, JS_UNDEFINED);
+            for (std::string name; std::getline(names, name);) {
+                if (!name.ends_with(".aex") || !modules_.emplace(name, JS_UNDEFINED).second) throw std::runtime_error("无效的字节码模块名 " + name);
+            }
             if (modules_.empty() || !names.eof()) throw std::runtime_error("UI 模块列表无效");
             if (!runtime_) throw std::runtime_error("无法创建 QuickJS runtime");
             context_.reset(JS_NewContext(runtime_.get()));
@@ -41,7 +43,7 @@ namespace {
                 if (!bytes) fail(name);
                 const auto release = [this](uint8_t* pointer) { js_free(context_.get(), pointer); };
                 const std::unique_ptr<uint8_t, decltype(release)> payload(bytes, release);
-                const auto file = output_ / Path(std::u8string(name.begin(), name.end()) + u8".qbc");
+                const auto file = output_ / std::filesystem::u8path(name);
                 std::filesystem::create_directories(file.parent_path());
                 std::ofstream out(file, std::ios::binary);
                 if (!(out.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size)).flush())) throw std::runtime_error("无法写入字节码 " + name);

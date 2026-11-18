@@ -80,7 +80,7 @@ test("生成的现代 SFA 使用真实公开 API 和 PNG/SVG ESM 资源，并通
     const assets = resolve(uiRoot, "src/assets")
     await mkdir(assets, { recursive: true })
     await cp(resolve(repoRoot, "demo/ui-src/public/arrange-logo.png"), resolve(assets, "logo.png"))
-    await cp(resolve(repoRoot, "demo/ui-src/public/icons/lucide/info.svg"), resolve(assets, "play.svg"))
+    await cp(resolve(repoRoot, "demo/ui-src/public/icons/info.svg"), resolve(assets, "play.svg"))
     const appPath = resolve(uiRoot, "src/App.sfa")
     const app = await readFile(appPath, "utf8")
     assert.match(app, /const projectTitle = "中文 显示 & 名称"/)

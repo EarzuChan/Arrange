@@ -99,7 +99,6 @@ namespace arrange::juce {
             core::UiEntryKind kind;
             std::size_t size;
             std::string hash;
-            std::string file;
         };
 
         class FileUiPackage final : public core::UiPackage {
@@ -130,7 +129,7 @@ namespace arrange::juce {
                 if (json.find('\0') != std::string::npos || parsed.failed() || !data.isObject()) fail("运行时清单无效", manifestName);
                 const auto format = data.getProperty("format", {});
                 const auto protocol = data.getProperty("protocol", {});
-                if (!format.isInt() || static_cast<int>(format) != 2) fail("不支持的 UI 包格式");
+                if (!format.isInt() || static_cast<int>(format) != 3) fail("不支持的 UI 包格式");
                 if (!protocol.isInt() || static_cast<int>(protocol) != static_cast<int>(core::RuntimeVersion)) fail("脚本与原生协议不匹配，当前需要 " + std::to_string(core::RuntimeVersion));
                 const auto script = data.getProperty("scriptFormat", {});
                 if (!script.isString() || (script.toString() != "js" && script.toString() != "bytecode")) fail("脚本表示无效");
@@ -146,7 +145,7 @@ namespace arrange::juce {
                 if (!array || array->isEmpty() || array->size() > entryCountLimit) fail("条目清单无效");
                 std::unordered_map<std::string, std::string> names{{std::string(manifestName), std::string(manifestName)}};
                 std::unordered_map<std::string, std::string> directories;
-                const auto registerName = [](const std::string& name, auto& names, auto& directories) {
+                const auto registerName = [&](const std::string& name) {
                     const auto key = text(name).toLowerCase().toStdString();
                     if (directories.contains(key) || !names.emplace(key, name).second) fail("条目路径冲突", name);
                     for (auto slash = name.find('/'); slash != std::string::npos; slash = name.find('/', slash + 1)) {
@@ -156,10 +155,9 @@ namespace arrange::juce {
                         if (names.contains(folded) || found->second != dir) fail("条目目录冲突", dir);
                     }
                 };
-                auto files = names;
-                auto fileDirectories = directories;
                 for (const auto& row : *array) {
-                    if (!row.isObject()) fail("条目格式无效");
+                    const auto* object = row.getDynamicObject();
+                    if (!object || object->getProperties().size() != 4) fail("条目格式无效");
                     const auto pathValue = row.getProperty("path", {});
                     const auto kindValue = row.getProperty("kind", {});
                     const auto shaValue = row.getProperty("sha256", {});
@@ -169,26 +167,22 @@ namespace arrange::juce {
                     const auto size = row.getProperty("size", {});
                     const auto hash = shaValue.toString().toStdString();
                     if (!portableName(name) || (type != "module" && type != "asset") || !size.isInt() || static_cast<int>(size) < 0 || static_cast<std::size_t>(static_cast<int>(size)) > core::UiEntryLimit || hash.size() != 64 || hash.find_first_not_of("0123456789abcdef") != std::string::npos) fail("条目字段无效", name);
-                    const auto payload = row.getProperty("file", {});
-                    std::string file = name;
-                    if (type == "module" && scriptFormat_ == core::UiScriptFormat::Bytecode) {
-                        file += ".qbc";
-                        if (!portableName(file) || !payload.isString() || payload.toString().toStdString() != file) fail("字节码载荷名无效", name);
-                    } else if (row.hasProperty("file")) {
-                        fail("条目不能重定向载荷", name);
+                    if (type == "module") {
+                        const bool bytecode = scriptFormat_ == core::UiScriptFormat::Bytecode;
+                        if (bytecode ? !name.ends_with(".aex") : pathValue.toString().endsWithIgnoreCase(".aex")) fail("UI 包模块名不符合脚本表示", name);
                     }
-                    registerName(name, names, directories);
-                    registerName(file, files, fileDirectories);
+                    registerName(name);
                     if (zip_) {
-                        const auto it = zipEntries_.find(file);
+                        const auto it = zipEntries_.find(name);
                         if (it == zipEntries_.end() || zip_->getEntry(it->second)->uncompressedSize != static_cast<int>(size)) fail("ZIP 索引与清单不符", name);
                     }
-                    entries_.emplace(name, Entry{type == "module" ? core::UiEntryKind::Module : core::UiEntryKind::Asset, static_cast<std::size_t>(static_cast<int>(size)), hash, std::move(file)});
+                    entries_.emplace(name, Entry{type == "module" ? core::UiEntryKind::Module : core::UiEntryKind::Asset, static_cast<std::size_t>(static_cast<int>(size)), hash});
                 }
                 if (zip_ && zipEntries_.size() != entries_.size() + 1) fail("ZIP 有未登记的条目");
                 const auto entryValue = data.getProperty("entry", {});
                 if (!entryValue.isString()) fail("入口字段不是字符串");
                 entry_ = entryValue.toString().toStdString();
+                if (scriptFormat_ == core::UiScriptFormat::Bytecode && entry_ != "app.aex") fail("字节码包入口必须为 app.aex", entry_);
                 const auto entry = entries_.find(entry_);
                 if (entry == entries_.end() || entry->second.kind != core::UiEntryKind::Module) fail("入口不是已登记模块", entry_);
             }
@@ -204,7 +198,7 @@ namespace arrange::juce {
                 if (it == entries_.end() || it->second.kind != kind) fail(kind == core::UiEntryKind::Module ? "找不到已登记模块" : "找不到已登记资产", path);
                 const auto& entry = it->second;
                 if (entry.size > limit) fail("超过读取预算", path);
-                auto result = readPhysical(entry.file, entry.size);
+                auto result = readPhysical(path, entry.size);
                 if (result.size() != entry.size || ::juce::SHA256(result.data(), result.size()).toHexString().toStdString() != entry.hash) fail("大小或摘要不匹配", path);
                 return result;
             }

@@ -15,7 +15,7 @@ import { typeScale, useGalleryTheme } from './theme'
 // 卡片里的一行：标题、行尾值或控件、可选的「›」；separator 时在底部画一条缩进分隔线
 const { title, value = '', chevron = false, accent = false, separator = false, onClick } = defineProps<{ title: string; value?: string; chevron?: boolean; accent?: boolean; separator?: boolean; onClick?: () => void }>()
 const theme = useGalleryTheme()
-const chevronPainter = painter('icons/lucide/chevron-right.svg')
+const chevronPainter = painter('icons/chevron-right.svg')
 const interaction = createInteractionState()
 const rowModifier = computed(() => {
     const color = theme.value.separator

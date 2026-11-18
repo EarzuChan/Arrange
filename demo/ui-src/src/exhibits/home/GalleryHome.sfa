@@ -24,7 +24,7 @@ import { topics, type TopicKey } from '../topics'
 // 主界面：大标题加两列宫格；大标题滚出后栏内补上小标题，「关于」在栏右侧，与次级界面左侧的返回同构
 const { showInterop, scroll, onOpen, onAbout } = defineProps<{ showInterop: boolean; scroll: ScrollState; onOpen: (key: TopicKey) => void; onAbout: () => void }>()
 const theme = useGalleryTheme()
-const about = computed(() => ({ icon: 'icons/lucide/info.svg', label: '关于 Arrange', onClick: onAbout }))
+const about = computed(() => ({ icon: 'icons/info.svg', label: '关于 Arrange', onClick: onAbout }))
 const shown = computed(() => topics.filter(topic => showInterop || !topic.interop))
 const rows = computed(() => {
     const result = []
