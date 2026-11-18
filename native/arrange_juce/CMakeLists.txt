@@ -46,7 +46,6 @@ target_sources(arrange_juce PRIVATE
   src/PackageRuntimeSource.cpp
   src/PassivePaintRenderer.cpp
   src/JucePointerInputAdapter.cpp
-  src/ScrollProbe.cpp
   src/JuceRepaintAdapter.cpp
   src/RuntimePackageBinder.cpp
   src/RuntimeSessionState.cpp

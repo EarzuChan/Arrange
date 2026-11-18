@@ -3,31 +3,14 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/core/InputIntent.h>
-#include <arrange/core/Scroll.h>
 #include <arrange/juce/ArrangeRuntime.h>
 #include <arrange/juce/DiagnosticsState.h>
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/RuntimeSessionState.h>
-#include "ScrollProbe.h"
 #include "PlatformWheelInput.h"
 
 namespace arrange::juce {
     namespace {
-        void recordWheelInput(ScrollProbe::Sample sample, const arrange::core::WheelInput& input, ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, arrange::core::NodeId root) {
-            if (!ScrollProbe::active()) return;
-            sample.kind = ScrollProbe::Kind::Input;
-            sample.phase = static_cast<std::uint8_t>(input.phase);
-            sample.momentumPhase = static_cast<std::uint8_t>(input.momentumPhase);
-            sample.unitX = static_cast<std::uint8_t>(input.unitX);
-            sample.unitY = static_cast<std::uint8_t>(input.unitY);
-            sample.nativePhases = input.nativePhases;
-            sample.interactive = session.interactive(diagnostics);
-            sample.valid = runtime.scene().contains(root);
-            sample.pending = runtime.hasPendingFrameWork();
-            sample.revision = runtime.publishedFrame().revision;
-            ScrollProbe::record(sample);
-        }
-
         void dispatchGesture(ArrangeRuntime& runtime, InteractionStateOwner& interaction, const arrange::core::PointerGestureOutput& output) {
             interaction.notePointerEffects(output);
             for (const auto& event : output.events) {
@@ -108,29 +91,10 @@ namespace arrange::juce {
 
     bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, const ::juce::MouseEvent& event, const ::juce::MouseWheelDetails& wheel) const {
         const auto input = readPlatformWheelInput(event, wheel);
-        ScrollProbe::Sample sample;
-        sample.sourceMillis = static_cast<double>(event.eventTime.toMilliseconds());
-        sample.x = event.position.x;
-        sample.y = event.position.y;
-        sample.deltaX = wheel.deltaX;
-        sample.deltaY = wheel.deltaY;
-        sample.inertial = wheel.isInertial;
-        sample.smooth = wheel.isSmooth;
-        sample.reversed = wheel.isReversed;
-        recordWheelInput(sample, input, runtime, session, diagnostics, root);
         return dispatchWheel(runtime, session, diagnostics, interaction, root, {event.position.x, event.position.y}, input);
     }
 
     bool JucePointerInputAdapter::wheelMove(ArrangeRuntime& runtime, const RuntimeSessionState& session, const DiagnosticsState& diagnostics, InteractionStateOwner& interaction, arrange::core::NodeId root, arrange::core::Point point, const arrange::core::WheelInput& input) const {
-        ScrollProbe::Sample sample;
-        sample.sourceMillis = input.timeMillis;
-        sample.x = point.x;
-        sample.y = point.y;
-        sample.deltaX = input.deltaX;
-        sample.deltaY = input.deltaY;
-        sample.inertial = input.inertial;
-        sample.smooth = input.precise;
-        recordWheelInput(sample, input, runtime, session, diagnostics, root);
         return dispatchWheel(runtime, session, diagnostics, interaction, root, point, input);
     }
 
@@ -140,17 +104,6 @@ namespace arrange::juce {
             return false;
         }
         const auto wheelResult = interaction.wheel(runtime.scene().tree(), root, point.x, point.y, input, runtime.publishedFrame().revision, runtime.publishedFrame().content.hitTest.get());
-        if (ScrollProbe::active())
-            for (const auto& [identity, value] : wheelResult.droppedPredictions) {
-                ScrollProbe::Sample sample;
-                sample.kind = ScrollProbe::Kind::PredictionReset;
-                sample.previousRevision = wheelResult.droppedFromRevision;
-                sample.revision = runtime.publishedFrame().revision;
-                sample.modifierIdentity = identity;
-                sample.value = value;
-                sample.queueDepth = wheelResult.droppedPredictions.size();
-                ScrollProbe::record(sample);
-            }
         if (wheelResult.wheelEvent) {
             auto payload = std::get<arrange::core::WheelEventPayload>(wheelResult.wheelEvent->payload);
             payload.modifiers = keyModifierState(::juce::ModifierKeys::getCurrentModifiers());
@@ -159,31 +112,6 @@ namespace arrange::juce {
         }
         if (wheelResult.locked && !wheelResult.scroll.target) return true;
         const auto& result = wheelResult.scroll;
-        if (ScrollProbe::active()) {
-            const auto logicalDistance = [&](float delta, arrange::core::WheelUnit unit) {
-                return delta * (unit == arrange::core::WheelUnit::Lines ? arrange::core::scrollLineDistance : unit == arrange::core::WheelUnit::Pages ? result.viewportSize : 1.0f);
-            };
-            ScrollProbe::Sample sample;
-            sample.kind = ScrollProbe::Kind::Route;
-            sample.deltaX = logicalDistance(input.deltaX, input.unitX);
-            sample.deltaY = logicalDistance(input.deltaY, input.unitY);
-            sample.phase = static_cast<std::uint8_t>(input.phase);
-            sample.momentumPhase = static_cast<std::uint8_t>(input.momentumPhase);
-            sample.nativePhases = input.nativePhases;
-            sample.sessionId = wheelResult.sessionId;
-            sample.locked = wheelResult.locked;
-            sample.sessionStarted = wheelResult.sessionStarted;
-            sample.sessionCancelled = wheelResult.sessionCancelled;
-            sample.revision = runtime.publishedFrame().revision;
-            sample.target = result.target;
-            sample.modifierIdentity = result.modifier.identity;
-            sample.horizontal = wheelResult.horizontal;
-            sample.consumed = result.consumed;
-            sample.valid = result.eventSlot.valid();
-            sample.value = result.value;
-            sample.maxValue = result.maxValue;
-            ScrollProbe::record(sample);
-        }
         if (!result.consumed) return false;
         runtime.enqueueIntent(arrange::core::InputIntent::wheel());
         runtime.enqueueScrollSnapshotEvent(result.eventSlot, result);

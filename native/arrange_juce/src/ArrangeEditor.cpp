@@ -3,7 +3,6 @@
 #if ARRANGE_JUCE_WITH_JUCE
 
 #include <arrange/juce/EditorSceneHost.h>
-#include "ScrollProbe.h"
 #include "PlatformWheelInput.h"
 #if JUCE_WINDOWS
 #include "WindowsPrecisionWheelSource.h"
@@ -48,14 +47,6 @@ namespace arrange::juce {
     }
 
     void EditorShellDriver::vblankTick(ArrangeEditor& editor, double nowMillis) const {
-        if (ScrollProbe::active()) {
-            ScrollProbe::Sample sample;
-            sample.kind = ScrollProbe::Kind::VBlank;
-            sample.sourceMillis = nowMillis;
-            sample.pending = editor.sceneHost_->wantsVBlank();
-            ScrollProbe::record(sample);
-        }
-
 #if JUCE_WINDOWS
         // 未测试！
         if (editor.precisionWheelSource_) editor.precisionWheelSource_->tick();
@@ -310,17 +301,6 @@ namespace arrange::juce {
 
     bool ArrangeEditor::keyPressed(const ::juce::KeyPress& key) {
 #if !defined(NDEBUG)
-        if (key.isKeyCode(::juce::KeyPress::F8Key)) {
-            const auto saved = ScrollProbe::toggle();
-            if (ScrollProbe::active()) {
-                if (auto* peer = getPeer()) peer->setTitle(::juce::String::fromUTF8("Arrange 滚动采样中 · F8 结束"));
-            } else if (!saved.empty()) {
-                if (auto* peer = getPeer()) peer->setTitle(::juce::String::fromUTF8("Arrange 采样已保存 · ") + ::juce::String(saved.string()));
-            }
-            return true;
-        }
-#endif
-#if !defined(NDEBUG)
         if (key.isKeyCode(::juce::KeyPress::F5Key)) {
             sceneHost_->manualReload(key.getModifiers().isCommandDown());
             shell_.afterTitleAndFrameRelevantChange(*this);
@@ -351,7 +331,7 @@ namespace arrange::juce {
             shell_.afterFrameRelevantChange(*this);
             return true;
         }
-        if (key.isKeyCode(::juce::KeyPress::F10Key) && key.getModifiers().getRawFlags() == 0 && sceneHost_->toggleFpsBadge()) {
+        if (key.isKeyCode(::juce::KeyPress::F8Key) && key.getModifiers().getRawFlags() == 0 && sceneHost_->toggleFpsBadge()) {
             shell_.afterFrameRelevantChange(*this);
             return true;
         }
@@ -449,7 +429,7 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::updateWindowTitle() {
-        const auto title = ScrollProbe::active() ? ::juce::String::fromUTF8("Arrange 滚动采样中 · F8 结束") : ::juce::String(sceneHost_->windowTitle(config_.window.title));
+        const auto title = ::juce::String(sceneHost_->windowTitle(config_.window.title));
         setName(title);
 
         if (auto* peer = getPeer()) peer->setTitle(title);

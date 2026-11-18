@@ -8,7 +8,6 @@
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/TextInputMutationSink.h>
-#include "ScrollProbe.h"
 #include <stdexcept>
 
 #include <string>
@@ -99,26 +98,6 @@ namespace arrange::juce {
                     callbacks.invalidateNativeState(*container, arrange::core::DirtyFlag::Layout);
                 }
             }
-        }
-        if (ScrollProbe::active()) {
-            auto sample = ScrollProbe::lastConsumed();
-            sample.kind = ScrollProbe::Kind::Publish;
-            sample.previousRevision = revision;
-            sample.revision = runtime.publishedFrame().revision;
-            sample.changed = sample.revision != revision;
-            sample.valid = frame.ok;
-            sample.pending = runtime.hasPendingFrameWork();
-            if (sample.target && runtime.scene().contains(sample.target)) {
-                const auto& node = runtime.scene().node(sample.target);
-                for (const auto& instance : node.modifier.elements()) {
-                    if (instance.handle.identity != sample.modifierIdentity) continue;
-                    const auto snapshot = arrange::core::ScrollDispatcher::snapshot(instance);
-                    sample.value = snapshot.value;
-                    sample.maxValue = snapshot.maxValue;
-                    break;
-                }
-            }
-            ScrollProbe::record(sample);
         }
         return runtime.publishedFrame().revision != revision;
     }

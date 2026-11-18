@@ -9,8 +9,6 @@
 #include "WheelInput.h"
 
 #include <optional>
-#include <utility>
-#include <vector>
 
 namespace arrange::core {
     struct PointerDownResult {
@@ -19,16 +17,9 @@ namespace arrange::core {
 
     struct WheelDispatchResult {
         ScrollResult scroll;
-        bool horizontal = false;
-        std::uint64_t sessionId = 0;
         bool locked = false;
-        bool sessionStarted = false;
-        bool sessionCancelled = false;
         // 会话锁定到 onWheel 受体时的交付，单位为逻辑 PX，向上 / 向左滚为正
         std::optional<PointerGestureEvent> wheelEvent;
-        // 发布修订变化时丢弃的预测滚动值（Modifier 身份、值），供平台层诊断
-        std::vector<std::pair<std::uint64_t, float>> droppedPredictions;
-        std::uint64_t droppedFromRevision = 0;
     };
 
     class PointerInputState {
@@ -57,7 +48,6 @@ namespace arrange::core {
 
        private:
         struct WheelSession {
-            std::uint64_t id = 0;
             bool active = false;
             bool nativePhases = false;
             bool preparing = false;
@@ -71,7 +61,6 @@ namespace arrange::core {
         };
 
         WheelSession wheelSession_;
-        std::uint64_t nextWheelSessionId_ = 0;
         HitTester hitTester_;
         PointerGestureSession gesture_;
         ScrollDispatcher scroll_;

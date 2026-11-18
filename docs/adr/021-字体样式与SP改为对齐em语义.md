@@ -4,7 +4,7 @@
 
 ## 背景
 
-M5-EX 要给文字加字体族、字重与字形，需求与两个平台的原型结论见 [M5-EX 需求与待办](../proj/m5：已完成/02-M5-EX需求与待办.md)。原型中发现一处与字体匹配无关、但必须先解决的问题：
+M5-EX 要给文字加字体族、字重与字形，需求与两个平台的原型结论见 [M5-EX 需求与待办](../proj/m5：已完成/02-已完成：M5-EX需求与待办.md)。原型中发现一处与字体匹配无关、但必须先解决的问题：
 
 - 文字的 `fontSize` 是 SP，名字对齐 Compose，落到 JUCE 却是 JUCE 高度（字体上下行之和），不是 em。换算系数因字体而异：Lucida Grande 0.849、Helvetica Neue 0.858、Arial 0.895、Avenir Next 0.732、PingFang SC 0.714。
 - 中日文回落字体沿用同一个 JUCE 高度，PingFang SC 的系数比拉丁字体小，同一行里中文比拉丁字母小约 16%。
@@ -33,7 +33,7 @@ M5-EX 要给文字加字体族、字重与字形，需求与两个平台的原�
 
 8. **字体环境代际一变，Text 与 Input 重新测量，含文字命令的绘制层重建。** 注册表任何变化都推进代际，排版服务读取代际并清空缓存，流水线运行前比较代际，变化时只标脏 Text、Input 所在节点（测量）和含文字命令的绘制 Modifier 所在节点（绘制），不整树失效；Canvas 的 `onDraw` 不重录，命令本身没变，只有排版结果换了。绘制层记录构建时的代际，代际不同即重建，因此缓存片段不会沿用旧字体的字形。运行时发现代际推进就请求一次流水线运行，不依赖其它失效。
 
-9. **平台分歧先在 Windows 施工，再在 macOS 验证。** macOS 的枚举（CoreText、Apple 刻度映射）、字面取用（`createSystemTypefaceFor` 以 CoreText 样式名取字面）、默认字体与伪造观感依原型结论实现，macOS 部分在 Windows 上无法编译，随后已在 macOS 上完成验证，逐项结论见 [M5-EX 需求与待办](../proj/m5：已完成/02-M5-EX需求与待办.md#macos-验证)。
+9. **平台分歧先在 Windows 施工，再在 macOS 验证。** macOS 的枚举（CoreText、Apple 刻度映射）、字面取用（`createSystemTypefaceFor` 以 CoreText 样式名取字面）、默认字体与伪造观感依原型结论实现，macOS 部分在 Windows 上无法编译，随后已在 macOS 上完成验证，逐项结论见 [M5-EX 需求与待办](../proj/m5：已完成/02-已完成：M5-EX需求与待办.md#macos-验证)。
 
 10. **文字只在视觉溢出时才裁剪。** 原先 `overflow: clip` 无条件裁到文字框，文字框宽度是前进量之和，斜体末字（真斜体与伪斜体都一样）伸出前进量的右上角被切掉。Compose 只在 `hasVisualOverflow && overflow != Visible` 时裁剪，而 `hasVisualOverflow` 指被截断或排版超出约束，字形突出不算，测量框也不含斜体突出。我们对齐：被截断或排版尺寸超出文字框才裁，布局与测量不变，绘制边界在不裁时取墨迹边界。
 

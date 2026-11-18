@@ -21,7 +21,6 @@
 #include <arrange/juce/RuntimePackageBinder.h>
 #include <arrange/juce/RuntimeSessionState.h>
 #include <arrange/juce/JuceTextInputAdapter.h>
-#include "ScrollProbe.h"
 
 #include <algorithm>
 #include <cmath>
@@ -207,12 +206,6 @@ namespace arrange::juce {
         }
 
         void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
-            if (ScrollProbe::active()) {
-                ScrollProbe::Sample sample;
-                sample.kind = ScrollProbe::Kind::Paint;
-                sample.revision = runtime_.publishedFrame().revision;
-                ScrollProbe::record(sample);
-            }
             lastPaintBounds_ = bounds;
             const auto& frame = runtime_.publishedFrame();
             const auto millis = paint_.paint(g, frame, overlayOps_);

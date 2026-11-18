@@ -8,7 +8,6 @@ namespace arrange::core {
     void PointerInputState::reset() {
         gesture_.reset();
         wheelSession_ = {};
-        nextWheelSessionId_ = 0;
         pendingScrollValues_.clear();
         scrollRevision_ = 0;
     }
@@ -56,15 +55,12 @@ namespace arrange::core {
         }
         WheelDispatchResult result;
         if (scrollRevision_ != publishedRevision) {
-            result.droppedFromRevision = scrollRevision_;
-            result.droppedPredictions.assign(pendingScrollValues_.begin(), pendingScrollValues_.end());
             pendingScrollValues_.clear();
             scrollRevision_ = publishedRevision;
         }
 
         const auto begin = [&] {
             wheelSession_ = {};
-            wheelSession_.id = ++nextWheelSessionId_;
             wheelSession_.active = true;
             wheelSession_.nativePhases = input.nativePhases;
             wheelSession_.lastInputMillis = input.timeMillis;
@@ -76,7 +72,6 @@ namespace arrange::core {
                         wheelSession_.candidate = item;
                         break;
                     }
-            result.sessionStarted = true;
         };
         const auto isCancellation = input.phase == WheelPhase::Cancelled || input.momentumPhase == WheelPhase::Cancelled;
         const auto hasDelta = (std::isfinite(input.deltaX) && input.deltaX != 0) || (std::isfinite(input.deltaY) && input.deltaY != 0);
@@ -94,11 +89,7 @@ namespace arrange::core {
             if (hasDelta && (!wheelSession_.active || wheelSession_.nativePhases || gap > wheelSequenceGapMillis || gap < 0)) begin();
         }
 
-        result.sessionId = wheelSession_.id;
-        if (isCancellation) {
-            cancelWheel();
-            result.sessionCancelled = true;
-        }
+        if (isCancellation) cancelWheel();
         if (wheelSession_.active) wheelSession_.lastInputMillis = input.timeMillis;
         if (!wheelSession_.active || wheelSession_.cancelled) return result;
 
@@ -123,36 +114,29 @@ namespace arrange::core {
         };
         if (wheelSession_.receptor) {
             result.locked = true;
-            if (!deliver(*wheelSession_.receptor)) {
-                cancelWheel();
-                result.sessionCancelled = true;
-            }
+            if (!deliver(*wheelSession_.receptor)) cancelWheel();
             if (input.momentumPhase == WheelPhase::Ended) wheelSession_.active = false;
             return result;
         }
         if (wheelSession_.target) {
-            result.horizontal = wheelSession_.target->horizontal;
             result.scroll = dispatch(*wheelSession_.target);
-            if (!result.scroll.target) {
-                cancelWheel();
-                result.sessionCancelled = true;
-            }
+            if (!result.scroll.target) cancelWheel();
         } else if (hasDelta) {
             const auto axisMagnitude = [](float delta, WheelUnit unit) {
                 return std::isfinite(delta) ? std::abs(delta) * (unit == WheelUnit::Lines ? scrollLineDistance : 1.0f) : 0.0f;
             };
-            result.horizontal = axisMagnitude(input.deltaX, input.unitX) > axisMagnitude(input.deltaY, input.unitY);
+            auto horizontal = axisMagnitude(input.deltaX, input.unitX) > axisMagnitude(input.deltaY, input.unitY);
             const auto hasAxis = [&](bool horizontal) {
                 for (const auto& target : wheelSession_.initialPath)
                     if (target.horizontal == horizontal && ScrollDispatcher::targetWheel(tree, target, 0, 1).target) return true;
                 return false;
             };
             // 主轴没有容器才允许改用次轴；边界不能让次轴噪声接管手势
-            if (!hasAxis(result.horizontal) && (result.horizontal ? input.deltaY : input.deltaX) != 0) result.horizontal = !result.horizontal;
+            if (!hasAxis(horizontal) && (horizontal ? input.deltaY : input.deltaX) != 0) horizontal = !horizontal;
             // onWheel 受体接受该轴且比同轴滚动容器更靠内时，整个会话交给它
-            if (const auto* receptor = wheelSession_.candidate ? liveInputModifier(tree, *wheelSession_.candidate) : nullptr; receptor && receptor->axis != (result.horizontal ? DragAxis::Vertical : DragAxis::Horizontal)) {
+            if (const auto* receptor = wheelSession_.candidate ? liveInputModifier(tree, *wheelSession_.candidate) : nullptr; receptor && receptor->axis != (horizontal ? DragAxis::Vertical : DragAxis::Horizontal)) {
                 const auto path = nodePath(tree, wheelSession_.candidate->node);
-                const auto inner = std::all_of(wheelSession_.initialPath.begin(), wheelSession_.initialPath.end(), [&](const auto& target) { return target.horizontal != result.horizontal || std::find(path.begin(), path.end(), target.node) != path.end(); });
+                const auto inner = std::all_of(wheelSession_.initialPath.begin(), wheelSession_.initialPath.end(), [&](const auto& target) { return target.horizontal != horizontal || std::find(path.begin(), path.end(), target.node) != path.end(); });
                 if (inner) {
                     wheelSession_.receptor = wheelSession_.candidate;
                     result.locked = true;
@@ -162,7 +146,7 @@ namespace arrange::core {
                 }
             }
             for (auto it = wheelSession_.initialPath.rbegin(); it != wheelSession_.initialPath.rend(); ++it) {
-                if (it->horizontal != result.horizontal) continue;
+                if (it->horizontal != horizontal) continue;
                 const auto candidate = dispatch(*it);
                 if (!candidate.target) continue;
                 result.scroll = candidate;

@@ -159,9 +159,6 @@ namespace arrange::juce {
         struct QueuedEvent {
             std::uint64_t sequence = 0;
             std::uint64_t ownerGeneration = 0;
-            std::uint64_t publishedRevision = 0;
-            double timestampMillis = 0;
-            std::uint64_t probeInputSequence = 0;
             QueuedEventKind kind = QueuedEventKind::Invoke;
             arrange::core::EventSlotId slot;
             std::string value;

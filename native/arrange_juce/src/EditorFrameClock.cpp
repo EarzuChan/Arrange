@@ -1,5 +1,4 @@
 #include <arrange/juce/EditorFrameClock.h>
-#include "ScrollProbe.h"
 
 #if ARRANGE_JUCE_WITH_JUCE
 
@@ -28,21 +27,9 @@ namespace arrange::juce {
     EditorFrameClock::~EditorFrameClock() = default;
 
     void EditorFrameClock::sync(::juce::Component& owner, bool running, VBlankTickCallback onVBlankTick) {
-        const auto wasActive = driver_ && driver_->active();
-        const auto recordClock = [&] {
-            if (!ScrollProbe::active()) return;
-            ScrollProbe::Sample sample;
-            sample.kind = ScrollProbe::Kind::Clock;
-            sample.peer = owner.getPeer() != nullptr;
-            sample.pending = running;
-            sample.valid = driver_ && driver_->active();
-            sample.changed = wasActive != sample.valid;
-            ScrollProbe::record(sample);
-        };
         // 无 peer 时保留待执行工作；不制造 timer 视觉帧
         if (!running || owner.getPeer() == nullptr) {
             stop();
-            recordClock();
             return;
         }
         if (!source_) {
@@ -50,7 +37,6 @@ namespace arrange::juce {
             driver_ = std::make_unique<VBlankFrameDriver>(*source_);
         }
         driver_->start(std::move(onVBlankTick));
-        recordClock();
     }
 
     void EditorFrameClock::stop() noexcept {
