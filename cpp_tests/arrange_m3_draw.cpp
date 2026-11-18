@@ -719,25 +719,51 @@ namespace {
                 return published;
             };
             arrange::juce::JuceDrawOpsPainter painter;
-            const auto draw = [&](const PublishedFrame& frame) {
+            painter.setSvgMaskCacheEnabled(true);
+            painter.setMetricsEnabled(true);
+            painter.bitmapCache().setNativeEnabled(true);
+            const auto draw = [&](arrange::juce::JuceDrawOpsPainter& replay, const PublishedFrame& frame) {
                 ::juce::Image image(::juce::Image::ARGB, 180, 140, true);
                 {
                     ::juce::Graphics graphics(image);
-                    painter.paint(graphics, frame.content.scenePaint);
+                    replay.paint(graphics, frame.content.scenePaint);
                 }
                 return image;
             };
-            const auto red = draw(publish(0xffff0000));
+            const auto red = draw(painter, publish(0xffff0000));
             check(red.getPixelAt(10, 10).getRed() > 240 && red.getPixelAt(10, 10).getGreen() < 20 && red.getPixelAt(10, 10).getAlpha() > 240, "tint 矢量没有按色着色");
             check(red.getPixelAt(1, 1).getAlpha() == 0, "tint 矢量的蒙版范围错误");
-            const auto blue = draw(publish(0xff0000ff));
+            const auto blue = draw(painter, publish(0xff0000ff));
             check(blue.getPixelAt(10, 10).getBlue() > 240 && blue.getPixelAt(10, 10).getRed() < 20, "换色后没有着新色");
             const auto counters = painter.bitmapCache().counters();
             check(counters.builds == 1 && counters.hits == 1 && counters.entries == 1, "tint 矢量换色重建了蒙版");
+            const auto cachedMetrics = painter.renderMetrics();
+            check(cachedMetrics.svgMaskBuilds == 1 && cachedMetrics.svgMaskHits == 1, "缓存蒙版的生成与命中指标错误");
+
+            // 关闭蒙版缓存后连续绘制必须重新生成，输出仍与缓存路径逐像素一致
+            painter.setSvgMaskCacheEnabled(false);
+            const auto frame = publish(0xffff0000);
+            for (int repeat = 0; repeat < 2; ++repeat) {
+                const auto uncached = draw(painter, frame);
+                for (int y = 0; y < red.getHeight(); ++y)
+                    for (int x = 0; x < red.getWidth(); ++x) check(red.getPixelAt(x, y) == uncached.getPixelAt(x, y), "关闭蒙版缓存改变了绘制像素");
+            }
+            const auto uncachedMetrics = painter.renderMetrics();
+            check(uncachedMetrics.svgMaskBuilds == cachedMetrics.svgMaskBuilds + 2 && uncachedMetrics.svgMaskHits == cachedMetrics.svgMaskHits, "关闭蒙版缓存后没有每次生成蒙版或误报命中");
+            check(painter.bitmapCache().counters().builds == counters.builds && painter.bitmapCache().counters().hits == counters.hits, "关闭蒙版缓存后仍经过位图缓存");
+
+            arrange::juce::JuceDrawOpsPainter quiet;
+            quiet.setSvgMaskCacheEnabled(false);
+            quiet.setMetricsEnabled(false);
+            draw(quiet, frame);
+            draw(quiet, frame);
+            const auto quietMetrics = quiet.renderMetrics();
+            check(!quiet.metricsEnabled() && quietMetrics.svgMaskBuilds == 0 && quietMetrics.svgMaskHits == 0 && quietMetrics.svgMaskMillis == 0, "关闭诊断后仍累计蒙版指标");
         }
         {
             // 位图缓存：条目为原生图，哈希索引在大量条目与淘汰下保持一致
             arrange::juce::BitmapCache cache;
+            cache.setNativeEnabled(true);
             const auto owner = std::make_shared<int>(1);
             const auto first = cache.get({owner, 1, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true, ::juce::SoftwareImageType()); });
             check(first.getPixelData()->createType()->getTypeID() == ::juce::NativeImageType().getTypeID(), "位图缓存条目没有转成原生图");
@@ -750,6 +776,64 @@ namespace {
             check(cache.counters().builds == builds && cache.counters().hits == 1, "最近条目没有命中");
             cache.get({owner, 1, 4, 4}, [] { return ::juce::Image(::juce::Image::ARGB, 4, 4, true); });
             check(cache.counters().builds == builds + 1, "已淘汰的条目被索引残留命中");
+        }
+        {
+            // native 开关只控制转换，关闭后软件图仍缓存并命中，不改变源图内容
+            const auto owner = std::make_shared<int>(2);
+            ::juce::Image source(::juce::Image::ARGB, 4, 4, true, ::juce::SoftwareImageType());
+            source.setPixelAt(1, 1, ::juce::Colour(0xff12ab34));
+            arrange::juce::BitmapCache software;
+            software.setNativeEnabled(false);
+            software.setMetricsEnabled(true);
+            check(!software.nativeEnabled() && software.metricsEnabled(), "位图缓存配置没有采用测试设置");
+            int softwareBuilds = 0;
+            const auto buildSoftware = [&] {
+                ++softwareBuilds;
+                return source;
+            };
+            const auto kept = software.get({owner, 1, 4, 4}, buildSoftware);
+            const auto repeated = software.get({owner, 1, 4, 4}, buildSoftware);
+            check(kept.getPixelData() == source.getPixelData() && repeated.getPixelData() == source.getPixelData() && kept.getPixelData()->createType()->getTypeID() == ::juce::SoftwareImageType().getTypeID(), "关闭 native 转换后没有保留软件源图");
+            const auto softwareCounters = software.counters();
+            check(softwareBuilds == 1 && softwareCounters.builds == 1 && softwareCounters.hits == 1 && softwareCounters.entries == 1 && softwareCounters.retainedBytes == 64, "关闭 native 转换改变了缓存命中或预算统计");
+            check(softwareCounters.nativeConversions == 0 && softwareCounters.nativeConvertBytes == 0 && softwareCounters.nativeConvertMillis == 0, "关闭 native 转换后仍报告转换");
+
+            // 开启转换时只在首次构建转一次，命中不再转换，源软件图保持原类型与像素
+            arrange::juce::BitmapCache native;
+            native.setNativeEnabled(true);
+            native.setMetricsEnabled(true);
+            const auto converted = native.get({owner, 1, 4, 4}, [&] { return source; });
+            const auto hit = native.get({owner, 1, 4, 4}, [&] { return source; });
+            check(native.nativeEnabled() && native.metricsEnabled() && converted.getPixelData()->createType()->getTypeID() == ::juce::NativeImageType().getTypeID(), "开启 native 转换后缓存结果不是原生图");
+            check(converted.getPixelData() != source.getPixelData() && hit.getPixelData() == converted.getPixelData(), "native 转换没有创建独立图像或命中发生了重复转换");
+            check(converted.getPixelAt(1, 1) == source.getPixelAt(1, 1) && source.getPixelData()->createType()->getTypeID() == ::juce::SoftwareImageType().getTypeID(), "native 转换改变了像素或源图类型");
+            const auto nativeCounters = native.counters();
+            check(nativeCounters.builds == 1 && nativeCounters.hits == 1 && nativeCounters.nativeConversions == 1 && nativeCounters.nativeConvertBytes == 64, "native 转换次数或字节数重复累计");
+
+            // 原生输入直接复用，不计转换次数、字节数与转换耗时
+            arrange::juce::BitmapCache alreadyNative;
+            alreadyNative.setNativeEnabled(true);
+            alreadyNative.setMetricsEnabled(true);
+            const auto reused = alreadyNative.get({owner, 1, 4, 4}, [&] { return converted; });
+            const auto alreadyCounters = alreadyNative.counters();
+            check(reused.getPixelData() == converted.getPixelData() && alreadyCounters.builds == 1 && alreadyCounters.entries == 1, "原生输入没有直接复用并缓存");
+            check(alreadyCounters.nativeConversions == 0 && alreadyCounters.nativeConvertBytes == 0 && alreadyCounters.nativeConvertMillis == 0, "原生输入虚报了转换指标");
+
+            // 关闭诊断仍执行转换并正常缓存，所有新增诊断保持为零
+            arrange::juce::BitmapCache quiet;
+            quiet.setNativeEnabled(true);
+            quiet.setMetricsEnabled(false);
+            const auto quietImage = quiet.get({owner, 1, 4, 4}, [&] { return source; });
+            quiet.get({owner, 1, 4, 4}, [&] { return source; });
+            const auto quietCounters = quiet.counters();
+            check(!quiet.metricsEnabled() && quietImage.getPixelData()->createType()->getTypeID() == ::juce::NativeImageType().getTypeID() && quietCounters.builds == 1 && quietCounters.hits == 1, "关闭诊断改变了 native 转换或缓存行为");
+            check(quietCounters.buildMillis == 0 && quietCounters.nativeConvertMillis == 0 && quietCounters.nativeConversions == 0 && quietCounters.nativeConvertBytes == 0, "关闭诊断后仍累计新增位图指标");
+
+            // 运行中关闭诊断不再更新累计值，但新条目仍转换
+            native.setMetricsEnabled(false);
+            native.get({owner, 2, 4, 4}, [&] { return source; });
+            const auto pausedCounters = native.counters();
+            check(pausedCounters.builds == 2 && pausedCounters.entries == 2 && pausedCounters.buildMillis == nativeCounters.buildMillis && pausedCounters.nativeConvertMillis == nativeCounters.nativeConvertMillis && pausedCounters.nativeConversions == nativeCounters.nativeConversions && pausedCounters.nativeConvertBytes == nativeCounters.nativeConvertBytes, "暂停诊断后仍更新累计指标或停止构建缓存");
         }
     }
 

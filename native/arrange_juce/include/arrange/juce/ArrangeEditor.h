@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
+#include <optional>
 #include <utility>
 #include <arrange/Log.h>
 #include <arrange/core/Interop.h>
@@ -95,6 +97,8 @@ namespace arrange::juce {
         // 诊断第 0 层的只读时间线；叠加层开启时自动记录，也可单独开启
         void setFrameTimelineEnabled(bool enabled);
         [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const;
+        // 只读定位文本或语义标签对应的可见点击点，不派发事件或改变状态
+        [[nodiscard]] std::optional<::juce::Point<float>> diagnosticClickPoint(std::string_view text) const;
 
         void paint(::juce::Graphics& g) override;
         void resized() override;

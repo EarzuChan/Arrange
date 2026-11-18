@@ -131,6 +131,10 @@ namespace arrange::juce {
         return sceneHost_->frameTimeline();
     }
 
+    std::optional<::juce::Point<float>> ArrangeEditor::diagnosticClickPoint(std::string_view text) const {
+        return sceneHost_->diagnosticClickPoint(text);
+    }
+
     void ArrangeEditor::reload() {
         sceneHost_->reload();
         shell_.afterReload(*this);
@@ -146,8 +150,7 @@ namespace arrange::juce {
     }
 
     void ArrangeEditor::paint(::juce::Graphics& g) {
-        // 编辑器在窗口里的逻辑位置：滚动图块的物理像素对齐要按窗口坐标算
-        sceneHost_->paint(g, getLocalBounds(), getTopLevelComponent()->getLocalPoint(this, ::juce::Point<float>()));
+        sceneHost_->paint(g, getLocalBounds());
         scheduleDevReadyCheck();
     }
 

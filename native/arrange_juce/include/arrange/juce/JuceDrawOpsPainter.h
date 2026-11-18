@@ -2,8 +2,9 @@
 
 #include <arrange/core/LayoutNode.h>
 #include <arrange/core/Paint.h>
+#include <arrange/core/RenderFrameMetrics.h>
+#include <arrange/juce/RenderMetricsTimer.h>
 #include <arrange/juce/BitmapCache.h>
-#include <arrange/juce/ScrollTileCache.h>
 #include <arrange/juce/ErrorScreenModel.h>
 
 #if ARRANGE_JUCE_WITH_JUCE
@@ -40,15 +41,20 @@ namespace arrange::juce {
             cullingEnabled_ = enabled;
         }
 
-        // 关闭后滚动层一律直接绘制，用于与图块绘制逐像素对照
-        void setScrollTilesEnabled(bool enabled) noexcept {
-            scrollTilesEnabled_ = enabled;
+        void setSvgMaskCacheEnabled(bool enabled) noexcept {
+            svgMaskCacheEnabled_ = enabled;
         }
 
-        // 绘制目标原点在窗口中的逻辑位置：编辑器不一定贴着窗口左上角，物理像素对齐要按窗口坐标算
-        void setDeviceOrigin(::juce::Point<float> origin) noexcept {
-            deviceOrigin_ = origin;
+        void setMetricsEnabled(bool enabled) noexcept {
+            metricsEnabled_ = enabled;
+            bitmapCache_.setMetricsEnabled(enabled);
         }
+
+        bool metricsEnabled() const noexcept {
+            return metricsEnabled_;
+        }
+
+        arrange::core::RenderFrameMetrics renderMetrics() const;
 
         PaintReplayCounters counters() const noexcept {
             return counters_;
@@ -61,11 +67,6 @@ namespace arrange::juce {
         // 渐变、阴影与模糊等离屏结果的缓存，跨帧保留
         BitmapCache& bitmapCache() const noexcept {
             return bitmapCache_;
-        }
-
-        // 滚动层的图块缓存，跨帧保留
-        ScrollTileCache& scrollTiles() const noexcept {
-            return scrollTiles_;
         }
 
        private:
@@ -81,20 +82,14 @@ namespace arrange::juce {
         ::juce::Image sweepImage(::juce::Graphics& g, const arrange::core::GradientRef& gradient, ::juce::Rectangle<float> box, ::juce::Rectangle<float> area) const;
         // 效果层的重放；返回 true 表示子片段已由效果自行绘制
         bool replayEffect(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& placed, const arrange::core::EffectModifier& effect, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const;
-        // 滚动层的子片段改取内容坐标系的图块绘制；不满足条件时返回 false，由调用方直接重放
-        bool replayScrollTiles(::juce::Graphics& graphics, const arrange::core::PlacedPaintFragment& scrollLayer, const arrange::core::PlacedPaintFragment& content, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const;
-        void repaintScrollTile(ScrollTileCache::Tile& tile, arrange::core::Point tileOrigin, float scale, const std::shared_ptr<const arrange::core::PaintFragment>& content, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps) const;
-        ::juce::Image buildScrollTile(const std::shared_ptr<const arrange::core::PaintFragment>& content, arrange::core::Point tileOrigin, float scale, arrange::core::ModifierHandle focusedInputModifier, std::span<const arrange::core::DrawOp> focusedInputOps) const;
         // 从根重放到目标片段之前，得到目标层局部 area 内已绘制的内容
         ::juce::Image captureBackdrop(const arrange::core::PlacedPaintFragment& target, ::juce::Rectangle<float> area, float scale, int width, int height) const;
 
         bool cullingEnabled_ = true;
-        bool scrollTilesEnabled_ = true;
-        ::juce::Point<float> deviceOrigin_;
-        // 图块栅格化途中，不嵌套提升
-        mutable bool inTile_ = false;
+        bool svgMaskCacheEnabled_ = renderEnvironmentFlag("ARRANGE_SVG_MASK_CACHE", true);
+        bool metricsEnabled_ = renderEnvironmentFlag("ARRANGE_RENDER_METRICS", false);
+        mutable arrange::core::RenderFrameMetrics renderMetrics_;
         mutable BitmapCache bitmapCache_;
-        mutable ScrollTileCache scrollTiles_;
         mutable PaintReplayCounters counters_;
         // 背景模糊需要回到根重放：记录根、焦点输入与当前层局部到根的逻辑变换
         mutable const arrange::core::PlacedPaintFragment* root_ = nullptr;

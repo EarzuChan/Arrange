@@ -31,24 +31,14 @@ namespace arrange::juce {
             drawOpsPainter_.setCullingEnabled(enabled);
         }
 
-        void setScrollTilesEnabled(bool enabled) noexcept {
-            drawOpsPainter_.setScrollTilesEnabled(enabled);
-        }
-
-        void setDeviceOrigin(::juce::Point<float> origin) noexcept {
-            drawOpsPainter_.setDeviceOrigin(origin);
-        }
-
-        void setScrollTileBudget(std::size_t bytes) {
-            drawOpsPainter_.scrollTiles().setBudget(bytes);
-        }
-
         PaintReplayCounters replayCounters() const noexcept {
             return drawOpsPainter_.counters();
         }
 
-        ScrollTileCounters scrollTileCounters() const noexcept {
-            return drawOpsPainter_.scrollTiles().counters();
+        arrange::core::RenderFrameMetrics renderMetrics() const {
+            auto result = drawOpsPainter_.renderMetrics();
+            if (drawOpsPainter_.metricsEnabled()) result.paints = fullViewportPaints_;
+            return result;
         }
 
         double paintMillis() const noexcept {

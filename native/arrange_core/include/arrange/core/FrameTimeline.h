@@ -2,6 +2,7 @@
 
 #include "Geometry.h"
 #include "Repaint.h"
+#include "RenderFrameMetrics.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +47,8 @@ namespace arrange::core {
         std::size_t nodes = 0;
         // 场景脏区，不含诊断叠加层自身的重绘
         RepaintRegion repaint;
+        // 此修订最后一次绘制后的累计重放计数，逐帧差分由相邻快照取得
+        RenderFrameMetrics render;
     };
 
     // 最近若干帧的环形时间线；关闭时 record 直接返回，管线也不准备记录
@@ -118,10 +121,13 @@ namespace arrange::core {
         }
 
         // 宿主重放发布帧后补记绘制耗时；同一修订多次重放累加
-        void notePaint(std::uint64_t revision, double millis) noexcept {
+        void notePaint(std::uint64_t revision, double millis, const RenderFrameMetrics& render = {}) noexcept {
             if (!enabled_ || records_.empty()) return;
             auto& last = records_[(head_ + records_.size() - 1) % records_.size()];
-            if (last.revision == revision && !last.failed) last.millis.paint += millis;
+            if (last.revision == revision && !last.failed) {
+                last.millis.paint += millis;
+                last.render = render;
+            }
         }
 
         void clear() noexcept {

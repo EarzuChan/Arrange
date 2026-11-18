@@ -2,7 +2,6 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-#include <arrange/core/Repaint.h>
 #include <arrange/juce/NativePainters.h>
 #include <arrange/juce/PainterResources.h>
 #include <arrange/juce/JuceTextServices.h>
@@ -202,26 +201,6 @@ namespace arrange::juce {
             return std::any_of(fragment.children.begin(), fragment.children.end(), [&](const auto& child) { return child.fragment && containsFocusedInput(*child.fragment, focused); });
         }
 
-        bool isScrollLayer(const arrange::core::PaintLayerFragment& layer) {
-            const auto* semantics = std::get_if<arrange::core::LayoutModifierSemantics>(&layer.value);
-            return semantics && semantics->enabled && (semantics->kind == arrange::core::LayoutModifierKind::VerticalScroll || semantics->kind == arrange::core::LayoutModifierKind::HorizontalScroll);
-        }
-
-        bool hasInputOps(std::span<const arrange::core::DrawOp> ops) {
-            return std::any_of(ops.begin(), ops.end(), [](const auto& op) { return op.inputText; });
-        }
-
-        // 子树是否含背景模糊（依赖根重放）与 Input（可能成为焦点而带光标与选区）
-        void scanTraits(const arrange::core::PaintFragment& fragment, bool& backdrop, bool& input) {
-            if (fragment.layer) {
-                if (const auto* effect = std::get_if<arrange::core::EffectModifier>(&fragment.layer->value); effect && effect->kind == arrange::core::EffectKind::BackdropBlur) backdrop = true;
-                if (hasInputOps(fragment.layer->before) || hasInputOps(fragment.layer->after)) input = true;
-            }
-            if (fragment.content && hasInputOps(*fragment.content)) input = true;
-            for (const auto& child : fragment.children)
-                if (child.fragment) scanTraits(*child.fragment, backdrop, input);
-        }
-
         // 截取背景只画到目标为止；目标在子树里时子树画不完整，不能写进缓存
         bool containsPlacement(const arrange::core::PlacedPaintFragment& placed, const arrange::core::PlacedPaintFragment* target) {
             if (&placed == target) return true;
@@ -327,13 +306,18 @@ namespace arrange::juce {
                 const auto scale = std::round(std::clamp(g.getInternalContext().getPhysicalPixelScaleFactor(), 0.25f, 8.0f) * 16.0f) / 16.0f;
                 const auto width = std::clamp(static_cast<int>(std::ceil(rect.getWidth() * scale)), 1, 4096), height = std::clamp(static_cast<int>(std::ceil(rect.getHeight() * scale)), 1, 4096);
                 const auto detail = CacheDetail{}.add(0x7a5cu).add(op.painter.frame).add(op.painter.frames).add(op.painter.horizontal).add(static_cast<int>(op.contentScale)).add(static_cast<int>(op.alignment)).add(rect.getWidth()).add(rect.getHeight()).add(scale).value();
-                const auto mask = bitmapCache_.get({content, detail, width, height}, [&] {
+                const auto buildMask = [&] {
+                    RenderMetricsTimer timer(metricsEnabled_, renderMetrics_.svgMaskMillis);
+                    if (metricsEnabled_) ++renderMetrics_.svgMaskBuilds;
                     ::juce::Image result(::juce::Image::ARGB, width, height, true, ::juce::SoftwareImageType());
                     ::juce::Graphics graphics(result);
                     graphics.addTransform(::juce::AffineTransform::scale(static_cast<float>(width) / rect.getWidth(), static_cast<float>(height) / rect.getHeight()));
                     drawVector(graphics, *juceContent->vector, vectorBounds, rect.withZeroOrigin(), op, 1.0f);
                     return result;
-                });
+                };
+                const auto buildsBefore = renderMetrics_.svgMaskBuilds;
+                const auto mask = svgMaskCacheEnabled_ ? bitmapCache_.get({content, detail, width, height}, buildMask) : buildMask();
+                if (metricsEnabled_ && svgMaskCacheEnabled_ && buildsBefore == renderMetrics_.svgMaskBuilds) ++renderMetrics_.svgMaskHits;
                 g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 g.drawImage(mask, rect, ::juce::RectanglePlacement::stretchToFit, true);
             } else
@@ -411,6 +395,21 @@ namespace arrange::juce {
         // 超出整数裁剪接口的范围时保留绘制，避免转换溢出造成漏画
         if (std::max({std::abs(r.x), std::abs(r.y), std::abs(r.x + r.width), std::abs(r.y + r.height)}) > 100000000.0f) return false;
         return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
+    }
+
+    arrange::core::RenderFrameMetrics JuceDrawOpsPainter::renderMetrics() const {
+        if (!metricsEnabled_) return {};
+        auto result = renderMetrics_;
+        const auto bitmaps = bitmapCache_.counters();
+        result.bitmapHits = bitmaps.hits;
+        result.bitmapBuilds = bitmaps.builds;
+        result.bitmapEvictions = bitmaps.evictions;
+        result.bitmapRetainedBytes = bitmaps.retainedBytes;
+        result.bitmapBuildMillis = bitmaps.buildMillis;
+        result.nativeConvertMillis = bitmaps.nativeConvertMillis;
+        result.nativeConversions = bitmaps.nativeConversions;
+        result.nativeBytes = bitmaps.nativeConvertBytes;
+        return result;
     }
 
     JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focused, float, std::span<const arrange::core::DrawOp> focusedInputOps) const {
@@ -496,9 +495,7 @@ namespace arrange::juce {
                 if (fragment.layer) replayOps(g, fragment.layer->before, focused, focusedInputOps, alpha, depth);
                 const auto contentAlpha = alpha * (fragment.layer ? fragment.layer->contentAlpha : 1.0f);
                 if (fragment.content) replayOps(g, *fragment.content, focused, focusedInputOps, contentAlpha, depth);
-                const auto tiled = fragment.layer && fragment.children.size() == 1 && isScrollLayer(*fragment.layer);
-                for (const auto& child : fragment.children)
-                    if (!tiled || !replayScrollTiles(g, placed, child, focused, focusedInputOps, contentAlpha)) replayFragment(g, child, focused, focusedInputOps, contentAlpha);
+                for (const auto& child : fragment.children) replayFragment(g, child, focused, focusedInputOps, contentAlpha);
                 if (fragment.layer) replayOps(g, fragment.layer->after, focused, focusedInputOps, alpha, depth);
             }
         } catch (...) {
@@ -656,180 +653,6 @@ namespace arrange::juce {
             }
         }
         return false;
-    }
-
-    ::juce::Image JuceDrawOpsPainter::buildScrollTile(const std::shared_ptr<const arrange::core::PaintFragment>& content, arrange::core::Point tileOrigin, float scale, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps) const {
-        ::juce::Image image(::juce::Image::ARGB, ScrollTileCache::tilePixels, ScrollTileCache::tilePixels, true, ::juce::NativeImageType());
-        const auto savedTransform = transform_;
-        auto savedStack = std::move(transformStack_);
-        transformStack_.clear();
-        transform_ = {};
-        inTile_ = true;
-        const auto restore = [&] {
-            inTile_ = false;
-            transform_ = savedTransform;
-            transformStack_ = std::move(savedStack);
-        };
-        try {
-            ::juce::Graphics graphics(image);
-            graphics.addTransform(::juce::AffineTransform::translation(-tileOrigin.x, -tileOrigin.y).scaled(scale));
-            replayFragment(graphics, {content, {}}, focused, focusedInputOps, 1.0f);
-        } catch (...) {
-            restore();
-            throw;
-        }
-        restore();
-        return image;
-    }
-
-    void JuceDrawOpsPainter::repaintScrollTile(ScrollTileCache::Tile& tile, arrange::core::Point tileOrigin, float scale, const std::shared_ptr<const arrange::core::PaintFragment>& content, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps) const {
-        const auto savedTransform = transform_;
-        auto savedStack = std::move(transformStack_);
-        transformStack_.clear();
-        transform_ = {};
-        inTile_ = true;
-        const auto restore = [&] {
-            inTile_ = false;
-            transform_ = savedTransform;
-            transformStack_ = std::move(savedStack);
-        };
-        try {
-            ::juce::Graphics graphics(tile.image);
-            for (const auto& rect : tile.dirty) {
-                // 标脏范围换算为图块像素并向外取整，在像素空间里清除、裁剪，再按图块的变换重放
-                const auto left = static_cast<int>(std::floor((rect.getX() - tileOrigin.x) * scale)), top = static_cast<int>(std::floor((rect.getY() - tileOrigin.y) * scale));
-                const auto right = static_cast<int>(std::ceil((rect.getRight() - tileOrigin.x) * scale)), bottom = static_cast<int>(std::ceil((rect.getBottom() - tileOrigin.y) * scale));
-                const auto pixels = ::juce::Rectangle<int>::leftTopRightBottom(left, top, right, bottom).getIntersection({0, 0, ScrollTileCache::tilePixels, ScrollTileCache::tilePixels});
-                if (pixels.isEmpty()) continue;
-                ::juce::Graphics::ScopedSaveState scope(graphics);
-                graphics.reduceClipRegion(pixels);
-                graphics.setColour(::juce::Colours::transparentBlack);
-                graphics.getInternalContext().fillRect(pixels, true);
-                graphics.addTransform(::juce::AffineTransform::translation(-tileOrigin.x, -tileOrigin.y).scaled(scale));
-                replayFragment(graphics, {content, {}}, focused, focusedInputOps, 1.0f);
-            }
-        } catch (...) {
-            restore();
-            throw;
-        }
-        restore();
-        tile.dirty.clear();
-    }
-
-    bool JuceDrawOpsPainter::replayScrollTiles(::juce::Graphics& g, const arrange::core::PlacedPaintFragment& scrollLayer, const arrange::core::PlacedPaintFragment& child, arrange::core::ModifierHandle focused, std::span<const arrange::core::DrawOp> focusedInputOps, float alpha) const {
-        const auto& content = child.fragment;
-        if (!scrollTilesEnabled_ || inTile_ || stopAt_ || !content) return false;
-        auto& counters = scrollTiles_.mutableCounters();
-        const auto direct = [&] {
-            ++counters.layersDirect;
-            return false;
-        };
-        // 图块是整层合成，只在与逐操作透明度等价、且只有平移的条件下使用
-        if (alpha < 0.9999f) return direct();
-        const auto& t = transform_;
-        if (std::abs(t.mat00 - 1.0f) > 1e-4f || std::abs(t.mat11 - 1.0f) > 1e-4f || std::abs(t.mat01) > 1e-4f || std::abs(t.mat10) > 1e-4f) return direct();
-        const auto& bounds = content->bounds;
-        if (!bounds.known || !std::isfinite(bounds.rect.x) || !std::isfinite(bounds.rect.y) || !std::isfinite(bounds.rect.width) || !std::isfinite(bounds.rect.height)) return direct();
-        if (bounds.empty) return true;
-
-        auto& state = scrollTiles_.layer(scrollLayer.fragment->layer);
-        const auto scale = std::clamp(g.getInternalContext().getPhysicalPixelScaleFactor(), 0.25f, 8.0f);
-        if (state.scale != scale) {
-            scrollTiles_.clear(state);
-            state.content.reset();
-            state.scale = scale;
-        }
-        const auto extent = static_cast<float>(ScrollTileCache::tilePixels) / scale;
-        // 网格锚点取内容边界左上角并对齐物理像素；已有图块时保持不变，图块索引才有意义
-        if (state.tiles.empty()) {
-            state.gridX = std::floor(bounds.rect.x * scale) / scale;
-            state.gridY = std::floor(bounds.rect.y * scale) / scale;
-        }
-        // 内容原点的设备位置吸附到物理像素：图块以整数像素对齐绘制，不重采样；吸附只作用于绘制
-        // 设备位置按窗口坐标算：编辑器原点是逻辑整数位置，乘以缩放后可能落在半个像素上
-        const auto originX = deviceOrigin_.x + t.getTranslationX() + child.offset.x, originY = deviceOrigin_.y + t.getTranslationY() + child.offset.y;
-        const arrange::core::Point origin{child.offset.x + std::round(originX * scale) / scale - originX, child.offset.y + std::round(originY * scale) / scale - originY};
-        const auto clip = g.getClipBounds().toFloat().expanded(1.0f).translated(-origin.x, -origin.y);
-        const auto visible = clip.getIntersection(::juce::Rectangle<float>(bounds.rect.x, bounds.rect.y, bounds.rect.width, bounds.rect.height));
-
-        const auto hadContent = state.content != nullptr;
-        const auto changed = state.content != content;
-        // 本次内容变化落在可见范围内的面积，用来判断内容是否在持续大面积变化
-        auto changedArea = 0.0f;
-        auto changedWhole = false;
-        if (changed) {
-            // 内容换新：比较新旧片段树，变化范围内的图块标脏、之后只局部重画；范围无法界定时全部失效
-            if (hadContent && !state.tiles.empty()) {
-                arrange::core::RepaintLimits limits;
-                limits.maxCollectedRects = 256;
-                arrange::core::RepaintDamage damage(limits);
-                damage.compareScene({state.content, {}}, {content, {}});
-                if (damage.full()) {
-                    scrollTiles_.clear(state);
-                    changedWhole = true;
-                } else {
-                    const auto tileArea = extent * extent;
-                    for (const auto& rect : damage.collected()) {
-                        const ::juce::Rectangle<float> area(rect.x - 1.0f, rect.y - 1.0f, rect.width + 2.0f, rect.height + 2.0f);
-                        const auto inView = area.getIntersection(visible);
-                        changedArea += inView.getWidth() * inView.getHeight();
-                        const auto column0 = static_cast<int>(std::floor((area.getX() - state.gridX) / extent)), column1 = static_cast<int>(std::floor((area.getRight() - state.gridX) / extent));
-                        const auto row0 = static_cast<int>(std::floor((area.getY() - state.gridY) / extent)), row1 = static_cast<int>(std::floor((area.getBottom() - state.gridY) / extent));
-                        for (auto row = row0; row <= row1; ++row)
-                            for (auto column = column0; column <= column1; ++column) {
-                                const ::juce::Rectangle<float> tile(state.gridX + static_cast<float>(column) * extent, state.gridY + static_cast<float>(row) * extent, extent, extent);
-                                scrollTiles_.markDirty(state, ScrollTileCache::pack(column, row), area.getIntersection(tile), tileArea);
-                            }
-                    }
-                }
-            } else if (!state.tiles.empty()) {
-                scrollTiles_.clear(state);
-            }
-            state.hasBackdrop = false;
-            state.hasInput = false;
-            scanTraits(*content, state.hasBackdrop, state.hasInput);
-            state.content = content;
-        }
-        if (state.hasBackdrop) return direct();
-        if (state.hasInput && focused.valid() && containsFocusedInput(*content, focused)) return direct();
-        if (visible.isEmpty()) return true;
-        const auto column0 = static_cast<int>(std::floor((visible.getX() - state.gridX) / extent)), column1 = static_cast<int>(std::ceil((visible.getRight() - state.gridX) / extent)) - 1;
-        const auto row0 = static_cast<int>(std::floor((visible.getY() - state.gridY) / extent)), row1 = static_cast<int>(std::ceil((visible.getBottom() - state.gridY) / extent)) - 1;
-        const auto count = static_cast<std::size_t>(column1 - column0 + 1) * static_cast<std::size_t>(row1 - row0 + 1);
-        if (count * ScrollTileCache::tileBytes > scrollTiles_.budget()) return direct();
-        // 内容在持续大面积变化时图块得不偿失：连续三次绘制，内容变化都覆盖了可见范围的一半以上，就改为直接绘制
-        // 只看内容变化的面积，滚动新进入的图块不算；内容一旦稳定或变化变小就恢复
-        const auto heavy = changed && hadContent && (changedWhole || changedArea * 2.0f >= visible.getWidth() * visible.getHeight());
-        state.churn = heavy ? state.churn + 1 : 0;
-        if (state.churn >= 3) {
-            ++counters.demotions;
-            return direct();
-        }
-
-        ::juce::Graphics::ScopedSaveState scope(g);
-        g.setOpacity(1.0f);
-        // 图块与设备像素一一对应，最近邻采样：万一偏离整数像素也只是平移不到半个像素，不会模糊
-        g.setImageResamplingQuality(::juce::Graphics::lowResamplingQuality);
-        for (auto row = row0; row <= row1; ++row)
-            for (auto column = column0; column <= column1; ++column) {
-                const auto key = ScrollTileCache::pack(column, row);
-                auto found = state.tiles.find(key);
-                if (found == state.tiles.end()) {
-                    auto image = buildScrollTile(content, {state.gridX + static_cast<float>(column) * extent, state.gridY + static_cast<float>(row) * extent}, scale, focused, focusedInputOps);
-                    found = state.tiles.emplace(key, ScrollTileCache::Tile{std::move(image), 0}).first;
-                    scrollTiles_.added();
-                } else if (!found->second.dirty.empty()) {
-                    // 图块里只有一小块内容变了：清掉那一块并只重放它，不整块重建
-                    repaintScrollTile(found->second, {state.gridX + static_cast<float>(column) * extent, state.gridY + static_cast<float>(row) * extent}, scale, content, focused, focusedInputOps);
-                    ++counters.tilesRepainted;
-                } else
-                    ++counters.tileHits;
-                found->second.used = scrollTiles_.touch();
-                g.drawImage(found->second.image, ::juce::Rectangle<float>(origin.x + state.gridX + static_cast<float>(column) * extent, origin.y + state.gridY + static_cast<float>(row) * extent, extent, extent), ::juce::RectanglePlacement::stretchToFit);
-            }
-        ++counters.layersTiled;
-        scrollTiles_.trim();
-        return true;
     }
 
     ::juce::Image JuceDrawOpsPainter::captureBackdrop(const arrange::core::PlacedPaintFragment& target, ::juce::Rectangle<float> area, float scale, int width, int height) const {

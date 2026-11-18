@@ -181,8 +181,38 @@ namespace arrange::juce {
             session_.resize(width, height, runtime_);
         }
 
-        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin) {
-            paint_.setDeviceOrigin(origin);
+        std::optional<::juce::Point<float>> diagnosticClickPoint(std::string_view text) const {
+            const auto& tree = runtime_.scene().tree();
+            const auto& hit = runtime_.publishedFrame().content.hitTest;
+            if (!hit) return std::nullopt;
+            const auto regions = arrange::core::exportHitRegions(*hit);
+            const ::juce::Rectangle<float> viewport(0, 0, static_cast<float>(lastPaintBounds_.getWidth()), static_cast<float>(lastPaintBounds_.getHeight()));
+            for (const auto id : tree.nodeIds()) {
+                bool matches = false;
+                for (const auto& instance : tree.node(id).modifier.elements()) {
+                    const auto& value = instance.descriptor.value;
+                    if (arrange::core::textPresentation(value) && arrange::core::modifierText(value) == text) matches = true;
+                    if (const auto* semantics = std::get_if<arrange::core::SemanticsModifier>(&value); semantics && semantics->label == text) matches = true;
+                }
+                if (!matches) continue;
+                for (std::optional<arrange::core::NodeId> ancestor = id; ancestor; ancestor = tree.parentOf(*ancestor)) {
+                    for (const auto& region : regions) {
+                        if (!region.target.clickable || region.target.node != *ancestor) continue;
+                        const auto area = viewport.getIntersection({region.bounds.x, region.bounds.y, region.bounds.width, region.bounds.height});
+                        if (area.isEmpty()) continue;
+                        for (const auto x : {0.5f, 0.25f, 0.75f})
+                            for (const auto y : {0.5f, 0.25f, 0.75f}) {
+                                const auto point = area.getPosition() + ::juce::Point<float>(area.getWidth() * x, area.getHeight() * y);
+                                const auto target = arrange::core::HitTester{}.hitTestClickable(*hit, {point.x, point.y});
+                                if (target.hit && target.eventSlot == region.target.eventSlot) return point;
+                            }
+                    }
+                }
+            }
+            return std::nullopt;
+        }
+
+        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
             if (ScrollProbe::active()) {
                 ScrollProbe::Sample sample;
                 sample.kind = ScrollProbe::Kind::Paint;
@@ -192,7 +222,7 @@ namespace arrange::juce {
             lastPaintBounds_ = bounds;
             const auto& frame = runtime_.publishedFrame();
             const auto millis = paint_.paint(g, frame, overlayOps_);
-            runtime_.frameTimeline().notePaint(frame.revision, millis);
+            runtime_.frameTimeline().notePaint(frame.revision, millis, paint_.renderMetrics());
         }
 
         void pointerMove(const ::juce::MouseEvent& event) {
@@ -468,8 +498,12 @@ namespace arrange::juce {
         impl_->resized(width, height);
     }
 
-    void EditorSceneHost::paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin) {
-        impl_->paint(g, bounds, origin);
+    std::optional<::juce::Point<float>> EditorSceneHost::diagnosticClickPoint(std::string_view text) const {
+        return impl_->diagnosticClickPoint(text);
+    }
+
+    void EditorSceneHost::paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
+        impl_->paint(g, bounds);
     }
 
     void EditorSceneHost::pointerMove(const ::juce::MouseEvent& event) {

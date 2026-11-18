@@ -44,6 +44,7 @@ namespace arrange::juce {
         [[nodiscard]] arrange::core::OverlayLayers diagnosticsOverlayLayers() const;
         void setFrameTimelineEnabled(bool enabled);
         [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const;
+        [[nodiscard]] std::optional<::juce::Point<float>> diagnosticClickPoint(std::string_view text) const;
 
         void repaintDirty(::juce::Component& owner);
         [[nodiscard]] bool wantsVBlank() const;
@@ -52,8 +53,7 @@ namespace arrange::juce {
         [[nodiscard]] std::string windowTitle(std::string_view baseTitle) const;
 
         void resized(int width, int height);
-        // origin 为绘制目标在窗口中的逻辑位置，供滚动图块按设备像素对齐
-        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds, ::juce::Point<float> origin = {});
+        void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds);
 
         void pointerMove(const ::juce::MouseEvent& event);
         void pointerExit();

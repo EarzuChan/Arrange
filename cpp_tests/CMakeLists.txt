@@ -57,6 +57,13 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
   target_link_libraries(arrange_interop PRIVATE Arrange::framework)
   add_test(NAME arrange_interop COMMAND arrange_interop)
   set_tests_properties(arrange_interop PROPERTIES TIMEOUT 30)
+  # 真实窗口性能基准，仅手动运行；复用隔离画廊夹具，不进入 CTest
+  if(WIN32)
+    add_executable(arrange_gui_bench arrange_gui_bench.cpp)
+    add_dependencies(arrange_gui_bench arrange_runtime_fixture)
+    target_compile_definitions(arrange_gui_bench PRIVATE _CONSOLE=1)
+    target_link_libraries(arrange_gui_bench PRIVATE Arrange::framework user32 gdi32)
+  endif()
   # Demo App 逐帧开销与分配基准，手动运行，不进 CTest
   add_executable(arrange_interop_frames arrange_interop_frames.cpp AllocationProbe.cpp)
   add_dependencies(arrange_interop_frames arrange_runtime_fixture)
@@ -120,9 +127,6 @@ if(TARGET juce::juce_audio_processors AND TARGET qjs)
 endif()
 
 if(TARGET juce::juce_audio_processors)
-  # 重放层性能基准，手动运行，不进 CTest
-  add_executable(arrange_paint_bench arrange_paint_bench.cpp)
-  target_link_libraries(arrange_paint_bench PRIVATE Arrange::framework)
   add_executable(arrange_retained_paint arrange_retained_paint.cpp)
   target_link_libraries(arrange_retained_paint PRIVATE Arrange::framework)
   add_test(NAME arrange_retained_paint COMMAND arrange_retained_paint)
