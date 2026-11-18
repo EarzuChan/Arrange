@@ -196,24 +196,36 @@ namespace arrange::core {
         const auto& before = previous.content;
         const auto& after = candidate.content;
         candidate.changes.overlayDrawOpsChanged = before.overlayDrawOps != after.overlayDrawOps || before.focusedInputNode != after.focusedInputNode || before.focusedInputModifier != after.focusedInputModifier || before.focusedInputViewportX != after.focusedInputViewportX;
-        candidate.changes.diagnosticsDrawOpsChanged = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
+        const auto diagnosticsFullRepaint = before.diagnosticsErrorDrawOps != after.diagnosticsErrorDrawOps || before.diagnosticsBadgeDrawOps != after.diagnosticsBadgeDrawOps || before.diagnosticsToastDrawOps != after.diagnosticsToastDrawOps || before.errorFrame != after.errorFrame;
+        const auto fpsChanged = before.diagnosticsFpsDrawOps != after.diagnosticsFpsDrawOps;
+        candidate.changes.diagnosticsDrawOpsChanged = diagnosticsFullRepaint || fpsChanged;
         // 叠加层变化即使场景未重建也要发布并重绘
         if (candidate.changes.overlayDrawOpsChanged || candidate.changes.diagnosticsDrawOpsChanged) {
             candidate.plan.publishFrame = true;
             candidate.plan.passivePaint = true;
         }
         if (candidate.plan.passivePaint) {
+            const auto sampleApp = !after.diagnosticsFpsDrawOps.empty() && !after.errorFrame;
+            const auto appFullRepaint = previous.revision == 0 || candidate.plan.fullFallback || before.viewport != after.viewport || before.errorFrame != after.errorFrame;
             RepaintDamage damage;
-            // 首帧、显式整块回退、视口变化、错误屏与诊断叠加层变化都整块重绘
-            if (previous.revision == 0 || candidate.plan.fullFallback || before.viewport != after.viewport || candidate.changes.diagnosticsDrawOpsChanged) damage.markFull();
+            if (appFullRepaint || (diagnosticsFullRepaint && !sampleApp)) damage.markFull();
             damage.compareScene(before.scenePaint, after.scenePaint);
             // 编辑命令在 TextField 叶项原位重放，范围取新旧聚焦叶项
             if (candidate.changes.overlayDrawOpsChanged) {
                 damage.addInputField(before.scenePaint, before.focusedInputModifier);
                 damage.addInputField(after.scenePaint, after.focusedInputModifier);
             }
-            damage.addBackdrops(before.scenePaint, after.scenePaint);
+            if (!damage.full() && (before.scenePaint != after.scenePaint || candidate.changes.overlayDrawOpsChanged)) damage.addBackdrops(before.scenePaint, after.scenePaint);
             candidate.changes.repaint = damage.finish(after.viewport);
+            if (sampleApp) candidate.changes.appRepaint = candidate.changes.repaint;
+            if (diagnosticsFullRepaint) {
+                candidate.changes.repaint = {true, {}};
+            } else if (fpsChanged && !damage.full()) {
+                // 徽标在场景之后合成，不参与场景背景模糊；首个操作是完整徽标底板
+                if (!before.diagnosticsFpsDrawOps.empty()) damage.addRect(before.diagnosticsFpsDrawOps.front().rect);
+                if (!after.diagnosticsFpsDrawOps.empty()) damage.addRect(after.diagnosticsFpsDrawOps.front().rect);
+                candidate.changes.repaint = damage.finish(after.viewport);
+            }
         }
         candidate.revision = previous.revision + (candidate.plan.publishFrame ? 1 : 0);
     }

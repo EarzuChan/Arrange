@@ -324,7 +324,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         initial.operations = {CreateNodeMutation{1, arrange::core::NodeType::Layout}, arrange::core::SetPropMutation{1, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("Box")}})}};
         runtime.enqueue(std::move(initial));
         const auto pump = [&](double now) {
-            return driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 400, 300}, true, {}, now);
+            return driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 400, 300}, true, {}, text, now);
         };
         check(pump(0) && !diagnostics.hasError(), "production host initial frame failed");
         const auto previous = runtime.publishedFrame();

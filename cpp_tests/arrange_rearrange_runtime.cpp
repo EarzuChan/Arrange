@@ -386,7 +386,7 @@ int main(int argc, char** argv) {
             std::weak_ptr<const PaintFragment> retiredPaint = runtime.publishedFrame().content.scenePaint.fragment;
             binder.apply(std::move(outcome), session, runtime, diagnostics, interaction, paint);
             runtime.enqueueStringEvent(oldSubmit, "text");
-            check(driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16), "HMR did not publish through the production host driver");
+            check(driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, textService, timestamp += 16), "HMR did not publish through the production host driver");
             check(retiredPaint.expired(), "HMR 后旧发布片段仍被运行时持有");
             replay();
             check(!diagnostics.hasError() && findText(runtime.scene(), "点了 0 次") != 0, "stale HMR event reached fresh context");
@@ -398,7 +398,7 @@ int main(int argc, char** argv) {
         runtime.enqueueStringEvent(oldSubmit, "bad-resource");
         const auto resourceDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!diagnostics.hasError() && std::chrono::steady_clock::now() < resourceDeadline) {
-            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, timestamp += 16);
+            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 520, 380}, true, {}, textService, timestamp += 16);
             std::this_thread::yield();
         }
         check(diagnostics.hasError() && diagnostics.error()->summary.find("FrameApp.sfa:") != std::string::npos && diagnostics.error()->summary.find("missing-m24-image.png") != std::string::npos, "资源加载失败丢失了资源路径或 SFA 来源");

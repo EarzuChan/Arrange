@@ -17,7 +17,7 @@ namespace arrange::juce {
 
     class FramePumpDriver final {
        public:
-        [[nodiscard]] bool pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const;
+        [[nodiscard]] bool pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, const arrange::core::TextLayoutService& textLayout, double nowMillis) const;
 
        private:
         static constexpr std::string_view TAG = "FramePumpDriver";

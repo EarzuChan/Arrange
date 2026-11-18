@@ -60,6 +60,7 @@ namespace arrange::core {
         std::vector<DrawOp> overlayDrawOps;
         std::vector<DrawOp> diagnosticsErrorDrawOps;
         std::vector<DrawOp> diagnosticsBadgeDrawOps;
+        std::vector<DrawOp> diagnosticsFpsDrawOps;
         std::vector<DrawOp> diagnosticsToastDrawOps;
         std::optional<NodeId> focusedInputNode;
         ModifierHandle focusedInputModifier;
@@ -74,6 +75,8 @@ namespace arrange::core {
         bool overlayDrawOpsChanged = false;
         // 相对上一发布帧的重绘范围，只在 passivePaint 时有意义
         RepaintRegion repaint;
+        // 仅在帧率徽标开启时保留，排除诊断层自身的重绘
+        RepaintRegion appRepaint;
     };
 
     struct FrameExecutionCounters {

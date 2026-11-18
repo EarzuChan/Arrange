@@ -36,7 +36,9 @@ namespace arrange::juce {
         [[nodiscard]] DiagnosticVisibility toastVisibility() const noexcept;
         void setToastsEnabled(bool enabled) noexcept;
         void invalidatePreparedFrame() noexcept;
-        [[nodiscard]] bool prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel);
+        void setFps(std::optional<int> fps) noexcept { fps_ = fps; }
+        [[nodiscard]] bool prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, const arrange::core::TextLayoutService& textLayout);
+        [[nodiscard]] std::vector<arrange::core::DrawOp> fpsOpsSnapshot() const { return preparedFpsOps_; }
 
         [[nodiscard]] std::vector<arrange::core::DrawOp> errorOpsSnapshot() const {
             return preparedErrorOps_;
@@ -58,8 +60,12 @@ namespace arrange::juce {
         DiagnosticsModel model_;
         DiagnosticsScene diagnosticsScene_;
         std::optional<ErrorScreenModel> error_;
+        std::optional<int> fps_;
+        std::optional<int> preparedFps_;
+        ::juce::Rectangle<int> preparedFpsBounds_;
         std::vector<arrange::core::DrawOp> preparedErrorOps_;
         std::vector<arrange::core::DrawOp> preparedBadgeOps_;
+        std::vector<arrange::core::DrawOp> preparedFpsOps_;
         std::vector<arrange::core::DrawOp> preparedToastOps_;
         std::string preparedSignature_;
     };

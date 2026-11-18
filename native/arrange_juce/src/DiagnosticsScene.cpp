@@ -2,6 +2,7 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
+#include <arrange/core/TextLayoutService.h>
 #include <algorithm>
 #include <cmath>
 
@@ -46,7 +47,7 @@ namespace arrange::juce {
         return ops;
     }
 
-    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility) const {
+    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility, const arrange::core::TextLayoutService& textLayout) const {
         std::vector<arrange::core::DrawOp> ops;
         if (!diagnosticVisibilityEnabled(visibility) || model.text.empty()) return ops;
 
@@ -57,8 +58,26 @@ namespace arrange::juce {
         ops.push_back(fill(badge, 0xcc111827u, 6.0f));
         ops.push_back(stroke(badge, 0x664b5563u, 1.0f, 6.0f));
         ops.push_back(fill({badge.x + 8.0f, badge.y + 7.0f, 6.0f, 6.0f}, static_cast<std::uint32_t>(model.dot.getARGB()), 3.0f));
-        ops.push_back(text({badge.x + 20.0f, badge.y + 1.0f, badge.width - 20.0f, badge.height - 2.0f}, model.text, 0xffe8eaedu, 9.5f));
+        ops.push_back(badgeText({badge.x + 20.0f, badge.y, badge.width - 20.0f, badge.height}, model.text, textLayout));
         return ops;
+    }
+
+    std::vector<arrange::core::DrawOp> DiagnosticsScene::buildFpsBadge(::juce::Rectangle<int> editorBounds, int fps, const arrange::core::TextLayoutService& textLayout) const {
+        const arrange::core::Rect badge{static_cast<float>(editorBounds.getX() + 8), static_cast<float>(editorBounds.getY() + 20), 78.0f, 20.0f};
+        return {
+            fill(badge, 0xcc111827u, 6.0f),
+            stroke(badge, 0x664b5563u, 1.0f, 6.0f),
+            badgeText({badge.x + 8.0f, badge.y, badge.width - 16.0f, badge.height}, fps == 0 ? "UI idle" : "UI " + std::to_string(fps) + " FPS", textLayout),
+        };
+    }
+
+    arrange::core::DrawOp DiagnosticsScene::badgeText(arrange::core::Rect area, std::string value, const arrange::core::TextLayoutService& textLayout) {
+        auto op = text(area, std::move(value), 0xffe8eaedu, 9.5f);
+        arrange::core::DrawOpsBuilder::prepareText(op, textLayout);
+        // 重放从文本框顶部开始；用实际字形墨迹的中点与徽标中点对齐。
+        const auto& ink = op.textLayout->inkBounds;
+        op.rect.y = area.y + area.height * 0.5f - (ink.y + ink.height * 0.5f);
+        return op;
     }
 
     std::vector<arrange::core::DrawOp> DiagnosticsScene::buildToasts(::juce::Rectangle<int> editorBounds, const std::vector<DiagnosticsToastModel>& toasts, DiagnosticVisibility visibility) const {

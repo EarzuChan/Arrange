@@ -306,18 +306,13 @@ namespace arrange::juce {
                 const auto scale = std::round(std::clamp(g.getInternalContext().getPhysicalPixelScaleFactor(), 0.25f, 8.0f) * 16.0f) / 16.0f;
                 const auto width = std::clamp(static_cast<int>(std::ceil(rect.getWidth() * scale)), 1, 4096), height = std::clamp(static_cast<int>(std::ceil(rect.getHeight() * scale)), 1, 4096);
                 const auto detail = CacheDetail{}.add(0x7a5cu).add(op.painter.frame).add(op.painter.frames).add(op.painter.horizontal).add(static_cast<int>(op.contentScale)).add(static_cast<int>(op.alignment)).add(rect.getWidth()).add(rect.getHeight()).add(scale).value();
-                const auto buildMask = [&] {
-                    RenderMetricsTimer timer(metricsEnabled_, renderMetrics_.svgMaskMillis);
-                    if (metricsEnabled_) ++renderMetrics_.svgMaskBuilds;
+                const auto mask = bitmapCache_.get({content, detail, width, height}, [&] {
                     ::juce::Image result(::juce::Image::ARGB, width, height, true, ::juce::SoftwareImageType());
                     ::juce::Graphics graphics(result);
                     graphics.addTransform(::juce::AffineTransform::scale(static_cast<float>(width) / rect.getWidth(), static_cast<float>(height) / rect.getHeight()));
                     drawVector(graphics, *juceContent->vector, vectorBounds, rect.withZeroOrigin(), op, 1.0f);
                     return result;
-                };
-                const auto buildsBefore = renderMetrics_.svgMaskBuilds;
-                const auto mask = svgMaskCacheEnabled_ ? bitmapCache_.get({content, detail, width, height}, buildMask) : buildMask();
-                if (metricsEnabled_ && svgMaskCacheEnabled_ && buildsBefore == renderMetrics_.svgMaskBuilds) ++renderMetrics_.svgMaskHits;
+                });
                 g.setColour(::juce::Colour(op.color).withMultipliedAlpha(alpha));
                 g.drawImage(mask, rect, ::juce::RectanglePlacement::stretchToFit, true);
             } else
@@ -395,21 +390,6 @@ namespace arrange::juce {
         // 超出整数裁剪接口的范围时保留绘制，避免转换溢出造成漏画
         if (std::max({std::abs(r.x), std::abs(r.y), std::abs(r.x + r.width), std::abs(r.y + r.height)}) > 100000000.0f) return false;
         return !graphics.clipRegionIntersects(::juce::Rectangle<float>(r.x, r.y, r.width, r.height).expanded(1.0f).getSmallestIntegerContainer());
-    }
-
-    arrange::core::RenderFrameMetrics JuceDrawOpsPainter::renderMetrics() const {
-        if (!metricsEnabled_) return {};
-        auto result = renderMetrics_;
-        const auto bitmaps = bitmapCache_.counters();
-        result.bitmapHits = bitmaps.hits;
-        result.bitmapBuilds = bitmaps.builds;
-        result.bitmapEvictions = bitmaps.evictions;
-        result.bitmapRetainedBytes = bitmaps.retainedBytes;
-        result.bitmapBuildMillis = bitmaps.buildMillis;
-        result.nativeConvertMillis = bitmaps.nativeConvertMillis;
-        result.nativeConversions = bitmaps.nativeConversions;
-        result.nativeBytes = bitmaps.nativeConvertBytes;
-        return result;
     }
 
     JuceDrawOpsPainter::PaintResult JuceDrawOpsPainter::paint(::juce::Graphics& g, const std::vector<arrange::core::DrawOp>& ops, arrange::core::ModifierHandle focused, float, std::span<const arrange::core::DrawOp> focusedInputOps) const {

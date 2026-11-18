@@ -185,12 +185,44 @@ namespace {
         const auto hidden = overlay.update(harness.pipeline.timeline(), harness.frame, tree, 1, 3002);
         check(overlay.ops().empty() && covers(hidden, {40, 0, 20, 10}), "关闭叠加层没有清除绘制");
     }
+
+    void verifyFpsDamage() {
+        Harness harness;
+        harness.apply(initialScene());
+        const Rect badge{8, 20, 78, 20};
+        const auto publishFps = [&](std::uint32_t color) {
+            return harness.pipeline.publishRetained(harness.scene, harness.frame, [&](const auto&, auto& frame) {
+                frame.content.diagnosticsFpsDrawOps = color ? std::vector{DrawOp{.type = DrawOpType::FillRect, .rect = badge, .color = color}} : std::vector<DrawOp>{};
+            });
+        };
+        const auto checkBadgeOnly = [&] {
+            const auto& changes = harness.frame.changes;
+            check(changes.appRepaint.empty() && !changes.repaint.full && changes.repaint.rects == std::vector{Rect{7, 19, 80, 22}}, "FPS 徽标应只重绘自身，不计入 App 脏区");
+        };
+        check(publishFps(0xff000001), "开启 FPS 徽标没有发布");
+        checkBadgeOnly();
+        check(!publishFps(0xff000001), "相同的 FPS 内容不应发布");
+        check(publishFps(0xff000002), "更新 FPS 徽标没有发布");
+        checkBadgeOnly();
+        harness.apply(modify(10, box(0xff00ff00)));
+        check(covers(harness.frame.changes.appRepaint, {140, 0, 20, 10}), "App 帧没有采样脏区");
+        check(harness.frame.changes.appRepaint == harness.frame.changes.repaint, "未改动的 FPS 徽标扩大了重绘范围");
+        check(harness.pipeline.publishRetained(harness.scene, harness.frame, [&](const auto&, auto& frame) {
+            frame.content.diagnosticsToastDrawOps = {DrawOp{.type = DrawOpType::FillRect, .rect = badge}};
+        }), "诊断气泡没有发布");
+        check(harness.frame.changes.repaint.full && harness.frame.changes.appRepaint.empty(), "诊断气泡不应计作 App 帧");
+        check(publishFps(0), "关闭 FPS 徽标没有发布");
+        checkBadgeOnly();
+        harness.apply(modify(10, box(0xffff0000)));
+        check(harness.frame.changes.appRepaint.empty(), "关闭 FPS 徽标后仍采集 App 脏区");
+    }
 }
 
 int main() {
     try {
         verifyTimeline();
         verifyOverlay();
+        verifyFpsDamage();
         std::cout << "arrange_diagnostics_overlay 通过\n";
         return 0;
     } catch (const std::exception& error) {

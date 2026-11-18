@@ -30,7 +30,7 @@ namespace arrange::juce {
 #endif
     }
 
-    bool FramePumpDriver::pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, double nowMillis) const {
+    bool FramePumpDriver::pumpFrame(ArrangeRuntime& runtime, RuntimeSessionState& session, DiagnosticsState& diagnostics, InteractionStateOwner& interaction, PassivePaintRenderer& paint, arrange::core::NodeId root, const std::filesystem::path& frameErrorPath, ::juce::Rectangle<int> diagnosticsBounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, const arrange::core::TextLayoutService& textLayout, double nowMillis) const {
         (void)tickDiagnostics(diagnostics, runtime, nowMillis);
         interaction.dispatchPendingTextEdits(runtime.scene().tree(), TextInputMutationSink{}.callbacks(runtime));
         const auto focusCommands = runtime.takeFocusCommands();
@@ -57,9 +57,10 @@ namespace arrange::juce {
             frame.content.focusedInputNode = candidateInteraction->textFocusedNode();
             frame.content.focusedInputModifier = candidateInteraction->focusedModifier();
             frame.content.focusedInputViewportX = candidateInteraction->viewportX();
-            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
+            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel, textLayout);
             replacePreparedOps(frame.content.diagnosticsErrorDrawOps, diagnostics.errorOpsSnapshot());
             replacePreparedOps(frame.content.diagnosticsBadgeDrawOps, diagnostics.badgeOpsSnapshot());
+            frame.content.diagnosticsFpsDrawOps = diagnostics.fpsOpsSnapshot();
             replacePreparedOps(frame.content.diagnosticsToastDrawOps, diagnostics.toastOpsSnapshot());
             frame.content.errorFrame = diagnostics.hasError() ? std::optional<std::string>(diagnostics.error()->summary) : std::nullopt;
             paint.prepareResources(frame.content);
@@ -80,11 +81,12 @@ namespace arrange::juce {
             // 原生调用方仍可使用核心层重试
             runtime.suspend();
             (void)session.applyFrameError(frame, diagnostics, runtime, frameErrorPath);
-            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel);
+            (void)diagnostics.prepareFrame(diagnosticsBounds, detailedErrorScreen, badgeModel, textLayout);
             (void)runtime.publishRetained([&](const auto&, auto& retained) {
                 retained.content.errorFrame = frame.error;
                 replacePreparedOps(retained.content.diagnosticsErrorDrawOps, diagnostics.errorOpsSnapshot());
                 replacePreparedOps(retained.content.diagnosticsBadgeDrawOps, diagnostics.badgeOpsSnapshot());
+                retained.content.diagnosticsFpsDrawOps = diagnostics.fpsOpsSnapshot();
                 replacePreparedOps(retained.content.diagnosticsToastDrawOps, diagnostics.toastOpsSnapshot());
                 paint.prepareResources(retained.content);
             });

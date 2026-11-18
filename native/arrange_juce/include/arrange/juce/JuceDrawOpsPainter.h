@@ -2,8 +2,6 @@
 
 #include <arrange/core/LayoutNode.h>
 #include <arrange/core/Paint.h>
-#include <arrange/core/RenderFrameMetrics.h>
-#include <arrange/juce/RenderMetricsTimer.h>
 #include <arrange/juce/BitmapCache.h>
 #include <arrange/juce/ErrorScreenModel.h>
 
@@ -41,21 +39,6 @@ namespace arrange::juce {
             cullingEnabled_ = enabled;
         }
 
-        void setSvgMaskCacheEnabled(bool enabled) noexcept {
-            svgMaskCacheEnabled_ = enabled;
-        }
-
-        void setMetricsEnabled(bool enabled) noexcept {
-            metricsEnabled_ = enabled;
-            bitmapCache_.setMetricsEnabled(enabled);
-        }
-
-        bool metricsEnabled() const noexcept {
-            return metricsEnabled_;
-        }
-
-        arrange::core::RenderFrameMetrics renderMetrics() const;
-
         PaintReplayCounters counters() const noexcept {
             return counters_;
         }
@@ -86,9 +69,6 @@ namespace arrange::juce {
         ::juce::Image captureBackdrop(const arrange::core::PlacedPaintFragment& target, ::juce::Rectangle<float> area, float scale, int width, int height) const;
 
         bool cullingEnabled_ = true;
-        bool svgMaskCacheEnabled_ = renderEnvironmentFlag("ARRANGE_SVG_MASK_CACHE", true);
-        bool metricsEnabled_ = renderEnvironmentFlag("ARRANGE_RENDER_METRICS", false);
-        mutable arrange::core::RenderFrameMetrics renderMetrics_;
         mutable BitmapCache bitmapCache_;
         mutable PaintReplayCounters counters_;
         // 背景模糊需要回到根重放：记录根、焦点输入与当前层局部到根的逻辑变换

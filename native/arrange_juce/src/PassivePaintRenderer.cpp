@@ -30,6 +30,7 @@ namespace arrange::juce {
             (void)drawOpsPainter_.paint(g, content.scenePaint, content.focusedInputModifier, content.focusedInputViewportX, content.overlayDrawOps);
         }
         if (!diagnosticsOverlay.empty()) (void)drawOpsPainter_.paint(g, diagnosticsOverlay);
+        (void)drawOpsPainter_.paint(g, content.diagnosticsFpsDrawOps);
         (void)drawOpsPainter_.paint(g, content.diagnosticsBadgeDrawOps);
         (void)drawOpsPainter_.paint(g, content.diagnosticsToastDrawOps);
         const auto millis = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();

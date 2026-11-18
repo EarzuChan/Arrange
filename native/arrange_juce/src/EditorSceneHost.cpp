@@ -23,6 +23,8 @@
 #include <arrange/juce/JuceTextInputAdapter.h>
 #include "ScrollProbe.h"
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace arrange::juce {
@@ -30,18 +32,24 @@ namespace arrange::juce {
         constexpr arrange::core::NodeId rootNodeId = 1;
     }
 
-    class EditorSceneHost::Impl final {
+    class EditorSceneHost::Impl final : private ::juce::Timer {
        public:
         Impl() : textLayoutService_(textMeasurer_), runtime_(arrange::core::SceneFramePipeline(arrange::core::LayoutEngine(textLayoutService_))), interaction_(textLayoutService_), paint_(textLayoutService_) {}
 
         void setWorkAvailable(std::function<void()> callback) {
-            runtime_.setWorkAvailable(std::move(callback));
+            workAvailable_ = std::move(callback);
+            runtime_.setWorkAvailable(workAvailable_);
+        }
+
+        ~Impl() override {
+            stopTimer();
         }
 
         void configure(const EditorConfig& config) {
             pendingReload_ = ReloadKind::None;
             config_ = config;
             diagnostics_.configure(config_.diagnostics);
+            if (!diagnosticVisibilityEnabled(config_.diagnostics.overlay)) setFpsBadgeEnabled(false);
             applyPackageLoadOutcome(packageSource_.configure(config_));
         }
 
@@ -75,6 +83,12 @@ namespace arrange::juce {
 
         bool diagnosticsOverlayAvailable() const {
             return diagnosticVisibilityEnabled(config_.diagnostics.overlay);
+        }
+
+        bool toggleFpsBadge() {
+            if (!diagnosticsOverlayAvailable()) return false;
+            setFpsBadgeEnabled(!fpsEnabled_);
+            return true;
         }
 
         bool setDiagnosticsOverlay(bool enabled) {
@@ -120,7 +134,7 @@ namespace arrange::juce {
         }
 
         bool wantsVBlank() const {
-            return pendingReload_ != ReloadKind::None || wantsReloadPolling() || diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork() || overlayPending_ || overlay_.animating();
+            return pendingReload_ != ReloadKind::None || wantsReloadPolling() || diagnostics_.hasActiveToasts() || runtime_.hasPendingFrameWork() || overlayPending_ || overlay_.animating() || fpsPending_;
         }
 
         bool pumpFrame(double nowMillis) {
@@ -163,7 +177,18 @@ namespace arrange::juce {
                     applyPackageLoadOutcome(packageSource_.manualReload(true));
                     break;
             }
-            const auto sceneChanged = framePump_.pumpFrame(runtime_, session_, diagnostics_, interaction_, paint_, rootNodeId, config_.app.distPath(), lastPaintBounds_, config_.diagnostics.errorScreen, chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_), nowMillis);
+            fpsPending_ = false;
+            const auto sceneChanged = framePump_.pumpFrame(runtime_, session_, diagnostics_, interaction_, paint_, rootNodeId, config_.app.distPath(), lastPaintBounds_, config_.diagnostics.errorScreen, chrome_.diagnosticsBadgeModel(packageSource_, diagnostics_), textLayoutService_, nowMillis);
+            if (fpsEnabled_ && sceneChanged) {
+                if (!ready()) {
+                    resetFpsSamples();
+                    setFpsReading(0);
+                } else {
+                    const auto& appRepaint = runtime_.publishedFrame().changes.appRepaint;
+                    // 诊断发布不覆盖尚未重放的 App 脏区。
+                    if (!appRepaint.empty()) pendingAppPaint_ = appRepaint;
+                }
+            }
             sceneChanged_ = sceneChanged_ || sceneChanged;
             return updateOverlay(nowMillis) || sceneChanged;
         }
@@ -181,37 +206,6 @@ namespace arrange::juce {
             session_.resize(width, height, runtime_);
         }
 
-        std::optional<::juce::Point<float>> diagnosticClickPoint(std::string_view text) const {
-            const auto& tree = runtime_.scene().tree();
-            const auto& hit = runtime_.publishedFrame().content.hitTest;
-            if (!hit) return std::nullopt;
-            const auto regions = arrange::core::exportHitRegions(*hit);
-            const ::juce::Rectangle<float> viewport(0, 0, static_cast<float>(lastPaintBounds_.getWidth()), static_cast<float>(lastPaintBounds_.getHeight()));
-            for (const auto id : tree.nodeIds()) {
-                bool matches = false;
-                for (const auto& instance : tree.node(id).modifier.elements()) {
-                    const auto& value = instance.descriptor.value;
-                    if (arrange::core::textPresentation(value) && arrange::core::modifierText(value) == text) matches = true;
-                    if (const auto* semantics = std::get_if<arrange::core::SemanticsModifier>(&value); semantics && semantics->label == text) matches = true;
-                }
-                if (!matches) continue;
-                for (std::optional<arrange::core::NodeId> ancestor = id; ancestor; ancestor = tree.parentOf(*ancestor)) {
-                    for (const auto& region : regions) {
-                        if (!region.target.clickable || region.target.node != *ancestor) continue;
-                        const auto area = viewport.getIntersection({region.bounds.x, region.bounds.y, region.bounds.width, region.bounds.height});
-                        if (area.isEmpty()) continue;
-                        for (const auto x : {0.5f, 0.25f, 0.75f})
-                            for (const auto y : {0.5f, 0.25f, 0.75f}) {
-                                const auto point = area.getPosition() + ::juce::Point<float>(area.getWidth() * x, area.getHeight() * y);
-                                const auto target = arrange::core::HitTester{}.hitTestClickable(*hit, {point.x, point.y});
-                                if (target.hit && target.eventSlot == region.target.eventSlot) return point;
-                            }
-                    }
-                }
-            }
-            return std::nullopt;
-        }
-
         void paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {
             if (ScrollProbe::active()) {
                 ScrollProbe::Sample sample;
@@ -222,7 +216,18 @@ namespace arrange::juce {
             lastPaintBounds_ = bounds;
             const auto& frame = runtime_.publishedFrame();
             const auto millis = paint_.paint(g, frame, overlayOps_);
-            runtime_.frameTimeline().notePaint(frame.revision, millis, paint_.renderMetrics());
+            runtime_.frameTimeline().notePaint(frame.revision, millis);
+            if (pendingAppPaint_.empty() || frame.content.diagnosticsFpsDrawOps.empty()) return;
+            const auto intersectsApp = pendingAppPaint_.full ? g.clipRegionIntersects(bounds) : std::any_of(pendingAppPaint_.rects.begin(), pendingAppPaint_.rects.end(), [&](const auto& rect) {
+                return g.clipRegionIntersects(::juce::Rectangle<float>(rect.x, rect.y, rect.width, rect.height).getSmallestIntegerContainer());
+            });
+            if (!intersectsApp) return;
+            pendingAppPaint_ = {};
+            if (!isTimerRunning()) {
+                fpsWindowStart_ = ::juce::Time::getMillisecondCounterHiRes();
+                startTimer(fpsIntervalMillis);
+            }
+            ++fpsSamples_;
         }
 
         void pointerMove(const ::juce::MouseEvent& event) {
@@ -348,6 +353,37 @@ namespace arrange::juce {
         }
 
        private:
+        void setFpsBadgeEnabled(bool enabled) {
+            if (enabled == fpsEnabled_) return;
+            fpsEnabled_ = enabled;
+            resetFpsSamples();
+            fpsReading_ = 0;
+            diagnostics_.setFps(enabled ? std::optional<int>{0} : std::nullopt);
+            fpsPending_ = true;
+        }
+
+        void resetFpsSamples() {
+            stopTimer();
+            fpsSamples_ = 0;
+            pendingAppPaint_ = {};
+        }
+
+        void setFpsReading(int fps) {
+            if (fps == fpsReading_) return;
+            fpsReading_ = fps;
+            diagnostics_.setFps(fps);
+            fpsPending_ = true;
+        }
+
+        void timerCallback() override {
+            const auto now = ::juce::Time::getMillisecondCounterHiRes();
+            const auto samples = std::exchange(fpsSamples_, 0);
+            if (samples == 0) stopTimer();
+            const auto elapsed = now - std::exchange(fpsWindowStart_, now);
+            setFpsReading(samples == 0 ? 0 : std::max(1, static_cast<int>(std::round(samples * 1000.0 / elapsed))));
+            if (fpsPending_ && workAvailable_) workAvailable_();
+        }
+
         void syncTimeline() {
             runtime_.frameTimeline().setEnabled(timelineRequested_ || overlay_.enabled());
         }
@@ -408,6 +444,14 @@ namespace arrange::juce {
         bool overlayPending_ = false;
         bool sceneChanged_ = false;
         bool timelineRequested_ = false;
+        static constexpr int fpsIntervalMillis = 500;
+        std::function<void()> workAvailable_;
+        arrange::core::RepaintRegion pendingAppPaint_;
+        double fpsWindowStart_ = 0;
+        int fpsSamples_ = 0;
+        int fpsReading_ = 0;
+        bool fpsEnabled_ = false;
+        bool fpsPending_ = false;
     };
 
     EditorSceneHost::EditorSceneHost() : impl_(std::make_unique<Impl>()) {}
@@ -448,6 +492,10 @@ namespace arrange::juce {
 
     bool EditorSceneHost::diagnosticsOverlayAvailable() const {
         return impl_->diagnosticsOverlayAvailable();
+    }
+
+    bool EditorSceneHost::toggleFpsBadge() {
+        return impl_->toggleFpsBadge();
     }
 
     bool EditorSceneHost::setDiagnosticsOverlay(bool enabled) {
@@ -496,10 +544,6 @@ namespace arrange::juce {
 
     void EditorSceneHost::resized(int width, int height) {
         impl_->resized(width, height);
-    }
-
-    std::optional<::juce::Point<float>> EditorSceneHost::diagnosticClickPoint(std::string_view text) const {
-        return impl_->diagnosticClickPoint(text);
     }
 
     void EditorSceneHost::paint(::juce::Graphics& g, ::juce::Rectangle<int> bounds) {

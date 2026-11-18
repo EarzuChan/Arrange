@@ -156,7 +156,10 @@ namespace arrange::core {
             replace(flash_, buildFlashes(nowMillis));
             replace(bounds_, layers_.bounds ? buildBounds() : Part{});
             replace(hit_, layers_.hit ? buildHit(frame) : Part{});
-            replace(panel_, layers_.frameTime || layers_.status ? buildPanel(timeline) : Part{});
+            const auto& fps = frame.content.diagnosticsFpsDrawOps;
+            // 左上角有帧率徽标时，F9 面板在其下方，其他诊断图层位置不变。
+            const auto y = fps.empty() ? panelY : fps.front().rect.y + fps.front().rect.height + panelY;
+            replace(panel_, layers_.frameTime || layers_.status ? buildPanel(timeline, y) : Part{});
         }
         ops_.clear();
         for (const auto* part : {&flash_, &bounds_, &hit_, &panel_}) ops_.insert(ops_.end(), part->ops.begin(), part->ops.end());
@@ -198,12 +201,12 @@ namespace arrange::core {
         return part;
     }
 
-    DiagnosticsOverlay::Part DiagnosticsOverlay::buildPanel(const FrameTimeline& timeline) const {
+    DiagnosticsOverlay::Part DiagnosticsOverlay::buildPanel(const FrameTimeline& timeline, float top) const {
         Part part;
         auto height = padding * 2;
         if (layers_.frameTime) height += graphHeight + 4 + lineHeight;
         if (layers_.status) height += lineHeight * 2;
-        const Rect panel{panelX, panelY, panelWidth, height};
+        const Rect panel{panelX, top, panelWidth, height};
         part.ops.push_back(fill(panel, 0xd0111827u, 6));
         part.areas.push_back(panel);
         auto y = panel.y + padding;

@@ -35,12 +35,6 @@ namespace arrange::juce {
             return drawOpsPainter_.counters();
         }
 
-        arrange::core::RenderFrameMetrics renderMetrics() const {
-            auto result = drawOpsPainter_.renderMetrics();
-            if (drawOpsPainter_.metricsEnabled()) result.paints = fullViewportPaints_;
-            return result;
-        }
-
         double paintMillis() const noexcept {
             return paintMillis_;
         }

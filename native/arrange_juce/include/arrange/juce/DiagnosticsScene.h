@@ -16,13 +16,15 @@ namespace arrange::juce {
     class DiagnosticsScene final {
        public:
         [[nodiscard]] std::vector<arrange::core::DrawOp> buildErrorScreen(::juce::Rectangle<int> editorBounds, const ErrorScreenModel& error, bool detailed) const;
-        [[nodiscard]] std::vector<arrange::core::DrawOp> buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility) const;
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildBadge(::juce::Rectangle<int> editorBounds, const DiagnosticsBadgeModel& model, DiagnosticVisibility visibility, const arrange::core::TextLayoutService& textLayout) const;
+        [[nodiscard]] std::vector<arrange::core::DrawOp> buildFpsBadge(::juce::Rectangle<int> editorBounds, int fps, const arrange::core::TextLayoutService& textLayout) const;
         [[nodiscard]] std::vector<arrange::core::DrawOp> buildToasts(::juce::Rectangle<int> editorBounds, const std::vector<DiagnosticsToastModel>& toasts, DiagnosticVisibility visibility) const;
 
        private:
         static arrange::core::Rect rect(::juce::Rectangle<int> value) noexcept;
         static arrange::core::DrawOp fill(arrange::core::Rect rect, std::uint32_t color, float radius = 0.0f);
         static arrange::core::DrawOp stroke(arrange::core::Rect rect, std::uint32_t color, float width = 1.0f, float radius = 0.0f);
+        static arrange::core::DrawOp badgeText(arrange::core::Rect area, std::string value, const arrange::core::TextLayoutService& textLayout);
         static arrange::core::DrawOp text(arrange::core::Rect rect, std::string value, std::uint32_t color, float fontSize, int maxLines = 1);
     };
 

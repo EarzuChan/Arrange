@@ -38,13 +38,13 @@ namespace arrange::juce {
         [[nodiscard]] bool copyDiagnosticsToClipboard();
 
         [[nodiscard]] bool diagnosticsOverlayAvailable() const;
+        [[nodiscard]] bool toggleFpsBadge();
         bool setDiagnosticsOverlay(bool enabled);
         [[nodiscard]] bool diagnosticsOverlayEnabled() const;
         void setDiagnosticsOverlayLayers(arrange::core::OverlayLayers layers);
         [[nodiscard]] arrange::core::OverlayLayers diagnosticsOverlayLayers() const;
         void setFrameTimelineEnabled(bool enabled);
         [[nodiscard]] const arrange::core::FrameTimeline& frameTimeline() const;
-        [[nodiscard]] std::optional<::juce::Point<float>> diagnosticClickPoint(std::string_view text) const;
 
         void repaintDirty(::juce::Component& owner);
         [[nodiscard]] bool wantsVBlank() const;

@@ -131,10 +131,6 @@ namespace arrange::juce {
         return sceneHost_->frameTimeline();
     }
 
-    std::optional<::juce::Point<float>> ArrangeEditor::diagnosticClickPoint(std::string_view text) const {
-        return sceneHost_->diagnosticClickPoint(text);
-    }
-
     void ArrangeEditor::reload() {
         sceneHost_->reload();
         shell_.afterReload(*this);
@@ -352,6 +348,10 @@ namespace arrange::juce {
                 (void)sceneHost_->setDiagnosticsOverlay(true);
             } else (void)sceneHost_->setDiagnosticsOverlay(!sceneHost_->diagnosticsOverlayEnabled());
 
+            shell_.afterFrameRelevantChange(*this);
+            return true;
+        }
+        if (key.isKeyCode(::juce::KeyPress::F10Key) && key.getModifiers().getRawFlags() == 0 && sceneHost_->toggleFpsBadge()) {
             shell_.afterFrameRelevantChange(*this);
             return true;
         }

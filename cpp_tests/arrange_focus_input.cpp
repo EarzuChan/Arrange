@@ -348,7 +348,7 @@ namespace {
         double time = 0;
         const auto pump = [&] {
             time += 16;
-            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 300, 120}, true, {}, time);
+            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 300, 120}, true, {}, service, time);
             check(!diagnostics.hasError(), "多击生产帧失败");
         };
         pump();
@@ -589,7 +589,7 @@ namespace {
         initial.operations = {CreateNodeMutation{1, NodeType::Layout}, SetPropMutation{1, "measurePolicy", PropValue::objectValue({{"kind", PropValue::stringValue("MinSize")}})}, SetModifierMutation{1, {{size(100, 50)}, {field}}}};
         runtime.enqueue(std::move(initial));
         const auto pump = [&](double time) {
-            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 100, 50}, true, {}, time);
+            (void)driver.pumpFrame(runtime, session, diagnostics, interaction, paint, 1, {}, {0, 0, 100, 50}, true, {}, service, time);
             check(!diagnostics.hasError(), "覆盖层生产帧失败");
         };
         pump(0);

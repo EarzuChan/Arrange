@@ -2,6 +2,7 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
+#include <arrange/core/TextLayoutService.h>
 #include <sstream>
 #include <utility>
 
@@ -91,17 +92,26 @@ namespace arrange::juce {
         preparedToastOps_.clear();
     }
 
-    bool DiagnosticsState::prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel) {
-        const auto signature = diagnosticsFrameSignature(bounds, *this, detailedErrorScreen, badgeModel);
+    bool DiagnosticsState::prepareFrame(::juce::Rectangle<int> bounds, bool detailedErrorScreen, const DiagnosticsBadgeModel& badgeModel, const arrange::core::TextLayoutService& textLayout) {
+        const auto environment = textLayout.environment();
+        const auto fps = error_ ? std::nullopt : fps_;
+        const auto fpsChanged = preparedFps_ != fps || (fps && (preparedFpsBounds_ != bounds || preparedFpsOps_.back().textLayout->environment != environment));
+        if (fpsChanged) {
+            preparedFpsOps_ = fps ? diagnosticsScene_.buildFpsBadge(bounds, *fps, textLayout) : std::vector<arrange::core::DrawOp>{};
+            preparedFpsBounds_ = bounds;
+            preparedFps_ = fps;
+        }
+
+        const auto signature = diagnosticsFrameSignature(bounds, *this, detailedErrorScreen, badgeModel) + "|font=" + std::to_string(environment);
         if (signature == preparedSignature_) {
-            return false;
+            return fpsChanged;
         }
 
         preparedErrorOps_.clear();
         if (error_) {
             preparedErrorOps_ = diagnosticsScene_.buildErrorScreen(bounds, *error_, detailedErrorScreen);
         }
-        preparedBadgeOps_ = diagnosticsScene_.buildBadge(bounds, badgeModel, badgeVisibility());
+        preparedBadgeOps_ = diagnosticsScene_.buildBadge(bounds, badgeModel, badgeVisibility(), textLayout);
         preparedToastOps_ = diagnosticsScene_.buildToasts(bounds, activeToastModels(), toastVisibility());
         preparedSignature_ = signature;
         return true;

@@ -16,6 +16,7 @@
 #include <arrange/quickjs/AppScriptLoader.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -309,9 +310,20 @@ int runSmoke() {
 
     arrange::juce::DiagnosticsBadgeModel badge;
     badge.text = "Debug dist";
-    const auto badgeOps = diagnosticsScene.buildBadge({0, 0, 320, 180}, badge, arrange::juce::DiagnosticVisibility::Always);
+    const auto badgeOps = diagnosticsScene.buildBadge({0, 0, 320, 180}, badge, arrange::juce::DiagnosticVisibility::Always, textLayoutService);
     if (badgeOps.size() < 4 || badgeOps.front().type != arrange::core::DrawOpType::FillRect) return 18;
-    if (!diagnosticsScene.buildBadge({0, 0, 320, 180}, badge, arrange::juce::DiagnosticVisibility::Hidden).empty()) return 19;
+    if (!diagnosticsScene.buildBadge({0, 0, 320, 180}, badge, arrange::juce::DiagnosticVisibility::Hidden, textLayoutService).empty()) return 19;
+    const auto inkCentered = [](const auto& ops) {
+        const auto& text = ops.back();
+        if (!text.textLayout) return false;
+        const auto& ink = text.textLayout->inkBounds;
+        const auto& badgeRect = ops.front().rect;
+        return ink.height > 0 && std::abs(text.rect.y + ink.y + ink.height * 0.5f - (badgeRect.y + badgeRect.height * 0.5f)) < 0.01f;
+    };
+    const auto fpsOps = diagnosticsScene.buildFpsBadge({0, 0, 320, 180}, 120, textLayoutService);
+    const auto idleOps = diagnosticsScene.buildFpsBadge({0, 0, 320, 180}, 0, textLayoutService);
+    if (!inkCentered(badgeOps) || !inkCentered(fpsOps) || !inkCentered(idleOps)) return 41;
+    if (fpsOps.front().rect != idleOps.front().rect || fpsOps.back().text != "UI 120 FPS" || idleOps.back().text != "UI idle") return 42;
 
     const std::vector<arrange::juce::DiagnosticsToastModel> toasts{{arrange::juce::LogLevel::Info, "Toast", "DiagnosticsScene"}};
     const auto toastOps = diagnosticsScene.buildToasts({0, 0, 320, 180}, toasts, arrange::juce::DiagnosticVisibility::Always);
@@ -326,13 +338,18 @@ int runSmoke() {
     DiagnosticsState.setToastsEnabled(false);
     arrange::juce::DiagnosticsToast::e(DiagnosticsState, "RuntimeSmoke", "测试气泡", "气泡关闭仍应日志输出");
     if (DiagnosticsState.hasActiveToasts()) return 38;
+    DiagnosticsState.setFps(0);
     DiagnosticsState.setError(arrange::makeErrorScreenModel(arrange::ErrorSource::ScriptRuntime, "prepared diagnostics frame smoke", "details"));
-    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 26;
-    if (DiagnosticsState.errorOpsSnapshot().empty() || DiagnosticsState.badgeOpsSnapshot().empty()) return 27;
-    if (DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 28;
+    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge, textLayoutService)) return 26;
+    if (DiagnosticsState.errorOpsSnapshot().empty() || DiagnosticsState.badgeOpsSnapshot().empty() || !DiagnosticsState.fpsOpsSnapshot().empty()) return 27;
+    if (DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge, textLayoutService)) return 28;
     DiagnosticsState.clearError();
-    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge)) return 29;
-    if (!DiagnosticsState.errorOpsSnapshot().empty()) return 30;
+    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge, textLayoutService)) return 29;
+    if (!DiagnosticsState.errorOpsSnapshot().empty() || DiagnosticsState.fpsOpsSnapshot().empty()) return 30;
+    DiagnosticsState.setFps(120);
+    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge, textLayoutService) || DiagnosticsState.fpsOpsSnapshot() != fpsOps) return 43;
+    DiagnosticsState.setFps(std::nullopt);
+    if (!DiagnosticsState.prepareFrame({0, 0, 320, 180}, true, badge, textLayoutService) || !DiagnosticsState.fpsOpsSnapshot().empty()) return 44;
 
     const auto resourceDir = std::filesystem::temp_directory_path() / "arrange-resource-prepare-smoke";
     std::filesystem::create_directories(resourceDir);

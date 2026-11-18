@@ -81,7 +81,7 @@ namespace arrange::core {
         Part buildFlashes(double nowMillis) const;
         Part buildBounds() const;
         Part buildHit(const PublishedFrame& frame) const;
-        Part buildPanel(const FrameTimeline& timeline) const;
+        Part buildPanel(const FrameTimeline& timeline, float y) const;
 
         bool enabled_ = false;
         OverlayLayers layers_;

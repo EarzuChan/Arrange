@@ -114,6 +114,10 @@ int main(int argc, char** argv) {
         config.app.useDist(std::filesystem::path(argv[1]).parent_path());
         config.diagnostics.badge = arrange::juce::DiagnosticVisibility::Hidden;
         config.diagnostics.toasts = arrange::juce::DiagnosticVisibility::Hidden;
+        config.diagnostics.overlay = arrange::juce::DiagnosticVisibility::Hidden;
+        editor.configure(config);
+        check(!editor.toggleFpsBadge(), "诊断不可用时接受了 F10");
+        config.diagnostics.overlay = arrange::juce::DiagnosticVisibility::Always;
         editor.configure(config);
         editor.resized(200, 100);
         for (int count = 0; count < 12 && editor.wantsVBlank(); ++count) (void)editor.pumpFrame(time += 16);
@@ -126,6 +130,21 @@ int main(int argc, char** argv) {
             editor.paint(graphics, {0, 0, 300, 200});
         }
         check(image.getPixelAt(290, 190).getARGB() == 0xff336699, "放大后的新区域仍未绘制内容");
+        for (int count = 0; count < 12 && editor.wantsVBlank(); ++count) (void)editor.pumpFrame(time += 16);
+        const auto appPixel = image.getPixelAt(12, 30);
+        check(editor.toggleFpsBadge() && editor.wantsVBlank(), "开启 FPS 徽标没有请求诊断帧");
+        check(editor.pumpFrame(time += 16) && !editor.wantsVBlank(), "静态 App 开启 FPS 徽标后没有立即空闲");
+        {
+            ::juce::Graphics graphics(image);
+            editor.paint(graphics, image.getBounds());
+        }
+        check(image.getPixelAt(12, 30) != appPixel && editor.frameTimeline().empty(), "FPS 徽标未独立绘制");
+        check(editor.toggleFpsBadge() && editor.pumpFrame(time += 16) && !editor.wantsVBlank(), "关闭 FPS 徽标后未清理诊断帧");
+        {
+            ::juce::Graphics graphics(image);
+            editor.paint(graphics, image.getBounds());
+        }
+        check(image.getPixelAt(12, 30) == appPixel, "关闭 FPS 徽标后仍有残留内容");
         std::cout << "视口、内容尺寸、滚动范围、响应式回传及宿主绘制链路通过\n";
         return 0;
     } catch (const std::exception& error) {
