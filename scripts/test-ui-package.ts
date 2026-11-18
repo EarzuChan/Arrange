@@ -58,7 +58,7 @@ try {
     const sources = new Map([
         [manifest.entry, `import { readCycle } from './cycle/a.js'; if (readCycle() !== 42) throw Error('cycle initialization');
 ${entryText}`],
-        ['cycle/a.js', `import { b } from './b.js'; export const a = 19; export function readCycle() { return b() };`],
+        ['cycle/a.js', `import { b } from './b.js'; export const a = 19; export function readCycle() { /* arrange-source-only-probe */ return b() };`],
         ['cycle/b.js', `import { a } from './a.js'; export function b() { return import.meta.url === 'cycle/b.js' ? a + 23 : 0 };`],
     ])
     for (const [path, source] of sources) {
@@ -94,6 +94,8 @@ ${entryText}`],
     const bc = await verifyUiPackage(bytecode, ARRANGE_PACKAGE_VERSION)
     assert.equal(bc.manifest.scriptFormat, 'bytecode')
     assert.ok(bc.entries.filter(row => row.kind === 'module').every(row => row.file?.endsWith('.qbc')))
+    const cycle = await readFile(join(bytecode, 'cycle/a.js.qbc'))
+    assert.equal(cycle.includes('arrange-source-only-probe'), false)
     await assert.rejects(readFile(join(bytecode, 'app.js')), { code: 'ENOENT' })
     assert.equal(await readFile(join(bytecode, 'not-module.js'), 'utf8'), 'throw Error("asset must not execute")')
     const bytecodeZip = join(root, 'bytecode-zip')

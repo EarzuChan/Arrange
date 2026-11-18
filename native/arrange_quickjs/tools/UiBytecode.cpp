@@ -37,7 +37,7 @@ namespace {
             }
             for (const auto& [name, value] : modules_) {
                 size_t size = 0;
-                auto* bytes = JS_WriteObject(context_.get(), &size, value, JS_WRITE_OBJ_BYTECODE);
+                auto* bytes = JS_WriteObject(context_.get(), &size, value, JS_WRITE_OBJ_BYTECODE | JS_WRITE_OBJ_STRIP_SOURCE);
                 if (!bytes) fail(name);
                 const auto release = [this](uint8_t* pointer) { js_free(context_.get(), pointer); };
                 const std::unique_ptr<uint8_t, decltype(release)> payload(bytes, release);
