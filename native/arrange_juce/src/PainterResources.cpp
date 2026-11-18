@@ -2,7 +2,7 @@
 
 #if ARRANGE_JUCE_WITH_JUCE
 
-#include <arrange/juce/AppResolver.h>
+#include <arrange/juce/UiPackage.h>
 #include <arrange/core/Font.h>
 #include <stdexcept>
 #include <cmath>
@@ -153,7 +153,7 @@ namespace arrange::juce {
             return result;
         }
 
-        PainterPayload httpPayload(const std::string& address, const PainterResourceLimits& limits) {
+        PainterPayload httpPayload(const std::string& address, const PainterResourceLimits& limits, bool painter = true) {
             const auto expiresAt = std::chrono::steady_clock::now() + std::chrono::milliseconds(limits.timeoutMs);
             ::juce::WebInputStream stream(::juce::URL(::juce::String(address)), false);
             stream.withConnectionTimeout(limits.timeoutMs).withNumRedirectsToFollow(0).withExtraHeaders("Cache-Control: no-cache\r\n");
@@ -173,7 +173,7 @@ namespace arrange::juce {
                 return expired || std::chrono::steady_clock::now() >= expiresAt;
             };
             const auto fail = [&](const std::string& reason) -> void {
-                throw std::runtime_error("Live Painter 读取失败：" + address + "：" + (timedOut() ? "请求超时" : reason));
+                throw std::runtime_error("Live 资产读取失败：" + address + "：" + (timedOut() ? "请求超时" : reason));
             };
             if (!stream.connect(nullptr)) fail("连接失败");
             const auto status = stream.getStatusCode();
@@ -181,7 +181,7 @@ namespace arrange::juce {
             const auto length = stream.getTotalLength();
             if (length > static_cast<::juce::int64>(limits.maxBytes)) fail("HTTP 200，响应超出资源字节预算");
             const auto mime = stream.getResponseHeaders()["Content-Type"].upToFirstOccurrenceOf(";", false, false).trim().toLowerCase();
-            if (mime.isNotEmpty() && !mime.startsWith("image/") && !isFontMime(mime) && mime != "application/octet-stream") fail("HTTP 200，资源 MIME 不支持：" + mime.toStdString());
+            if (painter && mime.isNotEmpty() && !mime.startsWith("image/") && !isFontMime(mime) && mime != "application/octet-stream") fail("HTTP 200，资源 MIME 不支持：" + mime.toStdString());
             PainterPayload result;
             result.source = address + "（HTTP 200）";
             const auto path = ::juce::String(address.substr(0, address.find('?'))).toLowerCase();
@@ -297,19 +297,37 @@ namespace arrange::juce {
                 return future;
             };
         }
+
+        core::AssetLoader asynchronousAssetLoader(std::function<std::string(const std::string&)> read) {
+            return [read = std::move(read)](std::string name, std::function<void()> wake) {
+                auto task = std::make_shared<std::packaged_task<std::string()>>([read, name = std::move(name)] { return read(name); });
+                auto future = task->get_future();
+                PainterWorkers::get().addJob([task, wake = std::move(wake)] {
+#if JUCE_MAC || JUCE_IOS
+                    const ::juce::ScopedAutoReleasePool requestPool;
+#endif
+                    (*task)();
+                    if (wake) wake();
+                });
+                return future;
+            };
+        }
     }
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir) {
-        return asynchronousPainterLoader([packageDir = std::move(packageDir)](const std::string& resource) {
+        return packagePainterLoader(mountUiPackage(packageDir));
+    }
+
+    arrange::core::PainterLoader packagePainterLoader(std::shared_ptr<const core::UiPackage> package) {
+        return asynchronousPainterLoader([package = std::move(package)](const std::string& resource) {
             if (resource.starts_with("data:")) return dataPayload(resource, PainterResourceLimits{});
-            const auto resolved = arrange::resolvePackageResource(packageDir, resource);
-            if (!resolved.ok) throw std::runtime_error(resolved.error);
+            const auto name = packageAssetName(resource);
+            const auto bytes = package->read(name, core::UiEntryKind::Asset, PainterResourceLimits::MaxResourceBytes);
             PainterPayload result;
-            const auto fileName = resolved.path.u8string();
-            const ::juce::File file(::juce::String::fromUTF8(reinterpret_cast<const char*>(fileName.data()), static_cast<int>(fileName.size())));
-            if (!file.loadFileAsData(result.bytes)) throw std::runtime_error("Painter 资源读取失败：" + resource);
-            result.svg = file.hasFileExtension("svg");
-            result.font = isFontPath(file.getFileName().toLowerCase());
+            result.bytes = ::juce::MemoryBlock(bytes.data(), bytes.size());
+            const auto lower = ::juce::String::fromUTF8(name.c_str()).toLowerCase();
+            result.svg = lower.endsWith(".svg");
+            result.font = isFontPath(lower);
             return result;
         });
     }
@@ -320,6 +338,30 @@ namespace arrange::juce {
         return asynchronousPainterLoader([server, limits](const std::string& resource) {
             if (resource.starts_with("data:")) return dataPayload(resource, limits);
             return httpPayload(liveResourceAddress(server, resource), limits);
+        });
+    }
+
+    core::AssetLoader packageAssetLoader(std::shared_ptr<const core::UiPackage> package) {
+        return asynchronousAssetLoader([package = std::move(package)](const std::string& reference) { return package->read(packageAssetName(reference), core::UiEntryKind::Asset, PainterResourceLimits::MaxResourceBytes); });
+    }
+
+    core::AssetLoader liveAssetLoader(std::string devServerUrl) {
+        const auto server = parseHttpAddress(devServerUrl);
+        return asynchronousAssetLoader([server](const std::string& reference) {
+            const auto name = packageAssetName(reference);
+            std::string path = "/";
+            constexpr std::string_view hex = "0123456789ABCDEF";
+            for (const unsigned char byte : name) {
+                if ((byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') || (byte >= '0' && byte <= '9') || std::string_view("-._~/").find(static_cast<char>(byte)) != std::string_view::npos)
+                    path += static_cast<char>(byte);
+                else {
+                    path += '%';
+                    path += hex[byte >> 4];
+                    path += hex[byte & 15];
+                }
+            }
+            const auto payload = httpPayload(liveResourceAddress(server, path), {}, false);
+            return payload.bytes.isEmpty() ? std::string{} : std::string(static_cast<const char*>(payload.bytes.getData()), payload.bytes.getSize());
         });
     }
 }

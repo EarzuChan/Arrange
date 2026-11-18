@@ -70,7 +70,7 @@ export type ArrangeTransformPlugin = {
     transform: (this: TransformThis, code: string, id: string) => string | Promise<{ code: string; map?: object | null } | null> | null
 }
 
-export type ArrangeVitePlugin = ArrangeTransformPlugin & {
+export type ArrangeVitePlugin = ArrangeTransformPlugin & Pick<import('vite').Plugin, 'configResolved' | 'writeBundle'> & {
     config: (config?: unknown, env?: ConfigEnv) => ArrangeViteConfig
     configureServer: (server: ArrangeDevServer) => void
     handleHotUpdate: (ctx: HotUpdateContext) => HotUpdateModule[]

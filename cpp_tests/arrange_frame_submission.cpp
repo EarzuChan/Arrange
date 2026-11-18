@@ -3,6 +3,7 @@
 #include "JuceTestApplication.h"
 #include <arrange/juce/ScenePipelineState.h>
 #include <arrange/juce/EditorSceneHost.h>
+#include "UiPackageFixture.h"
 #include <arrange/juce/ArrangeEditor.h>
 #include <arrange/juce/ArrangeRuntime.h>
 #include <arrange/juce/VBlankSource.h>
@@ -368,6 +369,7 @@ n.setModifier(1, { elements: [{ type: 'clickable', value: { onClick() {
         const auto writePackage = [&](const char* color, const char* request) {
             const auto source = std::string("const n = globalThis.__ARRANGE_NATIVE__;\n") + "void (n.createNode(1, 'LayoutNode'), n.updateBinding(n.registerBinding(1, 'measurePolicy'), {kind: 'Box'}));\n" + "n.setModifier(1, {elements: [{type: 'size', value: {width: 100, height: 100}}," + "{type: 'background', value: {color: " + color + "}}]});\n" + request;
             check(entry.replaceWithText(source), "reload package write failed");
+            test_support::writeUiManifest(std::filesystem::u8path(directory.getFullPathName().toStdString()));
         };
         arrange::juce::EditorSceneHost host;
         arrange::juce::EditorConfig config;

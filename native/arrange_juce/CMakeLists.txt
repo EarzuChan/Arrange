@@ -1,5 +1,6 @@
 add_library(arrange_juce STATIC
   src/AppResolver.cpp
+  src/UiPackage.cpp
   src/DevServerClient.cpp
   src/LiveModuleClient.cpp
   src/ErrorScreenModel.cpp
@@ -57,6 +58,7 @@ target_compile_definitions(arrange_juce PUBLIC ARRANGE_JUCE_WITH_JUCE=1)
 target_link_libraries(arrange_juce PUBLIC
   juce::juce_audio_processors
   juce::juce_gui_basics
+  PRIVATE juce::juce_cryptography
 )
 
 if(APPLE)

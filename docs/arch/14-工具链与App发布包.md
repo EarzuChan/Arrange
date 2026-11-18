@@ -41,25 +41,27 @@ arrange build
 
 UI 源码项目内部构建输出或仍叫 `dist/`，这是 UI 项目内部概念。Arrange 的最终交付物由 CLI 整理到工程根目录下的 `artifacts/`。
 
-# 运行时 ui 目录
+# 运行时 UI 包
 
-运行期可加载的 UI 产物包目录默认叫 `ui/`：
+目录与 ZIP 是同一只读包的两种载体，默认物理落点均为 `ui`（ZIP 不需要扩展名）。包根逻辑布局：
 
 ```txt
-ui/
-  app.js
-  chunks/...
-  assets/...
-  其他入口文件（可选）
+arrange-ui.json
+app.js
+chunks/...
+assets/...
+其他 public 资源
 ```
 
-`useDist()` 默认寻找名为 `ui/` 的 UI 产物包，用户也可以显式提供别的目录名。
+`arrange-ui.json` 由 Vite 对最终产物生成，声明 `format`、`framework`、`protocol`、`entry` 与 `entries`。条目记录 `path`、`kind`（`module` 或 `asset`）、`size` 与 `sha256`。文件名是 UTF-8、大小写敏感、用 `/` 分隔的逻辑名；拒绝重复名、大小写冲突、非法路径和符号链接。清单自身不登记。CLI 核验 Framework 版本，挂载检查格式和运行时协议，按需核验文件大小和摘要；无清单或清单无效即失败。摘要用于发现损坏和错配，不是签名。
+
+ESM 入口与依赖只能访问清单的模块条目，资源接口只访问资产条目。相对 ESM specifier 从导入者逻辑名解析并受包根约束。ZIP 使用 STORE/DEFLATE，挂载时读索引，按需读取或解压单个条目，不落地解包和持久化缓存；不接收加密、分卷、ZIP64 或归档注释。两个载体都限制清单（4 MiB、8192 条目）和单条目的解压后大小（64 MiB）；资源请求沿用 16 MiB 预算，ZIP 整体小于 2 GiB。
 
 # 结合到 C++ 发布包
 
-Arrange CLI 的 package phase 负责把 UI 产物与 native 产物整理到 `artifacts/`。C++ 发布版按约定优先找 `ui/`；若用户显式在代码中申明了别的目录，则按显式目录加载。
+Arrange CLI 的 pack phase 把 UI 包与 native 产物整理到 `artifacts/`。`useDist(path)` 打开一个明确落点，不搜索其他名称，也不扫描旧包。
 
-Windows 是可执行文件同级目录下的 `ui/`；macOS 和各类 bundle 则是资源目录里的 `ui/`。Debug 是否启用 live，不改变 dist 的打包位置与发现方式。
+Windows Standalone 的 `ui` 在可执行文件旁，VST3 和 macOS bundle 的 `ui` 在 `Contents/Resources`，按应用或插件模块定位，不使用宿主进程工作目录。Debug 和 Release 共用 Dist 路径规则。JUCE 不定义 Arrange 包，只提供宿主和资源解码等能力。
 
 # 诊断
 
@@ -74,7 +76,9 @@ Arrange 工具链应在开发期诊断：
 
 Vite 侧资源引用优先使用 ESM import；`public/` 里的文件在构建时原样复制到输出包根，在 Live 时由开发服务提供。Vite 负责将导入解析成资源地址或内联图片；C++ 获取层消费解析结果，不单独维护第二套资源图。
 
-资源来源跟随实际加载成功的 App source，而非构建 flavor。Live 注入当前已配置开发服务的资源获取器；Dist 注入 UI package 文件获取器。两者共享后台加载、图片与 SVG 解码、不可变结果、Painter 状态与生命周期处理，资源读取不进入音频线程或绘制阶段。共享 worker 由 JUCE GUI 关闭流程在消息线程销毁前收回，SVG 消息锁响应任务取消；Mac 每个任务独立释放平台临时对象，运行时退休和应用退出都属于加载生命周期。
+资源来源跟随实际加载成功的 App source，而非构建 flavor。Live 从当前开发服务取，Dist 从挂载包取。应用也可从 `@arrange/framework` 导入 `assets`，以 `await assets.readText('/presets/factory.json')` 取得 UTF-8 文本，或用 `await assets.readBytes(...)` 取得 `Uint8Array`。`public/` 提供稳定名称；普通读取失败拒绝 Promise，不接受 `data:`。资产 I/O 不进入音频线程、布局或绘制。两者共用后台 worker 和退休边界；共享 worker 由 JUCE GUI 关闭流程收回，SVG 消息锁响应任务取消，Mac 每个任务独立释放平台临时对象。
+
+从 `onMounted`、事件处理或其他异步任务读取，不在入口的顶层 `await` 阻塞 `createApp(...).mount()`。应用的初始挂载不等待资源 I/O，读取完成在 UI Owner 的语义检查点交付；等待期间由应用表达加载状态。C++ 使用 `mountUiPackage` 可显式打开同一只读包，读取逻辑名，不依赖 ZIP 内条目的物理路径。
 
 资源引用形态：
 
@@ -95,7 +99,7 @@ Painter 获取层接收以下资源引用：
 Dist 字符串路径规则：
 
 - `"/logo.png"` 表示 UI package root 下的资源 URL：去掉 URL 查询和片段后，单次解码百分号编码，再检查文件边界。Vite 非内联资源中编码后的空格、中文与百分号由此对应实际文件名。
-- `"assets/logo.png"` 表示 UI package root 下的字面相对文件路径；不将其百分号或问号重新解释为 URL 编码或查询。
+- `"assets/logo.png"` 表示 UI package root 下的字面相对逻辑名；不将其百分号重新解释为 URL 编码，跨平台非法文件名不能进入包。
 - 禁止绝对文件系统路径。
 - 禁止 `../` 逃逸 UI package。
 - 禁止隐式相对当前工作目录查找。

@@ -13,6 +13,7 @@ import { WindowsBundleIcon } from "./WindowsBundleIcon.ts"
 import { nativeBuildRecordName } from "../building/BuildReceipt.ts"
 import { TransactionStore } from "../transaction/TransactionStore.ts"
 import { isBusyPathError, ReplacementTransaction } from "../transaction/ReplacementTransaction.ts"
+import { stageUiPackage, verifyUiPackage } from './UiPackage.ts'
 
 export interface PackOptions {
     readonly flavor: BuildFlavor
@@ -212,10 +213,9 @@ export class Packer {
         const uiDirectory = resolve(state.rootDir, state.project.ui.directory)
         const uiDist = uiOutputDirectory(state)
         await requireDirectory(uiDist, "UI dist")
-        const entryInfo = await lstat(resolve(uiDist, "app.js")).catch(() => undefined)
-        if (!entryInfo?.isFile()) throw new Error(`UI dist 缺少普通文件 app.js：${uiDist}`)
         await verifyTree(uiDist)
-        const uiEntrySha256 = await digest(resolve(uiDist, "app.js"))
+        const ui = await verifyUiPackage(uiDist, state.project.framework.version, this.signal)
+        const packageFormat = state.project.ui.packageFormat ?? 'directory'
         const outputRoot = resolve(state.rootDir, state.project.artifacts.directory)
         await this.checkOutput(state, outputRoot, uiDirectory)
         const platform = artifacts[0].platform
@@ -270,7 +270,7 @@ export class Packer {
                 const uiPath = artifact.productPath === artifact.binaryPath ? resolve(staged, "ui") : resolve(productPath, artifact.uiRelativePath)
                 await rm(uiPath, { recursive: true, force: true })
                 await mkdir(dirname(uiPath), { recursive: true })
-                await this.copy(uiDist, uiPath)
+                await stageUiPackage(uiDist, uiPath, state.project.framework.version, packageFormat, ui.digest, this.signal)
                 if (artifact.platform === "darwin") await this.signer.ensureRunnable(artifact.productPath, productPath)
                 else if (artifact.product === "vst3") {
                     await rm(resolve(productPath, nativeWindowsIconOwnershipFile), { force: true })
@@ -279,8 +279,7 @@ export class Packer {
                 await verifyTree(staged)
                 const binaryRelative = artifact.productPath === artifact.binaryPath ? basename(artifact.binaryPath) : relative(artifact.productPath, artifact.binaryPath)
                 const stagedBinary = artifact.productPath === artifact.binaryPath ? productPath : resolve(productPath, binaryRelative)
-                const stagedUiEntrySha256 = await digest(resolve(uiPath, "app.js"))
-                if (stagedUiEntrySha256 !== uiEntrySha256) throw new Error("UI 复制验证失败")
+                const stagedUiEntrySha256 = ui.entry.sha256
                 const path = resolve(destination, basename(artifact.productPath))
                 products.push({ product: artifact.product, path, binaryPath: artifact.productPath === artifact.binaryPath ? path : resolve(path, binaryRelative), uiPath: artifact.productPath === artifact.binaryPath ? resolve(destination, "ui") : resolve(path, artifact.uiRelativePath) })
                 await writeFile(resolve(staged, "arrange-package.json"), `${JSON.stringify({ format: 1, project: state.project.project.name, version: state.project.project.version, frameworkVersion: state.project.framework.version, nativeTarget: state.project.native.target, flavor: options.flavor, platform, architecture, product: artifact.product, ownedEntries: [basename(artifact.productPath), ...(artifact.productPath === artifact.binaryPath ? ["ui", ...artifact.runtimeFiles.map(file => basename(file))] : [])], binary: relative(staged, stagedBinary), ui: relative(staged, uiPath), binarySha256: await digest(stagedBinary), uiEntrySha256: stagedUiEntrySha256, buildRecords }, null, 4)}\n`)

@@ -136,6 +136,7 @@ export type NativeTransactionTarget = {
     modifierInstances: (id: NodeId) => readonly NativeModifierHandle[]
     registerModifierBinding: (id: NodeId, instance: NativeModifierHandle) => NativeBindingHandle
     runtimeVersion: number
+    readAsset?: { (reference: string, text: true): Promise<string>, (reference: string, text: false): Promise<Uint8Array> }
     createNode: (id: NodeId, type: string) => void
     deleteNode: (id: NodeId) => void
     insertChild: (parent: NodeId, child: NodeId, index: number) => void

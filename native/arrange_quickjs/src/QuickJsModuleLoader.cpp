@@ -4,8 +4,6 @@
 
 #include "QuickJsValueReader.h"
 
-#include <fstream>
-#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -13,10 +11,6 @@ namespace arrange::quickjs {
     void QuickJsModuleLoader::install(const LiveModuleSnapshot& snapshot) {
         live_ = true;
         for (const auto& module : snapshot.modules) sources_.insert_or_assign(module.url, module);
-    }
-
-    void QuickJsModuleLoader::setModuleRoot(const std::filesystem::path& entryPath) {
-        moduleRoot_ = std::filesystem::absolute(entryPath).lexically_normal().parent_path();
     }
 
     bool QuickJsModuleLoader::startsWithDotSpecifier(std::string_view specifier) {
@@ -39,18 +33,18 @@ namespace arrange::quickjs {
             }
             return js_strdup(context, name.c_str());
         }
-        std::filesystem::path resolved;
-        if (std::filesystem::path(moduleName).is_absolute()) {
-            resolved = moduleName;
-        } else if (startsWithDotSpecifier(specifier)) {
-            const std::filesystem::path base = moduleBaseName != nullptr && *moduleBaseName != '\0' ? std::filesystem::path(moduleBaseName).parent_path() : loader->moduleRoot_;
-            resolved = base / moduleName;
-        } else {
-            JS_ThrowReferenceError(context, "unsupported bare module specifier '%s' in Arrange UI package", moduleName);
+        if (loader->package_) {
+            if (startsWithDotSpecifier(specifier) && specifier.find_first_of("\\:?#") == std::string_view::npos && moduleBaseName && *moduleBaseName) {
+                const auto from = std::filesystem::path(std::u8string_view(reinterpret_cast<const char8_t*>(moduleBaseName)));
+                const auto relative = std::filesystem::path(std::u8string(specifier.begin(), specifier.end()));
+                const auto name = (from.parent_path() / relative).lexically_normal().generic_u8string();
+                if (!name.empty() && !name.starts_with(u8"../") && name != u8"..") return js_strdup(context, reinterpret_cast<const char*>(name.c_str()));
+            }
+            JS_ThrowReferenceError(context, "invalid UI package ESM specifier '%s'", moduleName);
             return nullptr;
         }
-        const auto normalized = std::filesystem::absolute(resolved).lexically_normal().generic_string();
-        return js_strdup(context, normalized.c_str());
+        JS_ThrowReferenceError(context, "no module source installed for '%s'", moduleName);
+        return nullptr;
     }
 
     JSModuleDef* QuickJsModuleLoader::load(JSContext* context, const char* moduleName, void* opaque) {
@@ -68,16 +62,22 @@ namespace arrange::quickjs {
             JS_SetPropertyStr(context, meta.get(), "url", JS_NewString(context, moduleName));
             return module;
         }
-        const std::filesystem::path modulePath = std::filesystem::path(moduleName).lexically_normal();
-        std::ifstream stream(modulePath, std::ios::binary);
-        if (!stream) {
-            JS_ThrowReferenceError(context, "could not load Arrange UI module '%s'", moduleName);
-            return nullptr;
+        if (loader.package_) {
+            try {
+                const auto source = loader.package_->read(moduleName, core::UiEntryKind::Module, core::UiEntryLimit);
+                ScopedValue compiled(context, JS_Eval(context, source.data(), source.size(), moduleName, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY));
+                if (JS_IsException(compiled.get())) return nullptr;
+                auto* module = static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(compiled.get()));
+                ScopedValue meta(context, JS_GetImportMeta(context, module));
+                JS_SetPropertyStr(context, meta.get(), "url", JS_NewString(context, moduleName));
+                return module;
+            } catch (const std::exception& error) {
+                JS_ThrowReferenceError(context, "%s", error.what());
+                return nullptr;
+            }
         }
-        const std::string source((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-        ScopedValue compiled(context, JS_Eval(context, source.data(), source.size(), modulePath.generic_string().c_str(), JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY));
-        if (JS_IsException(compiled.get())) return nullptr;
-        return static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(compiled.get()));
+        JS_ThrowReferenceError(context, "no module source installed for '%s'", moduleName);
+        return nullptr;
     }
 }
 

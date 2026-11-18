@@ -48,6 +48,7 @@
                             <Spacer :modifier="M.height(4.dp)" />
 
                             <Text :text="`Demo ${buildInfo.version}、Framework ${buildInfo.framework}`" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
+                            <Text a-if="releaseLabel" :text="releaseLabel" :style="{ fontSize: typeScale.caption.sp, color: Color(theme.secondaryLabel) }" />
 
                             <Spacer :modifier="M.height(4.dp)" />
 
@@ -63,7 +64,7 @@
 </template>
 
 <script>
-import { provide, ref, computed, createScrollState } from '@arrange/framework'
+import { assets, onMounted, provide, ref, computed, createScrollState } from '@arrange/framework'
 import { Color, M, painter, rounded } from '@arrange/framework/ui'
 import { AnimatedVisibility, tween } from '@arrange/framework/animation'
 import { hasInterop } from '@arrange/framework/interop'
@@ -97,6 +98,14 @@ const page = ref<TopicKey | null>(null)
 const current = computed(() => topics.find(topic => topic.key === page.value) ?? topics[0])
 
 const aboutOpen = ref(false)
+const releaseLabel = ref('')
+onMounted(() => {
+    void assets.readText('/gallery.json').then(text => {
+        releaseLabel.value = JSON.parse(text).label
+    }).catch(() => {
+        releaseLabel.value = '无法读取展示包资料'
+    })
+})
 
 const dialogSpec = tween({ durationMillis: 220 })
 

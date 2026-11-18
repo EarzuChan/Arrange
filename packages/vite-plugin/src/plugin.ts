@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createArrangeTransformPlugin } from "./transform.ts"
 import { invalidateSfaTypeDependency } from "./sfa.ts"
 import { bindPublicResourceReload } from "./public-resource-hmr.ts"
+import { uiPackageHooks } from './ui-package.ts'
 import type { ArrangeDevServer, ArrangeViteConfig, ArrangeVitePlugin, ArrangeVitePluginOptions, ConfigEnv, HotUpdateContext, HotUpdateModule } from "./types.ts"
 
 export default function arrange(options: ArrangeVitePluginOptions = {}): ArrangeVitePlugin {
@@ -18,6 +19,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
     })
     return {
         ...transformPlugin,
+        ...uiPackageHooks(),
         config(_config: unknown = {}, env: ConfigEnv = {}): ArrangeViteConfig {
             command = env.command
             const nodeEnv = env.mode === "production" || env.command === "build" ? "production" : "development"

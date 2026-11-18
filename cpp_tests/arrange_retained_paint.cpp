@@ -442,19 +442,18 @@ namespace {
                              SetPropMutation{6, "measurePolicy", arrange::core::PropValue::objectValue({{"kind", arrange::core::PropValue::stringValue("MinSize")}})},
                              SetModifierMutation{6, {{size(160, 30), {}}, {OffsetModifier{20, 195}, {}}, {test_support::text("同资源不同颜色", 0xff0000ff, 18), {}}}},
                              InsertChildMutation{1, 6, 3}};
+        arrange::core::PainterLoadResult loaded;
         {
             ::juce::Image source(::juce::Image::ARGB, 100, 10, true);
             {
                 ::juce::Graphics graphics(source);
                 graphics.fillAll(::juce::Colour(0x999922aa));
             }
-            auto stream = ::juce::File::getCurrentWorkingDirectory().getChildFile("m23-crop-source.png").createOutputStream();
-            check(stream != nullptr, "无法打开绘制验收图像文件");
-            stream->setPosition(0);
-            stream->truncate();
-            check(::juce::PNGImageFormat{}.writeImageToStream(source, *stream), "无法创建图片边界验收资源");
+            ::juce::MemoryOutputStream stream;
+            check(::juce::PNGImageFormat{}.writeImageToStream(source, stream), "无法创建图片边界验收资源");
+            const auto url = "data:image/png;base64," + ::juce::Base64::toBase64(stream.getData(), stream.getDataSize()).toStdString();
+            loaded = arrange::juce::livePainterLoader("http://127.0.0.1:1")(url, {}).get();
         }
-        const auto loaded = arrange::juce::packagePainterLoader(std::filesystem::current_path())("m23-crop-source.png", {}).get();
         check(loaded.content != nullptr, "绘制验收图片加载失败");
         PaintModifier imagePaint;
         imagePaint.painter = {1, 1, 1, loaded.content};

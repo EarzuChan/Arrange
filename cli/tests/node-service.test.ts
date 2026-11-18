@@ -9,6 +9,7 @@ import { NodeJsService } from "../src/feature/nodejs/NodeJsService.ts"
 import { Executor } from "../src/feature/platform/Executor.ts"
 import type { ProcessResult, ProcessSpec } from "../src/feature/platform/ProcessSpec.ts"
 import { fixture, testTask, write } from "./fixture.ts"
+import { writeUiManifest } from './ui-package-fixture.ts'
 
 class InstallingExecutor extends Executor {
     readonly calls: ProcessSpec[] = []
@@ -31,7 +32,11 @@ async function setup(t: TestContext) {
         if (spec.args[0] === "install") {
             const manifest = JSON.parse(await readFile(resolve(uiRoot, "package.json"), "utf8"))
             for (const name of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) await write(resolve(uiRoot, "node_modules", name, "package.json"), JSON.stringify({ name, version: name === frameworkPackageName ? state.project.framework.version : "1.0.0", arrange: name === frameworkPackageName ? { cliCompatibility } : undefined }))
-        } else if (spec.args.join(" ") === "run build") await write(resolve(uiRoot, state.project.ui.outputDirectory ?? "dist", "app.js"), "export default {}\n")
+        } else if (spec.args.join(" ") === "run build") {
+            const output = resolve(uiRoot, state.project.ui.outputDirectory ?? 'dist')
+            await write(resolve(output, 'app.js'), 'export default {}\n')
+            await writeUiManifest(output, state.project.framework.version)
+        }
     }
     return { state, uiRoot, executor, node: new NodeJsService(executor) }
 }
@@ -155,7 +160,7 @@ test("UI --clean 只删除输出；源码、scripts、依赖子树及目录链�
     assert.equal(await readFile(userFile, "utf8"), "外部内容")
 })
 
-test("无 dev/build 的 UI manifest 为 Fatal；命令成功但缺 app.js 仍构建失败", async t => {
+test("无 dev/build 的 UI manifest 为 Fatal；命令成功但缺发布清单仍构建失败", async t => {
     const input = await setup(t)
     await write(resolve(input.uiRoot, "package.json"), JSON.stringify({ dependencies: { [frameworkPackageName]: input.state.project.framework.version } }))
     assert.equal((await input.node.inspect(input.state)).fatal, true)
@@ -164,7 +169,7 @@ test("无 dev/build 的 UI manifest 为 Fatal；命令成功但缺 app.js 仍构
     await write(resolve(input.uiRoot, "package.json"), packageJsonFile.make(input.state))
     await input.node.install(input.state, testTask())
     input.executor.handler = async () => { }
-    await assert.rejects(input.node.build(input.state, testTask()), /ENOENT|app\.js/)
+    await assert.rejects(input.node.build(input.state, testTask()), /arrange-ui\.json/)
 })
 
 test("安装取消即使退出码为零也抛 AbortError，旧准备记录不能继续使用", async t => {

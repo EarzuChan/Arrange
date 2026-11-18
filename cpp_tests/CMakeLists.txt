@@ -7,7 +7,7 @@ file(GLOB_RECURSE ARRANGE_RUNTIME_FIXTURE_INPUTS CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/demo/ui-src/public/*")
 set(ARRANGE_RUNTIME_FIXTURE_OUTPUTS)
 foreach(fixture IN ITEMS gallery rearrange-runtime viewport-runtime m3-layout m3-lazy m3-draw)
-    list(APPEND ARRANGE_RUNTIME_FIXTURE_OUTPUTS "${ARRANGE_FIXTURE_ROOT}/${fixture}/app.js")
+    list(APPEND ARRANGE_RUNTIME_FIXTURE_OUTPUTS "${ARRANGE_FIXTURE_ROOT}/${fixture}/app.js" "${ARRANGE_FIXTURE_ROOT}/${fixture}/arrange-ui.json")
 endforeach()
 add_custom_command(
     OUTPUT ${ARRANGE_RUNTIME_FIXTURE_OUTPUTS}
@@ -42,6 +42,8 @@ target_link_libraries(arrange_m24_contract PRIVATE Arrange::framework)
 add_test(NAME arrange_m24_contract COMMAND arrange_m24_contract)
 
 if(TARGET qjs)
+  add_executable(arrange_bytecode_bench EXCLUDE_FROM_ALL arrange_bytecode_bench.cpp)
+  target_link_libraries(arrange_bytecode_bench PRIVATE qjs)
   add_executable(arrange_live_modules arrange_live_modules.cpp)
   target_link_libraries(arrange_live_modules PRIVATE Arrange::quickjs)
   add_test(NAME arrange_live_modules COMMAND arrange_live_modules)
@@ -52,6 +54,10 @@ if(TARGET qjs)
 endif()
 
 if(TARGET juce::juce_audio_processors AND TARGET qjs)
+  add_executable(arrange_ui_package arrange_ui_package.cpp)
+  target_link_libraries(arrange_ui_package PRIVATE Arrange::framework)
+  add_test(NAME arrange_ui_package COMMAND "${ARRANGE_NODE_EXECUTABLE}" --import tsx scripts/test-ui-package.ts "$<TARGET_FILE:arrange_ui_package>")
+  set_tests_properties(arrange_ui_package PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 30)
   add_executable(arrange_interop arrange_interop.cpp)
   target_compile_definitions(arrange_interop PRIVATE _CONSOLE=1)
   target_link_libraries(arrange_interop PRIVATE Arrange::framework)

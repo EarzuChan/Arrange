@@ -3,6 +3,7 @@ import { delimiter, dirname, join } from "node:path"
 import { frameworkPackageName, uiPreparationFileName } from "../../CliMetadata.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
 import { uiDirectory, safeUiOutputDirectory, workDirectory } from "../project/ProjectPaths.ts"
+import { verifyUiPackage } from '../packing/UiPackage.ts'
 import { Executor } from "../platform/Executor.ts"
 import { throwIfProcessCancelled, type ProcessSpec } from "../platform/ProcessSpec.ts"
 import { readJsonFile, writeJsonFile } from "../../util/JsonFile.ts"
@@ -79,7 +80,7 @@ export class NodeJsService {
         const result = await this.executor.run(task.process(this.packageManagerSpec(state, ["run", "build"])))
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 构建失败，退出码 ${result.exitCode}`)
-        if (!(await stat(join(output, "app.js"))).isFile()) throw new Error(`UI 构建未生成 ${join(output, "app.js")}，请核对 outputDirectory 和 Vite 配置`)
+        await verifyUiPackage(output, state.project.framework.version)
         return output
     }
 

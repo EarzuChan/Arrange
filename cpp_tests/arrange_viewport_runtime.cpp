@@ -6,7 +6,7 @@
 #include <arrange/juce/TextInputOwner.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/core/ModifierGeometry.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <iostream>
 #include <stdexcept>
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
         ::juce::ScopedJuceInitialiser_GUI juce;
         check(argc == 2, "需要视口 SFA 夹具路径");
         auto script = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-        const auto loaded = arrange::quickjs::AppScriptLoader(*script).loadEntry(argv[1]);
+        const auto loaded = test_support::loadUiPackage(*script, std::filesystem::u8path(argv[1]).parent_path());
         check(loaded.ok, "视口夹具加载失败");
         auto initial = script->takePendingTransaction();
         check(!initial.has_value(), "视口夹具绕过首帧授权");

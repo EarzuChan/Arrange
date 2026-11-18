@@ -1,4 +1,5 @@
 #include <arrange/juce/PainterResources.h>
+#include "UiPackageFixture.h"
 #include <arrange/juce/AppResolver.h>
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
@@ -91,6 +92,10 @@ namespace {
                     send(*socket, "HTTP/1.1 302 Found\r\nLocation: http://example.com/image.png\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
                     continue;
                 }
+                if (path == "/factory%20%25.json") {
+                    send(*socket, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 9\r\nConnection: close\r\n\r\n{\"ok\":42}");
+                    continue;
+                }
                 if (path == "/large.png") {
                     send(*socket, "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 100000\r\nConnection: close\r\n\r\n");
                     send(*socket, std::string(1024, 'x'));
@@ -157,6 +162,8 @@ namespace {
             check(rejected, "资源预算或超时上限未拒绝非法设置");
         }
         const auto loader = arrange::juce::livePainterLoader(server.origin);
+        const auto read = arrange::juce::liveAssetLoader(server.origin);
+        check(read("factory %.json", {}).get() == "{\"ok\":42}", "Live 文本资产未按逻辑名读取 JSON");
         for (const auto& path : {std::string("logo.png"), std::string("/logo.png"), server.origin + "/src/assets/logo.png?import&t=1", std::string("/src/assets/logo%252e.png"), std::string("/assets/space%20%E4%B8%AD.png")}) {
             const auto loaded = load(loader, path);
             check(loaded.content && loaded.content->intrinsicSize == arrange::core::Size{3, 2}, "Live PNG 未从当前 origin 解码：" + loaded.error);
@@ -212,7 +219,10 @@ namespace {
         const auto cleanup = ::juce::ScopeGuard([&] { directory.deleteRecursively(); });
         check(directory.getChildFile("logo.png").replaceWithData(bytes.getData(), bytes.getSize()), "资源包测试 PNG 写入失败");
         for (const auto* name : {"logo 中文.png", "logo%2e.png", "logo%20.png"}) check(directory.getChildFile(::juce::String::fromUTF8(name)).replaceWithData(bytes.getData(), bytes.getSize()), "资源包特殊文件名写入失败");
-        const auto package = arrange::juce::packagePainterLoader(directory.getFullPathName().toStdString());
+        const auto dir = std::filesystem::u8path(directory.getFullPathName().toStdString());
+        std::ofstream(dir / "app.js") << "export {}";
+        test_support::writeUiManifest(dir, {"logo.png", "logo 中文.png", "logo%2e.png", "logo%20.png"});
+        const auto package = arrange::juce::packagePainterLoader(dir);
         for (const auto& loader : {package, arrange::juce::livePainterLoader("http://127.0.0.1:1")}) {
             const auto bitmap = load(loader, pngUrl);
             const auto svg = load(loader, svgUrl);
@@ -226,11 +236,7 @@ namespace {
         }
         expectFailure(arrange::juce::livePainterLoader("http://127.0.0.1:1", {16, 1000}), pngUrl, "字节预算");
         for (const auto& path : {"logo.png", "/logo.png", "/logo.png?cache=1#fragment", "logo 中文.png", "/logo%20%E4%B8%AD%E6%96%87.png", "logo%2e.png", "/logo%252e.png", "logo%20.png", "/logo%2520.png"}) check(load(package, path).content != nullptr, "Dist 包根路径未加载");
-        for (const auto& path : {"../logo.png", "/../logo.png", "/%2e%2e/logo.png", "/%2f%2fserver/logo.png", "/C%3a/logo.png", "/bad%00.png", "/bad%ZZ.png", "C:/logo.png", "C:\\logo.png", "//server/logo.png", "\\\\server\\logo.png", "http://127.0.0.1/logo.png", "file:///tmp/logo.png"}) check(!arrange::resolvePackageResource(directory.getFullPathName().toStdString(), path).ok, "Dist 接受了文件路径或包外资源");
-#if !defined(_WIN32)
-        check(directory.getChildFile("question?.png").replaceWithData(bytes.getData(), bytes.getSize()), "问号文件名写入失败");
-        check(load(package, "question?.png").content && load(package, "/question%3F.png?cache=1").content, "URL query 与文件名中的问号混淆");
-#endif
+        for (const auto& path : {"../logo.png", "/../logo.png", "/%2e%2e/logo.png", "/%2f%2fserver/logo.png", "/C%3a/logo.png", "/bad%00.png", "/bad%ZZ.png", "C:/logo.png", "C:\\logo.png", "//server/logo.png", "\\\\server\\logo.png", "http://127.0.0.1/logo.png", "file:///tmp/logo.png", "question?.png", "/question%3F.png?cache=1"}) check(!load(package, path).content, "Dist 接受了文件路径或包外资源");
         std::cout << "内联资源、Dist 包根语义和文件边界通过\n";
     }
 }

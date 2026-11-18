@@ -4,6 +4,7 @@
 #include <optional>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <arrange/core/EventSlot.h>
@@ -12,6 +13,7 @@
 #include <arrange/core/MutationTransaction.h>
 #include <arrange/core/Scroll.h>
 #include <arrange/core/Painter.h>
+#include <arrange/core/UiPackage.h>
 #include <arrange/core/FocusTypes.h>
 #include <arrange/core/Interop.h>
 #include <arrange/Log.h>
@@ -64,10 +66,12 @@ namespace arrange::quickjs {
         explicit QuickJsScriptHost(ScriptExecutionLimits limits = {});
         ~QuickJsScriptHost() override;
         void setPainterLoader(arrange::core::PainterLoader loader);
+        void setAssetLoader(core::AssetLoader loader);
         // 宿主寿命须长于本脚本宿主；须在加载脚本前设置
         void setInteropHost(arrange::core::InteropHost* host);
 
-        ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override;
+        ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source);
+        ScriptExecutionResult executePackage(std::shared_ptr<const core::UiPackage> package) override;
         ScriptExecutionResult executeLiveModules(const LiveModuleSnapshot& snapshot);
         CallbackInvokeResult applyHotUpdate(const LiveModuleSnapshot& snapshot, const HotMessage& message);
         std::vector<HotMessage> takeHotMessages();

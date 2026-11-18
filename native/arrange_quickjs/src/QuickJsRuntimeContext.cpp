@@ -1,10 +1,39 @@
 #include "QuickJsRuntimeContext.h"
+#include "QuickJsValueReader.h"
+#include <chrono>
 #include <stdexcept>
 #include <unordered_set>
 
 #if ARRANGE_WITH_QUICKJS_NG
 
 namespace arrange::quickjs {
+    bool QuickJsRuntimeContext::pumpAssets() {
+        for (auto it = assetRequests.begin(); it != assetRequests.end();) {
+            if (it->bytes.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+                ++it;
+                continue;
+            }
+            ScopedValue resolve(context, it->resolve);
+            ScopedValue reject(context, it->reject);
+            JSValue value;
+            bool ok = true;
+            try {
+                const auto bytes = it->bytes.get();
+                value = it->text ? JS_NewStringLen(context, bytes.data(), bytes.size()) : JS_NewUint8ArrayCopy(context, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+            } catch (const std::exception& error) {
+                ok = false;
+                value = JS_NewError(context);
+                if (!JS_IsException(value)) JS_SetPropertyStr(context, value, "message", JS_NewString(context, error.what()));
+            }
+            it = assetRequests.erase(it);
+            ScopedValue argument(context, value);
+            if (JS_IsException(value)) return false;
+            ScopedValue result(context, JS_Call(context, ok ? resolve.get() : reject.get(), JS_UNDEFINED, 1, &value));
+            if (JS_IsException(result.get())) return false;
+        }
+        return true;
+    }
+
     void QuickJsRuntimeContext::beginRearrange() {
         if (rearrangeCheckpoint) throw std::logic_error("重排候选不能重入");
         if (!pendingTransactions) throw std::logic_error("重排缺少原生提交队列");

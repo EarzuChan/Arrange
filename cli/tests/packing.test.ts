@@ -11,6 +11,7 @@ import { Packer } from "../src/feature/packing/Packer.ts"
 import { Executor } from "../src/feature/platform/Executor.ts"
 import type { ProcessResult, ProcessSpec } from "../src/feature/platform/ProcessSpec.ts"
 import { testTask, write } from "./fixture.ts"
+import { writeUiManifest } from './ui-package-fixture.ts'
 import { IconAssetsService } from "../src/feature/asset/IconAssetsService.ts"
 import { nativePresentationSignature } from "../src/feature/project/NativePresentation.ts"
 import { PNG } from "pngjs"
@@ -56,6 +57,7 @@ async function setup(t: TestContext, rebuild = false) {
     const ui = resolve(state.rootDir, "ui/dist")
     await write(resolve(ui, "app.js"), "export default {name: 'new-ui'}")
     await write(resolve(ui, "assets/icon.svg"), "<svg/>")
+    await writeUiManifest(ui, state.project.framework.version, ['assets/icon.svg'])
     const cmake = new ModelCmakeService(model)
     const locator = new ArtifactLocator(cmake)
     const executor = new RecordingExecutor()
@@ -141,6 +143,20 @@ test("无 --clean 保留所选目录额外文件，但当前 bundle/UI 总是完
     assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
     await assert.rejects(lstat(resolve(packed.products[0].uiPath, "stale.txt")), { code: "ENOENT" })
     assert.equal(await readFile(resolve(packed.products[0].path, "Contents/Resources/moduleinfo.json"), "utf8"), "{\"Name\":\"A Product\"}")
+})
+
+test('目录和 ZIP 使用同一个发布落点并能双向替换', async t => {
+    const input = await setup(t)
+    const packer = new Packer(input.locator, input.executor)
+    const options = { flavor: 'release', products: ['standalone', 'vst3'] } as const
+    for (const format of ['directory', 'zip', 'directory'] as const) {
+        input.state.project.ui.packageFormat = format
+        for (const product of (await packer.pack(input.state, options)).products) {
+            assert.equal((await lstat(product.uiPath)).isDirectory(), format === 'directory')
+            if (format === 'zip') assert.equal((await readFile(product.uiPath)).readUInt32LE(0), 0x04034b50)
+            else assert.equal(await readFile(resolve(product.uiPath, 'assets/icon.svg'), 'utf8'), '<svg/>')
+        }
+    }
 })
 
 test("显示名改变后按清单替换 CLI 旧产物，同时保留用户额外产品", async t => {
@@ -287,7 +303,7 @@ test("打包在复制期间取消，也不能提交新产物", async t => {
     class CancelledCopyPacker extends Packer {
         protected override async copy(source: string, destination: string): Promise<void> {
             await super.copy(source, destination)
-            if (source === input.ui) controller.abort()
+            if (source === input.standaloneRoot) controller.abort()
         }
     }
     await assert.rejects(new CancelledCopyPacker(input.locator, input.executor, controller.signal).pack(input.state, { flavor: "release", products: ["standalone"], clean: true }), error => error instanceof Error && error.name === "AbortError")
@@ -303,13 +319,13 @@ test("同轮打包中 UI 入口变化时拒绝混用版本，全部旧交付保�
         changed = false
         protected override async copy(source: string, destination: string): Promise<void> {
             await super.copy(source, destination)
-            if (source === input.ui && !this.changed) {
+            if (source === input.standaloneRoot && !this.changed) {
                 this.changed = true
                 await write(resolve(input.ui, "app.js"), "export default {name: 'changed-mid-package'}")
             }
         }
     }
-    await assert.rejects(new ChangingUiPacker(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone", "vst3"], clean: true }), /UI 复制验证失败/)
+    await assert.rejects(new ChangingUiPacker(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone", "vst3"], clean: true }), /大小不符|摘要不符/)
     assert.equal(await readFile(resolve(input.output, "standalone/old.txt"), "utf8"), "old-standalone")
     assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
     assert.equal(await readFile(resolve(input.output, "arrange-package.json"), "utf8"), "old-manifest")
@@ -415,7 +431,7 @@ test("拒绝 UI 包外符号链接、产物目录链接以及缺失 UI 入口，
     await symlink(dirname(external), resolve(input.output, "standalone"), "dir")
     await assert.rejects(new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["standalone"], clean: true }), /不是普通目录/)
     await rm(resolve(input.ui, "app.js"))
-    await assert.rejects(new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["vst3"], clean: true }), /缺少普通文件 app.js/)
+    await assert.rejects(new Packer(input.locator, input.executor).pack(input.state, { flavor: "release", products: ["vst3"], clean: true }), /大小不符：app.js/)
     assert.equal(await readFile(external, "utf8"), "outside")
     assert.equal(await readFile(resolve(input.output, "vst3/old.txt"), "utf8"), "old-vst3")
 })

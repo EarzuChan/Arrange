@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arrange/core/Painter.h>
+#include <arrange/core/UiPackage.h>
 #include <filesystem>
 #include <cstddef>
 #include <string>
@@ -23,6 +24,9 @@ namespace arrange::juce {
     };
 
     arrange::core::PainterLoader packagePainterLoader(std::filesystem::path packageDir);
+    arrange::core::PainterLoader packagePainterLoader(std::shared_ptr<const core::UiPackage> package);
     arrange::core::PainterLoader livePainterLoader(std::string devServerUrl, PainterResourceLimits limits = {});
+    core::AssetLoader packageAssetLoader(std::shared_ptr<const core::UiPackage> package);
+    core::AssetLoader liveAssetLoader(std::string devServerUrl);
 }
 #endif

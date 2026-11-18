@@ -28,23 +28,15 @@ ui/
   src/App.sfa
 ```
 
-## 运行时 ui 目录
+## 运行时 UI 包
 
-常指插件发布包下，可执行文件旁边或结构化资源目录里的 `ui/`。它是一个 UI 产物包目录。
-
-```txt
-ui/
-  app.js
-  其他资产
-```
-
-`useDist(path)` 指 UI 产物包目录，不是 UI 项目源码目录。若用户显式传其他目录，则按显式路径加载。
+`useDist(path)` 指 [运行时 UI 包](14-工具链与App发布包.md#运行时-ui-包) 的落点，不是源码目录。包可为目录或 ZIP。
 
 # App source API
 
 ```cpp
-config.app.useDist(); // 默认使用约定 ui/
-config.app.useDist("ui"); // 显式指定运行时 ui 目录
+config.app.useDist(); // 默认使用约定 ui
+config.app.useDist("ui"); // 显式指定运行时包落点
 config.app.useLive();
 config.app.useLive("http://host:port");
 ```
@@ -52,7 +44,7 @@ config.app.useLive("http://host:port");
 规则：
 
 - `useLive(...)` 的参数可缺省，缺省时使用 `http://127.0.0.1:9178`。
-- `useDist(path)` 的相对路径由 AppResolver 在运行期按发布包根解析；缺省时等同 `ui/`。
+- `useDist(path)` 的相对路径由 AppResolver 在运行期按发布包根解析；缺省时等同 `ui`。
 - `useDist(...)` 不依赖源码文件位置，也不依赖 DAW 当前工作目录。
 - 实际 Live 源的图片与图标也由该开发服务提供，实际 Dist 源的资源由 UI package 提供；内联图片与具体地址规则见[资源契约](14-工具链与App发布包.md#资源处理)。
 - Debug Demo 推荐同时配置 `useLive()` 与 `useDist()`。
@@ -73,7 +65,7 @@ createApp(App).mount()
 
 # 路径约定
 
-`useDist(path)` 由运行期 Resolver 按发布包根解析；缺省路径就是约定的 `ui/`。
+具体落点见 [UI 包发布位置](14-工具链与App发布包.md#结合到-c-发布包)。
 
 # Debug 加载
 
@@ -104,7 +96,7 @@ Debug 下需要支持手动操作：
 
 # Release 加载
 
-发布模式不连接开发服务器，只加载约定产物包目录或用户显式指定的产物包目录。默认目录是 `ui/`。
+发布模式不连接开发服务器，只加载默认落点或用户显式指定的 UI 包。
 Debug 是否启用 live，不改变 dist 的打包位置与发现方式。
 
 # 运行状态可见

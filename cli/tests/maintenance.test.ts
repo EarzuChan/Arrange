@@ -276,6 +276,8 @@ test("实际强杀事务持有者后，重新取得资源并恢复移动边界",
 test("当前工程清理保留依赖与用户交付内容，真实构建树及凭据按范围移除", async t => {
     const { state, cmake } = await nativeProducts(t)
     await write(join(state.rootDir, "ui/dist/app.js"), "UI")
+    const { writeUiManifest } = await import('./ui-package-fixture.ts')
+    await writeUiManifest(join(state.rootDir, 'ui/dist'), state.project.framework.version)
     await write(join(state.rootDir, "ui/node_modules/keep"), "依赖")
     const packed = await new Packer(new ArtifactLocator(cmake), new Executor()).pack(state, { flavor: "release", products: ["standalone", "vst3"] })
     await write(join(dirname(packed.products[0].path), "user.txt"), "用户文件")

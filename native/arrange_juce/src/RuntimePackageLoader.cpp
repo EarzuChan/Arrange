@@ -6,10 +6,6 @@
 #include <arrange/juce/AppResolver.h>
 #include <arrange/juce/DevServerClient.h>
 
-#if ARRANGE_WITH_QUICKJS_NG
-#include <arrange/quickjs/AppScriptLoader.h>
-#endif
-
 #include <filesystem>
 #include <string>
 
@@ -46,6 +42,7 @@ namespace arrange::juce {
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         try {
             scriptHost->setPainterLoader(livePainterLoader(resolved.devServerUrl));
+            scriptHost->setAssetLoader(liveAssetLoader(resolved.devServerUrl));
             scriptHost->setInteropHost(config.interop);
         } catch (const std::exception& failure) {
             result.error = makeErrorScreenModel(ErrorSource::AppPackage, failure.what(), {}, bundleUrl);
@@ -75,7 +72,7 @@ namespace arrange::juce {
         RuntimePackageLoadResult result;
         const auto resolved = resolver.resolveRelease(config.app);
         if (!resolved.ok) {
-            result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error, {}, resolved.entryPath);
+            result.error = makeErrorScreenModel(ErrorSource::AppPackage, resolved.error, {}, resolved.packageDir);
             setToast(result, LogLevel::Error, "Dist 应用源无效", resolved.error);
             return result;
         }
@@ -83,12 +80,12 @@ namespace arrange::juce {
 
 #if ARRANGE_WITH_QUICKJS_NG
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-        scriptHost->setPainterLoader(packagePainterLoader(result.packageDir));
+        scriptHost->setPainterLoader(packagePainterLoader(resolved.package));
+        scriptHost->setAssetLoader(packageAssetLoader(resolved.package));
         scriptHost->setInteropHost(config.interop);
-        arrange::quickjs::AppScriptLoader loader(*scriptHost);
-        const auto loaded = loader.loadEntry(resolved.entryPath);
+        const auto loaded = scriptHost->executePackage(resolved.package);
         if (!loaded.ok) {
-            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, loaded.error, {}, loaded.modulePath);
+            result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, loaded.error, {}, resolved.packageDir);
             setToast(result, LogLevel::Error, "Dist 运行时异常", loaded.error);
             return result;
         }
@@ -96,11 +93,11 @@ namespace arrange::juce {
         result.initialTransaction = std::move(initialTransaction);
         result.scriptHost = std::move(scriptHost);
         result.ok = true;
-        setLog(result, LogLevel::Info, "Dist App 已启动 " + resolved.entryPath.string());
+        setLog(result, LogLevel::Info, "Dist App 已启动 " + resolved.packageDir.string());
         return result;
 #else
-        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor 需要 QuickJS-NG 才能运行 ui/app.js，请通过 Arrange::framework 构建", "Arrange 运行时没有序列化回退路径，原生事务 API 需要 QuickJS-NG", resolved.entryPath);
-        setToast(result, LogLevel::Error, "QuickJS 不可用", "无法运行 Dist ui/app.js");
+        result.error = makeErrorScreenModel(ErrorSource::ScriptRuntime, "ArrangeEditor 需要 QuickJS-NG 才能运行 UI 包，请通过 Arrange::framework 构建", {}, resolved.packageDir);
+        setToast(result, LogLevel::Error, "QuickJS 不可用", "无法运行 Dist UI 包");
         return result;
 #endif
     }

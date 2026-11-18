@@ -56,6 +56,9 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+      yazl:
+        specifier: 3.3.1
+        version: 3.3.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -66,6 +69,9 @@ importers:
       '@types/pngjs':
         specifier: ^6.0.5
         version: 6.0.5
+      '@types/yazl':
+        specifier: 2.4.6
+        version: 2.4.6
       tsx:
         specifier: 4.22.3
         version: 4.22.3
@@ -76,7 +82,7 @@ importers:
   packages/compiler:
     dependencies:
       '@arrange/shared':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../shared
       '@babel/parser':
         specifier: 7.29.3
@@ -107,16 +113,16 @@ importers:
   packages/framework:
     dependencies:
       '@arrange/compiler':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../compiler
       '@arrange/reactivity':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../reactivity
       '@arrange/shared':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../shared
       '@arrange/vite-plugin':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../vite-plugin
       '@babel/parser':
         specifier: 7.29.3
@@ -146,7 +152,7 @@ importers:
   packages/reactivity:
     dependencies:
       '@arrange/shared':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../shared
 
   packages/shared: {}
@@ -154,10 +160,10 @@ importers:
   packages/vite-plugin:
     dependencies:
       '@arrange/compiler':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../compiler
       '@arrange/shared':
-        specifier: 0.10.4
+        specifier: 0.11.0
         version: link:../shared
       '@babel/parser':
         specifier: 7.29.3
@@ -553,8 +559,15 @@ packages:
   '@types/pngjs@6.0.5':
     resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
 
+  '@types/yazl@2.4.6':
+    resolution: {integrity: sha512-/ifFjQtcKaoZOjl5NNCQRR0fAKafB3Foxd7J/WvFPTMea46zekapcR30uzkwIkKAAuq5T6d0dkwz754RFH27hg==}
+
   '@xterm/headless@5.5.0':
     resolution: {integrity: sha512-5xXB7kdQlFBP82ViMJTwwEc3gKCLGKR/eoxQm4zge7GPBl86tCdI0IdPJjoKd8mUSFXz5V7i/25sfsEkP4j46g==}
+
+  buffer-crc32@1.0.0:
+    resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
+    engines: {node: '>=8.0.0'}
 
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
@@ -801,6 +814,9 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
+  yazl@3.3.1:
+    resolution: {integrity: sha512-BbETDVWG+VcMUle37k5Fqp//7SDOK2/1+T7X8TD96M3D9G8jK5VLUdQVdVjGi8im7FGkazX7kk5hkU8X4L5Bng==}
+
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
@@ -1013,7 +1029,13 @@ snapshots:
     dependencies:
       '@types/node': 24.12.4
 
+  '@types/yazl@2.4.6':
+    dependencies:
+      '@types/node': 24.12.4
+
   '@xterm/headless@5.5.0': {}
+
+  buffer-crc32@1.0.0: {}
 
   chokidar@4.0.3:
     dependencies:
@@ -1221,5 +1243,9 @@ snapshots:
       yaml: 2.9.0
 
   yaml@2.9.0: {}
+
+  yazl@3.3.1:
+    dependencies:
+      buffer-crc32: 1.0.0
 
   zod@4.4.3: {}

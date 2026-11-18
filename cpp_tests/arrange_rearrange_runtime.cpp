@@ -11,7 +11,7 @@
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/PainterResources.h>
 #include <arrange/juce/TextInputMutationSink.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <filesystem>
@@ -58,10 +58,8 @@ int main(int argc, char** argv) {
         ::juce::ScopedJuceInitialiser_GUI juceInitialiser;
         check(argc == 2, "需要编译后的 SFA 夹具路径");
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-        host->setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
         auto* hostView = host.get();
-        arrange::quickjs::AppScriptLoader loader(*host);
-        const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
+        const auto loaded = test_support::loadUiPackage(*host, std::filesystem::u8path(argv[1]).parent_path());
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         auto initialSubmission = host->takePendingTransaction();
         check(!initialSubmission.has_value(), "首次挂载不能在帧授权之前提交");
@@ -372,10 +370,8 @@ int main(int argc, char** argv) {
                 if (!running.ok) throw std::runtime_error(running.error);
             }
             auto nextHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-            nextHost->setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
             auto* nextView = nextHost.get();
-            arrange::quickjs::AppScriptLoader nextLoader(*nextHost);
-            const auto nextLoaded = nextLoader.loadEntry(std::filesystem::path(argv[1]));
+            const auto nextLoaded = test_support::loadUiPackage(*nextHost, std::filesystem::u8path(argv[1]).parent_path());
             if (!nextLoaded.ok) throw std::runtime_error(nextLoaded.error);
             arrange::juce::PackageLoadOutcome outcome;
             outcome.loaded = true;

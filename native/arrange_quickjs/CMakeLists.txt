@@ -1,6 +1,4 @@
-add_library(arrange_quickjs STATIC
-  src/AppScriptLoader.cpp
-)
+add_library(arrange_quickjs STATIC)
 
 add_library(Arrange::quickjs ALIAS arrange_quickjs)
 target_include_directories(arrange_quickjs PUBLIC

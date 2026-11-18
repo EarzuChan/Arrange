@@ -6,7 +6,7 @@
 #include <arrange/juce/PainterResources.h>
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/RuntimePackageBinder.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <chrono>
@@ -108,9 +108,7 @@ int main(int argc, char** argv) {
         auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         auto* script = host.get();
         host->setInteropHost(&interop);
-        host->setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
-        arrange::quickjs::AppScriptLoader loader(*host);
-        const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
+        const auto loaded = test_support::loadUiPackage(*host, std::filesystem::u8path(argv[1]).parent_path());
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         auto initial = host->takePendingTransaction();
         arrange::juce::JuceTextMeasurer measurer;

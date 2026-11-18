@@ -8,7 +8,7 @@
 #include <arrange/juce/PassivePaintRenderer.h>
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/TextInputMutationSink.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/juce/NativePainters.h>
 #include <arrange/juce/PainterResources.h>
 #include "TextFixtures.h"
@@ -950,7 +950,7 @@ namespace {
     void verifySfaDraw(const char* path) {
         auto scriptHost = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         auto* host = scriptHost.get();
-        const auto loaded = arrange::quickjs::AppScriptLoader(*host).loadEntry(path);
+        const auto loaded = test_support::loadUiPackage(*host, std::filesystem::u8path(path).parent_path());
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         arrange::juce::JuceTextMeasurer backend;
         TextLayoutService textService(backend);

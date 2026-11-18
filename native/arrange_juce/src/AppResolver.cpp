@@ -1,8 +1,8 @@
 #include <arrange/juce/AppResolver.h>
+#include <arrange/juce/UiPackage.h>
 
 #include <cstdlib>
 #include <string>
-#include <charconv>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -13,17 +13,6 @@
 namespace arrange {
     namespace {
         const int moduleAnchor = 0;
-
-        bool pathEscapesBase(const std::filesystem::path& candidate, const std::filesystem::path& base) {
-            const auto relative = candidate.lexically_relative(base);
-            if (relative.empty()) return true;
-            for (const auto& part : relative) {
-                if (part == "..") return true;
-                if (part == ".") continue;
-                return false;
-            }
-            return true;
-        }
 
         std::filesystem::path currentModulePath() {
 #if defined(_WIN32)
@@ -83,30 +72,15 @@ namespace arrange {
         }
 
         result.packageDir = resolvePackageDir(app.distPath());
-        result.entryPath = result.packageDir / DefaultEntry;
-
-        if (result.packageDir.empty()) {
-            result.error = "Arrange runtime resource root could not be discovered";
-            return result;
-        }
-        if (!std::filesystem::exists(result.packageDir)) {
-            result.error = "Arrange UI package directory does not exist: " + result.packageDir.string();
-            return result;
-        }
-        if (!std::filesystem::is_directory(result.packageDir)) {
-            result.error = "Arrange UI package path is not a directory: " + result.packageDir.string();
-            return result;
-        }
-        if (!std::filesystem::exists(result.entryPath)) {
-            result.error = "Arrange UI package entry app.js does not exist: " + result.entryPath.string();
-            return result;
-        }
-        if (!std::filesystem::is_regular_file(result.entryPath)) {
-            result.error = "Arrange UI package entry app.js is not a file: " + result.entryPath.string();
-            return result;
-        }
-
-        result.ok = true;
+        if (result.packageDir.empty())
+            result.error = "找不到 Arrange 产品资源根";
+        else
+            try {
+                result.package = juce::mountUiPackage(result.packageDir);
+                result.ok = true;
+            } catch (const std::exception& error) {
+                result.error = error.what();
+            }
         return result;
     }
 
@@ -128,68 +102,4 @@ namespace arrange {
         return DefaultDevServer;
     }
 
-    ResolvedResource resolvePackageResource(const std::filesystem::path& packageDir, std::string_view resource) {
-        ResolvedResource result;
-        result.packageDir = std::filesystem::absolute(packageDir).lexically_normal();
-        result.resource = std::string(resource);
-
-        if (result.resource.empty()) {
-            result.error = "Painter 资源路径不能为空";
-            return result;
-        }
-
-        auto packagePath = result.resource;
-        if (packagePath.starts_with('/')) {
-            packagePath = packagePath.substr(1, packagePath.find_first_of("?#") == std::string::npos ? std::string::npos : packagePath.find_first_of("?#") - 1);
-            std::string decoded;
-            for (std::size_t index = 0; index < packagePath.size(); ++index) {
-                if (packagePath[index] != '%')
-                    decoded += packagePath[index];
-                else {
-                    unsigned int value = 0;
-                    const auto end = index + 3;
-                    if (end > packagePath.size()) {
-                        result.error = "Painter 包根 URL 百分号编码无效：" + result.resource;
-                        return result;
-                    }
-                    const auto parsed = std::from_chars(packagePath.data() + index + 1, packagePath.data() + end, value, 16);
-                    if (parsed.ec != std::errc{} || parsed.ptr != packagePath.data() + end) {
-                        result.error = "Painter 包根 URL 百分号编码无效：" + result.resource;
-                        return result;
-                    }
-                    decoded += static_cast<char>(value);
-                    index += 2;
-                }
-            }
-            packagePath = std::move(decoded);
-        }
-        if (result.resource.starts_with("//") || packagePath.starts_with('/') || packagePath.find('\\') != std::string::npos || packagePath.find(':') != std::string::npos || packagePath.find('\0') != std::string::npos) {
-            result.error = "Painter 资源路径必须相对 UI package：" + result.resource;
-            return result;
-        }
-        const auto resourcePath = std::filesystem::path(std::u8string(packagePath.begin(), packagePath.end()));
-
-        if (!std::filesystem::exists(result.packageDir) || !std::filesystem::is_directory(result.packageDir)) {
-            result.error = "解析 Painter 资源时 UI package 目录不可用：" + result.packageDir.string();
-            return result;
-        }
-
-        result.path = (result.packageDir / resourcePath).lexically_normal();
-        if (pathEscapesBase(result.path, result.packageDir)) {
-            result.error = "Painter 资源路径越出 UI package：" + result.resource;
-            return result;
-        }
-
-        if (!std::filesystem::exists(result.path)) {
-            result.error = "Painter 资源不存在：" + result.path.string();
-            return result;
-        }
-        if (!std::filesystem::is_regular_file(result.path)) {
-            result.error = "Painter 资源不是文件：" + result.path.string();
-            return result;
-        }
-
-        result.ok = true;
-        return result;
-    }
 }

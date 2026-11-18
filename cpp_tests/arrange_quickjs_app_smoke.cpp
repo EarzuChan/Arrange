@@ -6,7 +6,7 @@
 #include <arrange/core/Mutation.h>
 #include <arrange/core/Paint.h>
 #include <arrange/core/SceneFramePipeline.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 #include <arrange/juce/PainterResources.h>
 
@@ -168,9 +168,7 @@ int main(int argc, char** argv) {
         return 37;
     }
 
-    host.setPainterLoader(arrange::juce::packagePainterLoader(std::filesystem::path(argv[1]).parent_path()));
-    arrange::quickjs::AppScriptLoader loader(host);
-    const auto loaded = loader.loadEntry(std::filesystem::path(argv[1]));
+    const auto loaded = test_support::loadUiPackage(host, std::filesystem::u8path(argv[1]).parent_path());
     if (!loaded.ok) {
         std::cerr << loaded.error << "\n";
         return 3;

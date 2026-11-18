@@ -13,7 +13,7 @@
 #include <arrange/juce/JuceDrawOpsPainter.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/ScriptEventDispatcher.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <cmath>
@@ -125,9 +125,7 @@ int runSmoke() {
     const auto entry = std::filesystem::absolute(std::filesystem::path(std::u8string(packagePath.begin(), packagePath.end())));
 
     auto host = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-    host->setPainterLoader(arrange::juce::packagePainterLoader(entry.parent_path()));
-    arrange::quickjs::AppScriptLoader loader(*host);
-    const auto loaded = loader.loadEntry(entry);
+    const auto loaded = test_support::loadUiPackage(*host, entry.parent_path());
     if (!loaded.ok) {
         std::cerr << loaded.error << "\n";
         return 3;
@@ -353,7 +351,6 @@ int runSmoke() {
 
     const auto resourceDir = std::filesystem::temp_directory_path() / "arrange-resource-prepare-smoke";
     std::filesystem::create_directories(resourceDir);
-    const auto acquire = arrange::juce::packagePainterLoader(resourceDir);
     const auto validPath = resourceDir / "valid.png";
     {
         ::juce::Image validImage(::juce::Image::RGB, 2, 2, true);
@@ -367,6 +364,9 @@ int runSmoke() {
         std::ofstream svg(validSvg);
         svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#000000\" d=\"M8 5v14l11-7z\"/></svg>";
     }
+    std::ofstream(resourceDir / "app.js") << "export {}";
+    test_support::writeUiManifest(resourceDir, {"valid.png", "play.svg"});
+    const auto acquire = arrange::juce::packagePainterLoader(resourceDir);
     // SVG 解析要取消息线程锁；应用发出的 SVG 请求可能正占着工作线程，阻塞等待会互锁
     // 派发循环停下后不能再次进入，三个请求一并发出，在同一次循环里等全部完成
     auto remaining = std::make_shared<int>(3);

@@ -25,6 +25,7 @@ export const uiProjectDefinitionSchema = z.object({
     directory: z.string().min(1),
     packageManager: packageManagerNameSchema,
     outputDirectory: z.string().min(1).optional(),
+    packageFormat: z.enum(['directory', 'zip']).optional(),
 })
 export type UiProjectDefinition = z.infer<typeof uiProjectDefinitionSchema>
 

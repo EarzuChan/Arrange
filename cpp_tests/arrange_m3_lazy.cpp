@@ -5,7 +5,7 @@
 #include <arrange/juce/InteractionStateOwner.h>
 #include <arrange/juce/JuceTextServices.h>
 #include <arrange/juce/TextInputMutationSink.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <cmath>
@@ -37,7 +37,7 @@ namespace {
     void fixture(const char* path) {
         auto script = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
         auto* host = script.get();
-        const auto loaded = arrange::quickjs::AppScriptLoader(*script).loadEntry(path);
+        const auto loaded = test_support::loadUiPackage(*script, std::filesystem::u8path(path).parent_path());
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         arrange::juce::ArrangeRuntime runtime;
         runtime.setScriptHost(std::move(script));

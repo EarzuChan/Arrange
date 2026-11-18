@@ -21,8 +21,8 @@
 #include <arrange/juce/ErrorScreenModel.h>
 #include <arrange/juce/FramePlanner.h>
 #include <arrange/juce/HeadlessArrangeEditor.h>
+#include "UiPackageFixture.h"
 #include <arrange/juce/ScenePipelineState.h>
-#include <arrange/quickjs/AppScriptLoader.h>
 
 #include <cmath>
 #include <filesystem>
@@ -459,15 +459,11 @@ namespace {
 
     class MockScriptHost final : public arrange::quickjs::ScriptHost {
        public:
-        arrange::quickjs::ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) override {
-            lastModulePath = modulePath;
-            lastSource = std::string(source);
+        arrange::quickjs::ScriptExecutionResult executePackage(std::shared_ptr<const arrange::core::UiPackage> package) override {
+            const auto source = package->read(package->entry(), arrange::core::UiEntryKind::Module, arrange::core::UiEntryLimit);
             if (source.find("throw") != std::string_view::npos) return {false, "mock script exception"};
             return {true, {}};
         }
-
-        std::filesystem::path lastModulePath;
-        std::string lastSource;
     };
 
     arrange::App appWithDist(const std::filesystem::path& path) {
@@ -489,16 +485,15 @@ namespace {
             std::ofstream(okDir / "app.js") << "export default {};\n";
             std::ofstream(badDir / "app.js") << "throw new Error('boom');\n";
         }
+        std::ofstream(okDir / "logo.png") << "png";
+        test_support::writeUiManifest(okDir, {"logo.png"});
+        test_support::writeUiManifest(badDir);
 
         arrange::AppResolver resolver;
         const auto resolved = resolver.resolveRelease(appWithDist(okDir));
-        if (!resolved.ok || resolved.entryPath.filename() != "app.js") return 71;
+        if (!resolved.ok || resolved.package->entry() != "app.js") return 71;
         if (resolver.resolveRelease(appWithDist(missingDir)).ok) return 72;
-        if (arrange::resolvePackageResource(okDir, "../escape.png").ok) return 73;
-        {
-            std::ofstream(okDir / "logo.png") << "png";
-        }
-        if (!arrange::resolvePackageResource(okDir, "logo.png").ok) return 74;
+        if (resolved.package->read("logo.png", arrange::core::UiEntryKind::Asset, 16) != "png") return 74;
 
         MockScriptHost host;
         arrange::HeadlessArrangeEditor editor(appWithDist(okDir), host);

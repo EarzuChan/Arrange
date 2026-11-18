@@ -63,6 +63,17 @@ namespace arrange::quickjs {
         std::uint64_t rejectedBindingUpdates = 0;
         QuickJsModuleLoader moduleLoader;
         arrange::core::PainterLoader painterLoader;
+        core::AssetLoader assetLoader;
+
+        struct AssetRequest {
+            std::future<std::string> bytes;
+            JSValue resolve;
+            JSValue reject;
+            bool text;
+        };
+
+        std::vector<AssetRequest> assetRequests;
+        bool pumpAssets();
         std::unique_ptr<QuickJsPainterResources> painters;
         arrange::core::InteropHost* interopHost = nullptr;
         std::unique_ptr<QuickJsInterop> interop;

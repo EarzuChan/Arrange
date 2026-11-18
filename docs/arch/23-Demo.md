@@ -30,7 +30,7 @@ demo/
   artifacts/              # CLI 交付物，不提交
 ```
 
-`ui-src/` 是独立 pnpm UI 项目，不提交 `pnpm-lock.yaml` 与 `pnpm-workspace.yaml`：Framework 来自本机发行包期间，锁里的 integrity 与 pnpm 自动写入的发布年龄豁免因机器而异，各机由 `arrange sync` 与安装自行生成（`esbuild` 构建授权由 SETUP 写入）；其余依赖在 `package.json` 里固定为精确版本。Framework 改用公开来源后再决定是否提交锁。发布运行时的 `ui/` 是 CLI 在产品旁或 bundle 内整理的构建产物目录。
+`ui-src/` 是独立 pnpm UI 项目，不提交 `pnpm-lock.yaml` 与 `pnpm-workspace.yaml`：Framework 来自本机发行包期间，锁里的 integrity 与 pnpm 自动写入的发布年龄豁免因机器而异，各机由 `arrange sync` 与安装自行生成（`esbuild` 构建授权由 SETUP 写入）；其余依赖在 `package.json` 里固定为精确版本。Framework 改用公开来源后再决定是否提交锁。交付物的 `ui` 是 [运行时 UI 包](14-工具链与App发布包.md#运行时-ui-包)。
 
 Demo 保留 `ui-src/`、`plugin-src/` 目录，通过共享配置声明实际路径。它是由 Arrange CLI 管理的普通工程；位于 Arrange Git 仓库内不改变工程主权。标准命令、配置职责与交付规则见 [Arrange CLI 与工程模式](31-ArrangeCLI与工程模式.md)，运行步骤见 [Demo 说明](../../demo/README.md)。
 

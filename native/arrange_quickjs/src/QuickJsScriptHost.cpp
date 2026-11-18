@@ -80,6 +80,11 @@ namespace arrange::quickjs {
                 runtime.materializeLayout = JS_UNDEFINED;
                 runtime.prepareFrame = runtime.completeFrame = runtime.disposeApp = JS_UNDEFINED;
                 runtime.painters.reset();
+                for (auto& request : runtime.assetRequests) {
+                    JS_FreeValue(runtime.context, request.resolve);
+                    JS_FreeValue(runtime.context, request.reject);
+                }
+                runtime.assetRequests.clear();
                 if (runtime.interop) runtime.interop->close();
                 runtime.interop.reset();
                 JS_FreeValue(runtime.context, runtime.rearrangeCompletion);
@@ -125,10 +130,9 @@ namespace arrange::quickjs {
             runtime.hotMessages.clear();
         }
 
-        void initialise(QuickJsScriptHost* owner, const std::filesystem::path& entryPath) {
+        void initialise(QuickJsScriptHost* owner) {
             reset();
             runtime.pendingTransactions = &owner->pendingTransactions_;
-            runtime.moduleLoader.setModuleRoot(entryPath);
             runtime.runtime = JS_NewRuntime2(&ScriptHeap::functions, &heap);
             // 给宿主输入、布局与异常处理保留栈空间，先由引擎报告脚本栈溢出
             if (!runtime.runtime) throw std::bad_alloc();
@@ -221,6 +225,10 @@ namespace arrange::quickjs {
     };
 
     QuickJsScriptHost::QuickJsScriptHost(ScriptExecutionLimits limits) : impl_(std::make_unique<Impl>(limits)) {}
+
+    void QuickJsScriptHost::setAssetLoader(core::AssetLoader loader) {
+        impl_->runtime.assetLoader = std::move(loader);
+    }
 
     QuickJsScriptHost::~QuickJsScriptHost() = default;
 
@@ -347,13 +355,14 @@ namespace arrange::quickjs {
         setFrameTimeMillis(nowMillis);
         state.remainingFrameJobs = QuickJsRuntimeContext::maxJobsPerFrame;
         if (state.painters && !state.painters->pump()) return {false, impl_->exceptionText(state.context)};
+        if (!state.pumpAssets()) return {false, impl_->exceptionText(state.context)};
         if (state.interop && !state.interop->pump(visualFrame)) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         return {drained.ok, drained.error};
     }
 
     bool QuickJsScriptHost::hasPendingSemanticWork() const noexcept {
-        return impl_ && impl_->runtime.context && (JS_IsJobPending(impl_->runtime.runtime) || (impl_->runtime.painters && impl_->runtime.painters->hasPending()) || (impl_->runtime.interop && impl_->runtime.interop->hasPending()));
+        return impl_ && impl_->runtime.context && (JS_IsJobPending(impl_->runtime.runtime) || !impl_->runtime.assetRequests.empty() || (impl_->runtime.painters && impl_->runtime.painters->hasPending()) || (impl_->runtime.interop && impl_->runtime.interop->hasPending()));
     }
 
     bool QuickJsScriptHost::hasPendingVisualWork() const noexcept {
@@ -475,7 +484,7 @@ namespace arrange::quickjs {
     ScriptExecutionResult QuickJsScriptHost::executeModule(const std::filesystem::path& modulePath, std::string_view source) {
         pendingTransactions_.clear();
         const auto normalizedModulePath = std::filesystem::absolute(modulePath).lexically_normal();
-        impl_->initialise(this, normalizedModulePath);
+        impl_->initialise(this);
         Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
         ScopedValue result(impl_->runtime.context, JS_Eval(impl_->runtime.context, source.data(), source.size(), normalizedModulePath.generic_string().c_str(), JS_EVAL_TYPE_MODULE));
         if (JS_IsException(result.get())) return {false, impl_->exceptionText(impl_->runtime.context)};
@@ -486,9 +495,27 @@ namespace arrange::quickjs {
         return {true, {}};
     }
 
+    ScriptExecutionResult QuickJsScriptHost::executePackage(std::shared_ptr<const core::UiPackage> package) {
+        pendingTransactions_.clear();
+        impl_->initialise(this);
+        Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
+        auto& state = impl_->runtime;
+        const std::string entry(package->entry());
+        state.moduleLoader.install(std::move(package));
+        auto* module = QuickJsModuleLoader::load(state.context, entry.c_str(), &state.moduleLoader);
+        if (!module) return {false, impl_->exceptionText(state.context)};
+        ScopedValue result(state.context, JS_EvalFunction(state.context, JS_DupValue(state.context, JS_MKPTR(JS_TAG_MODULE, module))));
+        if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
+        const auto drained = impl_->drainJobs();
+        if (!drained.ok) return {false, drained.error};
+        const auto& pending = pendingTransactions_.pending();
+        if ((!pending || !pending->hasTreeMutations()) && JS_IsUndefined(state.prepareFrame)) return {false, "应用未挂载：需要 createApp(App).mount() 安装帧驱动"};
+        return {true, {}};
+    }
+
     ScriptExecutionResult QuickJsScriptHost::executeLiveModules(const LiveModuleSnapshot& snapshot) {
         pendingTransactions_.clear();
-        impl_->initialise(this, snapshot.entry);
+        impl_->initialise(this);
         Impl::TaskBudget budget(*impl_, __func__, impl_->limits.moduleMillis);
         auto& state = impl_->runtime;
         state.moduleLoader.install(snapshot);

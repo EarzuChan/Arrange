@@ -1,7 +1,8 @@
 ﻿#pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include <memory>
+#include <arrange/core/UiPackage.h>
 #include <string>
 #include <string_view>
 
@@ -29,6 +30,6 @@ namespace arrange::quickjs {
     class ScriptHost {
        public:
         virtual ~ScriptHost() = default;
-        virtual ScriptExecutionResult executeModule(const std::filesystem::path& modulePath, std::string_view source) = 0;
+        virtual ScriptExecutionResult executePackage(std::shared_ptr<const core::UiPackage> package) = 0;
     };
 }

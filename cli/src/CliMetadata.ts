@@ -3,6 +3,8 @@ import pkg from "../package.json" with {type: "json"}
 export const cliName = "arrange"
 export const cliVersion = pkg.version
 export const cliCompatibility = pkg.compatibility
+export const uiManifestName = 'arrange-ui.json'
+export const uiPackageFormat = 1
 export const cliDescription = pkg.description
 export const supportedCliPlatforms = ["darwin", "win32"] as const
 export const frameworkRegistryTimeoutMs = 15000

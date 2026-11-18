@@ -12,6 +12,7 @@ export { defineProps, withDefaults, useSlots } from './runtime/apiSetupHelpers.t
 export type { Arrangable, ArrangableDefinition, ArrangableProps, AppConfig } from './runtime/arrangable.ts'
 export type { PropType, ExtractPropTypes, ExtractPublicPropTypes } from './runtime/arrangableProps.ts'
 export { createApp } from './app.ts'
+export { assets } from './assets.ts'
 export type { ArrangeApp } from './app.ts'
 export { createScrollState } from './state.ts'
 export { createDraggableState, createDraggable2DState, createInteractionState } from './gesture.ts'

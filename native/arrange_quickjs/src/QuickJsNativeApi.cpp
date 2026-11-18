@@ -532,6 +532,31 @@ namespace arrange::quickjs {
         ScopedValue native(context, JS_NewObject(context));
         JS_SetPropertyFunctionList(context, native.get(), nativeApiFunctions, static_cast<int>(std::size(nativeApiFunctions)));
         runtime.painters->install(native.get());
+        JS_SetPropertyStr(context, native.get(), "readAsset",
+                          JS_NewCFunction(
+                              context,
+                              [](JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) -> JSValue {
+                                  auto& state = *static_cast<QuickJsRuntimeContext*>(JS_GetContextOpaque(ctx));
+                                  if (!state.assetLoader) return JS_ThrowTypeError(ctx, "当前 App 不提供资产读取");
+                                  if (argc != 2 || !JS_IsString(argv[0]) || state.assetRequests.size() >= 32) return JS_ThrowTypeError(ctx, "资产请求无效或超过并发预算");
+                                  size_t length = 0;
+                                  const auto* name = JS_ToCStringLen(ctx, &length, argv[0]);
+                                  if (!name) return JS_EXCEPTION;
+                                  const std::string reference(name, length);
+                                  JS_FreeCString(ctx, name);
+                                  if (reference.empty() || reference.size() > 4096 || reference.find('\0') != std::string::npos || reference.starts_with("data:")) return JS_ThrowTypeError(ctx, "资产地址无效");
+                                  try {
+                                      auto bytes = state.assetLoader(reference, state.wakeOwner);
+                                      JSValue callbacks[2];
+                                      auto promise = JS_NewPromiseCapability(ctx, callbacks);
+                                      if (JS_IsException(promise)) return promise;
+                                      state.assetRequests.push_back({std::move(bytes), callbacks[0], callbacks[1], JS_ToBool(ctx, argv[1]) != 0});
+                                      return promise;
+                                  } catch (const std::exception& error) {
+                                      return JS_ThrowInternalError(ctx, "%s", error.what());
+                                  }
+                              },
+                              "readAsset", 2));
         if (runtime.interop) runtime.interop->install(native.get());
         JS_SetPropertyStr(context, native.get(), "runtimeVersion", JS_NewUint32(context, arrange::core::RuntimeVersion));
         JS_SetPropertyStr(context, global.get(), "__ARRANGE_NATIVE__", native.release());

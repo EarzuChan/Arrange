@@ -151,7 +151,7 @@ Debug 完整模式在 UI 服务就绪后才启动依赖它的 native 进程。�
 
 ### build
 
-按 flavor、范围和 products 构建真实产物。UI 调用所选包管理器的 build 脚本并检查 `app.js`；native configure 后按所选格式 targets 构建。完整构建时 UI 与 native 并行，任一失败时另一个跑完后一起报告，不进入 pack。完整构建默认继续 pack；单范围构建不 pack，`--no-pack` 可关闭完整构建的整理。build 结尾总是说明打包去向：打包完成时与 pack 同样列出交付目录、各产品位置、二进制大小与清单；跳过或因范围未打包时明确说明原因。
+按 flavor、范围和 products 构建真实产物。UI 调用所选包管理器的 build 脚本并检查[运行时 UI 包](14-工具链与App发布包.md#运行时-ui-包)清单及条目；native configure 后按所选格式 targets 构建。完整构建时 UI 与 native 并行，任一失败时另一个跑完后一起报告，不进入 pack。完整构建默认继续 pack；单范围构建不 pack，`--no-pack` 可关闭完整构建的整理。build 结尾总是说明打包去向：打包完成时与 pack 同样列出交付目录、各产品位置、二进制大小与清单；跳过或因范围未打包时明确说明原因。
 
 CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/Framework 版本、UI 输出或 native target/configuration/platform/architecture/products。记录用于识别 CLI 已知的失败或明显版本失配，不构建全仓源码指纹系统。
 
@@ -159,7 +159,7 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 ### pack
 
-只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，要求 UI dist 包含普通文件 `app.js`，复制整个 UI 目录。
+只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，核验 UI 清单和内容，按 `ui.packageFormat`（`directory` 默认，或 `zip`）把登记文件放进产品。
 
 已有 CLI 构建记录必须为 `completed`，且版本、输出位置、目标与所选产品等事实匹配。显式配置了产品显示名、图标或 macOS Bundle ID 时，必须有匹配资源身份的 CLI native 构建记录，防止只更新配置便交付旧二进制；缺少记录时提示先执行 native build。未使用这些字段的既有工程继续允许整理手工构建的产物；缺少记录不代表已证明源码或二进制版本一致，打包清单保留可取得的版本与文件摘要。
 
@@ -225,9 +225,9 @@ build/dev 发现准备缺失或过期时报告并提示 `arrange sync --setup`�
 
 | 产品 | 复制范围 | UI 位置 |
 |---|---|---|
-| Windows Standalone | `.exe` 与 CMake 依赖图中可定位的运行 DLL | 与 `.exe` 同目录的 `ui/` |
-| Mac Standalone | 完整 `.app` | `<app>/Contents/Resources/ui/` |
-| Windows/Mac VST3 | 完整 `.vst3`，保留 bundle 内既有资源与元信息 | `<plugin>/Contents/Resources/ui/` |
+| Windows Standalone | `.exe` 与 CMake 依赖图中可定位的运行 DLL | 与 `.exe` 同目录的 `ui` |
+| Mac Standalone | 完整 `.app` | `<app>/Contents/Resources/ui` |
+| Windows/Mac VST3 | 完整 `.vst3`，保留 bundle 内既有资源与元信息 | `<plugin>/Contents/Resources/ui` |
 
 Windows x64 VST3 的二进制目录核验为 `Contents/x86_64-win`；Mac 产品核验 `Contents/MacOS` 和 `Info.plist`。只复制 bundle 内现成的依赖，不尝试改写任意外部 Mac dylib 搜索路径。
 

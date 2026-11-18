@@ -1,7 +1,7 @@
 #include "TextFixtures.h"
 #include <arrange/core/SceneFramePipeline.h>
 #include <arrange/juce/ArrangeRuntime.h>
-#include <arrange/quickjs/AppScriptLoader.h>
+#include "UiPackageFixture.h"
 #include <arrange/quickjs/QuickJsScriptHost.h>
 
 #include <cmath>
@@ -57,7 +57,7 @@ namespace {
 
     void fixture(const char* path) {
         auto script = std::make_unique<arrange::quickjs::QuickJsScriptHost>();
-        const auto loaded = arrange::quickjs::AppScriptLoader(*script).loadEntry(path);
+        const auto loaded = test_support::loadUiPackage(*script, std::filesystem::u8path(path).parent_path());
         if (!loaded.ok) throw std::runtime_error(loaded.error);
         arrange::juce::ArrangeRuntime runtime;
         runtime.setScriptHost(std::move(script));

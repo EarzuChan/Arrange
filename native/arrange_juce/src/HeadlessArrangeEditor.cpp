@@ -1,19 +1,17 @@
 ﻿#include <arrange/juce/HeadlessArrangeEditor.h>
-#include <arrange/quickjs/AppScriptLoader.h>
 
 namespace arrange {
     bool HeadlessArrangeEditor::loadRelease() {
         resolved_ = resolver_.resolveRelease(app_);
         if (!resolved_.ok) {
-            error_ = makeErrorScreenModel(ErrorSource::AppPackage, resolved_.error, {}, resolved_.entryPath);
+            error_ = makeErrorScreenModel(ErrorSource::AppPackage, resolved_.error, {}, resolved_.packageDir);
             state_ = HeadlessEditorState::Error;
             return false;
         }
 
-        quickjs::AppScriptLoader loader(scriptHost_);
-        const auto loaded = loader.loadEntry(resolved_.entryPath);
+        const auto loaded = scriptHost_.executePackage(resolved_.package);
         if (!loaded.ok) {
-            error_ = makeErrorScreenModel(ErrorSource::ScriptRuntime, loaded.error, {}, loaded.modulePath);
+            error_ = makeErrorScreenModel(ErrorSource::ScriptRuntime, loaded.error, {}, resolved_.packageDir);
             state_ = HeadlessEditorState::Error;
             return false;
         }

@@ -3,6 +3,8 @@
 #if ARRANGE_WITH_QUICKJS_NG
 
 #include <filesystem>
+#include <memory>
+#include <arrange/core/UiPackage.h>
 #include <unordered_map>
 #include <arrange/quickjs/LiveModule.h>
 
@@ -13,15 +15,14 @@ extern "C" {
 namespace arrange::quickjs {
     class QuickJsModuleLoader {
        public:
-        void setModuleRoot(const std::filesystem::path& entryPath);
         void install(const LiveModuleSnapshot& snapshot);
 
-        [[nodiscard]] const std::filesystem::path& moduleRoot() const noexcept {
-            return moduleRoot_;
+        void install(std::shared_ptr<const core::UiPackage> package) {
+            package_ = std::move(package);
         }
 
         void clear() noexcept {
-            moduleRoot_.clear();
+            package_.reset();
             sources_.clear();
             live_ = false;
         }
@@ -32,7 +33,7 @@ namespace arrange::quickjs {
        private:
         static bool startsWithDotSpecifier(std::string_view specifier);
 
-        std::filesystem::path moduleRoot_;
+        std::shared_ptr<const core::UiPackage> package_;
         bool live_ = false;
         std::unordered_map<std::string, LiveModuleSource> sources_;
     };
