@@ -44,6 +44,7 @@ export type ArrangeViteConfig = {
     define: Record<string, string>
     server: { host: string; port: number; strictPort: boolean }
     build: {
+        outDir?: string
         target: string
         rollupOptions: {
             input: string
@@ -70,7 +71,7 @@ export type ArrangeTransformPlugin = {
     transform: (this: TransformThis, code: string, id: string) => string | Promise<{ code: string; map?: object | null } | null> | null
 }
 
-export type ArrangeVitePlugin = ArrangeTransformPlugin & Pick<import('vite').Plugin, 'configResolved' | 'writeBundle'> & {
+export type ArrangeVitePlugin = ArrangeTransformPlugin & Pick<import('vite').Plugin, 'configEnvironment' | 'configResolved' | 'writeBundle'> & {
     config: (config?: unknown, env?: ConfigEnv) => ArrangeViteConfig
     configureServer: (server: ArrangeDevServer) => void
     handleHotUpdate: (ctx: HotUpdateContext) => HotUpdateModule[]

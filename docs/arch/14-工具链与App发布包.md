@@ -43,17 +43,17 @@ UI 源码项目内部构建输出或仍叫 `dist/`，这是 UI 项目内部概�
 
 # 运行时 UI 包
 
-目录与 ZIP 是同一只读包的两种载体，默认物理落点均为 `ui`（ZIP 不需要扩展名）。包根逻辑布局：
+目录与 ZIP 是同一只读包的两种载体，默认使用 ZIP，物理落点均为 `ui`（ZIP 不需要扩展名）。包根逻辑布局：
 
 ```txt
 arrange-ui.json
-app.js
+app.js.qbc
 chunks/...
 assets/...
 其他 public 资源
 ```
 
-`arrange-ui.json` 由 Vite 对最终产物生成，声明 `format`、`framework`、`protocol`、`entry` 与 `entries`。条目记录 `path`、`kind`（`module` 或 `asset`）、`size` 与 `sha256`。文件名是 UTF-8、大小写敏感、用 `/` 分隔的逻辑名；拒绝重复名、大小写冲突、非法路径和符号链接。清单自身不登记。CLI 核验 Framework 版本，挂载检查格式和运行时协议，按需核验文件大小和摘要；无清单或清单无效即失败。摘要用于发现损坏和错配，不是签名。
+最终 `arrange-ui.json` 由 CLI UI 构建生成，声明 `format: 2`、`framework`、`protocol`、`scriptFormat`、`entry` 与 `entries`。条目记录逻辑 `path`、`kind`（`module` 或 `asset`）、实际载荷的 `size` 与 `sha256`。字节码模块条目的物理 `file` 是逻辑名加 `.qbc`，包的 `engine` 是所链接 QuickJS 库文件的 SHA-256。字节码和宿主须来自同一份原生引擎构建。Vite 提供 ESM 构建输入，字节码编译器处理所有登记模块，按逻辑名称解析模块图；脚本模式为 `js` 时直接交付 ESM。Dist 共享解析和执行流程。Live/HMR 使用 Vite 的 JS 模块快照。文件名是 UTF-8、大小写敏感、用 `/` 分隔的逻辑名；拒绝重复名、大小写冲突、非法路径和符号链接。清单自身不登记。CLI 核验 Framework 版本，挂载检查格式和运行时协议，按需核验文件大小和摘要；无清单或清单无效即失败。摘要用于发现损坏和错配，不是签名。
 
 ESM 入口与依赖只能访问清单的模块条目，资源接口只访问资产条目。相对 ESM specifier 从导入者逻辑名解析并受包根约束。ZIP 使用 STORE/DEFLATE，挂载时读索引，按需读取或解压单个条目，不落地解包和持久化缓存；不接收加密、分卷、ZIP64 或归档注释。两个载体都限制清单（4 MiB、8192 条目）和单条目的解压后大小（64 MiB）；资源请求沿用 16 MiB 预算，ZIP 整体小于 2 GiB。
 

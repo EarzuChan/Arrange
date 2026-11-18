@@ -159,7 +159,9 @@ CLI 在构建开始、成功、失败时更新本机构建记录，包含项目/
 
 ### pack
 
-只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，核验 UI 清单和内容，按 `ui.packageFormat`（`directory` 默认，或 `zip`）把登记文件放进产品。
+只整理已有的 UI/native 构建产物，不 install、不 configure、不 build。它核验 native 准备模型、配置、架构、格式目标与完整 bundle，核验 UI 清单和内容，按 `ui.packageFormat`（默认 `zip`，可显式指定 `directory`）装入产品。更换载体只需重新打包。
+
+`ui.scriptFormat` 默认为 `bytecode`，可显式指定 `js`。改脚本表示后需要重新构建 UI。默认 `build --ui-only` 使用所选 flavor 的 CMake 工具链构建同源编译器。JS 的 UI-only 只需 Node 工具链。完整构建并行运行 Vite 与 native，汇合后装配并整体替换 UI 输出。打包比较字节码清单与 native 构建记录中的 QuickJS 身份。
 
 已有 CLI 构建记录必须为 `completed`，且版本、输出位置、目标与所选产品等事实匹配。显式配置了产品显示名、图标或 macOS Bundle ID 时，必须有匹配资源身份的 CLI native 构建记录，防止只更新配置便交付旧二进制；缺少记录时提示先执行 native build。未使用这些字段的既有工程继续允许整理手工构建的产物；缺少记录不代表已证明源码或二进制版本一致，打包清单保留可取得的版本与文件摘要。
 

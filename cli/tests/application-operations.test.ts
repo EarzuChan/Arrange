@@ -44,10 +44,11 @@ test("两个 create 计划竞争同一目录，仅一个应用成功，后者重
 
 test("命令资源计划覆盖连续 build/pack、dev 使用期、sync 两范围及初始化写入", async t => {
     const state = await fixture(t, false)
+    const projectState = state
     const accesses: ProjectAccess[] = []
     const projectOperations = {
-        run: async (_root: string, access: ProjectAccess, _label: string, body: () => Promise<unknown>) => {
-            accesses.push(access)
+        run: async (_root: string, access: ProjectAccess | ((state: typeof projectState) => ProjectAccess), _label: string, body: () => Promise<unknown>) => {
+            accesses.push(typeof access === "function" ? access(projectState) : access)
             return body()
         }
     } as unknown as ProjectOperations
@@ -68,6 +69,13 @@ test("命令资源计划覆盖连续 build/pack、dev 使用期、sync 两范围
     await actions.build(builder, state.rootDir, { flavor: "debug", ui: false, native: true, pack: false })
     assert.equal(accesses.at(-1)!.ui, undefined)
     assert.deepEqual(accesses.at(-1)!.flavors, ["debug"])
+    await actions.build(builder, state.rootDir, { flavor: "debug", ui: true, native: false })
+    assert.equal(accesses.at(-1)!.native, "write")
+    assert.equal(accesses.at(-1)!.nativeSource, "read")
+    assert.equal(accesses.at(-1)!.artifacts, undefined)
+    state.project.ui.scriptFormat = "js"
+    await actions.build(builder, state.rootDir, { flavor: "debug", ui: true, native: false })
+    assert.equal(accesses.at(-1)!.native, undefined)
     const dev = { run: async () => 0 } as unknown as Parameters<ApplicationOperations["dev"]>[0]
     await actions.dev(dev, state.rootDir, { flavor: "debug", ui: true, native: true })
     assert.equal(accesses.at(-1)!.liveServer, true)

@@ -114,7 +114,7 @@ export function createCliApplication(options: CliApplicationOptions): Applicatio
     const native = new NativeBuildService(cmake)
     const artifacts = new ArtifactLocator(cmake)
     const packer = new Packer(artifacts, executor, signal)
-    const ui = new UiBuildService(node)
+    const ui = new UiBuildService(node, cmake)
     const builder = new BuildService(project, tools, ui, native, packer, terminal.tasks)
     const dev = new DevService(project, tools, node, cmake, native, artifacts, new DevSupervisor(executor), ui, packer, sources, terminal.tasks)
     const actions = new ApplicationOperations(operations, projectOperations, projectRegistry)

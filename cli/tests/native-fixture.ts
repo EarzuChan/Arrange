@@ -66,6 +66,7 @@ export async function nativeProducts(t: Pick<TestContext, "after">) {
     await write(join(source, "CMakeLists.txt"), `cmake_minimum_required(VERSION 3.24)
 project(Products LANGUAGES C CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+file(GENERATE OUTPUT "\${CMAKE_BINARY_DIR}/arrange-quickjs-identity/$<CONFIG>/identity.txt" CONTENT "${"a".repeat(64)}")
 add_library(TestPlugin STATIC plugin.cpp)
 if(WIN32)
     add_library(Effect SHARED effect.cpp)

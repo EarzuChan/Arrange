@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, join, resolve, win32 } from "node:path"
-import { cmakePreparationFileName, cmakeQueryClientName, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength, windowsObjectPathMax } from "../../CliMetadata.ts"
+import { cmakePreparationFileName, cmakeQueryClientName, quickJsIdentityDirectory, uiBytecodeCompilerTarget, nativeIconCmakeDefinitions, nativeIconDirectory, productTargetSuffixes, windowsBuildPathTailBudget, windowsExternalSourceTailBudget, windowsMaxPathLength, windowsObjectPathMax } from "../../CliMetadata.ts"
 import { isManagedItem, type BuildFlavor, type NativeProduct, type ProjectState } from "../project/ProjectState.ts"
 import type { Executor } from "../platform/Executor.ts"
 import type { PlatformService } from "../platform/PlatformService.ts"
@@ -223,14 +223,40 @@ export class CmakeService {
         })
     }
 
-    async build(state: ProjectState, flavor: BuildFlavor, products: readonly NativeProduct[], task: TaskOutput, clean = false): Promise<CmakeModel> {
+    async build(state: ProjectState, flavor: BuildFlavor, products: readonly NativeProduct[], task: TaskOutput, clean = false, bytecodeCompiler = false): Promise<CmakeModel> {
+        const targets = this.productTargets(state, products)
+        if (bytecodeCompiler) targets.push(uiBytecodeCompilerTarget)
+        return this.buildTargets(state, flavor, targets, task, clean)
+    }
+
+    async quickJsIdentity(model: CmakeModel): Promise<string> {
+        const file = join(model.buildDirectory, quickJsIdentityDirectory, model.configuration, 'identity.txt')
+        const identity = (await readFile(file, 'utf8')).trim()
+        if (!/^[0-9a-f]{64}$/u.test(identity)) throw new Error(`CMake QuickJS 构建身份无效：${file}`)
+        return identity
+    }
+
+    async compileUi(state: ProjectState, flavor: BuildFlavor, task: TaskOutput, input: string, output: string, modules: string, native?: CmakeModel): Promise<string> {
+        const model = native ?? await this.buildTargets(state, flavor, [uiBytecodeCompilerTarget], task)
+        const tool = model.targets.find(target => target.name === uiBytecodeCompilerTarget && target.type === 'EXECUTABLE')
+        if (tool?.artifacts.length !== 1) throw new Error(`CMake 未提供 ${uiBytecodeCompilerTarget} 可执行文件`)
+        task.stage('编译 UI 字节码')
+        const result = await this.executor.run({ ...task.process({ command: tool.artifacts[0], args: [input, output, modules], cwd: state.rootDir, env: await this.platform.nativeEnvironment(state.local!) }), retainOutput: true })
+        throwIfProcessCancelled(result)
+        if (result.exitCode !== 0) throw new Error(`QuickJS 字节码编译失败（${result.exitCode}）${result.stderr.trim() ? `：${result.stderr.trim()}` : ''}`)
+        const identity = await this.quickJsIdentity(model)
+        if (result.stdout.trim() !== identity) throw new Error('字节码编译器与当前 CMake QuickJS 构建身份不一致')
+        return identity
+    }
+
+    private async buildTargets(state: ProjectState, flavor: BuildFlavor, targets: readonly string[], task: TaskOutput, clean = false): Promise<CmakeModel> {
         const local = state.local
         if (!local?.cmake) throw new Error("未配置 CMake")
         await this.configure(state, flavor, task)
         await this.assertBuildDirectory(state, flavor)
         const args = ["--build", this.buildDirectory(state, flavor), "--config", this.configuration(flavor)]
         if (process.env.CMAKE_BUILD_PARALLEL_LEVEL === undefined) args.push("--parallel")
-        args.push("--target", ...this.productTargets(state, products))
+        args.push("--target", ...targets)
         if (clean) args.push("--clean-first")
         task.stage("编译")
         const result = await this.executor.run(task.process({ command: local.cmake.path, args, cwd: state.rootDir, env: await this.platform.nativeEnvironment(local) }, ninjaProgress))

@@ -10,10 +10,12 @@ import { DevSupervisor, type LongRunningProcessSpec } from "../platform/DevSuper
 import { Packer } from "../packing/Packer.ts"
 import { UiBuildService } from "./UiBuildService.ts"
 import { isJsonObject } from "../../util/Utils.ts"
-import type { TaskEntry, TaskRunner } from "../operation/Work.ts"
+import type { TaskRunner } from "../operation/Work.ts"
 import { NativeReadiness } from '../platform/NativeReadiness.ts'
 import type { DevSupervisorOutcome } from '../platform/DevSupervisor.ts'
 import type { NativeSourceService } from '../source/NativeSourceService.ts'
+
+import { runBuilds } from "./BuildTasks.ts"
 
 export type DevOutcome =
     | { readonly kind: 'ended', readonly reason: 'user' | 'process' }
@@ -53,9 +55,7 @@ export class DevService {
             if (!configured.ready) throw new Error(`${configured.reason}；请运行 arrange sync --setup --native`)
             // release 需要打包内置 UI：UI 构建与 native 构建并行，都成功后再整理 Standalone
             const packaged = !(options.flavor === "debug" && options.ui)
-            const entries: TaskEntry[] = [{ spec: { id: `build-native-${options.flavor}`, title: `构建 native · ${options.flavor}`, detail: "standalone", rootDir: state.rootDir }, run: output => this.native.build(state, options.flavor, ["standalone"], output) }]
-            if (packaged && options.ui) entries.push({ spec: { id: "build-ui", title: "构建 UI", detail: `${state.project.ui.packageManager} run build`, rootDir: state.rootDir }, run: output => this.ui.build(state, output) })
-            await this.tasks.all(entries)
+            await runBuilds(this.tasks, state, options.flavor, packaged && options.ui ? this.ui : undefined, this.native, ["standalone"])
             let binaryPath: string
             if (!packaged) binaryPath = (await this.artifacts.locateStandalone(state, options.flavor)).binaryPath
             else {

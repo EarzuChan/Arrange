@@ -23,9 +23,10 @@ export interface ProjectAccess {
 export class ProjectOperations {
     constructor(private readonly operations: Operations, private readonly store: ProjectStateStore, private readonly cmake: CmakeService, private readonly registry?: ProjectRegistry, private readonly sourceLifetime?: Resource) { }
 
-    async run<T>(root: string, access: ProjectAccess, label: string, body: () => Promise<T>): Promise<T> {
+    async run<T>(root: string, requestedAccess: ProjectAccess | ((state: ProjectState | undefined) => ProjectAccess), label: string, body: () => Promise<T>): Promise<T> {
         for (; ;) {
             const planned = await this.store.deepLoad(root)
+            const access = typeof requestedAccess === "function" ? requestedAccess(planned.state ?? undefined) : requestedAccess
             const resources: Resource[] = [{ kind: "configuration", path: resolve(root), mode: access.configuration }]
             if (this.sourceLifetime) resources.push(this.sourceLifetime)
             const state = planned.state

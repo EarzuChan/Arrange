@@ -1,7 +1,7 @@
 import { dirname } from "node:path"
 import type { ProjectInitializer, InitializationPlan } from "../feature/project/ProjectInitializer.ts"
 import type { SyncService, SyncRunOptions } from "../feature/sync/SyncService.ts"
-import type { BuildService, BuildOptions } from "../feature/building/BuildService.ts"
+import { requiresNativeBuildTools, type BuildService, type BuildOptions } from "../feature/building/BuildService.ts"
 import type { DevService, DevOptions } from "../feature/building/DevService.ts"
 import type { ProjectService } from "../feature/project/ProjectService.ts"
 import type { Packer, PackOptions } from "../feature/packing/Packer.ts"
@@ -32,7 +32,10 @@ export class ApplicationOperations {
 
     build(service: BuildService, root: string, options: BuildOptions) {
         const packed = options.ui && options.native && options.pack !== false
-        return this.projects.run(root, { configuration: "read", ui: options.ui ? "write" : undefined, nativeSource: options.native ? "read" : undefined, native: options.native ? "write" : undefined, flavors: [options.flavor], artifacts: packed ? "write" : undefined }, "arrange build", () => service.build(root, options))
+        return this.projects.run(root, state => {
+            const native = state ? requiresNativeBuildTools(state, options) : options.native
+            return { configuration: "read", ui: options.ui ? "write" : undefined, nativeSource: native ? "read" : undefined, native: native ? "write" : undefined, flavors: [options.flavor], artifacts: packed ? "write" : undefined }
+        }, "arrange build", () => service.build(root, options))
     }
 
     dev(service: DevService, root: string, options: DevOptions) {

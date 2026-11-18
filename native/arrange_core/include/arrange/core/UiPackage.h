@@ -8,10 +8,12 @@
 
 namespace arrange::core {
     enum class UiEntryKind { Module, Asset };
+    enum class UiScriptFormat { Js, Bytecode };
 
     class UiPackage {
        public:
         virtual ~UiPackage() = default;
+        virtual UiScriptFormat scriptFormat() const noexcept = 0;
         virtual std::string_view entry() const noexcept = 0;
         virtual std::string read(std::string_view path, UiEntryKind kind, std::size_t limit) const = 0;
     };

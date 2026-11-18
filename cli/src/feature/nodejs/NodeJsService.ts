@@ -1,9 +1,8 @@
 import { readFile, rm, stat } from "node:fs/promises"
 import { delimiter, dirname, join } from "node:path"
-import { frameworkPackageName, uiPreparationFileName } from "../../CliMetadata.ts"
+import { frameworkPackageName, uiPreparationFileName, uiBuildStageEnvironment } from "../../CliMetadata.ts"
 import type { ProjectState } from "../project/ProjectState.ts"
 import { uiDirectory, safeUiOutputDirectory, workDirectory } from "../project/ProjectPaths.ts"
-import { verifyUiPackage } from '../packing/UiPackage.ts'
 import { Executor } from "../platform/Executor.ts"
 import { throwIfProcessCancelled, type ProcessSpec } from "../platform/ProcessSpec.ts"
 import { readJsonFile, writeJsonFile } from "../../util/JsonFile.ts"
@@ -72,16 +71,13 @@ export class NodeJsService {
         await writeJsonFile(join(workDirectory(state), uiPreparationFileName), { inputHash: await this.installInputHash(state), frameworkVersion: installed.version, packageManager: state.project.ui.packageManager })
     }
 
-    async build(state: ProjectState, task: TaskOutput, clean = false): Promise<string> {
+    async build(state: ProjectState, task: TaskOutput, stage: string): Promise<void> {
         const prepared = await this.inspect(state)
         if (!prepared.ready) throw new Error(`${prepared.reason}；请运行 arrange sync --setup --ui`)
-        const output = await safeUiOutputDirectory(state)
-        if (clean) await rm(output, { recursive: true, force: true })
-        const result = await this.executor.run(task.process(this.packageManagerSpec(state, ["run", "build"])))
+        const spec = this.packageManagerSpec(state, ["run", "build"])
+        const result = await this.executor.run(task.process({ ...spec, env: { ...spec.env, [uiBuildStageEnvironment]: stage } }))
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`UI 构建失败，退出码 ${result.exitCode}`)
-        await verifyUiPackage(output, state.project.framework.version)
-        return output
     }
 
     private async installInputHash(state: ProjectState): Promise<string> {

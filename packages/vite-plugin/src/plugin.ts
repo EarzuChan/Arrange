@@ -30,6 +30,7 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
                 },
                 server: { host: options.host ?? "127.0.0.1", port: options.port ?? 9178, strictPort: options.strictPort ?? true },
                 build: {
+                    ...(env.command === "build" && process.env.ARRANGE_UI_BUILD_STAGE ? { outDir: process.env.ARRANGE_UI_BUILD_STAGE } : {}),
                     target: "es2022",
                     rollupOptions: {
                         input: entry,
@@ -42,6 +43,16 @@ export default function arrange(options: ArrangeVitePluginOptions = {}): Arrange
                         },
                     },
                 },
+            }
+        },
+        configEnvironment(name, _config, env) {
+            if (name !== 'client' || env.command !== 'build') return
+            // Dist executes ESM in QuickJS. A browser consumer injects DOM preload code around dynamic imports.
+            return {
+                consumer: 'server',
+                keepProcessEnv: false,
+                resolve: { noExternal: true, mainFields: ['browser', 'module', 'jsnext:main', 'jsnext'], conditions: ['module', 'browser', 'development|production'] },
+                build: { ssr: false, emitAssets: true, minify: 'oxc', modulePreload: false, rolldownOptions: { platform: 'browser' } },
             }
         },
         configureServer(server: ArrangeDevServer): void {

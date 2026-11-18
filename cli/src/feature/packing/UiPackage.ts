@@ -15,13 +15,38 @@ const schema = z.object({
     framework: z.string(),
     protocol: z.number().int().positive(),
     entry: z.string(),
+    scriptFormat: z.enum(['js', 'bytecode']),
+    engine: z.string().regex(/^[0-9a-f]{64}$/u).optional(),
     entries: z.array(z.object({
         path: z.string(),
+        file: z.string().optional(),
         kind: z.enum(['module', 'asset']),
         size: z.number().int().min(0).max(maxEntryBytes),
         sha256: z.string().regex(/^[0-9a-f]{64}$/u),
     })).min(1).max(8192),
 })
+
+export function bytecodeFile(path: string): string { return `${path}.qbc` }
+
+export class PackagePaths {
+    private readonly names = new Map([[uiManifestName, uiManifestName]])
+    private readonly directories = new Map<string, string>()
+
+    add(path: string): string[] {
+        const parts = path.split('/')
+        if (Buffer.byteLength(path) > 1024 || /[\x00-\x1f\x7f\\:*?"<>|]/u.test(path) || parts.some(part => !part || /[. ]$/u.test(part) || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/iu.test(part))) throw new Error(`UI 包条目路径无效：${path}`)
+        const key = path.normalize('NFC').toLowerCase()
+        if (this.names.has(key) || this.directories.has(key)) throw new Error(`UI 包条目重名：${path}`)
+        this.names.set(key, path)
+        for (let i = 1; i < parts.length; i++) {
+            const dir = parts.slice(0, i).join('/')
+            const folded = dir.normalize('NFC').toLowerCase()
+            if (this.names.has(folded) || this.directories.has(folded) && this.directories.get(folded) !== dir) throw new Error(`UI 包目录重名：${dir}`)
+            this.directories.set(folded, dir)
+        }
+        return parts
+    }
+}
 
 export async function verifyUiPackage(root: string, framework: string, signal?: AbortSignal) {
     const file = join(root, uiManifestName)
@@ -35,25 +60,21 @@ export async function verifyUiPackage(root: string, framework: string, signal?: 
     if (!parsed.success) throw new Error(`UI dist 清单格式无效：${file}`)
     const manifest = parsed.data
     if (manifest.framework !== framework) throw new Error(`UI dist 的 Framework ${manifest.framework} 不匹配工程 ${framework}；请重新构建 UI`)
-    const names = new Map([[uiManifestName, uiManifestName]])
-    const directories = new Map<string, string>()
+    if ((manifest.scriptFormat === 'bytecode') !== (manifest.engine !== undefined)) throw new Error('UI 包字节码引擎声明无效')
+    const logicalPaths = new PackagePaths()
+    const physicalPaths = new PackagePaths()
     for (const entry of manifest.entries) {
         signal?.throwIfAborted()
-        const parts = entry.path.split('/')
-        if (Buffer.byteLength(entry.path) > 1024 || /[\x00-\x1f\x7f\\:*?"<>|]/u.test(entry.path) || parts.some(part => !part || /[. ]$/u.test(part) || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/iu.test(part))) throw new Error(`UI 包条目路径无效：${entry.path}`)
-        const key = entry.path.normalize('NFC').toLowerCase()
-        if (names.has(key) || directories.has(key)) throw new Error(`UI 包条目重名：${entry.path}`)
-        names.set(key, entry.path)
+        const file = entry.kind === 'module' && manifest.scriptFormat === 'bytecode' ? bytecodeFile(entry.path) : undefined
+        if (entry.file !== file) throw new Error(`UI 包条目载荷名无效：${entry.path}`)
+        logicalPaths.add(entry.path)
+        const physical = physicalPaths.add(file ?? entry.path)
         let path = root
-        for (let i = 0; i < parts.length - 1; i++) {
-            const dir = parts.slice(0, i + 1).join('/')
-            const key = dir.normalize('NFC').toLowerCase()
-            if (names.has(key) || directories.has(key) && directories.get(key) !== dir) throw new Error(`UI 包目录重名：${dir}`)
-            directories.set(key, dir)
-            path = join(path, parts[i])
-            if (!(await lstat(path).catch(() => undefined))?.isDirectory()) throw new Error(`UI 包缺少普通目录：${dir}`)
+        for (const part of physical.slice(0, -1)) {
+            path = join(path, part)
+            if (!(await lstat(path).catch(() => undefined))?.isDirectory()) throw new Error(`UI 包缺少普通目录：${path}`)
         }
-        path = join(path, parts.at(-1)!)
+        path = join(path, physical.at(-1)!)
         const info = await lstat(path).catch(() => undefined)
         if (!info?.isFile() || info.size !== entry.size) throw new Error(`UI 包缺少普通文件或大小不符：${entry.path}`)
         const hash = createHash('sha256')
@@ -67,7 +88,7 @@ export async function verifyUiPackage(root: string, framework: string, signal?: 
     }
     const entry = manifest.entries.find(item => item.path === manifest.entry && item.kind === 'module')
     if (!entry) throw new Error(`UI 包入口不是已登记模块：${manifest.entry}`)
-    return { contents, entries: manifest.entries, entry, digest: createHash('sha256').update(contents).digest('hex') }
+    return { contents, manifest, entries: manifest.entries, entry, digest: createHash('sha256').update(contents).digest('hex') }
 }
 
 export async function stageUiPackage(source: string, staged: string, framework: string, format: 'directory' | 'zip', expected: string, signal?: AbortSignal) {
@@ -80,20 +101,24 @@ export async function stageUiPackage(source: string, staged: string, framework: 
         await writeFile(join(directory, uiManifestName), input.contents, { flag: 'wx' })
         for (const entry of input.entries) {
             signal?.throwIfAborted()
-            const target = join(directory, entry.path)
+            const file = entry.file ?? entry.path
+            const target = join(directory, file)
             await mkdir(dirname(target), { recursive: true })
-            await copyFile(join(source, entry.path), target)
+            await copyFile(join(source, file), target)
         }
         await verifyUiPackage(directory, framework, signal)
         if (format === 'zip') {
-            const total = input.entries.reduce((sum, entry) => sum + entry.size + Buffer.byteLength(entry.path) * 2 + 256, input.contents.length + 1024)
+            const total = input.entries.reduce((sum, entry) => sum + entry.size + Buffer.byteLength(entry.file ?? entry.path) * 2 + 256, input.contents.length + 1024)
             if (total >= maxZipBytes) throw new Error('UI ZIP 超过 2 GiB 预算，请使用目录包')
             const zip = new ZipFile()
             zip.on('error', error => zip.outputStream.emit('error', error))
             const written = pipeline(zip.outputStream, createWriteStream(staged, { flags: 'wx' }), { signal })
             const mtime = new Date(2000, 0, 1)
             zip.addBuffer(input.contents, uiManifestName, { mtime, compress: false })
-            for (const entry of input.entries) zip.addFile(join(directory, entry.path), entry.path, { mtime, compress: !compressed.test(entry.path) })
+            for (const entry of input.entries) {
+                const file = entry.file ?? entry.path
+                zip.addFile(join(directory, file), file, { mtime, compress: !compressed.test(file) })
+            }
             zip.end()
             await written
             if ((await lstat(staged)).size >= maxZipBytes) throw new Error('UI ZIP 超过 2 GiB 预算，请使用目录包')

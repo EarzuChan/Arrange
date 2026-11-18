@@ -48,6 +48,8 @@ after(() => productSeed.close())
 async function setup(t: TestContext, rebuild = false) {
     const input = rebuild ? await nativeProducts(t) : await productSeed.copy(t)
     const { state, model } = input
+    state.project.ui.scriptFormat = "js"
+    state.project.ui.packageFormat = "directory"
     const actualCmake = "cmake" in input ? input.cmake : undefined
     const platform = hostPlatform!
     const standalone = model.targets.find(target => target.name.endsWith("_Standalone"))!.artifacts.find(path => hostPlatform !== "win32" || path.endsWith(".exe"))!

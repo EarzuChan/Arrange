@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFile, rm, symlink } from "node:fs/promises"
 import { resolve } from "node:path"
 import { test, type TestContext } from "node:test"
-import { cliCompatibility, frameworkPackageName, uiPreparationFileName } from "../src/CliMetadata.ts"
+import { cliCompatibility, frameworkPackageName, uiPreparationFileName, uiBuildStageEnvironment } from "../src/CliMetadata.ts"
 import { UiBuildService } from "../src/feature/building/UiBuildService.ts"
 import { packageJsonFile } from "../src/feature/nodejs/NodeJsStuffs.ts"
 import { NodeJsService } from "../src/feature/nodejs/NodeJsService.ts"
@@ -26,6 +26,7 @@ class InstallingExecutor extends Executor {
 async function setup(t: TestContext) {
     const state = await fixture(t)
     state.local = { node: { path: "/tools/node" }, packageManager: { path: "/tools/npm" } }
+    state.project.ui.scriptFormat = "js"
     const uiRoot = resolve(state.rootDir, state.project.ui.directory)
     const executor = new InstallingExecutor()
     executor.handler = async spec => {
@@ -33,12 +34,14 @@ async function setup(t: TestContext) {
             const manifest = JSON.parse(await readFile(resolve(uiRoot, "package.json"), "utf8"))
             for (const name of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) await write(resolve(uiRoot, "node_modules", name, "package.json"), JSON.stringify({ name, version: name === frameworkPackageName ? state.project.framework.version : "1.0.0", arrange: name === frameworkPackageName ? { cliCompatibility } : undefined }))
         } else if (spec.args.join(" ") === "run build") {
-            const output = resolve(uiRoot, state.project.ui.outputDirectory ?? 'dist')
+            const output = spec.env![uiBuildStageEnvironment]
             await write(resolve(output, 'app.js'), 'export default {}\n')
             await writeUiManifest(output, state.project.framework.version)
         }
     }
-    return { state, uiRoot, executor, node: new NodeJsService(executor) }
+    const node = new NodeJsService(executor)
+    const ui = new UiBuildService(node, { compileUi: async () => { throw new Error('JS 构建不调用原生工具链') } })
+    return { state, uiRoot, executor, node, ui }
 }
 
 test("UI 从未安装与缺失准备记录可重新 SETUP，成功安装后才 ready", async t => {
@@ -132,7 +135,7 @@ test("包清单或 lock 改动使安装输入失效，失败重装不保留旧 r
     assert.equal((await input.node.inspect(input.state)).ready, false)
 })
 
-test("UI --clean 只删除输出；源码、scripts、依赖子树及目录链链接受保护", async t => {
+test("UI 构建整体替换输出，保护源码、scripts、依赖子树及目录链链接", async t => {
     const input = await setup(t)
     await input.node.install(input.state, testTask())
     const userFile = resolve(input.state.rootDir, "outside/user.txt")
@@ -142,19 +145,19 @@ test("UI --clean 只删除输出；源码、scripts、依赖子树及目录链�
         const result = await input.node.inspect(input.state)
         assert.equal(result.ready, false)
         assert.equal(result.fatal, true)
-        await assert.rejects(input.node.build(input.state, testTask(), true), /UI .*目录/)
+        await assert.rejects(input.ui.build(input.state, testTask(), "release"), /UI .*目录/)
     }
     const symlinkPath = resolve(input.uiRoot, "redirect")
     await symlink(resolve(input.state.rootDir, "outside"), symlinkPath, "dir")
     input.state.project.ui.outputDirectory = "redirect/dist"
-    await assert.rejects(input.node.build(input.state, testTask(), true), /符号链接|非目录/)
+    await assert.rejects(input.ui.build(input.state, testTask(), "release"), /符号链接|非目录/)
     assert.equal(await readFile(userFile, "utf8"), "外部内容")
     assert.equal(input.executor.calls.length, 1)
     await rm(symlinkPath)
     input.state.project.ui.outputDirectory = "dist"
     await write(resolve(input.uiRoot, "dist/assets/stale.js"), "旧资源")
     await write(resolve(input.uiRoot, "src/user.ts"), "用户源码")
-    assert.equal(await input.node.build(input.state, testTask(), true), resolve(input.uiRoot, "dist"))
+    assert.equal(await input.ui.build(input.state, testTask(), "release"), resolve(input.uiRoot, "dist"))
     await assert.rejects(readFile(resolve(input.uiRoot, "dist/assets/stale.js")), { code: "ENOENT" })
     assert.equal(await readFile(resolve(input.uiRoot, "src/user.ts"), "utf8"), "用户源码")
     assert.equal(await readFile(userFile, "utf8"), "外部内容")
@@ -169,7 +172,7 @@ test("无 dev/build 的 UI manifest 为 Fatal；命令成功但缺发布清单�
     await write(resolve(input.uiRoot, "package.json"), packageJsonFile.make(input.state))
     await input.node.install(input.state, testTask())
     input.executor.handler = async () => { }
-    await assert.rejects(input.node.build(input.state, testTask()), /arrange-ui\.json/)
+    await assert.rejects(input.ui.build(input.state, testTask(), "release"), /arrange-ui\.json/)
 })
 
 test("安装取消即使退出码为零也抛 AbortError，旧准备记录不能继续使用", async t => {
@@ -193,13 +196,13 @@ test("安装取消即使退出码为零也抛 AbortError，旧准备记录不能
 test("构建取消保留 AbortError 并使旧 completed 记录失效；普通退出失败不伪装取消", async t => {
     const input = await setup(t)
     await input.node.install(input.state, testTask())
-    const ui = new UiBuildService(input.node)
+    const ui = input.ui
     const receiptPath = resolve(input.state.rootDir, ".arrange/built-ui.json")
-    await ui.build(input.state, testTask())
+    await ui.build(input.state, testTask(), "release")
     assert.equal(JSON.parse(await readFile(receiptPath, "utf8")).status, "completed")
     input.executor.cancelled = true
     input.executor.exitCode = 130
-    await assert.rejects(ui.build(input.state, testTask()), error => {
+    await assert.rejects(ui.build(input.state, testTask(), "release"), error => {
         assert.ok(error instanceof Error)
         assert.equal(error.name, "AbortError")
         assert.match(error.message, /已取消/)
@@ -211,7 +214,7 @@ test("构建取消保留 AbortError 并使旧 completed 记录失效；普通退
     assert.equal(cancelled.projectVersion, input.state.project.project.version)
     input.executor.cancelled = false
     input.executor.exitCode = 1
-    await assert.rejects(ui.build(input.state, testTask()), error => {
+    await assert.rejects(ui.build(input.state, testTask(), "release"), error => {
         assert.ok(error instanceof Error)
         assert.equal(error.name, "Error")
         assert.match(error.message, /UI 构建失败，退出码 1/)

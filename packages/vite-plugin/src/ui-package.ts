@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { lstat, readdir, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { Plugin, ResolvedConfig } from 'vite'
 import { ARRANGE_PACKAGE_VERSION, ARRANGE_RUNTIME_VERSION } from '@arrange/framework/internal'
 
@@ -46,7 +46,13 @@ async function describe(directory: string, path: string, kind: Kind) {
 export function uiPackageHooks(): Pick<Plugin, 'configResolved' | 'writeBundle'> {
     let config: ResolvedConfig
     return {
-        configResolved(value) { config = value },
+        configResolved(value) {
+            config = value
+            const stage = process.env.ARRANGE_UI_BUILD_STAGE
+            if (stage && value.command === 'build' && resolve(value.root, value.environments.client?.build.outDir ?? value.build.outDir) !== resolve(stage)) {
+                throw new Error('Arrange CLI UI 构建必须将 ESM 输出写入指定的暂存目录')
+            }
+        },
         writeBundle: {
             order: 'post',
             sequential: true,
@@ -78,7 +84,7 @@ export function uiPackageHooks(): Pick<Plugin, 'configResolved' | 'writeBundle'>
                 if (names.size > 8192) throw new Error('UI 包条目数量超过限制')
                 const entries = []
                 for (const path of [...names.keys()].sort()) entries.push(await describe(output.dir, path, names.get(path)!))
-                const contents = JSON.stringify({ format: 1, framework: ARRANGE_PACKAGE_VERSION, protocol: ARRANGE_RUNTIME_VERSION, entry: entry[0].fileName, entries }) + '\n'
+                const contents = JSON.stringify({ format: 2, scriptFormat: 'js', framework: ARRANGE_PACKAGE_VERSION, protocol: ARRANGE_RUNTIME_VERSION, entry: entry[0].fileName, entries }) + '\n'
                 if (Buffer.byteLength(contents) > 4 * 1024 * 1024) throw new Error('UI 包清单超过大小限制')
                 const target = join(output.dir, manifestName)
                 const staged = `${target}.${process.pid}.tmp`

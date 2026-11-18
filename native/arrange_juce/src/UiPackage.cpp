@@ -1,3 +1,4 @@
+#include <arrange/quickjs/QuickJsBuild.h>
 #include <arrange/juce/UiPackage.h>
 #include <arrange/core/Version.h>
 #include <juce_core/juce_core.h>
@@ -98,6 +99,7 @@ namespace arrange::juce {
             core::UiEntryKind kind;
             std::size_t size;
             std::string hash;
+            std::string file;
         };
 
         class FileUiPackage final : public core::UiPackage {
@@ -128,13 +130,34 @@ namespace arrange::juce {
                 if (json.find('\0') != std::string::npos || parsed.failed() || !data.isObject()) fail("运行时清单无效", manifestName);
                 const auto format = data.getProperty("format", {});
                 const auto protocol = data.getProperty("protocol", {});
-                if (!format.isInt() || static_cast<int>(format) != 1) fail("不支持的 UI 包格式");
+                if (!format.isInt() || static_cast<int>(format) != 2) fail("不支持的 UI 包格式");
                 if (!protocol.isInt() || static_cast<int>(protocol) != static_cast<int>(core::RuntimeVersion)) fail("脚本与原生协议不匹配，当前需要 " + std::to_string(core::RuntimeVersion));
+                const auto script = data.getProperty("scriptFormat", {});
+                if (!script.isString() || (script.toString() != "js" && script.toString() != "bytecode")) fail("脚本表示无效");
+                scriptFormat_ = script.toString() == "bytecode" ? core::UiScriptFormat::Bytecode : core::UiScriptFormat::Js;
+                const auto engine = data.getProperty("engine", {});
+                if (scriptFormat_ == core::UiScriptFormat::Bytecode) {
+                    if (!engine.isString() || engine.toString().toStdString() != quickjs::buildIdentity()) fail("QuickJS 字节码构建身份不匹配");
+                } else if (data.hasProperty("engine")) {
+                    fail("JS 包不能声明字节码引擎");
+                }
                 const auto rows = data.getProperty("entries", {});
                 const auto* array = rows.getArray();
                 if (!array || array->isEmpty() || array->size() > entryCountLimit) fail("条目清单无效");
                 std::unordered_map<std::string, std::string> names{{std::string(manifestName), std::string(manifestName)}};
                 std::unordered_map<std::string, std::string> directories;
+                const auto registerName = [](const std::string& name, auto& names, auto& directories) {
+                    const auto key = text(name).toLowerCase().toStdString();
+                    if (directories.contains(key) || !names.emplace(key, name).second) fail("条目路径冲突", name);
+                    for (auto slash = name.find('/'); slash != std::string::npos; slash = name.find('/', slash + 1)) {
+                        const auto dir = name.substr(0, slash);
+                        const auto folded = text(dir).toLowerCase().toStdString();
+                        const auto found = directories.emplace(folded, dir).first;
+                        if (names.contains(folded) || found->second != dir) fail("条目目录冲突", dir);
+                    }
+                };
+                auto files = names;
+                auto fileDirectories = directories;
                 for (const auto& row : *array) {
                     if (!row.isObject()) fail("条目格式无效");
                     const auto pathValue = row.getProperty("path", {});
@@ -146,19 +169,21 @@ namespace arrange::juce {
                     const auto size = row.getProperty("size", {});
                     const auto hash = shaValue.toString().toStdString();
                     if (!portableName(name) || (type != "module" && type != "asset") || !size.isInt() || static_cast<int>(size) < 0 || static_cast<std::size_t>(static_cast<int>(size)) > core::UiEntryLimit || hash.size() != 64 || hash.find_first_not_of("0123456789abcdef") != std::string::npos) fail("条目字段无效", name);
-                    const auto key = text(name).toLowerCase().toStdString();
-                    if (directories.contains(key) || !names.emplace(key, name).second) fail("条目路径冲突", name);
-                    for (auto slash = name.find('/'); slash != std::string::npos; slash = name.find('/', slash + 1)) {
-                        const auto dir = name.substr(0, slash);
-                        const auto folded = text(dir).toLowerCase().toStdString();
-                        const auto found = directories.emplace(folded, dir).first;
-                        if (names.contains(folded) || found->second != dir) fail("条目目录冲突", dir);
+                    const auto payload = row.getProperty("file", {});
+                    std::string file = name;
+                    if (type == "module" && scriptFormat_ == core::UiScriptFormat::Bytecode) {
+                        file += ".qbc";
+                        if (!portableName(file) || !payload.isString() || payload.toString().toStdString() != file) fail("字节码载荷名无效", name);
+                    } else if (row.hasProperty("file")) {
+                        fail("条目不能重定向载荷", name);
                     }
+                    registerName(name, names, directories);
+                    registerName(file, files, fileDirectories);
                     if (zip_) {
-                        const auto it = zipEntries_.find(name);
+                        const auto it = zipEntries_.find(file);
                         if (it == zipEntries_.end() || zip_->getEntry(it->second)->uncompressedSize != static_cast<int>(size)) fail("ZIP 索引与清单不符", name);
                     }
-                    entries_.emplace(name, Entry{type == "module" ? core::UiEntryKind::Module : core::UiEntryKind::Asset, static_cast<std::size_t>(static_cast<int>(size)), hash});
+                    entries_.emplace(name, Entry{type == "module" ? core::UiEntryKind::Module : core::UiEntryKind::Asset, static_cast<std::size_t>(static_cast<int>(size)), hash, std::move(file)});
                 }
                 if (zip_ && zipEntries_.size() != entries_.size() + 1) fail("ZIP 有未登记的条目");
                 const auto entryValue = data.getProperty("entry", {});
@@ -167,6 +192,8 @@ namespace arrange::juce {
                 const auto entry = entries_.find(entry_);
                 if (entry == entries_.end() || entry->second.kind != core::UiEntryKind::Module) fail("入口不是已登记模块", entry_);
             }
+
+            core::UiScriptFormat scriptFormat() const noexcept override { return scriptFormat_; }
 
             std::string_view entry() const noexcept override {
                 return entry_;
@@ -177,7 +204,7 @@ namespace arrange::juce {
                 if (it == entries_.end() || it->second.kind != kind) fail(kind == core::UiEntryKind::Module ? "找不到已登记模块" : "找不到已登记资产", path);
                 const auto& entry = it->second;
                 if (entry.size > limit) fail("超过读取预算", path);
-                auto result = readPhysical(path, entry.size);
+                auto result = readPhysical(entry.file, entry.size);
                 if (result.size() != entry.size || ::juce::SHA256(result.data(), result.size()).toHexString().toStdString() != entry.hash) fail("大小或摘要不匹配", path);
                 return result;
             }
@@ -223,6 +250,7 @@ namespace arrange::juce {
             std::unordered_map<std::string, int> zipEntries_;
             std::unordered_map<std::string, Entry> entries_;
             std::string entry_;
+            core::UiScriptFormat scriptFormat_ = core::UiScriptFormat::Js;
         };
     }
 

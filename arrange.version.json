@@ -1,7 +1,7 @@
 {
-    "frameworkVersion": "0.11.0",
+    "frameworkVersion": "0.12.0",
     "frameworkInternalProtocolCode": 12,
   "nativeDevReadinessProtocolCode": 1,
-    "cliVersion": "1.3.0",
-    "cliCompatibility": 2
+    "cliVersion": "1.4.0",
+    "cliCompatibility": 3
 }

@@ -1,3 +1,4 @@
+import { writeUiManifest } from './ui-package-fixture.ts'
 import { hostPlatform, hostArchitecture } from "./native-fixture.ts"
 import assert from "node:assert/strict"
 import { readFile, readdir, rm } from "node:fs/promises"
@@ -181,7 +182,7 @@ function buildHarness(state: ProjectState) {
     const calls: { kind: "ui" | "native" | "pack", products?: readonly NativeProduct[], clean?: boolean }[] = []
     const project = { load: async () => state, requireConfiguration: async (_state: ProjectState, scope: SetupScope) => { scopes.push(scope) } } as unknown as ProjectService
     const tools = { inspect: async () => ({ local: state.local!, issues: [] }) } as unknown as ToolchainService
-    const ui = { build: async (_state: ProjectState, _task: unknown, clean?: boolean) => { calls.push({ kind: "ui", clean }) } } as unknown as UiBuildService
+    const ui = { build: async () => { calls.push({ kind: "ui" }) } } as unknown as UiBuildService
     const native = { build: async (_state: ProjectState, _flavor: BuildFlavor, products: readonly NativeProduct[], _task: unknown, clean?: boolean) => { calls.push({ kind: "native", products, clean }) } } as unknown as NativeBuildService
     const packer = {
         pack: async (state: ProjectState, options: PackOptions) => {
@@ -195,7 +196,7 @@ function buildHarness(state: ProjectState) {
 
 test("Build 的 UI/native 范围独立，全量默认交付、--no-pack 禁止交付", async t => {
     const cases: { name: string, options: BuildOptions, scope: SetupScope, kinds: string[] }[] = [
-        { name: "仅 UI", options: { flavor: "release", ui: true, native: false, clean: true }, scope: "UI", kinds: ["ui"] },
+        { name: "仅 UI", options: { flavor: "release", ui: true, native: false, clean: true }, scope: "Global", kinds: ["ui"] },
         { name: "仅原生", options: { flavor: "debug", ui: false, native: true, products: ["vst3", "vst3"] }, scope: "Native", kinds: ["native"] },
         { name: "全量默认", options: { flavor: "release", ui: true, native: true, clean: true }, scope: "Global", kinds: ["ui", "native", "pack"] },
         { name: "不交付", options: { flavor: "release", ui: true, native: true, pack: false }, scope: "Global", kinds: ["ui", "native"] },
@@ -208,7 +209,7 @@ test("Build 的 UI/native 范围独立，全量默认交付、--no-pack 禁止�
         assert.deepEqual(input.calls.map(call => call.kind).sort(), [...entry.kinds].sort())
         if (entry.kinds.includes("pack")) assert.equal(input.calls.at(-1)?.kind, "pack")
         for (const call of input.calls.filter(call => call.products)) assert.deepEqual(call.products, entry.options.products ? ["vst3"] : state.project.project.products)
-        for (const call of input.calls) assert.equal(call.clean, entry.options.clean)
+        for (const call of input.calls.filter(call => call.kind !== "ui")) assert.equal(call.clean, entry.options.clean)
     })
 })
 
@@ -255,21 +256,24 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
             assert.equal(JSON.parse(await readFile(receiptPath, "utf8")).status, "building")
             if (fail) throw new Error("模拟编译错误")
         }
+        state.project.ui.scriptFormat = 'js'
         const ui = new UiBuildService({
-            build: async () => {
+            build: async (_state, _task, stage) => {
                 await compile()
-                return resolve(state.rootDir, "ui/dist")
+                await write(resolve(stage, 'app.js'), 'export {}')
+                await writeUiManifest(stage, state.project.framework.version)
             }
-        } as unknown as NodeJsService)
+        }, { compileUi: async () => { throw new Error('JS 构建不调用原生工具链') } })
         const native = new NativeBuildService({
             platformName: hostPlatform!,
+            quickJsIdentity: async () => "a".repeat(64),
             presentationSignature: () => nativePresentationSignature(state, model.platform),
             build: async () => {
                 await compile()
                 return model
             }
         } as unknown as CmakeService)
-        const build = () => kind === "ui" ? ui.build(state, testTask()) : native.build(state, "release", ["standalone"], testTask())
+        const build = () => kind === "ui" ? ui.build(state, testTask(), "release") : native.build(state, "release", ["standalone"], testTask())
         await build()
         const completed = JSON.parse(await readFile(receiptPath, "utf8"))
         assert.equal(completed.status, "completed")

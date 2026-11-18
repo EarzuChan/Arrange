@@ -504,7 +504,9 @@ namespace arrange::quickjs {
         state.moduleLoader.install(std::move(package));
         auto* module = QuickJsModuleLoader::load(state.context, entry.c_str(), &state.moduleLoader);
         if (!module) return {false, impl_->exceptionText(state.context)};
-        ScopedValue result(state.context, JS_EvalFunction(state.context, JS_DupValue(state.context, JS_MKPTR(JS_TAG_MODULE, module))));
+        const auto value = JS_MKPTR(JS_TAG_MODULE, module);
+        if (JS_ResolveModule(state.context, value) < 0) return {false, impl_->exceptionText(state.context)};
+        ScopedValue result(state.context, JS_EvalFunction(state.context, JS_DupValue(state.context, value)));
         if (JS_IsException(result.get())) return {false, impl_->exceptionText(state.context)};
         const auto drained = impl_->drainJobs();
         if (!drained.ok) return {false, drained.error};

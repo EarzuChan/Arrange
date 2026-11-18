@@ -1,3 +1,4 @@
+import { defaultUiPackageFormat, defaultUiScriptFormat } from '../../CliMetadata.ts'
 import { createHash } from "node:crypto"
 import { cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path"
@@ -135,7 +136,7 @@ async function previousProductName(directory: string, state: ProjectState, artif
     return parts[0]
 }
 
-async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string) {
+async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string, manifest: { scriptFormat: string, engine?: string, digest: string }) {
     const ui = await readBuildRecord(resolve(workDirectory(state), "built-ui.json"))
     const native = await readBuildRecord(resolve(workDirectory(state), `built-${nativeBuildRecordName(state, options.flavor, platform)}.json`))
     const metadata = state.project.project
@@ -147,6 +148,10 @@ async function matchingBuildRecords(state: ProjectState, options: PackOptions, p
         if (record.projectVersion !== state.project.project.version || record.frameworkVersion !== state.project.framework.version) throw new Error(`${name} 构建记录的项目或 Framework 版本不匹配；请先 arrange build`)
     }
     if (ui && (typeof ui.path !== "string" || resolve(ui.path) !== uiOutputDirectory(state))) throw new Error("UI 构建记录的输出目录不匹配；请先 arrange build --ui-only")
+    if (manifest.scriptFormat === 'bytecode') {
+        if (ui?.digest !== manifest.digest || ui?.engine !== manifest.engine) throw new Error('UI 字节码缺少匹配的构建记录，请重新构建 UI')
+        if (native?.quickJsIdentity !== manifest.engine) throw new Error('UI 与 native 的 QuickJS 构建身份不匹配，请使用相同 flavor 和原生构建重新构建 UI 与 native')
+    }
     if (native) {
         if (native.target !== state.project.native.target || typeof native.configuration !== "string" || native.configuration.toLowerCase() !== options.flavor || native.platform !== platform || native.architecture !== architecture) throw new Error("native 构建记录的目标、配置、平台或架构不匹配；请先 arrange build --native-only")
         const products = native.products
@@ -215,13 +220,15 @@ export class Packer {
         await requireDirectory(uiDist, "UI dist")
         await verifyTree(uiDist)
         const ui = await verifyUiPackage(uiDist, state.project.framework.version, this.signal)
-        const packageFormat = state.project.ui.packageFormat ?? 'directory'
+        const scriptFormat = state.project.ui.scriptFormat ?? defaultUiScriptFormat
+        if (ui.manifest.scriptFormat !== scriptFormat) throw new Error(`UI dist 为 ${ui.manifest.scriptFormat}，工程要求 ${scriptFormat}；请重新构建 UI`)
+        const packageFormat = state.project.ui.packageFormat ?? defaultUiPackageFormat
         const outputRoot = resolve(state.rootDir, state.project.artifacts.directory)
         await this.checkOutput(state, outputRoot, uiDirectory)
         const platform = artifacts[0].platform
         const architecture = artifacts[0].architecture
         if (artifacts.some(artifact => artifact.platform !== platform || artifact.architecture !== architecture)) throw new Error("所选产品的平台或架构不一致")
-        const buildRecords = await matchingBuildRecords(state, options, platform, architecture)
+        const buildRecords = await matchingBuildRecords(state, options, platform, architecture, { ...ui.manifest, digest: ui.digest })
         const directory = resolve(outputRoot, options.flavor, ...(state.project.artifacts.includeVersionDirectory ? [state.project.project.version] : []), `${platform === "darwin" ? "macos" : "windows"}-${architecture}`)
         const canonicalDirectory = await canonical(directory)
         if (!contains(await canonical(outputRoot), canonicalDirectory)) throw new Error(`交付路径超出 artifacts：${directory}`)

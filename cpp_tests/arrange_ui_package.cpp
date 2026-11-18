@@ -8,13 +8,24 @@
 #include <thread>
 
 int main(int argc, char** argv) {
+    if (argc == 4 && std::string_view(argv[2]) == "chunk") {
+        ::juce::ScopedJuceInitialiser_GUI gui;
+        arrange::juce::EditorConfig config;
+        config.app.useDist(std::filesystem::u8path(argv[1]));
+        arrange::AppResolver resolver;
+        const auto loaded = arrange::juce::RuntimePackageLoader{}.loadDist(config, resolver);
+        if (!loaded.ok && loaded.error && loaded.error->summary.find(argv[3]) != std::string::npos) return 0;
+        if (loaded.error) std::cerr << loaded.error->summary << '\n';
+        return 1;
+    }
     if (argc == 3) {
         try {
             const auto package = arrange::juce::mountUiPackage(std::filesystem::u8path(argv[1]));
             (void)package->read("中文 %.json", arrange::core::UiEntryKind::Asset, 64);
         } catch (const std::exception& error) {
             const std::string_view description = error.what();
-            const auto expected = std::string_view(argv[2]) == "digest" ? "摘要" : std::string_view(argv[2]) == "legacy" ? "arrange-ui.json" : "ZIP";
+            const std::string_view mode(argv[2]);
+            const auto expected = mode == "digest" ? "摘要" : mode == "legacy" ? "arrange-ui.json" : mode == "engine" ? "构建身份" : mode == "old-format" ? "不支持的 UI 包格式" : "ZIP";
             return description.find(expected) != std::string_view::npos ? 0 : 1;
         }
         return 1;
