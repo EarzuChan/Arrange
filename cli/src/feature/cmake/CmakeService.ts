@@ -239,9 +239,11 @@ export class CmakeService {
     async compileUi(state: ProjectState, flavor: BuildFlavor, task: TaskOutput, input: string, output: string, modules: string, native?: CmakeModel): Promise<string> {
         const model = native ?? await this.buildTargets(state, flavor, [uiBytecodeCompilerTarget], task)
         const tool = model.targets.find(target => target.name === uiBytecodeCompilerTarget && target.type === 'EXECUTABLE')
-        if (tool?.artifacts.length !== 1) throw new Error(`CMake 未提供 ${uiBytecodeCompilerTarget} 可执行文件`)
+        const executableName = this.platform.name === 'win32' ? `${uiBytecodeCompilerTarget}.exe` : uiBytecodeCompilerTarget
+        const executables = tool?.artifacts.filter(path => basename(path) === executableName)
+        if (executables?.length !== 1) throw new Error(`CMake 未报告唯一的 ${executableName} 可执行文件`)
         task.stage('编译 UI 字节码')
-        const result = await this.executor.run({ ...task.process({ command: tool.artifacts[0], args: [input, output, modules], cwd: state.rootDir, env: await this.platform.nativeEnvironment(state.local!) }), retainOutput: true })
+        const result = await this.executor.run({ ...task.process({ command: executables[0], args: [input, output, modules], cwd: state.rootDir, env: await this.platform.nativeEnvironment(state.local!) }), retainOutput: true })
         throwIfProcessCancelled(result)
         if (result.exitCode !== 0) throw new Error(`QuickJS 字节码编译失败（${result.exitCode}）${result.stderr.trim() ? `：${result.stderr.trim()}` : ''}`)
         const identity = await this.quickJsIdentity(model)
