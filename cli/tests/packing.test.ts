@@ -478,6 +478,8 @@ test("手动既有产物可无 CLI receipt；已有 receipt 的版本/目标/失
         await write(nativeRecord, JSON.stringify({ ...goodNative, ...change }))
         await assert.rejects(packer.pack(input.state, options), /构建记录/)
     }
+    await write(nativeRecord, JSON.stringify({ ...goodNative, runtimeProtocol: 999 }))
+    await assert.rejects(packer.pack(input.state, options), /脚本与原生协议不匹配/)
     await write(nativeRecord, JSON.stringify({ ...goodNative, status: "completed" }))
     const packed = await packer.pack(input.state, options)
     const manifest = JSON.parse(await readFile(packed.manifestPath, "utf8"))

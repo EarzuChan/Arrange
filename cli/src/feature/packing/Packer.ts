@@ -136,7 +136,7 @@ async function previousProductName(directory: string, state: ProjectState, artif
     return parts[0]
 }
 
-async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string, manifest: { scriptFormat: string, engine?: string, digest: string }) {
+async function matchingBuildRecords(state: ProjectState, options: PackOptions, platform: "darwin" | "win32", architecture: string, manifest: { scriptFormat: string, engine?: string, protocol: number, digest: string }) {
     const ui = await readBuildRecord(resolve(workDirectory(state), "built-ui.json"))
     const native = await readBuildRecord(resolve(workDirectory(state), `built-${nativeBuildRecordName(state, options.flavor, platform)}.json`))
     const metadata = state.project.project
@@ -154,6 +154,9 @@ async function matchingBuildRecords(state: ProjectState, options: PackOptions, p
     }
     if (native) {
         if (native.target !== state.project.native.target || typeof native.configuration !== "string" || native.configuration.toLowerCase() !== options.flavor || native.platform !== platform || native.architecture !== architecture) throw new Error("native 构建记录的目标、配置、平台或架构不匹配；请先 arrange build --native-only")
+        if (native.runtimeProtocol !== undefined && native.runtimeProtocol !== manifest.protocol) {
+            throw new Error(`脚本与原生协议不匹配：UI 为 ${manifest.protocol}，原生构建要求 ${native.runtimeProtocol}；请使用匹配的 Framework 重新构建`)
+        }
         const products = native.products
         if (!Array.isArray(products) || options.products.some(product => !products.includes(product))) throw new Error("native 构建记录没有覆盖所选 products；请先构建所选产品")
         if (native.presentationSignature !== undefined || hasPresentation) {

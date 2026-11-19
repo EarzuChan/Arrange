@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.24)
 include(cmake/ArrangeVersion.cmake)
 project(Arrange VERSION "${ARRANGE_NUMERIC_VERSION}" LANGUAGES C CXX)
 
+# Version the output so reusing a build tree cannot pick up another Framework's protocol.
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/arrange-runtime-protocol/${ARRANGE_VERSION}.txt"
+  CONTENT "${ARRANGE_PROTOCOL_VERSION}\n")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

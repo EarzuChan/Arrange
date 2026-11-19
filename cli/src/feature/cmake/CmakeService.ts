@@ -229,6 +229,18 @@ export class CmakeService {
         return this.buildTargets(state, flavor, targets, task, clean)
     }
 
+    async runtimeProtocol(model: CmakeModel, framework: string): Promise<number | undefined> {
+        const file = join(model.buildDirectory, 'arrange-runtime-protocol', `${framework}.txt`)
+        const contents = await readFile(file, 'utf8').catch((error: NodeJS.ErrnoException) => {
+            if (error.code !== 'ENOENT') throw error
+            return undefined
+        })
+        if (contents === undefined) return undefined
+        const protocol = Number(contents.trim())
+        if (!Number.isSafeInteger(protocol) || protocol <= 0) throw new Error(`CMake 运行时协议无效：${file}`)
+        return protocol
+    }
+
     async quickJsIdentity(model: CmakeModel): Promise<string> {
         const file = join(model.buildDirectory, quickJsIdentityDirectory, model.configuration, 'identity.txt')
         const identity = (await readFile(file, 'utf8')).trim()

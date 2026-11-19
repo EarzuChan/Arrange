@@ -267,6 +267,7 @@ test("UI/native 同版本重建失败使旧成功 receipt 作废，构建期间�
         const native = new NativeBuildService({
             platformName: hostPlatform!,
             quickJsIdentity: async () => "a".repeat(64),
+            runtimeProtocol: async () => 12,
             presentationSignature: () => nativePresentationSignature(state, model.platform),
             build: async () => {
                 await compile()
