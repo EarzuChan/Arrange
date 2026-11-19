@@ -4,11 +4,12 @@ import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
 import { npmSubprocessEnv, repoRoot } from "./common.ts"
 import { readArrangeVersionContract } from "./version-contract.ts"
-import { ARRANGE_MACRO_PATTERN } from "../packages/vite-plugin/src/constraints.ts"
 import { defaultNodeRegistryUrl, defaultProjectDirectories } from "../cli/src/CliMetadata.ts"
 import { ProjectInitializer } from "../cli/src/feature/project/ProjectInitializer.ts"
 import { ProjectStateStore } from "../cli/src/feature/project/ProjectStateStore.ts"
 import { uiOutputDirectory } from "../cli/src/feature/project/ProjectPaths.ts"
+import { resolveLocalRepository } from "../cli/src/feature/framework/FrameworkOrigin.ts"
+import { verifyUiPackage } from "../cli/src/feature/packing/UiPackage.ts"
 import { FileTransaction } from "../cli/src/feature/transaction/FileTransaction.ts"
 import { configRegistry } from "../cli/src/feature/config/ConfigRegistry.ts"
 import { Executor } from "../cli/src/feature/platform/Executor.ts"
@@ -56,7 +57,9 @@ try {
         artifactsDirectory: defaultProjectDirectories.artifacts,
         managedItems: Object.fromEntries(configRegistry.items.map(item => [item.id, true])),
     })
-    const inspection = await tools.inspect(state, "UI")
+    const repository = process.env.ARRANGE_FETCHCONTENT_GIT_REPOSITORY?.trim()
+    if (repository) state.local = { ...state.local, framework: { cmakeFetchContentUrl: resolveLocalRepository(process.cwd(), repository) } }
+    const inspection = await tools.inspect(state, "Global")
     if (inspection.issues.length) throw new Error(inspection.issues.map(issue => issue.message).join("\n"))
     state.local = inspection.local
     const store = new ProjectStateStore(new FileTransaction())
@@ -114,14 +117,12 @@ try {
 `, "utf8")
     const runCli = (args: string[]): Promise<void> => execute({ command: inspection.local.node!.path, args: [runner, ...args], cwd: consumerDir, env })
     await runCli(["sync", "--scan", "--config", "--ui"])
-    await runCli(["sync", "--setup", "--ui"])
+    await runCli(["sync", "--setup"])
     await runCli(["build", "--ui-only"])
 
-    const appBundle = join(uiOutputDirectory(state), "app.js")
-    const source = await readFile(appBundle, "utf8")
-    const macro = source.match(ARRANGE_MACRO_PATTERN)
-    if (macro) throw new Error(`注册表消费者产物残留 Arrange 编译宏：${macro[0]}`)
-    console.log("[ArrangePackageVerify]", `Framework ${contract.frameworkVersion} 已从 ${registryUrl} 安装，CLI ${cliManifest.version} 正式入口已拒绝非 TTY，安装包的程序化入口已通过 CONFIG 扫描、SETUP 与 UI 构建验收`)
+    const { manifest } = await verifyUiPackage(uiOutputDirectory(state), contract.frameworkVersion)
+    if (manifest.scriptFormat !== "bytecode") throw new Error(`注册表消费者应生成字节码包，实际为 ${manifest.scriptFormat}`)
+    console.log("[ArrangePackageVerify]", `Framework ${contract.frameworkVersion} 已从 ${registryUrl} 安装，CLI ${cliManifest.version} 正式入口已拒绝非 TTY，安装包的程序化入口已通过 CONFIG 扫描、SETUP 与 UI 字节码构建验收（${manifest.entry}）`)
     await rm(directory, { recursive: true, force: true })
 } catch (error) {
     console.error("[ArrangePackageVerify]", `验收失败，临时工程保留于 ${directory}`)
